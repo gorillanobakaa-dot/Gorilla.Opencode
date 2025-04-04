@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"time"
@@ -50,7 +51,7 @@ func (b *diagnosticsTool) Run(ctx context.Context, call ToolCall) (ToolResponse,
 		return NewTextErrorResponse("no LSP clients available"), nil
 	}
 
-	if params.FilePath == "" {
+	if params.FilePath != "" {
 		notifyLspOpenFile(ctx, params.FilePath, lsps)
 	}
 
@@ -60,15 +61,68 @@ func (b *diagnosticsTool) Run(ctx context.Context, call ToolCall) (ToolResponse,
 }
 
 func notifyLspOpenFile(ctx context.Context, filePath string, lsps map[string]*lsp.Client) {
+	// Create a channel to receive diagnostic notifications
+	diagChan := make(chan struct{}, 1)
+
+	// Register a temporary diagnostic handler for each client
 	for _, client := range lsps {
-		err := client.OpenFile(ctx, filePath)
-		if err != nil {
-			// Wait for the file to be opened and diagnostics to be received
-			// TODO: see if we can do this in a more efficient way
-			time.Sleep(3 * time.Second)
+		// Store the original diagnostics map to detect changes
+		originalDiags := make(map[protocol.DocumentUri][]protocol.Diagnostic)
+		maps.Copy(originalDiags, client.GetDiagnostics())
+
+		// Create a notification handler that will signal when diagnostics are received
+		handler := func(params json.RawMessage) {
+			var diagParams protocol.PublishDiagnosticsParams
+			if err := json.Unmarshal(params, &diagParams); err != nil {
+				return
+			}
+
+			// If this is for our file or we've received any new diagnostics, signal completion
+			if diagParams.URI.Path() == filePath || hasDiagnosticsChanged(client.GetDiagnostics(), originalDiags) {
+				select {
+				case diagChan <- struct{}{}:
+					// Signal sent
+				default:
+					// Channel already has a value, no need to send again
+				}
+			}
 		}
 
+		// Register our temporary handler
+		client.RegisterNotificationHandler("textDocument/publishDiagnostics", handler)
+
+		// Open the file
+		err := client.OpenFile(ctx, filePath)
+		if err != nil {
+			// If there's an error opening the file, continue to the next client
+			continue
+		}
 	}
+
+	// Wait for diagnostics with a reasonable timeout
+	select {
+	case <-diagChan:
+		// Diagnostics received
+	case <-time.After(5 * time.Second):
+		// Timeout after 2 seconds - this is a fallback in case no diagnostics are published
+	case <-ctx.Done():
+		// Context cancelled
+	}
+
+	// Note: We're not unregistering our handler because the Client.RegisterNotificationHandler
+	// replaces any existing handler, and we'll be replaced by the original handler when
+	// the LSP client is reinitialized or when a new handler is registered.
+}
+
+// hasDiagnosticsChanged checks if there are any new diagnostics compared to the original set
+func hasDiagnosticsChanged(current, original map[protocol.DocumentUri][]protocol.Diagnostic) bool {
+	for uri, diags := range current {
+		origDiags, exists := original[uri]
+		if !exists || len(diags) != len(origDiags) {
+			return true
+		}
+	}
+	return false
 }
 
 func appendDiagnostics(filePath string, lsps map[string]*lsp.Client) string {

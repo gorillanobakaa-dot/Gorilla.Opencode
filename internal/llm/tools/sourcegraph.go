@@ -111,15 +111,10 @@ TIPS:
 )
 
 type SourcegraphParams struct {
-	Query   string `json:"query"`
-	Count   int    `json:"count,omitempty"`
-	Timeout int    `json:"timeout,omitempty"`
-}
-
-type SourcegraphPermissionsParams struct {
-	Query   string `json:"query"`
-	Count   int    `json:"count,omitempty"`
-	Timeout int    `json:"timeout,omitempty"`
+	Query         string `json:"query"`
+	Count         int    `json:"count,omitempty"`
+	ContextWindow int    `json:"context_window,omitempty"`
+	Timeout       int    `json:"timeout,omitempty"`
 }
 
 type sourcegraphTool struct {
@@ -147,6 +142,10 @@ func (t *sourcegraphTool) Info() ToolInfo {
 				"type":        "number",
 				"description": "Optional number of results to return (default: 10, max: 20)",
 			},
+			"context_window": map[string]any{
+				"type":        "number",
+				"description": "The context around the match to return (default: 10 lines)",
+			},
 			"timeout": map[string]any{
 				"type":        "number",
 				"description": "Optional timeout in seconds (max 120)",
@@ -173,6 +172,9 @@ func (t *sourcegraphTool) Run(ctx context.Context, call ToolCall) (ToolResponse,
 		params.Count = 20 // Limit to 20 results
 	}
 
+	if params.ContextWindow <= 0 {
+		params.ContextWindow = 10 // Default context window
+	}
 	client := t.client
 	if params.Timeout > 0 {
 		maxTimeout := 120 // 2 minutes
@@ -194,7 +196,7 @@ func (t *sourcegraphTool) Run(ctx context.Context, call ToolCall) (ToolResponse,
 	}
 
 	request := graphqlRequest{
-		Query: "query Search($query: String!) { search(query: $query, version: V2, patternType: standard ) { results { matchCount, limitHit, resultCount, approximateResultCount, missing { name }, timedout { name }, indexUnavailable, results { __typename, ... on FileMatch { repository { name }, file { path, url, content }, lineMatches { preview, lineNumber, offsetAndLengths } } } } } }",
+		Query: "query Search($query: String!) { search(query: $query, version: V2, patternType: keyword ) { results { matchCount, limitHit, resultCount, approximateResultCount, missing { name }, timedout { name }, indexUnavailable, results { __typename, ... on FileMatch { repository { name }, file { path, url, content }, lineMatches { preview, lineNumber, offsetAndLengths } } } } } }",
 	}
 	request.Variables.Query = params.Query
 
@@ -246,7 +248,7 @@ func (t *sourcegraphTool) Run(ctx context.Context, call ToolCall) (ToolResponse,
 	}
 
 	// Format the results in a readable way
-	formattedResults, err := formatSourcegraphResults(result)
+	formattedResults, err := formatSourcegraphResults(result, params.ContextWindow)
 	if err != nil {
 		return NewTextErrorResponse("Failed to format results: " + err.Error()), nil
 	}
@@ -254,7 +256,7 @@ func (t *sourcegraphTool) Run(ctx context.Context, call ToolCall) (ToolResponse,
 	return NewTextResponse(formattedResults), nil
 }
 
-func formatSourcegraphResults(result map[string]any) (string, error) {
+func formatSourcegraphResults(result map[string]any, contextWindow int) (string, error) {
 	var buffer strings.Builder
 
 	// Check for errors in the GraphQL response
@@ -364,8 +366,7 @@ func formatSourcegraphResults(result map[string]any) (string, error) {
 					buffer.WriteString("```\n")
 
 					// Display context before the match (up to 10 lines)
-					contextBefore := 10
-					startLine := max(1, int(lineNumber)-contextBefore)
+					startLine := max(1, int(lineNumber)-contextWindow)
 
 					for j := startLine - 1; j < int(lineNumber)-1 && j < len(lines); j++ {
 						if j >= 0 {
@@ -377,8 +378,7 @@ func formatSourcegraphResults(result map[string]any) (string, error) {
 					buffer.WriteString(fmt.Sprintf("%d|  %s\n", int(lineNumber), preview))
 
 					// Display context after the match (up to 10 lines)
-					contextAfter := 10
-					endLine := int(lineNumber) + contextAfter
+					endLine := int(lineNumber) + contextWindow
 
 					for j := int(lineNumber); j < endLine && j < len(lines); j++ {
 						if j < len(lines) {

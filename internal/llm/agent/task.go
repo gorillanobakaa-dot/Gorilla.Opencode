@@ -34,6 +34,7 @@ func NewTaskAgent(app *app.App) (Agent, error) {
 				tools.NewGlobTool(),
 				tools.NewGrepTool(),
 				tools.NewLsTool(),
+				tools.NewSourcegraphTool(),
 				tools.NewViewTool(app.LSPClients),
 			},
 			model:          model,
