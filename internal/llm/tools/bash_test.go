@@ -119,27 +119,38 @@ func TestBashTool_Run(t *testing.T) {
 		}
 	})
 
-	t.Run("handles safe read-only commands without permission check", func(t *testing.T) {
+	t.Run("handles multi-word safe commands without permission check", func(t *testing.T) {
 		permission.Default = newMockPermissionService(false)
 
 		tool := NewBashTool()
 
-		// Test with a safe read-only command
-		params := BashParams{
-			Command: "echo 'test'",
+		// Test with multi-word safe commands
+		multiWordCommands := []string{
+			"git status",
+			"git log -n 5",
+			"docker ps",
+			"go test ./...",
+			"kubectl get pods",
 		}
 
-		paramsJSON, err := json.Marshal(params)
-		require.NoError(t, err)
+		for _, cmd := range multiWordCommands {
+			params := BashParams{
+				Command: cmd,
+			}
 
-		call := ToolCall{
-			Name:  BashToolName,
-			Input: string(paramsJSON),
+			paramsJSON, err := json.Marshal(params)
+			require.NoError(t, err)
+
+			call := ToolCall{
+				Name:  BashToolName,
+				Input: string(paramsJSON),
+			}
+
+			response, err := tool.Run(context.Background(), call)
+			require.NoError(t, err)
+			assert.NotContains(t, response.Content, "permission denied", 
+				"Command %s should be allowed without permission", cmd)
 		}
-
-		response, err := tool.Run(context.Background(), call)
-		require.NoError(t, err)
-		assert.Equal(t, "test\n", response.Content)
 	})
 
 	t.Run("handles permission denied", func(t *testing.T) {

@@ -123,8 +123,6 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.status, _ = a.status.Update(msg)
 	case util.ErrorMsg:
 		a.status, _ = a.status.Update(msg)
-	case util.ClearStatusMsg:
-		a.status, _ = a.status.Update(msg)
 	case tea.KeyMsg:
 		if a.editorMode == vimtea.ModeNormal {
 			switch {
@@ -163,16 +161,21 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
+
+	var cmds []tea.Cmd
+	s, cmd := a.status.Update(msg)
+	a.status = s
+	cmds = append(cmds, cmd)
 	if a.dialogVisible {
 		d, cmd := a.dialog.Update(msg)
 		a.dialog = d.(core.DialogCmp)
-		return a, cmd
+		cmds = append(cmds, cmd)
+		return a, tea.Batch(cmds...)
 	}
-	s, _ := a.status.Update(msg)
-	a.status = s
 	p, cmd := a.pages[a.currentPage].Update(msg)
 	a.pages[a.currentPage] = p
-	return a, cmd
+	cmds = append(cmds, cmd)
+	return a, tea.Batch(cmds...)
 }
 
 func (a *appModel) ToggleHelp() {

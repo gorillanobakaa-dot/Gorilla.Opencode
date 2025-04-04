@@ -92,16 +92,7 @@ func formatDiff(diffText string) string {
 	}
 	
 	// Join all formatted lines
-	content := strings.Join(formattedLines, "\n")
-	
-	// Create a bordered box for the content
-	contentStyle := lipgloss.NewStyle().
-		MarginTop(1).
-		Padding(0, 1).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.Flamingo)
-	
-	return contentStyle.Render(content)
+	return strings.Join(formattedLines, "\n")
 }
 
 func (p *permissionDialogCmp) Init() tea.Cmd {
@@ -241,12 +232,46 @@ func (p *permissionDialogCmp) render() string {
 		headerParts = append(headerParts, keyStyle.Render("Update"))
 		// Recreate header content with the updated headerParts
 		headerContent = lipgloss.NewStyle().Padding(0, 1).Render(lipgloss.JoinVertical(lipgloss.Left, headerParts...))
-		// Format the diff with colors instead of using markdown code block
+		
+		// Format the diff with colors
 		formattedDiff := formatDiff(pr.Diff)
+		
+		// Set up viewport for the diff content
+		p.contentViewPort.Width = p.width - 2 - 2
+		
+		// Calculate content height dynamically based on window size
+		maxContentHeight := p.height - lipgloss.Height(headerContent) - lipgloss.Height(form) - 2 - 2 - 1
+		p.contentViewPort.Height = maxContentHeight
+		p.contentViewPort.SetContent(formattedDiff)
+		
+		// Style the viewport
+		var contentBorder lipgloss.Border
+		var borderColor lipgloss.TerminalColor
+		
+		if p.isViewportFocus {
+			contentBorder = lipgloss.DoubleBorder()
+			borderColor = styles.Blue
+		} else {
+			contentBorder = lipgloss.RoundedBorder()
+			borderColor = styles.Flamingo
+		}
+		
+		contentStyle := lipgloss.NewStyle().
+			MarginTop(1).
+			Padding(0, 1).
+			Border(contentBorder).
+			BorderForeground(borderColor)
+		
+		if p.isViewportFocus {
+			contentStyle = contentStyle.BorderBackground(styles.Surface0)
+		}
+		
+		contentFinal := contentStyle.Render(p.contentViewPort.View())
+		
 		return lipgloss.JoinVertical(
 			lipgloss.Top,
 			headerContent,
-			formattedDiff,
+			contentFinal,
 			form,
 		)
 		
@@ -255,12 +280,46 @@ func (p *permissionDialogCmp) render() string {
 		headerParts = append(headerParts, keyStyle.Render("Content"))
 		// Recreate header content with the updated headerParts
 		headerContent = lipgloss.NewStyle().Padding(0, 1).Render(lipgloss.JoinVertical(lipgloss.Left, headerParts...))
-		// Format the diff with colors instead of using markdown code block
+		
+		// Format the diff with colors
 		formattedDiff := formatDiff(pr.Content)
+		
+		// Set up viewport for the content
+		p.contentViewPort.Width = p.width - 2 - 2
+		
+		// Calculate content height dynamically based on window size
+		maxContentHeight := p.height - lipgloss.Height(headerContent) - lipgloss.Height(form) - 2 - 2 - 1
+		p.contentViewPort.Height = maxContentHeight
+		p.contentViewPort.SetContent(formattedDiff)
+		
+		// Style the viewport
+		var contentBorder lipgloss.Border
+		var borderColor lipgloss.TerminalColor
+		
+		if p.isViewportFocus {
+			contentBorder = lipgloss.DoubleBorder()
+			borderColor = styles.Blue
+		} else {
+			contentBorder = lipgloss.RoundedBorder()
+			borderColor = styles.Flamingo
+		}
+		
+		contentStyle := lipgloss.NewStyle().
+			MarginTop(1).
+			Padding(0, 1).
+			Border(contentBorder).
+			BorderForeground(borderColor)
+		
+		if p.isViewportFocus {
+			contentStyle = contentStyle.BorderBackground(styles.Surface0)
+		}
+		
+		contentFinal := contentStyle.Render(p.contentViewPort.View())
+		
 		return lipgloss.JoinVertical(
 			lipgloss.Top,
 			headerContent,
-			formattedDiff,
+			contentFinal,
 			form,
 		)
 		

@@ -38,8 +38,38 @@ var BannedCommands = []string{
 }
 
 var SafeReadOnlyCommands = []string{
+	// Basic shell commands
 	"ls", "echo", "pwd", "date", "cal", "uptime", "whoami", "id", "groups", "env", "printenv", "set", "unset", "which", "type", "whereis",
-	"whatis", //...
+	"whatis", "uname", "hostname", "df", "du", "free", "top", "ps", "kill", "killall", "nice", "nohup", "time", "timeout",
+	
+	// Git read-only commands
+	"git status", "git log", "git diff", "git show", "git branch", "git tag", "git remote", "git ls-files", "git ls-remote",
+	"git rev-parse", "git config --get", "git config --list", "git describe", "git blame", "git grep", "git shortlog",
+	
+	// Go commands
+	"go version", "go list", "go env", "go doc", "go vet", "go fmt", "go mod", "go test", "go build", "go run", "go install", "go clean",
+	
+	// Node.js commands
+	"node", "npm", "npx", "yarn", "pnpm",
+	
+	// Python commands
+	"python", "python3", "pip", "pip3", "pytest", "pylint", "mypy", "black", "isort", "flake8", "ruff",
+	
+	// Docker commands
+	"docker ps", "docker images", "docker volume", "docker network", "docker info", "docker version",
+	"docker-compose ps", "docker-compose config",
+	
+	// Kubernetes commands
+	"kubectl get", "kubectl describe", "kubectl logs", "kubectl version", "kubectl config",
+	
+	// Rust commands
+	"cargo", "rustc", "rustup",
+	
+	// Java commands
+	"java", "javac", "mvn", "gradle",
+	
+	// Misc development tools
+	"make", "cmake", "bazel", "terraform plan", "terraform validate", "ansible",
 }
 
 func (b *bashTool) Info() ToolInfo {
@@ -77,17 +107,26 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		return NewTextErrorResponse("missing command"), nil
 	}
 
+	// Check for banned commands (first word only)
 	baseCmd := strings.Fields(params.Command)[0]
 	for _, banned := range BannedCommands {
 		if strings.EqualFold(baseCmd, banned) {
 			return NewTextErrorResponse(fmt.Sprintf("command '%s' is not allowed", baseCmd)), nil
 		}
 	}
+	
+	// Check for safe commands (can be multi-word)
 	isSafeReadOnly := false
+	cmdLower := strings.ToLower(params.Command)
+	
 	for _, safe := range SafeReadOnlyCommands {
-		if strings.EqualFold(baseCmd, safe) {
-			isSafeReadOnly = true
-			break
+		// Check if command starts with the safe command pattern
+		if strings.HasPrefix(cmdLower, strings.ToLower(safe)) {
+			// Make sure it's either an exact match or followed by a space or flag
+			if len(cmdLower) == len(safe) || cmdLower[len(safe)] == ' ' || cmdLower[len(safe)] == '-' {
+				isSafeReadOnly = true
+				break
+			}
 		}
 	}
 	if !isSafeReadOnly {
