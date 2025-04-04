@@ -221,11 +221,15 @@ func (m *messagesCmp) renderMessageWithToolCall(content string, tools []message.
 			Bold(true).
 			Foreground(styles.Green).
 			Render(fmt.Sprintf("%s Result", styles.CheckIcon))
+
+		// Use the same style for both header and border if it's an error
+		borderColor := styles.Green
 		if result.IsError {
 			resultHeader = lipgloss.NewStyle().
 				Bold(true).
 				Foreground(styles.Red).
 				Render(fmt.Sprintf("%s Error", styles.ErrorIcon))
+			borderColor = styles.Red
 		}
 
 		truncate := 200
@@ -235,7 +239,7 @@ func (m *messagesCmp) renderMessageWithToolCall(content string, tools []message.
 		}
 
 		resultContent := lipgloss.JoinVertical(lipgloss.Left, resultHeader, content)
-		return toolResultStyle.Render(resultContent)
+		return toolResultStyle.BorderForeground(borderColor).Render(resultContent)
 	}
 
 	connector := connectorStyle.Render("└─> Tool Calls:")
