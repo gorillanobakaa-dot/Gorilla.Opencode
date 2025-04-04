@@ -13,8 +13,9 @@ func ReportError(err error) tea.Cmd {
 }
 
 type (
-	InfoMsg  string
-	ErrorMsg error
+	InfoMsg       string
+	ErrorMsg      error
+	ClearStatusMsg struct{}
 )
 
 func Clamp(v, low, high int) int {

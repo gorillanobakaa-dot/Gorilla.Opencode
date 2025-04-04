@@ -1,6 +1,8 @@
 package core
 
 import (
+	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/kujtimiihoxha/termai/internal/config"
@@ -11,9 +13,17 @@ import (
 )
 
 type statusCmp struct {
-	err   error
-	info  string
-	width int
+	err         error
+	info        string
+	width       int
+	messageTTL  time.Duration
+}
+
+// clearMessageCmd is a command that clears status messages after a timeout
+func (m statusCmp) clearMessageCmd() tea.Cmd {
+	return tea.Tick(m.messageTTL, func(time.Time) tea.Msg {
+		return util.ClearStatusMsg{}
+	})
 }
 
 func (m statusCmp) Init() tea.Cmd {
@@ -26,8 +36,15 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 	case util.ErrorMsg:
 		m.err = msg
+		m.info = ""
+		return m, m.clearMessageCmd()
 	case util.InfoMsg:
 		m.info = string(msg)
+		m.err = nil
+		return m, m.clearMessageCmd()
+	case util.ClearStatusMsg:
+		m.info = ""
+		m.err = nil
 	}
 	return m, nil
 }
@@ -75,5 +92,7 @@ func (m statusCmp) model() string {
 }
 
 func NewStatusCmp() tea.Model {
-	return &statusCmp{}
+	return &statusCmp{
+		messageTTL: 5 * time.Second,
+	}
 }
