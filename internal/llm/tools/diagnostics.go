@@ -53,6 +53,7 @@ func (b *diagnosticsTool) Run(ctx context.Context, call ToolCall) (ToolResponse,
 
 	if params.FilePath != "" {
 		notifyLspOpenFile(ctx, params.FilePath, lsps)
+		waitForLspDiagnostics(ctx, params.FilePath, lsps)
 	}
 
 	output := appendDiagnostics(params.FilePath, lsps)
@@ -61,6 +62,22 @@ func (b *diagnosticsTool) Run(ctx context.Context, call ToolCall) (ToolResponse,
 }
 
 func notifyLspOpenFile(ctx context.Context, filePath string, lsps map[string]*lsp.Client) {
+	for _, client := range lsps {
+		// Open the file
+		err := client.OpenFile(ctx, filePath)
+		if err != nil {
+			// If there's an error opening the file, continue to the next client
+			continue
+		}
+	}
+}
+
+// waitForLspDiagnostics opens a file in LSP clients and waits for diagnostics to be published
+func waitForLspDiagnostics(ctx context.Context, filePath string, lsps map[string]*lsp.Client) {
+	if len(lsps) == 0 {
+		return
+	}
+
 	// Create a channel to receive diagnostic notifications
 	diagChan := make(chan struct{}, 1)
 
@@ -92,11 +109,18 @@ func notifyLspOpenFile(ctx context.Context, filePath string, lsps map[string]*ls
 		// Register our temporary handler
 		client.RegisterNotificationHandler("textDocument/publishDiagnostics", handler)
 
-		// Open the file
-		err := client.OpenFile(ctx, filePath)
-		if err != nil {
-			// If there's an error opening the file, continue to the next client
-			continue
+		// Notify change if the file is already open
+		if client.IsFileOpen(filePath) {
+			err := client.NotifyChange(ctx, filePath)
+			if err != nil {
+				continue
+			}
+		} else {
+			// Open the file if it's not already open
+			err := client.OpenFile(ctx, filePath)
+			if err != nil {
+				continue
+			}
 		}
 	}
 
@@ -104,7 +128,7 @@ func notifyLspOpenFile(ctx context.Context, filePath string, lsps map[string]*ls
 	select {
 	case <-diagChan:
 		// Diagnostics received
-	case <-time.After(10 * time.Second):
+	case <-time.After(5 * time.Second):
 		// Timeout after 5 seconds - this is a fallback in case no diagnostics are published
 	case <-ctx.Done():
 		// Context cancelled

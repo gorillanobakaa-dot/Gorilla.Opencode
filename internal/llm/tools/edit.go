@@ -74,7 +74,6 @@ func (e *editTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		params.FilePath = filepath.Join(wd, params.FilePath)
 	}
 
-	notifyLspOpenFile(ctx, params.FilePath, e.lspClients)
 	if params.OldString == "" {
 		result, err := createNewFile(params.FilePath, params.NewString)
 		if err != nil {
@@ -96,6 +95,8 @@ func (e *editTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		return NewTextErrorResponse(fmt.Sprintf("error replacing content: %s", err)), nil
 	}
 
+	// Wait for LSP diagnostics after editing the file
+	waitForLspDiagnostics(ctx, params.FilePath, e.lspClients)
 	result = fmt.Sprintf("<result>\n%s\n</result>\n", result)
 	result += appendDiagnostics(params.FilePath, e.lspClients)
 	return NewTextResponse(result), nil
@@ -303,23 +304,23 @@ func GenerateDiff(oldContent, newContent string) string {
 	diffs = dmp.DiffCharsToLines(diffs, dmpStrings)
 	diffs = dmp.DiffCleanupSemantic(diffs)
 	buff := strings.Builder{}
-	
+
 	// Add a header to make the diff more readable
 	buff.WriteString("Changes:\n")
-	
+
 	for _, diff := range diffs {
 		text := diff.Text
 
 		switch diff.Type {
 		case diffmatchpatch.DiffInsert:
-			for _, line := range strings.Split(text, "\n") {
+			for line := range strings.SplitSeq(text, "\n") {
 				if line == "" {
 					continue
 				}
 				_, _ = buff.WriteString("+ " + line + "\n")
 			}
 		case diffmatchpatch.DiffDelete:
-			for _, line := range strings.Split(text, "\n") {
+			for line := range strings.SplitSeq(text, "\n") {
 				if line == "" {
 					continue
 				}

@@ -100,7 +100,6 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		return NewTextErrorResponse(fmt.Sprintf("Failed to create parent directories: %s", err)), nil
 	}
 
-	notifyLspOpenFile(ctx, filePath, w.lspClients)
 	// Get old content for diff if file exists
 	oldContent := ""
 	if fileInfo != nil && !fileInfo.IsDir() {
@@ -135,6 +134,8 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	// Record the file write
 	recordFileWrite(filePath)
 	recordFileRead(filePath)
+	// Wait for LSP diagnostics after writing the file
+	waitForLspDiagnostics(ctx, filePath, w.lspClients)
 
 	result := fmt.Sprintf("File successfully written: %s", filePath)
 	result = fmt.Sprintf("<result>\n%s\n</result>", result)
