@@ -2,6 +2,7 @@ package dialog
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -160,7 +161,29 @@ func (p *permissionDialogCmp) render() string {
 	renderedContent, _ := r.Render(content)
 	headerContent := lipgloss.NewStyle().Padding(0, 1).Render(lipgloss.JoinVertical(lipgloss.Left, headerParts...))
 	p.contentViewPort.Width = p.width - 2 - 2
-	p.contentViewPort.Height = p.height - lipgloss.Height(headerContent) - lipgloss.Height(form) - 2 - 2 - 1
+
+	// Calculate content height dynamically based on content
+	contentLines := len(strings.Split(renderedContent, "\n"))
+	// Set a reasonable min/max for the viewport height
+	minContentHeight := 3
+	maxContentHeight := p.height - lipgloss.Height(headerContent) - lipgloss.Height(form) - 2 - 2 - 1
+
+	// For bash commands, adjust height based on content length
+	if p.permission.ToolName == tools.BashToolName {
+		// Add some padding to the content lines
+		contentHeight := contentLines + 2
+		if contentHeight < minContentHeight {
+			contentHeight = minContentHeight
+		}
+		if contentHeight > maxContentHeight {
+			contentHeight = maxContentHeight
+		}
+		p.contentViewPort.Height = contentHeight
+	} else {
+		// For other content types, use the full available height
+		p.contentViewPort.Height = maxContentHeight
+	}
+
 	p.contentViewPort.SetContent(renderedContent)
 
 	// Make focus change more apparent with different border styles and colors
@@ -270,13 +293,14 @@ func NewPermissionDialogCmd(permission permission.PermissionRequest) tea.Cmd {
 	minWidth := 100
 	minHeight := 30
 
-	// Make the dialog size more appropriate for bash commands
+	// Make the dialog size more appropriate for different tools
 	switch permission.ToolName {
 	case tools.BashToolName:
+		// For bash commands, use a more compact dialog
 		widthRatio = 0.7
-		heightRatio = 0.5
+		heightRatio = 0.4 // Reduced from 0.5
 		minWidth = 100
-		minHeight = 30
+		minHeight = 20 // Reduced from 30
 	}
 	// Return the dialog command
 	return util.CmdHandler(core.DialogMsg{
