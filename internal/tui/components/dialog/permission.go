@@ -79,10 +79,18 @@ func (p *permissionDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			p.isViewportFocus = !p.isViewportFocus
 			if p.isViewportFocus {
 				p.selectOption.Blur()
+				// Add a visual indicator for focus change
+				cmds = append(cmds, tea.Batch(
+					util.CmdHandler(util.InfoMsg("Viewing content - use arrow keys to scroll")),
+				))
 			} else {
 				p.selectOption.Focus()
+				// Add a visual indicator for focus change
+				cmds = append(cmds, tea.Batch(
+					util.CmdHandler(util.InfoMsg("Select an action")),
+				))
 			}
-			return p, nil
+			return p, tea.Batch(cmds...)
 		}
 	}
 
@@ -133,34 +141,55 @@ func (p *permissionDialogCmp) render() string {
 	case tools.BashToolName:
 		pr := p.permission.Params.(tools.BashPermissionsParams)
 		headerParts = append(headerParts, keyStyle.Render("Command:"))
-		content, _ = r.Render(fmt.Sprintf("```bash\n%s\n```", pr.Command))
+		content = fmt.Sprintf("```bash\n%s\n```", pr.Command)
 	case tools.EditToolName:
 		pr := p.permission.Params.(tools.EditPermissionsParams)
 		headerParts = append(headerParts, keyStyle.Render("Update"))
-		content, _ = r.Render(fmt.Sprintf("```diff\n%s\n```", pr.Diff))
+		content = fmt.Sprintf("```\n%s\n```", pr.Diff)
 	case tools.WriteToolName:
 		pr := p.permission.Params.(tools.WritePermissionsParams)
 		headerParts = append(headerParts, keyStyle.Render("Content"))
-		content, _ = r.Render(fmt.Sprintf("```diff\n%s\n```", pr.Content))
+		content = fmt.Sprintf("```\n%s\n```", pr.Content)
 	case tools.FetchToolName:
 		pr := p.permission.Params.(tools.FetchPermissionsParams)
 		headerParts = append(headerParts, keyStyle.Render("URL: "+pr.URL))
 	default:
-		content, _ = r.Render(p.permission.Description)
+		content = p.permission.Description
 	}
+
+	renderedContent, _ := r.Render(content)
 	headerContent := lipgloss.NewStyle().Padding(0, 1).Render(lipgloss.JoinVertical(lipgloss.Left, headerParts...))
 	p.contentViewPort.Width = p.width - 2 - 2
 	p.contentViewPort.Height = p.height - lipgloss.Height(headerContent) - lipgloss.Height(form) - 2 - 2 - 1
-	p.contentViewPort.SetContent(content)
-	contentBorder := lipgloss.RoundedBorder()
+	p.contentViewPort.SetContent(renderedContent)
+
+	// Make focus change more apparent with different border styles and colors
+	var contentBorder lipgloss.Border
+	var borderColor lipgloss.TerminalColor
+
 	if p.isViewportFocus {
 		contentBorder = lipgloss.DoubleBorder()
+		borderColor = styles.Blue
+	} else {
+		contentBorder = lipgloss.RoundedBorder()
+		borderColor = styles.Flamingo
 	}
-	cotentStyle := lipgloss.NewStyle().MarginTop(1).Padding(0, 1).Border(contentBorder).BorderForeground(styles.Flamingo)
-	contentFinal := cotentStyle.Render(p.contentViewPort.View())
-	if content == "" {
+
+	contentStyle := lipgloss.NewStyle().
+		MarginTop(1).
+		Padding(0, 1).
+		Border(contentBorder).
+		BorderForeground(borderColor)
+
+	if p.isViewportFocus {
+		contentStyle = contentStyle.BorderBackground(styles.Surface0)
+	}
+
+	contentFinal := contentStyle.Render(p.contentViewPort.View())
+	if renderedContent == "" {
 		contentFinal = ""
 	}
+
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
 		headerContent,
@@ -241,12 +270,13 @@ func NewPermissionDialogCmd(permission permission.PermissionRequest) tea.Cmd {
 	minWidth := 100
 	minHeight := 30
 
+	// Make the dialog size more appropriate for bash commands
 	switch permission.ToolName {
 	case tools.BashToolName:
-		widthRatio = 0.5
-		heightRatio = 0.3
-		minWidth = 80
-		minHeight = 20
+		widthRatio = 0.7
+		heightRatio = 0.5
+		minWidth = 100
+		minHeight = 30
 	}
 	// Return the dialog command
 	return util.CmdHandler(core.DialogMsg{

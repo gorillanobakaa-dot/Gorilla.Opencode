@@ -72,6 +72,7 @@ func notifyLspOpenFile(ctx context.Context, filePath string, lsps map[string]*ls
 
 		// Create a notification handler that will signal when diagnostics are received
 		handler := func(params json.RawMessage) {
+			lsp.HandleDiagnostics(client, params)
 			var diagParams protocol.PublishDiagnosticsParams
 			if err := json.Unmarshal(params, &diagParams); err != nil {
 				return
@@ -103,8 +104,8 @@ func notifyLspOpenFile(ctx context.Context, filePath string, lsps map[string]*ls
 	select {
 	case <-diagChan:
 		// Diagnostics received
-	case <-time.After(5 * time.Second):
-		// Timeout after 2 seconds - this is a fallback in case no diagnostics are published
+	case <-time.After(10 * time.Second):
+		// Timeout after 5 seconds - this is a fallback in case no diagnostics are published
 	case <-ctx.Done():
 		// Context cancelled
 	}

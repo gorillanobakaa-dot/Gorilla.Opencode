@@ -303,23 +303,46 @@ func GenerateDiff(oldContent, newContent string) string {
 	diffs = dmp.DiffCharsToLines(diffs, dmpStrings)
 	diffs = dmp.DiffCleanupSemantic(diffs)
 	buff := strings.Builder{}
+	
+	// Add a header to make the diff more readable
+	buff.WriteString("Changes:\n")
+	
 	for _, diff := range diffs {
 		text := diff.Text
 
 		switch diff.Type {
 		case diffmatchpatch.DiffInsert:
-			for line := range strings.SplitSeq(text, "\n") {
+			for _, line := range strings.Split(text, "\n") {
+				if line == "" {
+					continue
+				}
 				_, _ = buff.WriteString("+ " + line + "\n")
 			}
 		case diffmatchpatch.DiffDelete:
-			for line := range strings.SplitSeq(text, "\n") {
+			for _, line := range strings.Split(text, "\n") {
+				if line == "" {
+					continue
+				}
 				_, _ = buff.WriteString("- " + line + "\n")
 			}
 		case diffmatchpatch.DiffEqual:
-			if len(text) > 40 {
-				_, _ = buff.WriteString("  " + text[:20] + "..." + text[len(text)-20:] + "\n")
+			// Only show a small context for unchanged text
+			lines := strings.Split(text, "\n")
+			if len(lines) > 3 {
+				// Show only first and last line of context with a separator
+				if lines[0] != "" {
+					_, _ = buff.WriteString("  " + lines[0] + "\n")
+				}
+				_, _ = buff.WriteString("  ...\n")
+				if lines[len(lines)-1] != "" {
+					_, _ = buff.WriteString("  " + lines[len(lines)-1] + "\n")
+				}
 			} else {
-				for line := range strings.SplitSeq(text, "\n") {
+				// Show all lines for small contexts
+				for _, line := range lines {
+					if line == "" {
+						continue
+					}
 					_, _ = buff.WriteString("  " + line + "\n")
 				}
 			}

@@ -101,6 +101,15 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	}
 
 	notifyLspOpenFile(ctx, filePath, w.lspClients)
+	// Get old content for diff if file exists
+	oldContent := ""
+	if fileInfo != nil && !fileInfo.IsDir() {
+		oldBytes, readErr := os.ReadFile(filePath)
+		if readErr == nil {
+			oldContent = string(oldBytes)
+		}
+	}
+	
 	p := permission.Default.Request(
 		permission.CreatePermissionRequest{
 			Path:        filePath,
@@ -109,7 +118,7 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 			Description: fmt.Sprintf("Create file %s", filePath),
 			Params: WritePermissionsParams{
 				FilePath: filePath,
-				Content:  GenerateDiff("", params.Content),
+				Content:  GenerateDiff(oldContent, params.Content),
 			},
 		},
 	)

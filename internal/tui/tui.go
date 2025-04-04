@@ -166,6 +166,8 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.dialog = d.(core.DialogCmp)
 		return a, cmd
 	}
+	s, _ := a.status.Update(msg)
+	a.status = s
 	p, cmd := a.pages[a.currentPage].Update(msg)
 	a.pages[a.currentPage] = p
 	return a, cmd
