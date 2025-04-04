@@ -65,6 +65,45 @@ type permissionDialogCmp struct {
 	selectOption    *huh.Select[string]
 }
 
+// formatDiff formats a diff string with colors for additions and deletions
+func formatDiff(diffText string) string {
+	lines := strings.Split(diffText, "\n")
+	var formattedLines []string
+	
+	// Define styles for different line types
+	addStyle := lipgloss.NewStyle().Foreground(styles.Green)
+	removeStyle := lipgloss.NewStyle().Foreground(styles.Red)
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Blue)
+	contextStyle := lipgloss.NewStyle().Foreground(styles.SubText0)
+	
+	// Process each line
+	for _, line := range lines {
+		if strings.HasPrefix(line, "+") {
+			formattedLines = append(formattedLines, addStyle.Render(line))
+		} else if strings.HasPrefix(line, "-") {
+			formattedLines = append(formattedLines, removeStyle.Render(line))
+		} else if strings.HasPrefix(line, "Changes:") || strings.HasPrefix(line, "  ...") {
+			formattedLines = append(formattedLines, headerStyle.Render(line))
+		} else if strings.HasPrefix(line, "  ") {
+			formattedLines = append(formattedLines, contextStyle.Render(line))
+		} else {
+			formattedLines = append(formattedLines, line)
+		}
+	}
+	
+	// Join all formatted lines
+	content := strings.Join(formattedLines, "\n")
+	
+	// Create a bordered box for the content
+	contentStyle := lipgloss.NewStyle().
+		MarginTop(1).
+		Padding(0, 1).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(styles.Flamingo)
+	
+	return contentStyle.Render(content)
+}
+
 func (p *permissionDialogCmp) Init() tea.Cmd {
 	return nil
 }
@@ -132,44 +171,32 @@ func (p *permissionDialogCmp) render() string {
 		lipgloss.JoinHorizontal(lipgloss.Left, keyStyle.Render("Path:"), " ", valueStyle.Render(p.permission.Path)),
 		" ",
 	}
+	
+	// Create the header content first so it can be used in all cases
+	headerContent := lipgloss.NewStyle().Padding(0, 1).Render(lipgloss.JoinVertical(lipgloss.Left, headerParts...))
+	
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStyles(styles.CatppuccinMarkdownStyle()),
 		glamour.WithWordWrap(p.width-10),
 		glamour.WithEmoji(),
 	)
-	content := ""
+	
+	// Handle different tool types
 	switch p.permission.ToolName {
 	case tools.BashToolName:
 		pr := p.permission.Params.(tools.BashPermissionsParams)
 		headerParts = append(headerParts, keyStyle.Render("Command:"))
-		content = fmt.Sprintf("```bash\n%s\n```", pr.Command)
-	case tools.EditToolName:
-		pr := p.permission.Params.(tools.EditPermissionsParams)
-		headerParts = append(headerParts, keyStyle.Render("Update"))
-		content = fmt.Sprintf("```\n%s\n```", pr.Diff)
-	case tools.WriteToolName:
-		pr := p.permission.Params.(tools.WritePermissionsParams)
-		headerParts = append(headerParts, keyStyle.Render("Content"))
-		content = fmt.Sprintf("```\n%s\n```", pr.Content)
-	case tools.FetchToolName:
-		pr := p.permission.Params.(tools.FetchPermissionsParams)
-		headerParts = append(headerParts, keyStyle.Render("URL: "+pr.URL))
-	default:
-		content = p.permission.Description
-	}
-
-	renderedContent, _ := r.Render(content)
-	headerContent := lipgloss.NewStyle().Padding(0, 1).Render(lipgloss.JoinVertical(lipgloss.Left, headerParts...))
-	p.contentViewPort.Width = p.width - 2 - 2
-
-	// Calculate content height dynamically based on content
-	contentLines := len(strings.Split(renderedContent, "\n"))
-	// Set a reasonable min/max for the viewport height
-	minContentHeight := 3
-	maxContentHeight := p.height - lipgloss.Height(headerContent) - lipgloss.Height(form) - 2 - 2 - 1
-
-	// For bash commands, adjust height based on content length
-	if p.permission.ToolName == tools.BashToolName {
+		content := fmt.Sprintf("```bash\n%s\n```", pr.Command)
+		
+		renderedContent, _ := r.Render(content)
+		p.contentViewPort.Width = p.width - 2 - 2
+		
+		// Calculate content height dynamically based on content
+		contentLines := len(strings.Split(renderedContent, "\n"))
+		// Set a reasonable min/max for the viewport height
+		minContentHeight := 3
+		maxContentHeight := p.height - lipgloss.Height(headerContent) - lipgloss.Height(form) - 2 - 2 - 1
+		
 		// Add some padding to the content lines
 		contentHeight := contentLines + 2
 		if contentHeight < minContentHeight {
@@ -179,46 +206,124 @@ func (p *permissionDialogCmp) render() string {
 			contentHeight = maxContentHeight
 		}
 		p.contentViewPort.Height = contentHeight
-	} else {
-		// For other content types, use the full available height
-		p.contentViewPort.Height = maxContentHeight
+		
+		p.contentViewPort.SetContent(renderedContent)
+		
+		// Style the viewport
+		var contentBorder lipgloss.Border
+		var borderColor lipgloss.TerminalColor
+		
+		if p.isViewportFocus {
+			contentBorder = lipgloss.DoubleBorder()
+			borderColor = styles.Blue
+		} else {
+			contentBorder = lipgloss.RoundedBorder()
+			borderColor = styles.Flamingo
+		}
+		
+		contentStyle := lipgloss.NewStyle().
+			MarginTop(1).
+			Padding(0, 1).
+			Border(contentBorder).
+			BorderForeground(borderColor)
+		
+		if p.isViewportFocus {
+			contentStyle = contentStyle.BorderBackground(styles.Surface0)
+		}
+		
+		contentFinal := contentStyle.Render(p.contentViewPort.View())
+		
+		return lipgloss.JoinVertical(
+			lipgloss.Top,
+			headerContent,
+			contentFinal,
+			form,
+		)
+		
+	case tools.EditToolName:
+		pr := p.permission.Params.(tools.EditPermissionsParams)
+		headerParts = append(headerParts, keyStyle.Render("Update"))
+		// Recreate header content with the updated headerParts
+		headerContent = lipgloss.NewStyle().Padding(0, 1).Render(lipgloss.JoinVertical(lipgloss.Left, headerParts...))
+		// Format the diff with colors instead of using markdown code block
+		formattedDiff := formatDiff(pr.Diff)
+		return lipgloss.JoinVertical(
+			lipgloss.Top,
+			headerContent,
+			formattedDiff,
+			form,
+		)
+		
+	case tools.WriteToolName:
+		pr := p.permission.Params.(tools.WritePermissionsParams)
+		headerParts = append(headerParts, keyStyle.Render("Content"))
+		// Recreate header content with the updated headerParts
+		headerContent = lipgloss.NewStyle().Padding(0, 1).Render(lipgloss.JoinVertical(lipgloss.Left, headerParts...))
+		// Format the diff with colors instead of using markdown code block
+		formattedDiff := formatDiff(pr.Content)
+		return lipgloss.JoinVertical(
+			lipgloss.Top,
+			headerContent,
+			formattedDiff,
+			form,
+		)
+		
+	case tools.FetchToolName:
+		pr := p.permission.Params.(tools.FetchPermissionsParams)
+		headerParts = append(headerParts, keyStyle.Render("URL: "+pr.URL))
+		content := p.permission.Description
+		
+		renderedContent, _ := r.Render(content)
+		p.contentViewPort.Width = p.width - 2 - 2
+		p.contentViewPort.Height = p.height - lipgloss.Height(headerContent) - lipgloss.Height(form) - 2 - 2 - 1
+		p.contentViewPort.SetContent(renderedContent)
+		
+		// Style the viewport
+		contentStyle := lipgloss.NewStyle().
+			MarginTop(1).
+			Padding(0, 1).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(styles.Flamingo)
+		
+		contentFinal := contentStyle.Render(p.contentViewPort.View())
+		if renderedContent == "" {
+			contentFinal = ""
+		}
+		
+		return lipgloss.JoinVertical(
+			lipgloss.Top,
+			headerContent,
+			contentFinal,
+			form,
+		)
+		
+	default:
+		content := p.permission.Description
+		
+		renderedContent, _ := r.Render(content)
+		p.contentViewPort.Width = p.width - 2 - 2
+		p.contentViewPort.Height = p.height - lipgloss.Height(headerContent) - lipgloss.Height(form) - 2 - 2 - 1
+		p.contentViewPort.SetContent(renderedContent)
+		
+		// Style the viewport
+		contentStyle := lipgloss.NewStyle().
+			MarginTop(1).
+			Padding(0, 1).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(styles.Flamingo)
+		
+		contentFinal := contentStyle.Render(p.contentViewPort.View())
+		if renderedContent == "" {
+			contentFinal = ""
+		}
+		
+		return lipgloss.JoinVertical(
+			lipgloss.Top,
+			headerContent,
+			contentFinal,
+			form,
+		)
 	}
-
-	p.contentViewPort.SetContent(renderedContent)
-
-	// Make focus change more apparent with different border styles and colors
-	var contentBorder lipgloss.Border
-	var borderColor lipgloss.TerminalColor
-
-	if p.isViewportFocus {
-		contentBorder = lipgloss.DoubleBorder()
-		borderColor = styles.Blue
-	} else {
-		contentBorder = lipgloss.RoundedBorder()
-		borderColor = styles.Flamingo
-	}
-
-	contentStyle := lipgloss.NewStyle().
-		MarginTop(1).
-		Padding(0, 1).
-		Border(contentBorder).
-		BorderForeground(borderColor)
-
-	if p.isViewportFocus {
-		contentStyle = contentStyle.BorderBackground(styles.Surface0)
-	}
-
-	contentFinal := contentStyle.Render(p.contentViewPort.View())
-	if renderedContent == "" {
-		contentFinal = ""
-	}
-
-	return lipgloss.JoinVertical(
-		lipgloss.Top,
-		headerContent,
-		contentFinal,
-		form,
-	)
 }
 
 func (p *permissionDialogCmp) View() string {
