@@ -199,12 +199,8 @@ func (p *permissionDialogCmp) render() string {
 		
 		// Add some padding to the content lines
 		contentHeight := contentLines + 2
-		if contentHeight < minContentHeight {
-			contentHeight = minContentHeight
-		}
-		if contentHeight > maxContentHeight {
-			contentHeight = maxContentHeight
-		}
+		contentHeight = max(contentHeight, minContentHeight)
+		contentHeight = min(contentHeight, maxContentHeight)
 		p.contentViewPort.Height = contentHeight
 		
 		p.contentViewPort.SetContent(renderedContent)
