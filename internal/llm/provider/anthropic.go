@@ -68,21 +68,25 @@ func (a *anthropicProvider) SendMessages(ctx context.Context, messages []message
 	anthropicMessages := a.convertToAnthropicMessages(messages)
 	anthropicTools := a.convertToAnthropicTools(tools)
 
-	response, err := a.client.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:       anthropic.Model(a.model.APIModel),
-		MaxTokens:   a.maxTokens,
-		Temperature: anthropic.Float(0),
-		Messages:    anthropicMessages,
-		Tools:       anthropicTools,
-		System: []anthropic.TextBlockParam{
-			{
-				Text: a.systemMessage,
-				CacheControl: anthropic.CacheControlEphemeralParam{
-					Type: "ephemeral",
+	response, err := a.client.Messages.New(
+		ctx,
+		anthropic.MessageNewParams{
+			Model:       anthropic.Model(a.model.APIModel),
+			MaxTokens:   a.maxTokens,
+			Temperature: anthropic.Float(0),
+			Messages:    anthropicMessages,
+			Tools:       anthropicTools,
+			System: []anthropic.TextBlockParam{
+				{
+					Text: a.systemMessage,
+					CacheControl: anthropic.CacheControlEphemeralParam{
+						Type: "ephemeral",
+					},
 				},
 			},
 		},
-	})
+		option.WithMaxRetries(8),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -121,22 +125,26 @@ func (a *anthropicProvider) StreamResponse(ctx context.Context, messages []messa
 		temperature = anthropic.Float(1)
 	}
 
-	stream := a.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
-		Model:       anthropic.Model(a.model.APIModel),
-		MaxTokens:   a.maxTokens,
-		Temperature: temperature,
-		Messages:    anthropicMessages,
-		Tools:       anthropicTools,
-		Thinking:    thinkingParam,
-		System: []anthropic.TextBlockParam{
-			{
-				Text: a.systemMessage,
-				CacheControl: anthropic.CacheControlEphemeralParam{
-					Type: "ephemeral",
+	stream := a.client.Messages.NewStreaming(
+		ctx,
+		anthropic.MessageNewParams{
+			Model:       anthropic.Model(a.model.APIModel),
+			MaxTokens:   a.maxTokens,
+			Temperature: temperature,
+			Messages:    anthropicMessages,
+			Tools:       anthropicTools,
+			Thinking:    thinkingParam,
+			System: []anthropic.TextBlockParam{
+				{
+					Text: a.systemMessage,
+					CacheControl: anthropic.CacheControlEphemeralParam{
+						Type: "ephemeral",
+					},
 				},
 			},
 		},
-	})
+		option.WithMaxRetries(8),
+	)
 
 	eventChan := make(chan ProviderEvent)
 
