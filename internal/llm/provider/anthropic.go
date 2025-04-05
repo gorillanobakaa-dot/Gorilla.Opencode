@@ -258,10 +258,10 @@ func (a *anthropicProvider) convertToAnthropicTools(tools []tools.BaseTool) []an
 }
 
 func (a *anthropicProvider) convertToAnthropicMessages(messages []message.Message) []anthropic.MessageParam {
-	anthropicMessages := make([]anthropic.MessageParam, len(messages))
+	anthropicMessages := make([]anthropic.MessageParam, 0, len(messages))
 	cachedBlocks := 0
 
-	for i, msg := range messages {
+	for _, msg := range messages {
 		switch msg.Role {
 		case message.User:
 			content := anthropic.NewTextBlock(msg.Content().String())
@@ -271,7 +271,7 @@ func (a *anthropicProvider) convertToAnthropicMessages(messages []message.Messag
 				}
 				cachedBlocks++
 			}
-			anthropicMessages[i] = anthropic.NewUserMessage(content)
+			anthropicMessages = append(anthropicMessages, anthropic.NewUserMessage(content))
 
 		case message.Assistant:
 			blocks := []anthropic.ContentBlockParamUnion{}
@@ -295,14 +295,17 @@ func (a *anthropicProvider) convertToAnthropicMessages(messages []message.Messag
 				blocks = append(blocks, anthropic.ContentBlockParamOfRequestToolUseBlock(toolCall.ID, inputMap, toolCall.Name))
 			}
 
-			anthropicMessages[i] = anthropic.NewAssistantMessage(blocks...)
+			// Skip empty assistant messages completely
+			if len(blocks) > 0 {
+				anthropicMessages = append(anthropicMessages, anthropic.NewAssistantMessage(blocks...))
+			}
 
 		case message.Tool:
 			results := make([]anthropic.ContentBlockParamUnion, len(msg.ToolResults()))
 			for i, toolResult := range msg.ToolResults() {
 				results[i] = anthropic.NewToolResultBlock(toolResult.ToolCallID, toolResult.Content, toolResult.IsError)
 			}
-			anthropicMessages[i] = anthropic.NewUserMessage(results...)
+			anthropicMessages = append(anthropicMessages, anthropic.NewUserMessage(results...))
 		}
 	}
 
