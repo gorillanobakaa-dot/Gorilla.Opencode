@@ -15,6 +15,8 @@ import (
 	"github.com/kujtimiihoxha/termai/internal/llm/provider"
 	"github.com/kujtimiihoxha/termai/internal/llm/tools"
 	"github.com/kujtimiihoxha/termai/internal/message"
+	"github.com/kujtimiihoxha/termai/internal/pubsub"
+	"github.com/kujtimiihoxha/termai/internal/tui/util"
 )
 
 type Agent interface {
@@ -92,9 +94,24 @@ func (c *agent) processEvent(
 		assistantMsg.AppendContent(event.Content)
 		return c.Messages.Update(*assistantMsg)
 	case provider.EventError:
+		// TODO: remove when realease
 		log.Println("error", event.Error)
+		c.App.Status.Publish(pubsub.UpdatedEvent, util.InfoMsg{
+			Type: util.InfoTypeError,
+			Msg:  event.Error.Error(),
+		})
 		return event.Error
-
+	case provider.EventWarning:
+		c.App.Status.Publish(pubsub.UpdatedEvent, util.InfoMsg{
+			Type: util.InfoTypeWarn,
+			Msg:  event.Info,
+		})
+		return nil
+	case provider.EventInfo:
+		c.App.Status.Publish(pubsub.UpdatedEvent, util.InfoMsg{
+			Type: util.InfoTypeInfo,
+			Msg:  event.Info,
+		})
 	case provider.EventComplete:
 		assistantMsg.SetToolCalls(event.Response.ToolCalls)
 		assistantMsg.AddFinish(event.Response.FinishReason)

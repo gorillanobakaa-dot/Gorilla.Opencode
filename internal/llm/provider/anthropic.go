@@ -149,8 +149,8 @@ func (a *anthropicProvider) StreamResponse(ctx context.Context, messages []messa
 
 				// Inform user we're retrying with attempt number
 				eventChan <- ProviderEvent{
-					Type:    EventContentDelta,
-					Content: fmt.Sprintf("\n\n[Retrying due to rate limit... attempt %d of %d]\n\n", attempts, maxRetries),
+					Type: EventWarning,
+					Info: fmt.Sprintf("[Retrying due to rate limit... attempt %d of %d]", attempts, maxRetries),
 				}
 
 				// Calculate backoff with exponential backoff and jitter
@@ -380,4 +380,3 @@ func (a *anthropicProvider) convertToAnthropicMessages(messages []message.Messag
 
 	return anthropicMessages
 }
-

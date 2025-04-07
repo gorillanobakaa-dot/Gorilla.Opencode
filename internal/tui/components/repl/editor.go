@@ -140,7 +140,7 @@ func (m *editorCmp) Send() tea.Cmd {
 	return func() tea.Msg {
 		messages, _ := m.app.Messages.List(m.sessionID)
 		if hasUnfinishedMessages(messages) {
-			return util.InfoMsg("Assistant is still working on the previous message")
+			return util.ReportWarn("Assistant is still working on the previous message")
 		}
 		a, _ := agent.NewCoderAgent(m.app)
 

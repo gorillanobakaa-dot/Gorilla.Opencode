@@ -9,12 +9,39 @@ func CmdHandler(msg tea.Msg) tea.Cmd {
 }
 
 func ReportError(err error) tea.Cmd {
-	return CmdHandler(ErrorMsg(err))
+	return CmdHandler(InfoMsg{
+		Type: InfoTypeError,
+		Msg:  err.Error(),
+	})
+}
+
+type InfoType int
+
+const (
+	InfoTypeInfo InfoType = iota
+	InfoTypeWarn
+	InfoTypeError
+)
+
+func ReportInfo(info string) tea.Cmd {
+	return CmdHandler(InfoMsg{
+		Type: InfoTypeInfo,
+		Msg:  info,
+	})
+}
+
+func ReportWarn(warn string) tea.Cmd {
+	return CmdHandler(InfoMsg{
+		Type: InfoTypeWarn,
+		Msg:  warn,
+	})
 }
 
 type (
-	InfoMsg       string
-	ErrorMsg      error
+	InfoMsg struct {
+		Type InfoType
+		Msg  string
+	}
 	ClearStatusMsg struct{}
 )
 
