@@ -13,22 +13,48 @@ import (
 	"github.com/kujtimiihoxha/termai/internal/lsp/protocol"
 )
 
+type DiagnosticsParams struct {
+	FilePath string `json:"file_path"`
+}
 type diagnosticsTool struct {
 	lspClients map[string]*lsp.Client
 }
 
 const (
-	DiagnosticsToolName = "diagnostics"
+	DiagnosticsToolName    = "diagnostics"
+	diagnosticsDescription = `Get diagnostics for a file and/or project.
+WHEN TO USE THIS TOOL:
+- Use when you need to check for errors or warnings in your code
+- Helpful for debugging and ensuring code quality
+- Good for getting a quick overview of issues in a file or project
+HOW TO USE:
+- Provide a path to a file to get diagnostics for that file
+- Leave the path empty to get diagnostics for the entire project
+- Results are displayed in a structured format with severity levels
+FEATURES:
+- Displays errors, warnings, and hints
+- Groups diagnostics by severity
+- Provides detailed information about each diagnostic
+LIMITATIONS:
+- Results are limited to the diagnostics provided by the LSP clients
+- May not cover all possible issues in the code
+- Does not provide suggestions for fixing issues
+TIPS:
+- Use in conjunction with other tools for a comprehensive code review
+- Combine with the LSP client for real-time diagnostics
+`
 )
 
-type DiagnosticsParams struct {
-	FilePath string `json:"file_path"`
+func NewDiagnosticsTool(lspClients map[string]*lsp.Client) BaseTool {
+	return &diagnosticsTool{
+		lspClients,
+	}
 }
 
 func (b *diagnosticsTool) Info() ToolInfo {
 	return ToolInfo{
 		Name:        DiagnosticsToolName,
-		Description: "Get diagnostics for a file and/or project.",
+		Description: diagnosticsDescription,
 		Parameters: map[string]any{
 			"file_path": map[string]any{
 				"type":        "string",
@@ -63,31 +89,24 @@ func (b *diagnosticsTool) Run(ctx context.Context, call ToolCall) (ToolResponse,
 
 func notifyLspOpenFile(ctx context.Context, filePath string, lsps map[string]*lsp.Client) {
 	for _, client := range lsps {
-		// Open the file
 		err := client.OpenFile(ctx, filePath)
 		if err != nil {
-			// If there's an error opening the file, continue to the next client
 			continue
 		}
 	}
 }
 
-// waitForLspDiagnostics opens a file in LSP clients and waits for diagnostics to be published
 func waitForLspDiagnostics(ctx context.Context, filePath string, lsps map[string]*lsp.Client) {
 	if len(lsps) == 0 {
 		return
 	}
 
-	// Create a channel to receive diagnostic notifications
 	diagChan := make(chan struct{}, 1)
 
-	// Register a temporary diagnostic handler for each client
 	for _, client := range lsps {
-		// Store the original diagnostics map to detect changes
 		originalDiags := make(map[protocol.DocumentUri][]protocol.Diagnostic)
 		maps.Copy(originalDiags, client.GetDiagnostics())
 
-		// Create a notification handler that will signal when diagnostics are received
 		handler := func(params json.RawMessage) {
 			lsp.HandleDiagnostics(client, params)
 			var diagParams protocol.PublishDiagnosticsParams
@@ -95,28 +114,22 @@ func waitForLspDiagnostics(ctx context.Context, filePath string, lsps map[string
 				return
 			}
 
-			// If this is for our file or we've received any new diagnostics, signal completion
 			if diagParams.URI.Path() == filePath || hasDiagnosticsChanged(client.GetDiagnostics(), originalDiags) {
 				select {
 				case diagChan <- struct{}{}:
-					// Signal sent
 				default:
-					// Channel already has a value, no need to send again
 				}
 			}
 		}
 
-		// Register our temporary handler
 		client.RegisterNotificationHandler("textDocument/publishDiagnostics", handler)
 
-		// Notify change if the file is already open
 		if client.IsFileOpen(filePath) {
 			err := client.NotifyChange(ctx, filePath)
 			if err != nil {
 				continue
 			}
 		} else {
-			// Open the file if it's not already open
 			err := client.OpenFile(ctx, filePath)
 			if err != nil {
 				continue
@@ -124,22 +137,13 @@ func waitForLspDiagnostics(ctx context.Context, filePath string, lsps map[string
 		}
 	}
 
-	// Wait for diagnostics with a reasonable timeout
 	select {
 	case <-diagChan:
-		// Diagnostics received
 	case <-time.After(5 * time.Second):
-		// Timeout after 5 seconds - this is a fallback in case no diagnostics are published
 	case <-ctx.Done():
-		// Context cancelled
 	}
-
-	// Note: We're not unregistering our handler because the Client.RegisterNotificationHandler
-	// replaces any existing handler, and we'll be replaced by the original handler when
-	// the LSP client is reinitialized or when a new handler is registered.
 }
 
-// hasDiagnosticsChanged checks if there are any new diagnostics compared to the original set
 func hasDiagnosticsChanged(current, original map[protocol.DocumentUri][]protocol.Diagnostic) bool {
 	for uri, diags := range current {
 		origDiags, exists := original[uri]
@@ -154,9 +158,7 @@ func appendDiagnostics(filePath string, lsps map[string]*lsp.Client) string {
 	fileDiagnostics := []string{}
 	projectDiagnostics := []string{}
 
-	// Enhanced format function that includes more diagnostic information
 	formatDiagnostic := func(pth string, diagnostic protocol.Diagnostic, source string) string {
-		// Base components
 		severity := "Info"
 		switch diagnostic.Severity {
 		case protocol.SeverityError:
@@ -167,10 +169,8 @@ func appendDiagnostics(filePath string, lsps map[string]*lsp.Client) string {
 			severity = "Hint"
 		}
 
-		// Location information
 		location := fmt.Sprintf("%s:%d:%d", pth, diagnostic.Range.Start.Line+1, diagnostic.Range.Start.Character+1)
 
-		// Source information (LSP name)
 		sourceInfo := ""
 		if diagnostic.Source != "" {
 			sourceInfo = diagnostic.Source
@@ -178,13 +178,11 @@ func appendDiagnostics(filePath string, lsps map[string]*lsp.Client) string {
 			sourceInfo = source
 		}
 
-		// Code information
 		codeInfo := ""
 		if diagnostic.Code != nil {
 			codeInfo = fmt.Sprintf("[%v]", diagnostic.Code)
 		}
 
-		// Tags information
 		tagsInfo := ""
 		if len(diagnostic.Tags) > 0 {
 			tags := []string{}
@@ -201,7 +199,6 @@ func appendDiagnostics(filePath string, lsps map[string]*lsp.Client) string {
 			}
 		}
 
-		// Assemble the full diagnostic message
 		return fmt.Sprintf("%s: %s [%s]%s%s %s",
 			severity,
 			location,
@@ -217,7 +214,6 @@ func appendDiagnostics(filePath string, lsps map[string]*lsp.Client) string {
 			for location, diags := range diagnostics {
 				isCurrentFile := location.Path() == filePath
 
-				// Group diagnostics by severity for better organization
 				for _, diag := range diags {
 					formattedDiag := formatDiagnostic(location.Path(), diag, lspName)
 
@@ -231,7 +227,6 @@ func appendDiagnostics(filePath string, lsps map[string]*lsp.Client) string {
 		}
 	}
 
-	// Sort diagnostics by severity (errors first) and then by location
 	sort.Slice(fileDiagnostics, func(i, j int) bool {
 		iIsError := strings.HasPrefix(fileDiagnostics[i], "Error")
 		jIsError := strings.HasPrefix(fileDiagnostics[j], "Error")
@@ -274,7 +269,6 @@ func appendDiagnostics(filePath string, lsps map[string]*lsp.Client) string {
 		output += "\n</project_diagnostics>\n"
 	}
 
-	// Add summary counts
 	if len(fileDiagnostics) > 0 || len(projectDiagnostics) > 0 {
 		fileErrors := countSeverity(fileDiagnostics, "Error")
 		fileWarnings := countSeverity(fileDiagnostics, "Warn")
@@ -290,7 +284,6 @@ func appendDiagnostics(filePath string, lsps map[string]*lsp.Client) string {
 	return output
 }
 
-// Helper function to count diagnostics by severity
 func countSeverity(diagnostics []string, severity string) int {
 	count := 0
 	for _, diag := range diagnostics {
@@ -299,10 +292,4 @@ func countSeverity(diagnostics []string, severity string) int {
 		}
 	}
 	return count
-}
-
-func NewDiagnosticsTool(lspClients map[string]*lsp.Client) BaseTool {
-	return &diagnosticsTool{
-		lspClients,
-	}
 }

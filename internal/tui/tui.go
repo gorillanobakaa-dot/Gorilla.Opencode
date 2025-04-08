@@ -80,11 +80,11 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dialog.PermissionResponseMsg:
 		switch msg.Action {
 		case dialog.PermissionAllow:
-			permission.Default.Grant(msg.Permission)
+			a.app.Permissions.Grant(msg.Permission)
 		case dialog.PermissionAllowForSession:
-			permission.Default.GrantPersistant(msg.Permission)
+			a.app.Permissions.GrantPersistant(msg.Permission)
 		case dialog.PermissionDeny:
-			permission.Default.Deny(msg.Permission)
+			a.app.Permissions.Deny(msg.Permission)
 		}
 	case vimtea.EditorModeMsg:
 		a.editorMode = msg.Mode

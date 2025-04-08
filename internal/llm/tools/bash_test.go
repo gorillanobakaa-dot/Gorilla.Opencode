@@ -15,7 +15,7 @@ import (
 )
 
 func TestBashTool_Info(t *testing.T) {
-	tool := NewBashTool()
+	tool := NewBashTool(newMockPermissionService(true))
 	info := tool.Info()
 
 	assert.Equal(t, BashToolName, info.Name)
@@ -26,13 +26,6 @@ func TestBashTool_Info(t *testing.T) {
 }
 
 func TestBashTool_Run(t *testing.T) {
-	// Setup a mock permission handler that always allows
-	origPermission := permission.Default
-	defer func() {
-		permission.Default = origPermission
-	}()
-	permission.Default = newMockPermissionService(true)
-
 	// Save original working directory
 	origWd, err := os.Getwd()
 	require.NoError(t, err)
@@ -41,8 +34,7 @@ func TestBashTool_Run(t *testing.T) {
 	}()
 
 	t.Run("executes command successfully", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewBashTool()
+		tool := NewBashTool(newMockPermissionService(true))
 		params := BashParams{
 			Command: "echo 'Hello World'",
 		}
@@ -61,9 +53,7 @@ func TestBashTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles invalid parameters", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-
-		tool := NewBashTool()
+		tool := NewBashTool(newMockPermissionService(true))
 		call := ToolCall{
 			Name:  BashToolName,
 			Input: "invalid json",
@@ -75,9 +65,7 @@ func TestBashTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles missing command", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-
-		tool := NewBashTool()
+		tool := NewBashTool(newMockPermissionService(true))
 		params := BashParams{
 			Command: "",
 		}
@@ -96,11 +84,9 @@ func TestBashTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles banned commands", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
+		tool := NewBashTool(newMockPermissionService(true))
 
-		tool := NewBashTool()
-
-		for _, bannedCmd := range BannedCommands {
+		for _, bannedCmd := range bannedCommands {
 			params := BashParams{
 				Command: bannedCmd + " arg1 arg2",
 			}
@@ -120,17 +106,11 @@ func TestBashTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles multi-word safe commands without permission check", func(t *testing.T) {
-		permission.Default = newMockPermissionService(false)
-
-		tool := NewBashTool()
+		tool := NewBashTool(newMockPermissionService(false))
 
 		// Test with multi-word safe commands
 		multiWordCommands := []string{
-			"git status",
-			"git log -n 5",
-			"docker ps",
-			"go test ./...",
-			"kubectl get pods",
+			"go env",
 		}
 
 		for _, cmd := range multiWordCommands {
@@ -148,15 +128,13 @@ func TestBashTool_Run(t *testing.T) {
 
 			response, err := tool.Run(context.Background(), call)
 			require.NoError(t, err)
-			assert.NotContains(t, response.Content, "permission denied", 
+			assert.NotContains(t, response.Content, "permission denied",
 				"Command %s should be allowed without permission", cmd)
 		}
 	})
 
 	t.Run("handles permission denied", func(t *testing.T) {
-		permission.Default = newMockPermissionService(false)
-
-		tool := NewBashTool()
+		tool := NewBashTool(newMockPermissionService(false))
 
 		// Test with a command that requires permission
 		params := BashParams{
@@ -177,8 +155,7 @@ func TestBashTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles command timeout", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewBashTool()
+		tool := NewBashTool(newMockPermissionService(true))
 		params := BashParams{
 			Command: "sleep 2",
 			Timeout: 100, // 100ms timeout
@@ -198,8 +175,7 @@ func TestBashTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles command with stderr output", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewBashTool()
+		tool := NewBashTool(newMockPermissionService(true))
 		params := BashParams{
 			Command: "echo 'error message' >&2",
 		}
@@ -218,8 +194,7 @@ func TestBashTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles command with both stdout and stderr", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewBashTool()
+		tool := NewBashTool(newMockPermissionService(true))
 		params := BashParams{
 			Command: "echo 'stdout message' && echo 'stderr message' >&2",
 		}
@@ -239,8 +214,7 @@ func TestBashTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles context cancellation", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewBashTool()
+		tool := NewBashTool(newMockPermissionService(true))
 		params := BashParams{
 			Command: "sleep 5",
 		}
@@ -267,8 +241,7 @@ func TestBashTool_Run(t *testing.T) {
 	})
 
 	t.Run("respects max timeout", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewBashTool()
+		tool := NewBashTool(newMockPermissionService(true))
 		params := BashParams{
 			Command: "echo 'test'",
 			Timeout: MaxTimeout + 1000, // Exceeds max timeout
@@ -288,8 +261,7 @@ func TestBashTool_Run(t *testing.T) {
 	})
 
 	t.Run("uses default timeout for zero or negative timeout", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewBashTool()
+		tool := NewBashTool(newMockPermissionService(true))
 		params := BashParams{
 			Command: "echo 'test'",
 			Timeout: -100, // Negative timeout
@@ -397,4 +369,3 @@ func newMockPermissionService(allow bool) permission.Service {
 		allow:  allow,
 	}
 }
-

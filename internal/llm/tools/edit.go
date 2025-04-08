@@ -15,14 +15,6 @@ import (
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
-type editTool struct {
-	lspClients map[string]*lsp.Client
-}
-
-const (
-	EditToolName = "edit"
-)
-
 type EditParams struct {
 	FilePath  string `json:"file_path"`
 	OldString string `json:"old_string"`
@@ -36,10 +28,73 @@ type EditPermissionsParams struct {
 	Diff      string `json:"diff"`
 }
 
+type editTool struct {
+	lspClients  map[string]*lsp.Client
+	permissions permission.Service
+}
+
+const (
+	EditToolName    = "edit"
+	editDescription = `Edits files by replacing text, creating new files, or deleting content. For moving or renaming files, use the Bash tool with the 'mv' command instead. For larger file edits, use the FileWrite tool to overwrite files.
+
+Before using this tool:
+
+1. Use the FileRead tool to understand the file's contents and context
+
+2. Verify the directory path is correct (only applicable when creating new files):
+   - Use the LS tool to verify the parent directory exists and is the correct location
+
+To make a file edit, provide the following:
+1. file_path: The absolute path to the file to modify (must be absolute, not relative)
+2. old_string: The text to replace (must be unique within the file, and must match the file contents exactly, including all whitespace and indentation)
+3. new_string: The edited text to replace the old_string
+
+Special cases:
+- To create a new file: provide file_path and new_string, leave old_string empty
+- To delete content: provide file_path and old_string, leave new_string empty
+
+The tool will replace ONE occurrence of old_string with new_string in the specified file.
+
+CRITICAL REQUIREMENTS FOR USING THIS TOOL:
+
+1. UNIQUENESS: The old_string MUST uniquely identify the specific instance you want to change. This means:
+   - Include AT LEAST 3-5 lines of context BEFORE the change point
+   - Include AT LEAST 3-5 lines of context AFTER the change point
+   - Include all whitespace, indentation, and surrounding code exactly as it appears in the file
+
+2. SINGLE INSTANCE: This tool can only change ONE instance at a time. If you need to change multiple instances:
+   - Make separate calls to this tool for each instance
+   - Each call must uniquely identify its specific instance using extensive context
+
+3. VERIFICATION: Before using this tool:
+   - Check how many instances of the target text exist in the file
+   - If multiple instances exist, gather enough context to uniquely identify each one
+   - Plan separate tool calls for each instance
+
+WARNING: If you do not follow these requirements:
+   - The tool will fail if old_string matches multiple locations
+   - The tool will fail if old_string doesn't match exactly (including whitespace)
+   - You may change the wrong instance if you don't include enough context
+
+When making edits:
+   - Ensure the edit results in idiomatic, correct code
+   - Do not leave the code in a broken state
+   - Always use absolute file paths (starting with /)
+
+Remember: when making multiple file edits in a row to the same file, you should prefer to send all edits in a single message with multiple calls to this tool, rather than multiple messages with a single call each.`
+)
+
+func NewEditTool(lspClients map[string]*lsp.Client, permissions permission.Service) BaseTool {
+	return &editTool{
+		lspClients:  lspClients,
+		permissions: permissions,
+	}
+}
+
 func (e *editTool) Info() ToolInfo {
 	return ToolInfo{
 		Name:        EditToolName,
-		Description: editDescription(),
+		Description: editDescription,
 		Parameters: map[string]any{
 			"file_path": map[string]any{
 				"type":        "string",
@@ -58,7 +113,6 @@ func (e *editTool) Info() ToolInfo {
 	}
 }
 
-// Run implements Tool.
 func (e *editTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error) {
 	var params EditParams
 	if err := json.Unmarshal([]byte(call.Input), &params); err != nil {
@@ -75,7 +129,7 @@ func (e *editTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	}
 
 	if params.OldString == "" {
-		result, err := createNewFile(params.FilePath, params.NewString)
+		result, err := e.createNewFile(params.FilePath, params.NewString)
 		if err != nil {
 			return NewTextErrorResponse(fmt.Sprintf("error creating file: %s", err)), nil
 		}
@@ -83,26 +137,25 @@ func (e *editTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	}
 
 	if params.NewString == "" {
-		result, err := deleteContent(params.FilePath, params.OldString)
+		result, err := e.deleteContent(params.FilePath, params.OldString)
 		if err != nil {
 			return NewTextErrorResponse(fmt.Sprintf("error deleting content: %s", err)), nil
 		}
 		return NewTextResponse(result), nil
 	}
 
-	result, err := replaceContent(params.FilePath, params.OldString, params.NewString)
+	result, err := e.replaceContent(params.FilePath, params.OldString, params.NewString)
 	if err != nil {
 		return NewTextErrorResponse(fmt.Sprintf("error replacing content: %s", err)), nil
 	}
 
-	// Wait for LSP diagnostics after editing the file
 	waitForLspDiagnostics(ctx, params.FilePath, e.lspClients)
 	result = fmt.Sprintf("<result>\n%s\n</result>\n", result)
 	result += appendDiagnostics(params.FilePath, e.lspClients)
 	return NewTextResponse(result), nil
 }
 
-func createNewFile(filePath, content string) (string, error) {
+func (e *editTool) createNewFile(filePath, content string) (string, error) {
 	fileInfo, err := os.Stat(filePath)
 	if err == nil {
 		if fileInfo.IsDir() {
@@ -118,7 +171,7 @@ func createNewFile(filePath, content string) (string, error) {
 		return "", fmt.Errorf("failed to create parent directories: %w", err)
 	}
 
-	p := permission.Default.Request(
+	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
 			Path:        filepath.Dir(filePath),
 			ToolName:    EditToolName,
@@ -147,7 +200,7 @@ func createNewFile(filePath, content string) (string, error) {
 	return "File created: " + filePath, nil
 }
 
-func deleteContent(filePath, oldString string) (string, error) {
+func (e *editTool) deleteContent(filePath, oldString string) (string, error) {
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -190,7 +243,7 @@ func deleteContent(filePath, oldString string) (string, error) {
 
 	newContent := oldContent[:index] + oldContent[index+len(oldString):]
 
-	p := permission.Default.Request(
+	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
 			Path:        filepath.Dir(filePath),
 			ToolName:    EditToolName,
@@ -219,7 +272,7 @@ func deleteContent(filePath, oldString string) (string, error) {
 	return "Content deleted from file: " + filePath, nil
 }
 
-func replaceContent(filePath, oldString, newString string) (string, error) {
+func (e *editTool) replaceContent(filePath, oldString, newString string) (string, error) {
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -268,7 +321,7 @@ func replaceContent(filePath, oldString, newString string) (string, error) {
 
 	diff := GenerateDiff(oldContent[startIndex:oldEndIndex], newContent[startIndex:newEndIndex])
 
-	p := permission.Default.Request(
+	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
 			Path:        filepath.Dir(filePath),
 			ToolName:    EditToolName,
@@ -305,7 +358,6 @@ func GenerateDiff(oldContent, newContent string) string {
 	diffs = dmp.DiffCleanupSemantic(diffs)
 	buff := strings.Builder{}
 
-	// Add a header to make the diff more readable
 	buff.WriteString("Changes:\n")
 
 	for _, diff := range diffs {
@@ -327,10 +379,8 @@ func GenerateDiff(oldContent, newContent string) string {
 				_, _ = buff.WriteString("- " + line + "\n")
 			}
 		case diffmatchpatch.DiffEqual:
-			// Only show a small context for unchanged text
 			lines := strings.Split(text, "\n")
 			if len(lines) > 3 {
-				// Show only first and last line of context with a separator
 				if lines[0] != "" {
 					_, _ = buff.WriteString("  " + lines[0] + "\n")
 				}
@@ -339,7 +389,6 @@ func GenerateDiff(oldContent, newContent string) string {
 					_, _ = buff.WriteString("  " + lines[len(lines)-1] + "\n")
 				}
 			} else {
-				// Show all lines for small contexts
 				for _, line := range lines {
 					if line == "" {
 						continue
@@ -350,60 +399,4 @@ func GenerateDiff(oldContent, newContent string) string {
 		}
 	}
 	return buff.String()
-}
-
-func editDescription() string {
-	return `Edits files by replacing text, creating new files, or deleting content. For moving or renaming files, use the Bash tool with the 'mv' command instead. For larger file edits, use the FileWrite tool to overwrite files.
-
-Before using this tool:
-
-1. Use the FileRead tool to understand the file's contents and context
-
-2. Verify the directory path is correct (only applicable when creating new files):
-   - Use the LS tool to verify the parent directory exists and is the correct location
-
-To make a file edit, provide the following:
-1. file_path: The absolute path to the file to modify (must be absolute, not relative)
-2. old_string: The text to replace (must be unique within the file, and must match the file contents exactly, including all whitespace and indentation)
-3. new_string: The edited text to replace the old_string
-
-Special cases:
-- To create a new file: provide file_path and new_string, leave old_string empty
-- To delete content: provide file_path and old_string, leave new_string empty
-
-The tool will replace ONE occurrence of old_string with new_string in the specified file.
-
-CRITICAL REQUIREMENTS FOR USING THIS TOOL:
-
-1. UNIQUENESS: The old_string MUST uniquely identify the specific instance you want to change. This means:
-   - Include AT LEAST 3-5 lines of context BEFORE the change point
-   - Include AT LEAST 3-5 lines of context AFTER the change point
-   - Include all whitespace, indentation, and surrounding code exactly as it appears in the file
-
-2. SINGLE INSTANCE: This tool can only change ONE instance at a time. If you need to change multiple instances:
-   - Make separate calls to this tool for each instance
-   - Each call must uniquely identify its specific instance using extensive context
-
-3. VERIFICATION: Before using this tool:
-   - Check how many instances of the target text exist in the file
-   - If multiple instances exist, gather enough context to uniquely identify each one
-   - Plan separate tool calls for each instance
-
-WARNING: If you do not follow these requirements:
-   - The tool will fail if old_string matches multiple locations
-   - The tool will fail if old_string doesn't match exactly (including whitespace)
-   - You may change the wrong instance if you don't include enough context
-
-When making edits:
-   - Ensure the edit results in idiomatic, correct code
-   - Do not leave the code in a broken state
-   - Always use absolute file paths (starting with /)
-
-Remember: when making multiple file edits in a row to the same file, you should prefer to send all edits in a single message with multiple calls to this tool, rather than multiple messages with a single call each.`
-}
-
-func NewEditTool(lspClients map[string]*lsp.Client) BaseTool {
-	return &editTool{
-		lspClients,
-	}
 }

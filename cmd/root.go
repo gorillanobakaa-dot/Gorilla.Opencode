@@ -50,7 +50,7 @@ var rootCmd = &cobra.Command{
 
 		go func() {
 			// Set this up once
-			agent.GetMcpTools(ctx)
+			agent.GetMcpTools(ctx, app.Permissions)
 			for msg := range ch {
 				tui.Send(msg)
 			}

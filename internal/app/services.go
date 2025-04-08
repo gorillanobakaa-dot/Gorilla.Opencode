@@ -41,7 +41,7 @@ func New(ctx context.Context, conn *sql.DB) *App {
 		Context:     ctx,
 		Sessions:    sessions,
 		Messages:    messages,
-		Permissions: permission.Default,
+		Permissions: permission.NewPermissionService(),
 		Logger:      log,
 		LSPClients:  make(map[string]*lsp.Client),
 	}
