@@ -44,7 +44,7 @@ func NewCoderAgent(app *app.App) (Agent, error) {
 		return nil, err
 	}
 
-	otherTools := GetMcpTools(app.Context)
+	otherTools := GetMcpTools(app.Context, app.Permissions)
 	if len(app.LSPClients) > 0 {
 		otherTools = append(otherTools, tools.NewDiagnosticsTool(app.LSPClients))
 	}
@@ -53,15 +53,15 @@ func NewCoderAgent(app *app.App) (Agent, error) {
 			App: app,
 			tools: append(
 				[]tools.BaseTool{
-					tools.NewBashTool(),
-					tools.NewEditTool(app.LSPClients),
-					tools.NewFetchTool(),
+					tools.NewBashTool(app.Permissions),
+					tools.NewEditTool(app.LSPClients, app.Permissions),
+					tools.NewFetchTool(app.Permissions),
 					tools.NewGlobTool(),
 					tools.NewGrepTool(),
 					tools.NewLsTool(),
 					tools.NewSourcegraphTool(),
 					tools.NewViewTool(app.LSPClients),
-					tools.NewWriteTool(app.LSPClients),
+					tools.NewWriteTool(app.LSPClients, app.Permissions),
 				}, otherTools...,
 			),
 			model:          model,

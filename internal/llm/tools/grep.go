@@ -16,12 +16,6 @@ import (
 	"github.com/kujtimiihoxha/termai/internal/config"
 )
 
-type grepTool struct{}
-
-const (
-	GrepToolName = "grep"
-)
-
 type GrepParams struct {
 	Pattern string `json:"pattern"`
 	Path    string `json:"path"`
@@ -33,10 +27,54 @@ type grepMatch struct {
 	modTime time.Time
 }
 
+type grepTool struct{}
+
+const (
+	GrepToolName    = "grep"
+	grepDescription = `Fast content search tool that finds files containing specific text or patterns, returning matching file paths sorted by modification time (newest first).
+
+WHEN TO USE THIS TOOL:
+- Use when you need to find files containing specific text or patterns
+- Great for searching code bases for function names, variable declarations, or error messages
+- Useful for finding all files that use a particular API or pattern
+
+HOW TO USE:
+- Provide a regex pattern to search for within file contents
+- Optionally specify a starting directory (defaults to current working directory)
+- Optionally provide an include pattern to filter which files to search
+- Results are sorted with most recently modified files first
+
+REGEX PATTERN SYNTAX:
+- Supports standard regular expression syntax
+- 'function' searches for the literal text "function"
+- 'log\..*Error' finds text starting with "log." and ending with "Error"
+- 'import\s+.*\s+from' finds import statements in JavaScript/TypeScript
+
+COMMON INCLUDE PATTERN EXAMPLES:
+- '*.js' - Only search JavaScript files
+- '*.{ts,tsx}' - Only search TypeScript files
+- '*.go' - Only search Go files
+
+LIMITATIONS:
+- Results are limited to 100 files (newest first)
+- Performance depends on the number of files being searched
+- Very large binary files may be skipped
+- Hidden files (starting with '.') are skipped
+
+TIPS:
+- For faster, more targeted searches, first use Glob to find relevant files, then use Grep
+- When doing iterative exploration that may require multiple rounds of searching, consider using the Agent tool instead
+- Always check if results are truncated and refine your search pattern if needed`
+)
+
+func NewGrepTool() BaseTool {
+	return &grepTool{}
+}
+
 func (g *grepTool) Info() ToolInfo {
 	return ToolInfo{
 		Name:        GrepToolName,
-		Description: grepDescription(),
+		Description: grepDescription,
 		Parameters: map[string]any{
 			"pattern": map[string]any{
 				"type":        "string",
@@ -55,7 +93,6 @@ func (g *grepTool) Info() ToolInfo {
 	}
 }
 
-// Run implements Tool.
 func (g *grepTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error) {
 	var params GrepParams
 	if err := json.Unmarshal([]byte(call.Input), &params); err != nil {
@@ -66,7 +103,6 @@ func (g *grepTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		return NewTextErrorResponse("pattern is required"), nil
 	}
 
-	// If path is empty, use current working directory
 	searchPath := params.Path
 	if searchPath == "" {
 		searchPath = config.WorkingDirectory()
@@ -77,7 +113,6 @@ func (g *grepTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		return NewTextErrorResponse(fmt.Sprintf("error searching files: %s", err)), nil
 	}
 
-	// Format the output for the assistant
 	var output string
 	if len(matches) == 0 {
 		output = "No files found"
@@ -103,28 +138,23 @@ func pluralize(count int) string {
 }
 
 func searchFiles(pattern, rootPath, include string, limit int) ([]string, bool, error) {
-	// First try using ripgrep if available for better performance
 	matches, err := searchWithRipgrep(pattern, rootPath, include)
 	if err != nil {
-		// Fall back to manual regex search if ripgrep is not available
 		matches, err = searchFilesWithRegex(pattern, rootPath, include)
 		if err != nil {
 			return nil, false, err
 		}
 	}
 
-	// Sort files by modification time (newest first)
 	sort.Slice(matches, func(i, j int) bool {
 		return matches[i].modTime.After(matches[j].modTime)
 	})
 
-	// Check if we need to truncate the results
 	truncated := len(matches) > limit
 	if truncated {
 		matches = matches[:limit]
 	}
 
-	// Extract just the paths
 	results := make([]string, len(matches))
 	for i, m := range matches {
 		results[i] = m.path
@@ -149,7 +179,6 @@ func searchWithRipgrep(pattern, path, include string) ([]grepMatch, error) {
 	output, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
-			// Exit code 1 means no matches, which isn't an error for our purposes
 			return []grepMatch{}, nil
 		}
 		return nil, err
@@ -203,17 +232,14 @@ func searchFilesWithRegex(pattern, rootPath, include string) ([]grepMatch, error
 			return nil // Skip directories
 		}
 
-		// Skip hidden files
 		if skipHidden(path) {
 			return nil
 		}
 
-		// Check include pattern if provided
 		if includePattern != nil && !includePattern.MatchString(path) {
 			return nil
 		}
 
-		// Check file contents for the pattern
 		match, err := fileContainsPattern(path, regex)
 		if err != nil {
 			return nil // Skip files we can't read
@@ -225,7 +251,6 @@ func searchFilesWithRegex(pattern, rootPath, include string) ([]grepMatch, error
 				modTime: info.ModTime(),
 			})
 
-			// Check if we've hit the limit (collect double for sorting)
 			if len(matches) >= 200 {
 				return filepath.SkipAll
 			}
@@ -269,45 +294,4 @@ func globToRegex(glob string) string {
 	})
 
 	return regexPattern
-}
-
-func grepDescription() string {
-	return `Fast content search tool that finds files containing specific text or patterns, returning matching file paths sorted by modification time (newest first).
-
-WHEN TO USE THIS TOOL:
-- Use when you need to find files containing specific text or patterns
-- Great for searching code bases for function names, variable declarations, or error messages
-- Useful for finding all files that use a particular API or pattern
-
-HOW TO USE:
-- Provide a regex pattern to search for within file contents
-- Optionally specify a starting directory (defaults to current working directory)
-- Optionally provide an include pattern to filter which files to search
-- Results are sorted with most recently modified files first
-
-REGEX PATTERN SYNTAX:
-- Supports standard regular expression syntax
-- 'function' searches for the literal text "function"
-- 'log\..*Error' finds text starting with "log." and ending with "Error"
-- 'import\s+.*\s+from' finds import statements in JavaScript/TypeScript
-
-COMMON INCLUDE PATTERN EXAMPLES:
-- '*.js' - Only search JavaScript files
-- '*.{ts,tsx}' - Only search TypeScript files
-- '*.go' - Only search Go files
-
-LIMITATIONS:
-- Results are limited to 100 files (newest first)
-- Performance depends on the number of files being searched
-- Very large binary files may be skipped
-- Hidden files (starting with '.') are skipped
-
-TIPS:
-- For faster, more targeted searches, first use Glob to find relevant files, then use Grep
-- When doing iterative exploration that may require multiple rounds of searching, consider using the Agent tool instead
-- Always check if results are truncated and refine your search pattern if needed`
-}
-
-func NewGrepTool() BaseTool {
-	return &grepTool{}
 }

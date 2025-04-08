@@ -9,13 +9,12 @@ import (
 	"time"
 
 	"github.com/kujtimiihoxha/termai/internal/lsp"
-	"github.com/kujtimiihoxha/termai/internal/permission"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestWriteTool_Info(t *testing.T) {
-	tool := NewWriteTool(make(map[string]*lsp.Client))
+	tool := NewWriteTool(make(map[string]*lsp.Client), newMockPermissionService(true))
 	info := tool.Info()
 
 	assert.Equal(t, WriteToolName, info.Name)
@@ -27,21 +26,13 @@ func TestWriteTool_Info(t *testing.T) {
 }
 
 func TestWriteTool_Run(t *testing.T) {
-	// Setup a mock permission handler that always allows
-	origPermission := permission.Default
-	defer func() {
-		permission.Default = origPermission
-	}()
-	permission.Default = newMockPermissionService(true)
-
 	// Create a temporary directory for testing
 	tempDir, err := os.MkdirTemp("", "write_tool_test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
 	t.Run("creates a new file successfully", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewWriteTool(make(map[string]*lsp.Client))
+		tool := NewWriteTool(make(map[string]*lsp.Client), newMockPermissionService(true))
 
 		filePath := filepath.Join(tempDir, "new_file.txt")
 		content := "This is a test content"
@@ -70,8 +61,7 @@ func TestWriteTool_Run(t *testing.T) {
 	})
 
 	t.Run("creates file with nested directories", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewWriteTool(make(map[string]*lsp.Client))
+		tool := NewWriteTool(make(map[string]*lsp.Client), newMockPermissionService(true))
 
 		filePath := filepath.Join(tempDir, "nested/dirs/new_file.txt")
 		content := "Content in nested directory"
@@ -100,8 +90,7 @@ func TestWriteTool_Run(t *testing.T) {
 	})
 
 	t.Run("updates existing file", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewWriteTool(make(map[string]*lsp.Client))
+		tool := NewWriteTool(make(map[string]*lsp.Client), newMockPermissionService(true))
 
 		// Create a file first
 		filePath := filepath.Join(tempDir, "existing_file.txt")
@@ -138,8 +127,7 @@ func TestWriteTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles invalid parameters", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewWriteTool(make(map[string]*lsp.Client))
+		tool := NewWriteTool(make(map[string]*lsp.Client), newMockPermissionService(true))
 
 		call := ToolCall{
 			Name:  WriteToolName,
@@ -152,8 +140,7 @@ func TestWriteTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles missing file_path", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewWriteTool(make(map[string]*lsp.Client))
+		tool := NewWriteTool(make(map[string]*lsp.Client), newMockPermissionService(true))
 
 		params := WriteParams{
 			FilePath: "",
@@ -174,8 +161,7 @@ func TestWriteTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles missing content", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewWriteTool(make(map[string]*lsp.Client))
+		tool := NewWriteTool(make(map[string]*lsp.Client), newMockPermissionService(true))
 
 		params := WriteParams{
 			FilePath: filepath.Join(tempDir, "file.txt"),
@@ -196,8 +182,7 @@ func TestWriteTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles writing to a directory path", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewWriteTool(make(map[string]*lsp.Client))
+		tool := NewWriteTool(make(map[string]*lsp.Client), newMockPermissionService(true))
 
 		// Create a directory
 		dirPath := filepath.Join(tempDir, "test_dir")
@@ -223,8 +208,7 @@ func TestWriteTool_Run(t *testing.T) {
 	})
 
 	t.Run("handles permission denied", func(t *testing.T) {
-		permission.Default = newMockPermissionService(false)
-		tool := NewWriteTool(make(map[string]*lsp.Client))
+		tool := NewWriteTool(make(map[string]*lsp.Client), newMockPermissionService(false))
 
 		filePath := filepath.Join(tempDir, "permission_denied.txt")
 		params := WriteParams{
@@ -250,8 +234,7 @@ func TestWriteTool_Run(t *testing.T) {
 	})
 
 	t.Run("detects file modified since last read", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewWriteTool(make(map[string]*lsp.Client))
+		tool := NewWriteTool(make(map[string]*lsp.Client), newMockPermissionService(true))
 
 		// Create a file
 		filePath := filepath.Join(tempDir, "modified_file.txt")
@@ -292,8 +275,7 @@ func TestWriteTool_Run(t *testing.T) {
 	})
 
 	t.Run("skips writing when content is identical", func(t *testing.T) {
-		permission.Default = newMockPermissionService(true)
-		tool := NewWriteTool(make(map[string]*lsp.Client))
+		tool := NewWriteTool(make(map[string]*lsp.Client), newMockPermissionService(true))
 
 		// Create a file
 		filePath := filepath.Join(tempDir, "identical_content.txt")
@@ -323,4 +305,3 @@ func TestWriteTool_Run(t *testing.T) {
 		assert.Contains(t, response.Content, "already contains the exact content")
 	})
 }
-

@@ -11,13 +11,6 @@ import (
 	"github.com/kujtimiihoxha/termai/internal/config"
 )
 
-type lsTool struct{}
-
-const (
-	LSToolName = "ls"
-	MaxLSFiles = 1000
-)
-
 type LSParams struct {
 	Path   string   `json:"path"`
 	Ignore []string `json:"ignore"`
@@ -30,10 +23,49 @@ type TreeNode struct {
 	Children []*TreeNode `json:"children,omitempty"`
 }
 
+type lsTool struct{}
+
+const (
+	LSToolName    = "ls"
+	MaxLSFiles    = 1000
+	lsDescription = `Directory listing tool that shows files and subdirectories in a tree structure, helping you explore and understand the project organization.
+
+WHEN TO USE THIS TOOL:
+- Use when you need to explore the structure of a directory
+- Helpful for understanding the organization of a project
+- Good first step when getting familiar with a new codebase
+
+HOW TO USE:
+- Provide a path to list (defaults to current working directory)
+- Optionally specify glob patterns to ignore
+- Results are displayed in a tree structure
+
+FEATURES:
+- Displays a hierarchical view of files and directories
+- Automatically skips hidden files/directories (starting with '.')
+- Skips common system directories like __pycache__
+- Can filter out files matching specific patterns
+
+LIMITATIONS:
+- Results are limited to 1000 files
+- Very large directories will be truncated
+- Does not show file sizes or permissions
+- Cannot recursively list all directories in a large project
+
+TIPS:
+- Use Glob tool for finding files by name patterns instead of browsing
+- Use Grep tool for searching file contents
+- Combine with other tools for more effective exploration`
+)
+
+func NewLsTool() BaseTool {
+	return &lsTool{}
+}
+
 func (l *lsTool) Info() ToolInfo {
 	return ToolInfo{
 		Name:        LSToolName,
-		Description: lsDescription(),
+		Description: lsDescription,
 		Parameters: map[string]any{
 			"path": map[string]any{
 				"type":        "string",
@@ -51,25 +83,21 @@ func (l *lsTool) Info() ToolInfo {
 	}
 }
 
-// Run implements Tool.
 func (l *lsTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error) {
 	var params LSParams
 	if err := json.Unmarshal([]byte(call.Input), &params); err != nil {
 		return NewTextErrorResponse(fmt.Sprintf("error parsing parameters: %s", err)), nil
 	}
 
-	// If path is empty, use current working directory
 	searchPath := params.Path
 	if searchPath == "" {
 		searchPath = config.WorkingDirectory()
 	}
 
-	// Ensure the path is absolute
 	if !filepath.IsAbs(searchPath) {
 		searchPath = filepath.Join(config.WorkingDirectory(), searchPath)
 	}
 
-	// Check if the path exists
 	if _, err := os.Stat(searchPath); os.IsNotExist(err) {
 		return NewTextErrorResponse(fmt.Sprintf("path does not exist: %s", searchPath)), nil
 	}
@@ -129,12 +157,10 @@ func listDirectory(initialPath string, ignorePatterns []string, limit int) ([]st
 func shouldSkip(path string, ignorePatterns []string) bool {
 	base := filepath.Base(path)
 
-	// Skip hidden files and directories
 	if base != "." && strings.HasPrefix(base, ".") {
 		return true
 	}
 
-	// Skip common directories and files
 	commonIgnored := []string{
 		"__pycache__",
 		"node_modules",
@@ -156,32 +182,26 @@ func shouldSkip(path string, ignorePatterns []string) bool {
 		"*.exe",
 	}
 
-	// Skip __pycache__ directories
 	if strings.Contains(path, filepath.Join("__pycache__", "")) {
 		return true
 	}
 
-	// Check against common ignored patterns
 	for _, ignored := range commonIgnored {
 		if strings.HasSuffix(ignored, "/") {
-			// Directory pattern
 			if strings.Contains(path, filepath.Join(ignored[:len(ignored)-1], "")) {
 				return true
 			}
 		} else if strings.HasPrefix(ignored, "*.") {
-			// File extension pattern
 			if strings.HasSuffix(base, ignored[1:]) {
 				return true
 			}
 		} else {
-			// Exact match
 			if base == ignored {
 				return true
 			}
 		}
 	}
 
-	// Check against ignore patterns
 	for _, pattern := range ignorePatterns {
 		matched, err := filepath.Match(pattern, base)
 		if err == nil && matched {
@@ -282,39 +302,4 @@ func printNode(builder *strings.Builder, node *TreeNode, level int) {
 			printNode(builder, child, level+1)
 		}
 	}
-}
-
-func lsDescription() string {
-	return `Directory listing tool that shows files and subdirectories in a tree structure, helping you explore and understand the project organization.
-
-WHEN TO USE THIS TOOL:
-- Use when you need to explore the structure of a directory
-- Helpful for understanding the organization of a project
-- Good first step when getting familiar with a new codebase
-
-HOW TO USE:
-- Provide a path to list (defaults to current working directory)
-- Optionally specify glob patterns to ignore
-- Results are displayed in a tree structure
-
-FEATURES:
-- Displays a hierarchical view of files and directories
-- Automatically skips hidden files/directories (starting with '.')
-- Skips common system directories like __pycache__
-- Can filter out files matching specific patterns
-
-LIMITATIONS:
-- Results are limited to 1000 files
-- Very large directories will be truncated
-- Does not show file sizes or permissions
-- Cannot recursively list all directories in a large project
-
-TIPS:
-- Use Glob tool for finding files by name patterns instead of browsing
-- Use Grep tool for searching file contents
-- Combine with other tools for more effective exploration`
-}
-
-func NewLsTool() BaseTool {
-	return &lsTool{}
 }

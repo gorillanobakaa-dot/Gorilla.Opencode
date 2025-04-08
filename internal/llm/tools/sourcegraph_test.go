@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/kujtimiihoxha/termai/internal/permission"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,13 +22,6 @@ func TestSourcegraphTool_Info(t *testing.T) {
 }
 
 func TestSourcegraphTool_Run(t *testing.T) {
-	// Setup a mock permission handler that always allows
-	origPermission := permission.Default
-	defer func() {
-		permission.Default = origPermission
-	}()
-	permission.Default = newMockPermissionService(true)
-
 	t.Run("handles missing query parameter", func(t *testing.T) {
 		tool := NewSourcegraphTool()
 		params := SourcegraphParams{
@@ -59,27 +51,6 @@ func TestSourcegraphTool_Run(t *testing.T) {
 		response, err := tool.Run(context.Background(), call)
 		require.NoError(t, err)
 		assert.Contains(t, response.Content, "Failed to parse sourcegraph parameters")
-	})
-
-	t.Run("handles permission denied", func(t *testing.T) {
-		permission.Default = newMockPermissionService(false)
-
-		tool := NewSourcegraphTool()
-		params := SourcegraphParams{
-			Query: "test query",
-		}
-
-		paramsJSON, err := json.Marshal(params)
-		require.NoError(t, err)
-
-		call := ToolCall{
-			Name:  SourcegraphToolName,
-			Input: string(paramsJSON),
-		}
-
-		response, err := tool.Run(context.Background(), call)
-		require.NoError(t, err)
-		assert.Contains(t, response.Content, "Permission denied")
 	})
 
 	t.Run("normalizes count parameter", func(t *testing.T) {

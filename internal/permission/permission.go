@@ -100,5 +100,3 @@ func NewPermissionService() Service {
 		sessionPermissions: make([]PermissionRequest, 0),
 	}
 }
-
-var Default Service = NewPermissionService()

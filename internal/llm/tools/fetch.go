@@ -15,6 +15,23 @@ import (
 	"github.com/kujtimiihoxha/termai/internal/permission"
 )
 
+type FetchParams struct {
+	URL     string `json:"url"`
+	Format  string `json:"format"`
+	Timeout int    `json:"timeout,omitempty"`
+}
+
+type FetchPermissionsParams struct {
+	URL     string `json:"url"`
+	Format  string `json:"format"`
+	Timeout int    `json:"timeout,omitempty"`
+}
+
+type fetchTool struct {
+	client      *http.Client
+	permissions permission.Service
+}
+
 const (
 	FetchToolName        = "fetch"
 	fetchToolDescription = `Fetches content from a URL and returns it in the specified format.
@@ -48,27 +65,12 @@ TIPS:
 - Set appropriate timeouts for potentially slow websites`
 )
 
-type FetchParams struct {
-	URL     string `json:"url"`
-	Format  string `json:"format"`
-	Timeout int    `json:"timeout,omitempty"`
-}
-
-type FetchPermissionsParams struct {
-	URL     string `json:"url"`
-	Format  string `json:"format"`
-	Timeout int    `json:"timeout,omitempty"`
-}
-
-type fetchTool struct {
-	client *http.Client
-}
-
-func NewFetchTool() BaseTool {
+func NewFetchTool(permissions permission.Service) BaseTool {
 	return &fetchTool{
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		permissions: permissions,
 	}
 }
 
@@ -113,7 +115,7 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		return NewTextErrorResponse("URL must start with http:// or https://"), nil
 	}
 
-	p := permission.Default.Request(
+	p := t.permissions.Request(
 		permission.CreatePermissionRequest{
 			Path:        config.WorkingDirectory(),
 			ToolName:    FetchToolName,
@@ -220,4 +222,3 @@ func convertHTMLToMarkdown(html string) (string, error) {
 
 	return markdown, nil
 }
-
