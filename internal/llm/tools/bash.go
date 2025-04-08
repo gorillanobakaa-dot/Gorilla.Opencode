@@ -214,8 +214,8 @@ func (b *bashTool) Info() ToolInfo {
 				"description": "The command to execute",
 			},
 			"timeout": map[string]any{
-				"type":       "number",
-				"desription": "Optional timeout in milliseconds (max 600000)",
+				"type":        "number",
+				"description": "Optional timeout in milliseconds (max 600000)",
 			},
 		},
 		Required: []string{"command"},
