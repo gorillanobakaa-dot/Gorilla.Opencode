@@ -17,6 +17,8 @@ const (
 	EventContentStop   EventType = "content_stop"
 	EventComplete      EventType = "complete"
 	EventError         EventType = "error"
+	EventWarning       EventType = "warning"
+	EventInfo          EventType = "info"
 )
 
 type TokenUsage struct {
@@ -40,6 +42,9 @@ type ProviderEvent struct {
 	ToolCall *message.ToolCall
 	Error    error
 	Response *ProviderResponse
+
+	// Used for giving users info on e.x retry
+	Info string
 }
 
 type Provider interface {

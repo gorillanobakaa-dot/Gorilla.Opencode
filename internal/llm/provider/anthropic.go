@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -68,21 +70,24 @@ func (a *anthropicProvider) SendMessages(ctx context.Context, messages []message
 	anthropicMessages := a.convertToAnthropicMessages(messages)
 	anthropicTools := a.convertToAnthropicTools(tools)
 
-	response, err := a.client.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:       anthropic.Model(a.model.APIModel),
-		MaxTokens:   a.maxTokens,
-		Temperature: anthropic.Float(0),
-		Messages:    anthropicMessages,
-		Tools:       anthropicTools,
-		System: []anthropic.TextBlockParam{
-			{
-				Text: a.systemMessage,
-				CacheControl: anthropic.CacheControlEphemeralParam{
-					Type: "ephemeral",
+	response, err := a.client.Messages.New(
+		ctx,
+		anthropic.MessageNewParams{
+			Model:       anthropic.Model(a.model.APIModel),
+			MaxTokens:   a.maxTokens,
+			Temperature: anthropic.Float(0),
+			Messages:    anthropicMessages,
+			Tools:       anthropicTools,
+			System: []anthropic.TextBlockParam{
+				{
+					Text: a.systemMessage,
+					CacheControl: anthropic.CacheControlEphemeralParam{
+						Type: "ephemeral",
+					},
 				},
 			},
 		},
-	})
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -121,83 +126,171 @@ func (a *anthropicProvider) StreamResponse(ctx context.Context, messages []messa
 		temperature = anthropic.Float(1)
 	}
 
-	stream := a.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
-		Model:       anthropic.Model(a.model.APIModel),
-		MaxTokens:   a.maxTokens,
-		Temperature: temperature,
-		Messages:    anthropicMessages,
-		Tools:       anthropicTools,
-		Thinking:    thinkingParam,
-		System: []anthropic.TextBlockParam{
-			{
-				Text: a.systemMessage,
-				CacheControl: anthropic.CacheControlEphemeralParam{
-					Type: "ephemeral",
-				},
-			},
-		},
-	})
-
 	eventChan := make(chan ProviderEvent)
 
 	go func() {
 		defer close(eventChan)
 
-		accumulatedMessage := anthropic.Message{}
+		const maxRetries = 8
+		attempts := 0
 
-		for stream.Next() {
-			event := stream.Current()
-			err := accumulatedMessage.Accumulate(event)
-			if err != nil {
-				eventChan <- ProviderEvent{Type: EventError, Error: err}
+		for {
+			// If this isn't the first attempt, we're retrying
+			if attempts > 0 {
+				if attempts > maxRetries {
+					eventChan <- ProviderEvent{
+						Type:  EventError,
+						Error: errors.New("maximum retry attempts reached for rate limit (429)"),
+					}
+					return
+				}
+
+				// Inform user we're retrying with attempt number
+				eventChan <- ProviderEvent{
+					Type: EventWarning,
+					Info: fmt.Sprintf("[Retrying due to rate limit... attempt %d of %d]", attempts, maxRetries),
+				}
+
+				// Calculate backoff with exponential backoff and jitter
+				backoffMs := 2000 * (1 << (attempts - 1)) // 2s, 4s, 8s, 16s, 32s
+				jitterMs := int(float64(backoffMs) * 0.2)
+				totalBackoffMs := backoffMs + jitterMs
+
+				// Sleep with backoff, respecting context cancellation
+				select {
+				case <-ctx.Done():
+					eventChan <- ProviderEvent{Type: EventError, Error: ctx.Err()}
+					return
+				case <-time.After(time.Duration(totalBackoffMs) * time.Millisecond):
+					// Continue with retry
+				}
+			}
+
+			attempts++
+
+			// Create new streaming request
+			stream := a.client.Messages.NewStreaming(
+				ctx,
+				anthropic.MessageNewParams{
+					Model:       anthropic.Model(a.model.APIModel),
+					MaxTokens:   a.maxTokens,
+					Temperature: temperature,
+					Messages:    anthropicMessages,
+					Tools:       anthropicTools,
+					Thinking:    thinkingParam,
+					System: []anthropic.TextBlockParam{
+						{
+							Text: a.systemMessage,
+							CacheControl: anthropic.CacheControlEphemeralParam{
+								Type: "ephemeral",
+							},
+						},
+					},
+				},
+			)
+
+			// Process stream events
+			accumulatedMessage := anthropic.Message{}
+			streamSuccess := false
+
+			// Process the stream until completion or error
+			for stream.Next() {
+				event := stream.Current()
+				err := accumulatedMessage.Accumulate(event)
+				if err != nil {
+					eventChan <- ProviderEvent{Type: EventError, Error: err}
+					return // Don't retry on accumulation errors
+				}
+
+				switch event := event.AsAny().(type) {
+				case anthropic.ContentBlockStartEvent:
+					eventChan <- ProviderEvent{Type: EventContentStart}
+
+				case anthropic.ContentBlockDeltaEvent:
+					if event.Delta.Type == "thinking_delta" && event.Delta.Thinking != "" {
+						eventChan <- ProviderEvent{
+							Type:     EventThinkingDelta,
+							Thinking: event.Delta.Thinking,
+						}
+					} else if event.Delta.Type == "text_delta" && event.Delta.Text != "" {
+						eventChan <- ProviderEvent{
+							Type:    EventContentDelta,
+							Content: event.Delta.Text,
+						}
+					}
+
+				case anthropic.ContentBlockStopEvent:
+					eventChan <- ProviderEvent{Type: EventContentStop}
+
+				case anthropic.MessageStopEvent:
+					streamSuccess = true
+					content := ""
+					for _, block := range accumulatedMessage.Content {
+						if text, ok := block.AsAny().(anthropic.TextBlock); ok {
+							content += text.Text
+						}
+					}
+
+					toolCalls := a.extractToolCalls(accumulatedMessage.Content)
+					tokenUsage := a.extractTokenUsage(accumulatedMessage.Usage)
+
+					eventChan <- ProviderEvent{
+						Type: EventComplete,
+						Response: &ProviderResponse{
+							Content:      content,
+							ToolCalls:    toolCalls,
+							Usage:        tokenUsage,
+							FinishReason: string(accumulatedMessage.StopReason),
+						},
+					}
+				}
+			}
+
+			// If the stream completed successfully, we're done
+			if streamSuccess {
 				return
 			}
 
-			switch event := event.AsAny().(type) {
-			case anthropic.ContentBlockStartEvent:
-				eventChan <- ProviderEvent{Type: EventContentStart}
+			// Check for stream errors
+			err := stream.Err()
+			if err != nil {
+				var apierr *anthropic.Error
+				if errors.As(err, &apierr) {
+					if apierr.StatusCode == 429 || apierr.StatusCode == 529 {
+						// Check for Retry-After header
+						if retryAfterValues := apierr.Response.Header.Values("Retry-After"); len(retryAfterValues) > 0 {
+							// Parse the retry after value (seconds)
+							var retryAfterSec int
+							if _, err := fmt.Sscanf(retryAfterValues[0], "%d", &retryAfterSec); err == nil {
+								retryMs := retryAfterSec * 1000
 
-			case anthropic.ContentBlockDeltaEvent:
-				if event.Delta.Type == "thinking_delta" && event.Delta.Thinking != "" {
-					eventChan <- ProviderEvent{
-						Type:     EventThinkingDelta,
-						Thinking: event.Delta.Thinking,
-					}
-				} else if event.Delta.Type == "text_delta" && event.Delta.Text != "" {
-					eventChan <- ProviderEvent{
-						Type:    EventContentDelta,
-						Content: event.Delta.Text,
+								// Inform user of retry with specific wait time
+								eventChan <- ProviderEvent{
+									Type: EventWarning,
+									Info: fmt.Sprintf("[Rate limited: waiting %d seconds as specified by API]", retryAfterSec),
+								}
+
+								// Sleep respecting context cancellation
+								select {
+								case <-ctx.Done():
+									eventChan <- ProviderEvent{Type: EventError, Error: ctx.Err()}
+									return
+								case <-time.After(time.Duration(retryMs) * time.Millisecond):
+									// Continue with retry after specified delay
+									continue
+								}
+							}
+						}
+
+						// Fall back to exponential backoff if Retry-After parsing failed
+						continue
 					}
 				}
 
-			case anthropic.ContentBlockStopEvent:
-				eventChan <- ProviderEvent{Type: EventContentStop}
-
-			case anthropic.MessageStopEvent:
-				content := ""
-				for _, block := range accumulatedMessage.Content {
-					if text, ok := block.AsAny().(anthropic.TextBlock); ok {
-						content += text.Text
-					}
-				}
-
-				toolCalls := a.extractToolCalls(accumulatedMessage.Content)
-				tokenUsage := a.extractTokenUsage(accumulatedMessage.Usage)
-
-				eventChan <- ProviderEvent{
-					Type: EventComplete,
-					Response: &ProviderResponse{
-						Content:      content,
-						ToolCalls:    toolCalls,
-						Usage:        tokenUsage,
-						FinishReason: string(accumulatedMessage.StopReason),
-					},
-				}
+				// For non-rate limit errors, report and exit
+				eventChan <- ProviderEvent{Type: EventError, Error: err}
+				return
 			}
-		}
-
-		if stream.Err() != nil {
-			eventChan <- ProviderEvent{Type: EventError, Error: stream.Err()}
 		}
 	}()
 
@@ -311,3 +404,4 @@ func (a *anthropicProvider) convertToAnthropicMessages(messages []message.Messag
 
 	return anthropicMessages
 }
+
