@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -88,7 +87,6 @@ func (a *anthropicProvider) SendMessages(ctx context.Context, messages []message
 				},
 			},
 		},
-		option.WithMaxRetries(8),
 	)
 	if err != nil {
 		return nil, err
@@ -256,11 +254,37 @@ func (a *anthropicProvider) StreamResponse(ctx context.Context, messages []messa
 			// Check for stream errors
 			err := stream.Err()
 			if err != nil {
-				log.Println("error", err)
-
 				var apierr *anthropic.Error
-				if errors.As(err, &apierr) && apierr.StatusCode == 429 {
-					continue
+				if errors.As(err, &apierr) {
+					if apierr.StatusCode == 429 || apierr.StatusCode == 529 {
+						// Check for Retry-After header
+						if retryAfterValues := apierr.Response.Header.Values("Retry-After"); len(retryAfterValues) > 0 {
+							// Parse the retry after value (seconds)
+							var retryAfterSec int
+							if _, err := fmt.Sscanf(retryAfterValues[0], "%d", &retryAfterSec); err == nil {
+								retryMs := retryAfterSec * 1000
+
+								// Inform user of retry with specific wait time
+								eventChan <- ProviderEvent{
+									Type: EventWarning,
+									Info: fmt.Sprintf("[Rate limited: waiting %d seconds as specified by API]", retryAfterSec),
+								}
+
+								// Sleep respecting context cancellation
+								select {
+								case <-ctx.Done():
+									eventChan <- ProviderEvent{Type: EventError, Error: ctx.Err()}
+									return
+								case <-time.After(time.Duration(retryMs) * time.Millisecond):
+									// Continue with retry after specified delay
+									continue
+								}
+							}
+						}
+
+						// Fall back to exponential backoff if Retry-After parsing failed
+						continue
+					}
 				}
 
 				// For non-rate limit errors, report and exit
@@ -380,3 +404,4 @@ func (a *anthropicProvider) convertToAnthropicMessages(messages []message.Messag
 
 	return anthropicMessages
 }
+

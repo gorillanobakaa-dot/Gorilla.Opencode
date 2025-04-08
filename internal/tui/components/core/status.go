@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/kujtimiihoxha/termai/internal/config"
 	"github.com/kujtimiihoxha/termai/internal/llm/models"
+	"github.com/kujtimiihoxha/termai/internal/pubsub"
 	"github.com/kujtimiihoxha/termai/internal/tui/styles"
 	"github.com/kujtimiihoxha/termai/internal/tui/util"
 	"github.com/kujtimiihoxha/termai/internal/version"
@@ -33,6 +34,9 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
+		return m, m.clearMessageCmd()
+	case pubsub.Event[util.InfoMsg]:
+		m.info = &msg.Payload
 		return m, m.clearMessageCmd()
 	case util.InfoMsg:
 		m.info = &msg
@@ -87,6 +91,6 @@ func (m statusCmp) model() string {
 
 func NewStatusCmp() tea.Model {
 	return &statusCmp{
-		messageTTL: 5 * time.Second,
+		messageTTL: 15 * time.Second,
 	}
 }
