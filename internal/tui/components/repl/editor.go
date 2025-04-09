@@ -1,7 +1,6 @@
 package repl
 
 import (
-	"log"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -140,9 +139,6 @@ func (m *editorCmp) SetSize(width int, height int) {
 func (m *editorCmp) Send() tea.Cmd {
 	return func() tea.Msg {
 		messages, err := m.app.Messages.List(m.sessionID)
-		log.Printf("error: %v", err)
-		log.Printf("messages: %v", messages)
-
 		if err != nil {
 			return util.ReportError(err)
 		}
@@ -150,8 +146,6 @@ func (m *editorCmp) Send() tea.Cmd {
 			return util.ReportWarn("Assistant is still working on the previous message")
 		}
 		a, err := agent.NewCoderAgent(m.app)
-		log.Printf("error: %v", err)
-		log.Printf("agent: %v", a)
 		if err != nil {
 			return util.ReportError(err)
 		}
