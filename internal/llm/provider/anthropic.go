@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/bedrock"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/kujtimiihoxha/termai/internal/llm/models"
 	"github.com/kujtimiihoxha/termai/internal/llm/tools"
@@ -21,6 +22,8 @@ type anthropicProvider struct {
 	maxTokens     int64
 	apiKey        string
 	systemMessage string
+	useBedrock    bool
+	disableCache  bool
 }
 
 type AnthropicOption func(*anthropicProvider)
@@ -49,6 +52,18 @@ func WithAnthropicKey(apiKey string) AnthropicOption {
 	}
 }
 
+func WithAnthropicBedrock() AnthropicOption {
+	return func(a *anthropicProvider) {
+		a.useBedrock = true
+	}
+}
+
+func WithAnthropicDisableCache() AnthropicOption {
+	return func(a *anthropicProvider) {
+		a.disableCache = true
+	}
+}
+
 func NewAnthropicProvider(opts ...AnthropicOption) (Provider, error) {
 	provider := &anthropicProvider{
 		maxTokens: 1024,
@@ -62,7 +77,16 @@ func NewAnthropicProvider(opts ...AnthropicOption) (Provider, error) {
 		return nil, errors.New("system message is required")
 	}
 
-	provider.client = anthropic.NewClient(option.WithAPIKey(provider.apiKey))
+	anthropicOptions := []option.RequestOption{}
+
+	if provider.apiKey != "" {
+		anthropicOptions = append(anthropicOptions, option.WithAPIKey(provider.apiKey))
+	}
+	if provider.useBedrock {
+		anthropicOptions = append(anthropicOptions, bedrock.WithLoadDefaultConfig(context.Background()))
+	}
+
+	provider.client = anthropic.NewClient(anthropicOptions...)
 	return provider, nil
 }
 
@@ -338,7 +362,7 @@ func (a *anthropicProvider) convertToAnthropicTools(tools []tools.BaseTool) []an
 			},
 		}
 
-		if i == len(tools)-1 {
+		if i == len(tools)-1 && !a.disableCache {
 			toolParam.CacheControl = anthropic.CacheControlEphemeralParam{
 				Type: "ephemeral",
 			}
@@ -358,7 +382,7 @@ func (a *anthropicProvider) convertToAnthropicMessages(messages []message.Messag
 		switch msg.Role {
 		case message.User:
 			content := anthropic.NewTextBlock(msg.Content().String())
-			if cachedBlocks < 2 {
+			if cachedBlocks < 2 && !a.disableCache {
 				content.OfRequestTextBlock.CacheControl = anthropic.CacheControlEphemeralParam{
 					Type: "ephemeral",
 				}
@@ -370,7 +394,7 @@ func (a *anthropicProvider) convertToAnthropicMessages(messages []message.Messag
 			blocks := []anthropic.ContentBlockParamUnion{}
 			if msg.Content().String() != "" {
 				content := anthropic.NewTextBlock(msg.Content().String())
-				if cachedBlocks < 2 {
+				if cachedBlocks < 2 && !a.disableCache {
 					content.OfRequestTextBlock.CacheControl = anthropic.CacheControlEphemeralParam{
 						Type: "ephemeral",
 					}
@@ -404,4 +428,3 @@ func (a *anthropicProvider) convertToAnthropicMessages(messages []message.Messag
 
 	return anthropicMessages
 }
-

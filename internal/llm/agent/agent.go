@@ -380,6 +380,29 @@ func getAgentProviders(ctx context.Context, model models.Model) (provider.Provid
 			return nil, nil, err
 		}
 
+	case models.ProviderBedrock:
+		var err error
+		agentProvider, err = provider.NewBedrockProvider(
+			provider.WithBedrockSystemMessage(
+				prompt.CoderAnthropicSystemPrompt(),
+			),
+			provider.WithBedrockMaxTokens(maxTokens),
+			provider.WithBedrockModel(model),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		titleGenerator, err = provider.NewBedrockProvider(
+			provider.WithBedrockSystemMessage(
+				prompt.TitlePrompt(),
+			),
+			provider.WithBedrockMaxTokens(maxTokens),
+			provider.WithBedrockModel(model),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+
 	}
 
 	return agentProvider, titleGenerator, nil

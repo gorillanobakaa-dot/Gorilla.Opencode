@@ -31,11 +31,15 @@ const (
 
 	// GROQ
 	QWENQwq ModelID = "qwen-qwq"
+
+	// Bedrock
+	BedrockClaude37Sonnet ModelID = "bedrock.claude-3.7-sonnet"
 )
 
 const (
 	ProviderOpenAI    ModelProvider = "openai"
 	ProviderAnthropic ModelProvider = "anthropic"
+	ProviderBedrock   ModelProvider = "bedrock"
 	ProviderGemini    ModelProvider = "gemini"
 	ProviderGROQ      ModelProvider = "groq"
 )
@@ -118,5 +122,17 @@ var SupportedModels = map[ModelID]Model{
 		CostPer1MInCached:  0,
 		CostPer1MOutCached: 0,
 		CostPer1MOut:       0,
+	},
+
+	// Bedrock
+	BedrockClaude37Sonnet: {
+		ID:                 BedrockClaude37Sonnet,
+		Name:               "Bedrock: Claude 3.7 Sonnet",
+		Provider:           ProviderBedrock,
+		APIModel:           "anthropic.claude-3-7-sonnet-20250219-v1:0",
+		CostPer1MIn:        3.0,
+		CostPer1MInCached:  3.75,
+		CostPer1MOutCached: 0.30,
+		CostPer1MOut:       15.0,
 	},
 }

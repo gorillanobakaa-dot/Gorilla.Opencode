@@ -36,6 +36,11 @@ type Model struct {
 	// TODO: Maybe support multiple models for different purposes
 }
 
+type AnthropicConfig struct {
+	DisableCache bool `json:"disableCache"`
+	UseBedrock   bool `json:"useBedrock"`
+}
+
 type Provider struct {
 	APIKey  string `json:"apiKey"`
 	Enabled bool   `json:"enabled"`
@@ -130,6 +135,8 @@ func Load(debug bool) error {
 			defaultModelSet = true
 		}
 	}
+
+	viper.SetDefault("providers.bedrock.enabled", true)
 	// TODO: add more providers
 	cfg = &Config{}
 
