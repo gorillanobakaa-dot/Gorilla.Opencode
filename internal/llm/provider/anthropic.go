@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -236,7 +237,7 @@ func (a *anthropicProvider) StreamResponse(ctx context.Context, messages []messa
 			}
 
 			err := stream.Err()
-			if err == nil {
+			if err == nil || errors.Is(err, io.EOF) {
 				return
 			}
 

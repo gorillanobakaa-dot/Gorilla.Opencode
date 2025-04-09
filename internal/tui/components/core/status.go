@@ -68,7 +68,7 @@ func (m statusCmp) View() string {
 		}
 		// Truncate message if it's longer than available width
 		msg := m.info.Msg
-		availWidth := m.availableFooterMsgWidth() - 3 // Account for ellipsis
+		availWidth := m.availableFooterMsgWidth() - 10
 		if len(msg) > availWidth && availWidth > 0 {
 			msg = msg[:availWidth] + "..."
 		}

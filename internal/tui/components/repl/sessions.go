@@ -123,7 +123,6 @@ func (i *sessionsCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, sessionKeyMapValue.Select):
-			i.app.Logger.PersistInfo("Session selected")
 			selected := i.list.SelectedItem()
 			if selected == nil {
 				return i, nil
