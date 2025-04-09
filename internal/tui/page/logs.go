@@ -9,17 +9,12 @@ import (
 var LogsPage PageID = "logs"
 
 func NewLogsPage() tea.Model {
-	p := layout.NewSinglePane(
-		logs.NewLogsTable(),
-		layout.WithSinglePaneFocusable(true),
-		layout.WithSinglePaneBordered(true),
-		layout.WithSignlePaneBorderText(
-			map[layout.BorderPosition]string{
-				layout.TopMiddleBorder: "Logs",
-			},
-		),
-		layout.WithSinglePanePadding(1),
+	return layout.NewBentoLayout(
+		layout.BentoPanes{
+			layout.BentoRightTopPane:    logs.NewLogsTable(),
+			layout.BentoRightBottomPane: logs.NewLogsDetails(),
+		},
+		layout.WithBentoLayoutCurrentPane(layout.BentoRightTopPane),
+		layout.WithBentoLayoutRightTopHeightRatio(0.5),
 	)
-	p.Focus()
-	return p
 }

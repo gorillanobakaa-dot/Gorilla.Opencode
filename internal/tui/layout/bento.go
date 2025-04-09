@@ -187,7 +187,6 @@ func (b *bentoLayout) SetSize(width int, height int) {
 	b.width = width
 	b.height = height
 
-	// Check which panes are available
 	leftExists := false
 	rightTopExists := false
 	rightBottomExists := false
@@ -218,7 +217,6 @@ func (b *bentoLayout) SetSize(width int, height int) {
 			rightTopHeight = int(float64(height) * b.rightTopHeightRatio)
 			rightBottomHeight = height - rightTopHeight
 
-			// Ensure minimum height for bottom pane
 			if rightBottomHeight < minRightBottomHeight && height >= minRightBottomHeight {
 				rightBottomHeight = minRightBottomHeight
 				rightTopHeight = height - rightBottomHeight
@@ -271,23 +269,47 @@ func (b *bentoLayout) HidePane(pane paneID) tea.Cmd {
 }
 
 func (b *bentoLayout) SwitchPane(back bool) tea.Cmd {
+	orderForward := []paneID{BentoLeftPane, BentoRightTopPane, BentoRightBottomPane}
+	orderBackward := []paneID{BentoLeftPane, BentoRightBottomPane, BentoRightTopPane}
+
+	order := orderForward
 	if back {
-		switch b.currentPane {
-		case BentoLeftPane:
-			b.currentPane = BentoRightBottomPane
-		case BentoRightTopPane:
-			b.currentPane = BentoLeftPane
-		case BentoRightBottomPane:
-			b.currentPane = BentoRightTopPane
+		order = orderBackward
+	}
+
+	currentIdx := -1
+	for i, id := range order {
+		if id == b.currentPane {
+			currentIdx = i
+			break
+		}
+	}
+
+	if currentIdx == -1 {
+		for _, id := range order {
+			if _, exists := b.panes[id]; exists {
+				if _, hidden := b.hiddenPanes[id]; !hidden {
+					b.currentPane = id
+					break
+				}
+			}
 		}
 	} else {
-		switch b.currentPane {
-		case BentoLeftPane:
-			b.currentPane = BentoRightTopPane
-		case BentoRightTopPane:
-			b.currentPane = BentoRightBottomPane
-		case BentoRightBottomPane:
-			b.currentPane = BentoLeftPane
+		startIdx := currentIdx
+		for {
+			currentIdx = (currentIdx + 1) % len(order)
+
+			nextID := order[currentIdx]
+			if _, exists := b.panes[nextID]; exists {
+				if _, hidden := b.hiddenPanes[nextID]; !hidden {
+					b.currentPane = nextID
+					break
+				}
+			}
+
+			if currentIdx == startIdx {
+				break
+			}
 		}
 	}
 
@@ -319,7 +341,6 @@ type BentoLayoutOption func(*bentoLayout)
 func NewBentoLayout(panes BentoPanes, opts ...BentoLayoutOption) BentoLayout {
 	p := make(map[paneID]SinglePaneLayout, len(panes))
 	for id, pane := range panes {
-		// Wrap any pane that is not a SinglePaneLayout in a SinglePaneLayout
 		if sp, ok := pane.(SinglePaneLayout); !ok {
 			p[id] = NewSinglePane(
 				pane,

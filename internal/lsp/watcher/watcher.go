@@ -3,7 +3,6 @@ package watcher
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,11 +10,13 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/kujtimiihoxha/termai/internal/config"
+	"github.com/kujtimiihoxha/termai/internal/logging"
 	"github.com/kujtimiihoxha/termai/internal/lsp"
 	"github.com/kujtimiihoxha/termai/internal/lsp/protocol"
 )
 
-var debug = false // Force debug logging on
+var logger = logging.Get()
 
 // WorkspaceWatcher manages LSP file watching
 type WorkspaceWatcher struct {
@@ -43,6 +44,7 @@ func NewWorkspaceWatcher(client *lsp.Client) *WorkspaceWatcher {
 
 // AddRegistrations adds file watchers to track
 func (w *WorkspaceWatcher) AddRegistrations(ctx context.Context, id string, watchers []protocol.FileSystemWatcher) {
+	cnf := config.Get()
 	w.registrationMu.Lock()
 	defer w.registrationMu.Unlock()
 
@@ -50,31 +52,35 @@ func (w *WorkspaceWatcher) AddRegistrations(ctx context.Context, id string, watc
 	w.registrations = append(w.registrations, watchers...)
 
 	// Print detailed registration information for debugging
-	if debug {
-		log.Printf("Added %d file watcher registrations (id: %s), total: %d",
-			len(watchers), id, len(w.registrations))
+	if cnf.Debug {
+		logger.Debug("Adding file watcher registrations",
+			"id", id,
+			"watchers", len(watchers),
+			"total", len(w.registrations),
+			"watchers", watchers,
+		)
 
 		for i, watcher := range watchers {
-			log.Printf("Registration #%d raw data:", i+1)
+			logger.Debug("Registration", "index", i+1)
 
 			// Log the GlobPattern
 			switch v := watcher.GlobPattern.Value.(type) {
 			case string:
-				log.Printf("  GlobPattern: string pattern '%s'", v)
+				logger.Debug("GlobPattern", "pattern", v)
 			case protocol.RelativePattern:
-				log.Printf("  GlobPattern: RelativePattern with pattern '%s'", v.Pattern)
+				logger.Debug("GlobPattern", "pattern", v.Pattern)
 
 				// Log BaseURI details
 				switch u := v.BaseURI.Value.(type) {
 				case string:
-					log.Printf("    BaseURI: string '%s'", u)
+					logger.Debug("BaseURI", "baseURI", u)
 				case protocol.DocumentUri:
-					log.Printf("    BaseURI: DocumentUri '%s'", u)
+					logger.Debug("BaseURI", "baseURI", u)
 				default:
-					log.Printf("    BaseURI: unknown type %T", u)
+					logger.Debug("BaseURI", "baseURI", u)
 				}
 			default:
-				log.Printf("  GlobPattern: unknown type %T", v)
+				logger.Debug("GlobPattern", "unknown type", fmt.Sprintf("%T", v))
 			}
 
 			// Log WatchKind
@@ -82,11 +88,8 @@ func (w *WorkspaceWatcher) AddRegistrations(ctx context.Context, id string, watc
 			if watcher.Kind != nil {
 				watchKind = *watcher.Kind
 			}
-			log.Printf("  WatchKind: %d (Create:%v, Change:%v, Delete:%v)",
-				watchKind,
-				watchKind&protocol.WatchCreate != 0,
-				watchKind&protocol.WatchChange != 0,
-				watchKind&protocol.WatchDelete != 0)
+
+			logger.Debug("WatchKind", "kind", watchKind)
 
 			// Test match against some example paths
 			testPaths := []string{
@@ -96,7 +99,7 @@ func (w *WorkspaceWatcher) AddRegistrations(ctx context.Context, id string, watc
 
 			for _, testPath := range testPaths {
 				isMatch := w.matchesPattern(testPath, watcher.GlobPattern)
-				log.Printf("  Test path '%s': %v", testPath, isMatch)
+				logger.Debug("Test path", "path", testPath, "matches", isMatch)
 			}
 		}
 	}
@@ -114,10 +117,9 @@ func (w *WorkspaceWatcher) AddRegistrations(ctx context.Context, id string, watc
 
 			// Skip directories that should be excluded
 			if d.IsDir() {
-				log.Println(path)
 				if path != w.workspacePath && shouldExcludeDir(path) {
-					if debug {
-						log.Printf("Skipping excluded directory!!: %s", path)
+					if cnf.Debug {
+						logger.Debug("Skipping excluded directory", "path", path)
 					}
 					return filepath.SkipDir
 				}
@@ -136,18 +138,23 @@ func (w *WorkspaceWatcher) AddRegistrations(ctx context.Context, id string, watc
 		})
 
 		elapsedTime := time.Since(startTime)
-		if debug {
-			log.Printf("Workspace scan complete: processed %d files in %.2f seconds", filesOpened, elapsedTime.Seconds())
+		if cnf.Debug {
+			logger.Debug("Workspace scan complete",
+				"filesOpened", filesOpened,
+				"elapsedTime", elapsedTime.Seconds(),
+				"workspacePath", w.workspacePath,
+			)
 		}
 
-		if err != nil && debug {
-			log.Printf("Error scanning workspace for files to open: %v", err)
+		if err != nil && cnf.Debug {
+			logger.Debug("Error scanning workspace for files to open", "error", err)
 		}
 	}()
 }
 
 // WatchWorkspace sets up file watching for a workspace
 func (w *WorkspaceWatcher) WatchWorkspace(ctx context.Context, workspacePath string) {
+	cnf := config.Get()
 	w.workspacePath = workspacePath
 
 	// Register handler for file watcher registrations from the server
@@ -157,7 +164,7 @@ func (w *WorkspaceWatcher) WatchWorkspace(ctx context.Context, workspacePath str
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatalf("Error creating watcher: %v", err)
+		logger.Error("Error creating watcher", "error", err)
 	}
 	defer watcher.Close()
 
@@ -170,8 +177,8 @@ func (w *WorkspaceWatcher) WatchWorkspace(ctx context.Context, workspacePath str
 		// Skip excluded directories (except workspace root)
 		if d.IsDir() && path != workspacePath {
 			if shouldExcludeDir(path) {
-				if debug {
-					log.Printf("Skipping watching excluded directory: %s", path)
+				if cnf.Debug {
+					logger.Debug("Skipping excluded directory", "path", path)
 				}
 				return filepath.SkipDir
 			}
@@ -181,14 +188,14 @@ func (w *WorkspaceWatcher) WatchWorkspace(ctx context.Context, workspacePath str
 		if d.IsDir() {
 			err = watcher.Add(path)
 			if err != nil {
-				log.Printf("Error watching path %s: %v", path, err)
+				logger.Error("Error watching path", "path", path, "error", err)
 			}
 		}
 
 		return nil
 	})
 	if err != nil {
-		log.Fatalf("Error walking workspace: %v", err)
+		logger.Error("Error walking workspace", "error", err)
 	}
 
 	// Event loop
@@ -210,7 +217,7 @@ func (w *WorkspaceWatcher) WatchWorkspace(ctx context.Context, workspacePath str
 						// Skip excluded directories
 						if !shouldExcludeDir(event.Name) {
 							if err := watcher.Add(event.Name); err != nil {
-								log.Printf("Error watching new directory: %v", err)
+								logger.Error("Error adding directory to watcher", "path", event.Name, "error", err)
 							}
 						}
 					} else {
@@ -223,10 +230,15 @@ func (w *WorkspaceWatcher) WatchWorkspace(ctx context.Context, workspacePath str
 			}
 
 			// Debug logging
-			if debug {
+			if cnf.Debug {
 				matched, kind := w.isPathWatched(event.Name)
-				log.Printf("Event: %s, Op: %s, Watched: %v, Kind: %d",
-					event.Name, event.Op.String(), matched, kind)
+				logger.Debug("File event",
+					"path", event.Name,
+					"operation", event.Op.String(),
+					"watched", matched,
+					"kind", kind,
+				)
+
 			}
 
 			// Check if this path should be watched according to server registrations
@@ -265,7 +277,7 @@ func (w *WorkspaceWatcher) WatchWorkspace(ctx context.Context, workspacePath str
 			if !ok {
 				return
 			}
-			log.Printf("Watcher error: %v\n", err)
+			logger.Error("Error watching file", "error", err)
 		}
 	}
 }
@@ -390,7 +402,7 @@ func matchesSimpleGlob(pattern, path string) bool {
 	// Fall back to simple matching for simpler patterns
 	matched, err := filepath.Match(pattern, path)
 	if err != nil {
-		log.Printf("Error matching pattern %s: %v", pattern, err)
+		logger.Error("Error matching pattern", "pattern", pattern, "path", path, "error", err)
 		return false
 	}
 
@@ -401,7 +413,7 @@ func matchesSimpleGlob(pattern, path string) bool {
 func (w *WorkspaceWatcher) matchesPattern(path string, pattern protocol.GlobPattern) bool {
 	patternInfo, err := pattern.AsPattern()
 	if err != nil {
-		log.Printf("Error parsing pattern: %v", err)
+		logger.Error("Error parsing pattern", "pattern", pattern, "error", err)
 		return false
 	}
 
@@ -426,7 +438,7 @@ func (w *WorkspaceWatcher) matchesPattern(path string, pattern protocol.GlobPatt
 	// Make path relative to basePath for matching
 	relPath, err := filepath.Rel(basePath, path)
 	if err != nil {
-		log.Printf("Error getting relative path for %s: %v", path, err)
+		logger.Error("Error getting relative path", "path", path, "basePath", basePath, "error", err)
 		return false
 	}
 	relPath = filepath.ToSlash(relPath)
@@ -467,21 +479,25 @@ func (w *WorkspaceWatcher) handleFileEvent(ctx context.Context, uri string, chan
 	if changeType == protocol.FileChangeType(protocol.Changed) && w.client.IsFileOpen(filePath) {
 		err := w.client.NotifyChange(ctx, filePath)
 		if err != nil {
-			log.Printf("Error notifying change: %v", err)
+			logger.Error("Error notifying change", "error", err)
 		}
 		return
 	}
 
 	// Notify LSP server about the file event using didChangeWatchedFiles
 	if err := w.notifyFileEvent(ctx, uri, changeType); err != nil {
-		log.Printf("Error notifying LSP server about file event: %v", err)
+		logger.Error("Error notifying LSP server about file event", "error", err)
 	}
 }
 
 // notifyFileEvent sends a didChangeWatchedFiles notification for a file event
 func (w *WorkspaceWatcher) notifyFileEvent(ctx context.Context, uri string, changeType protocol.FileChangeType) error {
-	if debug {
-		log.Printf("Notifying file event: %s (type: %d)", uri, changeType)
+	cnf := config.Get()
+	if cnf.Debug {
+		logger.Debug("Notifying file event",
+			"uri", uri,
+			"changeType", changeType,
+		)
 	}
 
 	params := protocol.DidChangeWatchedFilesParams{
@@ -575,7 +591,7 @@ func shouldExcludeDir(dirPath string) bool {
 // shouldExcludeFile returns true if the file should be excluded from opening
 func shouldExcludeFile(filePath string) bool {
 	fileName := filepath.Base(filePath)
-
+	cnf := config.Get()
 	// Skip dot files
 	if strings.HasPrefix(fileName, ".") {
 		return true
@@ -601,8 +617,15 @@ func shouldExcludeFile(filePath string) bool {
 
 	// Skip large files
 	if info.Size() > maxFileSize {
-		if debug {
-			log.Printf("Skipping large file: %s (%.2f MB)", filePath, float64(info.Size())/(1024*1024))
+		if cnf.Debug {
+			logger.Debug("Skipping large file",
+				"path", filePath,
+				"size", info.Size(),
+				"maxSize", maxFileSize,
+				"debug", cnf.Debug,
+				"sizeMB", float64(info.Size())/(1024*1024),
+				"maxSizeMB", float64(maxFileSize)/(1024*1024),
+			)
 		}
 		return true
 	}
@@ -612,6 +635,7 @@ func shouldExcludeFile(filePath string) bool {
 
 // openMatchingFile opens a file if it matches any of the registered patterns
 func (w *WorkspaceWatcher) openMatchingFile(ctx context.Context, path string) {
+	cnf := config.Get()
 	// Skip directories
 	info, err := os.Stat(path)
 	if err != nil || info.IsDir() {
@@ -626,8 +650,8 @@ func (w *WorkspaceWatcher) openMatchingFile(ctx context.Context, path string) {
 	// Check if this path should be watched according to server registrations
 	if watched, _ := w.isPathWatched(path); watched {
 		// Don't need to check if it's already open - the client.OpenFile handles that
-		if err := w.client.OpenFile(ctx, path); err != nil && debug {
-			log.Printf("Error opening file %s: %v", path, err)
+		if err := w.client.OpenFile(ctx, path); err != nil && cnf.Debug {
+			logger.Error("Error opening file", "path", path, "error", err)
 		}
 	}
 }

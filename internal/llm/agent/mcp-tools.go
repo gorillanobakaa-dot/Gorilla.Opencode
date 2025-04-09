@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/kujtimiihoxha/termai/internal/config"
 	"github.com/kujtimiihoxha/termai/internal/llm/tools"
+	"github.com/kujtimiihoxha/termai/internal/logging"
 	"github.com/kujtimiihoxha/termai/internal/permission"
 	"github.com/kujtimiihoxha/termai/internal/version"
 
@@ -21,6 +21,8 @@ type mcpTool struct {
 	mcpConfig   config.MCPServer
 	permissions permission.Service
 }
+
+var logger = logging.Get()
 
 type MCPClient interface {
 	Initialize(
@@ -141,13 +143,13 @@ func getTools(ctx context.Context, name string, m config.MCPServer, permissions 
 
 	_, err := c.Initialize(ctx, initRequest)
 	if err != nil {
-		log.Printf("error initializing mcp client: %s", err)
+		logger.Error("error initializing mcp client", "error", err)
 		return stdioTools
 	}
 	toolsRequest := mcp.ListToolsRequest{}
 	tools, err := c.ListTools(ctx, toolsRequest)
 	if err != nil {
-		log.Printf("error listing tools: %s", err)
+		logger.Error("error listing tools", "error", err)
 		return stdioTools
 	}
 	for _, t := range tools.Tools {
@@ -170,7 +172,7 @@ func GetMcpTools(ctx context.Context, permissions permission.Service) []tools.Ba
 				m.Args...,
 			)
 			if err != nil {
-				log.Printf("error creating mcp client: %s", err)
+				logger.Error("error creating mcp client", "error", err)
 				continue
 			}
 
@@ -181,7 +183,7 @@ func GetMcpTools(ctx context.Context, permissions permission.Service) []tools.Ba
 				client.WithHeaders(m.Headers),
 			)
 			if err != nil {
-				log.Printf("error creating mcp client: %s", err)
+				logger.Error("error creating mcp client", "error", err)
 				continue
 			}
 			mcpTools = append(mcpTools, getTools(ctx, name, m, permissions, c)...)

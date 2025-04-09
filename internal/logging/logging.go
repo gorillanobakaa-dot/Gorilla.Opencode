@@ -11,7 +11,13 @@ type Interface interface {
 	Info(msg string, args ...any)
 	Warn(msg string, args ...any)
 	Error(msg string, args ...any)
-	Subscribe(ctx context.Context) <-chan pubsub.Event[Message]
+	Subscribe(ctx context.Context) <-chan pubsub.Event[LogMessage]
 
-	List() []Message
+	PersistDebug(msg string, args ...any)
+	PersistInfo(msg string, args ...any)
+	PersistWarn(msg string, args ...any)
+	PersistError(msg string, args ...any)
+	List() []LogMessage
+
+	SetLevel(level string)
 }

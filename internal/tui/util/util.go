@@ -1,6 +1,10 @@
 package util
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 func CmdHandler(msg tea.Msg) tea.Cmd {
 	return func() tea.Msg {
@@ -41,6 +45,7 @@ type (
 	InfoMsg struct {
 		Type InfoType
 		Msg  string
+		TTL  time.Duration
 	}
 	ClearStatusMsg struct{}
 )

@@ -11,9 +11,7 @@ import (
 	"github.com/kujtimiihoxha/termai/internal/lsp/watcher"
 	"github.com/kujtimiihoxha/termai/internal/message"
 	"github.com/kujtimiihoxha/termai/internal/permission"
-	"github.com/kujtimiihoxha/termai/internal/pubsub"
 	"github.com/kujtimiihoxha/termai/internal/session"
-	"github.com/kujtimiihoxha/termai/internal/tui/util"
 )
 
 type App struct {
@@ -27,16 +25,14 @@ type App struct {
 
 	Logger logging.Interface
 
-	Status  *pubsub.Broker[util.InfoMsg]
 	ceanups []func()
 }
 
 func New(ctx context.Context, conn *sql.DB) *App {
 	cfg := config.Get()
 	q := db.New(conn)
-	log := logging.NewLogger(logging.Options{
-		Level: cfg.Log.Level,
-	})
+	log := logging.Get()
+	log.SetLevel(cfg.Log.Level)
 	sessions := session.NewService(ctx, q)
 	messages := message.NewService(ctx, q)
 
@@ -46,7 +42,6 @@ func New(ctx context.Context, conn *sql.DB) *App {
 		Messages:    messages,
 		Permissions: permission.NewPermissionService(),
 		Logger:      log,
-		Status:      pubsub.NewBroker[util.InfoMsg](),
 		LSPClients:  make(map[string]*lsp.Client),
 	}
 

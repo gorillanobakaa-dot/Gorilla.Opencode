@@ -12,6 +12,11 @@ import (
 
 const DefaultLevel = "info"
 
+const (
+	persistKeyArg  = "$persist"
+	PersistTimeArg = "$persist_time"
+)
+
 var levels = map[string]slog.Level{
 	"debug":      slog.LevelDebug,
 	DefaultLevel: slog.LevelInfo,
@@ -36,16 +41,16 @@ func ValidLevels() []string {
 	return keys
 }
 
-func NewLogger(opts Options) *Logger {
+func NewLogger(opts Options) Interface {
 	logger := &Logger{}
-	broker := pubsub.NewBroker[Message]()
+	broker := pubsub.NewBroker[LogMessage]()
 	writer := &writer{
-		messages: []Message{},
+		messages: []LogMessage{},
 		Broker:   broker,
 	}
 
 	handler := slog.NewTextHandler(
-		io.MultiWriter(append(opts.AdditionalWriters, writer)...),
+		io.MultiWriter(writer),
 		&slog.HandlerOptions{
 			Level: slog.Level(levels[opts.Level]),
 		},
@@ -57,13 +62,49 @@ func NewLogger(opts Options) *Logger {
 }
 
 type Options struct {
-	Level             string
-	AdditionalWriters []io.Writer
+	Level string
 }
 
 type Logger struct {
 	logger *slog.Logger
 	writer *writer
+}
+
+func (l *Logger) SetLevel(level string) {
+	if _, ok := levels[level]; !ok {
+		level = DefaultLevel
+	}
+	handler := slog.NewTextHandler(
+		io.MultiWriter(l.writer),
+		&slog.HandlerOptions{
+			Level: levels[level],
+		},
+	)
+	l.logger = slog.New(handler)
+}
+
+// PersistDebug implements Interface.
+func (l *Logger) PersistDebug(msg string, args ...any) {
+	args = append(args, persistKeyArg, true)
+	l.Debug(msg, args...)
+}
+
+// PersistError implements Interface.
+func (l *Logger) PersistError(msg string, args ...any) {
+	args = append(args, persistKeyArg, true)
+	l.Error(msg, args...)
+}
+
+// PersistInfo implements Interface.
+func (l *Logger) PersistInfo(msg string, args ...any) {
+	args = append(args, persistKeyArg, true)
+	l.Info(msg, args...)
+}
+
+// PersistWarn implements Interface.
+func (l *Logger) PersistWarn(msg string, args ...any) {
+	args = append(args, persistKeyArg, true)
+	l.Warn(msg, args...)
 }
 
 func (l *Logger) Debug(msg string, args ...any) {
@@ -82,19 +123,19 @@ func (l *Logger) Error(msg string, args ...any) {
 	l.logger.Error(msg, args...)
 }
 
-func (l *Logger) List() []Message {
+func (l *Logger) List() []LogMessage {
 	return l.writer.messages
 }
 
-func (l *Logger) Get(id string) (Message, error) {
+func (l *Logger) Get(id string) (LogMessage, error) {
 	for _, msg := range l.writer.messages {
 		if msg.ID == id {
 			return msg, nil
 		}
 	}
-	return Message{}, io.EOF
+	return LogMessage{}, io.EOF
 }
 
-func (l *Logger) Subscribe(ctx context.Context) <-chan pubsub.Event[Message] {
+func (l *Logger) Subscribe(ctx context.Context) <-chan pubsub.Event[LogMessage] {
 	return l.writer.Subscribe(ctx)
 }
