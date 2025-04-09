@@ -19,12 +19,19 @@ type TableComponent interface {
 	layout.Focusable
 	layout.Sizeable
 	layout.Bindings
+	layout.Bordered
 }
 
 var logger = logging.Get()
 
 type tableCmp struct {
 	table table.Model
+}
+
+func (i *tableCmp) BorderText() map[layout.BorderPosition]string {
+	return map[layout.BorderPosition]string{
+		layout.TopLeftBorder: "Logs",
+	}
 }
 
 type selectedLogMsg logging.LogMessage
