@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
-	"os"
 	"strings"
-)
 
-var debug = os.Getenv("DEBUG") != ""
+	"github.com/kujtimiihoxha/termai/internal/config"
+)
 
 // Write writes an LSP message to the given writer
 func WriteMessage(w io.Writer, msg *Message) error {
@@ -19,10 +17,10 @@ func WriteMessage(w io.Writer, msg *Message) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
+	cnf := config.Get()
 
-	if debug {
-		log.Printf("%v", msg.Method)
-		log.Printf("-> Sending: %s", string(data))
+	if cnf.Debug {
+		logger.Debug("Sending message to server", "method", msg.Method, "id", msg.ID)
 	}
 
 	_, err = fmt.Fprintf(w, "Content-Length: %d\r\n\r\n", len(data))
@@ -40,6 +38,7 @@ func WriteMessage(w io.Writer, msg *Message) error {
 
 // ReadMessage reads a single LSP message from the given reader
 func ReadMessage(r *bufio.Reader) (*Message, error) {
+	cnf := config.Get()
 	// Read headers
 	var contentLength int
 	for {
@@ -49,8 +48,8 @@ func ReadMessage(r *bufio.Reader) (*Message, error) {
 		}
 		line = strings.TrimSpace(line)
 
-		if debug {
-			log.Printf("<- Header: %s", line)
+		if cnf.Debug {
+			logger.Debug("Received header", "line", line)
 		}
 
 		if line == "" {
@@ -65,8 +64,8 @@ func ReadMessage(r *bufio.Reader) (*Message, error) {
 		}
 	}
 
-	if debug {
-		log.Printf("<- Reading content with length: %d", contentLength)
+	if cnf.Debug {
+		logger.Debug("Content-Length", "length", contentLength)
 	}
 
 	// Read content
@@ -76,8 +75,8 @@ func ReadMessage(r *bufio.Reader) (*Message, error) {
 		return nil, fmt.Errorf("failed to read content: %w", err)
 	}
 
-	if debug {
-		log.Printf("<- Received: %s", string(content))
+	if cnf.Debug {
+		logger.Debug("Received content", "content", string(content))
 	}
 
 	// Parse message
@@ -91,19 +90,20 @@ func ReadMessage(r *bufio.Reader) (*Message, error) {
 
 // handleMessages reads and dispatches messages in a loop
 func (c *Client) handleMessages() {
+	cnf := config.Get()
 	for {
 		msg, err := ReadMessage(c.stdout)
 		if err != nil {
-			if debug {
-				log.Printf("Error reading message: %v", err)
+			if cnf.Debug {
+				logger.Error("Error reading message", "error", err)
 			}
 			return
 		}
 
 		// Handle server->client request (has both Method and ID)
 		if msg.Method != "" && msg.ID != 0 {
-			if debug {
-				log.Printf("Received request from server: method=%s id=%d", msg.Method, msg.ID)
+			if cnf.Debug {
+				logger.Debug("Received request from server", "method", msg.Method, "id", msg.ID)
 			}
 
 			response := &Message{
@@ -143,7 +143,7 @@ func (c *Client) handleMessages() {
 
 			// Send response back to server
 			if err := WriteMessage(c.stdin, response); err != nil {
-				log.Printf("Error sending response to server: %v", err)
+				logger.Error("Error sending response to server", "error", err)
 			}
 
 			continue
@@ -156,12 +156,12 @@ func (c *Client) handleMessages() {
 			c.notificationMu.RUnlock()
 
 			if ok {
-				if debug {
-					log.Printf("Handling notification: %s", msg.Method)
+				if cnf.Debug {
+					logger.Debug("Handling notification", "method", msg.Method)
 				}
 				go handler(msg.Params)
-			} else if debug {
-				log.Printf("No handler for notification: %s", msg.Method)
+			} else if cnf.Debug {
+				logger.Debug("No handler for notification", "method", msg.Method)
 			}
 			continue
 		}
@@ -173,13 +173,13 @@ func (c *Client) handleMessages() {
 			c.handlersMu.RUnlock()
 
 			if ok {
-				if debug {
-					log.Printf("Sending response for ID %d to handler", msg.ID)
+				if cnf.Debug {
+					logger.Debug("Received response for request", "id", msg.ID)
 				}
 				ch <- msg
 				close(ch)
-			} else if debug {
-				log.Printf("No handler for response ID: %d", msg.ID)
+			} else if cnf.Debug {
+				logger.Debug("No handler for response", "id", msg.ID)
 			}
 		}
 	}
@@ -187,10 +187,11 @@ func (c *Client) handleMessages() {
 
 // Call makes a request and waits for the response
 func (c *Client) Call(ctx context.Context, method string, params any, result any) error {
+	cnf := config.Get()
 	id := c.nextID.Add(1)
 
-	if debug {
-		log.Printf("Making call: method=%s id=%d", method, id)
+	if cnf.Debug {
+		logger.Debug("Making call", "method", method, "id", id)
 	}
 
 	msg, err := NewRequest(id, method, params)
@@ -215,15 +216,15 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 		return fmt.Errorf("failed to send request: %w", err)
 	}
 
-	if debug {
-		log.Printf("Waiting for response to request ID: %d", id)
+	if cnf.Debug {
+		logger.Debug("Request sent", "method", method, "id", id)
 	}
 
 	// Wait for response
 	resp := <-ch
 
-	if debug {
-		log.Printf("Received response for request ID: %d", id)
+	if cnf.Debug {
+		logger.Debug("Received response", "id", id)
 	}
 
 	if resp.Error != nil {
@@ -247,8 +248,9 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 
 // Notify sends a notification (a request without an ID that doesn't expect a response)
 func (c *Client) Notify(ctx context.Context, method string, params any) error {
-	if debug {
-		log.Printf("Sending notification: method=%s", method)
+	cnf := config.Get()
+	if cnf.Debug {
+		logger.Debug("Sending notification", "method", method)
 	}
 
 	msg, err := NewNotification(method, params)

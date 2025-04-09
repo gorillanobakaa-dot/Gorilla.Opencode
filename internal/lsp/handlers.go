@@ -2,8 +2,8 @@ package lsp
 
 import (
 	"encoding/json"
-	"log"
 
+	"github.com/kujtimiihoxha/termai/internal/config"
 	"github.com/kujtimiihoxha/termai/internal/lsp/protocol"
 	"github.com/kujtimiihoxha/termai/internal/lsp/util"
 )
@@ -17,7 +17,7 @@ func HandleWorkspaceConfiguration(params json.RawMessage) (any, error) {
 func HandleRegisterCapability(params json.RawMessage) (any, error) {
 	var registerParams protocol.RegistrationParams
 	if err := json.Unmarshal(params, &registerParams); err != nil {
-		log.Printf("Error unmarshaling registration params: %v", err)
+		logger.Error("Error unmarshaling registration params", "error", err)
 		return nil, err
 	}
 
@@ -27,13 +27,13 @@ func HandleRegisterCapability(params json.RawMessage) (any, error) {
 			// Parse the registration options
 			optionsJSON, err := json.Marshal(reg.RegisterOptions)
 			if err != nil {
-				log.Printf("Error marshaling registration options: %v", err)
+				logger.Error("Error marshaling registration options", "error", err)
 				continue
 			}
 
 			var options protocol.DidChangeWatchedFilesRegistrationOptions
 			if err := json.Unmarshal(optionsJSON, &options); err != nil {
-				log.Printf("Error unmarshaling registration options: %v", err)
+				logger.Error("Error unmarshaling registration options", "error", err)
 				continue
 			}
 
@@ -53,7 +53,7 @@ func HandleApplyEdit(params json.RawMessage) (any, error) {
 
 	err := util.ApplyWorkspaceEdit(edit.Edit)
 	if err != nil {
-		log.Printf("Error applying workspace edit: %v", err)
+		logger.Error("Error applying workspace edit", "error", err)
 		return protocol.ApplyWorkspaceEditResult{Applied: false, FailureReason: err.Error()}, nil
 	}
 
@@ -81,19 +81,22 @@ func notifyFileWatchRegistration(id string, watchers []protocol.FileSystemWatche
 // Notifications
 
 func HandleServerMessage(params json.RawMessage) {
+	cnf := config.Get()
 	var msg struct {
 		Type    int    `json:"type"`
 		Message string `json:"message"`
 	}
 	if err := json.Unmarshal(params, &msg); err == nil {
-		log.Printf("Server message: %s\n", msg.Message)
+		if cnf.Debug {
+			logger.Debug("Server message", "type", msg.Type, "message", msg.Message)
+		}
 	}
 }
 
 func HandleDiagnostics(client *Client, params json.RawMessage) {
 	var diagParams protocol.PublishDiagnosticsParams
 	if err := json.Unmarshal(params, &diagParams); err != nil {
-		log.Printf("Error unmarshaling diagnostic params: %v", err)
+		logger.Error("Error unmarshaling diagnostics params", "error", err)
 		return
 	}
 

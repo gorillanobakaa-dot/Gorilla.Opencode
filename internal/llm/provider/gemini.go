@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/google/uuid"
 	"github.com/kujtimiihoxha/termai/internal/llm/models"
 	"github.com/kujtimiihoxha/termai/internal/llm/tools"
 	"github.com/kujtimiihoxha/termai/internal/message"
-	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -242,10 +240,6 @@ func (p *geminiProvider) StreamResponse(ctx context.Context, messages []message.
 				break
 			}
 			if err != nil {
-				var apiErr *googleapi.Error
-				if errors.As(err, &apiErr) {
-					log.Printf("%s", apiErr.Body)
-				}
 				eventChan <- ProviderEvent{
 					Type:  EventError,
 					Error: err,

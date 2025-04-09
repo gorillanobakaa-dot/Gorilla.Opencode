@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -14,8 +13,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kujtimiihoxha/termai/internal/config"
+	"github.com/kujtimiihoxha/termai/internal/logging"
 	"github.com/kujtimiihoxha/termai/internal/lsp/protocol"
 )
+
+var logger = logging.Get()
 
 type Client struct {
 	Cmd    *exec.Cmd
@@ -357,6 +360,7 @@ func (c *Client) NotifyChange(ctx context.Context, filepath string) error {
 }
 
 func (c *Client) CloseFile(ctx context.Context, filepath string) error {
+	cnf := config.Get()
 	uri := fmt.Sprintf("file://%s", filepath)
 
 	c.openFilesMu.Lock()
@@ -371,7 +375,10 @@ func (c *Client) CloseFile(ctx context.Context, filepath string) error {
 			URI: protocol.DocumentUri(uri),
 		},
 	}
-	log.Println("Closing", params.TextDocument.URI.Dir())
+
+	if cnf.Debug {
+		logger.Debug("Closing file", "file", filepath)
+	}
 	if err := c.Notify(ctx, "textDocument/didClose", params); err != nil {
 		return err
 	}
@@ -393,6 +400,7 @@ func (c *Client) IsFileOpen(filepath string) bool {
 
 // CloseAllFiles closes all currently open files
 func (c *Client) CloseAllFiles(ctx context.Context) {
+	cnf := config.Get()
 	c.openFilesMu.Lock()
 	filesToClose := make([]string, 0, len(c.openFiles))
 
@@ -407,13 +415,13 @@ func (c *Client) CloseAllFiles(ctx context.Context) {
 	// Then close them all
 	for _, filePath := range filesToClose {
 		err := c.CloseFile(ctx, filePath)
-		if err != nil && debug {
-			log.Printf("Error closing file %s: %v", filePath, err)
+		if err != nil && cnf.Debug {
+			logger.Warn("Error closing file", "file", filePath, "error", err)
 		}
 	}
 
-	if debug {
-		log.Printf("Closed %d files", len(filesToClose))
+	if cnf.Debug {
+		logger.Debug("Closed all files", "files", filesToClose)
 	}
 }
 

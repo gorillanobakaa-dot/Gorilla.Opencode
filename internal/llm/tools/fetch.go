@@ -121,11 +121,7 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 			ToolName:    FetchToolName,
 			Action:      "fetch",
 			Description: fmt.Sprintf("Fetch content from URL: %s", params.URL),
-			Params: FetchPermissionsParams{
-				URL:     params.URL,
-				Format:  params.Format,
-				Timeout: params.Timeout,
-			},
+			Params:      FetchPermissionsParams(params),
 		},
 	)
 

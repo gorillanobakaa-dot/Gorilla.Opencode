@@ -70,6 +70,8 @@ type Config struct {
 	LSP map[string]LSPConfig `json:"lsp,omitempty"`
 
 	Model *Model `json:"model,omitempty"`
+
+	Debug bool `json:"debug,omitempty"`
 }
 
 var cfg *Config
@@ -95,8 +97,10 @@ func Load(debug bool) error {
 	// Add defaults
 	viper.SetDefault("data.directory", defaultDataDirectory)
 	if debug {
+		viper.SetDefault("debug", true)
 		viper.Set("log.level", "debug")
 	} else {
+		viper.SetDefault("debug", false)
 		viper.SetDefault("log.level", defaultLogLevel)
 	}
 

@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/kujtimiihoxha/termai/internal/config"
 	"github.com/kujtimiihoxha/termai/internal/llm/models"
-	"github.com/kujtimiihoxha/termai/internal/pubsub"
 	"github.com/kujtimiihoxha/termai/internal/tui/styles"
 	"github.com/kujtimiihoxha/termai/internal/tui/util"
 	"github.com/kujtimiihoxha/termai/internal/version"
@@ -20,8 +19,8 @@ type statusCmp struct {
 }
 
 // clearMessageCmd is a command that clears status messages after a timeout
-func (m statusCmp) clearMessageCmd() tea.Cmd {
-	return tea.Tick(m.messageTTL, func(time.Time) tea.Msg {
+func (m statusCmp) clearMessageCmd(ttl time.Duration) tea.Cmd {
+	return tea.Tick(ttl, func(time.Time) tea.Msg {
 		return util.ClearStatusMsg{}
 	})
 }
@@ -34,13 +33,14 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		return m, m.clearMessageCmd()
-	case pubsub.Event[util.InfoMsg]:
-		m.info = &msg.Payload
-		return m, m.clearMessageCmd()
+		return m, nil
 	case util.InfoMsg:
 		m.info = &msg
-		return m, m.clearMessageCmd()
+		ttl := msg.TTL
+		if ttl == 0 {
+			ttl = m.messageTTL
+		}
+		return m, m.clearMessageCmd(ttl)
 	case util.ClearStatusMsg:
 		m.info = nil
 	}
@@ -66,7 +66,13 @@ func (m statusCmp) View() string {
 		case util.InfoTypeError:
 			infoStyle = infoStyle.Background(styles.Red)
 		}
-		status += infoStyle.Render(m.info.Msg)
+		// Truncate message if it's longer than available width
+		msg := m.info.Msg
+		availWidth := m.availableFooterMsgWidth() - 3 // Account for ellipsis
+		if len(msg) > availWidth && availWidth > 0 {
+			msg = msg[:availWidth] + "..."
+		}
+		status += infoStyle.Render(msg)
 	} else {
 		status += styles.Padded.
 			Foreground(styles.Base).
@@ -91,6 +97,6 @@ func (m statusCmp) model() string {
 
 func NewStatusCmp() tea.Model {
 	return &statusCmp{
-		messageTTL: 15 * time.Second,
+		messageTTL: 10 * time.Second,
 	}
 }

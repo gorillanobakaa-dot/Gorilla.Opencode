@@ -5,6 +5,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/kujtimiihoxha/termai/internal/app"
+	"github.com/kujtimiihoxha/termai/internal/logging"
 	"github.com/kujtimiihoxha/termai/internal/permission"
 	"github.com/kujtimiihoxha/termai/internal/pubsub"
 	"github.com/kujtimiihoxha/termai/internal/tui/components/core"
@@ -74,22 +75,9 @@ func (a appModel) Init() tea.Cmd {
 }
 
 func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
-	case pubsub.Event[permission.PermissionRequest]:
-		return a, dialog.NewPermissionDialogCmd(msg.Payload)
-	case pubsub.Event[util.InfoMsg]:
-		a.status, _ = a.status.Update(msg)
-	case dialog.PermissionResponseMsg:
-		switch msg.Action {
-		case dialog.PermissionAllow:
-			a.app.Permissions.Grant(msg.Permission)
-		case dialog.PermissionAllowForSession:
-			a.app.Permissions.GrantPersistant(msg.Permission)
-		case dialog.PermissionDeny:
-			a.app.Permissions.Deny(msg.Permission)
-		}
-	case vimtea.EditorModeMsg:
-		a.editorMode = msg.Mode
 	case tea.WindowSizeMsg:
 		var cmds []tea.Cmd
 		msg.Height -= 1 // Make space for the status bar
@@ -109,6 +97,59 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.dialog = d.(core.DialogCmp)
 
 		return a, tea.Batch(cmds...)
+
+	// Status
+	case util.InfoMsg:
+		a.status, cmd = a.status.Update(msg)
+		return a, cmd
+	case pubsub.Event[logging.LogMessage]:
+		if msg.Payload.Persist {
+			switch msg.Payload.Level {
+			case "error":
+				a.status, cmd = a.status.Update(util.InfoMsg{
+					Type: util.InfoTypeError,
+					Msg:  msg.Payload.Message,
+					TTL:  msg.Payload.PersistTime,
+				})
+			case "info":
+				a.status, cmd = a.status.Update(util.InfoMsg{
+					Type: util.InfoTypeInfo,
+					Msg:  msg.Payload.Message,
+					TTL:  msg.Payload.PersistTime,
+				})
+			case "warn":
+				a.status, cmd = a.status.Update(util.InfoMsg{
+					Type: util.InfoTypeWarn,
+					Msg:  msg.Payload.Message,
+					TTL:  msg.Payload.PersistTime,
+				})
+
+			default:
+				a.status, cmd = a.status.Update(util.InfoMsg{
+					Type: util.InfoTypeInfo,
+					Msg:  msg.Payload.Message,
+					TTL:  msg.Payload.PersistTime,
+				})
+			}
+			cmds = append(cmds, cmd)
+		}
+	case util.ClearStatusMsg:
+		a.status, _ = a.status.Update(msg)
+
+	// Permission
+	case pubsub.Event[permission.PermissionRequest]:
+		return a, dialog.NewPermissionDialogCmd(msg.Payload)
+	case dialog.PermissionResponseMsg:
+		switch msg.Action {
+		case dialog.PermissionAllow:
+			a.app.Permissions.Grant(msg.Permission)
+		case dialog.PermissionAllowForSession:
+			a.app.Permissions.GrantPersistant(msg.Permission)
+		case dialog.PermissionDeny:
+			a.app.Permissions.Deny(msg.Permission)
+		}
+
+	// Dialog
 	case core.DialogMsg:
 		d, cmd := a.dialog.Update(msg)
 		a.dialog = d.(core.DialogCmp)
@@ -119,10 +160,13 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.dialog = d.(core.DialogCmp)
 		a.dialogVisible = false
 		return a, cmd
+
+	// Editor
+	case vimtea.EditorModeMsg:
+		a.editorMode = msg.Mode
+
 	case page.PageChangeMsg:
 		return a, a.moveToPage(msg.ID)
-	case util.InfoMsg:
-		a.status, _ = a.status.Update(msg)
 	case tea.KeyMsg:
 		if a.editorMode == vimtea.ModeNormal {
 			switch {
@@ -162,18 +206,13 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	var cmds []tea.Cmd
-	s, cmd := a.status.Update(msg)
-	a.status = s
-	cmds = append(cmds, cmd)
 	if a.dialogVisible {
 		d, cmd := a.dialog.Update(msg)
 		a.dialog = d.(core.DialogCmp)
 		cmds = append(cmds, cmd)
 		return a, tea.Batch(cmds...)
 	}
-	p, cmd := a.pages[a.currentPage].Update(msg)
-	a.pages[a.currentPage] = p
+	a.pages[a.currentPage], cmd = a.pages[a.currentPage].Update(msg)
 	cmds = append(cmds, cmd)
 	return a, tea.Batch(cmds...)
 }

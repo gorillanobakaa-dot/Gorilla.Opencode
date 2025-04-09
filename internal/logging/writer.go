@@ -10,15 +10,16 @@ import (
 )
 
 type writer struct {
-	messages []Message
-	*pubsub.Broker[Message]
+	messages []LogMessage
+	*pubsub.Broker[LogMessage]
 }
 
 func (w *writer) Write(p []byte) (int, error) {
 	d := logfmt.NewDecoder(bytes.NewReader(p))
 	for d.ScanRecord() {
-		msg := Message{
-			ID: time.Now().Format(time.RFC3339Nano),
+		msg := LogMessage{
+			ID:   fmt.Sprintf("%d", time.Now().UnixNano()),
+			Time: time.Now(),
 		}
 		for d.ScanKeyval() {
 			switch string(d.Key()) {
@@ -33,10 +34,20 @@ func (w *writer) Write(p []byte) (int, error) {
 			case "msg":
 				msg.Message = string(d.Value())
 			default:
-				msg.Attributes = append(msg.Attributes, Attr{
-					Key:   string(d.Key()),
-					Value: string(d.Value()),
-				})
+				if string(d.Key()) == persistKeyArg {
+					msg.Persist = true
+				} else if string(d.Key()) == PersistTimeArg {
+					parsed, err := time.ParseDuration(string(d.Value()))
+					if err != nil {
+						continue
+					}
+					msg.PersistTime = parsed
+				} else {
+					msg.Attributes = append(msg.Attributes, Attr{
+						Key:   string(d.Key()),
+						Value: string(d.Value()),
+					})
+				}
 			}
 		}
 		w.messages = append(w.messages, msg)

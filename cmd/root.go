@@ -107,16 +107,6 @@ func setupSubscriptions(app *app.App) (chan tea.Msg, func()) {
 			wg.Done()
 		}()
 	}
-	{
-		sub := app.Status.Subscribe(ctx)
-		wg.Add(1)
-		go func() {
-			for ev := range sub {
-				ch <- ev
-			}
-			wg.Done()
-		}()
-	}
 	return ch, func() {
 		cancel()
 		wg.Wait()

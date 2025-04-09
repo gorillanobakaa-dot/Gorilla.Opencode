@@ -11,6 +11,7 @@ import (
 	"github.com/kujtimiihoxha/termai/internal/pubsub"
 	"github.com/kujtimiihoxha/termai/internal/tui/layout"
 	"github.com/kujtimiihoxha/termai/internal/tui/styles"
+	"github.com/kujtimiihoxha/termai/internal/tui/util"
 )
 
 type TableComponent interface {
@@ -26,29 +27,42 @@ type tableCmp struct {
 	table table.Model
 }
 
+type selectedLogMsg logging.LogMessage
+
 func (i *tableCmp) Init() tea.Cmd {
 	i.setRows()
 	return nil
 }
 
 func (i *tableCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
 	if i.table.Focused() {
-		switch msg := msg.(type) {
-		case pubsub.Event[logging.Message]:
+		switch msg.(type) {
+		case pubsub.Event[logging.LogMessage]:
 			i.setRows()
 			return i, nil
-		case tea.KeyMsg:
-			if msg.String() == "ctrl+s" {
-				logger.Info("Saving logs...",
-					"rows", len(i.table.Rows()),
-				)
+		}
+		prevSelectedRow := i.table.SelectedRow()
+		t, cmd := i.table.Update(msg)
+		cmds = append(cmds, cmd)
+		i.table = t
+		selectedRow := i.table.SelectedRow()
+		if selectedRow != nil {
+			if prevSelectedRow == nil || selectedRow[0] == prevSelectedRow[0] {
+				var log logging.LogMessage
+				for _, row := range logging.Get().List() {
+					if row.ID == selectedRow[0] {
+						log = row
+						break
+					}
+				}
+				if log.ID != "" {
+					cmds = append(cmds, util.CmdHandler(selectedLogMsg(log)))
+				}
 			}
 		}
-		t, cmd := i.table.Update(msg)
-		i.table = t
-		return i, cmd
 	}
-	return i, nil
+	return i, tea.Batch(cmds...)
 }
 
 func (i *tableCmp) View() string {
@@ -92,7 +106,7 @@ func (i *tableCmp) setRows() {
 	rows := []table.Row{}
 
 	logs := logger.List()
-	slices.SortFunc(logs, func(a, b logging.Message) int {
+	slices.SortFunc(logs, func(a, b logging.LogMessage) int {
 		if a.Time.Before(b.Time) {
 			return 1
 		}
@@ -106,6 +120,7 @@ func (i *tableCmp) setRows() {
 		bm, _ := json.Marshal(log.Attributes)
 
 		row := table.Row{
+			log.ID,
 			log.Time.Format("15:04:05"),
 			log.Level,
 			log.Message,
@@ -118,6 +133,7 @@ func (i *tableCmp) setRows() {
 
 func NewLogsTable() TableComponent {
 	columns := []table.Column{
+		{Title: "ID", Width: 4},
 		{Title: "Time", Width: 4},
 		{Title: "Level", Width: 10},
 		{Title: "Message", Width: 10},
