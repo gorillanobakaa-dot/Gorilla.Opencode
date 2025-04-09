@@ -40,7 +40,7 @@ func NewBedrockProvider(opts ...BedrockOption) (Provider, error) {
 	}
 
 	if region == "" {
-		return nil, errors.New("AWS_REGION or AWS_DEFAULT_REGION environment variable is required")
+		region = "us-east-1" // default region
 	}
 	if len(region) < 2 {
 		return nil, errors.New("AWS_REGION or AWS_DEFAULT_REGION environment variable is invalid")
