@@ -97,6 +97,6 @@ func (m statusCmp) model() string {
 
 func NewStatusCmp() tea.Model {
 	return &statusCmp{
-		messageTTL: 15 * time.Second,
+		messageTTL: 10 * time.Second,
 	}
 }

@@ -131,6 +131,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					TTL:  msg.Payload.PersistTime,
 				})
 			}
+			cmds = append(cmds, cmd)
 		}
 	case util.ClearStatusMsg:
 		a.status, _ = a.status.Update(msg)
@@ -205,8 +206,6 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	a.status, cmd = a.status.Update(msg)
-	cmds = append(cmds, cmd)
 	if a.dialogVisible {
 		d, cmd := a.dialog.Update(msg)
 		a.dialog = d.(core.DialogCmp)

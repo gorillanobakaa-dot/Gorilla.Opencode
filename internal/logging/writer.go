@@ -18,7 +18,8 @@ func (w *writer) Write(p []byte) (int, error) {
 	d := logfmt.NewDecoder(bytes.NewReader(p))
 	for d.ScanRecord() {
 		msg := LogMessage{
-			ID: fmt.Sprintf("%d", time.Now().UnixNano()),
+			ID:   fmt.Sprintf("%d", time.Now().UnixNano()),
+			Time: time.Now(),
 		}
 		for d.ScanKeyval() {
 			switch string(d.Key()) {
