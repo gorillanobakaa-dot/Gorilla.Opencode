@@ -163,6 +163,7 @@ func (p *openaiProvider) extractTokenUsage(usage openai.CompletionUsage) TokenUs
 }
 
 func (p *openaiProvider) SendMessages(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (*ProviderResponse, error) {
+	messages = cleanupMessages(messages)
 	chatMessages := p.convertToOpenAIMessages(messages)
 	openaiTools := p.convertToOpenAITools(tools)
 
@@ -206,6 +207,7 @@ func (p *openaiProvider) SendMessages(ctx context.Context, messages []message.Me
 }
 
 func (p *openaiProvider) StreamResponse(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (<-chan ProviderEvent, error) {
+	messages = cleanupMessages(messages)
 	chatMessages := p.convertToOpenAIMessages(messages)
 	openaiTools := p.convertToOpenAITools(tools)
 
@@ -276,4 +278,3 @@ func (p *openaiProvider) StreamResponse(ctx context.Context, messages []message.
 
 	return eventChan, nil
 }
-

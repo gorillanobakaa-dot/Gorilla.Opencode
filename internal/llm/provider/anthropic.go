@@ -92,6 +92,7 @@ func NewAnthropicProvider(opts ...AnthropicOption) (Provider, error) {
 }
 
 func (a *anthropicProvider) SendMessages(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (*ProviderResponse, error) {
+	messages = cleanupMessages(messages)
 	anthropicMessages := a.convertToAnthropicMessages(messages)
 	anthropicTools := a.convertToAnthropicTools(tools)
 
@@ -135,6 +136,7 @@ func (a *anthropicProvider) SendMessages(ctx context.Context, messages []message
 }
 
 func (a *anthropicProvider) StreamResponse(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (<-chan ProviderEvent, error) {
+	messages = cleanupMessages(messages)
 	anthropicMessages := a.convertToAnthropicMessages(messages)
 	anthropicTools := a.convertToAnthropicTools(tools)
 

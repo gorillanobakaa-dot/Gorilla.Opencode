@@ -52,3 +52,39 @@ type Provider interface {
 
 	StreamResponse(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (<-chan ProviderEvent, error)
 }
+
+func cleanupMessages(messages []message.Message) []message.Message {
+	// First pass: filter out canceled messages
+	var cleanedMessages []message.Message
+	for _, msg := range messages {
+		if msg.FinishReason() != "canceled" {
+			cleanedMessages = append(cleanedMessages, msg)
+		}
+	}
+
+	// Second pass: filter out tool messages without a corresponding tool call
+	var result []message.Message
+	toolMessageIDs := make(map[string]bool)
+
+	for _, msg := range cleanedMessages {
+		if msg.Role == message.Assistant {
+			for _, toolCall := range msg.ToolCalls() {
+				toolMessageIDs[toolCall.ID] = true // Mark as referenced
+			}
+		}
+	}
+
+	// Keep only messages that aren't unreferenced tool messages
+	for _, msg := range cleanedMessages {
+		if msg.Role == message.Tool {
+			for _, toolCall := range msg.ToolResults() {
+				if referenced, exists := toolMessageIDs[toolCall.ToolCallID]; exists && referenced {
+					result = append(result, msg)
+				}
+			}
+		} else {
+			result = append(result, msg)
+		}
+	}
+	return result
+}

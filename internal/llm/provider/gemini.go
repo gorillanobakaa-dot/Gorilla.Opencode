@@ -154,6 +154,7 @@ func (p *geminiProvider) extractTokenUsage(resp *genai.GenerateContentResponse) 
 }
 
 func (p *geminiProvider) SendMessages(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (*ProviderResponse, error) {
+	messages = cleanupMessages(messages)
 	model := p.client.GenerativeModel(p.model.APIModel)
 	model.SetMaxOutputTokens(p.maxTokens)
 
@@ -206,6 +207,7 @@ func (p *geminiProvider) SendMessages(ctx context.Context, messages []message.Me
 }
 
 func (p *geminiProvider) StreamResponse(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (<-chan ProviderEvent, error) {
+	messages = cleanupMessages(messages)
 	model := p.client.GenerativeModel(p.model.APIModel)
 	model.SetMaxOutputTokens(p.maxTokens)
 
