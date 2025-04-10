@@ -2,17 +2,46 @@ package logging
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logfmt/logfmt"
 	"github.com/kujtimiihoxha/termai/internal/pubsub"
 )
 
-type writer struct {
+const (
+	persistKeyArg  = "$_persist"
+	PersistTimeArg = "$_persist_time"
+)
+
+type LogData struct {
 	messages []LogMessage
 	*pubsub.Broker[LogMessage]
+	lock sync.Mutex
 }
+
+func (l *LogData) Add(msg LogMessage) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	l.messages = append(l.messages, msg)
+	l.Publish(pubsub.CreatedEvent, msg)
+}
+
+func (l *LogData) List() []LogMessage {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	return l.messages
+}
+
+var defaultLogData = &LogData{
+	messages: make([]LogMessage, 0),
+	Broker:   pubsub.NewBroker[LogMessage](),
+}
+
+type writer struct{}
 
 func (w *writer) Write(p []byte) (int, error) {
 	d := logfmt.NewDecoder(bytes.NewReader(p))
@@ -30,7 +59,7 @@ func (w *writer) Write(p []byte) (int, error) {
 				}
 				msg.Time = parsed
 			case "level":
-				msg.Level = string(d.Value())
+				msg.Level = strings.ToLower(string(d.Value()))
 			case "msg":
 				msg.Message = string(d.Value())
 			default:
@@ -50,11 +79,23 @@ func (w *writer) Write(p []byte) (int, error) {
 				}
 			}
 		}
-		w.messages = append(w.messages, msg)
-		w.Publish(pubsub.CreatedEvent, msg)
+		defaultLogData.Add(msg)
 	}
 	if d.Err() != nil {
 		return 0, d.Err()
 	}
 	return len(p), nil
+}
+
+func NewWriter() *writer {
+	w := &writer{}
+	return w
+}
+
+func Subscribe(ctx context.Context) <-chan pubsub.Event[LogMessage] {
+	return defaultLogData.Subscribe(ctx)
+}
+
+func List() []LogMessage {
+	return defaultLogData.List()
 }

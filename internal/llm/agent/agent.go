@@ -13,11 +13,12 @@ import (
 	"github.com/kujtimiihoxha/termai/internal/llm/prompt"
 	"github.com/kujtimiihoxha/termai/internal/llm/provider"
 	"github.com/kujtimiihoxha/termai/internal/llm/tools"
+	"github.com/kujtimiihoxha/termai/internal/logging"
 	"github.com/kujtimiihoxha/termai/internal/message"
 )
 
 type Agent interface {
-	Generate(sessionID string, content string) error
+	Generate(ctx context.Context, sessionID string, content string) error
 }
 
 type agent struct {
@@ -28,9 +29,9 @@ type agent struct {
 	titleGenerator provider.Provider
 }
 
-func (c *agent) handleTitleGeneration(sessionID, content string) {
+func (c *agent) handleTitleGeneration(ctx context.Context, sessionID, content string) {
 	response, err := c.titleGenerator.SendMessages(
-		c.Context,
+		ctx,
 		[]message.Message{
 			{
 				Role: message.User,
@@ -91,13 +92,16 @@ func (c *agent) processEvent(
 		assistantMsg.AppendContent(event.Content)
 		return c.Messages.Update(*assistantMsg)
 	case provider.EventError:
-		c.App.Logger.PersistError(event.Error.Error())
+		if errors.Is(event.Error, context.Canceled) {
+			return nil
+		}
+		logging.ErrorPersist(event.Error.Error())
 		return event.Error
 	case provider.EventWarning:
-		c.App.Logger.PersistWarn(event.Info)
+		logging.WarnPersist(event.Info)
 		return nil
 	case provider.EventInfo:
-		c.App.Logger.PersistInfo(event.Info)
+		logging.InfoPersist(event.Info)
 	case provider.EventComplete:
 		assistantMsg.SetToolCalls(event.Response.ToolCalls)
 		assistantMsg.AddFinish(event.Response.FinishReason)
@@ -115,11 +119,36 @@ func (c *agent) ExecuteTools(ctx context.Context, toolCalls []message.ToolCall, 
 	var wg sync.WaitGroup
 	toolResults := make([]message.ToolResult, len(toolCalls))
 	mutex := &sync.Mutex{}
+	errChan := make(chan error, 1)
+
+	// Create a child context that can be canceled
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	for i, tc := range toolCalls {
 		wg.Add(1)
 		go func(index int, toolCall message.ToolCall) {
 			defer wg.Done()
+
+			// Check if context is already canceled
+			select {
+			case <-ctx.Done():
+				mutex.Lock()
+				toolResults[index] = message.ToolResult{
+					ToolCallID: toolCall.ID,
+					Content:    "Tool execution canceled",
+					IsError:    true,
+				}
+				mutex.Unlock()
+
+				// Send cancellation error to error channel if it's empty
+				select {
+				case errChan <- ctx.Err():
+				default:
+				}
+				return
+			default:
+			}
 
 			response := ""
 			isError := false
@@ -133,8 +162,19 @@ func (c *agent) ExecuteTools(ctx context.Context, toolCalls []message.ToolCall, 
 						Name:  toolCall.Name,
 						Input: toolCall.Input,
 					})
+
 					if toolErr != nil {
-						response = fmt.Sprintf("error running tool: %s", toolErr)
+						if errors.Is(toolErr, context.Canceled) {
+							response = "Tool execution canceled"
+
+							// Send cancellation error to error channel if it's empty
+							select {
+							case errChan <- ctx.Err():
+							default:
+							}
+						} else {
+							response = fmt.Sprintf("error running tool: %s", toolErr)
+						}
 						isError = true
 					} else {
 						response = toolResult.Content
@@ -160,7 +200,24 @@ func (c *agent) ExecuteTools(ctx context.Context, toolCalls []message.ToolCall, 
 		}(i, tc)
 	}
 
-	wg.Wait()
+	// Wait for all goroutines to finish or context to be canceled
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// All tools completed successfully
+	case err := <-errChan:
+		// One of the tools encountered a cancellation
+		return toolResults, err
+	case <-ctx.Done():
+		// Context was canceled externally
+		return toolResults, ctx.Err()
+	}
+
 	return toolResults, nil
 }
 
@@ -188,14 +245,14 @@ func (c *agent) handleToolExecution(
 	return &msg, err
 }
 
-func (c *agent) generate(sessionID string, content string) error {
+func (c *agent) generate(ctx context.Context, sessionID string, content string) error {
 	messages, err := c.Messages.List(sessionID)
 	if err != nil {
 		return err
 	}
 
 	if len(messages) == 0 {
-		go c.handleTitleGeneration(sessionID, content)
+		go c.handleTitleGeneration(ctx, sessionID, content)
 	}
 
 	userMsg, err := c.Messages.Create(sessionID, message.CreateMessageParams{
@@ -212,9 +269,36 @@ func (c *agent) generate(sessionID string, content string) error {
 
 	messages = append(messages, userMsg)
 	for {
+		select {
+		case <-ctx.Done():
+			assistantMsg, err := c.Messages.Create(sessionID, message.CreateMessageParams{
+				Role:  message.Assistant,
+				Parts: []message.ContentPart{},
+			})
+			if err != nil {
+				return err
+			}
+			assistantMsg.AddFinish("canceled")
+			c.Messages.Update(assistantMsg)
+			return context.Canceled
+		default:
+			// Continue processing
+		}
 
-		eventChan, err := c.agent.StreamResponse(c.Context, messages, c.tools)
+		eventChan, err := c.agent.StreamResponse(ctx, messages, c.tools)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				assistantMsg, err := c.Messages.Create(sessionID, message.CreateMessageParams{
+					Role:  message.Assistant,
+					Parts: []message.ContentPart{},
+				})
+				if err != nil {
+					return err
+				}
+				assistantMsg.AddFinish("canceled")
+				c.Messages.Update(assistantMsg)
+				return context.Canceled
+			}
 			return err
 		}
 
@@ -228,18 +312,46 @@ func (c *agent) generate(sessionID string, content string) error {
 		for event := range eventChan {
 			err = c.processEvent(sessionID, &assistantMsg, event)
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					assistantMsg.AddFinish("canceled")
+					c.Messages.Update(assistantMsg)
+					return context.Canceled
+				}
 				assistantMsg.AddFinish("error:" + err.Error())
 				c.Messages.Update(assistantMsg)
 				return err
 			}
+
+			select {
+			case <-ctx.Done():
+				assistantMsg.AddFinish("canceled")
+				c.Messages.Update(assistantMsg)
+				return context.Canceled
+			default:
+			}
 		}
 
-		msg, err := c.handleToolExecution(c.Context, assistantMsg)
+		// Check for context cancellation before tool execution
+		select {
+		case <-ctx.Done():
+			assistantMsg.AddFinish("canceled")
+			c.Messages.Update(assistantMsg)
+			return context.Canceled
+		default:
+			// Continue processing
+		}
 
-		c.Messages.Update(assistantMsg)
+		msg, err := c.handleToolExecution(ctx, assistantMsg)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				assistantMsg.AddFinish("canceled")
+				c.Messages.Update(assistantMsg)
+				return context.Canceled
+			}
 			return err
 		}
+
+		c.Messages.Update(assistantMsg)
 
 		if len(assistantMsg.ToolCalls()) == 0 {
 			break
@@ -248,6 +360,16 @@ func (c *agent) generate(sessionID string, content string) error {
 		messages = append(messages, assistantMsg)
 		if msg != nil {
 			messages = append(messages, *msg)
+		}
+
+		// Check for context cancellation after tool execution
+		select {
+		case <-ctx.Done():
+			assistantMsg.AddFinish("canceled")
+			c.Messages.Update(assistantMsg)
+			return context.Canceled
+		default:
+			// Continue processing
 		}
 	}
 	return nil

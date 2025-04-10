@@ -18,8 +18,6 @@ import (
 	"github.com/kujtimiihoxha/termai/internal/lsp/protocol"
 )
 
-var logger = logging.Get()
-
 type Client struct {
 	Cmd    *exec.Cmd
 	stdin  io.WriteCloser
@@ -377,7 +375,7 @@ func (c *Client) CloseFile(ctx context.Context, filepath string) error {
 	}
 
 	if cnf.Debug {
-		logger.Debug("Closing file", "file", filepath)
+		logging.Debug("Closing file", "file", filepath)
 	}
 	if err := c.Notify(ctx, "textDocument/didClose", params); err != nil {
 		return err
@@ -416,12 +414,12 @@ func (c *Client) CloseAllFiles(ctx context.Context) {
 	for _, filePath := range filesToClose {
 		err := c.CloseFile(ctx, filePath)
 		if err != nil && cnf.Debug {
-			logger.Warn("Error closing file", "file", filePath, "error", err)
+			logging.Warn("Error closing file", "file", filePath, "error", err)
 		}
 	}
 
 	if cnf.Debug {
-		logger.Debug("Closed all files", "files", filesToClose)
+		logging.Debug("Closed all files", "files", filesToClose)
 	}
 }
 

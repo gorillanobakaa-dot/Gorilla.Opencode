@@ -56,7 +56,7 @@ func (b *agentTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolRes
 		return tools.NewTextErrorResponse(fmt.Sprintf("error creating session: %s", err)), nil
 	}
 
-	err = agent.Generate(session.ID, params.Prompt)
+	err = agent.Generate(ctx, session.ID, params.Prompt)
 	if err != nil {
 		return tools.NewTextErrorResponse(fmt.Sprintf("error generating agent: %s", err)), nil
 	}

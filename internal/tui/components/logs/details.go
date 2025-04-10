@@ -30,7 +30,7 @@ type detailCmp struct {
 }
 
 func (i *detailCmp) Init() tea.Cmd {
-	messages := logging.Get().List()
+	messages := logging.List()
 	if len(messages) == 0 {
 		return nil
 	}

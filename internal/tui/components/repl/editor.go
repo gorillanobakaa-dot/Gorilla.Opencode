@@ -12,6 +12,7 @@ import (
 	"github.com/kujtimiihoxha/termai/internal/tui/styles"
 	"github.com/kujtimiihoxha/termai/internal/tui/util"
 	"github.com/kujtimiihoxha/vimtea"
+	"golang.org/x/net/context"
 )
 
 type EditorCmp interface {
@@ -23,18 +24,20 @@ type EditorCmp interface {
 }
 
 type editorCmp struct {
-	app        *app.App
-	editor     vimtea.Editor
-	editorMode vimtea.EditorMode
-	sessionID  string
-	focused    bool
-	width      int
-	height     int
+	app           *app.App
+	editor        vimtea.Editor
+	editorMode    vimtea.EditorMode
+	sessionID     string
+	focused       bool
+	width         int
+	height        int
+	cancelMessage context.CancelFunc
 }
 
 type editorKeyMap struct {
 	SendMessage    key.Binding
 	SendMessageI   key.Binding
+	CancelMessage  key.Binding
 	InsertMode     key.Binding
 	NormaMode      key.Binding
 	VisualMode     key.Binding
@@ -49,6 +52,10 @@ var editorKeyMapValue = editorKeyMap{
 	SendMessageI: key.NewBinding(
 		key.WithKeys("ctrl+s"),
 		key.WithHelp("ctrl+s", "send message insert mode"),
+	),
+	CancelMessage: key.NewBinding(
+		key.WithKeys("ctrl+x"),
+		key.WithHelp("ctrl+x", "cancel current message"),
 	),
 	InsertMode: key.NewBinding(
 		key.WithKeys("i"),
@@ -93,6 +100,8 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.editorMode == vimtea.ModeInsert {
 					return m, m.Send()
 				}
+			case key.Matches(msg, editorKeyMapValue.CancelMessage):
+				return m, m.Cancel()
 			}
 		}
 		u, cmd := m.editor.Update(msg)
@@ -136,6 +145,16 @@ func (m *editorCmp) SetSize(width int, height int) {
 	m.editor.SetSize(width, height)
 }
 
+func (m *editorCmp) Cancel() tea.Cmd {
+	if m.cancelMessage == nil {
+		return util.ReportWarn("No message to cancel")
+	}
+
+	m.cancelMessage()
+	m.cancelMessage = nil
+	return util.ReportWarn("Message cancelled")
+}
+
 func (m *editorCmp) Send() tea.Cmd {
 	return func() tea.Msg {
 		messages, err := m.app.Messages.List(m.sessionID)
@@ -151,7 +170,13 @@ func (m *editorCmp) Send() tea.Cmd {
 		}
 
 		content := strings.Join(m.editor.GetBuffer().Lines(), "\n")
-		go a.Generate(m.sessionID, content)
+		ctx, cancel := context.WithCancel(m.app.Context)
+		m.cancelMessage = cancel
+		go func() {
+			defer cancel()
+			a.Generate(ctx, m.sessionID, content)
+			m.cancelMessage = nil
+		}()
 
 		return m.editor.Reset()
 	}

@@ -16,8 +16,6 @@ import (
 	"github.com/kujtimiihoxha/termai/internal/logging"
 )
 
-var log = logging.Get()
-
 func Connect() (*sql.DB, error) {
 	dataDir := config.Get().Data.Directory
 	if dataDir == "" {
@@ -50,43 +48,43 @@ func Connect() (*sql.DB, error) {
 
 	for _, pragma := range pragmas {
 		if _, err = db.Exec(pragma); err != nil {
-			log.Warn("Failed to set pragma", pragma, err)
+			logging.Warn("Failed to set pragma", pragma, err)
 		} else {
-			log.Warn("Set pragma", "pragma", pragma)
+			logging.Warn("Set pragma", "pragma", pragma)
 		}
 	}
 
 	// Initialize schema from embedded file
 	d, err := iofs.New(FS, "migrations")
 	if err != nil {
-		log.Error("Failed to open embedded migrations", "error", err)
+		logging.Error("Failed to open embedded migrations", "error", err)
 		db.Close()
 		return nil, fmt.Errorf("failed to open embedded migrations: %w", err)
 	}
 
 	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
 	if err != nil {
-		log.Error("Failed to create SQLite driver", "error", err)
+		logging.Error("Failed to create SQLite driver", "error", err)
 		db.Close()
 		return nil, fmt.Errorf("failed to create SQLite driver: %w", err)
 	}
 
 	m, err := migrate.NewWithInstance("iofs", d, "ql", driver)
 	if err != nil {
-		log.Error("Failed to create migration instance", "error", err)
+		logging.Error("Failed to create migration instance", "error", err)
 		db.Close()
 		return nil, fmt.Errorf("failed to create migration instance: %w", err)
 	}
 
 	err = m.Up()
 	if err != nil && err != migrate.ErrNoChange {
-		log.Error("Migration failed", "error", err)
+		logging.Error("Migration failed", "error", err)
 		db.Close()
 		return nil, fmt.Errorf("failed to apply schema: %w", err)
 	} else if err == migrate.ErrNoChange {
-		log.Info("No schema changes to apply")
+		logging.Info("No schema changes to apply")
 	} else {
-		log.Info("Schema migration applied successfully")
+		logging.Info("Schema migration applied successfully")
 	}
 
 	return db, nil

@@ -13,7 +13,7 @@ import (
 )
 
 type statusCmp struct {
-	info       *util.InfoMsg
+	info       util.InfoMsg
 	width      int
 	messageTTL time.Duration
 }
@@ -35,14 +35,14 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		return m, nil
 	case util.InfoMsg:
-		m.info = &msg
+		m.info = msg
 		ttl := msg.TTL
 		if ttl == 0 {
 			ttl = m.messageTTL
 		}
 		return m, m.clearMessageCmd(ttl)
 	case util.ClearStatusMsg:
-		m.info = nil
+		m.info = util.InfoMsg{}
 	}
 	return m, nil
 }
@@ -54,7 +54,7 @@ var (
 
 func (m statusCmp) View() string {
 	status := styles.Padded.Background(styles.Grey).Foreground(styles.Text).Render("? help")
-	if m.info != nil {
+	if m.info.Msg != "" {
 		infoStyle := styles.Padded.
 			Foreground(styles.Base).
 			Width(m.availableFooterMsgWidth())

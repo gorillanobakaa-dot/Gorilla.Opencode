@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 
 	"github.com/kujtimiihoxha/termai/internal/config"
 	"github.com/kujtimiihoxha/termai/internal/db"
@@ -23,16 +24,14 @@ type App struct {
 
 	LSPClients map[string]*lsp.Client
 
-	Logger logging.Interface
-
 	ceanups []func()
 }
 
 func New(ctx context.Context, conn *sql.DB) *App {
 	cfg := config.Get()
+	logging.Info("Debug mode enabled")
+
 	q := db.New(conn)
-	log := logging.Get()
-	log.SetLevel(cfg.Log.Level)
 	sessions := session.NewService(ctx, q)
 	messages := message.NewService(ctx, q)
 
@@ -41,7 +40,6 @@ func New(ctx context.Context, conn *sql.DB) *App {
 		Sessions:    sessions,
 		Messages:    messages,
 		Permissions: permission.NewPermissionService(),
-		Logger:      log,
 		LSPClients:  make(map[string]*lsp.Client),
 	}
 
@@ -52,13 +50,13 @@ func New(ctx context.Context, conn *sql.DB) *App {
 		})
 		workspaceWatcher := watcher.NewWorkspaceWatcher(lspClient)
 		if err != nil {
-			log.Error("Failed to create LSP client for", name, err)
+			logging.Error("Failed to create LSP client for", name, err)
 			continue
 		}
 
 		_, err = lspClient.InitializeLSPClient(ctx, config.WorkingDirectory())
 		if err != nil {
-			log.Error("Initialize failed", "error", err)
+			logging.Error("Initialize failed", "error", err)
 			continue
 		}
 		go workspaceWatcher.WatchWorkspace(ctx, config.WorkingDirectory())
@@ -74,5 +72,5 @@ func (a *App) Close() {
 	for _, client := range a.LSPClients {
 		client.Close()
 	}
-	a.Logger.Info("App closed")
+	slog.Info("App closed")
 }

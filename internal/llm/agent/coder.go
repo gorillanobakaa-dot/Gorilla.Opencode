@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"errors"
 
 	"github.com/kujtimiihoxha/termai/internal/app"
@@ -28,9 +29,9 @@ func (c *coderAgent) setAgentTool(sessionID string) {
 	}
 }
 
-func (c *coderAgent) Generate(sessionID string, content string) error {
+func (c *coderAgent) Generate(ctx context.Context, sessionID string, content string) error {
 	c.setAgentTool(sessionID)
-	return c.generate(sessionID, content)
+	return c.generate(ctx, sessionID, content)
 }
 
 func NewCoderAgent(app *app.App) (Agent, error) {

@@ -309,7 +309,7 @@ func (m *messagesCmp) renderMessageWithToolCall(content string, tools []message.
 	}
 
 	for _, msg := range futureMessages {
-		if msg.Content().String() != "" {
+		if msg.Content().String() != "" || msg.FinishReason() == "canceled" {
 			break
 		}
 
@@ -345,13 +345,18 @@ func (m *messagesCmp) renderView() {
 	prevMessageWasUser := false
 	for inx, msg := range m.messages {
 		content := msg.Content().String()
-		if content != "" || prevMessageWasUser {
+		if content != "" || prevMessageWasUser || msg.FinishReason() == "canceled" {
 			if msg.ReasoningContent().String() != "" && content == "" {
 				content = msg.ReasoningContent().String()
 			} else if content == "" {
 				content = "..."
 			}
-			content, _ = r.Render(content)
+			if msg.FinishReason() == "canceled" {
+				content, _ = r.Render(content)
+				content += lipgloss.NewStyle().Padding(1, 0, 0, 1).Foreground(styles.Error).Render(styles.ErrorIcon + " Canceled")
+			} else {
+				content, _ = r.Render(content)
+			}
 
 			isSelected := inx == m.selectedMsgIdx
 

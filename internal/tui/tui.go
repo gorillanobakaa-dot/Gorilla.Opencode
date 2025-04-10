@@ -101,7 +101,8 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Status
 	case util.InfoMsg:
 		a.status, cmd = a.status.Update(msg)
-		return a, cmd
+		cmds = append(cmds, cmd)
+		return a, tea.Batch(cmds...)
 	case pubsub.Event[logging.LogMessage]:
 		if msg.Payload.Persist {
 			switch msg.Payload.Level {

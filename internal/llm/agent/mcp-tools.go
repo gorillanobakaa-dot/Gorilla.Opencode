@@ -22,8 +22,6 @@ type mcpTool struct {
 	permissions permission.Service
 }
 
-var logger = logging.Get()
-
 type MCPClient interface {
 	Initialize(
 		ctx context.Context,
@@ -143,13 +141,13 @@ func getTools(ctx context.Context, name string, m config.MCPServer, permissions 
 
 	_, err := c.Initialize(ctx, initRequest)
 	if err != nil {
-		logger.Error("error initializing mcp client", "error", err)
+		logging.Error("error initializing mcp client", "error", err)
 		return stdioTools
 	}
 	toolsRequest := mcp.ListToolsRequest{}
 	tools, err := c.ListTools(ctx, toolsRequest)
 	if err != nil {
-		logger.Error("error listing tools", "error", err)
+		logging.Error("error listing tools", "error", err)
 		return stdioTools
 	}
 	for _, t := range tools.Tools {
@@ -172,7 +170,7 @@ func GetMcpTools(ctx context.Context, permissions permission.Service) []tools.Ba
 				m.Args...,
 			)
 			if err != nil {
-				logger.Error("error creating mcp client", "error", err)
+				logging.Error("error creating mcp client", "error", err)
 				continue
 			}
 
@@ -183,7 +181,7 @@ func GetMcpTools(ctx context.Context, permissions permission.Service) []tools.Ba
 				client.WithHeaders(m.Headers),
 			)
 			if err != nil {
-				logger.Error("error creating mcp client", "error", err)
+				logging.Error("error creating mcp client", "error", err)
 				continue
 			}
 			mcpTools = append(mcpTools, getTools(ctx, name, m, permissions, c)...)

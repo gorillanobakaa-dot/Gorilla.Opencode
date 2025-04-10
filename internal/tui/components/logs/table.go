@@ -22,8 +22,6 @@ type TableComponent interface {
 	layout.Bordered
 }
 
-var logger = logging.Get()
-
 type tableCmp struct {
 	table table.Model
 }
@@ -57,7 +55,7 @@ func (i *tableCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if selectedRow != nil {
 			if prevSelectedRow == nil || selectedRow[0] == prevSelectedRow[0] {
 				var log logging.LogMessage
-				for _, row := range logging.Get().List() {
+				for _, row := range logging.List() {
 					if row.ID == selectedRow[0] {
 						log = row
 						break
@@ -112,7 +110,7 @@ func (i *tableCmp) BindingKeys() []key.Binding {
 func (i *tableCmp) setRows() {
 	rows := []table.Row{}
 
-	logs := logger.List()
+	logs := logging.List()
 	slices.SortFunc(logs, func(a, b logging.LogMessage) int {
 		if a.Time.Before(b.Time) {
 			return 1

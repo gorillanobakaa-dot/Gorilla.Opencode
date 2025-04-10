@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"errors"
 
 	"github.com/kujtimiihoxha/termai/internal/app"
@@ -13,8 +14,8 @@ type taskAgent struct {
 	*agent
 }
 
-func (c *taskAgent) Generate(sessionID string, content string) error {
-	return c.generate(sessionID, content)
+func (c *taskAgent) Generate(ctx context.Context, sessionID string, content string) error {
+	return c.generate(ctx, sessionID, content)
 }
 
 func NewTaskAgent(app *app.App) (Agent, error) {

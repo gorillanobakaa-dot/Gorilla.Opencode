@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/kujtimiihoxha/termai/internal/config"
+	"github.com/kujtimiihoxha/termai/internal/logging"
 )
 
 // Write writes an LSP message to the given writer
@@ -20,7 +21,7 @@ func WriteMessage(w io.Writer, msg *Message) error {
 	cnf := config.Get()
 
 	if cnf.Debug {
-		logger.Debug("Sending message to server", "method", msg.Method, "id", msg.ID)
+		logging.Debug("Sending message to server", "method", msg.Method, "id", msg.ID)
 	}
 
 	_, err = fmt.Fprintf(w, "Content-Length: %d\r\n\r\n", len(data))
@@ -49,7 +50,7 @@ func ReadMessage(r *bufio.Reader) (*Message, error) {
 		line = strings.TrimSpace(line)
 
 		if cnf.Debug {
-			logger.Debug("Received header", "line", line)
+			logging.Debug("Received header", "line", line)
 		}
 
 		if line == "" {
@@ -65,7 +66,7 @@ func ReadMessage(r *bufio.Reader) (*Message, error) {
 	}
 
 	if cnf.Debug {
-		logger.Debug("Content-Length", "length", contentLength)
+		logging.Debug("Content-Length", "length", contentLength)
 	}
 
 	// Read content
@@ -76,7 +77,7 @@ func ReadMessage(r *bufio.Reader) (*Message, error) {
 	}
 
 	if cnf.Debug {
-		logger.Debug("Received content", "content", string(content))
+		logging.Debug("Received content", "content", string(content))
 	}
 
 	// Parse message
@@ -95,7 +96,7 @@ func (c *Client) handleMessages() {
 		msg, err := ReadMessage(c.stdout)
 		if err != nil {
 			if cnf.Debug {
-				logger.Error("Error reading message", "error", err)
+				logging.Error("Error reading message", "error", err)
 			}
 			return
 		}
@@ -103,7 +104,7 @@ func (c *Client) handleMessages() {
 		// Handle server->client request (has both Method and ID)
 		if msg.Method != "" && msg.ID != 0 {
 			if cnf.Debug {
-				logger.Debug("Received request from server", "method", msg.Method, "id", msg.ID)
+				logging.Debug("Received request from server", "method", msg.Method, "id", msg.ID)
 			}
 
 			response := &Message{
@@ -143,7 +144,7 @@ func (c *Client) handleMessages() {
 
 			// Send response back to server
 			if err := WriteMessage(c.stdin, response); err != nil {
-				logger.Error("Error sending response to server", "error", err)
+				logging.Error("Error sending response to server", "error", err)
 			}
 
 			continue
@@ -157,11 +158,11 @@ func (c *Client) handleMessages() {
 
 			if ok {
 				if cnf.Debug {
-					logger.Debug("Handling notification", "method", msg.Method)
+					logging.Debug("Handling notification", "method", msg.Method)
 				}
 				go handler(msg.Params)
 			} else if cnf.Debug {
-				logger.Debug("No handler for notification", "method", msg.Method)
+				logging.Debug("No handler for notification", "method", msg.Method)
 			}
 			continue
 		}
@@ -174,12 +175,12 @@ func (c *Client) handleMessages() {
 
 			if ok {
 				if cnf.Debug {
-					logger.Debug("Received response for request", "id", msg.ID)
+					logging.Debug("Received response for request", "id", msg.ID)
 				}
 				ch <- msg
 				close(ch)
 			} else if cnf.Debug {
-				logger.Debug("No handler for response", "id", msg.ID)
+				logging.Debug("No handler for response", "id", msg.ID)
 			}
 		}
 	}
@@ -191,7 +192,7 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 	id := c.nextID.Add(1)
 
 	if cnf.Debug {
-		logger.Debug("Making call", "method", method, "id", id)
+		logging.Debug("Making call", "method", method, "id", id)
 	}
 
 	msg, err := NewRequest(id, method, params)
@@ -217,14 +218,14 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 	}
 
 	if cnf.Debug {
-		logger.Debug("Request sent", "method", method, "id", id)
+		logging.Debug("Request sent", "method", method, "id", id)
 	}
 
 	// Wait for response
 	resp := <-ch
 
 	if cnf.Debug {
-		logger.Debug("Received response", "id", id)
+		logging.Debug("Received response", "id", id)
 	}
 
 	if resp.Error != nil {
@@ -250,7 +251,7 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 func (c *Client) Notify(ctx context.Context, method string, params any) error {
 	cnf := config.Get()
 	if cnf.Debug {
-		logger.Debug("Sending notification", "method", method)
+		logging.Debug("Sending notification", "method", method)
 	}
 
 	msg, err := NewNotification(method, params)

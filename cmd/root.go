@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"sync"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/kujtimiihoxha/termai/internal/config"
 	"github.com/kujtimiihoxha/termai/internal/db"
 	"github.com/kujtimiihoxha/termai/internal/llm/agent"
+	"github.com/kujtimiihoxha/termai/internal/logging"
 	"github.com/kujtimiihoxha/termai/internal/tui"
 	zone "github.com/lrstanley/bubblezone"
 	"github.com/spf13/cobra"
@@ -26,6 +28,16 @@ var rootCmd = &cobra.Command{
 		}
 		debug, _ := cmd.Flags().GetBool("debug")
 		err := config.Load(debug)
+		cfg := config.Get()
+		defaultLevel := slog.LevelInfo
+		if cfg.Debug {
+			defaultLevel = slog.LevelDebug
+		}
+		logger := slog.New(slog.NewTextHandler(logging.NewWriter(), &slog.HandlerOptions{
+			Level: defaultLevel,
+		}))
+		slog.SetDefault(logger)
+
 		if err != nil {
 			return err
 		}
@@ -37,14 +49,14 @@ var rootCmd = &cobra.Command{
 
 		app := app.New(ctx, conn)
 		defer app.Close()
-		app.Logger.Info("Starting termai...")
+		logging.Info("Starting termai...")
 		zone.NewGlobal()
 		tui := tea.NewProgram(
 			tui.New(app),
 			tea.WithAltScreen(),
 			tea.WithMouseCellMotion(),
 		)
-		app.Logger.Info("Setting up subscriptions...")
+		logging.Info("Setting up subscriptions...")
 		ch, unsub := setupSubscriptions(app)
 		defer unsub()
 
@@ -66,9 +78,8 @@ func setupSubscriptions(app *app.App) (chan tea.Msg, func()) {
 	ch := make(chan tea.Msg)
 	wg := sync.WaitGroup{}
 	ctx, cancel := context.WithCancel(app.Context)
-
 	{
-		sub := app.Logger.Subscribe(ctx)
+		sub := logging.Subscribe(ctx)
 		wg.Add(1)
 		go func() {
 			for ev := range sub {
