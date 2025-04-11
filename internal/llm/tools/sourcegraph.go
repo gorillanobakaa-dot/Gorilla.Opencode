@@ -117,8 +117,7 @@ TIPS:
 - Use specific file extensions to narrow results
 - Add repo: filters for more targeted searches
 - Use type:symbol to find function/method definitions
-- Use type:file to find relevant files
-- For more details on query syntax, visit: https://docs.sourcegraph.com/code_search/queries`
+- Use type:file to find relevant files`
 )
 
 func NewSourcegraphTool() BaseTool {
