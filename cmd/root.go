@@ -48,7 +48,6 @@ var rootCmd = &cobra.Command{
 		ctx := context.Background()
 
 		app := app.New(ctx, conn)
-		defer app.Close()
 		logging.Info("Starting termai...")
 		zone.NewGlobal()
 		tui := tea.NewProgram(
