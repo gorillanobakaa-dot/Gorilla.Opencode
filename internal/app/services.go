@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"database/sql"
-	"log/slog"
 
 	"github.com/kujtimiihoxha/termai/internal/config"
 	"github.com/kujtimiihoxha/termai/internal/db"
@@ -23,8 +22,6 @@ type App struct {
 	Permissions permission.Service
 
 	LSPClients map[string]*lsp.Client
-
-	ceanups []func()
 }
 
 func New(ctx context.Context, conn *sql.DB) *App {
@@ -44,10 +41,7 @@ func New(ctx context.Context, conn *sql.DB) *App {
 	}
 
 	for name, client := range cfg.LSP {
-		lspClient, err := lsp.NewClient(client.Command, client.Args...)
-		app.ceanups = append(app.ceanups, func() {
-			lspClient.Close()
-		})
+		lspClient, err := lsp.NewClient(ctx, client.Command, client.Args...)
 		workspaceWatcher := watcher.NewWorkspaceWatcher(lspClient)
 		if err != nil {
 			logging.Error("Failed to create LSP client for", name, err)
@@ -63,14 +57,4 @@ func New(ctx context.Context, conn *sql.DB) *App {
 		app.LSPClients[name] = lspClient
 	}
 	return app
-}
-
-func (a *App) Close() {
-	for _, cleanup := range a.ceanups {
-		cleanup()
-	}
-	for _, client := range a.LSPClients {
-		client.Close()
-	}
-	slog.Info("App closed")
 }
