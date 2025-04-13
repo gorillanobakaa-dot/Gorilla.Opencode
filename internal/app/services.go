@@ -6,6 +6,7 @@ import (
 
 	"github.com/kujtimiihoxha/termai/internal/config"
 	"github.com/kujtimiihoxha/termai/internal/db"
+	"github.com/kujtimiihoxha/termai/internal/history"
 	"github.com/kujtimiihoxha/termai/internal/logging"
 	"github.com/kujtimiihoxha/termai/internal/lsp"
 	"github.com/kujtimiihoxha/termai/internal/lsp/watcher"
@@ -19,6 +20,7 @@ type App struct {
 
 	Sessions    session.Service
 	Messages    message.Service
+	Files       history.Service
 	Permissions permission.Service
 
 	LSPClients map[string]*lsp.Client
@@ -31,11 +33,13 @@ func New(ctx context.Context, conn *sql.DB) *App {
 	q := db.New(conn)
 	sessions := session.NewService(ctx, q)
 	messages := message.NewService(ctx, q)
+	files := history.NewService(ctx, q)
 
 	app := &App{
 		Context:     ctx,
 		Sessions:    sessions,
 		Messages:    messages,
+		Files:       files,
 		Permissions: permission.NewPermissionService(),
 		LSPClients:  make(map[string]*lsp.Client),
 	}
