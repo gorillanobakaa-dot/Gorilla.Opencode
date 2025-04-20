@@ -57,16 +57,18 @@ func newAnthropicClient(opts providerClientOptions) AnthropicClient {
 }
 
 func (a *anthropicClient) convertMessages(messages []message.Message) (anthropicMessages []anthropic.MessageParam) {
-	cachedBlocks := 0
-	for _, msg := range messages {
+	for i, msg := range messages {
+		cache := false
+		if len(messages)-3 > i {
+			cache = true
+		}
 		switch msg.Role {
 		case message.User:
 			content := anthropic.NewTextBlock(msg.Content().String())
-			if cachedBlocks < 2 && !a.options.disableCache {
+			if cache && !a.options.disableCache {
 				content.OfRequestTextBlock.CacheControl = anthropic.CacheControlEphemeralParam{
 					Type: "ephemeral",
 				}
-				cachedBlocks++
 			}
 			anthropicMessages = append(anthropicMessages, anthropic.NewUserMessage(content))
 
@@ -74,11 +76,10 @@ func (a *anthropicClient) convertMessages(messages []message.Message) (anthropic
 			blocks := []anthropic.ContentBlockParamUnion{}
 			if msg.Content().String() != "" {
 				content := anthropic.NewTextBlock(msg.Content().String())
-				if cachedBlocks < 2 && !a.options.disableCache {
+				if cache && !a.options.disableCache {
 					content.OfRequestTextBlock.CacheControl = anthropic.CacheControlEphemeralParam{
 						Type: "ephemeral",
 					}
-					cachedBlocks++
 				}
 				blocks = append(blocks, content)
 			}

@@ -375,6 +375,9 @@ func (p *permissionDialogCmp) render() string {
 		contentFinal = p.renderDefaultContent()
 	}
 
+	// Add help text
+	helpText := styles.BaseStyle.Width(p.width - 4).Padding(0, 1).Foreground(styles.ForgroundDim).Render("←/→/tab: switch options  a: allow  A: allow for session  d: deny  enter/space: confirm")
+	
 	content := lipgloss.JoinVertical(
 		lipgloss.Top,
 		title,
@@ -382,6 +385,8 @@ func (p *permissionDialogCmp) render() string {
 		headerContent,
 		contentFinal,
 		buttons,
+		styles.BaseStyle.Render(strings.Repeat(" ", p.width - 4)),
+		helpText,
 	)
 
 	return styles.BaseStyle.
@@ -401,7 +406,7 @@ func (p *permissionDialogCmp) View() string {
 }
 
 func (p *permissionDialogCmp) BindingKeys() []key.Binding {
-	return layout.KeyMapToSlice(helpKeys)
+	return layout.KeyMapToSlice(permissionsKeys)
 }
 
 func (p *permissionDialogCmp) SetSize() tea.Cmd {
