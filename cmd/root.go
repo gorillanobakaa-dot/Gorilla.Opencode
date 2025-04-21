@@ -182,7 +182,7 @@ func setupSubscriber[T any](
 			select {
 			case event, ok := <-subCh:
 				if !ok {
-					logging.Info("%s subscription channel closed", name)
+					logging.Info("subscription channel closed", "name", name)
 					return
 				}
 
@@ -191,13 +191,13 @@ func setupSubscriber[T any](
 				select {
 				case outputCh <- msg:
 				case <-time.After(2 * time.Second):
-					logging.Warn("%s message dropped due to slow consumer", name)
+					logging.Warn("message dropped due to slow consumer", "name", name)
 				case <-ctx.Done():
-					logging.Info("%s subscription cancelled", name)
+					logging.Info("subscription cancelled", "name", name)
 					return
 				}
 			case <-ctx.Done():
-				logging.Info("%s subscription cancelled", name)
+				logging.Info("subscription cancelled", "name", name)
 				return
 			}
 		}
