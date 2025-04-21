@@ -21,8 +21,10 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "OpenCode",
-	Short: "A terminal ai assistant",
-	Long:  `A terminal ai assistant`,
+	Short: "A terminal AI assistant for software development",
+	Long: `OpenCode is a powerful terminal-based AI assistant that helps with software development tasks.
+It provides an interactive chat interface with AI capabilities, code analysis, and LSP integration
+to assist developers in writing, debugging, and understanding code directly from the terminal.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// If the help flag is set, show the help message
 		if cmd.Flag("help").Changed {
