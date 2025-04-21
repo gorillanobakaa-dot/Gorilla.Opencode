@@ -169,7 +169,7 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		return NewTextErrorResponse(fmt.Sprintf("failed to parse patch: %s", err)), nil
 	}
 
-	if fuzz > 0 {
+	if fuzz > 3 {
 		return NewTextErrorResponse(fmt.Sprintf("patch contains fuzzy matches (fuzz level: %d). Please make your context lines more precise", fuzz)), nil
 	}
 
