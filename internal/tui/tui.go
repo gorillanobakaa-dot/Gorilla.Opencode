@@ -57,8 +57,8 @@ var returnKey = key.NewBinding(
 )
 
 var logsKeyReturnKey = key.NewBinding(
-	key.WithKeys("backspace"),
-	key.WithHelp("backspace", "go back"),
+	key.WithKeys("backspace", "q"),
+	key.WithHelp("backspace/q", "go back"),
 )
 
 type appModel struct {

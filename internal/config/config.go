@@ -120,13 +120,11 @@ func Load(workingDir string, debug bool) (*Config, error) {
 	}
 
 	applyDefaultValues()
-
 	defaultLevel := slog.LevelInfo
 	if cfg.Debug {
 		defaultLevel = slog.LevelDebug
 	}
-	// if we are in debug mode make the writer a file
-	if cfg.Debug {
+	if os.Getenv("OPENCODE_DEV_DEBUG") == "true" {
 		loggingFile := fmt.Sprintf("%s/%s", cfg.Data.Directory, "debug.log")
 
 		// if file does not exist create it
@@ -154,6 +152,11 @@ func Load(workingDir string, debug bool) (*Config, error) {
 			Level: defaultLevel,
 		}))
 		slog.SetDefault(logger)
+	}
+
+	// Validate configuration
+	if err := Validate(); err != nil {
+		return cfg, fmt.Errorf("config validation failed: %w", err)
 	}
 
 	if cfg.Agents == nil {
@@ -300,6 +303,273 @@ func applyDefaultValues() {
 			cfg.MCPServers[k] = v
 		}
 	}
+}
+
+// Validate checks if the configuration is valid and applies defaults where needed.
+// It validates model IDs and providers, ensuring they are supported.
+func Validate() error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+
+	// Validate agent models
+	for name, agent := range cfg.Agents {
+		// Check if model exists
+		model, modelExists := models.SupportedModels[agent.Model]
+		if !modelExists {
+			logging.Warn("unsupported model configured, reverting to default",
+				"agent", name,
+				"configured_model", agent.Model)
+
+			// Set default model based on available providers
+			if setDefaultModelForAgent(name) {
+				logging.Info("set default model for agent", "agent", name, "model", cfg.Agents[name].Model)
+			} else {
+				return fmt.Errorf("no valid provider available for agent %s", name)
+			}
+			continue
+		}
+
+		// Check if provider for the model is configured
+		provider := model.Provider
+		providerCfg, providerExists := cfg.Providers[provider]
+
+		if !providerExists {
+			// Provider not configured, check if we have environment variables
+			apiKey := getProviderAPIKey(provider)
+			if apiKey == "" {
+				logging.Warn("provider not configured for model, reverting to default",
+					"agent", name,
+					"model", agent.Model,
+					"provider", provider)
+
+				// Set default model based on available providers
+				if setDefaultModelForAgent(name) {
+					logging.Info("set default model for agent", "agent", name, "model", cfg.Agents[name].Model)
+				} else {
+					return fmt.Errorf("no valid provider available for agent %s", name)
+				}
+			} else {
+				// Add provider with API key from environment
+				cfg.Providers[provider] = Provider{
+					APIKey: apiKey,
+				}
+				logging.Info("added provider from environment", "provider", provider)
+			}
+		} else if providerCfg.Disabled || providerCfg.APIKey == "" {
+			// Provider is disabled or has no API key
+			logging.Warn("provider is disabled or has no API key, reverting to default",
+				"agent", name,
+				"model", agent.Model,
+				"provider", provider)
+
+			// Set default model based on available providers
+			if setDefaultModelForAgent(name) {
+				logging.Info("set default model for agent", "agent", name, "model", cfg.Agents[name].Model)
+			} else {
+				return fmt.Errorf("no valid provider available for agent %s", name)
+			}
+		}
+
+		// Validate max tokens
+		if agent.MaxTokens <= 0 {
+			logging.Warn("invalid max tokens, setting to default",
+				"agent", name,
+				"model", agent.Model,
+				"max_tokens", agent.MaxTokens)
+
+			// Update the agent with default max tokens
+			updatedAgent := cfg.Agents[name]
+			if model.DefaultMaxTokens > 0 {
+				updatedAgent.MaxTokens = model.DefaultMaxTokens
+			} else {
+				updatedAgent.MaxTokens = 4096 // Fallback default
+			}
+			cfg.Agents[name] = updatedAgent
+		} else if model.ContextWindow > 0 && agent.MaxTokens > model.ContextWindow/2 {
+			// Ensure max tokens doesn't exceed half the context window (reasonable limit)
+			logging.Warn("max tokens exceeds half the context window, adjusting",
+				"agent", name,
+				"model", agent.Model,
+				"max_tokens", agent.MaxTokens,
+				"context_window", model.ContextWindow)
+
+			// Update the agent with adjusted max tokens
+			updatedAgent := cfg.Agents[name]
+			updatedAgent.MaxTokens = model.ContextWindow / 2
+			cfg.Agents[name] = updatedAgent
+		}
+
+		// Validate reasoning effort for models that support reasoning
+		if model.CanReason && provider == models.ProviderOpenAI {
+			if agent.ReasoningEffort == "" {
+				// Set default reasoning effort for models that support it
+				logging.Info("setting default reasoning effort for model that supports reasoning",
+					"agent", name,
+					"model", agent.Model)
+
+				// Update the agent with default reasoning effort
+				updatedAgent := cfg.Agents[name]
+				updatedAgent.ReasoningEffort = "medium"
+				cfg.Agents[name] = updatedAgent
+			} else {
+				// Check if reasoning effort is valid (low, medium, high)
+				effort := strings.ToLower(agent.ReasoningEffort)
+				if effort != "low" && effort != "medium" && effort != "high" {
+					logging.Warn("invalid reasoning effort, setting to medium",
+						"agent", name,
+						"model", agent.Model,
+						"reasoning_effort", agent.ReasoningEffort)
+
+					// Update the agent with valid reasoning effort
+					updatedAgent := cfg.Agents[name]
+					updatedAgent.ReasoningEffort = "medium"
+					cfg.Agents[name] = updatedAgent
+				}
+			}
+		} else if !model.CanReason && agent.ReasoningEffort != "" {
+			// Model doesn't support reasoning but reasoning effort is set
+			logging.Warn("model doesn't support reasoning but reasoning effort is set, ignoring",
+				"agent", name,
+				"model", agent.Model,
+				"reasoning_effort", agent.ReasoningEffort)
+
+			// Update the agent to remove reasoning effort
+			updatedAgent := cfg.Agents[name]
+			updatedAgent.ReasoningEffort = ""
+			cfg.Agents[name] = updatedAgent
+		}
+	}
+
+	// Validate providers
+	for provider, providerCfg := range cfg.Providers {
+		if providerCfg.APIKey == "" && !providerCfg.Disabled {
+			logging.Warn("provider has no API key, marking as disabled", "provider", provider)
+			providerCfg.Disabled = true
+			cfg.Providers[provider] = providerCfg
+		}
+	}
+
+	// Validate LSP configurations
+	for language, lspConfig := range cfg.LSP {
+		if lspConfig.Command == "" && !lspConfig.Disabled {
+			logging.Warn("LSP configuration has no command, marking as disabled", "language", language)
+			lspConfig.Disabled = true
+			cfg.LSP[language] = lspConfig
+		}
+	}
+
+	return nil
+}
+
+// getProviderAPIKey gets the API key for a provider from environment variables
+func getProviderAPIKey(provider models.ModelProvider) string {
+	switch provider {
+	case models.ProviderAnthropic:
+		return os.Getenv("ANTHROPIC_API_KEY")
+	case models.ProviderOpenAI:
+		return os.Getenv("OPENAI_API_KEY")
+	case models.ProviderGemini:
+		return os.Getenv("GEMINI_API_KEY")
+	case models.ProviderGROQ:
+		return os.Getenv("GROQ_API_KEY")
+	case models.ProviderBedrock:
+		if hasAWSCredentials() {
+			return "aws-credentials-available"
+		}
+	}
+	return ""
+}
+
+// setDefaultModelForAgent sets a default model for an agent based on available providers
+func setDefaultModelForAgent(agent AgentName) bool {
+	// Check providers in order of preference
+	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
+		maxTokens := int64(5000)
+		if agent == AgentTitle {
+			maxTokens = 80
+		}
+		cfg.Agents[agent] = Agent{
+			Model:     models.Claude37Sonnet,
+			MaxTokens: maxTokens,
+		}
+		return true
+	}
+
+	if apiKey := os.Getenv("OPENAI_API_KEY"); apiKey != "" {
+		var model models.ModelID
+		maxTokens := int64(5000)
+		reasoningEffort := ""
+
+		switch agent {
+		case AgentTitle:
+			model = models.GPT41Mini
+			maxTokens = 80
+		case AgentTask:
+			model = models.GPT41Mini
+		default:
+			model = models.GPT41
+		}
+
+		// Check if model supports reasoning
+		if modelInfo, ok := models.SupportedModels[model]; ok && modelInfo.CanReason {
+			reasoningEffort = "medium"
+		}
+
+		cfg.Agents[agent] = Agent{
+			Model:           model,
+			MaxTokens:       maxTokens,
+			ReasoningEffort: reasoningEffort,
+		}
+		return true
+	}
+
+	if apiKey := os.Getenv("GEMINI_API_KEY"); apiKey != "" {
+		var model models.ModelID
+		maxTokens := int64(5000)
+
+		if agent == AgentTitle {
+			model = models.Gemini25Flash
+			maxTokens = 80
+		} else {
+			model = models.Gemini25
+		}
+
+		cfg.Agents[agent] = Agent{
+			Model:     model,
+			MaxTokens: maxTokens,
+		}
+		return true
+	}
+
+	if apiKey := os.Getenv("GROQ_API_KEY"); apiKey != "" {
+		maxTokens := int64(5000)
+		if agent == AgentTitle {
+			maxTokens = 80
+		}
+
+		cfg.Agents[agent] = Agent{
+			Model:     models.QWENQwq,
+			MaxTokens: maxTokens,
+		}
+		return true
+	}
+
+	if hasAWSCredentials() {
+		maxTokens := int64(5000)
+		if agent == AgentTitle {
+			maxTokens = 80
+		}
+
+		cfg.Agents[agent] = Agent{
+			Model:           models.BedrockClaude37Sonnet,
+			MaxTokens:       maxTokens,
+			ReasoningEffort: "medium", // Claude models support reasoning
+		}
+		return true
+	}
+
+	return false
 }
 
 // Get returns the current configuration.

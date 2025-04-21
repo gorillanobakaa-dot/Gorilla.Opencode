@@ -2,10 +2,12 @@ package permission
 
 import (
 	"errors"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kujtimiihoxha/opencode/internal/config"
 	"github.com/kujtimiihoxha/opencode/internal/pubsub"
 )
 
@@ -67,9 +69,13 @@ func (s *permissionService) Deny(permission PermissionRequest) {
 }
 
 func (s *permissionService) Request(opts CreatePermissionRequest) bool {
+	dir := filepath.Dir(opts.Path)
+	if dir == "." {
+		dir = config.WorkingDirectory()
+	}
 	permission := PermissionRequest{
 		ID:          uuid.New().String(),
-		Path:        opts.Path,
+		Path:        dir,
 		ToolName:    opts.ToolName,
 		Description: opts.Description,
 		Action:      opts.Action,
@@ -77,7 +83,7 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	}
 
 	for _, p := range s.sessionPermissions {
-		if p.ToolName == permission.ToolName && p.Action == permission.Action {
+		if p.ToolName == permission.ToolName && p.Action == permission.Action && p.SessionID == permission.SessionID && p.Path == permission.Path {
 			return true
 		}
 	}
