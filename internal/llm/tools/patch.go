@@ -11,6 +11,7 @@ import (
 	"github.com/kujtimiihoxha/opencode/internal/config"
 	"github.com/kujtimiihoxha/opencode/internal/diff"
 	"github.com/kujtimiihoxha/opencode/internal/history"
+	"github.com/kujtimiihoxha/opencode/internal/logging"
 	"github.com/kujtimiihoxha/opencode/internal/lsp"
 	"github.com/kujtimiihoxha/opencode/internal/permission"
 )
@@ -314,7 +315,7 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 			// If not adding a file, create history entry for existing file
 			_, err = p.files.Create(ctx, sessionID, absPath, oldContent)
 			if err != nil {
-				fmt.Printf("Error creating file history: %v\n", err)
+				logging.Debug("Error creating file history", "error", err)
 			}
 		}
 
@@ -322,7 +323,7 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 			// User manually changed content, store intermediate version
 			_, err = p.files.CreateVersion(ctx, sessionID, absPath, oldContent)
 			if err != nil {
-				fmt.Printf("Error creating file history version: %v\n", err)
+				logging.Debug("Error creating file history version", "error", err)
 			}
 		}
 
@@ -333,7 +334,7 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 			_, err = p.files.CreateVersion(ctx, sessionID, absPath, newContent)
 		}
 		if err != nil {
-			fmt.Printf("Error creating file history version: %v\n", err)
+			logging.Debug("Error creating file history version", "error", err)
 		}
 
 		// Record file operations

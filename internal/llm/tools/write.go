@@ -11,6 +11,7 @@ import (
 	"github.com/kujtimiihoxha/opencode/internal/config"
 	"github.com/kujtimiihoxha/opencode/internal/diff"
 	"github.com/kujtimiihoxha/opencode/internal/history"
+	"github.com/kujtimiihoxha/opencode/internal/logging"
 	"github.com/kujtimiihoxha/opencode/internal/lsp"
 	"github.com/kujtimiihoxha/opencode/internal/permission"
 )
@@ -192,13 +193,13 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		// User Manually changed the content store an intermediate version
 		_, err = w.files.CreateVersion(ctx, sessionID, filePath, oldContent)
 		if err != nil {
-			fmt.Printf("Error creating file history version: %v\n", err)
+			logging.Debug("Error creating file history version", "error", err)
 		}
 	}
 	// Store the new version
 	_, err = w.files.CreateVersion(ctx, sessionID, filePath, params.Content)
 	if err != nil {
-		fmt.Printf("Error creating file history version: %v\n", err)
+		logging.Debug("Error creating file history version", "error", err)
 	}
 
 	recordFileWrite(filePath)
