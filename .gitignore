@@ -31,7 +31,7 @@ go.work
 .Trashes
 ehthumbs.db
 Thumbs.db
-debug.log
+*.log
 
 # Binary output directory
 /bin/
@@ -41,5 +41,5 @@ debug.log
 .env
 .env.local
 
-.termai
+.opencode/
 

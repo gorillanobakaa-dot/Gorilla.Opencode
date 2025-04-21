@@ -1,21 +1,34 @@
 package core
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/kujtimiihoxha/termai/internal/config"
-	"github.com/kujtimiihoxha/termai/internal/llm/models"
-	"github.com/kujtimiihoxha/termai/internal/tui/styles"
-	"github.com/kujtimiihoxha/termai/internal/tui/util"
-	"github.com/kujtimiihoxha/termai/internal/version"
+	"github.com/kujtimiihoxha/opencode/internal/config"
+	"github.com/kujtimiihoxha/opencode/internal/llm/models"
+	"github.com/kujtimiihoxha/opencode/internal/lsp"
+	"github.com/kujtimiihoxha/opencode/internal/lsp/protocol"
+	"github.com/kujtimiihoxha/opencode/internal/pubsub"
+	"github.com/kujtimiihoxha/opencode/internal/session"
+	"github.com/kujtimiihoxha/opencode/internal/tui/components/chat"
+	"github.com/kujtimiihoxha/opencode/internal/tui/styles"
+	"github.com/kujtimiihoxha/opencode/internal/tui/util"
 )
+
+type StatusCmp interface {
+	tea.Model
+	SetHelpMsg(string)
+}
 
 type statusCmp struct {
 	info       util.InfoMsg
 	width      int
 	messageTTL time.Duration
+	lspClients map[string]*lsp.Client
+	session    session.Session
 }
 
 // clearMessageCmd is a command that clears status messages after a timeout
@@ -34,6 +47,16 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		return m, nil
+	case chat.SessionSelectedMsg:
+		m.session = msg
+	case chat.SessionClearedMsg:
+		m.session = session.Session{}
+	case pubsub.Event[session.Session]:
+		if msg.Type == pubsub.UpdatedEvent {
+			if m.session.ID == msg.Payload.ID {
+				m.session = msg.Payload
+			}
+		}
 	case util.InfoMsg:
 		m.info = msg
 		ttl := msg.TTL
@@ -47,20 +70,53 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-var (
-	versionWidget = styles.Padded.Background(styles.DarkGrey).Foreground(styles.Text).Render(version.Version)
-	helpWidget    = styles.Padded.Background(styles.Grey).Foreground(styles.Text).Render("? help")
-)
+var helpWidget = styles.Padded.Background(styles.ForgroundMid).Foreground(styles.BackgroundDarker).Bold(true).Render("ctrl+? help")
+
+func formatTokensAndCost(tokens int64, cost float64) string {
+	// Format tokens in human-readable format (e.g., 110K, 1.2M)
+	var formattedTokens string
+	switch {
+	case tokens >= 1_000_000:
+		formattedTokens = fmt.Sprintf("%.1fM", float64(tokens)/1_000_000)
+	case tokens >= 1_000:
+		formattedTokens = fmt.Sprintf("%.1fK", float64(tokens)/1_000)
+	default:
+		formattedTokens = fmt.Sprintf("%d", tokens)
+	}
+
+	// Remove .0 suffix if present
+	if strings.HasSuffix(formattedTokens, ".0K") {
+		formattedTokens = strings.Replace(formattedTokens, ".0K", "K", 1)
+	}
+	if strings.HasSuffix(formattedTokens, ".0M") {
+		formattedTokens = strings.Replace(formattedTokens, ".0M", "M", 1)
+	}
+
+	// Format cost with $ symbol and 2 decimal places
+	formattedCost := fmt.Sprintf("$%.2f", cost)
+
+	return fmt.Sprintf("Tokens: %s, Cost: %s", formattedTokens, formattedCost)
+}
 
 func (m statusCmp) View() string {
-	status := styles.Padded.Background(styles.Grey).Foreground(styles.Text).Render("? help")
+	status := helpWidget
+	if m.session.ID != "" {
+		tokens := formatTokensAndCost(m.session.PromptTokens+m.session.CompletionTokens, m.session.Cost)
+		tokensStyle := styles.Padded.
+			Background(styles.Forground).
+			Foreground(styles.BackgroundDim).
+			Render(tokens)
+		status += tokensStyle
+	}
+
+	diagnostics := styles.Padded.Background(styles.BackgroundDarker).Render(m.projectDiagnostics())
 	if m.info.Msg != "" {
 		infoStyle := styles.Padded.
 			Foreground(styles.Base).
-			Width(m.availableFooterMsgWidth())
+			Width(m.availableFooterMsgWidth(diagnostics))
 		switch m.info.Type {
 		case util.InfoTypeInfo:
-			infoStyle = infoStyle.Background(styles.Blue)
+			infoStyle = infoStyle.Background(styles.BorderColor)
 		case util.InfoTypeWarn:
 			infoStyle = infoStyle.Background(styles.Peach)
 		case util.InfoTypeError:
@@ -68,7 +124,7 @@ func (m statusCmp) View() string {
 		}
 		// Truncate message if it's longer than available width
 		msg := m.info.Msg
-		availWidth := m.availableFooterMsgWidth() - 10
+		availWidth := m.availableFooterMsgWidth(diagnostics) - 10
 		if len(msg) > availWidth && availWidth > 0 {
 			msg = msg[:availWidth] + "..."
 		}
@@ -76,27 +132,121 @@ func (m statusCmp) View() string {
 	} else {
 		status += styles.Padded.
 			Foreground(styles.Base).
-			Background(styles.LightGrey).
-			Width(m.availableFooterMsgWidth()).
+			Background(styles.BackgroundDim).
+			Width(m.availableFooterMsgWidth(diagnostics)).
 			Render("")
 	}
+
+	status += diagnostics
 	status += m.model()
-	status += versionWidget
 	return status
 }
 
-func (m statusCmp) availableFooterMsgWidth() int {
-	// -2 to accommodate padding
-	return max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(versionWidget)-lipgloss.Width(m.model()))
+func (m *statusCmp) projectDiagnostics() string {
+	// Check if any LSP server is still initializing
+	initializing := false
+	for _, client := range m.lspClients {
+		if client.GetServerState() == lsp.StateStarting {
+			initializing = true
+			break
+		}
+	}
+
+	// If any server is initializing, show that status
+	if initializing {
+		return lipgloss.NewStyle().
+			Background(styles.BackgroundDarker).
+			Foreground(styles.Peach).
+			Render(fmt.Sprintf("%s Initializing LSP...", styles.SpinnerIcon))
+	}
+
+	errorDiagnostics := []protocol.Diagnostic{}
+	warnDiagnostics := []protocol.Diagnostic{}
+	hintDiagnostics := []protocol.Diagnostic{}
+	infoDiagnostics := []protocol.Diagnostic{}
+	for _, client := range m.lspClients {
+		for _, d := range client.GetDiagnostics() {
+			for _, diag := range d {
+				switch diag.Severity {
+				case protocol.SeverityError:
+					errorDiagnostics = append(errorDiagnostics, diag)
+				case protocol.SeverityWarning:
+					warnDiagnostics = append(warnDiagnostics, diag)
+				case protocol.SeverityHint:
+					hintDiagnostics = append(hintDiagnostics, diag)
+				case protocol.SeverityInformation:
+					infoDiagnostics = append(infoDiagnostics, diag)
+				}
+			}
+		}
+	}
+
+	if len(errorDiagnostics) == 0 && len(warnDiagnostics) == 0 && len(hintDiagnostics) == 0 && len(infoDiagnostics) == 0 {
+		return "No diagnostics"
+	}
+
+	diagnostics := []string{}
+
+	if len(errorDiagnostics) > 0 {
+		errStr := lipgloss.NewStyle().
+			Background(styles.BackgroundDarker).
+			Foreground(styles.Error).
+			Render(fmt.Sprintf("%s %d", styles.ErrorIcon, len(errorDiagnostics)))
+		diagnostics = append(diagnostics, errStr)
+	}
+	if len(warnDiagnostics) > 0 {
+		warnStr := lipgloss.NewStyle().
+			Background(styles.BackgroundDarker).
+			Foreground(styles.Warning).
+			Render(fmt.Sprintf("%s %d", styles.WarningIcon, len(warnDiagnostics)))
+		diagnostics = append(diagnostics, warnStr)
+	}
+	if len(hintDiagnostics) > 0 {
+		hintStr := lipgloss.NewStyle().
+			Background(styles.BackgroundDarker).
+			Foreground(styles.Text).
+			Render(fmt.Sprintf("%s %d", styles.HintIcon, len(hintDiagnostics)))
+		diagnostics = append(diagnostics, hintStr)
+	}
+	if len(infoDiagnostics) > 0 {
+		infoStr := lipgloss.NewStyle().
+			Background(styles.BackgroundDarker).
+			Foreground(styles.Peach).
+			Render(fmt.Sprintf("%s %d", styles.InfoIcon, len(infoDiagnostics)))
+		diagnostics = append(diagnostics, infoStr)
+	}
+
+	return strings.Join(diagnostics, " ")
+}
+
+func (m statusCmp) availableFooterMsgWidth(diagnostics string) int {
+	tokens := ""
+	tokensWidth := 0
+	if m.session.ID != "" {
+		tokens = formatTokensAndCost(m.session.PromptTokens+m.session.CompletionTokens, m.session.Cost)
+		tokensWidth = lipgloss.Width(tokens) + 2
+	}
+	return max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(m.model())-lipgloss.Width(diagnostics)-tokensWidth)
 }
 
 func (m statusCmp) model() string {
-	model := models.SupportedModels[config.Get().Model.Coder]
+	cfg := config.Get()
+
+	coder, ok := cfg.Agents[config.AgentCoder]
+	if !ok {
+		return "Unknown"
+	}
+	model := models.SupportedModels[coder.Model]
 	return styles.Padded.Background(styles.Grey).Foreground(styles.Text).Render(model.Name)
 }
 
-func NewStatusCmp() tea.Model {
+func (m statusCmp) SetHelpMsg(s string) {
+	helpWidget = styles.Padded.Background(styles.Forground).Foreground(styles.BackgroundDarker).Bold(true).Render(s)
+}
+
+func NewStatusCmp(lspClients map[string]*lsp.Client) StatusCmp {
 	return &statusCmp{
 		messageTTL: 10 * time.Second,
+		lspClients: lspClients,
 	}
 }

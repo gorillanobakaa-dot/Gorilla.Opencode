@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
-	"github.com/kujtimiihoxha/termai/internal/config"
-	"github.com/kujtimiihoxha/termai/internal/llm/tools/shell"
-	"github.com/kujtimiihoxha/termai/internal/permission"
+	"github.com/kujtimiihoxha/opencode/internal/config"
+	"github.com/kujtimiihoxha/opencode/internal/llm/tools/shell"
+	"github.com/kujtimiihoxha/opencode/internal/permission"
 )
 
 type BashParams struct {
@@ -21,6 +22,10 @@ type BashPermissionsParams struct {
 	Timeout int    `json:"timeout"`
 }
 
+type BashResponseMetadata struct {
+	StartTime int64 `json:"start_time"`
+	EndTime   int64 `json:"end_time"`
+}
 type bashTool struct {
 	permissions permission.Service
 }
@@ -46,7 +51,7 @@ var safeReadOnlyCommands = []string{
 	"git status", "git log", "git diff", "git show", "git branch", "git tag", "git remote", "git ls-files", "git ls-remote",
 	"git rev-parse", "git config --get", "git config --list", "git describe", "git blame", "git grep", "git shortlog",
 
-	"go version", "go list", "go env", "go doc", "go vet", "go fmt", "go mod", "go test", "go build", "go run", "go install", "go clean",
+	"go version", "go help", "go list", "go env", "go doc", "go vet", "go fmt", "go mod", "go test", "go build", "go run", "go install", "go clean",
 }
 
 func bashDescription() string {
@@ -117,16 +122,16 @@ When the user asks you to create a new git commit, follow these steps carefully:
 </commit_analysis>
 
 4. Create the commit with a message ending with:
-🤖 Generated with termai
-Co-Authored-By: termai <noreply@termai.io>
+🤖 Generated with opencode
+Co-Authored-By: opencode <noreply@opencode.ai>
 
 - In order to ensure good formatting, ALWAYS pass the commit message via a HEREDOC, a la this example:
 <example>
 git commit -m "$(cat <<'EOF'
  Commit message here.
 
- 🤖 Generated with termai
- Co-Authored-By: termai <noreply@termai.io>
+ 🤖 Generated with opencode
+ Co-Authored-By: opencode <noreply@opencode.ai>
  EOF
  )"
 </example>
@@ -188,7 +193,7 @@ gh pr create --title "the pr title" --body "$(cat <<'EOF'
 ## Test plan
 [Checklist of TODOs for testing the pull request...]
 
-🤖 Generated with termai
+🤖 Generated with opencode
 EOF
 )"
 </example>
@@ -256,9 +261,15 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 			}
 		}
 	}
+
+	sessionID, messageID := GetContextValues(ctx)
+	if sessionID == "" || messageID == "" {
+		return ToolResponse{}, fmt.Errorf("session ID and message ID are required for creating a new file")
+	}
 	if !isSafeReadOnly {
 		p := b.permissions.Request(
 			permission.CreatePermissionRequest{
+				SessionID:   sessionID,
 				Path:        config.WorkingDirectory(),
 				ToolName:    BashToolName,
 				Action:      "execute",
@@ -269,13 +280,14 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 			},
 		)
 		if !p {
-			return NewTextErrorResponse("permission denied"), nil
+			return ToolResponse{}, permission.ErrorPermissionDenied
 		}
 	}
+	startTime := time.Now()
 	shell := shell.GetPersistentShell(config.WorkingDirectory())
 	stdout, stderr, exitCode, interrupted, err := shell.Exec(ctx, params.Command, params.Timeout)
 	if err != nil {
-		return NewTextErrorResponse(fmt.Sprintf("error executing command: %s", err)), nil
+		return ToolResponse{}, fmt.Errorf("error executing command: %w", err)
 	}
 
 	stdout = truncateOutput(stdout)
@@ -304,10 +316,14 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		stdout += "\n" + errorMessage
 	}
 
-	if stdout == "" {
-		return NewTextResponse("no output"), nil
+	metadata := BashResponseMetadata{
+		StartTime: startTime.UnixMilli(),
+		EndTime:   time.Now().UnixMilli(),
 	}
-	return NewTextResponse(stdout), nil
+	if stdout == "" {
+		return WithResponseMetadata(NewTextResponse("no output"), metadata), nil
+	}
+	return WithResponseMetadata(NewTextResponse(stdout), metadata), nil
 }
 
 func truncateOutput(content string) string {

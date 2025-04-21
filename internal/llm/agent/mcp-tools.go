@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/kujtimiihoxha/termai/internal/config"
-	"github.com/kujtimiihoxha/termai/internal/llm/tools"
-	"github.com/kujtimiihoxha/termai/internal/logging"
-	"github.com/kujtimiihoxha/termai/internal/permission"
-	"github.com/kujtimiihoxha/termai/internal/version"
+	"github.com/kujtimiihoxha/opencode/internal/config"
+	"github.com/kujtimiihoxha/opencode/internal/llm/tools"
+	"github.com/kujtimiihoxha/opencode/internal/logging"
+	"github.com/kujtimiihoxha/opencode/internal/permission"
+	"github.com/kujtimiihoxha/opencode/internal/version"
 
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -46,7 +46,7 @@ func runTool(ctx context.Context, c MCPClient, toolName string, input string) (t
 	initRequest := mcp.InitializeRequest{}
 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
 	initRequest.Params.ClientInfo = mcp.Implementation{
-		Name:    "termai",
+		Name:    "OpenCode",
 		Version: version.Version,
 	}
 
@@ -80,9 +80,14 @@ func runTool(ctx context.Context, c MCPClient, toolName string, input string) (t
 }
 
 func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolResponse, error) {
+	sessionID, messageID := tools.GetContextValues(ctx)
+	if sessionID == "" || messageID == "" {
+		return tools.ToolResponse{}, fmt.Errorf("session ID and message ID are required for creating a new file")
+	}
 	permissionDescription := fmt.Sprintf("execute %s with the following parameters: %s", b.Info().Name, params.Input)
 	p := b.permissions.Request(
 		permission.CreatePermissionRequest{
+			SessionID:   sessionID,
 			Path:        config.WorkingDirectory(),
 			ToolName:    b.Info().Name,
 			Action:      "execute",
@@ -135,7 +140,7 @@ func getTools(ctx context.Context, name string, m config.MCPServer, permissions 
 	initRequest := mcp.InitializeRequest{}
 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
 	initRequest.Params.ClientInfo = mcp.Implementation{
-		Name:    "termai",
+		Name:    "OpenCode",
 		Version: version.Version,
 	}
 

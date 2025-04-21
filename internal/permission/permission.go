@@ -1,20 +1,28 @@
 package permission
 
 import (
+	"errors"
+	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kujtimiihoxha/termai/internal/pubsub"
+	"github.com/kujtimiihoxha/opencode/internal/config"
+	"github.com/kujtimiihoxha/opencode/internal/pubsub"
 )
 
+var ErrorPermissionDenied = errors.New("permission denied")
+
 type CreatePermissionRequest struct {
+	SessionID   string `json:"session_id"`
 	ToolName    string `json:"tool_name"`
 	Description string `json:"description"`
 	Action      string `json:"action"`
 	Params      any    `json:"params"`
 	Path        string `json:"path"`
 }
+
 type PermissionRequest struct {
 	ID          string `json:"id"`
 	SessionID   string `json:"session_id"`
@@ -31,13 +39,15 @@ type Service interface {
 	Grant(permission PermissionRequest)
 	Deny(permission PermissionRequest)
 	Request(opts CreatePermissionRequest) bool
+	AutoApproveSession(sessionID string)
 }
 
 type permissionService struct {
 	*pubsub.Broker[PermissionRequest]
 
-	sessionPermissions []PermissionRequest
-	pendingRequests    sync.Map
+	sessionPermissions  []PermissionRequest
+	pendingRequests     sync.Map
+	autoApproveSessions []string
 }
 
 func (s *permissionService) GrantPersistant(permission PermissionRequest) {
@@ -63,9 +73,17 @@ func (s *permissionService) Deny(permission PermissionRequest) {
 }
 
 func (s *permissionService) Request(opts CreatePermissionRequest) bool {
+	if slices.Contains(s.autoApproveSessions, opts.SessionID) {
+		return true
+	}
+	dir := filepath.Dir(opts.Path)
+	if dir == "." {
+		dir = config.WorkingDirectory()
+	}
 	permission := PermissionRequest{
 		ID:          uuid.New().String(),
-		Path:        opts.Path,
+		Path:        dir,
+		SessionID:   opts.SessionID,
 		ToolName:    opts.ToolName,
 		Description: opts.Description,
 		Action:      opts.Action,
@@ -73,7 +91,7 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	}
 
 	for _, p := range s.sessionPermissions {
-		if p.ToolName == permission.ToolName && p.Action == permission.Action {
+		if p.ToolName == permission.ToolName && p.Action == permission.Action && p.SessionID == permission.SessionID && p.Path == permission.Path {
 			return true
 		}
 	}
@@ -92,6 +110,10 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	case <-time.After(10 * time.Minute):
 		return false
 	}
+}
+
+func (s *permissionService) AutoApproveSession(sessionID string) {
+	s.autoApproveSessions = append(s.autoApproveSessions, sessionID)
 }
 
 func NewPermissionService() Service {

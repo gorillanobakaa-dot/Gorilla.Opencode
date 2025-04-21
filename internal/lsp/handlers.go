@@ -3,10 +3,10 @@ package lsp
 import (
 	"encoding/json"
 
-	"github.com/kujtimiihoxha/termai/internal/config"
-	"github.com/kujtimiihoxha/termai/internal/logging"
-	"github.com/kujtimiihoxha/termai/internal/lsp/protocol"
-	"github.com/kujtimiihoxha/termai/internal/lsp/util"
+	"github.com/kujtimiihoxha/opencode/internal/config"
+	"github.com/kujtimiihoxha/opencode/internal/logging"
+	"github.com/kujtimiihoxha/opencode/internal/lsp/protocol"
+	"github.com/kujtimiihoxha/opencode/internal/lsp/util"
 )
 
 // Requests
@@ -88,7 +88,7 @@ func HandleServerMessage(params json.RawMessage) {
 		Message string `json:"message"`
 	}
 	if err := json.Unmarshal(params, &msg); err == nil {
-		if cnf.Debug {
+		if cnf.DebugLSP {
 			logging.Debug("Server message", "type", msg.Type, "message", msg.Message)
 		}
 	}

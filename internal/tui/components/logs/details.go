@@ -9,22 +9,19 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/kujtimiihoxha/termai/internal/logging"
-	"github.com/kujtimiihoxha/termai/internal/tui/layout"
-	"github.com/kujtimiihoxha/termai/internal/tui/styles"
+	"github.com/kujtimiihoxha/opencode/internal/logging"
+	"github.com/kujtimiihoxha/opencode/internal/tui/layout"
+	"github.com/kujtimiihoxha/opencode/internal/tui/styles"
 )
 
 type DetailComponent interface {
 	tea.Model
-	layout.Focusable
 	layout.Sizeable
 	layout.Bindings
-	layout.Bordered
 }
 
 type detailCmp struct {
 	width, height int
-	focused       bool
 	currentLog    logging.LogMessage
 	viewport      viewport.Model
 }
@@ -39,11 +36,6 @@ func (i *detailCmp) Init() tea.Cmd {
 }
 
 func (i *detailCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var (
-		cmd  tea.Cmd
-		cmds []tea.Cmd
-	)
-
 	switch msg := msg.(type) {
 	case selectedLogMsg:
 		if msg.ID != i.currentLog.ID {
@@ -52,12 +44,7 @@ func (i *detailCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if i.focused {
-		i.viewport, cmd = i.viewport.Update(msg)
-		cmds = append(cmds, cmd)
-	}
-
-	return i, tea.Batch(cmds...)
+	return i, nil
 }
 
 func (i *detailCmp) updateContent() {
@@ -125,48 +112,24 @@ func getLevelStyle(level string) lipgloss.Style {
 }
 
 func (i *detailCmp) View() string {
-	return i.viewport.View()
-}
-
-func (i *detailCmp) Blur() tea.Cmd {
-	i.focused = false
-	return nil
-}
-
-func (i *detailCmp) Focus() tea.Cmd {
-	i.focused = true
-	return nil
-}
-
-func (i *detailCmp) IsFocused() bool {
-	return i.focused
+	return styles.ForceReplaceBackgroundWithLipgloss(i.viewport.View(), styles.Background)
 }
 
 func (i *detailCmp) GetSize() (int, int) {
 	return i.width, i.height
 }
 
-func (i *detailCmp) SetSize(width int, height int) {
+func (i *detailCmp) SetSize(width int, height int) tea.Cmd {
 	i.width = width
 	i.height = height
 	i.viewport.Width = i.width
 	i.viewport.Height = i.height
 	i.updateContent()
+	return nil
 }
 
 func (i *detailCmp) BindingKeys() []key.Binding {
-	return []key.Binding{
-		i.viewport.KeyMap.PageDown,
-		i.viewport.KeyMap.PageUp,
-		i.viewport.KeyMap.HalfPageDown,
-		i.viewport.KeyMap.HalfPageUp,
-	}
-}
-
-func (i *detailCmp) BorderText() map[layout.BorderPosition]string {
-	return map[layout.BorderPosition]string{
-		layout.TopLeftBorder: "Log Details",
-	}
+	return layout.KeyMapToSlice(i.viewport.KeyMap)
 }
 
 func NewLogsDetails() DetailComponent {

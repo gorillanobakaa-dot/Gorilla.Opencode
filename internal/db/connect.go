@@ -12,8 +12,8 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/kujtimiihoxha/termai/internal/config"
-	"github.com/kujtimiihoxha/termai/internal/logging"
+	"github.com/kujtimiihoxha/opencode/internal/config"
+	"github.com/kujtimiihoxha/opencode/internal/logging"
 )
 
 func Connect() (*sql.DB, error) {
@@ -24,7 +24,7 @@ func Connect() (*sql.DB, error) {
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
-	dbPath := filepath.Join(dataDir, "termai.db")
+	dbPath := filepath.Join(dataDir, "opencode.db")
 	// Open the SQLite database
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
@@ -48,9 +48,9 @@ func Connect() (*sql.DB, error) {
 
 	for _, pragma := range pragmas {
 		if _, err = db.Exec(pragma); err != nil {
-			logging.Warn("Failed to set pragma", pragma, err)
+			logging.Error("Failed to set pragma", pragma, err)
 		} else {
-			logging.Warn("Set pragma", "pragma", pragma)
+			logging.Debug("Set pragma", "pragma", pragma)
 		}
 	}
 

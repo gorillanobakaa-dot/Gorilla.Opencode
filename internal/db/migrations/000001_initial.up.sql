@@ -18,14 +18,39 @@ UPDATE sessions SET updated_at = strftime('%s', 'now')
 WHERE id = new.id;
 END;
 
+-- Files
+CREATE TABLE IF NOT EXISTS files (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    path TEXT NOT NULL,
+    content TEXT NOT NULL,
+    version TEXT NOT NULL,
+    created_at INTEGER NOT NULL,  -- Unix timestamp in milliseconds
+    updated_at INTEGER NOT NULL,  -- Unix timestamp in milliseconds
+    FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE,
+    UNIQUE(path, session_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
+CREATE INDEX IF NOT EXISTS idx_files_path ON files (path);
+
+CREATE TRIGGER IF NOT EXISTS update_files_updated_at
+AFTER UPDATE ON files
+BEGIN
+UPDATE files SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
 -- Messages
 CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY,
     session_id TEXT NOT NULL,
     role TEXT NOT NULL,
     parts TEXT NOT NULL default '[]',
+    model TEXT,
     created_at INTEGER NOT NULL,  -- Unix timestamp in milliseconds
     updated_at INTEGER NOT NULL,  -- Unix timestamp in milliseconds
+    finished_at INTEGER,  -- Unix timestamp in milliseconds
     FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
 );
 

@@ -9,10 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kujtimiihoxha/termai/internal/config"
-	"github.com/kujtimiihoxha/termai/internal/lsp"
-	"github.com/kujtimiihoxha/termai/internal/permission"
-	"github.com/sergi/go-diff/diffmatchpatch"
+	"github.com/kujtimiihoxha/opencode/internal/config"
+	"github.com/kujtimiihoxha/opencode/internal/diff"
+	"github.com/kujtimiihoxha/opencode/internal/history"
+	"github.com/kujtimiihoxha/opencode/internal/logging"
+	"github.com/kujtimiihoxha/opencode/internal/lsp"
+	"github.com/kujtimiihoxha/opencode/internal/permission"
 )
 
 type EditParams struct {
@@ -22,15 +24,20 @@ type EditParams struct {
 }
 
 type EditPermissionsParams struct {
-	FilePath  string `json:"file_path"`
-	OldString string `json:"old_string"`
-	NewString string `json:"new_string"`
+	FilePath string `json:"file_path"`
+	Diff     string `json:"diff"`
+}
+
+type EditResponseMetadata struct {
 	Diff      string `json:"diff"`
+	Additions int    `json:"additions"`
+	Removals  int    `json:"removals"`
 }
 
 type editTool struct {
 	lspClients  map[string]*lsp.Client
 	permissions permission.Service
+	files       history.Service
 }
 
 const (
@@ -84,10 +91,11 @@ When making edits:
 Remember: when making multiple file edits in a row to the same file, you should prefer to send all edits in a single message with multiple calls to this tool, rather than multiple messages with a single call each.`
 )
 
-func NewEditTool(lspClients map[string]*lsp.Client, permissions permission.Service) BaseTool {
+func NewEditTool(lspClients map[string]*lsp.Client, permissions permission.Service, files history.Service) BaseTool {
 	return &editTool{
 		lspClients:  lspClients,
 		permissions: permissions,
+		files:       files,
 	}
 }
 
@@ -128,275 +136,354 @@ func (e *editTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		params.FilePath = filepath.Join(wd, params.FilePath)
 	}
 
+	var response ToolResponse
+	var err error
+
 	if params.OldString == "" {
-		result, err := e.createNewFile(params.FilePath, params.NewString)
+		response, err = e.createNewFile(ctx, params.FilePath, params.NewString)
 		if err != nil {
-			return NewTextErrorResponse(fmt.Sprintf("error creating file: %s", err)), nil
+			return response, err
 		}
-		return NewTextResponse(result), nil
 	}
 
 	if params.NewString == "" {
-		result, err := e.deleteContent(params.FilePath, params.OldString)
+		response, err = e.deleteContent(ctx, params.FilePath, params.OldString)
 		if err != nil {
-			return NewTextErrorResponse(fmt.Sprintf("error deleting content: %s", err)), nil
+			return response, err
 		}
-		return NewTextResponse(result), nil
 	}
 
-	result, err := e.replaceContent(params.FilePath, params.OldString, params.NewString)
+	response, err = e.replaceContent(ctx, params.FilePath, params.OldString, params.NewString)
 	if err != nil {
-		return NewTextErrorResponse(fmt.Sprintf("error replacing content: %s", err)), nil
+		return response, err
+	}
+	if response.IsError {
+		// Return early if there was an error during content replacement
+		// This prevents unnecessary LSP diagnostics processing
+		return response, nil
 	}
 
 	waitForLspDiagnostics(ctx, params.FilePath, e.lspClients)
-	result = fmt.Sprintf("<result>\n%s\n</result>\n", result)
-	result += appendDiagnostics(params.FilePath, e.lspClients)
-	return NewTextResponse(result), nil
+	text := fmt.Sprintf("<result>\n%s\n</result>\n", response.Content)
+	text += getDiagnostics(params.FilePath, e.lspClients)
+	response.Content = text
+	return response, nil
 }
 
-func (e *editTool) createNewFile(filePath, content string) (string, error) {
+func (e *editTool) createNewFile(ctx context.Context, filePath, content string) (ToolResponse, error) {
 	fileInfo, err := os.Stat(filePath)
 	if err == nil {
 		if fileInfo.IsDir() {
-			return "", fmt.Errorf("path is a directory, not a file: %s", filePath)
+			return NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s", filePath)), nil
 		}
-		return "", fmt.Errorf("file already exists: %s. Use the Replace tool to overwrite an existing file", filePath)
+		return NewTextErrorResponse(fmt.Sprintf("file already exists: %s", filePath)), nil
 	} else if !os.IsNotExist(err) {
-		return "", fmt.Errorf("failed to access file: %w", err)
+		return ToolResponse{}, fmt.Errorf("failed to access file: %w", err)
 	}
 
 	dir := filepath.Dir(filePath)
 	if err = os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("failed to create parent directories: %w", err)
+		return ToolResponse{}, fmt.Errorf("failed to create parent directories: %w", err)
 	}
 
+	sessionID, messageID := GetContextValues(ctx)
+	if sessionID == "" || messageID == "" {
+		return ToolResponse{}, fmt.Errorf("session ID and message ID are required for creating a new file")
+	}
+
+	diff, additions, removals := diff.GenerateDiff(
+		"",
+		content,
+		filePath,
+	)
+	rootDir := config.WorkingDirectory()
+	permissionPath := filepath.Dir(filePath)
+	if strings.HasPrefix(filePath, rootDir) {
+		permissionPath = rootDir
+	}
 	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
-			Path:        filepath.Dir(filePath),
+			SessionID:   sessionID,
+			Path:        permissionPath,
 			ToolName:    EditToolName,
-			Action:      "create",
+			Action:      "write",
 			Description: fmt.Sprintf("Create file %s", filePath),
 			Params: EditPermissionsParams{
-				FilePath:  filePath,
-				OldString: "",
-				NewString: content,
-				Diff:      GenerateDiff("", content),
+				FilePath: filePath,
+				Diff:     diff,
 			},
 		},
 	)
 	if !p {
-		return "", fmt.Errorf("permission denied")
+		return ToolResponse{}, permission.ErrorPermissionDenied
 	}
 
 	err = os.WriteFile(filePath, []byte(content), 0o644)
 	if err != nil {
-		return "", fmt.Errorf("failed to write file: %w", err)
+		return ToolResponse{}, fmt.Errorf("failed to write file: %w", err)
+	}
+
+	// File can't be in the history so we create a new file history
+	_, err = e.files.Create(ctx, sessionID, filePath, "")
+	if err != nil {
+		// Log error but don't fail the operation
+		return ToolResponse{}, fmt.Errorf("error creating file history: %w", err)
+	}
+
+	// Add the new content to the file history
+	_, err = e.files.CreateVersion(ctx, sessionID, filePath, content)
+	if err != nil {
+		// Log error but don't fail the operation
+		logging.Debug("Error creating file history version", "error", err)
 	}
 
 	recordFileWrite(filePath)
 	recordFileRead(filePath)
 
-	return "File created: " + filePath, nil
+	return WithResponseMetadata(
+		NewTextResponse("File created: "+filePath),
+		EditResponseMetadata{
+			Diff:      diff,
+			Additions: additions,
+			Removals:  removals,
+		},
+	), nil
 }
 
-func (e *editTool) deleteContent(filePath, oldString string) (string, error) {
+func (e *editTool) deleteContent(ctx context.Context, filePath, oldString string) (ToolResponse, error) {
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", fmt.Errorf("file not found: %s", filePath)
+			return NewTextErrorResponse(fmt.Sprintf("file not found: %s", filePath)), nil
 		}
-		return "", fmt.Errorf("failed to access file: %w", err)
+		return ToolResponse{}, fmt.Errorf("failed to access file: %w", err)
 	}
 
 	if fileInfo.IsDir() {
-		return "", fmt.Errorf("path is a directory, not a file: %s", filePath)
+		return NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s", filePath)), nil
 	}
 
 	if getLastReadTime(filePath).IsZero() {
-		return "", fmt.Errorf("you must read the file before editing it. Use the View tool first")
+		return NewTextErrorResponse("you must read the file before editing it. Use the View tool first"), nil
 	}
 
 	modTime := fileInfo.ModTime()
 	lastRead := getLastReadTime(filePath)
 	if modTime.After(lastRead) {
-		return "", fmt.Errorf("file %s has been modified since it was last read (mod time: %s, last read: %s)",
-			filePath, modTime.Format(time.RFC3339), lastRead.Format(time.RFC3339))
+		return NewTextErrorResponse(
+			fmt.Sprintf("file %s has been modified since it was last read (mod time: %s, last read: %s)",
+				filePath, modTime.Format(time.RFC3339), lastRead.Format(time.RFC3339),
+			)), nil
 	}
 
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
+		return ToolResponse{}, fmt.Errorf("failed to read file: %w", err)
 	}
 
 	oldContent := string(content)
 
 	index := strings.Index(oldContent, oldString)
 	if index == -1 {
-		return "", fmt.Errorf("old_string not found in file. Make sure it matches exactly, including whitespace and line breaks")
+		return NewTextErrorResponse("old_string not found in file. Make sure it matches exactly, including whitespace and line breaks"), nil
 	}
 
 	lastIndex := strings.LastIndex(oldContent, oldString)
 	if index != lastIndex {
-		return "", fmt.Errorf("old_string appears multiple times in the file. Please provide more context to ensure a unique match")
+		return NewTextErrorResponse("old_string appears multiple times in the file. Please provide more context to ensure a unique match"), nil
 	}
 
 	newContent := oldContent[:index] + oldContent[index+len(oldString):]
 
+	sessionID, messageID := GetContextValues(ctx)
+
+	if sessionID == "" || messageID == "" {
+		return ToolResponse{}, fmt.Errorf("session ID and message ID are required for creating a new file")
+	}
+
+	diff, additions, removals := diff.GenerateDiff(
+		oldContent,
+		newContent,
+		filePath,
+	)
+
+	rootDir := config.WorkingDirectory()
+	permissionPath := filepath.Dir(filePath)
+	if strings.HasPrefix(filePath, rootDir) {
+		permissionPath = rootDir
+	}
 	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
-			Path:        filepath.Dir(filePath),
+			SessionID:   sessionID,
+			Path:        permissionPath,
 			ToolName:    EditToolName,
-			Action:      "delete",
+			Action:      "write",
 			Description: fmt.Sprintf("Delete content from file %s", filePath),
 			Params: EditPermissionsParams{
-				FilePath:  filePath,
-				OldString: oldString,
-				NewString: "",
-				Diff:      GenerateDiff(oldContent, newContent),
+				FilePath: filePath,
+				Diff:     diff,
 			},
 		},
 	)
 	if !p {
-		return "", fmt.Errorf("permission denied")
+		return ToolResponse{}, permission.ErrorPermissionDenied
 	}
 
 	err = os.WriteFile(filePath, []byte(newContent), 0o644)
 	if err != nil {
-		return "", fmt.Errorf("failed to write file: %w", err)
+		return ToolResponse{}, fmt.Errorf("failed to write file: %w", err)
+	}
+
+	// Check if file exists in history
+	file, err := e.files.GetByPathAndSession(ctx, filePath, sessionID)
+	if err != nil {
+		_, err = e.files.Create(ctx, sessionID, filePath, oldContent)
+		if err != nil {
+			// Log error but don't fail the operation
+			return ToolResponse{}, fmt.Errorf("error creating file history: %w", err)
+		}
+	}
+	if file.Content != oldContent {
+		// User Manually changed the content store an intermediate version
+		_, err = e.files.CreateVersion(ctx, sessionID, filePath, oldContent)
+		if err != nil {
+			logging.Debug("Error creating file history version", "error", err)
+		}
+	}
+	// Store the new version
+	_, err = e.files.CreateVersion(ctx, sessionID, filePath, "")
+	if err != nil {
+		logging.Debug("Error creating file history version", "error", err)
 	}
 
 	recordFileWrite(filePath)
 	recordFileRead(filePath)
 
-	return "Content deleted from file: " + filePath, nil
+	return WithResponseMetadata(
+		NewTextResponse("Content deleted from file: "+filePath),
+		EditResponseMetadata{
+			Diff:      diff,
+			Additions: additions,
+			Removals:  removals,
+		},
+	), nil
 }
 
-func (e *editTool) replaceContent(filePath, oldString, newString string) (string, error) {
+func (e *editTool) replaceContent(ctx context.Context, filePath, oldString, newString string) (ToolResponse, error) {
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", fmt.Errorf("file not found: %s", filePath)
+			return NewTextErrorResponse(fmt.Sprintf("file not found: %s", filePath)), nil
 		}
-		return "", fmt.Errorf("failed to access file: %w", err)
+		return ToolResponse{}, fmt.Errorf("failed to access file: %w", err)
 	}
 
 	if fileInfo.IsDir() {
-		return "", fmt.Errorf("path is a directory, not a file: %s", filePath)
+		return NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s", filePath)), nil
 	}
 
 	if getLastReadTime(filePath).IsZero() {
-		return "", fmt.Errorf("you must read the file before editing it. Use the View tool first")
+		return NewTextErrorResponse("you must read the file before editing it. Use the View tool first"), nil
 	}
 
 	modTime := fileInfo.ModTime()
 	lastRead := getLastReadTime(filePath)
 	if modTime.After(lastRead) {
-		return "", fmt.Errorf("file %s has been modified since it was last read (mod time: %s, last read: %s)",
-			filePath, modTime.Format(time.RFC3339), lastRead.Format(time.RFC3339))
+		return NewTextErrorResponse(
+			fmt.Sprintf("file %s has been modified since it was last read (mod time: %s, last read: %s)",
+				filePath, modTime.Format(time.RFC3339), lastRead.Format(time.RFC3339),
+			)), nil
 	}
 
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
+		return ToolResponse{}, fmt.Errorf("failed to read file: %w", err)
 	}
 
 	oldContent := string(content)
 
 	index := strings.Index(oldContent, oldString)
 	if index == -1 {
-		return "", fmt.Errorf("old_string not found in file. Make sure it matches exactly, including whitespace and line breaks")
+		return NewTextErrorResponse("old_string not found in file. Make sure it matches exactly, including whitespace and line breaks"), nil
 	}
 
 	lastIndex := strings.LastIndex(oldContent, oldString)
 	if index != lastIndex {
-		return "", fmt.Errorf("old_string appears multiple times in the file. Please provide more context to ensure a unique match")
+		return NewTextErrorResponse("old_string appears multiple times in the file. Please provide more context to ensure a unique match"), nil
 	}
 
 	newContent := oldContent[:index] + newString + oldContent[index+len(oldString):]
 
-	startIndex := max(0, index-3)
-	oldEndIndex := min(len(oldContent), index+len(oldString)+3)
-	newEndIndex := min(len(newContent), index+len(newString)+3)
+	if oldContent == newContent {
+		return NewTextErrorResponse("new content is the same as old content. No changes made."), nil
+	}
+	sessionID, messageID := GetContextValues(ctx)
 
-	diff := GenerateDiff(oldContent[startIndex:oldEndIndex], newContent[startIndex:newEndIndex])
-
+	if sessionID == "" || messageID == "" {
+		return ToolResponse{}, fmt.Errorf("session ID and message ID are required for creating a new file")
+	}
+	diff, additions, removals := diff.GenerateDiff(
+		oldContent,
+		newContent,
+		filePath,
+	)
+	rootDir := config.WorkingDirectory()
+	permissionPath := filepath.Dir(filePath)
+	if strings.HasPrefix(filePath, rootDir) {
+		permissionPath = rootDir
+	}
 	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
-			Path:        filepath.Dir(filePath),
+			SessionID:   sessionID,
+			Path:        permissionPath,
 			ToolName:    EditToolName,
-			Action:      "replace",
+			Action:      "write",
 			Description: fmt.Sprintf("Replace content in file %s", filePath),
 			Params: EditPermissionsParams{
-				FilePath:  filePath,
-				OldString: oldString,
-				NewString: newString,
-				Diff:      diff,
+				FilePath: filePath,
+				Diff:     diff,
 			},
 		},
 	)
 	if !p {
-		return "", fmt.Errorf("permission denied")
+		return ToolResponse{}, permission.ErrorPermissionDenied
 	}
 
 	err = os.WriteFile(filePath, []byte(newContent), 0o644)
 	if err != nil {
-		return "", fmt.Errorf("failed to write file: %w", err)
+		return ToolResponse{}, fmt.Errorf("failed to write file: %w", err)
+	}
+
+	// Check if file exists in history
+	file, err := e.files.GetByPathAndSession(ctx, filePath, sessionID)
+	if err != nil {
+		_, err = e.files.Create(ctx, sessionID, filePath, oldContent)
+		if err != nil {
+			// Log error but don't fail the operation
+			return ToolResponse{}, fmt.Errorf("error creating file history: %w", err)
+		}
+	}
+	if file.Content != oldContent {
+		// User Manually changed the content store an intermediate version
+		_, err = e.files.CreateVersion(ctx, sessionID, filePath, oldContent)
+		if err != nil {
+			logging.Debug("Error creating file history version", "error", err)
+		}
+	}
+	// Store the new version
+	_, err = e.files.CreateVersion(ctx, sessionID, filePath, newContent)
+	if err != nil {
+		logging.Debug("Error creating file history version", "error", err)
 	}
 
 	recordFileWrite(filePath)
 	recordFileRead(filePath)
 
-	return "Content replaced in file: " + filePath, nil
-}
-
-func GenerateDiff(oldContent, newContent string) string {
-	dmp := diffmatchpatch.New()
-	fileAdmp, fileBdmp, dmpStrings := dmp.DiffLinesToChars(oldContent, newContent)
-	diffs := dmp.DiffMain(fileAdmp, fileBdmp, false)
-	diffs = dmp.DiffCharsToLines(diffs, dmpStrings)
-	diffs = dmp.DiffCleanupSemantic(diffs)
-	buff := strings.Builder{}
-
-	buff.WriteString("Changes:\n")
-
-	for _, diff := range diffs {
-		text := diff.Text
-
-		switch diff.Type {
-		case diffmatchpatch.DiffInsert:
-			for line := range strings.SplitSeq(text, "\n") {
-				if line == "" {
-					continue
-				}
-				_, _ = buff.WriteString("+ " + line + "\n")
-			}
-		case diffmatchpatch.DiffDelete:
-			for line := range strings.SplitSeq(text, "\n") {
-				if line == "" {
-					continue
-				}
-				_, _ = buff.WriteString("- " + line + "\n")
-			}
-		case diffmatchpatch.DiffEqual:
-			lines := strings.Split(text, "\n")
-			if len(lines) > 3 {
-				if lines[0] != "" {
-					_, _ = buff.WriteString("  " + lines[0] + "\n")
-				}
-				_, _ = buff.WriteString("  ...\n")
-				if lines[len(lines)-1] != "" {
-					_, _ = buff.WriteString("  " + lines[len(lines)-1] + "\n")
-				}
-			} else {
-				for _, line := range lines {
-					if line == "" {
-						continue
-					}
-					_, _ = buff.WriteString("  " + line + "\n")
-				}
-			}
-		}
-	}
-	return buff.String()
+	return WithResponseMetadata(
+		NewTextResponse("Content replaced in file: "+filePath),
+		EditResponseMetadata{
+			Diff:      diff,
+			Additions: additions,
+			Removals:  removals,
+		}), nil
 }

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kujtimiihoxha/termai/internal/lsp"
-	"github.com/kujtimiihoxha/termai/internal/lsp/protocol"
+	"github.com/kujtimiihoxha/opencode/internal/lsp"
+	"github.com/kujtimiihoxha/opencode/internal/lsp/protocol"
 )
 
 type DiagnosticsParams struct {
@@ -82,7 +82,7 @@ func (b *diagnosticsTool) Run(ctx context.Context, call ToolCall) (ToolResponse,
 		waitForLspDiagnostics(ctx, params.FilePath, lsps)
 	}
 
-	output := appendDiagnostics(params.FilePath, lsps)
+	output := getDiagnostics(params.FilePath, lsps)
 
 	return NewTextResponse(output), nil
 }
@@ -154,7 +154,7 @@ func hasDiagnosticsChanged(current, original map[protocol.DocumentUri][]protocol
 	return false
 }
 
-func appendDiagnostics(filePath string, lsps map[string]*lsp.Client) string {
+func getDiagnostics(filePath string, lsps map[string]*lsp.Client) string {
 	fileDiagnostics := []string{}
 	projectDiagnostics := []string{}
 

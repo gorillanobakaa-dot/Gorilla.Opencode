@@ -5,14 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/kujtimiihoxha/termai/internal/app"
-	"github.com/kujtimiihoxha/termai/internal/llm/tools"
-	"github.com/kujtimiihoxha/termai/internal/message"
+	"github.com/kujtimiihoxha/opencode/internal/config"
+	"github.com/kujtimiihoxha/opencode/internal/llm/tools"
+	"github.com/kujtimiihoxha/opencode/internal/lsp"
+	"github.com/kujtimiihoxha/opencode/internal/message"
+	"github.com/kujtimiihoxha/opencode/internal/session"
 )
 
 type agentTool struct {
-	parentSessionID string
-	app             *app.App
+	sessions   session.Service
+	messages   message.Service
+	lspClients map[string]*lsp.Client
 }
 
 const (
@@ -46,57 +49,63 @@ func (b *agentTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolRes
 		return tools.NewTextErrorResponse("prompt is required"), nil
 	}
 
-	agent, err := NewTaskAgent(b.app)
-	if err != nil {
-		return tools.NewTextErrorResponse(fmt.Sprintf("error creating agent: %s", err)), nil
+	sessionID, messageID := tools.GetContextValues(ctx)
+	if sessionID == "" || messageID == "" {
+		return tools.ToolResponse{}, fmt.Errorf("session_id and message_id are required")
 	}
 
-	session, err := b.app.Sessions.CreateTaskSession(call.ID, b.parentSessionID, "New Agent Session")
+	agent, err := NewAgent(config.AgentTask, b.sessions, b.messages, TaskAgentTools(b.lspClients))
 	if err != nil {
-		return tools.NewTextErrorResponse(fmt.Sprintf("error creating session: %s", err)), nil
+		return tools.ToolResponse{}, fmt.Errorf("error creating agent: %s", err)
 	}
 
-	err = agent.Generate(ctx, session.ID, params.Prompt)
+	session, err := b.sessions.CreateTaskSession(ctx, call.ID, sessionID, "New Agent Session")
 	if err != nil {
-		return tools.NewTextErrorResponse(fmt.Sprintf("error generating agent: %s", err)), nil
+		return tools.ToolResponse{}, fmt.Errorf("error creating session: %s", err)
 	}
 
-	messages, err := b.app.Messages.List(session.ID)
+	done, err := agent.Run(ctx, session.ID, params.Prompt)
 	if err != nil {
-		return tools.NewTextErrorResponse(fmt.Sprintf("error listing messages: %s", err)), nil
+		return tools.ToolResponse{}, fmt.Errorf("error generating agent: %s", err)
 	}
-	if len(messages) == 0 {
-		return tools.NewTextErrorResponse("no messages found"), nil
+	result := <-done
+	if result.Err() != nil {
+		return tools.ToolResponse{}, fmt.Errorf("error generating agent: %s", result.Err())
 	}
 
-	response := messages[len(messages)-1]
+	response := result.Response()
 	if response.Role != message.Assistant {
-		return tools.NewTextErrorResponse("no assistant message found"), nil
+		return tools.NewTextErrorResponse("no response"), nil
 	}
 
-	updatedSession, err := b.app.Sessions.Get(session.ID)
+	updatedSession, err := b.sessions.Get(ctx, session.ID)
 	if err != nil {
-		return tools.NewTextErrorResponse(fmt.Sprintf("error: %s", err)), nil
+		return tools.ToolResponse{}, fmt.Errorf("error getting session: %s", err)
 	}
-	parentSession, err := b.app.Sessions.Get(b.parentSessionID)
+	parentSession, err := b.sessions.Get(ctx, sessionID)
 	if err != nil {
-		return tools.NewTextErrorResponse(fmt.Sprintf("error: %s", err)), nil
+		return tools.ToolResponse{}, fmt.Errorf("error getting parent session: %s", err)
 	}
 
 	parentSession.Cost += updatedSession.Cost
 	parentSession.PromptTokens += updatedSession.PromptTokens
 	parentSession.CompletionTokens += updatedSession.CompletionTokens
 
-	_, err = b.app.Sessions.Save(parentSession)
+	_, err = b.sessions.Save(ctx, parentSession)
 	if err != nil {
-		return tools.NewTextErrorResponse(fmt.Sprintf("error: %s", err)), nil
+		return tools.ToolResponse{}, fmt.Errorf("error saving parent session: %s", err)
 	}
 	return tools.NewTextResponse(response.Content().String()), nil
 }
 
-func NewAgentTool(parentSessionID string, app *app.App) tools.BaseTool {
+func NewAgentTool(
+	Sessions session.Service,
+	Messages message.Service,
+	LspClients map[string]*lsp.Client,
+) tools.BaseTool {
 	return &agentTool{
-		parentSessionID: parentSessionID,
-		app:             app,
+		sessions:   Sessions,
+		messages:   Messages,
+		lspClients: LspClients,
 	}
 }

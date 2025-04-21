@@ -8,13 +8,25 @@ import (
 	"database/sql"
 )
 
-type Message struct {
+type File struct {
 	ID        string `json:"id"`
 	SessionID string `json:"session_id"`
-	Role      string `json:"role"`
-	Parts     string `json:"parts"`
+	Path      string `json:"path"`
+	Content   string `json:"content"`
+	Version   string `json:"version"`
 	CreatedAt int64  `json:"created_at"`
 	UpdatedAt int64  `json:"updated_at"`
+}
+
+type Message struct {
+	ID         string         `json:"id"`
+	SessionID  string         `json:"session_id"`
+	Role       string         `json:"role"`
+	Parts      string         `json:"parts"`
+	Model      sql.NullString `json:"model"`
+	CreatedAt  int64          `json:"created_at"`
+	UpdatedAt  int64          `json:"updated_at"`
+	FinishedAt sql.NullInt64  `json:"finished_at"`
 }
 
 type Session struct {

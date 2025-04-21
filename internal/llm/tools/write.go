@@ -6,11 +6,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/kujtimiihoxha/termai/internal/config"
-	"github.com/kujtimiihoxha/termai/internal/lsp"
-	"github.com/kujtimiihoxha/termai/internal/permission"
+	"github.com/kujtimiihoxha/opencode/internal/config"
+	"github.com/kujtimiihoxha/opencode/internal/diff"
+	"github.com/kujtimiihoxha/opencode/internal/history"
+	"github.com/kujtimiihoxha/opencode/internal/logging"
+	"github.com/kujtimiihoxha/opencode/internal/lsp"
+	"github.com/kujtimiihoxha/opencode/internal/permission"
 )
 
 type WriteParams struct {
@@ -20,12 +24,19 @@ type WriteParams struct {
 
 type WritePermissionsParams struct {
 	FilePath string `json:"file_path"`
-	Content  string `json:"content"`
+	Diff     string `json:"diff"`
 }
 
 type writeTool struct {
 	lspClients  map[string]*lsp.Client
 	permissions permission.Service
+	files       history.Service
+}
+
+type WriteResponseMetadata struct {
+	Diff      string `json:"diff"`
+	Additions int    `json:"additions"`
+	Removals  int    `json:"removals"`
 }
 
 const (
@@ -60,10 +71,11 @@ TIPS:
 - Always include descriptive comments when making changes to existing code`
 )
 
-func NewWriteTool(lspClients map[string]*lsp.Client, permissions permission.Service) BaseTool {
+func NewWriteTool(lspClients map[string]*lsp.Client, permissions permission.Service, files history.Service) BaseTool {
 	return &writeTool{
 		lspClients:  lspClients,
 		permissions: permissions,
+		files:       files,
 	}
 }
 
@@ -122,12 +134,12 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 			return NewTextErrorResponse(fmt.Sprintf("File %s already contains the exact content. No changes made.", filePath)), nil
 		}
 	} else if !os.IsNotExist(err) {
-		return NewTextErrorResponse(fmt.Sprintf("Failed to access file: %s", err)), nil
+		return ToolResponse{}, fmt.Errorf("error checking file: %w", err)
 	}
 
 	dir := filepath.Dir(filePath)
 	if err = os.MkdirAll(dir, 0o755); err != nil {
-		return NewTextErrorResponse(fmt.Sprintf("Failed to create parent directories: %s", err)), nil
+		return ToolResponse{}, fmt.Errorf("error creating directory: %w", err)
 	}
 
 	oldContent := ""
@@ -138,25 +150,64 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		}
 	}
 
+	sessionID, messageID := GetContextValues(ctx)
+	if sessionID == "" || messageID == "" {
+		return ToolResponse{}, fmt.Errorf("session_id and message_id are required")
+	}
+
+	diff, additions, removals := diff.GenerateDiff(
+		oldContent,
+		params.Content,
+		filePath,
+	)
+
+	rootDir := config.WorkingDirectory()
+	permissionPath := filepath.Dir(filePath)
+	if strings.HasPrefix(filePath, rootDir) {
+		permissionPath = rootDir
+	}
 	p := w.permissions.Request(
 		permission.CreatePermissionRequest{
-			Path:        filePath,
+			SessionID:   sessionID,
+			Path:        permissionPath,
 			ToolName:    WriteToolName,
-			Action:      "create",
+			Action:      "write",
 			Description: fmt.Sprintf("Create file %s", filePath),
 			Params: WritePermissionsParams{
 				FilePath: filePath,
-				Content:  GenerateDiff(oldContent, params.Content),
+				Diff:     diff,
 			},
 		},
 	)
 	if !p {
-		return NewTextErrorResponse(fmt.Sprintf("Permission denied to create file: %s", filePath)), nil
+		return ToolResponse{}, permission.ErrorPermissionDenied
 	}
 
 	err = os.WriteFile(filePath, []byte(params.Content), 0o644)
 	if err != nil {
-		return NewTextErrorResponse(fmt.Sprintf("Failed to write file: %s", err)), nil
+		return ToolResponse{}, fmt.Errorf("error writing file: %w", err)
+	}
+
+	// Check if file exists in history
+	file, err := w.files.GetByPathAndSession(ctx, filePath, sessionID)
+	if err != nil {
+		_, err = w.files.Create(ctx, sessionID, filePath, oldContent)
+		if err != nil {
+			// Log error but don't fail the operation
+			return ToolResponse{}, fmt.Errorf("error creating file history: %w", err)
+		}
+	}
+	if file.Content != oldContent {
+		// User Manually changed the content store an intermediate version
+		_, err = w.files.CreateVersion(ctx, sessionID, filePath, oldContent)
+		if err != nil {
+			logging.Debug("Error creating file history version", "error", err)
+		}
+	}
+	// Store the new version
+	_, err = w.files.CreateVersion(ctx, sessionID, filePath, params.Content)
+	if err != nil {
+		logging.Debug("Error creating file history version", "error", err)
 	}
 
 	recordFileWrite(filePath)
@@ -165,6 +216,12 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 
 	result := fmt.Sprintf("File successfully written: %s", filePath)
 	result = fmt.Sprintf("<result>\n%s\n</result>", result)
-	result += appendDiagnostics(filePath, w.lspClients)
-	return NewTextResponse(result), nil
+	result += getDiagnostics(filePath, w.lspClients)
+	return WithResponseMetadata(NewTextResponse(result),
+		WriteResponseMetadata{
+			Diff:      diff,
+			Additions: additions,
+			Removals:  removals,
+		},
+	), nil
 }

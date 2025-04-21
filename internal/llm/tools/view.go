@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kujtimiihoxha/termai/internal/config"
-	"github.com/kujtimiihoxha/termai/internal/lsp"
+	"github.com/kujtimiihoxha/opencode/internal/config"
+	"github.com/kujtimiihoxha/opencode/internal/lsp"
 )
 
 type ViewParams struct {
@@ -22,6 +22,11 @@ type ViewParams struct {
 
 type viewTool struct {
 	lspClients map[string]*lsp.Client
+}
+
+type ViewResponseMetadata struct {
+	FilePath string `json:"file_path"`
+	Content  string `json:"content"`
 }
 
 const (
@@ -135,7 +140,7 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 
 			return NewTextErrorResponse(fmt.Sprintf("File not found: %s", filePath)), nil
 		}
-		return NewTextErrorResponse(fmt.Sprintf("Failed to access file: %s", err)), nil
+		return ToolResponse{}, fmt.Errorf("error accessing file: %w", err)
 	}
 
 	// Check if it's a directory
@@ -156,6 +161,7 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 
 	// Check if it's an image file
 	isImage, imageType := isImageFile(filePath)
+	// TODO: handle images
 	if isImage {
 		return NewTextErrorResponse(fmt.Sprintf("This is an image file of type: %s\nUse a different tool to process images", imageType)), nil
 	}
@@ -163,7 +169,7 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	// Read the file content
 	content, lineCount, err := readTextFile(filePath, params.Offset, params.Limit)
 	if err != nil {
-		return NewTextErrorResponse(fmt.Sprintf("Failed to read file: %s", err)), nil
+		return ToolResponse{}, fmt.Errorf("error reading file: %w", err)
 	}
 
 	notifyLspOpenFile(ctx, filePath, v.lspClients)
@@ -177,9 +183,15 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 			params.Offset+len(strings.Split(content, "\n")))
 	}
 	output += "\n</file>\n"
-	output += appendDiagnostics(filePath, v.lspClients)
+	output += getDiagnostics(filePath, v.lspClients)
 	recordFileRead(filePath)
-	return NewTextResponse(output), nil
+	return WithResponseMetadata(
+		NewTextResponse(output),
+		ViewResponseMetadata{
+			FilePath: filePath,
+			Content:  content,
+		},
+	), nil
 }
 
 func addLineNumbers(content string, startLine int) string {

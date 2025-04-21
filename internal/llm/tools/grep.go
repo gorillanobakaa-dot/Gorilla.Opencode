@@ -10,21 +10,30 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/kujtimiihoxha/termai/internal/config"
+	"github.com/kujtimiihoxha/opencode/internal/config"
 )
 
 type GrepParams struct {
-	Pattern string `json:"pattern"`
-	Path    string `json:"path"`
-	Include string `json:"include"`
+	Pattern     string `json:"pattern"`
+	Path        string `json:"path"`
+	Include     string `json:"include"`
+	LiteralText bool   `json:"literal_text"`
 }
 
 type grepMatch struct {
-	path    string
-	modTime time.Time
+	path     string
+	modTime  time.Time
+	lineNum  int
+	lineText string
+}
+
+type GrepResponseMetadata struct {
+	NumberOfMatches int  `json:"number_of_matches"`
+	Truncated       bool `json:"truncated"`
 }
 
 type grepTool struct{}
@@ -40,11 +49,12 @@ WHEN TO USE THIS TOOL:
 
 HOW TO USE:
 - Provide a regex pattern to search for within file contents
+- Set literal_text=true if you want to search for the exact text with special characters (recommended for non-regex users)
 - Optionally specify a starting directory (defaults to current working directory)
 - Optionally provide an include pattern to filter which files to search
 - Results are sorted with most recently modified files first
 
-REGEX PATTERN SYNTAX:
+REGEX PATTERN SYNTAX (when literal_text=false):
 - Supports standard regular expression syntax
 - 'function' searches for the literal text "function"
 - 'log\..*Error' finds text starting with "log." and ending with "Error"
@@ -64,7 +74,8 @@ LIMITATIONS:
 TIPS:
 - For faster, more targeted searches, first use Glob to find relevant files, then use Grep
 - When doing iterative exploration that may require multiple rounds of searching, consider using the Agent tool instead
-- Always check if results are truncated and refine your search pattern if needed`
+- Always check if results are truncated and refine your search pattern if needed
+- Use literal_text=true when searching for exact text containing special characters like dots, parentheses, etc.`
 )
 
 func NewGrepTool() BaseTool {
@@ -88,9 +99,25 @@ func (g *grepTool) Info() ToolInfo {
 				"type":        "string",
 				"description": "File pattern to include in the search (e.g. \"*.js\", \"*.{ts,tsx}\")",
 			},
+			"literal_text": map[string]any{
+				"type":        "boolean",
+				"description": "If true, the pattern will be treated as literal text with special regex characters escaped. Default is false.",
+			},
 		},
 		Required: []string{"pattern"},
 	}
+}
+
+// escapeRegexPattern escapes special regex characters so they're treated as literal characters
+func escapeRegexPattern(pattern string) string {
+	specialChars := []string{"\\", ".", "+", "*", "?", "(", ")", "[", "]", "{", "}", "^", "$", "|"}
+	escaped := pattern
+
+	for _, char := range specialChars {
+		escaped = strings.ReplaceAll(escaped, char, "\\"+char)
+	}
+
+	return escaped
 }
 
 func (g *grepTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error) {
@@ -103,41 +130,59 @@ func (g *grepTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		return NewTextErrorResponse("pattern is required"), nil
 	}
 
+	// If literal_text is true, escape the pattern
+	searchPattern := params.Pattern
+	if params.LiteralText {
+		searchPattern = escapeRegexPattern(params.Pattern)
+	}
+
 	searchPath := params.Path
 	if searchPath == "" {
 		searchPath = config.WorkingDirectory()
 	}
 
-	matches, truncated, err := searchFiles(params.Pattern, searchPath, params.Include, 100)
+	matches, truncated, err := searchFiles(searchPattern, searchPath, params.Include, 100)
 	if err != nil {
-		return NewTextErrorResponse(fmt.Sprintf("error searching files: %s", err)), nil
+		return ToolResponse{}, fmt.Errorf("error searching files: %w", err)
 	}
 
 	var output string
 	if len(matches) == 0 {
 		output = "No files found"
 	} else {
-		output = fmt.Sprintf("Found %d file%s\n%s",
-			len(matches),
-			pluralize(len(matches)),
-			strings.Join(matches, "\n"))
+		output = fmt.Sprintf("Found %d matches\n", len(matches))
+
+		currentFile := ""
+		for _, match := range matches {
+			if currentFile != match.path {
+				if currentFile != "" {
+					output += "\n"
+				}
+				currentFile = match.path
+				output += fmt.Sprintf("%s:\n", match.path)
+			}
+			if match.lineNum > 0 {
+				output += fmt.Sprintf("  Line %d: %s\n", match.lineNum, match.lineText)
+			} else {
+				output += fmt.Sprintf("  %s\n", match.path)
+			}
+		}
 
 		if truncated {
-			output += "\n\n(Results are truncated. Consider using a more specific path or pattern.)"
+			output += "\n(Results are truncated. Consider using a more specific path or pattern.)"
 		}
 	}
 
-	return NewTextResponse(output), nil
+	return WithResponseMetadata(
+		NewTextResponse(output),
+		GrepResponseMetadata{
+			NumberOfMatches: len(matches),
+			Truncated:       truncated,
+		},
+	), nil
 }
 
-func pluralize(count int) string {
-	if count == 1 {
-		return ""
-	}
-	return "s"
-}
-
-func searchFiles(pattern, rootPath, include string, limit int) ([]string, bool, error) {
+func searchFiles(pattern, rootPath, include string, limit int) ([]grepMatch, bool, error) {
 	matches, err := searchWithRipgrep(pattern, rootPath, include)
 	if err != nil {
 		matches, err = searchFilesWithRegex(pattern, rootPath, include)
@@ -155,12 +200,7 @@ func searchFiles(pattern, rootPath, include string, limit int) ([]string, bool, 
 		matches = matches[:limit]
 	}
 
-	results := make([]string, len(matches))
-	for i, m := range matches {
-		results[i] = m.path
-	}
-
-	return results, truncated, nil
+	return matches, truncated, nil
 }
 
 func searchWithRipgrep(pattern, path, include string) ([]grepMatch, error) {
@@ -169,7 +209,8 @@ func searchWithRipgrep(pattern, path, include string) ([]grepMatch, error) {
 		return nil, fmt.Errorf("ripgrep not found: %w", err)
 	}
 
-	args := []string{"-l", pattern}
+	// Use -n to show line numbers and include the matched line
+	args := []string{"-n", pattern}
 	if include != "" {
 		args = append(args, "--glob", include)
 	}
@@ -192,14 +233,29 @@ func searchWithRipgrep(pattern, path, include string) ([]grepMatch, error) {
 			continue
 		}
 
-		fileInfo, err := os.Stat(line)
+		// Parse ripgrep output format: file:line:content
+		parts := strings.SplitN(line, ":", 3)
+		if len(parts) < 3 {
+			continue
+		}
+
+		filePath := parts[0]
+		lineNum, err := strconv.Atoi(parts[1])
+		if err != nil {
+			continue
+		}
+		lineText := parts[2]
+
+		fileInfo, err := os.Stat(filePath)
 		if err != nil {
 			continue // Skip files we can't access
 		}
 
 		matches = append(matches, grepMatch{
-			path:    line,
-			modTime: fileInfo.ModTime(),
+			path:     filePath,
+			modTime:  fileInfo.ModTime(),
+			lineNum:  lineNum,
+			lineText: lineText,
 		})
 	}
 
@@ -240,15 +296,17 @@ func searchFilesWithRegex(pattern, rootPath, include string) ([]grepMatch, error
 			return nil
 		}
 
-		match, err := fileContainsPattern(path, regex)
+		match, lineNum, lineText, err := fileContainsPattern(path, regex)
 		if err != nil {
 			return nil // Skip files we can't read
 		}
 
 		if match {
 			matches = append(matches, grepMatch{
-				path:    path,
-				modTime: info.ModTime(),
+				path:     path,
+				modTime:  info.ModTime(),
+				lineNum:  lineNum,
+				lineText: lineText,
 			})
 
 			if len(matches) >= 200 {
@@ -265,21 +323,24 @@ func searchFilesWithRegex(pattern, rootPath, include string) ([]grepMatch, error
 	return matches, nil
 }
 
-func fileContainsPattern(filePath string, pattern *regexp.Regexp) (bool, error) {
+func fileContainsPattern(filePath string, pattern *regexp.Regexp) (bool, int, string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return false, err
+		return false, 0, "", err
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+	lineNum := 0
 	for scanner.Scan() {
-		if pattern.MatchString(scanner.Text()) {
-			return true, nil
+		lineNum++
+		line := scanner.Text()
+		if pattern.MatchString(line) {
+			return true, lineNum, line, nil
 		}
 	}
 
-	return false, scanner.Err()
+	return false, 0, "", scanner.Err()
 }
 
 func globToRegex(glob string) string {
