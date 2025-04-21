@@ -39,11 +39,17 @@ var keys = keyMap{
 		key.WithKeys("ctrl+_"),
 		key.WithHelp("ctrl+?", "toggle help"),
 	),
+
 	SwitchSession: key.NewBinding(
 		key.WithKeys("ctrl+a"),
 		key.WithHelp("ctrl+a", "switch session"),
 	),
 }
+
+var helpEsc = key.NewBinding(
+	key.WithKeys("?"),
+	key.WithHelp("?", "toggle help"),
+)
 
 var returnKey = key.NewBinding(
 	key.WithKeys("esc"),
@@ -61,7 +67,7 @@ type appModel struct {
 	previousPage  page.PageID
 	pages         map[page.PageID]tea.Model
 	loadedPages   map[page.PageID]bool
-	status        tea.Model
+	status        core.StatusCmp
 	app           *app.App
 
 	showPermissions bool
@@ -75,6 +81,8 @@ type appModel struct {
 
 	showSessionDialog bool
 	sessionDialog     dialog.SessionDialog
+
+	editingMode bool
 }
 
 func (a appModel) Init() tea.Cmd {
@@ -101,7 +109,8 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		msg.Height -= 1 // Make space for the status bar
 		a.width, a.height = msg.Width, msg.Height
 
-		a.status, _ = a.status.Update(msg)
+		s, _ := a.status.Update(msg)
+		a.status = s.(core.StatusCmp)
 		a.pages[a.currentPage], cmd = a.pages[a.currentPage].Update(msg)
 		cmds = append(cmds, cmd)
 
@@ -118,45 +127,56 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, sessionCmd)
 
 		return a, tea.Batch(cmds...)
-
+	case chat.EditorFocusMsg:
+		a.editingMode = bool(msg)
 	// Status
 	case util.InfoMsg:
-		a.status, cmd = a.status.Update(msg)
+		s, cmd := a.status.Update(msg)
+		a.status = s.(core.StatusCmp)
 		cmds = append(cmds, cmd)
 		return a, tea.Batch(cmds...)
 	case pubsub.Event[logging.LogMessage]:
 		if msg.Payload.Persist {
 			switch msg.Payload.Level {
 			case "error":
-				a.status, cmd = a.status.Update(util.InfoMsg{
+				s, cmd := a.status.Update(util.InfoMsg{
 					Type: util.InfoTypeError,
 					Msg:  msg.Payload.Message,
 					TTL:  msg.Payload.PersistTime,
 				})
+				a.status = s.(core.StatusCmp)
+				cmds = append(cmds, cmd)
 			case "info":
-				a.status, cmd = a.status.Update(util.InfoMsg{
+				s, cmd := a.status.Update(util.InfoMsg{
 					Type: util.InfoTypeInfo,
 					Msg:  msg.Payload.Message,
 					TTL:  msg.Payload.PersistTime,
 				})
+				a.status = s.(core.StatusCmp)
+				cmds = append(cmds, cmd)
+
 			case "warn":
-				a.status, cmd = a.status.Update(util.InfoMsg{
+				s, cmd := a.status.Update(util.InfoMsg{
 					Type: util.InfoTypeWarn,
 					Msg:  msg.Payload.Message,
 					TTL:  msg.Payload.PersistTime,
 				})
 
+				a.status = s.(core.StatusCmp)
+				cmds = append(cmds, cmd)
 			default:
-				a.status, cmd = a.status.Update(util.InfoMsg{
+				s, cmd := a.status.Update(util.InfoMsg{
 					Type: util.InfoTypeInfo,
 					Msg:  msg.Payload.Message,
 					TTL:  msg.Payload.PersistTime,
 				})
+				a.status = s.(core.StatusCmp)
+				cmds = append(cmds, cmd)
 			}
-			cmds = append(cmds, cmd)
 		}
 	case util.ClearStatusMsg:
-		a.status, _ = a.status.Update(msg)
+		s, _ := a.status.Update(msg)
+		a.status = s.(core.StatusCmp)
 
 	// Permission
 	case pubsub.Event[permission.PermissionRequest]:
@@ -243,7 +263,16 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			a.showHelp = !a.showHelp
 			return a, nil
+		case key.Matches(msg, helpEsc):
+			if !a.editingMode {
+				if a.showQuit {
+					return a, nil
+				}
+				a.showHelp = !a.showHelp
+				return a, nil
+			}
 		}
+
 	}
 
 	if a.showQuit {
@@ -275,7 +304,8 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	a.status, _ = a.status.Update(msg)
+	s, _ := a.status.Update(msg)
+	a.status = s.(core.StatusCmp)
 	a.pages[a.currentPage], cmd = a.pages[a.currentPage].Update(msg)
 	cmds = append(cmds, cmd)
 	return a, tea.Batch(cmds...)
@@ -326,6 +356,12 @@ func (a appModel) View() string {
 		)
 	}
 
+	if a.editingMode {
+		a.status.SetHelpMsg("ctrl+? help")
+	} else {
+		a.status.SetHelpMsg("? help")
+	}
+
 	if a.showHelp {
 		bindings := layout.KeyMapToSlice(keys)
 		if p, ok := a.pages[a.currentPage].(layout.Bindings); ok {
@@ -337,7 +373,9 @@ func (a appModel) View() string {
 		if a.currentPage == page.LogsPage {
 			bindings = append(bindings, logsKeyReturnKey)
 		}
-
+		if !a.editingMode {
+			bindings = append(bindings, helpEsc)
+		}
 		a.help.SetBindings(bindings)
 
 		overlay := a.help.View()
@@ -398,6 +436,7 @@ func New(app *app.App) tea.Model {
 		sessionDialog: dialog.NewSessionDialogCmp(),
 		permissions:   dialog.NewPermissionDialogCmp(),
 		app:           app,
+		editingMode:   true,
 		pages: map[page.PageID]tea.Model{
 			page.ChatPage: page.NewChatPage(app),
 			page.LogsPage: page.NewLogsPage(),

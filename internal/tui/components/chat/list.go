@@ -370,6 +370,7 @@ func (m *messagesCmp) SetSize(width, height int) tea.Cmd {
 		delete(m.cachedContent, msg.ID)
 	}
 	m.uiMessages = make([]uiMessage, 0)
+	m.renderView()
 	return nil
 }
 

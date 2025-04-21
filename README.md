@@ -351,9 +351,12 @@ go build -o opencode
 
 ## Acknowledgments
 
-OpenCode builds upon the work of several open source projects and developers:
+OpenCode gratefully acknowledges the contributions and support from these key individuals:
 
-- [@isaacphi](https://github.com/isaacphi) - LSP client implementation
+- [@isaacphi](https://github.com/isaacphi) - For the [mcp-language-server](https://github.com/isaacphi/mcp-language-server) project which provided the foundation for our LSP client implementation
+- [@adamdottv](https://github.com/adamdottv) - For the design direction and UI/UX architecture
+
+Special thanks to the broader open source community whose tools and libraries have made this project possible.
 
 ## License
 

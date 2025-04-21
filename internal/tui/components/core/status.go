@@ -18,6 +18,11 @@ import (
 	"github.com/kujtimiihoxha/opencode/internal/tui/util"
 )
 
+type StatusCmp interface {
+	tea.Model
+	SetHelpMsg(string)
+}
+
 type statusCmp struct {
 	info       util.InfoMsg
 	width      int
@@ -146,7 +151,7 @@ func (m *statusCmp) projectDiagnostics() string {
 			break
 		}
 	}
-	
+
 	// If any server is initializing, show that status
 	if initializing {
 		return lipgloss.NewStyle().
@@ -154,7 +159,7 @@ func (m *statusCmp) projectDiagnostics() string {
 			Foreground(styles.Peach).
 			Render(fmt.Sprintf("%s Initializing LSP...", styles.SpinnerIcon))
 	}
-	
+
 	errorDiagnostics := []protocol.Diagnostic{}
 	warnDiagnostics := []protocol.Diagnostic{}
 	hintDiagnostics := []protocol.Diagnostic{}
@@ -235,7 +240,11 @@ func (m statusCmp) model() string {
 	return styles.Padded.Background(styles.Grey).Foreground(styles.Text).Render(model.Name)
 }
 
-func NewStatusCmp(lspClients map[string]*lsp.Client) tea.Model {
+func (m statusCmp) SetHelpMsg(s string) {
+	helpWidget = styles.Padded.Background(styles.Forground).Foreground(styles.BackgroundDarker).Bold(true).Render(s)
+}
+
+func NewStatusCmp(lspClients map[string]*lsp.Client) StatusCmp {
 	return &statusCmp{
 		messageTTL: 10 * time.Second,
 		lspClients: lspClients,
