@@ -51,7 +51,7 @@ var safeReadOnlyCommands = []string{
 	"git status", "git log", "git diff", "git show", "git branch", "git tag", "git remote", "git ls-files", "git ls-remote",
 	"git rev-parse", "git config --get", "git config --list", "git describe", "git blame", "git grep", "git shortlog",
 
-	"go version", "go list", "go env", "go doc", "go vet", "go fmt", "go mod", "go test", "go build", "go run", "go install", "go clean",
+	"go version", "go help", "go list", "go env", "go doc", "go vet", "go fmt", "go mod", "go test", "go build", "go run", "go install", "go clean",
 }
 
 func bashDescription() string {
@@ -261,9 +261,15 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 			}
 		}
 	}
+
+	sessionID, messageID := GetContextValues(ctx)
+	if sessionID == "" || messageID == "" {
+		return ToolResponse{}, fmt.Errorf("session ID and message ID are required for creating a new file")
+	}
 	if !isSafeReadOnly {
 		p := b.permissions.Request(
 			permission.CreatePermissionRequest{
+				SessionID:   sessionID,
 				Path:        config.WorkingDirectory(),
 				ToolName:    BashToolName,
 				Action:      "execute",

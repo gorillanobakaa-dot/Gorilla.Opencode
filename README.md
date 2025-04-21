@@ -104,6 +104,7 @@ You can configure OpenCode using environment variables:
 OpenCode supports a variety of AI models from different providers:
 
 ### OpenAI
+
 - GPT-4.1 family (gpt-4.1, gpt-4.1-mini, gpt-4.1-nano)
 - GPT-4.5 Preview
 - GPT-4o family (gpt-4o, gpt-4o-mini)
@@ -112,6 +113,7 @@ OpenCode supports a variety of AI models from different providers:
 - O4 Mini
 
 ### Anthropic
+
 - Claude 3.5 Sonnet
 - Claude 3.5 Haiku
 - Claude 3.7 Sonnet
@@ -119,12 +121,14 @@ OpenCode supports a variety of AI models from different providers:
 - Claude 3 Opus
 
 ### Google
+
 - Gemini 2.5
 - Gemini 2.5 Flash
 - Gemini 2.0 Flash
 - Gemini 2.0 Flash Lite
 
 ### AWS Bedrock
+
 - Claude 3.7 Sonnet
 
 ## Usage
@@ -152,14 +156,15 @@ opencode -c /path/to/project
 
 ### Global Shortcuts
 
-| Shortcut  | Action                                                  |
-| --------- | ------------------------------------------------------- |
-| `Ctrl+C`  | Quit application                                        |
-| `Ctrl+?`  | Toggle help dialog                                      |
-| `?`       | Toggle help dialog (when not in editing mode)           |
-| `Ctrl+L`  | View logs                                               |
-| `Ctrl+A`  | Switch session                                          |
-| `Esc`     | Close current overlay/dialog or return to previous mode |
+| Shortcut | Action                                                  |
+| -------- | ------------------------------------------------------- |
+| `Ctrl+C` | Quit application                                        |
+| `Ctrl+?` | Toggle help dialog                                      |
+| `?`      | Toggle help dialog (when not in editing mode)           |
+| `Ctrl+L` | View logs                                               |
+| `Ctrl+A` | Switch session                                          |
+| `Ctrl+K` | Command dialog                                          |
+| `Esc`    | Close current overlay/dialog or return to previous mode |
 
 ### Chat Page Shortcuts
 
@@ -181,28 +186,28 @@ opencode -c /path/to/project
 
 ### Session Dialog Shortcuts
 
-| Shortcut      | Action           |
-| ------------- | ---------------- |
-| `↑` or `k`    | Previous session |
-| `↓` or `j`    | Next session     |
-| `Enter`       | Select session   |
-| `Esc`         | Close dialog     |
+| Shortcut   | Action           |
+| ---------- | ---------------- |
+| `↑` or `k` | Previous session |
+| `↓` or `j` | Next session     |
+| `Enter`    | Select session   |
+| `Esc`      | Close dialog     |
 
 ### Permission Dialog Shortcuts
 
-| Shortcut                  | Action                  |
-| ------------------------- | ----------------------- |
-| `←` or `left`             | Switch options left     |
-| `→` or `right` or `tab`   | Switch options right    |
-| `Enter` or `space`        | Confirm selection       |
-| `a`                       | Allow permission        |
-| `A`                       | Allow permission for session |
-| `d`                       | Deny permission         |
+| Shortcut                | Action                       |
+| ----------------------- | ---------------------------- |
+| `←` or `left`           | Switch options left          |
+| `→` or `right` or `tab` | Switch options right         |
+| `Enter` or `space`      | Confirm selection            |
+| `a`                     | Allow permission             |
+| `A`                     | Allow permission for session |
+| `d`                     | Deny permission              |
 
 ### Logs Page Shortcuts
 
-| Shortcut         | Action              |
-| ---------------- | ------------------- |
+| Shortcut           | Action              |
+| ------------------ | ------------------- |
 | `Backspace` or `q` | Return to chat page |
 
 ## AI Assistant Tools

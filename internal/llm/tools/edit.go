@@ -203,6 +203,7 @@ func (e *editTool) createNewFile(ctx context.Context, filePath, content string) 
 	}
 	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
+			SessionID:   sessionID,
 			Path:        permissionPath,
 			ToolName:    EditToolName,
 			Action:      "write",
@@ -313,6 +314,7 @@ func (e *editTool) deleteContent(ctx context.Context, filePath, oldString string
 	}
 	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
+			SessionID:   sessionID,
 			Path:        permissionPath,
 			ToolName:    EditToolName,
 			Action:      "write",
@@ -432,6 +434,7 @@ func (e *editTool) replaceContent(ctx context.Context, filePath, oldString, newS
 	}
 	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
+			SessionID:   sessionID,
 			Path:        permissionPath,
 			ToolName:    EditToolName,
 			Action:      "write",

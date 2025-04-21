@@ -80,9 +80,14 @@ func runTool(ctx context.Context, c MCPClient, toolName string, input string) (t
 }
 
 func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolResponse, error) {
+	sessionID, messageID := tools.GetContextValues(ctx)
+	if sessionID == "" || messageID == "" {
+		return tools.ToolResponse{}, fmt.Errorf("session ID and message ID are required for creating a new file")
+	}
 	permissionDescription := fmt.Sprintf("execute %s with the following parameters: %s", b.Info().Name, params.Input)
 	p := b.permissions.Request(
 		permission.CreatePermissionRequest{
+			SessionID:   sessionID,
 			Path:        config.WorkingDirectory(),
 			ToolName:    b.Info().Name,
 			Action:      "execute",

@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/kujtimiihoxha/opencode/internal/app"
+	"github.com/kujtimiihoxha/opencode/internal/config"
 	"github.com/kujtimiihoxha/opencode/internal/logging"
 	"github.com/kujtimiihoxha/opencode/internal/permission"
 	"github.com/kujtimiihoxha/opencode/internal/pubsub"
@@ -23,6 +24,7 @@ type keyMap struct {
 	Quit          key.Binding
 	Help          key.Binding
 	SwitchSession key.Binding
+	Commands      key.Binding
 }
 
 var keys = keyMap{
@@ -43,6 +45,11 @@ var keys = keyMap{
 	SwitchSession: key.NewBinding(
 		key.WithKeys("ctrl+a"),
 		key.WithHelp("ctrl+a", "switch session"),
+	),
+
+	Commands: key.NewBinding(
+		key.WithKeys("ctrl+k"),
+		key.WithHelp("ctrl+K", "commands"),
 	),
 }
 
@@ -82,6 +89,13 @@ type appModel struct {
 	showSessionDialog bool
 	sessionDialog     dialog.SessionDialog
 
+	showCommandDialog bool
+	commandDialog     dialog.CommandDialog
+	commands          []dialog.Command
+
+	showInitDialog bool
+	initDialog     dialog.InitDialogCmp
+
 	editingMode bool
 }
 
@@ -98,6 +112,23 @@ func (a appModel) Init() tea.Cmd {
 	cmds = append(cmds, cmd)
 	cmd = a.sessionDialog.Init()
 	cmds = append(cmds, cmd)
+	cmd = a.commandDialog.Init()
+	cmds = append(cmds, cmd)
+	cmd = a.initDialog.Init()
+	cmds = append(cmds, cmd)
+
+	// Check if we should show the init dialog
+	cmds = append(cmds, func() tea.Msg {
+		shouldShow, err := config.ShouldShowInitDialog()
+		if err != nil {
+			return util.InfoMsg{
+				Type: util.InfoTypeError,
+				Msg:  "Failed to check init status: " + err.Error(),
+			}
+		}
+		return dialog.ShowInitDialogMsg{Show: shouldShow}
+	})
+
 	return tea.Batch(cmds...)
 }
 
@@ -125,6 +156,12 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		session, sessionCmd := a.sessionDialog.Update(msg)
 		a.sessionDialog = session.(dialog.SessionDialog)
 		cmds = append(cmds, sessionCmd)
+
+		command, commandCmd := a.commandDialog.Update(msg)
+		a.commandDialog = command.(dialog.CommandDialog)
+		cmds = append(cmds, commandCmd)
+
+		a.initDialog.SetSize(msg.Width, msg.Height)
 
 		return a, tea.Batch(cmds...)
 	case chat.EditorFocusMsg:
@@ -207,6 +244,35 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.showSessionDialog = false
 		return a, nil
 
+	case dialog.CloseCommandDialogMsg:
+		a.showCommandDialog = false
+		return a, nil
+
+	case dialog.ShowInitDialogMsg:
+		a.showInitDialog = msg.Show
+		return a, nil
+
+	case dialog.CloseInitDialogMsg:
+		a.showInitDialog = false
+		if msg.Initialize {
+			// Run the initialization command
+			for _, cmd := range a.commands {
+				if cmd.ID == "init" {
+					// Mark the project as initialized
+					if err := config.MarkProjectInitialized(); err != nil {
+						return a, util.ReportError(err)
+					}
+					return a, cmd.Handler(cmd)
+				}
+			}
+		} else {
+			// Mark the project as initialized without running the command
+			if err := config.MarkProjectInitialized(); err != nil {
+				return a, util.ReportError(err)
+			}
+		}
+		return a, nil
+
 	case chat.SessionSelectedMsg:
 		a.sessionDialog.SetSelectedSession(msg.ID)
 	case dialog.SessionSelectedMsg:
@@ -215,6 +281,14 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, util.CmdHandler(chat.SessionSelectedMsg(msg.Session))
 		}
 		return a, nil
+
+	case dialog.CommandSelectedMsg:
+		a.showCommandDialog = false
+		// Execute the command handler if available
+		if msg.Command.Handler != nil {
+			return a, msg.Command.Handler(msg.Command)
+		}
+		return a, util.ReportInfo("Command selected: " + msg.Command.Title)
 
 	case tea.KeyMsg:
 		switch {
@@ -226,9 +300,12 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.showSessionDialog {
 				a.showSessionDialog = false
 			}
+			if a.showCommandDialog {
+				a.showCommandDialog = false
+			}
 			return a, nil
 		case key.Matches(msg, keys.SwitchSession):
-			if a.currentPage == page.ChatPage && !a.showQuit && !a.showPermissions {
+			if a.currentPage == page.ChatPage && !a.showQuit && !a.showPermissions && !a.showCommandDialog {
 				// Load sessions and show the dialog
 				sessions, err := a.app.Sessions.List(context.Background())
 				if err != nil {
@@ -239,6 +316,17 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				a.sessionDialog.SetSessions(sessions)
 				a.showSessionDialog = true
+				return a, nil
+			}
+			return a, nil
+		case key.Matches(msg, keys.Commands):
+			if a.currentPage == page.ChatPage && !a.showQuit && !a.showPermissions && !a.showSessionDialog {
+				// Show commands dialog
+				if len(a.commands) == 0 {
+					return a, util.ReportWarn("No commands available")
+				}
+				a.commandDialog.SetCommands(a.commands)
+				a.showCommandDialog = true
 				return a, nil
 			}
 			return a, nil
@@ -253,6 +341,14 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if a.showHelp {
 				a.showHelp = !a.showHelp
+				return a, nil
+			}
+			if a.showInitDialog {
+				a.showInitDialog = false
+				// Mark the project as initialized without running the command
+				if err := config.MarkProjectInitialized(); err != nil {
+					return a, util.ReportError(err)
+				}
 				return a, nil
 			}
 		case key.Matches(msg, keys.Logs):
@@ -304,11 +400,36 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if a.showCommandDialog {
+		d, commandCmd := a.commandDialog.Update(msg)
+		a.commandDialog = d.(dialog.CommandDialog)
+		cmds = append(cmds, commandCmd)
+		// Only block key messages send all other messages down
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showInitDialog {
+		d, initCmd := a.initDialog.Update(msg)
+		a.initDialog = d.(dialog.InitDialogCmp)
+		cmds = append(cmds, initCmd)
+		// Only block key messages send all other messages down
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
 	s, _ := a.status.Update(msg)
 	a.status = s.(core.StatusCmp)
 	a.pages[a.currentPage], cmd = a.pages[a.currentPage].Update(msg)
 	cmds = append(cmds, cmd)
 	return a, tea.Batch(cmds...)
+}
+
+// RegisterCommand adds a command to the command dialog
+func (a *appModel) RegisterCommand(cmd dialog.Command) {
+	a.commands = append(a.commands, cmd)
 }
 
 func (a *appModel) moveToPage(pageID page.PageID) tea.Cmd {
@@ -422,24 +543,74 @@ func (a appModel) View() string {
 		)
 	}
 
+	if a.showCommandDialog {
+		overlay := a.commandDialog.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(
+			col,
+			row,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
+	if a.showInitDialog {
+		overlay := a.initDialog.View()
+		appView = layout.PlaceOverlay(
+			a.width/2-lipgloss.Width(overlay)/2,
+			a.height/2-lipgloss.Height(overlay)/2,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
 	return appView
 }
 
 func New(app *app.App) tea.Model {
 	startPage := page.ChatPage
-	return &appModel{
+	model := &appModel{
 		currentPage:   startPage,
 		loadedPages:   make(map[page.PageID]bool),
 		status:        core.NewStatusCmp(app.LSPClients),
 		help:          dialog.NewHelpCmp(),
 		quit:          dialog.NewQuitCmp(),
 		sessionDialog: dialog.NewSessionDialogCmp(),
+		commandDialog: dialog.NewCommandDialogCmp(),
 		permissions:   dialog.NewPermissionDialogCmp(),
+		initDialog:    dialog.NewInitDialogCmp(),
 		app:           app,
 		editingMode:   true,
+		commands:      []dialog.Command{},
 		pages: map[page.PageID]tea.Model{
 			page.ChatPage: page.NewChatPage(app),
 			page.LogsPage: page.NewLogsPage(),
 		},
 	}
+
+	model.RegisterCommand(dialog.Command{
+		ID:          "init",
+		Title:       "Initialize Project",
+		Description: "Create/Update the OpenCode.md memory file",
+		Handler: func(cmd dialog.Command) tea.Cmd {
+			prompt := `Please analyze this codebase and create a OpenCode.md file containing:
+1. Build/lint/test commands - especially for running a single test
+2. Code style guidelines including imports, formatting, types, naming conventions, error handling, etc.
+
+The file you create will be given to agentic coding agents (such as yourself) that operate in this repository. Make it about 20 lines long.
+If there's already a opencode.md, improve it.
+If there are Cursor rules (in .cursor/rules/ or .cursorrules) or Copilot rules (in .github/copilot-instructions.md), make sure to include them.`
+			return tea.Batch(
+				util.CmdHandler(chat.SendMsg{
+					Text: prompt,
+				}),
+			)
+		},
+	})
+	return model
 }

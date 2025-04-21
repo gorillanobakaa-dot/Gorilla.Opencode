@@ -168,6 +168,7 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	}
 	p := w.permissions.Request(
 		permission.CreatePermissionRequest{
+			SessionID:   sessionID,
 			Path:        permissionPath,
 			ToolName:    WriteToolName,
 			Action:      "write",

@@ -14,8 +14,13 @@ var contextFiles = []string{
 	".github/copilot-instructions.md",
 	".cursorrules",
 	"CLAUDE.md",
+	"CLAUDE.local.md",
 	"opencode.md",
+	"opencode.local.md",
 	"OpenCode.md",
+	"OpenCode.local.md",
+	"OPENCODE.md",
+	"OPENCODE.local.md",
 }
 
 func GetAgentPrompt(agentName config.AgentName, provider models.ModelProvider) string {
@@ -31,12 +36,13 @@ func GetAgentPrompt(agentName config.AgentName, provider models.ModelProvider) s
 		basePrompt = "You are a helpful assistant"
 	}
 
-	// Add context from project-specific instruction files if they exist
-	contextContent := getContextFromFiles()
-	if contextContent != "" {
-		return fmt.Sprintf("%s\n\n# Project-Specific Context\n%s", basePrompt, contextContent)
+	if agentName == config.AgentCoder || agentName == config.AgentTask {
+		// Add context from project-specific instruction files if they exist
+		contextContent := getContextFromFiles()
+		if contextContent != "" {
+			return fmt.Sprintf("%s\n\n# Project-Specific Context\n%s", basePrompt, contextContent)
+		}
 	}
-
 	return basePrompt
 }
 
