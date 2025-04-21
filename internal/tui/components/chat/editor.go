@@ -132,6 +132,9 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.KeyMsg:
 		if key.Matches(msg, focusedKeyMaps.OpenEditor) {
+			if m.app.CoderAgent.IsSessionBusy(m.session.ID) {
+				return m, util.ReportWarn("Agent is working, please wait...")
+			}
 			return m, openEditor()
 		}
 		// if the key does not match any binding, return
