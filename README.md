@@ -18,6 +18,7 @@ OpenCode is a Go-based CLI application that brings AI assistance to your termina
 - **Persistent Storage**: SQLite database for storing conversations and sessions
 - **LSP Integration**: Language Server Protocol support for code intelligence
 - **File Change Tracking**: Track and visualize file changes during sessions
+- **External Editor Support**: Open your preferred editor for composing messages
 
 ## Installation
 
@@ -100,41 +101,31 @@ You can configure OpenCode using environment variables:
 
 ## Supported AI Models
 
-### OpenAI Models
+OpenCode supports a variety of AI models from different providers:
 
-| Model ID          | Name            | Context Window   |
-| ----------------- | --------------- | ---------------- |
-| `gpt-4.1`         | GPT 4.1         | 1,047,576 tokens |
-| `gpt-4.1-mini`    | GPT 4.1 Mini    | 200,000 tokens   |
-| `gpt-4.1-nano`    | GPT 4.1 Nano    | 1,047,576 tokens |
-| `gpt-4.5-preview` | GPT 4.5 Preview | 128,000 tokens   |
-| `gpt-4o`          | GPT-4o          | 128,000 tokens   |
-| `gpt-4o-mini`     | GPT-4o Mini     | 128,000 tokens   |
-| `o1`              | O1              | 200,000 tokens   |
-| `o1-pro`          | O1 Pro          | 200,000 tokens   |
-| `o1-mini`         | O1 Mini         | 128,000 tokens   |
-| `o3`              | O3              | 200,000 tokens   |
-| `o3-mini`         | O3 Mini         | 200,000 tokens   |
-| `o4-mini`         | O4 Mini         | 128,000 tokens   |
+### OpenAI
+- GPT-4.1 family (gpt-4.1, gpt-4.1-mini, gpt-4.1-nano)
+- GPT-4.5 Preview
+- GPT-4o family (gpt-4o, gpt-4o-mini)
+- O1 family (o1, o1-pro, o1-mini)
+- O3 family (o3, o3-mini)
+- O4 Mini
 
-### Anthropic Models
+### Anthropic
+- Claude 3.5 Sonnet
+- Claude 3.5 Haiku
+- Claude 3.7 Sonnet
+- Claude 3 Haiku
+- Claude 3 Opus
 
-| Model ID            | Name              | Context Window |
-| ------------------- | ----------------- | -------------- |
-| `claude-3.5-sonnet` | Claude 3.5 Sonnet | 200,000 tokens |
-| `claude-3-haiku`    | Claude 3 Haiku    | 200,000 tokens |
-| `claude-3.7-sonnet` | Claude 3.7 Sonnet | 200,000 tokens |
-| `claude-3.5-haiku`  | Claude 3.5 Haiku  | 200,000 tokens |
-| `claude-3-opus`     | Claude 3 Opus     | 200,000 tokens |
+### Google
+- Gemini 2.5
+- Gemini 2.5 Flash
+- Gemini 2.0 Flash
+- Gemini 2.0 Flash Lite
 
-### Other Models
-
-| Model ID                    | Provider    | Name              | Context Window |
-| --------------------------- | ----------- | ----------------- | -------------- |
-| `gemini-2.5`                | Google      | Gemini 2.5 Pro    | -              |
-| `gemini-2.0-flash`          | Google      | Gemini 2.0 Flash  | -              |
-| `qwen-qwq`                  | Groq        | Qwen Qwq          | -              |
-| `bedrock.claude-3.7-sonnet` | AWS Bedrock | Claude 3.7 Sonnet | -              |
+### AWS Bedrock
+- Claude 3.7 Sonnet
 
 ## Usage
 
@@ -161,12 +152,14 @@ opencode -c /path/to/project
 
 ### Global Shortcuts
 
-| Shortcut | Action                                                  |
-| -------- | ------------------------------------------------------- |
-| `Ctrl+C` | Quit application                                        |
-| `Ctrl+?` | Toggle help dialog                                      |
-| `Ctrl+L` | View logs                                               |
-| `Esc`    | Close current overlay/dialog or return to previous mode |
+| Shortcut  | Action                                                  |
+| --------- | ------------------------------------------------------- |
+| `Ctrl+C`  | Quit application                                        |
+| `Ctrl+?`  | Toggle help dialog                                      |
+| `?`       | Toggle help dialog (when not in editing mode)           |
+| `Ctrl+L`  | View logs                                               |
+| `Ctrl+A`  | Switch session                                          |
+| `Esc`     | Close current overlay/dialog or return to previous mode |
 
 ### Chat Page Shortcuts
 
@@ -183,13 +176,34 @@ opencode -c /path/to/project
 | ------------------- | ----------------------------------------- |
 | `Ctrl+S`            | Send message (when editor is focused)     |
 | `Enter` or `Ctrl+S` | Send message (when editor is not focused) |
+| `Ctrl+E`            | Open external editor                      |
 | `Esc`               | Blur editor and focus messages            |
+
+### Session Dialog Shortcuts
+
+| Shortcut      | Action           |
+| ------------- | ---------------- |
+| `↑` or `k`    | Previous session |
+| `↓` or `j`    | Next session     |
+| `Enter`       | Select session   |
+| `Esc`         | Close dialog     |
+
+### Permission Dialog Shortcuts
+
+| Shortcut                  | Action                  |
+| ------------------------- | ----------------------- |
+| `←` or `left`             | Switch options left     |
+| `→` or `right` or `tab`   | Switch options right    |
+| `Enter` or `space`        | Confirm selection       |
+| `a`                       | Allow permission        |
+| `A`                       | Allow permission for session |
+| `d`                       | Deny permission         |
 
 ### Logs Page Shortcuts
 
-| Shortcut    | Action              |
-| ----------- | ------------------- |
-| `Backspace` | Return to chat page |
+| Shortcut         | Action              |
+| ---------------- | ------------------- |
+| `Backspace` or `q` | Return to chat page |
 
 ## AI Assistant Tools
 
@@ -275,28 +289,13 @@ Once configured, MCP tools are automatically available to the AI assistant along
 
 ## LSP (Language Server Protocol)
 
-OpenCode integrates with Language Server Protocol to provide rich code intelligence features across multiple programming languages.
+OpenCode integrates with Language Server Protocol to provide code intelligence features across multiple programming languages.
 
 ### LSP Features
 
 - **Multi-language Support**: Connect to language servers for different programming languages
-- **Code Intelligence**: Get diagnostics, completions, and navigation assistance
+- **Diagnostics**: Receive error checking and linting information
 - **File Watching**: Automatically notify language servers of file changes
-- **Diagnostics**: Display errors, warnings, and hints in your code
-
-### Supported LSP Features
-
-| Feature           | Description                         |
-| ----------------- | ----------------------------------- |
-| Diagnostics       | Error checking and linting          |
-| Completions       | Code suggestions and autocompletion |
-| Hover             | Documentation on hover              |
-| Definition        | Go to definition                    |
-| References        | Find all references                 |
-| Document Symbols  | Navigate symbols in current file    |
-| Workspace Symbols | Search symbols across workspace     |
-| Formatting        | Code formatting                     |
-| Code Actions      | Quick fixes and refactorings        |
 
 ### Configuring LSP
 
@@ -324,13 +323,14 @@ The AI assistant can access LSP features through the `diagnostics` tool, allowin
 
 - Check for errors in your code
 - Suggest fixes based on diagnostics
-- Provide intelligent code assistance
+
+While the LSP client implementation supports the full LSP protocol (including completions, hover, definition, etc.), currently only diagnostics are exposed to the AI assistant.
 
 ## Development
 
 ### Prerequisites
 
-- Go 1.23.5 or higher
+- Go 1.24.0 or higher
 
 ### Building from Source
 
@@ -338,9 +338,6 @@ The AI assistant can access LSP features through the `diagnostics` tool, allowin
 # Clone the repository
 git clone https://github.com/kujtimiihoxha/opencode.git
 cd opencode
-
-# Build the diff script first
-go run cmd/diff/main.go
 
 # Build
 go build -o opencode
