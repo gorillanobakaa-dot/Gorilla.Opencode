@@ -200,22 +200,16 @@ func setDefaults(debug bool) {
 // 1. Anthropic
 // 2. OpenAI
 // 3. Google Gemini
-// 4. AWS Bedrock
+// 4. Groq
+// 5. AWS Bedrock
 func setProviderDefaults() {
-	// Groq configuration
-	if apiKey := os.Getenv("GROQ_API_KEY"); apiKey != "" {
-		viper.SetDefault("providers.groq.apiKey", apiKey)
-		viper.SetDefault("agents.coder.model", models.QWENQwq)
-		viper.SetDefault("agents.task.model", models.QWENQwq)
-		viper.SetDefault("agents.title.model", models.QWENQwq)
-	}
-
-	// Google Gemini configuration
-	if apiKey := os.Getenv("GEMINI_API_KEY"); apiKey != "" {
-		viper.SetDefault("providers.gemini.apiKey", apiKey)
-		viper.SetDefault("agents.coder.model", models.Gemini25)
-		viper.SetDefault("agents.task.model", models.Gemini25Flash)
-		viper.SetDefault("agents.title.model", models.Gemini25Flash)
+	// Anthropic configuration
+	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
+		viper.SetDefault("providers.anthropic.apiKey", apiKey)
+		viper.SetDefault("agents.coder.model", models.Claude37Sonnet)
+		viper.SetDefault("agents.task.model", models.Claude37Sonnet)
+		viper.SetDefault("agents.title.model", models.Claude37Sonnet)
+		return
 	}
 
 	// OpenAI configuration
@@ -224,21 +218,33 @@ func setProviderDefaults() {
 		viper.SetDefault("agents.coder.model", models.GPT41)
 		viper.SetDefault("agents.task.model", models.GPT41Mini)
 		viper.SetDefault("agents.title.model", models.GPT41Mini)
-
+		return
 	}
 
-	// Anthropic configuration
-	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
-		viper.SetDefault("providers.anthropic.apiKey", apiKey)
-		viper.SetDefault("agents.coder.model", models.Claude37Sonnet)
-		viper.SetDefault("agents.task.model", models.Claude37Sonnet)
-		viper.SetDefault("agents.title.model", models.Claude37Sonnet)
+	// Google Gemini configuration
+	if apiKey := os.Getenv("GEMINI_API_KEY"); apiKey != "" {
+		viper.SetDefault("providers.gemini.apiKey", apiKey)
+		viper.SetDefault("agents.coder.model", models.Gemini25)
+		viper.SetDefault("agents.task.model", models.Gemini25Flash)
+		viper.SetDefault("agents.title.model", models.Gemini25Flash)
+		return
 	}
 
+	// Groq configuration
+	if apiKey := os.Getenv("GROQ_API_KEY"); apiKey != "" {
+		viper.SetDefault("providers.groq.apiKey", apiKey)
+		viper.SetDefault("agents.coder.model", models.QWENQwq)
+		viper.SetDefault("agents.task.model", models.QWENQwq)
+		viper.SetDefault("agents.title.model", models.QWENQwq)
+		return
+	}
+
+	// AWS Bedrock configuration
 	if hasAWSCredentials() {
 		viper.SetDefault("agents.coder.model", models.BedrockClaude37Sonnet)
 		viper.SetDefault("agents.task.model", models.BedrockClaude37Sonnet)
 		viper.SetDefault("agents.title.model", models.BedrockClaude37Sonnet)
+		return
 	}
 }
 
