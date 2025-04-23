@@ -25,8 +25,22 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ">=1.23.2"
+          cache: true
+          cache-dependency-path: go.sum
 
       - run: go mod download
+      
+      - name: Restore GoReleaser build cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            dist/
+            .goreleaser.cache
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/*.go') }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-build-
+      
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
