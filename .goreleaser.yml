@@ -4,7 +4,7 @@ before:
   hooks:
 builds:
   - env:
-      - CGO_ENABLED=1
+      - CGO_ENABLED=0
     goos:
       - linux
       - darwin
@@ -17,7 +17,6 @@ builds:
 
 archives:
   - format: tar.gz
-    # this name template makes the OS and Arch compatible with the results of uname.
     name_template: >-
       opencode-
       {{- if eq .Os "darwin" }}mac-
@@ -27,7 +26,6 @@ archives:
       {{- else if eq .Arch "#86" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
     format_overrides:
       - goos: windows
         format: zip
