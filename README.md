@@ -22,8 +22,35 @@ OpenCode is a Go-based CLI application that brings AI assistance to your termina
 
 ## Installation
 
+### Using the Install Script
+
 ```bash
-# Coming soon
+# Install the latest version
+curl -fsSL https://opencode.ai/install | bash
+
+# Install a specific version
+curl -fsSL https://opencode.ai/install | VERSION=0.1.0 bash
+```
+
+### Using Homebrew (macOS and Linux)
+
+```bash
+brew install opencode-ai/tap/opencode
+```
+
+### Using AUR (Arch Linux)
+
+```bash
+# Using yay
+yay -S opencode-bin
+
+# Using paru
+paru -S opencode-bin
+```
+
+### Using Go
+
+```bash
 go install github.com/opencode-ai/opencode@latest
 ```
 
