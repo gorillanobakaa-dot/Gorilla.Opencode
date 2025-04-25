@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
@@ -13,6 +14,7 @@ import (
 var contextFiles = []string{
 	".github/copilot-instructions.md",
 	".cursorrules",
+	".cursor/rules/", // Directory containing multiple rule files
 	"CLAUDE.md",
 	"CLAUDE.local.md",
 	"opencode.md",
@@ -51,11 +53,30 @@ func getContextFromFiles() string {
 	workDir := config.WorkingDirectory()
 	var contextContent string
 
-	for _, file := range contextFiles {
-		filePath := filepath.Join(workDir, file)
-		content, err := os.ReadFile(filePath)
-		if err == nil {
-			contextContent += fmt.Sprintf("\n%s\n", string(content))
+	for _, path := range contextFiles {
+		// Check if path ends with a slash (indicating a directory)
+		if strings.HasSuffix(path, "/") {
+			// Handle directory - read all files within it
+			dirPath := filepath.Join(workDir, path)
+			files, err := os.ReadDir(dirPath)
+			if err == nil {
+				for _, file := range files {
+					if !file.IsDir() {
+						filePath := filepath.Join(dirPath, file.Name())
+						content, err := os.ReadFile(filePath)
+						if err == nil {
+							contextContent += fmt.Sprintf("\n# From %s\n%s\n", file.Name(), string(content))
+						}
+					}
+				}
+			}
+		} else {
+			// Handle individual file as before
+			filePath := filepath.Join(workDir, path)
+			content, err := os.ReadFile(filePath)
+			if err == nil {
+				contextContent += fmt.Sprintf("\n%s\n", string(content))
+			}
 		}
 	}
 
