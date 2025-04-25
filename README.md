@@ -91,6 +91,10 @@ You can configure OpenCode using environment variables:
     "anthropic": {
       "apiKey": "your-api-key",
       "disabled": false
+    },
+    "groq": {
+        "apiKey": "your-api-key",
+        "disabled": false
     }
   },
   "agents": {
@@ -157,6 +161,14 @@ OpenCode supports a variety of AI models from different providers:
 ### AWS Bedrock
 
 - Claude 3.7 Sonnet
+
+### Groq
+
+- Llama 4 Maverick (17b-128e-instruct) 
+- Llama 4 Scout (17b-16e-instruct)
+- QWEN QWQ-32b
+- Deepseek R1 distill Llama 70b
+- Llama 3.3 70b Versatile
 
 ## Usage
 

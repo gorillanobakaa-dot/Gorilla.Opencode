@@ -107,6 +107,14 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 			options: clientOptions,
 			client:  newBedrockClient(clientOptions),
 		}, nil
+	case models.ProviderGROQ:
+		clientOptions.openaiOptions = append(clientOptions.openaiOptions,
+			WithOpenAIBaseURL("https://api.groq.com/openai/v1"),
+		)
+		return &baseProvider[OpenAIClient]{
+			options: clientOptions,
+			client:  newOpenAIClient(clientOptions),
+		}, nil
 	case models.ProviderMock:
 		// TODO: implement mock client for test
 		panic("not implemented")

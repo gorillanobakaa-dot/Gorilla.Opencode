@@ -23,17 +23,12 @@ type Model struct {
 
 // Model IDs
 const ( // GEMINI
-	// GROQ
-	QWENQwq ModelID = "qwen-qwq"
-
 	// Bedrock
 	BedrockClaude37Sonnet ModelID = "bedrock.claude-3.7-sonnet"
 )
 
 const (
 	ProviderBedrock ModelProvider = "bedrock"
-	ProviderGROQ    ModelProvider = "groq"
-
 	// ForTests
 	ProviderMock ModelProvider = "__mock"
 )
@@ -63,18 +58,6 @@ var SupportedModels = map[ModelID]Model{
 	// 	CostPer1MOut:       0.4,
 	// },
 	//
-	// // GROQ
-	// QWENQwq: {
-	// 	ID:                 QWENQwq,
-	// 	Name:               "Qwen Qwq",
-	// 	Provider:           ProviderGROQ,
-	// 	APIModel:           "qwen-qwq-32b",
-	// 	CostPer1MIn:        0,
-	// 	CostPer1MInCached:  0,
-	// 	CostPer1MOutCached: 0,
-	// 	CostPer1MOut:       0,
-	// },
-	//
 	// // Bedrock
 	BedrockClaude37Sonnet: {
 		ID:                 BedrockClaude37Sonnet,
@@ -92,4 +75,5 @@ func init() {
 	maps.Copy(SupportedModels, AnthropicModels)
 	maps.Copy(SupportedModels, OpenAIModels)
 	maps.Copy(SupportedModels, GeminiModels)
+	maps.Copy(SupportedModels, GroqModels)
 }
