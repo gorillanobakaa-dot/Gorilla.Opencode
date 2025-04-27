@@ -1,11 +1,13 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -132,6 +134,73 @@ func (g *globTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 }
 
 func globFiles(pattern, searchPath string, limit int) ([]string, bool, error) {
+	matches, err := globWithRipgrep(pattern, searchPath, limit)
+	if err == nil {
+		return matches, len(matches) >= limit, nil
+	}
+
+	return globWithDoublestar(pattern, searchPath, limit)
+}
+
+func globWithRipgrep(
+	pattern, searchRoot string,
+	limit int,
+) ([]string, error) {
+
+	if searchRoot == "" {
+		searchRoot = "."
+	}
+
+	rgBin, err := exec.LookPath("rg")
+	if err != nil {
+		return nil, fmt.Errorf("ripgrep not found in $PATH: %w", err)
+	}
+
+	if !filepath.IsAbs(pattern) && !strings.HasPrefix(pattern, "/") {
+		pattern = "/" + pattern
+	}
+
+	args := []string{
+		"--files",
+		"--null",
+		"--glob", pattern,
+		"-L",
+	}
+
+	cmd := exec.Command(rgBin, args...)
+	cmd.Dir = searchRoot
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 1 {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("ripgrep: %w\n%s", err, out)
+	}
+
+	var matches []string
+	for _, p := range bytes.Split(out, []byte{0}) {
+		if len(p) == 0 {
+			continue
+		}
+		abs := filepath.Join(searchRoot, string(p))
+		if skipHidden(abs) {
+			continue
+		}
+		matches = append(matches, abs)
+	}
+
+	sort.SliceStable(matches, func(i, j int) bool {
+		return len(matches[i]) < len(matches[j])
+	})
+
+	if len(matches) > limit {
+		matches = matches[:limit]
+	}
+	return matches, nil
+}
+
+func globWithDoublestar(pattern, searchPath string, limit int) ([]string, bool, error) {
 	if !strings.HasPrefix(pattern, "/") && !strings.HasPrefix(pattern, searchPath) {
 		if !strings.HasSuffix(searchPath, "/") {
 			searchPath += "/"
