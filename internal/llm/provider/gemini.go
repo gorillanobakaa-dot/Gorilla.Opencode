@@ -132,7 +132,8 @@ func (g *geminiClient) convertMessages(messages []message.Message) []*genai.Cont
 }
 
 func (g *geminiClient) convertTools(tools []tools.BaseTool) []*genai.Tool {
-	geminiTools := make([]*genai.Tool, 0, len(tools))
+	geminiTool := &genai.Tool{}
+	geminiTool.FunctionDeclarations = make([]*genai.FunctionDeclaration, 0, len(tools))
 
 	for _, tool := range tools {
 		info := tool.Info()
@@ -146,12 +147,10 @@ func (g *geminiClient) convertTools(tools []tools.BaseTool) []*genai.Tool {
 			},
 		}
 
-		geminiTools = append(geminiTools, &genai.Tool{
-			FunctionDeclarations: []*genai.FunctionDeclaration{declaration},
-		})
+		geminiTool.FunctionDeclarations = append(geminiTool.FunctionDeclarations, declaration)
 	}
 
-	return geminiTools
+	return []*genai.Tool{geminiTool}
 }
 
 func (g *geminiClient) finishReason(reason genai.FinishReason) message.FinishReason {
