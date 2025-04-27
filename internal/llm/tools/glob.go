@@ -146,7 +146,6 @@ func globWithRipgrep(
 	pattern, searchRoot string,
 	limit int,
 ) ([]string, error) {
-
 	if searchRoot == "" {
 		searchRoot = "."
 	}
@@ -201,14 +200,7 @@ func globWithRipgrep(
 }
 
 func globWithDoublestar(pattern, searchPath string, limit int) ([]string, bool, error) {
-	if !strings.HasPrefix(pattern, "/") && !strings.HasPrefix(pattern, searchPath) {
-		if !strings.HasSuffix(searchPath, "/") {
-			searchPath += "/"
-		}
-		pattern = searchPath + pattern
-	}
-
-	fsys := os.DirFS("/")
+	fsys := os.DirFS(searchPath)
 
 	relPattern := strings.TrimPrefix(pattern, "/")
 
@@ -227,7 +219,11 @@ func globWithDoublestar(pattern, searchPath string, limit int) ([]string, bool, 
 			return nil // Skip files we can't access
 		}
 
-		absPath := "/" + path // Restore absolute path
+		absPath := path // Restore absolute path
+		if !strings.HasPrefix(absPath, searchPath) {
+			absPath = filepath.Join(searchPath, absPath)
+		}
+
 		matches = append(matches, fileInfo{
 			path:    absPath,
 			modTime: info.ModTime(),
