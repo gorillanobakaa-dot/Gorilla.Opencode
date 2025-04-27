@@ -9,6 +9,7 @@ import (
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
+	"github.com/opencode-ai/opencode/internal/logging"
 )
 
 func GetAgentPrompt(agentName config.AgentName, provider models.ModelProvider) string {
@@ -27,6 +28,7 @@ func GetAgentPrompt(agentName config.AgentName, provider models.ModelProvider) s
 	if agentName == config.AgentCoder || agentName == config.AgentTask {
 		// Add context from project-specific instruction files if they exist
 		contextContent := getContextFromPaths()
+		logging.Debug("Context content", "Context", contextContent)
 		if contextContent != "" {
 			return fmt.Sprintf("%s\n\n# Project-Specific Context\n Make sure to follow the instructions in the context below\n%s", basePrompt, contextContent)
 		}
@@ -59,6 +61,10 @@ func processContextPaths(workDir string, paths []string) string {
 		resultCh = make(chan string)
 	)
 
+	// Track processed files to avoid duplicates
+	processedFiles := make(map[string]bool)
+	var processedMutex sync.Mutex
+
 	for _, path := range paths {
 		wg.Add(1)
 		go func(p string) {
@@ -70,16 +76,38 @@ func processContextPaths(workDir string, paths []string) string {
 						return err
 					}
 					if !d.IsDir() {
-						if result := processFile(path); result != "" {
-							resultCh <- result
+						// Check if we've already processed this file (case-insensitive)
+						processedMutex.Lock()
+						lowerPath := strings.ToLower(path)
+						if !processedFiles[lowerPath] {
+							processedFiles[lowerPath] = true
+							processedMutex.Unlock()
+
+							if result := processFile(path); result != "" {
+								resultCh <- result
+							}
+						} else {
+							processedMutex.Unlock()
 						}
 					}
 					return nil
 				})
 			} else {
-				result := processFile(filepath.Join(workDir, p))
-				if result != "" {
-					resultCh <- result
+				fullPath := filepath.Join(workDir, p)
+
+				// Check if we've already processed this file (case-insensitive)
+				processedMutex.Lock()
+				lowerPath := strings.ToLower(fullPath)
+				if !processedFiles[lowerPath] {
+					processedFiles[lowerPath] = true
+					processedMutex.Unlock()
+
+					result := processFile(fullPath)
+					if result != "" {
+						resultCh <- result
+					}
+				} else {
+					processedMutex.Unlock()
 				}
 			}
 		}(path)
@@ -105,4 +133,3 @@ func processFile(filePath string) string {
 	}
 	return "# From:" + filePath + "\n" + string(content)
 }
-
