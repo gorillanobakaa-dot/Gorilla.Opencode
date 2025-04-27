@@ -91,11 +91,11 @@ func processContextPaths(workDir string, paths []string) string {
 	}()
 
 	var (
-		results = make([]string, len(resultCh))
+		results = make([]string, 0)
 		i       int
 	)
 	for result := range resultCh {
-		results[i] = result
+		results = append(results, result)
 		i++
 	}
 
@@ -109,3 +109,4 @@ func processFile(filePath string) string {
 	}
 	return "# From:" + filePath + "\n" + string(content)
 }
+
