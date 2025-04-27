@@ -4,23 +4,18 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/aymanbagabas/go-udiff"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/opencode-ai/opencode/internal/config"
-	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
@@ -942,106 +937,21 @@ func GenerateDiff(beforeContent, afterContent, fileName string) (string, int, in
 	cwd := config.WorkingDirectory()
 	fileName = strings.TrimPrefix(fileName, cwd)
 	fileName = strings.TrimPrefix(fileName, "/")
-	// Create temporary directory for git operations
-	tempDir, err := os.MkdirTemp("", fmt.Sprintf("git-diff-%d", time.Now().UnixNano()))
-	if err != nil {
-		logging.Error("Failed to create temp directory for git diff", "error", err)
-		return "", 0, 0
-	}
-	defer os.RemoveAll(tempDir)
 
-	// Initialize git repo
-	repo, err := git.PlainInit(tempDir, false)
-	if err != nil {
-		logging.Error("Failed to initialize git repository", "error", err)
-		return "", 0, 0
-	}
+	var (
+		unified   = udiff.Unified("a/"+fileName, "b/"+fileName, beforeContent, afterContent)
+		additions = 0
+		removals  = 0
+	)
 
-	wt, err := repo.Worktree()
-	if err != nil {
-		logging.Error("Failed to get git worktree", "error", err)
-		return "", 0, 0
+	lines := strings.Split(unified, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+			additions++
+		} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
+			removals++
+		}
 	}
 
-	// Write the "before" content and commit it
-	fullPath := filepath.Join(tempDir, fileName)
-	if err = os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
-		logging.Error("Failed to create directory for file", "error", err)
-		return "", 0, 0
-	}
-	if err = os.WriteFile(fullPath, []byte(beforeContent), 0o644); err != nil {
-		logging.Error("Failed to write before content to file", "error", err)
-		return "", 0, 0
-	}
-
-	_, err = wt.Add(fileName)
-	if err != nil {
-		logging.Error("Failed to add file to git", "error", err)
-		return "", 0, 0
-	}
-
-	beforeCommit, err := wt.Commit("Before", &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "OpenCode",
-			Email: "coder@opencode.ai",
-			When:  time.Now(),
-		},
-	})
-	if err != nil {
-		logging.Error("Failed to commit before content", "error", err)
-		return "", 0, 0
-	}
-
-	// Write the "after" content and commit it
-	if err = os.WriteFile(fullPath, []byte(afterContent), 0o644); err != nil {
-		logging.Error("Failed to write after content to file", "error", err)
-		return "", 0, 0
-	}
-
-	_, err = wt.Add(fileName)
-	if err != nil {
-		logging.Error("Failed to add file to git", "error", err)
-		return "", 0, 0
-	}
-
-	afterCommit, err := wt.Commit("After", &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "OpenCode",
-			Email: "coder@opencode.ai",
-			When:  time.Now(),
-		},
-	})
-	if err != nil {
-		logging.Error("Failed to commit after content", "error", err)
-		return "", 0, 0
-	}
-
-	// Get the diff between the two commits
-	beforeCommitObj, err := repo.CommitObject(beforeCommit)
-	if err != nil {
-		logging.Error("Failed to get before commit object", "error", err)
-		return "", 0, 0
-	}
-
-	afterCommitObj, err := repo.CommitObject(afterCommit)
-	if err != nil {
-		logging.Error("Failed to get after commit object", "error", err)
-		return "", 0, 0
-	}
-
-	patch, err := beforeCommitObj.Patch(afterCommitObj)
-	if err != nil {
-		logging.Error("Failed to create git diff patch", "error", err)
-		return "", 0, 0
-	}
-
-	// Count additions and removals
-	additions := 0
-	removals := 0
-	for _, fileStat := range patch.Stats() {
-		additions += fileStat.Addition
-		removals += fileStat.Deletion
-	}
-
-	return patch.String(), additions, removals
+	return unified, additions, removals
 }
