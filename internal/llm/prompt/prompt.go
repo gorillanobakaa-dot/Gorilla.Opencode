@@ -90,13 +90,9 @@ func processContextPaths(workDir string, paths []string) string {
 		close(resultCh)
 	}()
 
-	var (
-		results = make([]string, 0)
-		i       int
-	)
+	results := make([]string, 0)
 	for result := range resultCh {
 		results = append(results, result)
-		i++
 	}
 
 	return strings.Join(results, "\n")
