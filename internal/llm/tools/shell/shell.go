@@ -47,8 +47,10 @@ func GetPersistentShell(workingDir string) *PersistentShell {
 		shellInstance = newPersistentShell(workingDir)
 	})
 
-	if shellInstance == nil || !shellInstance.isAlive {
+	if shellInstance == nil {
 		shellInstance = newPersistentShell(workingDir)
+	} else if !shellInstance.isAlive {
+		shellInstance = newPersistentShell(shellInstance.cwd)
 	}
 
 	return shellInstance
