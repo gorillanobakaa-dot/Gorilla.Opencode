@@ -67,14 +67,15 @@ type LSPConfig struct {
 
 // Config is the main configuration structure for the application.
 type Config struct {
-	Data       Data                              `json:"data"`
-	WorkingDir string                            `json:"wd,omitempty"`
-	MCPServers map[string]MCPServer              `json:"mcpServers,omitempty"`
-	Providers  map[models.ModelProvider]Provider `json:"providers,omitempty"`
-	LSP        map[string]LSPConfig              `json:"lsp,omitempty"`
-	Agents     map[AgentName]Agent               `json:"agents"`
-	Debug      bool                              `json:"debug,omitempty"`
-	DebugLSP   bool                              `json:"debugLSP,omitempty"`
+	Data         Data                              `json:"data"`
+	WorkingDir   string                            `json:"wd,omitempty"`
+	MCPServers   map[string]MCPServer              `json:"mcpServers,omitempty"`
+	Providers    map[models.ModelProvider]Provider `json:"providers,omitempty"`
+	LSP          map[string]LSPConfig              `json:"lsp,omitempty"`
+	Agents       map[AgentName]Agent               `json:"agents"`
+	Debug        bool                              `json:"debug,omitempty"`
+	DebugLSP     bool                              `json:"debugLSP,omitempty"`
+	ContextPaths []string                          `json:"contextPaths,omitempty"`
 }
 
 // Application constants
@@ -83,6 +84,20 @@ const (
 	defaultLogLevel      = "info"
 	appName              = "opencode"
 )
+
+var defaultContextPaths = []string{
+	".github/copilot-instructions.md",
+	".cursorrules",
+	".cursor/rules/",
+	"CLAUDE.md",
+	"CLAUDE.local.md",
+	"opencode.md",
+	"opencode.local.md",
+	"OpenCode.md",
+	"OpenCode.local.md",
+	"OPENCODE.md",
+	"OPENCODE.local.md",
+}
 
 // Global configuration instance
 var cfg *Config
@@ -185,6 +200,7 @@ func configureViper() {
 // setDefaults configures default values for configuration options.
 func setDefaults(debug bool) {
 	viper.SetDefault("data.directory", defaultDataDirectory)
+	viper.SetDefault("contextPaths", defaultContextPaths)
 
 	if debug {
 		viper.SetDefault("debug", true)
