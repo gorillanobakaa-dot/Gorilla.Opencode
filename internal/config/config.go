@@ -272,6 +272,15 @@ func setProviderDefaults() {
 		viper.SetDefault("agents.title.model", models.BedrockClaude37Sonnet)
 		return
 	}
+
+	if os.Getenv("AZURE_OPENAI_ENDPOINT") != "" {
+		// api-key may be empty when using Entra ID credentials – that's okay
+		viper.SetDefault("providers.azure.apiKey", os.Getenv("AZURE_OPENAI_API_KEY"))
+		viper.SetDefault("agents.coder.model", models.AzureGPT41)
+		viper.SetDefault("agents.task.model", models.AzureGPT41Mini)
+		viper.SetDefault("agents.title.model", models.AzureGPT41Mini)
+		return
+	}
 }
 
 // hasAWSCredentials checks if AWS credentials are available in the environment.
@@ -506,6 +515,8 @@ func getProviderAPIKey(provider models.ModelProvider) string {
 		return os.Getenv("GEMINI_API_KEY")
 	case models.ProviderGROQ:
 		return os.Getenv("GROQ_API_KEY")
+	case models.ProviderAzure:
+		return os.Getenv("AZURE_OPENAI_API_KEY")
 	case models.ProviderBedrock:
 		if hasAWSCredentials() {
 			return "aws-credentials-available"

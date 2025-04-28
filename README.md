@@ -11,7 +11,7 @@ OpenCode is a Go-based CLI application that brings AI assistance to your termina
 ## Features
 
 - **Interactive TUI**: Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) for a smooth terminal experience
-- **Multiple AI Providers**: Support for OpenAI, Anthropic Claude, Google Gemini, AWS Bedrock, and Groq
+- **Multiple AI Providers**: Support for OpenAI, Anthropic Claude, Google Gemini, AWS Bedrock, Groq, and Azure OpenAI
 - **Session Management**: Save and manage multiple conversation sessions
 - **Tool Integration**: AI can execute commands, search files, and modify code
 - **Vim-like Editor**: Integrated editor with text input capabilities
@@ -66,15 +66,19 @@ OpenCode looks for configuration in the following locations:
 
 You can configure OpenCode using environment variables:
 
-| Environment Variable    | Purpose                  |
-| ----------------------- | ------------------------ |
-| `ANTHROPIC_API_KEY`     | For Claude models        |
-| `OPENAI_API_KEY`        | For OpenAI models        |
-| `GEMINI_API_KEY`        | For Google Gemini models |
-| `GROQ_API_KEY`          | For Groq models          |
-| `AWS_ACCESS_KEY_ID`     | For AWS Bedrock (Claude) |
-| `AWS_SECRET_ACCESS_KEY` | For AWS Bedrock (Claude) |
-| `AWS_REGION`            | For AWS Bedrock (Claude) |
+| Environment Variable       | Purpose                                                |
+|----------------------------|--------------------------------------------------------|
+| `ANTHROPIC_API_KEY`        | For Claude models                                      |
+| `OPENAI_API_KEY`           | For OpenAI models                                      |
+| `GEMINI_API_KEY`           | For Google Gemini models                               |
+| `GROQ_API_KEY`             | For Groq models                                        |
+| `AWS_ACCESS_KEY_ID`        | For AWS Bedrock (Claude)                               |
+| `AWS_SECRET_ACCESS_KEY`    | For AWS Bedrock (Claude)                               |
+| `AWS_REGION`               | For AWS Bedrock (Claude)                               |
+| `AZURE_OPENAI_ENDPOINT`    | For Azure OpenAI models                                |
+| `AZURE_OPENAI_API_KEY`     | For Azure OpenAI models (optional when using Entra ID) |
+| `AZURE_OPENAI_API_VERSION` | For Azure OpenAI models                                |
+
 
 ### Configuration File Structure
 
@@ -169,6 +173,15 @@ OpenCode supports a variety of AI models from different providers:
 - QWEN QWQ-32b
 - Deepseek R1 distill Llama 70b
 - Llama 3.3 70b Versatile
+
+### Azure OpenAI
+
+- GPT-4.1 family (gpt-4.1, gpt-4.1-mini, gpt-4.1-nano)
+- GPT-4.5 Preview
+- GPT-4o family (gpt-4o, gpt-4o-mini)
+- O1 family (o1, o1-mini)
+- O3 family (o3, o3-mini)
+- O4 Mini
 
 ## Usage
 

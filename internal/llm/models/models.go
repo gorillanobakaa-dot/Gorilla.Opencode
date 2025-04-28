@@ -76,4 +76,5 @@ func init() {
 	maps.Copy(SupportedModels, OpenAIModels)
 	maps.Copy(SupportedModels, GeminiModels)
 	maps.Copy(SupportedModels, GroqModels)
+	maps.Copy(SupportedModels, AzureModels)
 }
