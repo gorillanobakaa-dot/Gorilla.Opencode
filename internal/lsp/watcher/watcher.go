@@ -643,7 +643,9 @@ func (w *WorkspaceWatcher) debounceHandleFileEvent(ctx context.Context, uri stri
 func (w *WorkspaceWatcher) handleFileEvent(ctx context.Context, uri string, changeType protocol.FileChangeType) {
 	// If the file is open and it's a change event, use didChange notification
 	filePath := uri[7:] // Remove "file://" prefix
-	if changeType == protocol.FileChangeType(protocol.Changed) && w.client.IsFileOpen(filePath) {
+	if changeType == protocol.FileChangeType(protocol.Deleted) {
+		w.client.ClearDiagnosticsForURI(protocol.DocumentUri(uri))
+	} else if changeType == protocol.FileChangeType(protocol.Changed) && w.client.IsFileOpen(filePath) {
 		err := w.client.NotifyChange(ctx, filePath)
 		if err != nil {
 			logging.Error("Error notifying change", "error", err)
