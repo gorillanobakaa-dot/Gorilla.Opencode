@@ -33,6 +33,15 @@ const (
 	ProviderMock ModelProvider = "__mock"
 )
 
+// Providers in order of popularity
+var ProviderPopularity = map[ModelProvider]int{
+	ProviderAnthropic: 1,
+	ProviderOpenAI:    2,
+	ProviderGemini:    3,
+	ProviderGROQ:      4,
+	ProviderBedrock:   5,
+}
+
 var SupportedModels = map[ModelID]Model{
 	//
 	// // GEMINI

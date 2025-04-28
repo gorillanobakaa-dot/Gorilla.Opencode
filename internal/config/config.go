@@ -83,6 +83,8 @@ const (
 	defaultDataDirectory = ".opencode"
 	defaultLogLevel      = "info"
 	appName              = "opencode"
+
+	MaxTokensFallbackDefault = 4096
 )
 
 var defaultContextPaths = []string{
@@ -347,60 +349,33 @@ func applyDefaultValues() {
 	}
 }
 
-// Validate checks if the configuration is valid and applies defaults where needed.
 // It validates model IDs and providers, ensuring they are supported.
-func Validate() error {
-	if cfg == nil {
-		return fmt.Errorf("config not loaded")
+func validateAgent(cfg *Config, name AgentName, agent Agent) error {
+	// Check if model exists
+	model, modelExists := models.SupportedModels[agent.Model]
+	if !modelExists {
+		logging.Warn("unsupported model configured, reverting to default",
+			"agent", name,
+			"configured_model", agent.Model)
+
+		// Set default model based on available providers
+		if setDefaultModelForAgent(name) {
+			logging.Info("set default model for agent", "agent", name, "model", cfg.Agents[name].Model)
+		} else {
+			return fmt.Errorf("no valid provider available for agent %s", name)
+		}
+		return nil
 	}
 
-	// Validate agent models
-	for name, agent := range cfg.Agents {
-		// Check if model exists
-		model, modelExists := models.SupportedModels[agent.Model]
-		if !modelExists {
-			logging.Warn("unsupported model configured, reverting to default",
-				"agent", name,
-				"configured_model", agent.Model)
+	// Check if provider for the model is configured
+	provider := model.Provider
+	providerCfg, providerExists := cfg.Providers[provider]
 
-			// Set default model based on available providers
-			if setDefaultModelForAgent(name) {
-				logging.Info("set default model for agent", "agent", name, "model", cfg.Agents[name].Model)
-			} else {
-				return fmt.Errorf("no valid provider available for agent %s", name)
-			}
-			continue
-		}
-
-		// Check if provider for the model is configured
-		provider := model.Provider
-		providerCfg, providerExists := cfg.Providers[provider]
-
-		if !providerExists {
-			// Provider not configured, check if we have environment variables
-			apiKey := getProviderAPIKey(provider)
-			if apiKey == "" {
-				logging.Warn("provider not configured for model, reverting to default",
-					"agent", name,
-					"model", agent.Model,
-					"provider", provider)
-
-				// Set default model based on available providers
-				if setDefaultModelForAgent(name) {
-					logging.Info("set default model for agent", "agent", name, "model", cfg.Agents[name].Model)
-				} else {
-					return fmt.Errorf("no valid provider available for agent %s", name)
-				}
-			} else {
-				// Add provider with API key from environment
-				cfg.Providers[provider] = Provider{
-					APIKey: apiKey,
-				}
-				logging.Info("added provider from environment", "provider", provider)
-			}
-		} else if providerCfg.Disabled || providerCfg.APIKey == "" {
-			// Provider is disabled or has no API key
-			logging.Warn("provider is disabled or has no API key, reverting to default",
+	if !providerExists {
+		// Provider not configured, check if we have environment variables
+		apiKey := getProviderAPIKey(provider)
+		if apiKey == "" {
+			logging.Warn("provider not configured for model, reverting to default",
 				"agent", name,
 				"model", agent.Model,
 				"provider", provider)
@@ -411,75 +386,110 @@ func Validate() error {
 			} else {
 				return fmt.Errorf("no valid provider available for agent %s", name)
 			}
-		}
-
-		// Validate max tokens
-		if agent.MaxTokens <= 0 {
-			logging.Warn("invalid max tokens, setting to default",
-				"agent", name,
-				"model", agent.Model,
-				"max_tokens", agent.MaxTokens)
-
-			// Update the agent with default max tokens
-			updatedAgent := cfg.Agents[name]
-			if model.DefaultMaxTokens > 0 {
-				updatedAgent.MaxTokens = model.DefaultMaxTokens
-			} else {
-				updatedAgent.MaxTokens = 4096 // Fallback default
+		} else {
+			// Add provider with API key from environment
+			cfg.Providers[provider] = Provider{
+				APIKey: apiKey,
 			}
-			cfg.Agents[name] = updatedAgent
-		} else if model.ContextWindow > 0 && agent.MaxTokens > model.ContextWindow/2 {
-			// Ensure max tokens doesn't exceed half the context window (reasonable limit)
-			logging.Warn("max tokens exceeds half the context window, adjusting",
-				"agent", name,
-				"model", agent.Model,
-				"max_tokens", agent.MaxTokens,
-				"context_window", model.ContextWindow)
-
-			// Update the agent with adjusted max tokens
-			updatedAgent := cfg.Agents[name]
-			updatedAgent.MaxTokens = model.ContextWindow / 2
-			cfg.Agents[name] = updatedAgent
+			logging.Info("added provider from environment", "provider", provider)
 		}
+	} else if providerCfg.Disabled || providerCfg.APIKey == "" {
+		// Provider is disabled or has no API key
+		logging.Warn("provider is disabled or has no API key, reverting to default",
+			"agent", name,
+			"model", agent.Model,
+			"provider", provider)
 
-		// Validate reasoning effort for models that support reasoning
-		if model.CanReason && provider == models.ProviderOpenAI {
-			if agent.ReasoningEffort == "" {
-				// Set default reasoning effort for models that support it
-				logging.Info("setting default reasoning effort for model that supports reasoning",
+		// Set default model based on available providers
+		if setDefaultModelForAgent(name) {
+			logging.Info("set default model for agent", "agent", name, "model", cfg.Agents[name].Model)
+		} else {
+			return fmt.Errorf("no valid provider available for agent %s", name)
+		}
+	}
+
+	// Validate max tokens
+	if agent.MaxTokens <= 0 {
+		logging.Warn("invalid max tokens, setting to default",
+			"agent", name,
+			"model", agent.Model,
+			"max_tokens", agent.MaxTokens)
+
+		// Update the agent with default max tokens
+		updatedAgent := cfg.Agents[name]
+		if model.DefaultMaxTokens > 0 {
+			updatedAgent.MaxTokens = model.DefaultMaxTokens
+		} else {
+			updatedAgent.MaxTokens = MaxTokensFallbackDefault
+		}
+		cfg.Agents[name] = updatedAgent
+	} else if model.ContextWindow > 0 && agent.MaxTokens > model.ContextWindow/2 {
+		// Ensure max tokens doesn't exceed half the context window (reasonable limit)
+		logging.Warn("max tokens exceeds half the context window, adjusting",
+			"agent", name,
+			"model", agent.Model,
+			"max_tokens", agent.MaxTokens,
+			"context_window", model.ContextWindow)
+
+		// Update the agent with adjusted max tokens
+		updatedAgent := cfg.Agents[name]
+		updatedAgent.MaxTokens = model.ContextWindow / 2
+		cfg.Agents[name] = updatedAgent
+	}
+
+	// Validate reasoning effort for models that support reasoning
+	if model.CanReason && provider == models.ProviderOpenAI {
+		if agent.ReasoningEffort == "" {
+			// Set default reasoning effort for models that support it
+			logging.Info("setting default reasoning effort for model that supports reasoning",
+				"agent", name,
+				"model", agent.Model)
+
+			// Update the agent with default reasoning effort
+			updatedAgent := cfg.Agents[name]
+			updatedAgent.ReasoningEffort = "medium"
+			cfg.Agents[name] = updatedAgent
+		} else {
+			// Check if reasoning effort is valid (low, medium, high)
+			effort := strings.ToLower(agent.ReasoningEffort)
+			if effort != "low" && effort != "medium" && effort != "high" {
+				logging.Warn("invalid reasoning effort, setting to medium",
 					"agent", name,
-					"model", agent.Model)
+					"model", agent.Model,
+					"reasoning_effort", agent.ReasoningEffort)
 
-				// Update the agent with default reasoning effort
+				// Update the agent with valid reasoning effort
 				updatedAgent := cfg.Agents[name]
 				updatedAgent.ReasoningEffort = "medium"
 				cfg.Agents[name] = updatedAgent
-			} else {
-				// Check if reasoning effort is valid (low, medium, high)
-				effort := strings.ToLower(agent.ReasoningEffort)
-				if effort != "low" && effort != "medium" && effort != "high" {
-					logging.Warn("invalid reasoning effort, setting to medium",
-						"agent", name,
-						"model", agent.Model,
-						"reasoning_effort", agent.ReasoningEffort)
-
-					// Update the agent with valid reasoning effort
-					updatedAgent := cfg.Agents[name]
-					updatedAgent.ReasoningEffort = "medium"
-					cfg.Agents[name] = updatedAgent
-				}
 			}
-		} else if !model.CanReason && agent.ReasoningEffort != "" {
-			// Model doesn't support reasoning but reasoning effort is set
-			logging.Warn("model doesn't support reasoning but reasoning effort is set, ignoring",
-				"agent", name,
-				"model", agent.Model,
-				"reasoning_effort", agent.ReasoningEffort)
+		}
+	} else if !model.CanReason && agent.ReasoningEffort != "" {
+		// Model doesn't support reasoning but reasoning effort is set
+		logging.Warn("model doesn't support reasoning but reasoning effort is set, ignoring",
+			"agent", name,
+			"model", agent.Model,
+			"reasoning_effort", agent.ReasoningEffort)
 
-			// Update the agent to remove reasoning effort
-			updatedAgent := cfg.Agents[name]
-			updatedAgent.ReasoningEffort = ""
-			cfg.Agents[name] = updatedAgent
+		// Update the agent to remove reasoning effort
+		updatedAgent := cfg.Agents[name]
+		updatedAgent.ReasoningEffort = ""
+		cfg.Agents[name] = updatedAgent
+	}
+
+	return nil
+}
+
+// Validate checks if the configuration is valid and applies defaults where needed.
+func Validate() error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+
+	// Validate agent models
+	for name, agent := range cfg.Agents {
+		if err := validateAgent(cfg, name, agent); err != nil {
+			return err
 		}
 	}
 
@@ -628,4 +638,37 @@ func WorkingDirectory() string {
 		panic("config not loaded")
 	}
 	return cfg.WorkingDir
+}
+
+func UpdateAgentModel(agentName AgentName, modelID models.ModelID) error {
+	if cfg == nil {
+		panic("config not loaded")
+	}
+
+	existingAgentCfg := cfg.Agents[agentName]
+
+	model, ok := models.SupportedModels[modelID]
+	if !ok {
+		return fmt.Errorf("model %s not supported", modelID)
+	}
+
+	maxTokens := existingAgentCfg.MaxTokens
+	if model.DefaultMaxTokens > 0 {
+		maxTokens = model.DefaultMaxTokens
+	}
+
+	newAgentCfg := Agent{
+		Model:           modelID,
+		MaxTokens:       maxTokens,
+		ReasoningEffort: existingAgentCfg.ReasoningEffort,
+	}
+	cfg.Agents[agentName] = newAgentCfg
+
+	if err := validateAgent(cfg, agentName, newAgentCfg); err != nil {
+		// revert config update on failure
+		cfg.Agents[agentName] = existingAgentCfg
+		return fmt.Errorf("failed to update agent model: %w", err)
+	}
+
+	return nil
 }

@@ -11,8 +11,8 @@ const (
 	Claude3Opus    ModelID = "claude-3-opus"
 )
 
+// https://docs.anthropic.com/en/docs/about-claude/models/all-models
 var AnthropicModels = map[ModelID]Model{
-	// Anthropic
 	Claude35Sonnet: {
 		ID:                 Claude35Sonnet,
 		Name:               "Claude 3.5 Sonnet",
@@ -29,13 +29,13 @@ var AnthropicModels = map[ModelID]Model{
 		ID:                 Claude3Haiku,
 		Name:               "Claude 3 Haiku",
 		Provider:           ProviderAnthropic,
-		APIModel:           "claude-3-haiku-latest",
+		APIModel:           "claude-3-haiku-20240307", // doesn't support "-latest"
 		CostPer1MIn:        0.25,
 		CostPer1MInCached:  0.30,
 		CostPer1MOutCached: 0.03,
 		CostPer1MOut:       1.25,
 		ContextWindow:      200000,
-		DefaultMaxTokens:   5000,
+		DefaultMaxTokens:   4096,
 	},
 	Claude37Sonnet: {
 		ID:                 Claude37Sonnet,

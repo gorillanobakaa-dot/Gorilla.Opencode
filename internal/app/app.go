@@ -73,6 +73,7 @@ func New(ctx context.Context, conn *sql.DB) (*App, error) {
 	return app, nil
 }
 
+
 // Shutdown performs a clean shutdown of the application
 func (app *App) Shutdown() {
 	// Cancel all watcher goroutines

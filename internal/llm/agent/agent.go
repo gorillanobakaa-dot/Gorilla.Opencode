@@ -42,6 +42,7 @@ type Service interface {
 	Cancel(sessionID string)
 	IsSessionBusy(sessionID string) bool
 	IsBusy() bool
+	Update(agentName config.AgentName, modelID models.ModelID) (models.Model, error)
 }
 
 type agent struct {
@@ -434,6 +435,25 @@ func (a *agent) TrackUsage(ctx context.Context, sessionID string, model models.M
 		return fmt.Errorf("failed to save session: %w", err)
 	}
 	return nil
+}
+
+func (a *agent) Update(agentName config.AgentName, modelID models.ModelID) (models.Model, error) {
+	if a.IsBusy() {
+		return models.Model{}, fmt.Errorf("cannot change model while processing requests")
+	}
+
+	if err := config.UpdateAgentModel(agentName, modelID); err != nil {
+		return models.Model{}, fmt.Errorf("failed to update config: %w", err)
+	}
+
+	provider, err := createAgentProvider(agentName)
+	if err != nil {
+		return models.Model{}, fmt.Errorf("failed to create provider for model %s: %w", modelID, err)
+	}
+
+	a.provider = provider
+
+	return a.provider.Model(), nil
 }
 
 func createAgentProvider(agentName config.AgentName) (provider.Provider, error) {
