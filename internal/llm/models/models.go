@@ -86,4 +86,5 @@ func init() {
 	maps.Copy(SupportedModels, GeminiModels)
 	maps.Copy(SupportedModels, GroqModels)
 	maps.Copy(SupportedModels, AzureModels)
+	maps.Copy(SupportedModels, OpenRouterModels)
 }

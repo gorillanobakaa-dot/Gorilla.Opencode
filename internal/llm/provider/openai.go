@@ -21,6 +21,7 @@ type openaiOptions struct {
 	baseURL         string
 	disableCache    bool
 	reasoningEffort string
+	extraHeaders    map[string]string
 }
 
 type OpenAIOption func(*openaiOptions)
@@ -47,6 +48,12 @@ func newOpenAIClient(opts providerClientOptions) OpenAIClient {
 	}
 	if openaiOpts.baseURL != "" {
 		openaiClientOptions = append(openaiClientOptions, option.WithBaseURL(openaiOpts.baseURL))
+	}
+
+	if openaiOpts.extraHeaders != nil {
+		for key, value := range openaiOpts.extraHeaders {
+			openaiClientOptions = append(openaiClientOptions, option.WithHeader(key, value))
+		}
 	}
 
 	client := openai.NewClient(openaiClientOptions...)
@@ -204,11 +211,18 @@ func (o *openaiClient) send(ctx context.Context, messages []message.Message, too
 			content = openaiResponse.Choices[0].Message.Content
 		}
 
+		toolCalls := o.toolCalls(*openaiResponse)
+		finishReason := o.finishReason(string(openaiResponse.Choices[0].FinishReason))
+
+		if len(toolCalls) > 0 {
+			finishReason = message.FinishReasonToolUse
+		}
+
 		return &ProviderResponse{
 			Content:      content,
-			ToolCalls:    o.toolCalls(*openaiResponse),
+			ToolCalls:    toolCalls,
 			Usage:        o.usage(*openaiResponse),
-			FinishReason: o.finishReason(string(openaiResponse.Choices[0].FinishReason)),
+			FinishReason: finishReason,
 		}, nil
 	}
 }
@@ -267,13 +281,19 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			err := openaiStream.Err()
 			if err == nil || errors.Is(err, io.EOF) {
 				// Stream completed successfully
+				finishReason := o.finishReason(string(acc.ChatCompletion.Choices[0].FinishReason))
+
+				if len(toolCalls) > 0 {
+					finishReason = message.FinishReasonToolUse
+				}
+
 				eventChan <- ProviderEvent{
 					Type: EventComplete,
 					Response: &ProviderResponse{
 						Content:      currentContent,
 						ToolCalls:    toolCalls,
 						Usage:        o.usage(acc.ChatCompletion),
-						FinishReason: o.finishReason(string(acc.ChatCompletion.Choices[0].FinishReason)),
+						FinishReason: finishReason,
 					},
 				}
 				close(eventChan)
@@ -372,6 +392,12 @@ func (o *openaiClient) usage(completion openai.ChatCompletion) TokenUsage {
 func WithOpenAIBaseURL(baseURL string) OpenAIOption {
 	return func(options *openaiOptions) {
 		options.baseURL = baseURL
+	}
+}
+
+func WithOpenAIExtraHeaders(headers map[string]string) OpenAIOption {
+	return func(options *openaiOptions) {
+		options.extraHeaders = headers
 	}
 }
 

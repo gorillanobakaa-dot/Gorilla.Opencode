@@ -120,6 +120,18 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 			options: clientOptions,
 			client:  newAzureClient(clientOptions),
 		}, nil
+	case models.ProviderOpenRouter:
+		clientOptions.openaiOptions = append(clientOptions.openaiOptions,
+			WithOpenAIBaseURL("https://openrouter.ai/api/v1"),
+			WithOpenAIExtraHeaders(map[string]string{
+				"HTTP-Referer": "opencode.ai",
+				"X-Title":      "OpenCode",
+			}),
+		)
+		return &baseProvider[OpenAIClient]{
+			options: clientOptions,
+			client:  newOpenAIClient(clientOptions),
+		}, nil
 	case models.ProviderMock:
 		// TODO: implement mock client for test
 		panic("not implemented")

@@ -267,6 +267,15 @@ func setProviderDefaults() {
 		return
 	}
 
+	// OpenRouter configuration
+	if apiKey := os.Getenv("OPENROUTER_API_KEY"); apiKey != "" {
+		viper.SetDefault("providers.openrouter.apiKey", apiKey)
+		viper.SetDefault("agents.coder.model", models.OpenRouterClaude37Sonnet)
+		viper.SetDefault("agents.task.model", models.OpenRouterClaude37Sonnet)
+		viper.SetDefault("agents.title.model", models.OpenRouterClaude35Haiku)
+		return
+	}
+
 	// AWS Bedrock configuration
 	if hasAWSCredentials() {
 		viper.SetDefault("agents.coder.model", models.BedrockClaude37Sonnet)
@@ -527,6 +536,8 @@ func getProviderAPIKey(provider models.ModelProvider) string {
 		return os.Getenv("GROQ_API_KEY")
 	case models.ProviderAzure:
 		return os.Getenv("AZURE_OPENAI_API_KEY")
+	case models.ProviderOpenRouter:
+		return os.Getenv("OPENROUTER_API_KEY")
 	case models.ProviderBedrock:
 		if hasAWSCredentials() {
 			return "aws-credentials-available"
@@ -563,6 +574,34 @@ func setDefaultModelForAgent(agent AgentName) bool {
 			model = models.GPT41Mini
 		default:
 			model = models.GPT41
+		}
+
+		// Check if model supports reasoning
+		if modelInfo, ok := models.SupportedModels[model]; ok && modelInfo.CanReason {
+			reasoningEffort = "medium"
+		}
+
+		cfg.Agents[agent] = Agent{
+			Model:           model,
+			MaxTokens:       maxTokens,
+			ReasoningEffort: reasoningEffort,
+		}
+		return true
+	}
+
+	if apiKey := os.Getenv("OPENROUTER_API_KEY"); apiKey != "" {
+		var model models.ModelID
+		maxTokens := int64(5000)
+		reasoningEffort := ""
+
+		switch agent {
+		case AgentTitle:
+			model = models.OpenRouterClaude35Haiku
+			maxTokens = 80
+		case AgentTask:
+			model = models.OpenRouterClaude37Sonnet
+		default:
+			model = models.OpenRouterClaude37Sonnet
 		}
 
 		// Check if model supports reasoning

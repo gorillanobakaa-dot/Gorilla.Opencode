@@ -173,6 +173,7 @@ func generateSchema() map[string]any {
 		string(models.ProviderOpenAI),
 		string(models.ProviderGemini),
 		string(models.ProviderGROQ),
+		string(models.ProviderOpenRouter),
 		string(models.ProviderBedrock),
 		string(models.ProviderAzure),
 	}
