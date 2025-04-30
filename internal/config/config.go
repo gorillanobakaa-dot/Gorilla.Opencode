@@ -228,6 +228,9 @@ func setProviderDefaults() {
 	if apiKey := os.Getenv("GROQ_API_KEY"); apiKey != "" {
 		viper.SetDefault("providers.groq.apiKey", apiKey)
 	}
+	if apiKey := os.Getenv("OPENROUTER_API_KEY"); apiKey != "" {
+		viper.SetDefault("providers.openrouter.apiKey", apiKey)
+	}
 
 	// Use this order to set the default models
 	// 1. Anthropic
