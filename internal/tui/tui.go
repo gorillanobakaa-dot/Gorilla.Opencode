@@ -46,8 +46,8 @@ var keys = keyMap{
 	),
 
 	SwitchSession: key.NewBinding(
-		key.WithKeys("ctrl+a"),
-		key.WithHelp("ctrl+a", "switch session"),
+		key.WithKeys("ctrl+s"),
+		key.WithHelp("ctrl+s", "switch session"),
 	),
 
 	Commands: key.NewBinding(
@@ -56,8 +56,8 @@ var keys = keyMap{
 	),
 
 	Models: key.NewBinding(
-		key.WithKeys("ctrl+o"),
-		key.WithHelp("ctrl+o", "model selection"),
+		key.WithKeys("ctrl+m"),
+		key.WithHelp("ctrl+m", "model selection"),
 	),
 
 	SwitchTheme: key.NewBinding(
@@ -77,8 +77,8 @@ var returnKey = key.NewBinding(
 )
 
 var logsKeyReturnKey = key.NewBinding(
-	key.WithKeys("backspace", "q"),
-	key.WithHelp("backspace/q", "go back"),
+	key.WithKeys("esc", "backspace", "q"),
+	key.WithHelp("esc/q", "go back"),
 )
 
 type appModel struct {
