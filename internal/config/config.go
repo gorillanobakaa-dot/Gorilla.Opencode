@@ -129,7 +129,6 @@ func Load(workingDir string, debug bool) (*Config, error) {
 
 	configureViper()
 	setDefaults(debug)
-	setProviderDefaults()
 
 	// Read global config
 	if err := readConfig(viper.ReadInConfig()); err != nil {
@@ -138,6 +137,8 @@ func Load(workingDir string, debug bool) (*Config, error) {
 
 	// Load and merge local config
 	mergeLocalConfig(workingDir)
+
+	setProviderDefaults()
 
 	// Apply configuration to the struct
 	if err := viper.Unmarshal(cfg); err != nil {
@@ -222,7 +223,8 @@ func setDefaults(debug bool) {
 	}
 }
 
-// setProviderDefaults configures LLM provider defaults based on environment variables.
+// setProviderDefaults configures LLM provider defaults based on provider provided by
+// environment variables and configuration file.
 func setProviderDefaults() {
 	// Set all API keys we can find in the environment
 	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
@@ -246,9 +248,12 @@ func setProviderDefaults() {
 	// 2. OpenAI
 	// 3. Google Gemini
 	// 4. Groq
-	// 5. AWS Bedrock
+	// 5. OpenRouter
+	// 6. AWS Bedrock
+	// 7. Azure
+
 	// Anthropic configuration
-	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
+	if viper.Get("providers.anthropic.apiKey") != "" {
 		viper.SetDefault("agents.coder.model", models.Claude37Sonnet)
 		viper.SetDefault("agents.task.model", models.Claude37Sonnet)
 		viper.SetDefault("agents.title.model", models.Claude37Sonnet)
@@ -256,7 +261,7 @@ func setProviderDefaults() {
 	}
 
 	// OpenAI configuration
-	if apiKey := os.Getenv("OPENAI_API_KEY"); apiKey != "" {
+	if viper.Get("providers.openai.apiKey") != "" {
 		viper.SetDefault("agents.coder.model", models.GPT41)
 		viper.SetDefault("agents.task.model", models.GPT41Mini)
 		viper.SetDefault("agents.title.model", models.GPT41Mini)
@@ -264,7 +269,7 @@ func setProviderDefaults() {
 	}
 
 	// Google Gemini configuration
-	if apiKey := os.Getenv("GEMINI_API_KEY"); apiKey != "" {
+	if viper.Get("providers.google.gemini.apiKey") != "" {
 		viper.SetDefault("agents.coder.model", models.Gemini25)
 		viper.SetDefault("agents.task.model", models.Gemini25Flash)
 		viper.SetDefault("agents.title.model", models.Gemini25Flash)
@@ -272,7 +277,7 @@ func setProviderDefaults() {
 	}
 
 	// Groq configuration
-	if apiKey := os.Getenv("GROQ_API_KEY"); apiKey != "" {
+	if viper.Get("providers.groq.apiKey") != "" {
 		viper.SetDefault("agents.coder.model", models.QWENQwq)
 		viper.SetDefault("agents.task.model", models.QWENQwq)
 		viper.SetDefault("agents.title.model", models.QWENQwq)
@@ -280,8 +285,7 @@ func setProviderDefaults() {
 	}
 
 	// OpenRouter configuration
-	if apiKey := os.Getenv("OPENROUTER_API_KEY"); apiKey != "" {
-		viper.SetDefault("providers.openrouter.apiKey", apiKey)
+	if viper.Get("providers.openrouter.apiKey") != "" {
 		viper.SetDefault("agents.coder.model", models.OpenRouterClaude37Sonnet)
 		viper.SetDefault("agents.task.model", models.OpenRouterClaude37Sonnet)
 		viper.SetDefault("agents.title.model", models.OpenRouterClaude35Haiku)
