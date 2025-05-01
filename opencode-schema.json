@@ -12,75 +12,79 @@
         "model": {
           "description": "Model ID for the agent",
           "enum": [
-            "bedrock.claude-3.7-sonnet",
-            "claude-3-haiku",
-            "claude-3.7-sonnet",
-            "claude-3.5-haiku",
-            "o3",
-            "azure.o3",
-            "gpt-4.5-preview",
-            "azure.gpt-4.5-preview",
-            "o1-pro",
-            "o4-mini",
-            "azure.o4-mini",
-            "gpt-4.1",
-            "azure.gpt-4.1",
-            "o3-mini",
-            "azure.o3-mini",
-            "gpt-4.1-nano",
-            "azure.gpt-4.1-nano",
             "gpt-4o-mini",
+            "o1-pro",
             "azure.gpt-4o-mini",
-            "o1",
-            "azure.o1",
-            "gemini-2.5-flash",
-            "qwen-qwq",
-            "meta-llama/llama-4-maverick-17b-128e-instruct",
-            "claude-3-opus",
-            "gpt-4o",
-            "azure.gpt-4o",
-            "gemini-2.0-flash-lite",
+            "openrouter.gpt-4.1-mini",
+            "openrouter.o1-mini",
+            "bedrock.claude-3.7-sonnet",
+            "meta-llama/llama-4-scout-17b-16e-instruct",
+            "openrouter.gpt-4o-mini",
             "gemini-2.0-flash",
             "deepseek-r1-distill-llama-70b",
-            "llama-3.3-70b-versatile",
-            "claude-3.5-sonnet",
-            "o1-mini",
-            "azure.o1-mini",
-            "gpt-4.1-mini",
-            "azure.gpt-4.1-mini",
-            "gemini-2.5",
-            "meta-llama/llama-4-scout-17b-16e-instruct",
-            "openrouter.deepseek-chat-free",
-            "openrouter.deepseek-r1-free",
-            "openrouter.gpt-4.1",
-            "openrouter.gpt-4.1-mini",
-            "openrouter.gpt-4.1-nano",
+            "openrouter.claude-3.7-sonnet",
             "openrouter.gpt-4.5-preview",
-            "openrouter.gpt-4o",
-            "openrouter.gpt-4o-mini",
+            "azure.o3-mini",
+            "openrouter.claude-3.5-haiku",
+            "azure.o1-mini",
             "openrouter.o1",
-            "openrouter.o1-pro",
-            "openrouter.o1-mini",
-            "openrouter.o3",
-            "openrouter.o3-mini",
+            "openrouter.gemini-2.5",
+            "llama-3.3-70b-versatile",
+            "gpt-4.5-preview",
+            "openrouter.claude-3-opus",
+            "openrouter.claude-3.5-sonnet",
+            "o4-mini",
+            "gemini-2.0-flash-lite",
+            "azure.gpt-4.5-preview",
+            "openrouter.gpt-4o",
+            "o1",
+            "azure.gpt-4o",
+            "openrouter.gpt-4.1-nano",
+            "o3",
+            "gpt-4.1",
+            "azure.o1",
+            "claude-3-haiku",
+            "claude-3-opus",
+            "gpt-4.1-mini",
             "openrouter.o4-mini",
             "openrouter.gemini-2.5-flash",
-            "openrouter.gemini-2.5",
-            "openrouter.claude-3.5-sonnet",
+            "claude-3.5-haiku",
+            "o3-mini",
+            "azure.o3",
+            "gpt-4o",
+            "azure.gpt-4.1",
             "openrouter.claude-3-haiku",
-            "openrouter.claude-3.7-sonnet",
-            "openrouter.claude-3.5-haiku",
-            "openrouter.claude-3-opus"
+            "gpt-4.1-nano",
+            "azure.gpt-4.1-nano",
+            "claude-3.7-sonnet",
+            "gemini-2.5",
+            "azure.o4-mini",
+            "o1-mini",
+            "qwen-qwq",
+            "meta-llama/llama-4-maverick-17b-128e-instruct",
+            "openrouter.gpt-4.1",
+            "openrouter.o1-pro",
+            "openrouter.o3",
+            "claude-3.5-sonnet",
+            "gemini-2.5-flash",
+            "azure.gpt-4.1-mini",
+            "openrouter.o3-mini"
           ],
           "type": "string"
         },
         "reasoningEffort": {
           "description": "Reasoning effort for models that support it (OpenAI, Anthropic)",
-          "enum": ["low", "medium", "high"],
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
           "type": "string"
         }
       },
-      "required": ["model"],
+      "required": [
+        "model"
+      ],
       "type": "object"
     }
   },
@@ -98,75 +102,79 @@
           "model": {
             "description": "Model ID for the agent",
             "enum": [
-              "bedrock.claude-3.7-sonnet",
-              "claude-3-haiku",
-              "claude-3.7-sonnet",
-              "claude-3.5-haiku",
-              "o3",
-              "azure.o3",
-              "gpt-4.5-preview",
-              "azure.gpt-4.5-preview",
-              "o1-pro",
-              "o4-mini",
-              "azure.o4-mini",
-              "gpt-4.1",
-              "azure.gpt-4.1",
-              "o3-mini",
-              "azure.o3-mini",
-              "gpt-4.1-nano",
-              "azure.gpt-4.1-nano",
               "gpt-4o-mini",
+              "o1-pro",
               "azure.gpt-4o-mini",
-              "o1",
-              "azure.o1",
-              "gemini-2.5-flash",
-              "qwen-qwq",
-              "meta-llama/llama-4-maverick-17b-128e-instruct",
-              "claude-3-opus",
-              "gpt-4o",
-              "azure.gpt-4o",
-              "gemini-2.0-flash-lite",
+              "openrouter.gpt-4.1-mini",
+              "openrouter.o1-mini",
+              "bedrock.claude-3.7-sonnet",
+              "meta-llama/llama-4-scout-17b-16e-instruct",
+              "openrouter.gpt-4o-mini",
               "gemini-2.0-flash",
               "deepseek-r1-distill-llama-70b",
-              "llama-3.3-70b-versatile",
-              "claude-3.5-sonnet",
-              "o1-mini",
-              "azure.o1-mini",
-              "gpt-4.1-mini",
-              "azure.gpt-4.1-mini",
-              "gemini-2.5",
-              "meta-llama/llama-4-scout-17b-16e-instruct",
-              "openrouter.deepseek-chat-free",
-              "openrouter.deepseek-r1-free",
-              "openrouter.gpt-4.1",
-              "openrouter.gpt-4.1-mini",
-              "openrouter.gpt-4.1-nano",
+              "openrouter.claude-3.7-sonnet",
               "openrouter.gpt-4.5-preview",
-              "openrouter.gpt-4o",
-              "openrouter.gpt-4o-mini",
+              "azure.o3-mini",
+              "openrouter.claude-3.5-haiku",
+              "azure.o1-mini",
               "openrouter.o1",
-              "openrouter.o1-pro",
-              "openrouter.o1-mini",
-              "openrouter.o3",
-              "openrouter.o3-mini",
+              "openrouter.gemini-2.5",
+              "llama-3.3-70b-versatile",
+              "gpt-4.5-preview",
+              "openrouter.claude-3-opus",
+              "openrouter.claude-3.5-sonnet",
+              "o4-mini",
+              "gemini-2.0-flash-lite",
+              "azure.gpt-4.5-preview",
+              "openrouter.gpt-4o",
+              "o1",
+              "azure.gpt-4o",
+              "openrouter.gpt-4.1-nano",
+              "o3",
+              "gpt-4.1",
+              "azure.o1",
+              "claude-3-haiku",
+              "claude-3-opus",
+              "gpt-4.1-mini",
               "openrouter.o4-mini",
               "openrouter.gemini-2.5-flash",
-              "openrouter.gemini-2.5",
-              "openrouter.claude-3.5-sonnet",
+              "claude-3.5-haiku",
+              "o3-mini",
+              "azure.o3",
+              "gpt-4o",
+              "azure.gpt-4.1",
               "openrouter.claude-3-haiku",
-              "openrouter.claude-3.7-sonnet",
-              "openrouter.claude-3.5-haiku",
-              "openrouter.claude-3-opus"
+              "gpt-4.1-nano",
+              "azure.gpt-4.1-nano",
+              "claude-3.7-sonnet",
+              "gemini-2.5",
+              "azure.o4-mini",
+              "o1-mini",
+              "qwen-qwq",
+              "meta-llama/llama-4-maverick-17b-128e-instruct",
+              "openrouter.gpt-4.1",
+              "openrouter.o1-pro",
+              "openrouter.o3",
+              "claude-3.5-sonnet",
+              "gemini-2.5-flash",
+              "azure.gpt-4.1-mini",
+              "openrouter.o3-mini"
             ],
             "type": "string"
           },
           "reasoningEffort": {
             "description": "Reasoning effort for models that support it (OpenAI, Anthropic)",
-            "enum": ["low", "medium", "high"],
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
             "type": "string"
           }
         },
-        "required": ["model"],
+        "required": [
+          "model"
+        ],
         "type": "object"
       },
       "description": "Agent configurations",
@@ -212,7 +220,9 @@
           "type": "string"
         }
       },
-      "required": ["directory"],
+      "required": [
+        "directory"
+      ],
       "type": "object"
     },
     "debug": {
@@ -250,7 +260,9 @@
             "type": "object"
           }
         },
-        "required": ["command"],
+        "required": [
+          "command"
+        ],
         "type": "object"
       },
       "description": "Language Server Protocol configurations",
@@ -288,7 +300,10 @@
           "type": {
             "default": "stdio",
             "description": "Type of MCP server",
-            "enum": ["stdio", "sse"],
+            "enum": [
+              "stdio",
+              "sse"
+            ],
             "type": "string"
           },
           "url": {
@@ -296,7 +311,9 @@
             "type": "string"
           }
         },
-        "required": ["command"],
+        "required": [
+          "command"
+        ],
         "type": "object"
       },
       "description": "Model Control Protocol server configurations",
@@ -322,9 +339,9 @@
               "openai",
               "gemini",
               "groq",
+              "openrouter",
               "bedrock",
-              "azure",
-              "openrouter"
+              "azure"
             ],
             "type": "string"
           }
@@ -332,6 +349,28 @@
         "type": "object"
       },
       "description": "LLM provider configurations",
+      "type": "object"
+    },
+    "tui": {
+      "description": "Terminal User Interface configuration",
+      "properties": {
+        "theme": {
+          "default": "opencode",
+          "description": "TUI theme name",
+          "enum": [
+            "opencode",
+            "catppuccin",
+            "dracula",
+            "flexoki",
+            "gruvbox",
+            "monokai",
+            "onedark",
+            "tokyonight",
+            "tron"
+          ],
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "wd": {

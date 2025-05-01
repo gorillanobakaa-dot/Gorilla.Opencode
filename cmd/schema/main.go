@@ -98,6 +98,29 @@ func generateSchema() map[string]any {
 		},
 	}
 
+	schema["properties"].(map[string]any)["tui"] = map[string]any{
+		"type":        "object",
+		"description": "Terminal User Interface configuration",
+		"properties": map[string]any{
+			"theme": map[string]any{
+				"type":        "string",
+				"description": "TUI theme name",
+				"default":     "opencode",
+				"enum": []string{
+					"opencode",
+					"catppuccin",
+					"dracula",
+					"flexoki",
+					"gruvbox",
+					"monokai",
+					"onedark",
+					"tokyonight",
+					"tron",
+				},
+			},
+		},
+	}
+
 	// Add MCP servers
 	schema["properties"].(map[string]any)["mcpServers"] = map[string]any{
 		"type":        "object",
