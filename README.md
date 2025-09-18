@@ -1,10 +1,8 @@
 # Archived: Project has Moved
 
-This repository is no longer maintained.
+This repository is no longer maintained and has been archived for provenance.
 
 The project has continued under the name [Crush][crush], developed by the original author and the Charm team.
-
-To reduce confusion and ensure the community follows the active project, this repo will be removed in the near term.
 
 Please follow [Crush][crush] for ongoing development.
 
