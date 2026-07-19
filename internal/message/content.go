@@ -87,6 +87,10 @@ type ToolCall struct {
 	Input    string `json:"input"`
 	Type     string `json:"type"`
 	Finished bool   `json:"finished"`
+	// GORILLA OVERRIDE: Gemini 3 function calls carry a thought
+	// signature that MUST be echoed back verbatim when the call is
+	// replayed in history (API 400s otherwise). Stored base64.
+	ThoughtSignature string `json:"thought_signature,omitempty"`
 }
 
 func (ToolCall) isPart() {}
