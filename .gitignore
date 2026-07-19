@@ -45,5 +45,7 @@ Thumbs.db
 
 opencode
 opencode.md
-opencode-dino
+gorilla-opencode
 *.deb
+gorilla-opencode-linux-amd64
+checksums.sha256

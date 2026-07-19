@@ -1,24 +1,24 @@
 #!/bin/sh
-# OpenCode Dino installer — for people who prefer one command.
+# Gorilla OpenCode installer — for people who prefer one command.
 #
 # What this script does, in order, and nothing else:
 #   1. Downloads the latest release binary from GitHub.
 #   2. Verifies its sha256 checksum against the published checksum file.
-#   3. Runs `opencode-dino install`, which copies the binary onto your
+#   3. Runs `gorilla-opencode install`, which copies the binary onto your
 #      PATH (~/.local/bin as a normal user), unpacks its embedded icons,
 #      and creates a desktop entry. It prints every file it creates.
 #   4. Deletes its own temporary download.
-# Remove everything later with: opencode-dino uninstall
+# Remove everything later with: gorilla-opencode uninstall
 set -eu
 
 REPO="gorillanobakaa-dot/Gorilla.Opencode"
-ASSET="opencode-dino-linux-amd64"
+ASSET="gorilla-opencode-linux-amd64"
 BASE="https://github.com/$REPO/releases/latest/download"
 
 case "$(uname -s)/$(uname -m)" in
   Linux/x86_64) ;;
   *) echo "Sorry: prebuilt binaries currently exist only for Linux x86_64." >&2
-     echo "Build from source instead: go build -o opencode-dino ." >&2
+     echo "Build from source instead: go build -o gorilla-opencode ." >&2
      exit 1 ;;
 esac
 
