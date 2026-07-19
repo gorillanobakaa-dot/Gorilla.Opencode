@@ -16,5 +16,5 @@ import "embed"
 var Icons embed.FS
 
 // IconSizes lists the raster sizes available in Icons, matching
-// files named icons/opencode-dino-<size>.png.
+// files named icons/gorilla-opencode-<size>.png.
 var IconSizes = []int{128, 256, 512, 1024}

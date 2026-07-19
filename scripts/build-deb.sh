@@ -1,50 +1,50 @@
 #!/bin/sh
 # Build the Debian package. Usage: scripts/build-deb.sh <version>
-# Requires: a built ./opencode-dino binary in the repo root, dpkg-deb.
+# Requires: a built ./gorilla-opencode binary in the repo root, dpkg-deb.
 # The package installs system-wide equivalents of what
-# `opencode-dino install` does per-user: /usr/bin binary, hicolor
+# `gorilla-opencode install` does per-user: /usr/bin binary, hicolor
 # icons, desktop entry, plus the dual-track documentation.
 set -eu
 
 VERSION="${1:?usage: scripts/build-deb.sh <version>}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/opencode-dino"
-[ -x "$BIN" ] || { echo "Build the binary first: go build -o opencode-dino ." >&2; exit 1; }
+BIN="$ROOT/gorilla-opencode"
+[ -x "$BIN" ] || { echo "Build the binary first: go build -o gorilla-opencode ." >&2; exit 1; }
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
-PKG="$STAGE/opencode-dino_${VERSION}_amd64"
+PKG="$STAGE/gorilla-opencode_${VERSION}_amd64"
 
-install -Dm755 "$BIN" "$PKG/usr/bin/opencode-dino"
+install -Dm755 "$BIN" "$PKG/usr/bin/gorilla-opencode"
 for s in 128 256 512 1024; do
-  install -Dm644 "$ROOT/internal/assets/icons/opencode-dino-$s.png" \
-    "$PKG/usr/share/icons/hicolor/${s}x${s}/apps/opencode-dino.png"
+  install -Dm644 "$ROOT/internal/assets/icons/gorilla-opencode-$s.png" \
+    "$PKG/usr/share/icons/hicolor/${s}x${s}/apps/gorilla-opencode.png"
 done
-install -Dm644 "$ROOT/internal/assets/icons/opencode-dino.svg" \
-  "$PKG/usr/share/icons/hicolor/scalable/apps/opencode-dino.svg"
+install -Dm644 "$ROOT/internal/assets/icons/gorilla-opencode.svg" \
+  "$PKG/usr/share/icons/hicolor/scalable/apps/gorilla-opencode.svg"
 
 install -d "$PKG/usr/share/applications"
-cat > "$PKG/usr/share/applications/opencode-dino.desktop" <<'EOF'
+cat > "$PKG/usr/share/applications/gorilla-opencode.desktop" <<'EOF'
 [Desktop Entry]
 Type=Application
-Name=OpenCode Dino
+Name=Gorilla OpenCode
 Comment=Terminal AI coding agent (revived original OpenCode) — bring your own API keys
-Exec=opencode-dino
-Icon=opencode-dino
+Exec=gorilla-opencode
+Icon=gorilla-opencode
 Terminal=true
 Categories=Development;IDE;
 Keywords=ai;coding;agent;terminal;llm;
 EOF
 
-install -Dm644 "$ROOT/README.md" "$PKG/usr/share/doc/opencode-dino/README.md"
-install -Dm644 "$ROOT/DOCUMENTATION.dual-track.md" "$PKG/usr/share/doc/opencode-dino/DOCUMENTATION.dual-track.md"
-install -Dm644 "$ROOT/PHILOSOPHY.md" "$PKG/usr/share/doc/opencode-dino/PHILOSOPHY.md"
-install -Dm644 "$ROOT/LICENSE" "$PKG/usr/share/doc/opencode-dino/copyright"
+install -Dm644 "$ROOT/README.md" "$PKG/usr/share/doc/gorilla-opencode/README.md"
+install -Dm644 "$ROOT/DOCUMENTATION.dual-track.md" "$PKG/usr/share/doc/gorilla-opencode/DOCUMENTATION.dual-track.md"
+install -Dm644 "$ROOT/PHILOSOPHY.md" "$PKG/usr/share/doc/gorilla-opencode/PHILOSOPHY.md"
+install -Dm644 "$ROOT/LICENSE" "$PKG/usr/share/doc/gorilla-opencode/copyright"
 
 install -d "$PKG/DEBIAN"
 SIZE_KB=$(du -sk "$PKG" | cut -f1)
 cat > "$PKG/DEBIAN/control" <<EOF
-Package: opencode-dino
+Package: gorilla-opencode
 Version: $VERSION
 Section: devel
 Priority: optional
@@ -59,7 +59,7 @@ Description: Terminal AI coding agent (revived original OpenCode)
  No telemetry, no accounts; bring your own API keys.
  .
  Dual-track documentation (plain-language and developer) is installed
- under /usr/share/doc/opencode-dino.
+ under /usr/share/doc/gorilla-opencode.
 EOF
 
 cat > "$PKG/DEBIAN/postinst" <<'EOF'
@@ -71,5 +71,5 @@ EOF
 cp "$PKG/DEBIAN/postinst" "$PKG/DEBIAN/postrm"
 chmod 755 "$PKG/DEBIAN/postinst" "$PKG/DEBIAN/postrm"
 
-dpkg-deb --build --root-owner-group "$PKG" "$ROOT/opencode-dino_${VERSION}_amd64.deb"
-echo "Built: $ROOT/opencode-dino_${VERSION}_amd64.deb"
+dpkg-deb --build --root-owner-group "$PKG" "$ROOT/gorilla-opencode_${VERSION}_amd64.deb"
+echo "Built: $ROOT/gorilla-opencode_${VERSION}_amd64.deb"
