@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -78,12 +79,21 @@ func (g *geminiClient) convertMessages(messages []message.Message) []*genai.Cont
 			if len(msg.ToolCalls()) > 0 {
 				for _, call := range msg.ToolCalls() {
 					args, _ := parseJsonToMap(call.Input)
-					assistantParts = append(assistantParts, &genai.Part{
+					part := &genai.Part{
 						FunctionCall: &genai.FunctionCall{
 							Name: call.Name,
 							Args: args,
 						},
-					})
+					}
+					// GORILLA OVERRIDE: echo the Gemini 3 thought
+					// signature captured at generation time; replayed
+					// functionCall parts without it are rejected (400).
+					if call.ThoughtSignature != "" {
+						if sig, err := base64.StdEncoding.DecodeString(call.ThoughtSignature); err == nil {
+							part.ThoughtSignature = sig
+						}
+					}
+					assistantParts = append(assistantParts, part)
 				}
 			}
 
@@ -123,7 +133,10 @@ func (g *geminiClient) convertMessages(messages []message.Message) []*genai.Cont
 							},
 						},
 					},
-					Role: "function",
+					// GORILLA OVERRIDE: the 2025 "function" role is gone;
+					// the current Gemini API takes functionResponse parts
+					// in a "user" turn, and genai v1.64 rejects other roles.
+					Role: genai.RoleUser,
 				})
 			}
 		}
@@ -186,7 +199,12 @@ func (g *geminiClient) send(ctx context.Context, messages []message.Message, too
 	if len(tools) > 0 {
 		config.Tools = g.convertTools(tools)
 	}
-	chat, _ := g.client.Chats.Create(ctx, g.providerOptions.model.APIModel, config, history)
+	// GORILLA OVERRIDE: never swallow Create errors — a nil chat
+	// segfaults inside the SDK on the first Send.
+	chat, err := g.client.Chats.Create(ctx, g.providerOptions.model.APIModel, config, history)
+	if err != nil {
+		return nil, fmt.Errorf("creating gemini chat: %w", err)
+	}
 
 	attempts := 0
 	for {
@@ -221,7 +239,9 @@ func (g *geminiClient) send(ctx context.Context, messages []message.Message, too
 		if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
 			for _, part := range resp.Candidates[0].Content.Parts {
 				switch {
-				case part.Text != "":
+				// GORILLA OVERRIDE: !part.Thought keeps Gemini 3 internal
+				// reasoning summaries out of the visible chat content.
+				case part.Text != "" && !part.Thought:
 					content = string(part.Text)
 				case part.FunctionCall != nil:
 					id := "call_" + uuid.New().String()
@@ -232,6 +252,8 @@ func (g *geminiClient) send(ctx context.Context, messages []message.Message, too
 						Input:    string(args),
 						Type:     "function",
 						Finished: true,
+						// GORILLA OVERRIDE: keep Gemini 3 thought signature.
+						ThoughtSignature: base64.StdEncoding.EncodeToString(part.ThoughtSignature),
 					})
 				}
 			}
@@ -274,13 +296,19 @@ func (g *geminiClient) stream(ctx context.Context, messages []message.Message, t
 	if len(tools) > 0 {
 		config.Tools = g.convertTools(tools)
 	}
-	chat, _ := g.client.Chats.Create(ctx, g.providerOptions.model.APIModel, config, history)
+	// GORILLA OVERRIDE: never swallow Create errors — a nil chat
+	// segfaults inside the SDK on the first SendStream.
+	chat, chatErr := g.client.Chats.Create(ctx, g.providerOptions.model.APIModel, config, history)
 
 	attempts := 0
 	eventChan := make(chan ProviderEvent)
 
 	go func() {
 		defer close(eventChan)
+		if chatErr != nil {
+			eventChan <- ProviderEvent{Type: EventError, Error: fmt.Errorf("creating gemini chat: %w", chatErr)}
+			return
+		}
 
 		for {
 			attempts++
@@ -321,12 +349,22 @@ func (g *geminiClient) stream(ctx context.Context, messages []message.Message, t
 					}
 				}
 
+				// GORILLA OVERRIDE: upstream crash bug — when the iterator
+				// yields err != nil it ends with resp == nil; the retry
+				// branch fell through to resp.Candidates and segfaulted,
+				// hiding the real API error from the user.
+				if resp == nil {
+					continue
+				}
+
 				finalResp = resp
 
 				if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
 					for _, part := range resp.Candidates[0].Content.Parts {
 						switch {
-						case part.Text != "":
+						// GORILLA OVERRIDE: !part.Thought keeps Gemini 3 internal
+				// reasoning summaries out of the visible chat content.
+				case part.Text != "" && !part.Thought:
 							delta := string(part.Text)
 							if delta != "" {
 								eventChan <- ProviderEvent{
@@ -344,6 +382,8 @@ func (g *geminiClient) stream(ctx context.Context, messages []message.Message, t
 								Input:    string(args),
 								Type:     "function",
 								Finished: true,
+								// GORILLA OVERRIDE: keep Gemini 3 thought signature.
+								ThoughtSignature: base64.StdEncoding.EncodeToString(part.ThoughtSignature),
 							}
 
 							isNew := true
@@ -436,6 +476,8 @@ func (g *geminiClient) toolCalls(resp *genai.GenerateContentResponse) []message.
 					Name:  part.FunctionCall.Name,
 					Input: string(args),
 					Type:  "function",
+					// GORILLA OVERRIDE: keep Gemini 3 thought signature.
+					ThoughtSignature: base64.StdEncoding.EncodeToString(part.ThoughtSignature),
 				})
 			}
 		}

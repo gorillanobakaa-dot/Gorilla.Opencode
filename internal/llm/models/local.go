@@ -52,7 +52,10 @@ func init() {
 
 		loadLocalModels(models)
 
-		viper.SetDefault("providers.local.apiKey", "dummy")
+		// GORILLA OVERRIDE: chat completions must authenticate with the
+		// real endpoint key (NVIDIA NIM etc.), not the hardcoded "dummy".
+		viper.SetDefault("providers.local.apiKey",
+			cmp.Or(os.Getenv("LOCAL_ENDPOINT_API_KEY"), "dummy"))
 		ProviderPopularity[ProviderLocal] = 0
 	}
 }
@@ -75,7 +78,21 @@ type localModel struct {
 }
 
 func listLocalModels(modelsEndpoint string) []localModel {
-	res, err := http.Get(modelsEndpoint)
+	req, err := http.NewRequest(http.MethodGet, modelsEndpoint, nil)
+	if err != nil {
+		logging.Debug("Failed to build local models request",
+			"error", err,
+			"endpoint", modelsEndpoint,
+		)
+		return []localModel{}
+	}
+	// GORILLA OVERRIDE: allow authenticated OpenAI-compatible endpoints
+	// (e.g. NVIDIA NIM) to act as the "local" provider — the original
+	// unauthenticated http.Get gets 401 from any keyed endpoint.
+	if key := os.Getenv("LOCAL_ENDPOINT_API_KEY"); key != "" {
+		req.Header.Set("Authorization", "Bearer "+key)
+	}
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		logging.Debug("Failed to list local models",
 			"error", err,
@@ -143,9 +160,17 @@ func convertLocalModel(model localModel) Model {
 		Name:                friendlyModelName(model.ID),
 		Provider:            ProviderLocal,
 		APIModel:            model.ID,
-		ContextWindow:       cmp.Or(model.LoadedContextLength, 4096),
-		DefaultMaxTokens:    cmp.Or(model.LoadedContextLength, 4096),
-		CanReason:           true,
+		// GORILLA OVERRIDE: 4096 fallback crippled every endpoint that
+		// doesn't report context length (Ollama /v1/models, NVIDIA NIM).
+		// 32768 is a conservative floor, not a measured limit — same
+		// convention as the crush.json NIM config (2026-07-19).
+		ContextWindow:       cmp.Or(model.LoadedContextLength, 32768),
+		DefaultMaxTokens:    cmp.Or(model.LoadedContextLength, 8192),
+		// GORILLA OVERRIDE: local models must not be assumed reasoning-capable.
+		// CanReason=true made the OpenAI-compat client send reasoning_effort,
+		// which Ollama (2026) rejects with 400 "does not support thinking"
+		// for non-thinking models like qwen2.5-coder.
+		CanReason:           false,
 		SupportsAttachments: true,
 	}
 }
