@@ -1,6 +1,6 @@
-<p align="center"><img src="internal/assets/icons/opencode-dino-256.png" width="128" alt="OpenCode Dino"></p>
+<p align="center"><img src="internal/assets/icons/gorilla-opencode-256.png" width="128" alt="Gorilla OpenCode"></p>
 
-# OpenCode Dino
+# Gorilla OpenCode
 
 **The original OpenCode, revived.** A terminal AI coding agent — MIT
 licensed, no telemetry, no accounts, no vendor funnel. Bring your own
@@ -12,7 +12,7 @@ API keys or run models on your own machine.
 > under Charm (FSL license). It is unrelated to
 > [SST's opencode](https://github.com/sst/opencode), which reuses the
 > name. This fork revives the archived MIT original — the fossil the
-> living species evolved from, hence *Dino* — and keeps it working with
+> living species evolved from — and keeps it working with
 > the AI providers of 2026. The full reasoning, and everything that was
 > changed, is documented for both humans and developers in
 > [DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-track.md), per this
@@ -30,33 +30,33 @@ curl -fsSL https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode
 **Debian / Ubuntu package** — from the [releases page](../../releases):
 
 ```sh
-sudo apt install ./opencode-dino_*_amd64.deb
+sudo apt install ./gorilla-opencode_*_amd64.deb
 ```
 
 **From source:**
 
 ```sh
-go build -o opencode-dino .   # Go ≥ 1.24
-./opencode-dino install       # optional: icons + desktop entry, no sudo
+go build -o gorilla-opencode .   # Go ≥ 1.24
+./gorilla-opencode install       # optional: icons + desktop entry, no sudo
 ```
 
-`opencode-dino uninstall` removes exactly what `install` created.
+`gorilla-opencode uninstall` removes exactly what `install` created.
 
 ## Use
 
 ```sh
 # NVIDIA NIM (your key, NVIDIA's prices)
 LOCAL_ENDPOINT=https://integrate.api.nvidia.com/v1 \
-LOCAL_ENDPOINT_API_KEY=nvapi-... opencode-dino
+LOCAL_ENDPOINT_API_KEY=nvapi-... gorilla-opencode
 
 # Google AI Studio (Gemini 3, free tier works)
-GEMINI_API_KEY=... opencode-dino
+GEMINI_API_KEY=... gorilla-opencode
 
 # Local models via Ollama (no key, no cloud)
-LOCAL_ENDPOINT=http://localhost:11434/v1 opencode-dino
+LOCAL_ENDPOINT=http://localhost:11434/v1 gorilla-opencode
 ```
 
-Non-interactive: `opencode-dino -p "your task" -q`. Pin models per
+Non-interactive: `gorilla-opencode -p "your task" -q`. Pin models per
 project in `.opencode.json`:
 
 ```json

@@ -1,6 +1,6 @@
-# OpenCode Dino — Dual-Track Documentation
+# Gorilla OpenCode — Dual-Track Documentation
 
-**Project:** the revived original OpenCode (Go), continued as "OpenCode Dino"
+**Project:** the revived original OpenCode (Go), continued as "Gorilla OpenCode"
 **Repository:** https://github.com/gorillanobakaa-dot/Gorilla.Opencode
 **Revival date:** 2026-07-19 / 2026-07-20
 **License:** MIT (unchanged from the original)
@@ -42,7 +42,7 @@ distinction matters:
 
 This project takes path 1 — the frozen original, whose license (MIT)
 means it belongs to everyone, forever — and brings it back to life. We
-call the revival **OpenCode Dino**: it is, quite literally, the fossil
+call the revival **Gorilla OpenCode**: it is, quite literally, the fossil
 the living species evolved from.
 
 ## Why bother?
@@ -72,9 +72,9 @@ fixed exactly that — nothing more. In plain terms:
   program called Ollama) — including newer versions of Ollama that
   rejected the old code's requests.
 - **It can install itself.** Download one file, run
-  `opencode-dino install`, and it puts itself where programs live, adds
+  `gorilla-opencode install`, and it puts itself where programs live, adds
   its icon, and appears in your applications menu like any normal app.
-  `opencode-dino uninstall` removes every file it created — the exact
+  `gorilla-opencode uninstall` removes every file it created — the exact
   list is printed as it happens. No hidden leftovers.
 
 ## What does it do with your data?
@@ -113,8 +113,8 @@ fixed exactly that — nothing more. In plain terms:
    `curl -fsSL https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/install.sh | sh`
    (or the same with `wget -qO- … | sh`)
 2. **Debian/Ubuntu package:** download the `.deb` file from the
-   releases page, then `sudo apt install ./opencode-dino_*.deb`
-3. **From source** (for developers): `go build -o opencode-dino .`
+   releases page, then `sudo apt install ./gorilla-opencode_*.deb`
+3. **From source** (for developers): `go build -o gorilla-opencode .`
 
 Then set a key and run it — the program prints these exact lines after
 installing:
@@ -258,9 +258,9 @@ output:
 ## Build and release recipe
 
 ```sh
-go build -o opencode-dino .            # Go ≥ 1.24
-./opencode-dino install                # user-scope install
-scripts/build-deb.sh 0.1.0             # produces opencode-dino_0.1.0_amd64.deb
+go build -o gorilla-opencode .            # Go ≥ 1.24
+./gorilla-opencode install                # user-scope install
+scripts/build-deb.sh 0.1.0             # produces gorilla-opencode_0.1.0_amd64.deb
 ```
 
 ---

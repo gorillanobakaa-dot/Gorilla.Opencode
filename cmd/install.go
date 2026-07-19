@@ -1,5 +1,5 @@
 // GORILLA OVERRIDE: this file did not exist upstream. It adds
-// `opencode-dino install` / `opencode-dino uninstall` so that people who
+// `gorilla-opencode install` / `gorilla-opencode uninstall` so that people who
 // do not live in a terminal can get a working desktop application from a
 // single downloaded binary: the binary copies itself onto the PATH,
 // unpacks its embedded icons into the hicolor theme, writes a desktop
@@ -18,10 +18,10 @@ import (
 )
 
 const (
-	appBinName   = "opencode-dino"
+	appBinName   = "gorilla-opencode"
 	desktopEntry = `[Desktop Entry]
 Type=Application
-Name=OpenCode Dino
+Name=Gorilla OpenCode
 Comment=Terminal AI coding agent (revived original OpenCode) — bring your own API keys
 Exec=` + appBinName + `
 Icon=` + appBinName + `
