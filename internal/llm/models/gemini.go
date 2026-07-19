@@ -13,9 +13,13 @@ const (
 var GeminiModels = map[ModelID]Model{
 	Gemini25Flash: {
 		ID:                  Gemini25Flash,
-		Name:                "Gemini 2.5 Flash",
+		Name:                "Gemini Flash (latest)",
 		Provider:            ProviderGemini,
-		APIModel:            "gemini-2.5-flash-preview-04-17",
+		// GORILLA OVERRIDE: the 04-17 preview alias died in 2025, and
+		// versioned 2.5 aliases are gated off for new accounts ("no
+		// longer available to new users", verified 2026-07-19). The
+		// rolling alias tracks whatever Google currently serves.
+		APIModel:            "gemini-flash-latest",
 		CostPer1MIn:         0.15,
 		CostPer1MInCached:   0,
 		CostPer1MOutCached:  0,
@@ -26,9 +30,10 @@ var GeminiModels = map[ModelID]Model{
 	},
 	Gemini25: {
 		ID:                  Gemini25,
-		Name:                "Gemini 2.5 Pro",
+		Name:                "Gemini Pro (latest)",
 		Provider:            ProviderGemini,
-		APIModel:            "gemini-2.5-pro-preview-05-06",
+		// GORILLA OVERRIDE: same as above — rolling alias, never stale.
+		APIModel:            "gemini-pro-latest",
 		CostPer1MIn:         1.25,
 		CostPer1MInCached:   0,
 		CostPer1MOutCached:  0,
