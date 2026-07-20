@@ -32,6 +32,8 @@ that does not exist. That line is token-wasting and misleading and has
 been removed from the code. There is nothing to opt out of because
 there is nothing being sent.
 
+Primary citations and links for everything below: **[RESEARCH-SOURCES.md](RESEARCH-SOURCES.md)**.
+
 ## What the research says (synthesis)
 
 From the SOTA dossier (SWE-agent, CodePlan, CodeR, AGoT, LLMLingua,
