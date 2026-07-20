@@ -10,6 +10,9 @@ API keys or run models on your own machine.
 
 > Proof gallery — running on NVIDIA NIM and the `/context` token-loadout
 > menu in action: **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)**.
+>
+> The design draws on published research; we cite our sources so you can
+> read them and judge for yourself: **[system-prompts/RESEARCH-SOURCES.md](system-prompts/RESEARCH-SOURCES.md)**.
 
 > **Provenance, stated plainly:** this is the original Go OpenCode by
 > [Kujtim Hoxha](https://github.com/kujtimiihoxha), archived in 2025
