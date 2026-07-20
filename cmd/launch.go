@@ -78,11 +78,43 @@ const envTemplate = `# Gorilla OpenCode — API keys for desktop launches.
 #LOCAL_ENDPOINT=http://localhost:11434/v1
 `
 
+// ensureEnvTemplate writes the commented key-file template if it does
+// not already exist, and reports whether it had to create it. Shared by
+// `install` and `launch` so that BOTH the self-installer and the .deb
+// (whose desktop entry also calls `launch`) get the key file — the two
+// paths drifted in v0.1.1 and .deb users never got it.
+func ensureEnvTemplate() (created bool) {
+	path := envFilePath()
+	if _, err := os.Stat(path); err == nil {
+		return false
+	}
+	if os.MkdirAll(filepath.Dir(path), 0o755) != nil {
+		return false
+	}
+	if os.WriteFile(path, []byte(envTemplate), 0o600) != nil {
+		return false
+	}
+	return true
+}
+
 var launchCmd = &cobra.Command{
 	Use:    "launch",
 	Hidden: true, // desktop-entry plumbing, not part of the CLI surface
 	Short:  "Run with keys from the env file; hold the window open on error",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// First desktop launch after a .deb install: create the key
+		// file and tell the user where it is, instead of flash-dying.
+		if ensureEnvTemplate() {
+			fmt.Printf("Welcome to Gorilla OpenCode.\n\nNo API keys are set yet. Put them in:\n  %s\n\n", envFilePath())
+			fmt.Println("  NVIDIA NIM:  LOCAL_ENDPOINT=https://integrate.api.nvidia.com/v1")
+			fmt.Println("               LOCAL_ENDPOINT_API_KEY=nvapi-...")
+			fmt.Println("  Google:      GEMINI_API_KEY=...")
+			fmt.Println("  Ollama:      LOCAL_ENDPOINT=http://localhost:11434/v1")
+			fmt.Print("\nThen launch again. Press Enter to close... ")
+			_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+			return nil
+		}
+
 		self, err := os.Executable()
 		if err != nil {
 			return err
