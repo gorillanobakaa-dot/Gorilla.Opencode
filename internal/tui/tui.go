@@ -124,6 +124,10 @@ type appModel struct {
 	showModelDialog bool
 	modelDialog     dialog.ModelDialog
 
+	// GORILLA OVERRIDE: context loadout menu (/context)
+	showLoadoutDialog bool
+	loadoutDialog     dialog.LoadoutDialog
+
 	showInitDialog bool
 	initDialog     dialog.InitDialogCmp
 
@@ -405,9 +409,21 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// the accumulated context (and its per-turn token cost).
 			a.selectedSession = session.Session{}
 			return a, util.CmdHandler(chat.SessionClearedMsg{})
+		case "context", "loadout", "tokens":
+			a.showLoadoutDialog = true
+			return a, nil
 		default:
-			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /export, /clear)", msg.Name))
+			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /export, /clear, /context)", msg.Name))
 		}
+
+	case dialog.CloseLoadoutDialogMsg:
+		a.showLoadoutDialog = false
+		return a, nil
+
+	case dialog.LoadoutChangedMsg:
+		// Rebuild the coder agent's tools so toggles take effect now.
+		a.app.ReloadCoderTools()
+		return a, util.ReportInfo(fmt.Sprintf("Loadout: ~%d tokens/turn", config.LoadoutActiveTokens()))
 
 	case chat.SessionSelectedMsg:
 		a.selectedSession = msg
@@ -487,6 +503,9 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if a.showModelDialog {
 				a.showModelDialog = false
+			}
+			if a.showLoadoutDialog {
+				a.showLoadoutDialog = false
 			}
 			if a.showMultiArgumentsDialog {
 				a.showMultiArgumentsDialog = false
@@ -649,6 +668,15 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.modelDialog = d.(dialog.ModelDialog)
 		cmds = append(cmds, modelCmd)
 		// Only block key messages send all other messages down
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showLoadoutDialog {
+		d, loadoutCmd := a.loadoutDialog.Update(msg)
+		a.loadoutDialog = d.(dialog.LoadoutDialog)
+		cmds = append(cmds, loadoutCmd)
 		if _, ok := msg.(tea.KeyMsg); ok {
 			return a, tea.Batch(cmds...)
 		}
@@ -857,6 +885,21 @@ func (a appModel) View() string {
 		)
 	}
 
+	if a.showLoadoutDialog {
+		overlay := a.loadoutDialog.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(
+			col,
+			row,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
 	if a.showCommandDialog {
 		overlay := a.commandDialog.View()
 		row := lipgloss.Height(appView) / 2
@@ -927,6 +970,7 @@ func New(app *app.App) tea.Model {
 		sessionDialog: dialog.NewSessionDialogCmp(),
 		commandDialog: dialog.NewCommandDialogCmp(),
 		modelDialog:   dialog.NewModelDialogCmp(),
+		loadoutDialog: dialog.NewLoadoutDialogCmp(),
 		permissions:   dialog.NewPermissionDialogCmp(),
 		initDialog:    dialog.NewInitDialogCmp(),
 		themeDialog:   dialog.NewThemeDialogCmp(),
