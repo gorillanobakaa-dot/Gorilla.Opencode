@@ -66,6 +66,29 @@ project in `.opencode.json`:
 All original providers (Anthropic, OpenAI, Groq, OpenRouter, Azure,
 Bedrock, Vertex, Copilot) remain wired as upstream left them.
 
+## What this fork adds
+
+- **Runs on 2026 providers**: NVIDIA NIM (your key, curated + ranked
+  models), Google Gemini 3 (thought-signature support), local Ollama.
+- **Navigable model picker**: 100+ discovered models shown with curated
+  names + capability descriptions ("DeepSeek V4 Pro — 1.6T MoE, 1M ctx,
+  80.6% SWE-bench"), ranked best-coder-first, with a position counter.
+- **Slash commands**: `/model` `/models` (picker), `/export` (session →
+  Markdown in the cwd), `/clear` (fresh session), `/context` (loadout).
+- **Context loadout** (`/context`): a transparent, total-control menu
+  showing exactly what's sent to the model every turn and its token
+  cost, with a switch for every tool and prompt block — strip it to the
+  bone at your own risk, one key resets defaults.
+- **Prompt caching** (opt-in, `OPENCODE_PROMPT_CACHE=1`) for endpoints
+  that support it; Anthropic caching always on. See the changelog for
+  the honest note on NIM.
+- **Desktop-native**: embedded icons, self-installer, `.deb`, one-line
+  curl install; the app-grid icon reads keys from
+  `~/.config/gorilla-opencode/env`.
+
+Full history: [CHANGELOG.md](CHANGELOG.md). Deep explanations, both
+plain-language and developer: [DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-track.md).
+
 ## What the revival changed
 
 Six files. Every change carries a `// GORILLA OVERRIDE:` comment saying
