@@ -205,8 +205,20 @@ func (m *modelDialogCmp) View() string {
 		Foreground(t.Primary()).
 		Bold(true).
 		Width(w).
-		Padding(0, 0, 1).
 		Render(fmt.Sprintf("Select %s Model", providerName))
+
+	// GORILLA OVERRIDE: for a curated provider (ranked list), tell the
+	// user these are only the models we pinged live and got a reply
+	// from — dead/junk models were dropped, and the number is the
+	// coding-quality rank (1 = best).
+	subtitle := ""
+	if len(m.models) > 0 && m.models[0].Rank > 0 {
+		subtitle = baseStyle.Foreground(t.TextMuted()).Width(w).Padding(0, 0, 1).
+			Render(fmt.Sprintf("%d models — pinged live with 1 token, only responders kept; ranked 1=best", len(m.models)))
+	} else {
+		title = baseStyle.Foreground(t.Primary()).Bold(true).Width(w).Padding(0, 0, 1).
+			Render(fmt.Sprintf("Select %s Model", providerName))
+	}
 
 	// Render visible models
 	endIdx := min(m.scrollOffset+numVisibleModels, len(m.models))
@@ -236,12 +248,15 @@ func (m *modelDialogCmp) View() string {
 
 	scrollIndicator := m.getScrollIndicators(w)
 
-	content := lipgloss.JoinVertical(
-		lipgloss.Left,
-		title,
+	parts := []string{title}
+	if subtitle != "" {
+		parts = append(parts, subtitle)
+	}
+	parts = append(parts,
 		baseStyle.Width(w).Render(lipgloss.JoinVertical(lipgloss.Left, modelItems...)),
 		scrollIndicator,
 	)
+	content := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
 	return baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).

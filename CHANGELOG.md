@@ -21,6 +21,21 @@ AI providers of 2026. Every source change carries an in-code
 complete audit trail. Dual-track (plain-language + developer)
 explanations live in [DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-track.md).
 
+## v0.1.18 — 2026-07-20 — Unified config dir, honest cost, "alive models" note
+
+- **All config in one clearly-labelled folder**:
+  `~/.config/gorilla-opencode/` now holds `config.json` (models/agents/
+  theme), `env` (keys), and `loadout.json` — with a one-time migration
+  from the old `~/.opencode.json`. No more Gorilla config scattered under
+  the generic `opencode` name that other tools share.
+- **Cost is marked as an estimate**: the status bar shows `~$0.03 est`
+  (or `$0.00`), because the figure is computed from a static, possibly
+  stale price table — it is NOT your bill. On a free tier (Gemini) or
+  flat-rate key (NIM) your real cost is $0.
+- **Model picker says what the list is**: for curated providers it now
+  shows "N models — pinged live with 1 token, only responders kept;
+  ranked 1=best", so users know the dead models were probed out.
+
 ## v0.1.9 — 2026-07-20 — Loadout: real numbers, wider, proof
 
 - The `/context` loadout shows **measured** per-turn token costs (real
