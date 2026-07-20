@@ -57,12 +57,17 @@ type Service interface {
 	// GORILLA OVERRIDE: swap the active tool set at runtime so context
 	// loadout changes take effect without a restart.
 	ReloadTools(newTools []tools.BaseTool)
+	// RebuildProvider recreates the provider so a fresh system prompt
+	// (which now honours the loadout's env/LSP toggles) takes effect
+	// without a restart. No-op while a request is in flight.
+	RebuildProvider()
 }
 
 type agent struct {
 	*pubsub.Broker[AgentEvent]
-	sessions session.Service
-	messages message.Service
+	agentName config.AgentName
+	sessions  session.Service
+	messages  message.Service
 
 	tools    []tools.BaseTool
 	toolsMu  sync.RWMutex
@@ -102,6 +107,7 @@ func NewAgent(
 
 	agent := &agent{
 		Broker:            pubsub.NewBroker[AgentEvent](),
+		agentName:         agentName,
 		provider:          agentProvider,
 		messages:          messages,
 		sessions:          sessions,
@@ -130,6 +136,18 @@ func (a *agent) ReloadTools(newTools []tools.BaseTool) {
 	a.toolsMu.Lock()
 	a.tools = newTools
 	a.toolsMu.Unlock()
+}
+
+// RebuildProvider recreates the provider so the system prompt is
+// re-rendered against the current loadout (env/LSP blocks). Skipped
+// while busy to avoid swapping the provider mid-request.
+func (a *agent) RebuildProvider() {
+	if a.IsBusy() {
+		return
+	}
+	if p, err := createAgentProvider(a.agentName); err == nil {
+		a.provider = p
+	}
 }
 
 func (a *agent) Cancel(sessionID string) {
