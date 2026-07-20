@@ -2,10 +2,14 @@ package provider
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/openai/openai-go"
@@ -185,6 +189,30 @@ func (o *openaiClient) preparedParams(messages []openai.ChatCompletionMessagePar
 	return params
 }
 
+// GORILLA OVERRIDE: prompt caching for OpenAI-compatible providers.
+// The OpenAI wire protocol caches on a stable prompt PREFIX and can be
+// steered with `prompt_cache_key`; a single stable key per (system
+// prompt + model) routes every turn of a session to the same cached
+// prefix, so the ~thousands of tokens of system prompt + tool schemas
+// are not re-processed each turn.
+//
+// IMPORTANT, and why this is OPT-IN: not every OpenAI-compatible
+// endpoint accepts the field. NVIDIA NIM — the provider this fork was
+// built for — REJECTS it with HTTP 400 "Unsupported parameter" (verified
+// 2026-07-20) and reports no cache metrics at all, i.e. NIM offers no
+// prompt caching to enable. Sending the key by default would BREAK every
+// NIM request. So it is off unless you opt in with OPENCODE_PROMPT_CACHE=1,
+// for endpoints known to support it (OpenAI, DeepSeek's direct API, …).
+// Anthropic caching is separate and always on (see anthropic.go).
+func (o *openaiClient) cacheOptions() []option.RequestOption {
+	if on, _ := strconv.ParseBool(os.Getenv("OPENCODE_PROMPT_CACHE")); !on {
+		return nil
+	}
+	sum := sha256.Sum256([]byte(o.providerOptions.model.APIModel + "\x00" + o.providerOptions.systemMessage))
+	key := "goc-" + hex.EncodeToString(sum[:8])
+	return []option.RequestOption{option.WithJSONSet("prompt_cache_key", key)}
+}
+
 func (o *openaiClient) send(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (response *ProviderResponse, err error) {
 	params := o.preparedParams(o.convertMessages(messages), o.convertTools(tools))
 	cfg := config.Get()
@@ -198,6 +226,7 @@ func (o *openaiClient) send(ctx context.Context, messages []message.Message, too
 		openaiResponse, err := o.client.Chat.Completions.New(
 			ctx,
 			params,
+			o.cacheOptions()...,
 		)
 		// If there is an error we are going to see if we can retry the call
 		if err != nil {
@@ -259,6 +288,7 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			openaiStream := o.client.Chat.Completions.NewStreaming(
 				ctx,
 				params,
+				o.cacheOptions()...,
 			)
 
 			acc := openai.ChatCompletionAccumulator{}
