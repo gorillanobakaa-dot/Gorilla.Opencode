@@ -6,21 +6,22 @@
 // which looks exactly like a crash.
 //
 // `gorilla-opencode launch` (used by the desktop entry) fixes both:
-//  1. it loads KEY=VALUE lines from ~/.config/gorilla-opencode/env
-//     (written as a commented template by `install`, chmod 600) and
-//     re-runs the real program with them — re-exec is required because
-//     LOCAL_ENDPOINT is read at package-init time, before main();
-//  2. if the program exits with an error, it holds the window open
-//     until Enter is pressed, so the error can actually be read.
+//  1. it creates the key file (~/.config/gorilla-opencode/env) on
+//     first run and shows a held-open welcome if no keys are set yet;
+//  2. it loads KEY=VALUE lines from that file and execve-replaces
+//     itself with the real program — replace, not spawn, so exactly
+//     one process owns the terminal (a lingering parent breaks the
+//     TUI under some terminal emulators). re-loading env this way is
+//     required because LOCAL_ENDPOINT is read at package-init time.
 package cmd
 
 import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
 )
@@ -119,17 +120,24 @@ var launchCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		child := exec.Command(self)
-		child.Stdin, child.Stdout, child.Stderr = os.Stdin, os.Stdout, os.Stderr
-		child.Env = append(os.Environ(), loadEnvFile(envFilePath())...)
-		runErr := child.Run()
-		if runErr != nil {
-			fmt.Fprintf(os.Stderr, "\ngorilla-opencode exited with an error: %v\n", runErr)
-			fmt.Fprintf(os.Stderr, "Hint: put your API keys in %s\n", envFilePath())
+		// GORILLA OVERRIDE: replace this process with the real binary
+		// via execve, rather than spawning it as a child. The child
+		// approach left `launch` alive holding the terminal while the
+		// TUI tried to take control of the same PTY — under a real
+		// terminal emulator (gnome-terminal, no `script` PTY in
+		// between) the bubbletea TUI cannot become the controlling
+		// process and dies instantly: the "flash-die" on the desktop
+		// icon. execve leaves exactly one process owning the terminal,
+		// which is how every env-loading launcher (env, direnv, …)
+		// hands off. We keep the keys loaded from the env file.
+		env := append(os.Environ(), loadEnvFile(envFilePath())...)
+		if err := syscall.Exec(self, []string{self}, env); err != nil {
+			fmt.Fprintf(os.Stderr, "\nfailed to start gorilla-opencode: %v\n", err)
 			fmt.Fprint(os.Stderr, "Press Enter to close this window... ")
 			_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+			return err
 		}
-		return nil
+		return nil // unreachable after a successful exec
 	},
 }
 
