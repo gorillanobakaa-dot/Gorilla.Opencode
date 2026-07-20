@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -36,6 +37,8 @@ type messagesCmp struct {
 	spinner       spinner.Model
 	rendering     bool
 	attachments   viewport.Model
+	// GORILLA OVERRIDE: throttle streaming re-renders (see below).
+	lastStreamRender time.Time
 }
 type renderFinishedMsg struct{}
 
@@ -160,6 +163,17 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if needsRerender {
+			// GORILLA OVERRIDE: re-rendering the whole growing message's
+			// Markdown on EVERY streamed token is O(n^2) and makes long
+			// answers crawl. Throttle intermediate deltas to ~every
+			// 80ms; always render the final (finished) token so nothing
+			// is lost. This is a display fix — the network was never the
+			// bottleneck (NIM answers in ~1s).
+			finished := msg.Type == pubsub.CreatedEvent || msg.Payload.IsFinished()
+			if !finished && time.Since(m.lastStreamRender) < 80*time.Millisecond {
+				return m, tea.Batch(cmds...)
+			}
+			m.lastStreamRender = time.Now()
 			m.renderView()
 			if len(m.messages) > 0 {
 				if (msg.Type == pubsub.CreatedEvent) ||
