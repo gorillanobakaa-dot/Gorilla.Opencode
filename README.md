@@ -12,6 +12,11 @@ API keys or run models on your own machine.
 > and menus (incl. how to reach the Google models): **[docs/GUIDE.md](docs/GUIDE.md)**.
 > Screenshots & proof: **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)**.
 >
+> **⏱️ Why does an AI model feel slow?** A free, hands-on lesson built from
+> our own measurements — what "tokens per second" means, why a 550-billion
+> model can beat a 70-billion one, and a 60-line script so you can prove it
+> yourself: **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)**.
+>
 > The design draws on published research; we cite our sources so you can
 > read them and judge for yourself: **[system-prompts/RESEARCH-SOURCES.md](system-prompts/RESEARCH-SOURCES.md)**.
 
