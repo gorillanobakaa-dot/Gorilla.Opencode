@@ -30,7 +30,7 @@ cat > "$PKG/usr/share/applications/gorilla-opencode.desktop" <<'EOF'
 Type=Application
 Name=Gorilla OpenCode
 Comment=Terminal AI coding agent (revived original OpenCode) — bring your own API keys
-Exec=gorilla-opencode
+Exec=gorilla-opencode launch
 Icon=gorilla-opencode
 Terminal=true
 Categories=Development;IDE;

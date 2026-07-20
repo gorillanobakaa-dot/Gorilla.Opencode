@@ -53,6 +53,20 @@ OUT="$(cd "$TMP" && env -i HOME="$TMP" PATH="/usr/bin:/bin" TERM=dumb "$BIN" -p 
 echo "$OUT" | grep -q "FZF not found" \
   && fail "FZF warning still prints in non-interactive mode" || pass "no FZF noise"
 
+# 6. Desktop launch parity: the .deb and the self-installer must BOTH
+#    use the `launch` wrapper, or GUI launches flash-die (v0.1.1 bug:
+#    only the self-installer was fixed).
+DEB_EXEC="$(grep -A20 'opencode-dino.desktop\|gorilla-opencode.desktop' "$ROOT/scripts/build-deb.sh" | grep '^Exec=' | head -1)"
+echo "$DEB_EXEC" | grep -q 'launch' \
+  && pass ".deb desktop entry uses launch wrapper" || fail ".deb desktop entry missing 'launch' (GUI flash-die)"
+grep -q 'Exec=` + appBinName + ` launch' "$ROOT/cmd/install.go" \
+  && pass "self-installer desktop entry uses launch wrapper" || fail "self-installer missing 'launch'"
+
+# 7. launch self-heals: creates the key file if missing (so .deb users
+#    who never run `install` still get onboarded, not flash-died).
+grep -q 'ensureEnvTemplate' "$ROOT/cmd/launch.go" \
+  && pass "launch creates key file when missing" || fail "launch does not self-heal missing key file"
+
 echo "---"
 [ "$FAILS" -eq 0 ] && echo "smoke: all checks passed" || echo "smoke: $FAILS check(s) FAILED"
 exit "$FAILS"

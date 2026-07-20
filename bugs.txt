@@ -66,6 +66,30 @@ FINDING 6 — note, not a defect — "GORILLA OVERRIDE not grep-able in
             recipe), which is where auditing belongs.
   Status:   WONTFIX (documented here instead).
 
+FINDING 7 — 🔴 P0 — .deb desktop icon still flash-dies (v0.1.1 fix
+            never reached the package)
+  Symptom:  install the .deb (the NORMAL user path), click the app-grid
+            icon -> terminal flashes and closes. Reproduced clean-room
+            2026-07-20: fresh `apt install ./gorilla-opencode_0.1.0` ->
+            GUI launch -> "agent coder not found", exit 1, instant.
+  Cause:    the v0.1.1 desktop-launch fix (launch wrapper + key file)
+            was applied ONLY to the self-installer (cmd/install.go).
+            scripts/build-deb.sh still wrote the bare
+            `Exec=gorilla-opencode` and created no key file, so anyone
+            installing via .deb got the unfixed v0.1.0 behaviour. The
+            smoke test missed it because it never installs the .deb and
+            clicks the icon. The two install paths had silently drifted.
+  Status:   FIXED in v0.1.2.
+            - build-deb.sh desktop entry -> `Exec=gorilla-opencode launch`.
+            - `launch` now self-heals: if the key file is missing it
+              creates the template and shows a held-open welcome naming
+              the file, instead of flash-dying (shared ensureEnvTemplate
+              used by both install and launch).
+  Guard:    smoke.sh checks 6 (both paths use launch) and 7 (launch
+            self-heals). Verified clean-room: fresh .deb install + GUI
+            launch with no keys -> friendly welcome + key file created;
+            with keys in the file -> TUI starts, no error.
+
 MINIMAX SUGGESTIONS ADOPTED
   - tests/ smoke script (its option "b"): tests/smoke.sh, 10 checks,
     one per regression above; run before every release.

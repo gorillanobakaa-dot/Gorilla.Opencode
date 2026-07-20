@@ -288,6 +288,24 @@ never overwriting an existing file.
 
 # CHANGELOG (one track — written for both audiences)
 
+## v0.1.2 — 2026-07-20 — "Package parity"
+
+The v0.1.1 desktop-launch fix reached only the self-installer; users who
+installed the **.deb** (the normal path) still got the flash-die,
+because `scripts/build-deb.sh` wrote the old bare `Exec=gorilla-opencode`
+and shipped no key file. Reproduced clean-room by installing the
+published .deb as a fresh user and launching from the app grid.
+
+- `.deb` desktop entry now uses `Exec=gorilla-opencode launch`, same as
+  the self-installer.
+- `launch` self-heals: on first run it creates the key-file template
+  (`~/.config/gorilla-opencode/env`) and shows a held-open welcome
+  naming the file, so a `.deb` user who never ran `install` is onboarded
+  instead of flash-died. Shared `ensureEnvTemplate` removes the drift.
+- Two new smoke checks assert both install paths use `launch` and that
+  `launch` creates the key file — the class of bug that let the two
+  paths diverge unnoticed.
+
 ## v0.1.1 — 2026-07-20 — "Community review hardening"
 
 An independent review by another AI model (MiniMax M3, run by the
