@@ -278,6 +278,16 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 			defer logging.RecoverPanic("agent.Run", func() {
 				logging.ErrorPersist("panic while generating title")
 			})
+			// GORILLA OVERRIDE: the title request used to fire at the same
+			// instant as the user's message — two CONCURRENT requests. On
+			// providers that cap concurrency (NVIDIA NIM's free tier does),
+			// the second is 429'd, which triggered a retry storm on a
+			// plain "yo". Wait for the main request to finish first so we
+			// only ever have one request in flight.
+			deadline := time.Now().Add(120 * time.Second)
+			for a.IsSessionBusy(sessionID) && time.Now().Before(deadline) {
+				time.Sleep(150 * time.Millisecond)
+			}
 			titleErr := a.generateTitle(context.Background(), sessionID, content)
 			if titleErr != nil {
 				logging.ErrorPersist(fmt.Sprintf("failed to generate title: %v", titleErr))

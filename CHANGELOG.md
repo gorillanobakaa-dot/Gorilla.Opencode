@@ -60,6 +60,16 @@ explanations live in [DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-track.md).
   retrying 2/5 in 1.0s" — it fires on 429 and 500, not only rate limits.
 - (Networking itself was fine all along — NIM answers in ~1s; measured.)
 
+## v0.1.22 — 2026-07-20 — Stop the concurrent title request (root-cause of the 429s)
+
+- Proven with a request-counting proxy: one "yo" fired TWO simultaneous
+  chat requests — your message and a concurrent session-title request.
+  NVIDIA NIM's free tier caps CONCURRENT requests (separate from the 40
+  rpm), so the second was 429'd, triggering the retry storm. Now the
+  title request waits for your message to finish first — peak concurrency
+  1, not 2. Combined with v0.1.21's backoff cap, a plain "yo" no longer
+  rate-limits.
+
 ## v0.1.9 — 2026-07-20 — Loadout: real numbers, wider, proof
 
 - The `/context` loadout shows **measured** per-turn token costs (real
