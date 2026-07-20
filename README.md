@@ -8,8 +8,9 @@ API keys or run models on your own machine.
 
 ![Gorilla OpenCode running on NVIDIA NIM](docs/screenshots/01-running-nvidia-nim.png)
 
-> Proof gallery — running on NVIDIA NIM and the `/context` token-loadout
-> menu in action: **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)**.
+> New to a tool like this? A plain-English walkthrough of the screen
+> and menus (incl. how to reach the Google models): **[docs/GUIDE.md](docs/GUIDE.md)**.
+> Screenshots & proof: **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)**.
 >
 > The design draws on published research; we cite our sources so you can
 > read them and judge for yourself: **[system-prompts/RESEARCH-SOURCES.md](system-prompts/RESEARCH-SOURCES.md)**.
