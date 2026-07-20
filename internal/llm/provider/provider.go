@@ -122,6 +122,15 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 			options: clientOptions,
 			client:  newOpenAIClient(clientOptions),
 		}, nil
+	// GORILLA OVERRIDE: native Cerebras (OpenAI-compatible, wafer-scale).
+	case models.ProviderCerebras:
+		clientOptions.openaiOptions = append(clientOptions.openaiOptions,
+			WithOpenAIBaseURL("https://api.cerebras.ai/v1"),
+		)
+		return &baseProvider[OpenAIClient]{
+			options: clientOptions,
+			client:  newOpenAIClient(clientOptions),
+		}, nil
 	case models.ProviderAzure:
 		return &baseProvider[AzureClient]{
 			options: clientOptions,
