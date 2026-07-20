@@ -29,6 +29,8 @@ type statusCmp struct {
 	messageTTL time.Duration
 	lspClients map[string]*lsp.Client
 	session    session.Session
+	// GORILLA OVERRIDE: show the "cost is an estimate" note once per run.
+	costNoticeShown bool
 }
 
 // clearMessageCmd is a command that clears status messages after a timeout
@@ -56,6 +58,17 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.session.ID == msg.Payload.ID {
 				m.session = msg.Payload
 			}
+		}
+		// GORILLA OVERRIDE: the first time a session shows a non-zero
+		// cost, remind the user (once) that it's only an estimate — on
+		// a free or flat-rate tier the real bill is $0.
+		if !m.costNoticeShown && m.session.Cost > 0 {
+			m.costNoticeShown = true
+			return m, util.CmdHandler(util.InfoMsg{
+				Type: util.InfoTypeInfo,
+				Msg:  "That cost is a rough estimate from a static price table — on a free or flat-rate tier your real bill is $0, genius.",
+				TTL:  10 * time.Second,
+			})
 		}
 	case util.InfoMsg:
 		m.info = msg
