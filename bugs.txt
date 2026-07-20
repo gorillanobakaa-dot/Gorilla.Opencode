@@ -1,0 +1,86 @@
+GORILLA OPENCODE — DRIVE-TEST FINDINGS AND STATUS
+==================================================
+Source: independent drive-test of release v0.1.0 by MiniMax M3
+        (session 2026-07-19/20, exported by the project owner).
+        MiniMax found the bugs but never wrote this file despite
+        eleven promises to; written up from its session export.
+Status column reflects the v0.1.1 hardening pass (commit history:
+git log --oneline; every fix guarded by tests/smoke.sh, 10 checks).
+
+FINDING 1 — 🔴 P0 — desktop/vanilla launch is a brick wall
+  Symptom:  fresh install, no keys anywhere -> "Error: agent coder
+            not found", exit. From the app grid the terminal closes
+            before the error is readable ("the icon crashes").
+  Cause:    (a) no-provider state surfaced as an internal error;
+            (b) GUI-launched apps never inherit shell env vars, so
+            keys exported in .bashrc are invisible to them.
+  Status:   FIXED in v0.1.1.
+            - Friendly actionable message naming the exact variables
+              (cmd/root.go, after config.Load).
+            - New `launch` subcommand used by the desktop entry:
+              loads keys from ~/.config/gorilla-opencode/env
+              (template written at install, chmod 600) and holds the
+              window open on error until Enter (cmd/launch.go).
+  Guard:    smoke.sh checks 1a-1d.
+
+FINDING 2 — 🔴 P0 — "-p silently falls through to help"
+  Symptom:  every failing -p run printed the full usage text; the
+            actual error drowned. MiniMax read this as the -p flag
+            not routing at all.
+  Cause:    diagnosis PARTLY WRONG, symptom real: -p routing was
+            fine; cobra prints the entire usage dump after any RunE
+            error by default, burying the one line that mattered.
+            (MiniMax's fake-provider test also exited on the
+            no-provider path above, compounding the misread.)
+  Status:   FIXED in v0.1.1: SilenceUsage=true; runtime errors print
+            the error and exit nonzero. Usage prints only for actual
+            usage mistakes.
+  Guard:    smoke.sh checks 1c, 2a, 2b.
+
+FINDING 3 — 🟠 P1 — --version says v0.0.0-...+dirty, not the release
+  Cause:    deeper than the missing -ldflags MiniMax suggested:
+            internal/version/version.go let the Go VCS pseudo-version
+            (stamped by Go >=1.22 even for plain `go build`) OVERRIDE
+            an explicit -ldflags value.
+  Status:   FIXED in v0.1.1: explicit stamp wins; build recipe in
+            README/scripts carries the ldflags line.
+  Guard:    smoke.sh check 3 (exact version match).
+
+FINDING 4 — 🟠 P1 — help text still said "opencode" everywhere
+  Cause:    the rename commit changed binary/package/desktop/docs but
+            missed the cobra Use:/Long:/Example: string literals.
+  Status:   FIXED in v0.1.1: all derived from the appBinName constant.
+  Guard:    smoke.sh checks 4a, 4b.
+
+FINDING 5 — 🟡 P2 — FZF warning noise on every non-interactive run
+  Status:   FIXED in v0.1.1: demoted to debug level
+            (internal/fileutil/fileutil.go).
+  Guard:    smoke.sh check 5.
+
+FINDING 6 — note, not a defect — "GORILLA OVERRIDE not grep-able in
+            the shipped binary"
+  Fact:     correct observation: provenance markers are comments and
+            comments do not survive compilation. The audit trail is
+            source-level by design; the binary is reproducible from
+            the tagged source (see DOCUMENTATION.dual-track.md build
+            recipe), which is where auditing belongs.
+  Status:   WONTFIX (documented here instead).
+
+MINIMAX SUGGESTIONS ADOPTED
+  - tests/ smoke script (its option "b"): tests/smoke.sh, 10 checks,
+    one per regression above; run before every release.
+  - single AppName constant for branding strings.
+
+VERIFIED CORRECT BY THE SAME DRIVE-TEST (worth keeping on record)
+  - sha256 of released binary matches checksums.sha256
+  - .deb structure "flawless": package name, /usr/bin path, hicolor
+    icons incl. scalable SVG, desktop entry, dual-track docs under
+    /usr/share/doc/gorilla-opencode
+  - install/uninstall subcommands wired with correct behavior
+
+OUTSTANDING (pre-existing, tracked in DOCUMENTATION.dual-track.md)
+  - dependency CVE audit (all non-genai deps are early-2025 vintage)
+  - gemini-pro-latest wired but not exercised end-to-end
+  - Google free-tier 429 retries can look like a hang on quota-zero
+    models (no progress indication in -p mode)
+  - Linux x86_64 only
