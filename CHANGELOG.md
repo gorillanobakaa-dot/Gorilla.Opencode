@@ -70,6 +70,18 @@ explanations live in [DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-track.md).
   1, not 2. Combined with v0.1.21's backoff cap, a plain "yo" no longer
   rate-limits.
 
+## v0.1.24 — 2026-07-20 — Slim the bash tool description (~1,600 tokens saved)
+
+- The bash tool's description carried ~1,400 tokens of git-commit and
+  pull-request *ritual* — <commit_analysis> XML tags, HEREDOC templates,
+  a "Generated with opencode" footer, tool-use choreography — sent on
+  EVERY turn. Replaced with a compact "Git and GitHub" paragraph that
+  keeps the real safety rules (never touch git config, no interactive
+  -i flags, no empty commits, don't auto-push, check before committing)
+  and drops the boilerplate. Bash tool: ~2,442 -> ~845 tokens.
+- The agent still commits fine — git know-how is in the model's weights,
+  not the prompt. A default-trimmed loadout now runs well under 5k/turn.
+
 ## v0.1.9 — 2026-07-20 — Loadout: real numbers, wider, proof
 
 - The `/context` loadout shows **measured** per-turn token costs (real
