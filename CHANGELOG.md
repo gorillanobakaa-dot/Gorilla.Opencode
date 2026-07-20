@@ -6,6 +6,16 @@ AI providers of 2026. Every source change carries an in-code
 complete audit trail. Dual-track (plain-language + developer)
 explanations live in [DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-track.md).
 
+## v0.1.9 — 2026-07-20 — Loadout: real numbers, wider, proof
+
+- The `/context` loadout shows **measured** per-turn token costs (real
+  tool schemas + system prompt), not estimates — the total now matches
+  reality (~10.4K default) and disabling a tool drops it by its true
+  cost. Dialog widened ~2× so tradeoffs aren't truncated.
+- Screenshots committed as proof (`docs/screenshots/`, gallery at
+  `docs/SCREENSHOTS.md`). Tool toggles apply live; env/LSP prompt blocks
+  apply on restart.
+
 ## v0.1.8 — 2026-07-20 — Prompt caching (opt-in) + honesty about NIM
 
 - **Prompt caching for OpenAI-compatible providers**, opt-in via
