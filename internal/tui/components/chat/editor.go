@@ -132,6 +132,13 @@ func (m *editorCmp) send() tea.Cmd {
 	if value == "" {
 		return nil
 	}
+	// GORILLA OVERRIDE: slash commands. A message that is exactly a
+	// known slash command (e.g. "/model", "/models", "/export") is
+	// intercepted and dispatched instead of being sent to the model —
+	// the ergonomics users expect from the current OpenCode.
+	if cmd := strings.TrimSpace(value); strings.HasPrefix(cmd, "/") {
+		return util.CmdHandler(SlashCommandMsg{Name: strings.ToLower(strings.TrimPrefix(cmd, "/"))})
+	}
 	return tea.Batch(
 		util.CmdHandler(SendMsg{
 			Text:        value,

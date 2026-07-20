@@ -1,0 +1,498 @@
+{
+ "01-ai/yi-large": {
+  "description": "Large dense generalist from 01.AI",
+  "name": "Yi Large"
+ },
+ "abacusai/dracarys-llama-3.1-70b-instruct": {
+  "description": "70B dense, Llama-3.1 coding fine-tune",
+  "name": "Dracarys 70B"
+ },
+ "adept/fuyu-8b": {
+  "description": "shit tier \u2014 vision-language model for UI/screen understanding, not code.",
+  "name": "Fuyu 8B"
+ },
+ "ai21labs/jamba-1.5-large-instruct": {
+  "context_window": 262144,
+  "description": "398B hybrid Mamba-Transformer MoE, 256K ctx",
+  "name": "Jamba 1.5 Large"
+ },
+ "aisingapore/sea-lion-7b-instruct": {
+  "description": "shit tier \u2014 . Southeast-Asian-language-focused 7B model. Not built for\u2026",
+  "name": "SEA-LION 7B"
+ },
+ "baai/bge-m3": {
+  "description": "shit tier \u2014 general-purpose embedding model, not generative.",
+  "name": "BGE-M3"
+ },
+ "bigcode/starcoder2-15b": {
+  "context_window": 16384,
+  "description": "15B dense, 16K ctx, 600+ languages",
+  "name": "StarCoder2 15B"
+ },
+ "databricks/dbrx-instruct": {
+  "context_window": 32768,
+  "description": "132B MoE (36B active), 32K ctx",
+  "name": "DBRX Instruct"
+ },
+ "deepseek-ai/deepseek-coder-6.7b-instruct": {
+  "context_window": 16384,
+  "description": "6.7B dense, 16K ctx, trivial fixes only",
+  "name": "DeepSeek Coder 6.7B"
+ },
+ "deepseek-ai/deepseek-v4-flash": {
+  "context_window": 1000000,
+  "description": "284B MoE, 1M ctx, 79% SWE-bench, fast",
+  "name": "DeepSeek V4 Flash"
+ },
+ "deepseek-ai/deepseek-v4-pro": {
+  "context_window": 1000000,
+  "description": "1.6T MoE, 1M ctx, 80.6% SWE-bench",
+  "name": "DeepSeek V4 Pro"
+ },
+ "google/codegemma-1.1-7b": {
+  "description": "shit tier \u2014 minor revision of the above, same limitations.",
+  "name": "CodeGemma 1.1 7B"
+ },
+ "google/codegemma-7b": {
+  "description": "shit tier \u2014 7B, dated (2024), weak vs any Tier 1-3 pick",
+  "name": "CodeGemma 7B"
+ },
+ "google/deplot": {
+  "description": "shit tier \u2014 chart-to-table extraction model",
+  "name": "DePlot"
+ },
+ "google/gemma-2-2b-it": {
+  "description": "shit tier \u2014 . Same scale problem as above, one generation newer.",
+  "name": "Gemma 2 2B-it"
+ },
+ "google/gemma-2b": {
+  "description": "shit tier \u2014 . 2B toy model. Only useful for autocomplete-scale demos.",
+  "name": "Gemma 2B"
+ },
+ "google/gemma-3-12b-it": {
+  "description": "shit tier \u2014 , borderline",
+  "name": "Gemma 3 12B-it"
+ },
+ "google/gemma-3-4b-it": {
+  "description": "shit tier \u2014 . Still too small for real repo reasoning.",
+  "name": "Gemma 3 4B-it"
+ },
+ "google/gemma-3n-e2b-it": {
+  "description": "shit tier \u2014 . Edge/mobile-optimized 2B-class model \u2014 not a coding tool.",
+  "name": "Gemma 3n E2B"
+ },
+ "google/gemma-3n-e4b-it": {
+  "description": "shit tier \u2014 . Edge/mobile-optimized 4B-class model \u2014 not a coding tool.",
+  "name": "Gemma 3n E4B"
+ },
+ "google/gemma-4-31b-it": {
+  "description": "shit tier \u2014 . 31B general instruct model, no coding specialization \u2014\u2026",
+  "name": "Gemma 4 31B-it"
+ },
+ "google/recurrentgemma-2b": {
+  "description": "shit tier \u2014 . Research-oriented recurrent architecture at toy scale \u2014 not\u2026",
+  "name": "RecurrentGemma 2B"
+ },
+ "ibm/granite-3.0-3b-a800m-instruct": {
+  "description": "shit tier \u2014 . 3B MoE (800M active) \u2014 toy scale, skip.",
+  "name": "Granite 3.0 3B"
+ },
+ "ibm/granite-3.0-8b-instruct": {
+  "description": "shit tier \u2014 . General 8B chat model, not the code-tuned Granite variant \u2014\u2026",
+  "name": "Granite 3.0 8B"
+ },
+ "ibm/granite-34b-code-instruct": {
+  "context_window": 8192,
+  "description": "34B dense, 8K ctx, incl. legacy langs",
+  "name": "Granite 34B Code"
+ },
+ "ibm/granite-8b-code-instruct": {
+  "description": "8B dense, tiny ctx",
+  "name": "Granite 8B Code"
+ },
+ "meta/codellama-70b": {
+  "context_window": 16384,
+  "description": "70B dense, 16K ctx, coding specialist",
+  "name": "CodeLlama 70B"
+ },
+ "meta/llama-3.1-405b-instruct": {
+  "context_window": 131072,
+  "description": "405B dense, 128K ctx. Largest open dense model \u2014 capable but slow, and not\u2026",
+  "name": "Llama 3.1 405B"
+ },
+ "meta/llama-3.1-70b-instruct": {
+  "context_window": 131072,
+  "description": "70B dense, 128K ctx. Same tier as 3.3 above \u2014 prefer 3.3 if both are\u2026",
+  "name": "Llama 3.1 70B"
+ },
+ "meta/llama-3.2-11b-vision-instruct": {
+  "description": "shit tier \u2014 a vision-language model",
+  "name": "Llama 3.2 11B Vision"
+ },
+ "meta/llama-3.2-1b-instruct": {
+  "description": "shit tier \u2014 . 1B \u2014 genuinely too small to reason about a single function,\u2026",
+  "name": "Llama 3.2 1B"
+ },
+ "meta/llama-3.2-3b-instruct": {
+  "description": "shit tier \u2014 . 3B \u2014 same problem as above, slightly less bad.",
+  "name": "Llama 3.2 3B"
+ },
+ "meta/llama-3.2-90b-vision-instruct": {
+  "description": "shit tier \u2014 vision-language model",
+  "name": "Llama 3.2 90B Vision"
+ },
+ "meta/llama-3.3-70b-instruct": {
+  "context_window": 131072,
+  "description": "70B dense, 128K ctx. Solid generalist fallback, better\u2026",
+  "name": "Llama 3.3 70B"
+ },
+ "meta/llama-4-maverick-17b-128e-instruct": {
+  "context_window": 1000000,
+  "description": "~400B MoE, 1M ctx, efficient routing",
+  "name": "Llama 4 Maverick"
+ },
+ "meta/llama-guard-4-12b": {
+  "description": "shit tier \u2014 a content-safety classifier, not a coding model",
+  "name": "Llama Guard 4 12B"
+ },
+ "meta/llama2-70b": {
+  "description": "shit tier \u2014 . 2023-generation dense model, no meaningful code training,\u2026",
+  "name": "Llama 2 70B"
+ },
+ "microsoft/kosmos-2": {
+  "description": "shit tier \u2014 grounded vision-language model, no code focus.",
+  "name": "Kosmos-2"
+ },
+ "microsoft/phi-3-vision-128k-instruct": {
+  "description": "shit tier \u2014 vision-language model, code is not its purpose.",
+  "name": "Phi-3 Vision 128K"
+ },
+ "microsoft/phi-3.5-moe-instruct": {
+  "description": "shit tier \u2014 small general MoE, dated, no coding edge worth using over Tier\u2026",
+  "name": "Phi-3.5 MoE"
+ },
+ "minimaxai/minimax-m2.7": {
+  "context_window": 208896,
+  "description": "prior-gen MiniMax, 204K ctx",
+  "name": "MiniMax M2.7"
+ },
+ "minimaxai/minimax-m3": {
+  "context_window": 1000000,
+  "description": "MoE, 1M ctx, proven long autonomous debug runs",
+  "name": "MiniMax M3"
+ },
+ "mistralai/codestral-22b-instruct-v0.1": {
+  "context_window": 32768,
+  "description": "22B dense, 32K ctx, coding specialist",
+  "name": "Codestral 22B"
+ },
+ "mistralai/ministral-14b-instruct-2512": {
+  "description": "14B dense. Small, fast, general-purpose \u2014 fine for quick chat-style Q&A\u2026",
+  "name": "Ministral 14B"
+ },
+ "mistralai/mistral-7b-instruct-v0.3": {
+  "context_window": 32768,
+  "description": "shit tier \u2014 . 7B general chat model, 32K ctx. Can produce syntactically OK\u2026",
+  "name": "Mistral 7B v0.3"
+ },
+ "mistralai/mistral-large": {
+  "description": "Original Mistral Large",
+  "name": "Mistral Large (v1)"
+ },
+ "mistralai/mistral-large-2-instruct": {
+  "context_window": 131072,
+  "description": "123B dense, 128K ctx",
+  "name": "Mistral Large 2"
+ },
+ "mistralai/mistral-large-3-675b-instruct-2512": {
+  "context_window": 131072,
+  "description": "675B MoE, 128K ctx, multilingual",
+  "name": "Mistral Large 3"
+ },
+ "mistralai/mistral-medium-3.5-128b": {
+  "context_window": 131072,
+  "description": "128B-class dense, 128K ctx",
+  "name": "Mistral Medium 3.5"
+ },
+ "mistralai/mistral-nemotron": {
+  "description": "NVIDIA/Mistral collaboration dense model",
+  "name": "Mistral Nemotron"
+ },
+ "mistralai/mistral-small-4-119b-2603": {
+  "description": "Despite the name, ~119B dense",
+  "name": "Mistral Small 4"
+ },
+ "mistralai/mixtral-8x22b-v0.1": {
+  "context_window": 65536,
+  "description": "176B MoE, 64K ctx",
+  "name": "Mixtral 8x22B"
+ },
+ "mistralai/mixtral-8x7b-instruct-v0.1": {
+  "context_window": 32768,
+  "description": "56B MoE (12B active), 32K ctx",
+  "name": "Mixtral 8x7B"
+ },
+ "moonshotai/kimi-k2.6": {
+  "context_window": 262144,
+  "description": "1T MoE, 256K ctx, strong Rust/Go/Python/C",
+  "name": "Kimi K2.6"
+ },
+ "nv-mistralai/mistral-nemo-12b-instruct": {
+  "description": "shit tier \u2014 . 12B general chat model, decent multilingual but no coding\u2026",
+  "name": "Mistral NeMo 12B"
+ },
+ "nvidia/ai-synthetic-video-detector": {
+  "description": "shit tier \u2014 literally a deepfake-video detector",
+  "name": "AI Synthetic Video Detector"
+ },
+ "nvidia/cosmos-reason2-8b": {
+  "description": "shit tier \u2014 NVIDIA's physical-world/robotics reasoning model, unrelated to\u2026",
+  "name": "Cosmos Reason2 8B"
+ },
+ "nvidia/embed-qa-4": {
+  "description": "shit tier \u2014 embedding model for retrieval, not generative",
+  "name": "Embed-QA-4"
+ },
+ "nvidia/gliner-pii": {
+  "description": "shit tier \u2014 a PII-detection NER model, has nothing to do with source code.",
+  "name": "GLiNER PII"
+ },
+ "nvidia/ising-calibration-1-35b-a3b": {
+  "description": "shit tier \u2014 appears to be a specialized physics/optimization calibration\u2026",
+  "name": "Ising Calibration 1 35B-A3B"
+ },
+ "nvidia/llama-3.1-nemoguard-8b-content-safety": {
+  "description": "shit tier \u2014 safety classifier, not a generative coding model.",
+  "name": "NemoGuard Content Safety 8B"
+ },
+ "nvidia/llama-3.1-nemoguard-8b-topic-control": {
+  "description": "shit tier \u2014 topic-filtering classifier, can't write or debug code.",
+  "name": "NemoGuard Topic Control 8B"
+ },
+ "nvidia/llama-3.1-nemotron-51b-instruct": {
+  "description": "shit tier \u2014 2024-era general instruct model, no coding tune, superseded by\u2026",
+  "name": "Nemotron 51B (v1, dated)"
+ },
+ "nvidia/llama-3.1-nemotron-70b-instruct": {
+  "description": "shit tier \u2014 same story, dated general-purpose tune, skip in favor of the\u2026",
+  "name": "Nemotron 70B (v1, dated)"
+ },
+ "nvidia/llama-3.1-nemotron-nano-8b-v1": {
+  "description": "shit tier \u2014 small general chat model.",
+  "name": "Nemotron Nano 8B v1"
+ },
+ "nvidia/llama-3.1-nemotron-nano-vl-8b-v1": {
+  "description": "shit tier \u2014 vision-language variant.",
+  "name": "Nemotron Nano VL 8B v1"
+ },
+ "nvidia/llama-3.1-nemotron-safety-guard-8b-v3": {
+  "description": "shit tier \u2014 another safety classifier.",
+  "name": "Nemotron Safety Guard 8B v3"
+ },
+ "nvidia/llama-3.1-nemotron-ultra-253b-v1": {
+  "context_window": 131072,
+  "description": "253B dense, 128K ctx, no MoE variance",
+  "name": "Nemotron Ultra 253B"
+ },
+ "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1": {
+  "description": "shit tier \u2014 embedding model, not generative.",
+  "name": "NeMo Retriever 1B VLM Embed"
+ },
+ "nvidia/llama-3.2-nv-embedqa-1b-v1": {
+  "description": "shit tier \u2014 embedding model, not generative.",
+  "name": "NV-EmbedQA 1B"
+ },
+ "nvidia/llama-3.3-nemotron-super-49b-v1": {
+  "context_window": 131072,
+  "description": "49B dense, 128K ctx, older tune",
+  "name": "Nemotron Super 49B v1"
+ },
+ "nvidia/llama-3.3-nemotron-super-49b-v1.5": {
+  "context_window": 131072,
+  "description": "49B dense, 128K ctx, fast structured output",
+  "name": "Nemotron Super 49B v1.5"
+ },
+ "nvidia/llama-nemotron-embed-1b-v2": {
+  "description": "shit tier \u2014 embedding model, not generative.",
+  "name": "Nemotron Embed 1B v2"
+ },
+ "nvidia/llama-nemotron-embed-vl-1b-v2": {
+  "description": "shit tier \u2014 multimodal embedding model, not generative.",
+  "name": "Nemotron Embed VL 1B v2"
+ },
+ "nvidia/llama3-chatqa-1.5-70b": {
+  "description": "shit tier \u2014 retrieval-augmented Q&A model, not a coding tool.",
+  "name": "Llama3-ChatQA 1.5 70B"
+ },
+ "nvidia/mistral-nemo-minitron-8b-8k-instruct": {
+  "context_window": 8192,
+  "description": "shit tier \u2014 distilled small general model, 8K ctx, no coding edge.",
+  "name": "Mistral-NeMo-Minitron 8B"
+ },
+ "nvidia/nemoretriever-parse": {
+  "description": "shit tier \u2014 document-parsing model, not generative code.",
+  "name": "NeMo Retriever Parse"
+ },
+ "nvidia/nemotron-3-embed-1b": {
+  "description": "shit tier \u2014 embedding model, not generative.",
+  "name": "Nemotron 3 Embed 1B"
+ },
+ "nvidia/nemotron-3-nano-30b-a3b": {
+  "context_window": 131072,
+  "description": "30B MoE (3B active), 128K ctx",
+  "name": "Nemotron 3 Nano 30B"
+ },
+ "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning": {
+  "context_window": 131072,
+  "description": "30B MoE (3B active), 128K ctx, reasoning-tuned",
+  "name": "Nemotron 3 Nano Omni 30B"
+ },
+ "nvidia/nemotron-3-super-120b-a12b": {
+  "context_window": 1000000,
+  "description": "120B MoE, 1M ctx, best speed/quality NVIDIA tier",
+  "name": "Nemotron 3 Super 120B"
+ },
+ "nvidia/nemotron-3-ultra-550b-a55b": {
+  "context_window": 1000000,
+  "description": "550B MoE, 1M ctx, hybrid Mamba-Transformer",
+  "name": "Nemotron 3 Ultra 550B"
+ },
+ "nvidia/nemotron-3.5-content-safety": {
+  "description": "shit tier \u2014 content moderation model, not for code.",
+  "name": "Nemotron 3.5 Content Safety"
+ },
+ "nvidia/nemotron-4-340b-instruct": {
+  "context_window": 4096,
+  "description": "340B dense, 4K ctx (short!)",
+  "name": "Nemotron 4 340B"
+ },
+ "nvidia/nemotron-4-340b-reward": {
+  "description": "shit tier \u2014 a reward model for RLHF pipelines, not something you chat with\u2026",
+  "name": "Nemotron 4 340B Reward"
+ },
+ "nvidia/nemotron-mini-4b-instruct": {
+  "description": "shit tier \u2014 . 4B \u2014 fine for a phone, not for reasoning about a kernel\u2026",
+  "name": "Nemotron Mini 4B"
+ },
+ "nvidia/nemotron-nano-3-30b-a3b": {
+  "description": "Listed in the catalog but appears to be a duplicate/variant of\u2026",
+  "name": "Nemotron Nano 3 30B-A3B (unverified listing)"
+ },
+ "nvidia/nemotron-parse": {
+  "description": "shit tier \u2014 same category, document parsing, not code.",
+  "name": "Nemotron Parse"
+ },
+ "nvidia/neva-22b": {
+  "description": "shit tier \u2014 vision-language chat model.",
+  "name": "NeVA 22B"
+ },
+ "nvidia/nv-embed-v1": {
+  "description": "shit tier \u2014 general embedding model, not generative.",
+  "name": "NV-Embed v1"
+ },
+ "nvidia/nv-embedcode-7b-v1": {
+  "description": "shit tier \u2014 as a chat model \u2014 this is a code embedding model for semantic\u2026",
+  "name": "NV-EmbedCode 7B"
+ },
+ "nvidia/nv-embedqa-e5-v5": {
+  "description": "shit tier \u2014 embedding model, not generative.",
+  "name": "NV-EmbedQA E5 v5"
+ },
+ "nvidia/nv-embedqa-mistral-7b-v2": {
+  "description": "shit tier \u2014 embedding model built on Mistral 7B, but embedding-only, not\u2026",
+  "name": "NV-EmbedQA Mistral 7B v2"
+ },
+ "nvidia/nvclip": {
+  "description": "shit tier \u2014 image/text similarity embedding model, no code generation.",
+  "name": "NV-CLIP"
+ },
+ "nvidia/nvidia-nemotron-nano-9b-v2": {
+  "description": "shit tier \u2014 9B general-purpose small model, not coding-specialized.",
+  "name": "Nemotron Nano 9B v2"
+ },
+ "nvidia/riva-translate-4b-instruct": {
+  "description": "shit tier \u2014 speech/text translation model, not a coding model.",
+  "name": "Riva Translate 4B"
+ },
+ "nvidia/riva-translate-4b-instruct-v1.1": {
+  "description": "shit tier \u2014 same as above, minor revision.",
+  "name": "Riva Translate 4B v1.1"
+ },
+ "nvidia/vila": {
+  "description": "shit tier \u2014 vision-language model.",
+  "name": "VILA"
+ },
+ "openai/gpt-oss-120b": {
+  "context_window": 131072,
+  "description": "~120B MoE, 128K ctx",
+  "name": "GPT-OSS 120B"
+ },
+ "poolside/laguna-xs-2.1": {
+  "description": "'XS' = the small tier of Poolside's code-focused model family",
+  "name": "Poolside Laguna XS 2.1"
+ },
+ "qwen/qwen3-next-80b-a3b-instruct": {
+  "context_window": 262144,
+  "description": "80B MoE, 256K ctx, fast but shallow",
+  "name": "Qwen3-Next 80B"
+ },
+ "qwen/qwen3.5-122b-a10b": {
+  "context_window": 268288,
+  "description": "122B MoE, 262K ctx",
+  "name": "Qwen 3.5 122B"
+ },
+ "qwen/qwen3.5-397b-a17b": {
+  "context_window": 268288,
+  "description": "397B MoE, 262K ctx, 76.4% SWE-bench",
+  "name": "Qwen 3.5 397B"
+ },
+ "sarvamai/sarvam-m": {
+  "description": "shit tier \u2014 . Indic-language-focused model. Wrong tool entirely for\u2026",
+  "name": "Sarvam-M"
+ },
+ "snowflake/arctic-embed-l": {
+  "description": "shit tier \u2014 embedding model, not generative.",
+  "name": "Arctic Embed L"
+ },
+ "stepfun-ai/step-3.5-flash": {
+  "description": "Fast general-purpose model from StepFun",
+  "name": "Step 3.5 Flash"
+ },
+ "stepfun-ai/step-3.7-flash": {
+  "description": "Newer Step Flash generation",
+  "name": "Step 3.7 Flash"
+ },
+ "thinkingmachines/inkling": {
+  "description": "Thinking Machines Lab's research model",
+  "name": "Inkling"
+ },
+ "upstage/solar-10.7b-instruct": {
+  "description": "10.7B dense generalist",
+  "name": "Solar 10.7B"
+ },
+ "writer/palmyra-creative-122b": {
+  "description": "shit tier \u2014 tuned for marketing/creative writing, not code.",
+  "name": "Palmyra Creative 122B"
+ },
+ "writer/palmyra-fin-70b-32k": {
+  "description": "shit tier \u2014 finance-domain model, irrelevant to kernel/Firefox work.",
+  "name": "Palmyra Fin 70B"
+ },
+ "writer/palmyra-med-70b": {
+  "description": "shit tier \u2014 medical-domain model, irrelevant here.",
+  "name": "Palmyra Med 70B"
+ },
+ "writer/palmyra-med-70b-32k": {
+  "description": "shit tier \u2014 same as above, longer context, still medical-domain.",
+  "name": "Palmyra Med 70B 32K"
+ },
+ "z-ai/glm-5.2": {
+  "context_window": 1000000,
+  "description": "~750B MoE, 1M ctx, best long-horizon agent",
+  "name": "GLM 5.2"
+ },
+ "zyphra/zamba2-7b-instruct": {
+  "description": "shit tier \u2014 . Small hybrid SSM-transformer, general chat only. No coding\u2026",
+  "name": "Zamba2 7B"
+ }
+}

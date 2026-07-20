@@ -19,6 +19,12 @@ type SendMsg struct {
 	Attachments []message.Attachment
 }
 
+// GORILLA OVERRIDE: emitted when the user types a slash command in the
+// editor (e.g. /model, /models, /export). Handled centrally in the TUI.
+type SlashCommandMsg struct {
+	Name string
+}
+
 type SessionSelectedMsg = session.Session
 
 type SessionClearedMsg struct{}

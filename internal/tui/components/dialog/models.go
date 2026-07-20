@@ -206,12 +206,21 @@ func (m *modelDialogCmp) View() string {
 	modelItems := make([]string, 0, endIdx-m.scrollOffset)
 
 	for i := m.scrollOffset; i < endIdx; i++ {
+		// GORILLA OVERRIDE: show "Name — description" so 100+ discovered
+		// models are distinguishable; truncate to the dialog width.
+		label := m.models[i].Name
+		if d := m.models[i].Description; d != "" {
+			label = fmt.Sprintf("%s — %s", m.models[i].Name, d)
+		}
+		if r := []rune(label); len(r) > maxDialogWidth-1 {
+			label = string(r[:maxDialogWidth-2]) + "…"
+		}
 		itemStyle := baseStyle.Width(maxDialogWidth)
 		if i == m.selectedIdx {
 			itemStyle = itemStyle.Background(t.Primary()).
 				Foreground(t.Background()).Bold(true)
 		}
-		modelItems = append(modelItems, itemStyle.Render(m.models[i].Name))
+		modelItems = append(modelItems, itemStyle.Render(label))
 	}
 
 	scrollIndicator := m.getScrollIndicators(maxDialogWidth)
@@ -252,8 +261,14 @@ func (m *modelDialogCmp) getScrollIndicators(maxWidth int) string {
 		}
 	}
 
-	if indicator == "" {
-		return ""
+	// GORILLA OVERRIDE: always show "position/total" so the user knows
+	// where they are in a long list and when they've reached the end,
+	// instead of an unbounded scroll with no reference point.
+	pos := fmt.Sprintf("%d/%d", m.selectedIdx+1, len(m.models))
+	if indicator != "" {
+		indicator = pos + "  " + indicator
+	} else {
+		indicator = pos
 	}
 
 	t := theme.CurrentTheme()

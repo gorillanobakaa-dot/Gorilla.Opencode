@@ -391,6 +391,19 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, nil
 
+	case chat.SlashCommandMsg:
+		// GORILLA OVERRIDE: dispatch editor slash commands.
+		switch msg.Name {
+		case "model", "models":
+			a.modelDialog.Init()
+			a.showModelDialog = true
+			return a, nil
+		case "export":
+			return a, a.exportSession()
+		default:
+			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model or /export)", msg.Name))
+		}
+
 	case chat.SessionSelectedMsg:
 		a.selectedSession = msg
 		a.sessionDialog.SetSelectedSession(msg.ID)
