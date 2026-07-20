@@ -162,18 +162,21 @@ func convertLocalModel(model localModel) Model {
 	name := friendlyModelName(model.ID)
 	description := ""
 	var metaCtx int64
+	rank := 0
 	if meta, ok := lookupModelMeta(model.ID); ok {
 		if meta.Name != "" {
 			name = meta.Name
 		}
 		description = meta.Description
 		metaCtx = meta.ContextWindow
+		rank = meta.Rank
 	}
 	ctx := cmp.Or(model.LoadedContextLength, metaCtx, 32768)
 	return Model{
 		ID:          ModelID("local." + model.ID),
 		Name:        name,
 		Description: description,
+		Rank:        rank,
 		Provider:    ProviderLocal,
 		APIModel:    model.ID,
 		// GORILLA OVERRIDE: prefer the endpoint's reported length, then
