@@ -16,6 +16,29 @@ tracks cover the same facts. Neither is a summary of the other.
 
 *Plain language. No assumed knowledge.*
 
+## What it looks like
+
+The whole thing runs in a terminal. You type in plain English at the
+bottom; the assistant answers above. On the right is a status panel
+(which folder you're in, which model is answering). A full plain-English
+tour of every part of the screen is in **[docs/GUIDE.md](docs/GUIDE.md)**.
+
+![Gorilla OpenCode running on NVIDIA NIM](docs/screenshots/01-running-nvidia-nim.png)
+
+Picking a model (type `/model`): a ranked list of the models that
+actually work — we pinged each one and dropped the dead ones. Press the
+**→ arrow** to switch to the Google models.
+
+![The model picker](docs/screenshots/gallery/10-09-02-16.png)
+
+Seeing what each message costs (type `/context`): every piece of
+background the assistant sends is listed with its token cost, and you can
+switch any of it off.
+
+![The context menu](docs/screenshots/02-context-loadout.png)
+
+More screenshots: **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)**.
+
 ## What is this?
 
 This is a program that puts an AI coding assistant inside your terminal
