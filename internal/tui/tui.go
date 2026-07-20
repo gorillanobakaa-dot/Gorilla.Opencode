@@ -400,8 +400,13 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		case "export":
 			return a, a.exportSession()
+		case "clear", "new":
+			// GORILLA OVERRIDE: /clear starts a fresh session, dropping
+			// the accumulated context (and its per-turn token cost).
+			a.selectedSession = session.Session{}
+			return a, util.CmdHandler(chat.SessionClearedMsg{})
 		default:
-			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model or /export)", msg.Name))
+			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /export, /clear)", msg.Name))
 		}
 
 	case chat.SessionSelectedMsg:
