@@ -191,13 +191,20 @@ func (m *modelDialogCmp) switchProvider(offset int) {
 func (m *modelDialogCmp) View() string {
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
+	// GORILLA OVERRIDE: responsive width — as wide as the terminal
+	// allows so long model descriptions ("DeepSeek V4 Pro — 1.6T MoE,
+	// 1M ctx, 80.6% SWE-bench") are readable, not truncated at 62.
+	w := maxDialogWidth
+	if m.width > 0 && m.width-8 > w {
+		w = m.width - 8
+	}
 
 	// Capitalize first letter of provider name
 	providerName := strings.ToUpper(string(m.provider)[:1]) + string(m.provider[1:])
 	title := baseStyle.
 		Foreground(t.Primary()).
 		Bold(true).
-		Width(maxDialogWidth).
+		Width(w).
 		Padding(0, 0, 1).
 		Render(fmt.Sprintf("Select %s Model", providerName))
 
@@ -212,10 +219,10 @@ func (m *modelDialogCmp) View() string {
 		if d := m.models[i].Description; d != "" {
 			label = fmt.Sprintf("%s — %s", m.models[i].Name, d)
 		}
-		if r := []rune(label); len(r) > maxDialogWidth-1 {
-			label = string(r[:maxDialogWidth-2]) + "…"
+		if r := []rune(label); len(r) > w-1 {
+			label = string(r[:w-2]) + "…"
 		}
-		itemStyle := baseStyle.Width(maxDialogWidth)
+		itemStyle := baseStyle.Width(w)
 		if i == m.selectedIdx {
 			itemStyle = itemStyle.Background(t.Primary()).
 				Foreground(t.Background()).Bold(true)
@@ -223,12 +230,12 @@ func (m *modelDialogCmp) View() string {
 		modelItems = append(modelItems, itemStyle.Render(label))
 	}
 
-	scrollIndicator := m.getScrollIndicators(maxDialogWidth)
+	scrollIndicator := m.getScrollIndicators(w)
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
 		title,
-		baseStyle.Width(maxDialogWidth).Render(lipgloss.JoinVertical(lipgloss.Left, modelItems...)),
+		baseStyle.Width(w).Render(lipgloss.JoinVertical(lipgloss.Left, modelItems...)),
 		scrollIndicator,
 	)
 
