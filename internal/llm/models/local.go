@@ -155,17 +155,33 @@ func loadLocalModels(models []localModel) {
 }
 
 func convertLocalModel(model localModel) Model {
+	// GORILLA OVERRIDE: enrich discovered models with bundled metadata
+	// (curated name, capability description, real context window) so a
+	// user facing 100+ NVIDIA NIM models can tell them apart. Falls
+	// back to the auto-generated name when a model isn't in the bundle.
+	name := friendlyModelName(model.ID)
+	description := ""
+	var metaCtx int64
+	if meta, ok := lookupModelMeta(model.ID); ok {
+		if meta.Name != "" {
+			name = meta.Name
+		}
+		description = meta.Description
+		metaCtx = meta.ContextWindow
+	}
+	ctx := cmp.Or(model.LoadedContextLength, metaCtx, 32768)
 	return Model{
-		ID:                  ModelID("local." + model.ID),
-		Name:                friendlyModelName(model.ID),
-		Provider:            ProviderLocal,
-		APIModel:            model.ID,
-		// GORILLA OVERRIDE: 4096 fallback crippled every endpoint that
-		// doesn't report context length (Ollama /v1/models, NVIDIA NIM).
-		// 32768 is a conservative floor, not a measured limit — same
-		// convention as the crush.json NIM config (2026-07-19).
-		ContextWindow:       cmp.Or(model.LoadedContextLength, 32768),
-		DefaultMaxTokens:    cmp.Or(model.LoadedContextLength, 8192),
+		ID:          ModelID("local." + model.ID),
+		Name:        name,
+		Description: description,
+		Provider:    ProviderLocal,
+		APIModel:    model.ID,
+		// GORILLA OVERRIDE: prefer the endpoint's reported length, then
+		// bundled metadata, then a conservative 32K floor. 4096 (the
+		// original) crippled endpoints that report nothing (Ollama
+		// /v1/models, NVIDIA NIM).
+		ContextWindow:    ctx,
+		DefaultMaxTokens: min(ctx/2, 8192),
 		// GORILLA OVERRIDE: local models must not be assumed reasoning-capable.
 		// CanReason=true made the OpenAI-compat client send reasoning_effort,
 		// which Ollama (2026) rejects with 400 "does not support thinking"

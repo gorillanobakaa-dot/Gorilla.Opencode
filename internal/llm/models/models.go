@@ -8,8 +8,12 @@ type (
 )
 
 type Model struct {
-	ID                  ModelID       `json:"id"`
-	Name                string        `json:"name"`
+	ID   ModelID `json:"id"`
+	Name string  `json:"name"`
+	// GORILLA OVERRIDE: short human description of capability
+	// (params, context window, coding strength) shown in the model
+	// picker. Populated for discovered models from bundled metadata.
+	Description         string        `json:"description,omitempty"`
 	Provider            ModelProvider `json:"provider"`
 	APIModel            string        `json:"api_model"`
 	CostPer1MIn         float64       `json:"cost_per_1m_in"`
