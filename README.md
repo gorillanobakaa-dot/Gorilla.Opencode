@@ -134,13 +134,30 @@ plain-language and developer: [DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-t
 
 ## What the revival changed
 
-Six files. Every change carries a `// GORILLA OVERRIDE:` comment saying
-what and why — `grep -rn "GORILLA OVERRIDE" .` is the complete audit
-trail. Headlines: authenticated OpenAI-compatible endpoints (NVIDIA NIM),
-Gemini 3 thought-signature support (SDK v1.3→v1.64), two segfault fixes
-that were masking real API errors, one upstream operator-precedence bug,
-embedded icons + self-installer. Details, verification results, and
-honest limitations: [DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-track.md).
+It started as six files to get the fossil talking to 2026 providers; it
+has since grown into **~80 files changed across 20+ releases** — roughly
+**+4,000 lines**, **85 `// GORILLA OVERRIDE:` markers in 32 source
+files**. Every single change carries one of those comments saying what
+changed and why, so `grep -rn "GORILLA OVERRIDE" .` is the complete,
+honest audit trail.
+
+Headline work:
+
+- **Providers**: authenticated OpenAI-compatible endpoints (NVIDIA NIM),
+  Google Gemini 3 with thought-signature support (genai SDK v1.3→v1.64),
+  local Ollama, and native Groq + Cerebras.
+- **Bug fixes**: two segfaults masking real API errors, an upstream
+  operator-precedence bug, a rate-limit retry storm (2→256s backoff), and
+  a concurrent-request bug that tripped free-tier limits on a plain "yo".
+- **UX**: a ranked, probe-verified model picker; `/model` `/context`
+  `/export` `/clear` slash commands; the `/context` token-loadout menu;
+  mouse-wheel scrolling; a modern, lean system prompt.
+- **Packaging**: embedded icons + self-installer, `.deb`, one-line curl
+  install, and all config unified under `~/.config/gorilla-opencode/`.
+
+Blow-by-blow with dates: [CHANGELOG.md](CHANGELOG.md). Details,
+verification results, and honest limitations:
+[DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-track.md).
 
 ## License
 
