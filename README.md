@@ -25,6 +25,10 @@ API keys or run models on your own machine.
 > (`gorilla-opencode login`) to use Google's Code Assist free tier — the same
 > login Gemini CLI/Antigravity use, so your quota lasts: **[docs/GOOGLE-LOGIN.md](docs/GOOGLE-LOGIN.md)**.
 >
+> **🔐 "Why did GitHub block our push over a secret that isn't secret?"** A
+> real story from building this, turned into a lesson on OAuth logins, client
+> secrets, and telling a real leak from a false alarm: **[docs/CLIENT-SECRETS-EXPLAINED.md](docs/CLIENT-SECRETS-EXPLAINED.md)**.
+>
 > The design draws on published research; we cite our sources so you can
 > read them and judge for yourself: **[system-prompts/RESEARCH-SOURCES.md](system-prompts/RESEARCH-SOURCES.md)**.
 
