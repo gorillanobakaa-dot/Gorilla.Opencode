@@ -17,7 +17,12 @@ import (
 	"github.com/opencode-ai/opencode/internal/tui/util"
 )
 
-const loadoutDialogWidth = 74
+// GORILLA OVERRIDE: widened (was 74) and made responsive so the full
+// per-turn cost sentences are visible; capped so it stays readable.
+const (
+	loadoutMinWidth = 100
+	loadoutMaxWidth = 150
+)
 
 // CloseLoadoutDialogMsg closes the loadout menu.
 type CloseLoadoutDialogMsg struct{}
@@ -32,6 +37,19 @@ type LoadoutDialog interface {
 
 type loadoutDialogCmp struct {
 	selectedIdx int
+	termWidth   int
+}
+
+// width returns the responsive dialog width.
+func (m *loadoutDialogCmp) width() int {
+	w := loadoutMaxWidth
+	if m.termWidth > 0 && m.termWidth-6 < w {
+		w = m.termWidth - 6
+	}
+	if w < loadoutMinWidth {
+		w = loadoutMinWidth
+	}
+	return w
 }
 
 type loadoutKeyMap struct {
@@ -52,6 +70,8 @@ func (m *loadoutDialogCmp) Init() tea.Cmd { return nil }
 
 func (m *loadoutDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.termWidth = msg.Width
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, loadoutKeys.Up):
@@ -78,13 +98,14 @@ func (m *loadoutDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *loadoutDialogCmp) View() string {
 	t := theme.CurrentTheme()
 	base := styles.BaseStyle()
+	w := m.width()
 
 	total := config.LoadoutActiveTokens()
-	header := base.Foreground(t.Primary()).Bold(true).Width(loadoutDialogWidth).
+	header := base.Foreground(t.Primary()).Bold(true).Width(w).
 		Render("Context loadout — what every turn costs")
-	sub := base.Foreground(t.TextMuted()).Width(loadoutDialogWidth).
+	sub := base.Foreground(t.TextMuted()).Width(w).
 		Render(fmt.Sprintf("~%s tokens are sent to the model on EVERY turn, even to say \"yo\".", commaInt(total)))
-	fixed := base.Foreground(t.TextMuted()).Width(loadoutDialogWidth).
+	fixed := base.Foreground(t.TextMuted()).Width(w).
 		Render(fmt.Sprintf("(base system prompt ~%s is always on; the rest is yours to cut)", commaInt(config.LoadoutBaseTokens())))
 
 	var rows []string
@@ -98,11 +119,12 @@ func (m *loadoutDialogCmp) View() string {
 		if c.Critical {
 			mark = " ⚠"
 		}
-		line := fmt.Sprintf("%s %-18s ~%-5s  %s%s", box, c.Name, commaInt(c.Tokens), tradeoffText(on, c.Tradeoff), mark)
-		if r := []rune(line); len(r) > loadoutDialogWidth-1 {
-			line = string(r[:loadoutDialogWidth-2]) + "…"
+		// GORILLA OVERRIDE: real measured cost via ComponentTokens.
+		line := fmt.Sprintf("%s %-18s ~%-6s  %s%s", box, c.Name, commaInt(config.ComponentTokens(c)), tradeoffText(on, c.Tradeoff), mark)
+		if r := []rune(line); len(r) > w-1 {
+			line = string(r[:w-2]) + "…"
 		}
-		style := base.Width(loadoutDialogWidth)
+		style := base.Width(w)
 		switch {
 		case i == m.selectedIdx:
 			style = style.Background(t.Primary()).Foreground(t.Background()).Bold(true)
@@ -112,8 +134,8 @@ func (m *loadoutDialogCmp) View() string {
 		rows = append(rows, style.Render(line))
 	}
 
-	help := base.Foreground(t.TextMuted()).Width(loadoutDialogWidth).
-		Render("space toggle · r reset defaults · esc close   ⚠ = disabling cripples the agent")
+	help := base.Foreground(t.TextMuted()).Width(w).
+		Render("space toggle · r reset defaults · esc close   ⚠ = disabling cripples the agent · prompt.* apply on restart")
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		header, sub, fixed, "",

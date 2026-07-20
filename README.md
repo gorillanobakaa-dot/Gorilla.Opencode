@@ -6,6 +6,11 @@
 licensed, no telemetry, no accounts, no vendor funnel. Bring your own
 API keys or run models on your own machine.
 
+![Gorilla OpenCode running on NVIDIA NIM](docs/screenshots/01-running-nvidia-nim.png)
+
+> Proof gallery — running on NVIDIA NIM and the `/context` token-loadout
+> menu in action: **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)**.
+
 > **Provenance, stated plainly:** this is the original Go OpenCode by
 > [Kujtim Hoxha](https://github.com/kujtimiihoxha), archived in 2025
 > when its development continued as [Crush](https://github.com/charmbracelet/crush)
