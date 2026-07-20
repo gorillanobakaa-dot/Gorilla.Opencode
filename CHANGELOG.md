@@ -48,6 +48,18 @@ explanations live in [DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-track.md).
   /context, the env/git block is the big one — and model choice (some
   NIM models reason internally and are just slow).
 
+## v0.1.21 — 2026-07-20 — Fix the rate-limit retry storm ("forever" cure)
+
+- The real cause of "models take forever": on an HTTP 429 (NVIDIA NIM's
+  free/eval tier has a low concurrent-request limit) the app retried with
+  a runaway backoff — 2,4,8,16,32,64,128,256s over 8 attempts, so a 2s
+  blip became 8+ minutes of "Retrying due to rate limit". Now capped at
+  6s per retry over 5 attempts (worst case ~20s), and most transient
+  429s recover on the first ~0.5s retry.
+- The status message is honest now: "Provider busy (rate-limit/5xx),
+  retrying 2/5 in 1.0s" — it fires on 429 and 500, not only rate limits.
+- (Networking itself was fine all along — NIM answers in ~1s; measured.)
+
 ## v0.1.9 — 2026-07-20 — Loadout: real numbers, wider, proof
 
 - The `/context` loadout shows **measured** per-turn token costs (real
