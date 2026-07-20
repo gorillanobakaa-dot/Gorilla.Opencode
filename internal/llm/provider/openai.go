@@ -235,7 +235,7 @@ func (o *openaiClient) send(ctx context.Context, messages []message.Message, too
 				return nil, retryErr
 			}
 			if retry {
-				logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, maxRetries), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+				logging.WarnPersist(fmt.Sprintf("Provider busy (rate-limit/5xx), retrying %d/%d in %.1fs", attempts, maxRetries, float64(after)/1000), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
 					return nil, ctx.Err()
@@ -342,7 +342,7 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 				return
 			}
 			if retry {
-				logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, maxRetries), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+				logging.WarnPersist(fmt.Sprintf("Provider busy (rate-limit/5xx), retrying %d/%d in %.1fs", attempts, maxRetries, float64(after)/1000), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
 					// context cancelled
@@ -375,18 +375,26 @@ func (o *openaiClient) shouldRetry(attempts int, err error) (bool, int64, error)
 	}
 
 	if attempts > maxRetries {
-		return false, 0, fmt.Errorf("maximum retry attempts reached for rate limit: %d retries", maxRetries)
+		return false, 0, fmt.Errorf("still failing after %d retries (HTTP %d) — the provider is rate-limiting or unavailable; wait a moment or switch model", maxRetries, apierr.StatusCode)
 	}
 
-	retryMs := 0
-	retryAfterValues := apierr.Response.Header.Values("Retry-After")
-
-	backoffMs := 2000 * (1 << (attempts - 1))
-	jitterMs := int(float64(backoffMs) * 0.2)
-	retryMs = backoffMs + jitterMs
-	if len(retryAfterValues) > 0 {
-		if _, err := fmt.Sscanf(retryAfterValues[0], "%d", &retryMs); err == nil {
-			retryMs = retryMs * 1000
+	// GORILLA OVERRIDE: the old schedule was 2s·2^(n-1) = 2,4,8,16,32,
+	// 64,128,256s — a brief 429 (common on NIM's low concurrency limit)
+	// turned into 8+ minutes of "retrying". Cap the backoff so a
+	// transient rate-limit recovers in seconds. Honour a server-sent
+	// Retry-After but cap that too.
+	retryMs := 500 * (1 << (attempts - 1)) // 0.5,1,2,4,8,16...
+	if retryMs > 6000 {
+		retryMs = 6000
+	}
+	retryMs += int(float64(retryMs) * 0.2) // jitter
+	if vals := apierr.Response.Header.Values("Retry-After"); len(vals) > 0 {
+		var secs int
+		if _, err := fmt.Sscanf(vals[0], "%d", &secs); err == nil {
+			retryMs = secs * 1000
+			if retryMs > 15000 {
+				retryMs = 15000
+			}
 		}
 	}
 	return true, int64(retryMs), nil
