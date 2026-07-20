@@ -216,6 +216,12 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.filepicker = filepicker.(dialog.FilepickerCmp)
 		cmds = append(cmds, filepickerCmd)
 
+		// GORILLA OVERRIDE: the loadout dialog needs the terminal width
+		// to render full-width; feed it the size even while hidden.
+		loadoutModel, loadoutCmd := a.loadoutDialog.Update(msg)
+		a.loadoutDialog = loadoutModel.(dialog.LoadoutDialog)
+		cmds = append(cmds, loadoutCmd)
+
 		a.initDialog.SetSize(msg.Width, msg.Height)
 
 		if a.showMultiArgumentsDialog {

@@ -136,7 +136,7 @@ func (m *loadoutDialogCmp) View() string {
 	}
 
 	help := base.Foreground(t.TextMuted()).Width(w).
-		Render("space toggle · r reset defaults · esc close   ⚠ = disabling cripples the agent · prompt.* apply on restart")
+		Render("space toggle · r reset defaults · esc close   ⚠ = disabling cripples the agent")
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		header, sub, fixed, "",

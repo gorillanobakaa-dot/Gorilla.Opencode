@@ -202,4 +202,8 @@ func (app *App) ReloadCoderTools() {
 		app.History,
 		app.LSPClients,
 	))
+	// GORILLA OVERRIDE: also re-render the system prompt so env/LSP
+	// loadout toggles (the env block can be thousands of tokens) take
+	// effect immediately, not on restart.
+	app.CoderAgent.RebuildProvider()
 }
