@@ -2,10 +2,12 @@ package prompt
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
@@ -13,13 +15,25 @@ import (
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 )
 
+// GORILLA OVERRIDE: the modern base prompt. Replaces the two 2023-era
+// prompts (baseOpenAICoderPrompt / baseAnthropicCoderPrompt, ~2,003
+// tokens, heavy ALL-CAPS + markdown headers). This one is ~924 tokens
+// of plain declarative prose — no shouty caps, no "#" scaffolding for a
+// swarm to echo — synthesised from the modern Claude Code prompt plus
+// the SOTA agentic-prompting research (neutral/imperative, faithful
+// outcome reporting, anti-hallucination, loop discipline) and
+// specialised for building large systems (Firefox/mach, Linux kernel,
+// Windows internals). Editable: internal/llm/prompt/coder-modern.txt;
+// study copy in system-prompts/proposed/.
+//
+//go:embed coder-modern.txt
+var baseModernCoderPrompt string
+
 // BaseCoderPrompt is the base instructions only (no env/LSP blocks).
 // GORILLA OVERRIDE: exported so the context loadout can measure it.
+// Provider-neutral now — the modern prompt works across providers.
 func BaseCoderPrompt(provider models.ModelProvider) string {
-	if provider == models.ProviderOpenAI {
-		return baseOpenAICoderPrompt
-	}
-	return baseAnthropicCoderPrompt
+	return strings.TrimSpace(baseModernCoderPrompt)
 }
 
 // EnvironmentInfoBlock / LSPInfoBlock expose the switchable prompt blocks
