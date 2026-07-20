@@ -21,6 +21,10 @@ API keys or run models on your own machine.
 > reproducible network audit (`ss`/`tshark`/`strace`) proving it connects
 > only to the provider you choose: **[SECURITY.md](SECURITY.md)**.
 >
+> **🔑 Free Gemini with no API key.** Sign in with your Gmail
+> (`gorilla-opencode login`) to use Google's Code Assist free tier — the same
+> login Gemini CLI/Antigravity use, so your quota lasts: **[docs/GOOGLE-LOGIN.md](docs/GOOGLE-LOGIN.md)**.
+>
 > The design draws on published research; we cite our sources so you can
 > read them and judge for yourself: **[system-prompts/RESEARCH-SOURCES.md](system-prompts/RESEARCH-SOURCES.md)**.
 
@@ -69,6 +73,9 @@ LOCAL_ENDPOINT_API_KEY=nvapi-... gorilla-opencode
 
 # Google AI Studio (Gemini 3, free tier works)
 GEMINI_API_KEY=... gorilla-opencode
+
+# ...or sign in with Google (free Code Assist tier, no API key) — see below
+gorilla-opencode login
 
 # Local models via Ollama (no key, no cloud)
 LOCAL_ENDPOINT=http://localhost:11434/v1 gorilla-opencode

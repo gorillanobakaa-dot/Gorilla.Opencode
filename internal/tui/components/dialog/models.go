@@ -199,8 +199,8 @@ func (m *modelDialogCmp) View() string {
 		w = m.width - 8
 	}
 
-	// Capitalize first letter of provider name
-	providerName := strings.ToUpper(string(m.provider)[:1]) + string(m.provider[1:])
+	// Capitalize first letter of provider name (with friendly overrides)
+	providerName := providerDisplayName(m.provider)
 	title := baseStyle.
 		Foreground(t.Primary()).
 		Bold(true).
@@ -462,6 +462,21 @@ func codingRank(id string) int {
 	}
 	// Everything else in the middle-bottom.
 	return 60
+}
+
+// providerDisplayName renders a friendly provider title for the picker.
+// GORILLA OVERRIDE: the raw id "gemini-oauth" is capitalized to an ugly
+// "Gemini-oauth"; show what it actually is instead.
+func providerDisplayName(p models.ModelProvider) string {
+	switch p {
+	case models.ProviderGeminiCA:
+		return "Gemini (Google login)"
+	}
+	s := string(p)
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 func NewModelDialogCmp() ModelDialog {
