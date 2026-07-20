@@ -128,13 +128,8 @@ Run as root it installs under /usr/local for all users.`,
 		fmt.Println("installed desktop entry:", desktopPath)
 
 		// 4. Env-file template for desktop launches (never overwrite).
-		envPath := envFilePath()
-		if _, err := os.Stat(envPath); os.IsNotExist(err) {
-			if err := os.MkdirAll(filepath.Dir(envPath), 0o755); err == nil {
-				if os.WriteFile(envPath, []byte(envTemplate), 0o600) == nil {
-					fmt.Println("created key file for desktop launches:", envPath)
-				}
-			}
+		if ensureEnvTemplate() {
+			fmt.Println("created key file for desktop launches:", envFilePath())
 		}
 
 		refreshCaches(iconRoot, appsDir)
