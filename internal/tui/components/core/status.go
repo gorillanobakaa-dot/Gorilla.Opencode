@@ -104,8 +104,16 @@ func formatTokensAndCost(tokens, contextWindow int64, cost float64) string {
 		formattedTokens = strings.Replace(formattedTokens, ".0M", "M", 1)
 	}
 
-	// Format cost with $ symbol and 2 decimal places
-	formattedCost := fmt.Sprintf("$%.2f", cost)
+	// GORILLA OVERRIDE: the cost is a rough ESTIMATE computed from a
+	// static, possibly-stale price table — it is NOT your actual bill.
+	// On a free tier (e.g. Gemini's) or a flat-rate key (NVIDIA NIM) the
+	// real cost is $0. Mark it so nobody mistakes it for money spent.
+	var formattedCost string
+	if cost > 0 {
+		formattedCost = fmt.Sprintf("~$%.2f est", cost)
+	} else {
+		formattedCost = "$0.00"
+	}
 
 	percentage := (float64(tokens) / float64(contextWindow)) * 100
 	if percentage > 80 {

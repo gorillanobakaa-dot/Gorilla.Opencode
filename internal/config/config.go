@@ -215,13 +215,65 @@ func Load(workingDir string, debug bool) (*Config, error) {
 	return cfg, nil
 }
 
+// GorillaConfigFile is the single, clearly-labelled home for all of this
+// app's config: ~/.config/gorilla-opencode/config.json (or under
+// $XDG_CONFIG_HOME). GORILLA OVERRIDE: everything lives in ONE folder
+// named "gorilla-opencode" — keys (env), token loadout (loadout.json),
+// and the main config (config.json) — instead of scattered dotfiles
+// sharing the generic "opencode" name with other tools.
+func GorillaConfigFile() string {
+	base := gorillaConfigBase()
+	return filepath.Join(base, "config.json")
+}
+
+func gorillaConfigBase() string {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, gorillaConfigDir)
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", gorillaConfigDir)
+}
+
+// migrateLegacyConfig moves an old ~/.opencode.json (or the opencode
+// XDG dir) into the unified gorilla-opencode/config.json, once.
+func migrateLegacyConfig() {
+	dst := GorillaConfigFile()
+	if _, err := os.Stat(dst); err == nil {
+		return // already unified
+	}
+	home, _ := os.UserHomeDir()
+	candidates := []string{
+		filepath.Join(home, fmt.Sprintf(".%s.json", appName)),
+		filepath.Join(home, ".config", appName, fmt.Sprintf(".%s.json", appName)),
+	}
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		candidates = append(candidates, filepath.Join(xdg, appName, fmt.Sprintf(".%s.json", appName)))
+	}
+	for _, src := range candidates {
+		if data, err := os.ReadFile(src); err == nil {
+			_ = os.MkdirAll(gorillaConfigBase(), 0o755)
+			if os.WriteFile(dst, data, 0o644) == nil {
+				_ = os.Remove(src)
+				return
+			}
+		}
+	}
+}
+
 // configureViper sets up viper's configuration paths and environment variables.
 func configureViper() {
-	viper.SetConfigName(fmt.Sprintf(".%s", appName))
+	// GORILLA OVERRIDE: read the unified config first; fall back to the
+	// legacy locations for anyone who hasn't migrated.
+	migrateLegacyConfig()
+	if _, err := os.Stat(GorillaConfigFile()); err == nil {
+		viper.SetConfigFile(GorillaConfigFile())
+	} else {
+		viper.SetConfigName(fmt.Sprintf(".%s", appName))
+		viper.AddConfigPath("$HOME")
+		viper.AddConfigPath(fmt.Sprintf("$XDG_CONFIG_HOME/%s", appName))
+		viper.AddConfigPath(fmt.Sprintf("$HOME/.config/%s", appName))
+	}
 	viper.SetConfigType("json")
-	viper.AddConfigPath("$HOME")
-	viper.AddConfigPath(fmt.Sprintf("$XDG_CONFIG_HOME/%s", appName))
-	viper.AddConfigPath(fmt.Sprintf("$HOME/.config/%s", appName))
 	viper.SetEnvPrefix(strings.ToUpper(appName))
 	viper.AutomaticEnv()
 }
@@ -828,11 +880,12 @@ func updateCfgFile(updateCfg func(config *Config)) error {
 	configFile := viper.ConfigFileUsed()
 	var configData []byte
 	if configFile == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("failed to get home directory: %w", err)
+		// GORILLA OVERRIDE: create the config in the unified
+		// ~/.config/gorilla-opencode/config.json, not a home dotfile.
+		configFile = GorillaConfigFile()
+		if err := os.MkdirAll(gorillaConfigBase(), 0o755); err != nil {
+			return fmt.Errorf("failed to create config dir: %w", err)
 		}
-		configFile = filepath.Join(homeDir, fmt.Sprintf(".%s.json", appName))
 		logging.Info("config file not found, creating new one", "path", configFile)
 		configData = []byte(`{}`)
 	} else {
