@@ -89,12 +89,40 @@ var (
 	loadoutMu    sync.RWMutex
 )
 
-func loadoutPath() string {
+// GORILLA OVERRIDE: Gorilla-specific config lives under a "gorilla-opencode"
+// directory, matching the desktop launch key file — NOT under "opencode",
+// which is a different app's (SST opencode) config directory. Using appName
+// ("opencode") polluted that other app's dir and split our own config.
+const gorillaConfigDir = "gorilla-opencode"
+
+func loadoutConfigBase() string {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, appName, loadoutFileName)
+		return filepath.Join(xdg, gorillaConfigDir)
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", appName, loadoutFileName)
+	return filepath.Join(home, ".config", gorillaConfigDir)
+}
+
+func loadoutPath() string {
+	// One-time migration: move a loadout.json left in the old
+	// (~/.config/opencode) location into the correct dir.
+	newPath := filepath.Join(loadoutConfigBase(), loadoutFileName)
+	if _, err := os.Stat(newPath); os.IsNotExist(err) {
+		var oldPath string
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			oldPath = filepath.Join(xdg, appName, loadoutFileName)
+		} else {
+			home, _ := os.UserHomeDir()
+			oldPath = filepath.Join(home, ".config", appName, loadoutFileName)
+		}
+		if data, err := os.ReadFile(oldPath); err == nil {
+			_ = os.MkdirAll(loadoutConfigBase(), 0o755)
+			if os.WriteFile(newPath, data, 0o600) == nil {
+				_ = os.Remove(oldPath)
+			}
+		}
+	}
+	return newPath
 }
 
 func initLoadout() {
