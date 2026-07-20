@@ -75,6 +75,40 @@ project in `.opencode.json`:
 All original providers (Anthropic, OpenAI, Groq, OpenRouter, Azure,
 Bedrock, Vertex, Copilot) remain wired as upstream left them.
 
+## See it in action
+
+New to this kind of tool? The plain-English **[GUIDE](docs/GUIDE.md)**
+explains every part of the screen. Here's the short version.
+
+**The model picker — a ranked leaderboard of models that actually work.**
+We pinged every model on your key with a one-token message and kept only
+the ones that answered — the dead ones are gone. What's left is numbered
+best-for-coding first (1 = best), each with a plain description of its
+size and strength.
+
+![The ranked model picker](docs/screenshots/gallery/10-09-02-16.png)
+
+**Switching to the Google models — press the → (right arrow).** Your
+models are grouped by provider. Up/down moves through the list; **left/
+right switches provider.** Press → until the title says "Select Gemini
+Model" (the `1/4 →` at the bottom shows which provider page you're on).
+Bottom-left, "Context: 6.9K" is how much the assistant sends each
+message — smaller is leaner and faster.
+
+![Reaching the Google models with the arrow key](docs/screenshots/gallery/15-09-12-23.png)
+
+**The `/context` menu — see exactly what every message costs.** It lists
+everything sent to the model each turn with its token cost, and lets you
+switch any of it off. The `⚠` marks things the assistant can't work
+without. Turning off the big ones (like "Environment info") drops the
+number immediately.
+
+![The context loadout menu](docs/screenshots/02-context-loadout.png)
+
+More full-resolution screenshots and captions:
+**[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)** ·
+**[docs/GUIDE.md](docs/GUIDE.md)**.
+
 ## What this fork adds
 
 - **Runs on 2026 providers**: NVIDIA NIM (your key, curated + ranked
