@@ -25,6 +25,11 @@ type SlashCommandMsg struct {
 	Name string
 }
 
+// GORILLA OVERRIDE: request a fresh session. Handled by the chat PAGE so
+// it resets the page's own session and clears the sidebar — /clear used
+// to only clear the message list, leaving the editor in a broken state.
+type NewSessionMsg struct{}
+
 type SessionSelectedMsg = session.Session
 
 type SessionClearedMsg struct{}
