@@ -13,15 +13,26 @@ import (
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 )
 
-func CoderPrompt(provider models.ModelProvider) string {
-	basePrompt := baseAnthropicCoderPrompt
-	switch provider {
-	case models.ProviderOpenAI:
-		basePrompt = baseOpenAICoderPrompt
+// BaseCoderPrompt is the base instructions only (no env/LSP blocks).
+// GORILLA OVERRIDE: exported so the context loadout can measure it.
+func BaseCoderPrompt(provider models.ModelProvider) string {
+	if provider == models.ProviderOpenAI {
+		return baseOpenAICoderPrompt
 	}
+	return baseAnthropicCoderPrompt
+}
+
+// EnvironmentInfoBlock / LSPInfoBlock expose the switchable prompt blocks
+// so the loadout can price them. GORILLA OVERRIDE.
+func EnvironmentInfoBlock() string { return getEnvironmentInfo() }
+func LSPInfoBlock() string         { return lspInformation() }
+
+func CoderPrompt(provider models.ModelProvider) string {
 	// GORILLA OVERRIDE: env and LSP context blocks are switchable via the
 	// context loadout (/context menu). Off = fewer tokens per turn, at the
-	// cost of the agent knowing your cwd/OS/git and active LSPs.
+	// cost of the agent knowing your cwd/OS/git and active LSPs. Because
+	// this is re-evaluated whenever the system prompt is (re)built, a
+	// toggle takes effect on the next rebuild (see ReloadCoderTools).
 	envInfo := ""
 	if config.LoadoutEnabled("prompt.env") {
 		envInfo = getEnvironmentInfo()
@@ -31,7 +42,7 @@ func CoderPrompt(provider models.ModelProvider) string {
 		lspInfo = lspInformation()
 	}
 
-	return fmt.Sprintf("%s\n\n%s\n%s", basePrompt, envInfo, lspInfo)
+	return fmt.Sprintf("%s\n\n%s\n%s", BaseCoderPrompt(provider), envInfo, lspInfo)
 }
 
 const baseOpenAICoderPrompt = `

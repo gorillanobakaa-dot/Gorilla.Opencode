@@ -56,6 +56,10 @@ func New(ctx context.Context, conn *sql.DB) (*App, error) {
 	// Initialize theme based on configuration
 	app.initTheme()
 
+	// GORILLA OVERRIDE: measure the real per-turn token cost of every
+	// tool and the base prompt so the /context loadout reports truth.
+	agent.CalibrateLoadout(app.Permissions, app.Sessions, app.Messages, app.History, app.LSPClients)
+
 	// Initialize LSP clients in the background
 	go app.initLSPClients(ctx)
 

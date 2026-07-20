@@ -46,10 +46,42 @@ var LoadoutComponents = []LoadoutComponent{
 	{"prompt.lsp", "LSP info", "agent won't be told which language servers are active", 100, true, false},
 }
 
-const (
-	loadoutFileName    = "loadout.json"
-	systemPromptTokens = 3000 // the base coder prompt; always sent, not switchable
+const loadoutFileName = "loadout.json"
+
+// GORILLA OVERRIDE: token figures start as estimates but are replaced at
+// startup with REAL measured values (agent.CalibrateLoadout serialises
+// each tool's actual schema and the actual system prompt). This is why
+// the menu total matches what the model really receives, and why turning
+// a tool off drops the number by its true cost.
+var (
+	basePromptTokens = 3000 // measured system prompt; always on, not switchable
+	tokenOverride    = map[string]int{}
+	tokenOverrideMu  sync.RWMutex
 )
+
+// SetBasePromptTokens records the measured base system-prompt token count.
+func SetBasePromptTokens(n int) {
+	tokenOverrideMu.Lock()
+	basePromptTokens = n
+	tokenOverrideMu.Unlock()
+}
+
+// SetLoadoutTokens records a component's measured token cost.
+func SetLoadoutTokens(id string, n int) {
+	tokenOverrideMu.Lock()
+	tokenOverride[id] = n
+	tokenOverrideMu.Unlock()
+}
+
+// ComponentTokens returns the measured cost if known, else the estimate.
+func ComponentTokens(c LoadoutComponent) int {
+	tokenOverrideMu.RLock()
+	defer tokenOverrideMu.RUnlock()
+	if v, ok := tokenOverride[c.ID]; ok {
+		return v
+	}
+	return c.Tokens
+}
 
 var (
 	loadoutOnce  sync.Once
@@ -129,14 +161,20 @@ func saveLoadout() {
 // LoadoutActiveTokens is the approximate per-turn overhead of everything
 // currently switched on, including the always-present base system prompt.
 func LoadoutActiveTokens() int {
-	total := systemPromptTokens
+	tokenOverrideMu.RLock()
+	total := basePromptTokens
+	tokenOverrideMu.RUnlock()
 	for _, c := range LoadoutComponents {
 		if LoadoutEnabled(c.ID) {
-			total += c.Tokens
+			total += ComponentTokens(c)
 		}
 	}
 	return total
 }
 
 // LoadoutBaseTokens is the fixed, non-switchable overhead (base prompt).
-func LoadoutBaseTokens() int { return systemPromptTokens }
+func LoadoutBaseTokens() int {
+	tokenOverrideMu.RLock()
+	defer tokenOverrideMu.RUnlock()
+	return basePromptTokens
+}
