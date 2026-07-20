@@ -131,6 +131,13 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 			options: clientOptions,
 			client:  newOpenAIClient(clientOptions),
 		}, nil
+	// GORILLA OVERRIDE: Gemini via "Login with Google" (Code Assist free
+	// tier). Not OpenAI-compatible; its own hand-built envelope client.
+	case models.ProviderGeminiCA:
+		return &baseProvider[CodeAssistClient]{
+			options: clientOptions,
+			client:  newCodeAssistClient(clientOptions),
+		}, nil
 	case models.ProviderAzure:
 		return &baseProvider[AzureClient]{
 			options: clientOptions,

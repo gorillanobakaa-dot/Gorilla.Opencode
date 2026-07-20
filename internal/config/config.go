@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/opencode-ai/opencode/internal/auth"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/spf13/viper"
@@ -321,6 +322,13 @@ func setProviderDefaults() {
 	}
 	if apiKey := os.Getenv("CEREBRAS_API_KEY"); apiKey != "" {
 		viper.SetDefault("providers.cerebras.apiKey", apiKey)
+	}
+	// GORILLA OVERRIDE: enable the Gemini "Login with Google" provider when
+	// OAuth credentials exist on disk (from `gorilla-opencode login`). It
+	// has no API key — the placeholder just clears the "apiKey == '' means
+	// disabled" gate in Validate(); the real auth is the stored token.
+	if creds, _ := auth.LoadGeminiCreds(); creds != nil && creds.AccessToken != "" {
+		viper.SetDefault("providers.gemini-oauth.apiKey", "oauth-login")
 	}
 	if apiKey := os.Getenv("OPENROUTER_API_KEY"); apiKey != "" {
 		viper.SetDefault("providers.openrouter.apiKey", apiKey)
@@ -836,6 +844,22 @@ func setDefaultModelForAgent(agent AgentName) bool {
 			Model:     model,
 			MaxTokens: maxTokens,
 		}
+		return true
+	}
+
+	// GORILLA OVERRIDE: Gemini via "Login with Google" (Code Assist free
+	// tier). If the user has signed in, default the background agents
+	// (title/summarizer/task) to the login too, so the whole app runs on
+	// the free tier instead of falling through to a provider whose key may
+	// be missing (that is the "title generation failed on Groq" trap).
+	if creds, _ := auth.LoadGeminiCreds(); creds != nil && creds.AccessToken != "" {
+		model := models.GeminiCAPro
+		maxTokens := int64(5000)
+		if agent == AgentTitle {
+			model = models.GeminiCAFlash
+			maxTokens = 80
+		}
+		cfg.Agents[agent] = Agent{Model: model, MaxTokens: maxTokens}
 		return true
 	}
 
