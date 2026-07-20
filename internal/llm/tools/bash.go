@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -290,6 +293,12 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		return ToolResponse{}, fmt.Errorf("error executing command: %w", err)
 	}
 
+	// GORILLA OVERRIDE: filter noisy build logs to their signal (errors,
+	// warnings, file:line) before the naive first/last-half truncation,
+	// which on a long make/mach build would otherwise drop the actual
+	// error sitting in the middle. See filterBuildLog.
+	stdout = filterBuildLog(stdout)
+	stderr = filterBuildLog(stderr)
 	stdout = truncateOutput(stdout)
 	stderr = truncateOutput(stderr)
 
@@ -324,6 +333,72 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		return WithResponseMetadata(NewTextResponse("no output"), metadata), nil
 	}
 	return WithResponseMetadata(NewTextResponse(stdout), metadata), nil
+}
+
+// GORILLA OVERRIDE: build-log signal extraction. Raw output from
+// `make -j`, `./mach build`, `cargo build`, kbuild, etc. is thousands of
+// progress lines (CC/CXX/AR/LD/…) that saturate the model's context and
+// bury the one line that matters. When output is long AND looks like a
+// build/compile log, we keep only the lines that carry signal — errors,
+// warnings, linker failures, and the file:line they point at — plus a
+// little context, and note how much was dropped. Opt out with
+// OPENCODE_NO_LOG_FILTER=1. This is the SWE-agent finding: bounded,
+// filtered tool output is the single biggest lever for build agents.
+var (
+	buildSignalRe = regexp.MustCompile(`(?i)(\berror\b:|fatal error:|undefined reference|undefined symbol|multiple definition|recipe for target .* failed|make(\[\d+\])?: \*\*\*|ld: |ld\.lld: |collect2:|linker command failed|cannot find|no such file|: warning:|warning generated|note: |panic:|Segmentation fault|failed with exit|Error \d)`)
+	buildNoiseRe  = regexp.MustCompile(`(?i)^\s*(cc|cxx|ar|ld|as|ranlib|cpp|gen|host cc|host cxx|copy|install|strip|objcopy|compiling|building|checking|make(\[\d+\])?:\s+(entering|leaving|nothing to be done)|\[\s*\d+%\]|\d+/\d+\s)`)
+	buildMarkerRe = regexp.MustCompile(`(?i)(\bgcc\b|\bclang\b|\bmake\b|\bmach\b|\bcargo\b|\bcmake\b|\bninja\b|\bmozconfig\b|CC\s|CXX\s|\.o\b|\.rlib\b)`)
+	fileLineRe    = regexp.MustCompile(`^[^\s:][^:]*:\d+(:\d+)?:`)
+)
+
+func filterBuildLog(content string) string {
+	if on, _ := strconv.ParseBool(os.Getenv("OPENCODE_NO_LOG_FILTER")); on {
+		return content
+	}
+	lines := strings.Split(content, "\n")
+	if len(lines) < 200 {
+		return content
+	}
+	// Only engage when this really looks like a build log.
+	markers := 0
+	for _, l := range lines {
+		if buildMarkerRe.MatchString(l) {
+			markers++
+			if markers >= 5 {
+				break
+			}
+		}
+	}
+	if markers < 5 {
+		return content
+	}
+
+	var kept []string
+	keptIdx := map[int]bool{}
+	for i, l := range lines {
+		if buildSignalRe.MatchString(l) || fileLineRe.MatchString(l) {
+			// include one line of context on each side
+			for j := i - 1; j <= i+1; j++ {
+				if j >= 0 && j < len(lines) && !keptIdx[j] && !buildNoiseRe.MatchString(lines[j]) {
+					keptIdx[j] = true
+					kept = append(kept, lines[j])
+				}
+			}
+		}
+	}
+	if len(kept) == 0 {
+		// Successful/no-error build: don't dump thousands of lines,
+		// just the tail so the agent sees it completed.
+		tail := lines
+		if len(lines) > 40 {
+			tail = lines[len(lines)-40:]
+		}
+		return fmt.Sprintf("[build log: %d lines, no error/warning lines detected — showing last %d]\n%s",
+			len(lines), len(tail), strings.Join(tail, "\n"))
+	}
+	dropped := len(lines) - len(kept)
+	return fmt.Sprintf("[build log filtered: %d of %d lines were compile/progress noise; showing the %d signal lines. Set OPENCODE_NO_LOG_FILTER=1 for raw output.]\n%s",
+		dropped, len(lines), len(kept), strings.Join(kept, "\n"))
 }
 
 func truncateOutput(content string) string {
