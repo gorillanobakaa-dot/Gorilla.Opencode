@@ -23,7 +23,7 @@ const (
 Type=Application
 Name=Gorilla OpenCode
 Comment=Terminal AI coding agent (revived original OpenCode) — bring your own API keys
-Exec=` + appBinName + `
+Exec=` + appBinName + ` launch
 Icon=` + appBinName + `
 Terminal=true
 Categories=Development;IDE;
@@ -126,6 +126,16 @@ Run as root it installs under /usr/local for all users.`,
 			return err
 		}
 		fmt.Println("installed desktop entry:", desktopPath)
+
+		// 4. Env-file template for desktop launches (never overwrite).
+		envPath := envFilePath()
+		if _, err := os.Stat(envPath); os.IsNotExist(err) {
+			if err := os.MkdirAll(filepath.Dir(envPath), 0o755); err == nil {
+				if os.WriteFile(envPath, []byte(envTemplate), 0o600) == nil {
+					fmt.Println("created key file for desktop launches:", envPath)
+				}
+			}
+		}
 
 		refreshCaches(iconRoot, appsDir)
 		fmt.Println("done. Set your API key and run:", appBinName)

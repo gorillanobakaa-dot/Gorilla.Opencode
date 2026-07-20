@@ -265,7 +265,50 @@ scripts/build-deb.sh 0.1.0             # produces gorilla-opencode_0.1.0_amd64.d
 
 ---
 
+## Desktop launches and the key file (added in v0.1.1)
+
+**Human track:** apps started from the applications menu do not see the
+settings from your terminal, so the desktop icon used to open a window
+that closed instantly — the program couldn't find any AI service and
+the error vanished with the window. Now the desktop entry starts the
+program through a small wrapper that (1) reads your keys from one file,
+`~/.config/gorilla-opencode/env` (created for you at install time, with
+instructions inside, readable only by you), and (2) if anything still
+goes wrong, keeps the window open until you press Enter so you can
+actually read the message.
+
+**Developer track:** `cmd/launch.go` adds a hidden `launch` subcommand
+used by the desktop entry (`Exec=gorilla-opencode launch`). It parses
+KEY=VALUE lines from the env file (process env wins on conflict) and
+re-executes the real binary as a child with the augmented environment —
+re-exec is required because `LOCAL_ENDPOINT` is read at package-init
+time, before main(). Nonzero child exit → error + hint printed, window
+held open on stdin read. `install` writes the commented template 0600,
+never overwriting an existing file.
+
 # CHANGELOG (one track — written for both audiences)
+
+## v0.1.1 — 2026-07-20 — "Community review hardening"
+
+An independent review by another AI model (MiniMax M3, run by the
+project owner) found five real defects in v0.1.0. All five are fixed,
+and a smoke test (`tests/smoke.sh`) now guards each one:
+
+- Desktop icon appeared to crash: apps launched from the menu don't
+  inherit shell environment variables, so no API key was found and the
+  window closed before the error could be read. Fixed with the `launch`
+  wrapper + key file (see section above).
+- No configured provider now prints an actionable message naming the
+  exact variables to set, instead of the cryptic "agent coder not found".
+- Runtime errors (bad key, unreachable endpoint) no longer dump the
+  entire usage/help text after the error, which buried it — in scripts
+  and CI this made failures look like usage mistakes.
+- `--version` now reports the real release version. (Root cause: Go
+  ≥1.22 stamps VCS pseudo-versions for plain `go build`, silently
+  overriding the release stamp — precedence inverted, ldflags wins.)
+- Help text said `opencode`; it now consistently says
+  `gorilla-opencode`. The FZF warning was demoted to debug — it printed
+  on every non-interactive run where it is irrelevant.
 
 ## v0.1.0 — 2026-07-20 — "The fossil breathes"
 

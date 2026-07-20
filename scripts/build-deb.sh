@@ -1,6 +1,7 @@
 #!/bin/sh
 # Build the Debian package. Usage: scripts/build-deb.sh <version>
 # Requires: a built ./gorilla-opencode binary in the repo root, dpkg-deb.
+# Build it stamped: go build -ldflags "-X github.com/opencode-ai/opencode/internal/version.Version=v<version>" -o gorilla-opencode .
 # The package installs system-wide equivalents of what
 # `gorilla-opencode install` does per-user: /usr/bin binary, hicolor
 # icons, desktop entry, plus the dual-track documentation.

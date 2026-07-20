@@ -28,7 +28,9 @@ func init() {
 	}
 	fzfPath, err = exec.LookPath("fzf")
 	if err != nil {
-		logging.Warn("FZF not found in $PATH. Some features might be limited or slower.")
+		// GORILLA OVERRIDE: was Warn — it printed on every run, including
+		// non-interactive/scripted ones where fzf is irrelevant noise.
+		logging.Debug("FZF not found in $PATH. Some features might be limited or slower.")
 		fzfPath = ""
 	}
 }

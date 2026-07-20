@@ -36,7 +36,7 @@ sudo apt install ./gorilla-opencode_*_amd64.deb
 **From source:**
 
 ```sh
-go build -o gorilla-opencode .   # Go ≥ 1.24
+go build -ldflags "-X github.com/opencode-ai/opencode/internal/version.Version=vX.Y.Z" -o gorilla-opencode .   # Go ≥ 1.24
 ./gorilla-opencode install       # optional: icons + desktop entry, no sudo
 ```
 

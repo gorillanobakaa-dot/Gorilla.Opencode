@@ -22,29 +22,34 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "opencode",
+	Use:   appBinName,
 	Short: "Terminal-based AI assistant for software development",
-	Long: `OpenCode is a powerful terminal-based AI assistant that helps with software development tasks.
-It provides an interactive chat interface with AI capabilities, code analysis, and LSP integration
-to assist developers in writing, debugging, and understanding code directly from the terminal.`,
+	Long: `Gorilla OpenCode is a terminal-based AI assistant that helps with software
+development tasks. It provides an interactive chat interface with AI capabilities,
+code analysis, and LSP integration to assist developers in writing, debugging, and
+understanding code directly from the terminal.`,
+	// GORILLA OVERRIDE: a runtime failure (bad key, unreachable endpoint)
+	// used to dump this entire usage text after the error, burying it.
+	// Usage now prints only for actual usage mistakes.
+	SilenceUsage: true,
 	Example: `
   # Run in interactive mode
-  opencode
+  ` + appBinName + `
 
   # Run with debug logging
-  opencode -d
+  ` + appBinName + ` -d
 
   # Run with debug logging in a specific directory
-  opencode -d -c /path/to/project
+  ` + appBinName + ` -d -c /path/to/project
 
   # Print version
-  opencode -v
+  ` + appBinName + ` -v
 
   # Run a single non-interactive prompt
-  opencode -p "Explain the use of context in Go"
+  ` + appBinName + ` -p "Explain the use of context in Go"
 
   # Run a single non-interactive prompt with JSON output format
-  opencode -p "Explain the use of context in Go" -f json
+  ` + appBinName + ` -p "Explain the use of context in Go" -f json
   `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// If the help flag is set, show the help message
@@ -82,9 +87,24 @@ to assist developers in writing, debugging, and understanding code directly from
 			}
 			cwd = c
 		}
-		_, err := config.Load(cwd, debug)
+		cfg, err := config.Load(cwd, debug)
 		if err != nil {
 			return err
+		}
+
+		// GORILLA OVERRIDE: without any provider the old code died later
+		// with the cryptic "agent coder not found". Say what is actually
+		// wrong and what to do about it, up front.
+		if _, ok := cfg.Agents[config.AgentCoder]; !ok {
+			return fmt.Errorf(`no AI provider is configured.
+
+Set one of these and try again:
+  NVIDIA NIM:  LOCAL_ENDPOINT=https://integrate.api.nvidia.com/v1 LOCAL_ENDPOINT_API_KEY=nvapi-...
+  Google:      GEMINI_API_KEY=...
+  Ollama:      LOCAL_ENDPOINT=http://localhost:11434/v1
+  (or ANTHROPIC_API_KEY, OPENAI_API_KEY, GROQ_API_KEY, ... — see README)
+
+Desktop launches read keys from ~/.config/%s/env`, appBinName)
 		}
 
 		// Connect DB, this will also run migrations
