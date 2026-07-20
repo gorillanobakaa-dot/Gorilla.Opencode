@@ -1,36 +1,39 @@
-# Gorilla OpenCode — Proof it works
+# Gorilla OpenCode — screenshots & proof
 
-Real screenshots from a Debian 13 / GNOME 48 machine, running the
-revived original OpenCode on an NVIDIA NIM API key. These are the
-receipts for what the [CHANGELOG](../CHANGELOG.md) describes.
+Real screenshots from a Debian 13 / GNOME 48 machine running the revived
+OpenCode on an NVIDIA NIM key. **New here? Read the plain-English
+[GUIDE.md](GUIDE.md)** — it explains every part of the screen, the
+menus, and the not-obvious ← → arrow trick to switch to the Google
+models.
 
-## Running on NVIDIA NIM
+All screenshots are full-resolution (1600×899) so the terminal text is
+readable — the complete set is in [`screenshots/gallery/`](screenshots/gallery/).
 
-The revived agent, rebranded, pointed at NVIDIA NIM with the user's own
-key — no Charm gateway, no telemetry, no account.
+## The model picker, full width (v0.1.16)
 
-![Running on NVIDIA NIM](screenshots/01-running-nvidia-nim.png)
+118 models, each with a capability description, sorted best-for-coding
+first, with a position counter. Up/down moves through models; **left/
+right switches provider**.
 
-## The context loadout (`/context`)
+![Model picker](screenshots/gallery/10-09-02-16.png)
 
-Total transparency about what every turn costs. The menu names each
-piece of per-turn context, its token cost, and what you give up by
-turning it off. `⚠` marks components whose removal cripples the agent.
+## Reaching the Google (Gemini) models — press the → arrow
 
-![Context loadout menu](screenshots/02-context-loadout.png)
+Your models are grouped by provider. Press **→** in the picker to page
+from NVIDIA to **"Select Gemini Model"** — the `1/4 →` at the bottom
+shows you're on the Gemini page. Bottom-left shows the context down to
+**6.9K** (it used to be ~15K).
 
-## Loadout after switching things off
+![Gemini model page](screenshots/gallery/15-09-12-23.png)
 
-The same menu after disabling Fetch, Diagnostics, Sub-agent and
-Sourcegraph — the per-turn total drops, and disabled rows dim. This is
-the "opt out of everything" philosophy in action: your tokens, your
-call, one key (`r`) to restore defaults.
+## The context loadout — every token accounted for
 
-![Loadout after disabling tools](screenshots/03-loadout-after-disabling.png)
+`/context` shows exactly what's sent to the model every turn and lets you
+switch any of it off. See the [gallery](screenshots/gallery/) for the
+menu, and the [GUIDE](GUIDE.md#the-context-loadout-context--your-token-budget)
+for how to use it.
 
 ---
 
-*These were captured on v0.1.8. From v0.1.9 the loadout menu is wider
-(no truncated tradeoffs) and its token figures are measured from the
-real tool schemas and system prompt rather than estimated — see the
-changelog.*
+*The design draws on published research — sources cited in
+[system-prompts/RESEARCH-SOURCES.md](../system-prompts/RESEARCH-SOURCES.md).*
