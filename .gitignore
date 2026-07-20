@@ -49,3 +49,6 @@ gorilla-opencode
 *.deb
 gorilla-opencode-linux-amd64
 checksums.sha256
+
+# Third-party leaked prompts kept LOCAL for study, not redistributed
+system-prompts/reference/
