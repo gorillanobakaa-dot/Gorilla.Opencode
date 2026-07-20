@@ -36,6 +36,18 @@ explanations live in [DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-track.md).
   shows "N models — pinged live with 1 token, only responders kept;
   ranked 1=best", so users know the dead models were probed out.
 
+## v0.1.20 — 2026-07-20 — Streaming render throttle (not a network issue)
+
+- Measured: NVIDIA NIM answers in ~0.5-1.4s to first byte — the network
+  was never the bottleneck. The slowness was the DISPLAY: the message
+  list re-ran the Markdown renderer over the whole growing answer on
+  every single streamed token (O(n^2)), so long replies crawled. Now
+  intermediate deltas are throttled to ~every 80ms (final token always
+  renders), which keeps streaming smooth as answers grow.
+- Other latency levers (not code bugs): context size — trim it in
+  /context, the env/git block is the big one — and model choice (some
+  NIM models reason internally and are just slow).
+
 ## v0.1.9 — 2026-07-20 — Loadout: real numbers, wider, proof
 
 - The `/context` loadout shows **measured** per-turn token costs (real
