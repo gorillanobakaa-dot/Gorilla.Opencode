@@ -98,7 +98,10 @@ func lspsConfigured(width int) string {
 }
 
 func logo(width int) string {
-	logo := fmt.Sprintf("%s %s", styles.OpenCodeIcon, "OpenCode")
+	// GORILLA OVERRIDE: user-facing product name. The Go module path
+	// stays github.com/opencode-ai/opencode for provenance; only the
+	// displayed branding changes.
+	logo := fmt.Sprintf("%s %s", styles.OpenCodeIcon, "Gorilla OpenCode")
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
@@ -120,7 +123,8 @@ func logo(width int) string {
 }
 
 func repo(width int) string {
-	repo := "https://github.com/opencode-ai/opencode"
+	// GORILLA OVERRIDE: point users at the revival repo, not upstream.
+	repo := "https://github.com/gorillanobakaa-dot/Gorilla.Opencode"
 	t := theme.CurrentTheme()
 
 	return styles.BaseStyle().
@@ -138,4 +142,3 @@ func cwd(width int) string {
 		Width(width).
 		Render(cwd)
 }
-
