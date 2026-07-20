@@ -19,9 +19,19 @@ func CoderPrompt(provider models.ModelProvider) string {
 	case models.ProviderOpenAI:
 		basePrompt = baseOpenAICoderPrompt
 	}
-	envInfo := getEnvironmentInfo()
+	// GORILLA OVERRIDE: env and LSP context blocks are switchable via the
+	// context loadout (/context menu). Off = fewer tokens per turn, at the
+	// cost of the agent knowing your cwd/OS/git and active LSPs.
+	envInfo := ""
+	if config.LoadoutEnabled("prompt.env") {
+		envInfo = getEnvironmentInfo()
+	}
+	lspInfo := ""
+	if config.LoadoutEnabled("prompt.lsp") {
+		lspInfo = lspInformation()
+	}
 
-	return fmt.Sprintf("%s\n\n%s\n%s", basePrompt, envInfo, lspInformation())
+	return fmt.Sprintf("%s\n\n%s\n%s", basePrompt, envInfo, lspInfo)
 }
 
 const baseOpenAICoderPrompt = `

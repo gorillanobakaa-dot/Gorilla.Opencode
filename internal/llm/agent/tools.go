@@ -2,9 +2,8 @@ package agent
 
 import (
 	"context"
-	"os"
-	"strconv"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/history"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 	"github.com/opencode-ai/opencode/internal/lsp"
@@ -13,14 +12,11 @@ import (
 	"github.com/opencode-ai/opencode/internal/session"
 )
 
-// GORILLA OVERRIDE: the Sourcegraph tool (public-code web search) carries
-// a large description that is sent to the model on every single turn, but
-// most local development never uses it. It is opt-in via
-// OPENCODE_SOURCEGRAPH=1 to keep the per-turn token overhead down.
-func sourcegraphEnabled() bool {
-	on, _ := strconv.ParseBool(os.Getenv("OPENCODE_SOURCEGRAPH"))
-	return on
-}
+// GORILLA OVERRIDE: every tool is switchable via the context loadout
+// (see internal/config/loadout.go and the /context menu). Each tool's
+// description rides every turn, so turning a tool off is a real token
+// saving — at the cost of that capability.
+func loadoutOn(id string) bool { return config.LoadoutEnabled(id) }
 
 func CoderAgentTools(
 	permissions permission.Service,
@@ -31,36 +27,40 @@ func CoderAgentTools(
 ) []tools.BaseTool {
 	ctx := context.Background()
 	otherTools := GetMcpTools(ctx, permissions)
-	if len(lspClients) > 0 {
+	if len(lspClients) > 0 && loadoutOn("tool.diagnostics") {
 		otherTools = append(otherTools, tools.NewDiagnosticsTool(lspClients))
 	}
-	coderTools := []tools.BaseTool{
-		tools.NewBashTool(permissions),
-		tools.NewEditTool(lspClients, permissions, history),
-		tools.NewFetchTool(permissions),
-		tools.NewGlobTool(),
-		tools.NewGrepTool(),
-		tools.NewLsTool(),
-		tools.NewViewTool(lspClients),
-		tools.NewPatchTool(lspClients, permissions, history),
-		tools.NewWriteTool(lspClients, permissions, history),
-		NewAgentTool(sessions, messages, lspClients),
+	var coderTools []tools.BaseTool
+	add := func(id string, t tools.BaseTool) {
+		if loadoutOn(id) {
+			coderTools = append(coderTools, t)
+		}
 	}
-	if sourcegraphEnabled() {
-		coderTools = append(coderTools, tools.NewSourcegraphTool())
-	}
+	add("tool.bash", tools.NewBashTool(permissions))
+	add("tool.edit", tools.NewEditTool(lspClients, permissions, history))
+	add("tool.fetch", tools.NewFetchTool(permissions))
+	add("tool.glob", tools.NewGlobTool())
+	add("tool.grep", tools.NewGrepTool())
+	add("tool.ls", tools.NewLsTool())
+	add("tool.view", tools.NewViewTool(lspClients))
+	add("tool.patch", tools.NewPatchTool(lspClients, permissions, history))
+	add("tool.write", tools.NewWriteTool(lspClients, permissions, history))
+	add("tool.agent", NewAgentTool(sessions, messages, lspClients))
+	add("tool.sourcegraph", tools.NewSourcegraphTool())
 	return append(coderTools, otherTools...)
 }
 
 func TaskAgentTools(lspClients map[string]*lsp.Client) []tools.BaseTool {
-	taskTools := []tools.BaseTool{
-		tools.NewGlobTool(),
-		tools.NewGrepTool(),
-		tools.NewLsTool(),
-		tools.NewViewTool(lspClients),
+	var taskTools []tools.BaseTool
+	add := func(id string, t tools.BaseTool) {
+		if loadoutOn(id) {
+			taskTools = append(taskTools, t)
+		}
 	}
-	if sourcegraphEnabled() {
-		taskTools = append(taskTools, tools.NewSourcegraphTool())
-	}
+	add("tool.glob", tools.NewGlobTool())
+	add("tool.grep", tools.NewGrepTool())
+	add("tool.ls", tools.NewLsTool())
+	add("tool.view", tools.NewViewTool(lspClients))
+	add("tool.sourcegraph", tools.NewSourcegraphTool())
 	return taskTools
 }

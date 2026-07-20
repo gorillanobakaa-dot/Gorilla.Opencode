@@ -184,3 +184,18 @@ func (app *App) Shutdown() {
 		cancel()
 	}
 }
+
+// GORILLA OVERRIDE: rebuild the coder agent's tool set from the current
+// context loadout so /context toggles take effect without a restart.
+func (app *App) ReloadCoderTools() {
+	if app.CoderAgent == nil {
+		return
+	}
+	app.CoderAgent.ReloadTools(agent.CoderAgentTools(
+		app.Permissions,
+		app.Sessions,
+		app.Messages,
+		app.History,
+		app.LSPClients,
+	))
+}

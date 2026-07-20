@@ -54,6 +54,9 @@ type Service interface {
 	IsBusy() bool
 	Update(agentName config.AgentName, modelID models.ModelID) (models.Model, error)
 	Summarize(ctx context.Context, sessionID string) error
+	// GORILLA OVERRIDE: swap the active tool set at runtime so context
+	// loadout changes take effect without a restart.
+	ReloadTools(newTools []tools.BaseTool)
 }
 
 type agent struct {
@@ -62,6 +65,7 @@ type agent struct {
 	messages message.Service
 
 	tools    []tools.BaseTool
+	toolsMu  sync.RWMutex
 	provider provider.Provider
 
 	titleProvider     provider.Provider
@@ -112,6 +116,20 @@ func NewAgent(
 
 func (a *agent) Model() models.Model {
 	return a.provider.Model()
+}
+
+// GORILLA OVERRIDE: getTools/ReloadTools let the context loadout swap the
+// active tool set at runtime under a lock (the stream loop reads it).
+func (a *agent) getTools() []tools.BaseTool {
+	a.toolsMu.RLock()
+	defer a.toolsMu.RUnlock()
+	return a.tools
+}
+
+func (a *agent) ReloadTools(newTools []tools.BaseTool) {
+	a.toolsMu.Lock()
+	a.tools = newTools
+	a.toolsMu.Unlock()
 }
 
 func (a *agent) Cancel(sessionID string) {
@@ -321,7 +339,7 @@ func (a *agent) createUserMessage(ctx context.Context, sessionID, content string
 
 func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msgHistory []message.Message) (message.Message, *message.Message, error) {
 	ctx = context.WithValue(ctx, tools.SessionIDContextKey, sessionID)
-	eventChan := a.provider.StreamResponse(ctx, msgHistory, a.tools)
+	eventChan := a.provider.StreamResponse(ctx, msgHistory, a.getTools())
 
 	assistantMsg, err := a.messages.Create(ctx, sessionID, message.CreateMessageParams{
 		Role:  message.Assistant,
@@ -365,7 +383,7 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 		default:
 			// Continue processing
 			var tool tools.BaseTool
-			for _, availableTool := range a.tools {
+			for _, availableTool := range a.getTools() {
 				if availableTool.Info().Name == toolCall.Name {
 					tool = availableTool
 					break
