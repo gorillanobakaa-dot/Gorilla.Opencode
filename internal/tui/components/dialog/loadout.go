@@ -17,11 +17,11 @@ import (
 	"github.com/opencode-ai/opencode/internal/tui/util"
 )
 
-// GORILLA OVERRIDE: widened (was 74) and made responsive so the full
-// per-turn cost sentences are visible; capped so it stays readable.
+// GORILLA OVERRIDE: use nearly the full terminal width so no message or
+// tradeoff line ever wraps or truncates.
 const (
-	loadoutMinWidth = 100
-	loadoutMaxWidth = 150
+	loadoutMinWidth    = 100
+	loadoutSidePadding = 6 // border + breathing room on each side
 )
 
 // CloseLoadoutDialogMsg closes the loadout menu.
@@ -40,12 +40,13 @@ type loadoutDialogCmp struct {
 	termWidth   int
 }
 
-// width returns the responsive dialog width.
+// width returns the dialog inner width — as wide as the terminal allows,
+// so the full messages are always readable.
 func (m *loadoutDialogCmp) width() int {
-	w := loadoutMaxWidth
-	if m.termWidth > 0 && m.termWidth-6 < w {
-		w = m.termWidth - 6
+	if m.termWidth <= 0 {
+		return loadoutMinWidth
 	}
+	w := m.termWidth - loadoutSidePadding
 	if w < loadoutMinWidth {
 		w = loadoutMinWidth
 	}
