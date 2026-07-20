@@ -17,8 +17,11 @@ import (
 )
 
 const (
-	numVisibleModels = 10
-	maxDialogWidth   = 40
+	// GORILLA OVERRIDE: widened from 40 and 10 — 40 cols truncated
+	// longer model names and the product name; 10 rows hid most of a
+	// large discovered provider (NVIDIA NIM ships ~119 models).
+	numVisibleModels = 14
+	maxDialogWidth   = 62
 )
 
 // ModelSelectedMsg is sent when a model is selected
@@ -355,17 +358,56 @@ func getModelsForProvider(provider models.ModelProvider) []models.Model {
 		}
 	}
 
-	// reverse alphabetical order (if llm naming was consistent latest would appear first)
+	// GORILLA OVERRIDE: rank by coding usefulness so the strongest
+	// models sit at the top, instead of the old reverse-alphabetical
+	// order that floated junk (Diffusiongemma, Deplot, Cosmos) above
+	// DeepSeek V4 Pro. Ties fall back to alphabetical.
 	slices.SortFunc(providerModels, func(a, b models.Model) int {
-		if a.Name > b.Name {
-			return -1
-		} else if a.Name < b.Name {
-			return 1
+		ra, rb := codingRank(string(a.ID)), codingRank(string(b.ID))
+		if ra != rb {
+			return ra - rb
 		}
-		return 0
+		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
 
 	return providerModels
+}
+
+// codingRank scores a model id by coding usefulness (lower = better).
+// It matches on substrings of the raw model id so it works for any
+// provider's discovered models, not a hardcoded list.
+func codingRank(id string) int {
+	s := strings.ToLower(id)
+	has := func(subs ...string) bool {
+		for _, sub := range subs {
+			if strings.Contains(s, sub) {
+				return true
+			}
+		}
+		return false
+	}
+	// Bottom: not generative coding models at all.
+	if has("embed", "rerank", "guard", "safety", "content-safety", "moderation",
+		"deplot", "cosmos", "gliner", "parse", "video", "vision", "-vl-", "vlm",
+		"diffusion", "tts", "-image", "ocr", "riva", "nvclip", "neva", "fuyu", "kosmos") {
+		return 90
+	}
+	// Tier 1: current flagship coders.
+	if has("deepseek-v4-pro", "deepseek-v4.1", "glm-5", "kimi-k2", "minimax-m3",
+		"qwen3.5", "nemotron-3-ultra", "nemotron-3-super", "mistral-large-3") {
+		return 10
+	}
+	// Tier 2: strong / fast current models.
+	if has("deepseek-v4", "deepseek", "glm", "qwen3", "qwen", "minimax",
+		"nemotron-3", "llama-4", "mistral-large", "codestral", "starcoder", "codellama") {
+		return 20
+	}
+	// Tier 3: older but capable general models.
+	if has("llama-3", "mixtral", "mistral", "nemotron", "granite", "gemma-4", "gpt-oss") {
+		return 40
+	}
+	// Everything else in the middle-bottom.
+	return 60
 }
 
 func NewModelDialogCmp() ModelDialog {
