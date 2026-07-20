@@ -140,6 +140,10 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 		program := tea.NewProgram(
 			tui.New(app),
 			tea.WithAltScreen(),
+			// GORILLA OVERRIDE: enable mouse so the conversation scrolls
+			// with the wheel. Trade-off: selecting terminal text now
+			// needs Shift held down (mouse events go to the app).
+			tea.WithMouseCellMotion(),
 		)
 
 		// Setup the subscriptions, this will send services events to the TUI

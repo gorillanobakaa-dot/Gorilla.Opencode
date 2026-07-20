@@ -417,9 +417,10 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, a.exportSession()
 		case "clear", "new":
 			// GORILLA OVERRIDE: /clear starts a fresh session, dropping
-			// the accumulated context (and its per-turn token cost).
+			// the accumulated context. Routed through the chat page's
+			// full new-session flow so the editor/sidebar reset cleanly.
 			a.selectedSession = session.Session{}
-			return a, util.CmdHandler(chat.SessionClearedMsg{})
+			return a, util.CmdHandler(chat.NewSessionMsg{})
 		case "context", "loadout", "tokens":
 			a.showLoadoutDialog = true
 			return a, nil

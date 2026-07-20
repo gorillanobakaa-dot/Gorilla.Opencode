@@ -13,7 +13,10 @@ type Model struct {
 	// GORILLA OVERRIDE: short human description of capability
 	// (params, context window, coding strength) shown in the model
 	// picker. Populated for discovered models from bundled metadata.
-	Description         string        `json:"description,omitempty"`
+	Description string `json:"description,omitempty"`
+	// GORILLA OVERRIDE: curated rank (1 = best). 0 = not on the
+	// verified best-models list; the picker can hide these.
+	Rank                int           `json:"rank,omitempty"`
 	Provider            ModelProvider `json:"provider"`
 	APIModel            string        `json:"api_model"`
 	CostPer1MIn         float64       `json:"cost_per_1m_in"`

@@ -213,11 +213,15 @@ func (m *modelDialogCmp) View() string {
 	modelItems := make([]string, 0, endIdx-m.scrollOffset)
 
 	for i := m.scrollOffset; i < endIdx; i++ {
-		// GORILLA OVERRIDE: show "Name — description" so 100+ discovered
-		// models are distinguishable; truncate to the dialog width.
+		// GORILLA OVERRIDE: show "N. Name — description" for curated
+		// ranked models (N = quality rank, 1 = best), so the picker
+		// reads as a leaderboard; plain "Name — description" otherwise.
 		label := m.models[i].Name
 		if d := m.models[i].Description; d != "" {
 			label = fmt.Sprintf("%s — %s", m.models[i].Name, d)
+		}
+		if r := m.models[i].Rank; r > 0 {
+			label = fmt.Sprintf("%2d. %s", r, label)
 		}
 		if r := []rune(label); len(r) > w-1 {
 			label = string(r[:w-2]) + "…"
@@ -380,10 +384,23 @@ func getModelsForProvider(provider models.ModelProvider) []models.Model {
 		}
 	}
 
-	// GORILLA OVERRIDE: rank by coding usefulness so the strongest
-	// models sit at the top, instead of the old reverse-alphabetical
-	// order that floated junk (Diffusiongemma, Deplot, Cosmos) above
-	// DeepSeek V4 Pro. Ties fall back to alphabetical.
+	// GORILLA OVERRIDE: if this provider has a curated, probe-verified
+	// ranking (Rank > 0), show ONLY those models, ordered 1..N — the
+	// user doesn't want 118 models including dead and junk ones, just
+	// the best. Providers without ranks (e.g. Gemini) keep the
+	// coding-usefulness heuristic order and show everything.
+	var ranked []models.Model
+	for _, m := range providerModels {
+		if m.Rank > 0 {
+			ranked = append(ranked, m)
+		}
+	}
+	if len(ranked) > 0 {
+		slices.SortFunc(ranked, func(a, b models.Model) int { return a.Rank - b.Rank })
+		return ranked
+	}
+
+	// Fallback: rank by coding usefulness (keyword heuristic).
 	slices.SortFunc(providerModels, func(a, b models.Model) int {
 		ra, rb := codingRank(string(a.ID)), codingRank(string(b.ID))
 		if ra != rb {

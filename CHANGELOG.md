@@ -1,3 +1,18 @@
+## v0.1.17 — 2026-07-20 — Ranked picker, /clear fix, scrolling
+
+- **Model picker is now a ranked leaderboard.** For NVIDIA NIM it shows
+  only the 30 curated, probe-verified best models, numbered 1..30 (1 =
+  DeepSeek V4 Pro), dropping the ~88 dead/junk/embedding models. Ranking
+  comes from the earlier one-token probe + curation. Providers without a
+  curated ranking (Gemini) keep showing everything, best-coder-first.
+- **/clear no longer breaks the editor.** It now routes through the same
+  new-session flow as Ctrl+N (resets the page session and clears the
+  sidebar) instead of only wiping the message list, which left the input
+  invisible and unusable.
+- **Mouse-wheel scrolling** of the conversation is enabled (you could
+  already scroll with PageUp/PageDown; now the wheel works too). Selecting
+  terminal text now needs Shift held down.
+
 # Changelog — Gorilla OpenCode
 
 The revived, MIT-licensed original OpenCode (Go), kept working with the
