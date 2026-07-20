@@ -75,6 +75,12 @@ const envTemplate = `# Gorilla OpenCode — API keys for desktop launches.
 # Google AI Studio (Gemini):
 #GEMINI_API_KEY=...
 #
+# Groq (fast; free tier caps at 12k tokens/min — trim the /context loadout):
+#GROQ_API_KEY=gsk_...
+#
+# Cerebras (fast; free key lists models but inference may need credits):
+#CEREBRAS_API_KEY=csk-...
+#
 # Local Ollama (no key needed):
 #LOCAL_ENDPOINT=http://localhost:11434/v1
 `

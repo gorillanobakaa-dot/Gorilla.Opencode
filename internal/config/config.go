@@ -319,6 +319,9 @@ func setProviderDefaults() {
 	if apiKey := os.Getenv("GROQ_API_KEY"); apiKey != "" {
 		viper.SetDefault("providers.groq.apiKey", apiKey)
 	}
+	if apiKey := os.Getenv("CEREBRAS_API_KEY"); apiKey != "" {
+		viper.SetDefault("providers.cerebras.apiKey", apiKey)
+	}
 	if apiKey := os.Getenv("OPENROUTER_API_KEY"); apiKey != "" {
 		viper.SetDefault("providers.openrouter.apiKey", apiKey)
 	}
@@ -385,10 +388,21 @@ func setProviderDefaults() {
 
 	// Groq configuration
 	if key := viper.GetString("providers.groq.apiKey"); strings.TrimSpace(key) != "" {
-		viper.SetDefault("agents.coder.model", models.QWENQwq)
-		viper.SetDefault("agents.summarizer.model", models.QWENQwq)
-		viper.SetDefault("agents.task.model", models.QWENQwq)
-		viper.SetDefault("agents.title.model", models.QWENQwq)
+		// GORILLA OVERRIDE: default was QWENQwq (qwen-qwq-32b), which
+		// Groq has retired. Use a model Groq actually serves today.
+		viper.SetDefault("agents.coder.model", models.Llama3_3_70BVersatile)
+		viper.SetDefault("agents.summarizer.model", models.Llama3_3_70BVersatile)
+		viper.SetDefault("agents.task.model", models.Llama3_3_70BVersatile)
+		viper.SetDefault("agents.title.model", models.Llama3_3_70BVersatile)
+		return
+	}
+
+	// GORILLA OVERRIDE: Cerebras configuration (native provider).
+	if key := viper.GetString("providers.cerebras.apiKey"); strings.TrimSpace(key) != "" {
+		viper.SetDefault("agents.coder.model", models.CerebrasGLM47)
+		viper.SetDefault("agents.summarizer.model", models.CerebrasGLM47)
+		viper.SetDefault("agents.task.model", models.CerebrasGLM47)
+		viper.SetDefault("agents.title.model", models.CerebrasGLM47)
 		return
 	}
 
@@ -706,6 +720,8 @@ func getProviderAPIKey(provider models.ModelProvider) string {
 		return os.Getenv("GEMINI_API_KEY")
 	case models.ProviderGROQ:
 		return os.Getenv("GROQ_API_KEY")
+	case models.ProviderCerebras:
+		return os.Getenv("CEREBRAS_API_KEY")
 	case models.ProviderAzure:
 		return os.Getenv("AZURE_OPENAI_API_KEY")
 	case models.ProviderOpenRouter:
@@ -830,7 +846,19 @@ func setDefaultModelForAgent(agent AgentName) bool {
 		}
 
 		cfg.Agents[agent] = Agent{
-			Model:     models.QWENQwq,
+			Model:     models.Llama3_3_70BVersatile,
+			MaxTokens: maxTokens,
+		}
+		return true
+	}
+
+	if apiKey := os.Getenv("CEREBRAS_API_KEY"); apiKey != "" {
+		maxTokens := int64(5000)
+		if agent == AgentTitle {
+			maxTokens = 80
+		}
+		cfg.Agents[agent] = Agent{
+			Model:     models.CerebrasGLM47,
 			MaxTokens: maxTokens,
 		}
 		return true
