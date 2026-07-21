@@ -1,0 +1,93 @@
+===============================================================================
+GORILLA OPENCODE MODIFICATIONS LOG - JULY 21, 2026
+===============================================================================
+
+1. MODEL CATALOG: GEMINI 3.6 FLASH + 3.5 FLASH-LITE
+-------------------------------------------------------------------------------
+  - internal/llm/models/gemini.go: Added Gemini36Flash ("gemini-3.6-flash") and
+    Gemini35FlashLite ("gemini-3.5-flash-lite"), both 1M context, verified live
+    via ListModels + generateContent probe on 2026-07-21.
+  - internal/llm/models/vertexai.go: Added VertexAIGemini36Flash and
+    VertexAIGemini35Flash mappings for ProviderVertexAI.
+
+2. VIEW TOOL: MAXREADSIZE 250K -> 5MB
+-------------------------------------------------------------------------------
+  - internal/llm/tools/view.go: MaxReadSize bumped from 250*1024 to 5*1024*1024.
+    DefaultReadLimit (2000 lines) unchanged. Fixes truncation on large JSON
+    metadata files (nim.json etc).
+
+3. ROOT CAUSE: GEMINI 3.6 FLASH NOT WORKING
+-------------------------------------------------------------------------------
+  Problem: User reported 3.6/3.5 models not working despite GEMINI_API_KEY
+  being set and the models being live on Google AI Studio and AGY.
+
+  Diagnosis (two separate issues found):
+
+  A) Config routing (PRIMARY):
+     ~/.config/gorilla-opencode/config.json had:
+       "model": "gemini-oauth.gemini-2.5-flash"
+     The "gemini-oauth." prefix routes requests through Google Code Assist
+     (cloudcode-pa.googleapis.com) via OAuth, completely bypassing GEMINI_API_KEY.
+     Google Code Assist is a separate backend from generativelanguage.googleapis.com
+     and has NOT deployed gemini-3.6-flash yet (returns HTTP 404).
+
+  B) Code Assist model catalog (SECONDARY):
+     gemini_codeassist.go cloned ALL GeminiModels into GeminiCAModels, including
+     models that Code Assist doesn't serve. Selecting any of these in the picker
+     while signed in via Google Login would silently 404.
+
+  REST API probe results (2026-07-21):
+    generativelanguage.googleapis.com (API Key):
+      gemini-3.6-flash       -> SUCCESS
+      gemini-3.5-flash       -> SUCCESS (slow/timeout on 2nd run)
+      gemini-3.5-flash-lite  -> SUCCESS
+      gemini-3.1-flash-lite  -> SUCCESS
+      gemini-3-flash-preview -> SUCCESS
+      gemini-3-pro-preview   -> 429 (quota limit: 0, billing gate)
+      gemini-3.1-pro-preview -> 429 (quota limit: 0, billing gate)
+      gemini-2.5-pro         -> 429 (quota limit: 0, billing gate)
+      gemini-2.5-flash       -> 404 ("no longer available to new users")
+      gemini-2.0-flash       -> 429 (quota limit: 0, billing gate)
+
+    cloudcode-pa.googleapis.com (OAuth Code Assist):
+      gemini-3.6-flash       -> 404 ("Requested entity was not found")
+      gemini-3.5-flash       -> 404
+      gemini-3.5-flash-lite  -> 404
+      gemini-2.0-flash       -> 404
+      gemini-3.1-flash-lite  -> SUCCESS
+      gemini-3-flash-preview -> SUCCESS
+      gemini-3-pro-preview   -> 429 (capacity exhausted)
+      gemini-2.5-pro         -> 429 (capacity exhausted)
+      gemini-2.5-flash       -> 429 (capacity exhausted)
+
+  Fixes applied:
+
+  A) Config fix:
+     - ~/.config/gorilla-opencode/config.json: Changed model from
+       "gemini-oauth.gemini-2.5-flash" to "gemini-3.6-flash" (standard provider,
+       uses GEMINI_API_KEY via generativelanguage.googleapis.com).
+
+  B) Default model update:
+     - internal/config/config.go: Gemini defaults updated from Gemini25/Gemini25Flash
+       to Gemini36Flash/Gemini35FlashLite when GEMINI_API_KEY is configured.
+
+  C) Code Assist model filtering:
+     - internal/llm/models/gemini_codeassist.go: GeminiCAModels init now skips
+       Gemini36Flash, Gemini35Flash, Gemini35FlashLite, Gemini20Flash (all 404 on
+       Code Assist). Prevents silent failures for Google Login users.
+
+  D) Caches.Create removal:
+     - internal/llm/provider/gemini.go: Removed experimental Caches.Create pre-call
+       from send() and stream(). Was triggering HTTP 400 ("Cached content is too
+       small, min_total_token_count=1024") and adding an extra roundtrip per request.
+
+4. BUILD VERIFICATION
+-------------------------------------------------------------------------------
+  - /home/gorilla/.local/go/bin/go build ./... -> 0 errors
+  - /home/gorilla/.local/go/bin/go vet ./...   -> 0 errors
+
+5. KEY MANAGEMENT
+-------------------------------------------------------------------------------
+  - Zero hardcoded API keys in source or compiled binary. Confirmed via git diff.
+  - GEMINI_API_KEY loaded at runtime from env or ~/.config/gorilla-opencode/env.
+===============================================================================
