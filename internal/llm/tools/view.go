@@ -32,7 +32,7 @@ type ViewResponseMetadata struct {
 
 const (
 	ViewToolName     = "view"
-	MaxReadSize      = 250 * 1024
+	MaxReadSize      = 5 * 1024 * 1024 // 5MB (was 250*1024; bumped to fit large JSON catalogues — DefaultReadLimit still caps to 2000 lines/read)
 	DefaultReadLimit = 2000
 	MaxLineLength    = 2000
 	viewDescription  = `File viewing tool that reads and displays the contents of files with line numbers, allowing you to examine code, logs, or text data.

@@ -132,7 +132,8 @@ More full-resolution screenshots and captions:
 ## What this fork adds
 
 - **Runs on 2026 providers**: NVIDIA NIM (your key, curated + ranked
-  models), Google Gemini 3 (thought-signature support), local Ollama.
+  models), Google Gemini 3 — up to **3.6 Flash / 3.5 Flash-Lite**
+  (1M context, thought-signature support) — and local Ollama.
 - **Navigable model picker**: 100+ discovered models shown with curated
   names + capability descriptions ("DeepSeek V4 Pro — 1.6T MoE, 1M ctx,
   80.6% SWE-bench"), ranked best-coder-first, with a position counter.
@@ -155,8 +156,8 @@ plain-language and developer: [DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-t
 ## What the revival changed
 
 It started as six files to get the fossil talking to 2026 providers; it
-has since grown into **~80 files changed across 20+ releases** — roughly
-**+4,000 lines**, **85 `// GORILLA OVERRIDE:` markers in 32 source
+has since grown into **~80 files changed across 25 releases** — roughly
+**+4,000 lines**, **96 `// GORILLA OVERRIDE:` markers in 36 source
 files**. Every single change carries one of those comments saying what
 changed and why, so `grep -rn "GORILLA OVERRIDE" .` is the complete,
 honest audit trail.
