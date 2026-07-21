@@ -22,11 +22,13 @@ const (
 	// 404 "not found") was left out. Some of these return 429 "limit: 0"
 	// on a free-tier key — that is a quota/billing gate, not a dead model;
 	// the model itself is alive and works once the key has quota.
-	Gemini3Pro        ModelID = "gemini-3-pro-preview"
+	Gemini36Flash     ModelID = "gemini-3.6-flash"
+	Gemini35FlashLite ModelID = "gemini-3.5-flash-lite"
 	Gemini35Flash     ModelID = "gemini-3.5-flash"
-	Gemini3Flash      ModelID = "gemini-3-flash-preview"
+	Gemini3Pro        ModelID = "gemini-3-pro-preview"
 	Gemini31Pro       ModelID = "gemini-3.1-pro-preview"
 	Gemini31FlashLite ModelID = "gemini-3.1-flash-lite"
+	Gemini3Flash      ModelID = "gemini-3-flash-preview"
 	Gemini25Pro       ModelID = "gemini-2.5-pro"
 	Gemini25FlashLite ModelID = "gemini-2.5-flash-lite"
 	GeminiFlashLite   ModelID = "gemini-flash-lite-latest"
@@ -78,7 +80,37 @@ var GeminiModels = map[ModelID]Model{
 		SupportsAttachments: true,
 	},
 
+	// GORILLA OVERRIDE: 3.6 Flash + 3.5 Flash-Lite verified live
+	// against the Gemini API (ListModels + generateContent probe) on
+	// 2026-07-21, the day Google announced them. 3.6 Flash is the new
+	// workhorse (improved coding + computer use, fewer tool loops);
+	// 3.5 Flash-Lite is the high-throughput / low-latency tier. The
+	// announced "3.5 Flash Cyber" model is NOT registered here: a
+	// ListModels probe returns nothing matching "cyber" — it is a
+	// government/partner pilot gated off the public API, so adding
+	// it would silently 404 at call time. Add it only after a live
+	// id surfaces.
 	// ---- Gemini 3.x (current generation) ---------------------------------
+	Gemini36Flash: {
+		ID:                  Gemini36Flash,
+		Name:                "Gemini 3.6 Flash",
+		Description:         "Newest Flash workhorse — coding + computer use, fewer tool loops, 1M ctx",
+		Provider:            ProviderGemini,
+		APIModel:            "gemini-3.6-flash",
+		ContextWindow:       1000000,
+		DefaultMaxTokens:    50000,
+		SupportsAttachments: true,
+	},
+	Gemini35FlashLite: {
+		ID:                  Gemini35FlashLite,
+		Name:                "Gemini 3.5 Flash Lite",
+		Description:         "High-throughput / low-latency Flash-Lite — 350 tok/s, 1M ctx",
+		Provider:            ProviderGemini,
+		APIModel:            "gemini-3.5-flash-lite",
+		ContextWindow:       1000000,
+		DefaultMaxTokens:    16000,
+		SupportsAttachments: true,
+	},
 	Gemini3Pro: {
 		ID:                  Gemini3Pro,
 		Name:                "Gemini 3 Pro (preview)",

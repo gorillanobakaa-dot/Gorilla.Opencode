@@ -1,3 +1,34 @@
+## v0.1.25 — 2026-07-21 — Gemini 3.6 Flash, and making it actually reachable
+
+- **Newest Google models, verified live**: `gemini-3.6-flash` and
+  `gemini-3.5-flash-lite` (both 1M context) added and probed on
+  2026-07-21 via `ListModels` + a real `generateContent` call. Registered
+  for both Google AI Studio (`GEMINI_API_KEY`) and Vertex AI.
+- **Fixed "the new Gemini models don't work" — even with a valid key.**
+  The cause was *routing*, not the key. A saved config of
+  `gemini-oauth.gemini-2.5-flash` sent every request through Google's
+  **Code Assist** backend (OAuth), which ignores `GEMINI_API_KEY` and
+  hasn't shipped 3.6 yet (HTTP 404). The Gemini default is now
+  `gemini-3.6-flash` on the standard API-key endpoint when a key is set.
+- **The picker no longer offers models that will 404.** Signed in with
+  Google (Code Assist), it now hides the models that backend doesn't
+  serve (3.6 Flash, 3.5 Flash/Lite, 2.0 Flash) instead of listing them
+  and failing on selection.
+- **Removed a broken pre-call**: the experimental `Caches.Create` step
+  fired before every Gemini request, adding a roundtrip and throwing
+  HTTP 400 ("cached content too small") on short prompts. Gone.
+- **Large files open again**: the `view` tool's max read size went from
+  250 KB → 5 MB, so big JSON metadata catalogues (the ~1.6 MB model
+  price/context table) can be read. The 2,000-lines-per-read cap is
+  unchanged, so context stays lean.
+
+Backend reality, probed 2026-07-21 (why routing matters): the API-key
+endpoint serves 3.6 / 3.5 / 3.5-lite / 3.1-lite / 3-flash-preview; the
+OAuth Code Assist endpoint serves only 3.1-lite and 3-flash-preview of the
+Flash line. Pro models are billing-gated (429) on both. Verified with zero
+hardcoded keys in source or binary (`git diff`); `GEMINI_API_KEY` is read
+at runtime from the environment or `~/.config/gorilla-opencode/env`.
+
 ## v0.1.17 — 2026-07-20 — Ranked picker, /clear fix, scrolling
 
 - **Model picker is now a ranked leaderboard.** For NVIDIA NIM it shows

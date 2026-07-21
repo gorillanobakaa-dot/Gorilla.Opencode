@@ -9,19 +9,27 @@ import "maps"
 
 const ProviderGeminiCA ModelProvider = "gemini-oauth"
 
-// Handy ids for the two OAuth models used as agent defaults (ids are the
+// Handy ids for the OAuth models used as agent defaults (ids are the
 // canonical Gemini ids prefixed with "gemini-oauth.").
 const (
-	GeminiCAPro   ModelID = "gemini-oauth.gemini-2.5"
-	GeminiCAFlash ModelID = "gemini-oauth.gemini-2.5-flash"
+	GeminiCA31FlashLite ModelID = "gemini-oauth.gemini-3.1-flash-lite"
+	GeminiCA3Flash      ModelID = "gemini-oauth.gemini-3-flash-preview"
+	GeminiCAPro         ModelID = "gemini-oauth.gemini-2.5"
+	GeminiCAFlash       ModelID = "gemini-oauth.gemini-2.5-flash"
 )
 
 // GeminiCAModels mirrors GeminiModels but on the OAuth/Code-Assist provider.
-// Populated in init() so it always tracks the canonical Gemini list.
+// Populated in init() excluding models unserved by cloudcode-pa.googleapis.com (e.g. 3.6/3.5).
 var GeminiCAModels = map[ModelID]Model{}
 
 func init() {
 	for id, m := range GeminiModels {
+		// GORILLA OVERRIDE: Google Code Assist (cloudcode-pa.googleapis.com) returns HTTP 404
+		// "Requested entity was not found" for 3.6-flash, 3.5-flash, 3.5-flash-lite, and 2.0-flash.
+		// Only expose models live on the Code Assist backend.
+		if id == Gemini36Flash || id == Gemini35Flash || id == Gemini35FlashLite || id == Gemini20Flash {
+			continue
+		}
 		clone := m
 		clone.ID = ModelID("gemini-oauth." + string(id))
 		clone.Provider = ProviderGeminiCA

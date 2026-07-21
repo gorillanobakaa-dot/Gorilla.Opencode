@@ -199,6 +199,7 @@ func (g *geminiClient) send(ctx context.Context, messages []message.Message, too
 	if len(tools) > 0 {
 		config.Tools = g.convertTools(tools)
 	}
+
 	// GORILLA OVERRIDE: never swallow Create errors — a nil chat
 	// segfaults inside the SDK on the first Send.
 	chat, err := g.client.Chats.Create(ctx, g.providerOptions.model.APIModel, config, history)
@@ -296,6 +297,7 @@ func (g *geminiClient) stream(ctx context.Context, messages []message.Message, t
 	if len(tools) > 0 {
 		config.Tools = g.convertTools(tools)
 	}
+
 	// GORILLA OVERRIDE: never swallow Create errors — a nil chat
 	// segfaults inside the SDK on the first SendStream.
 	chat, chatErr := g.client.Chats.Create(ctx, g.providerOptions.model.APIModel, config, history)

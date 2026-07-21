@@ -4,11 +4,31 @@ const (
 	ProviderVertexAI ModelProvider = "vertexai"
 
 	// Models
+	VertexAIGemini36Flash ModelID = "vertexai.gemini-3.6-flash"
+	VertexAIGemini35Flash ModelID = "vertexai.gemini-3.5-flash"
 	VertexAIGemini25Flash ModelID = "vertexai.gemini-2.5-flash"
 	VertexAIGemini25      ModelID = "vertexai.gemini-2.5"
 )
 
 var VertexAIGeminiModels = map[ModelID]Model{
+	VertexAIGemini36Flash: {
+		ID:                  VertexAIGemini36Flash,
+		Name:                "VertexAI: Gemini 3.6 Flash",
+		Provider:            ProviderVertexAI,
+		APIModel:            "gemini-3.6-flash",
+		ContextWindow:       1000000,
+		DefaultMaxTokens:    50000,
+		SupportsAttachments: true,
+	},
+	VertexAIGemini35Flash: {
+		ID:                  VertexAIGemini35Flash,
+		Name:                "VertexAI: Gemini 3.5 Flash",
+		Provider:            ProviderVertexAI,
+		APIModel:            "gemini-3.5-flash",
+		ContextWindow:       1000000,
+		DefaultMaxTokens:    50000,
+		SupportsAttachments: true,
+	},
 	VertexAIGemini25Flash: {
 		ID:                  VertexAIGemini25Flash,
 		Name:                "VertexAI: Gemini 2.5 Flash",
