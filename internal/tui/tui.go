@@ -9,8 +9,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/app"
+	"github.com/opencode-ai/opencode/internal/auth"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
+	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/pubsub"
@@ -424,13 +426,45 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "context", "loadout", "tokens":
 			a.showLoadoutDialog = true
 			return a, nil
+		case "login":
+			// GORILLA OVERRIDE: /login — run the browser OAuth flow
+			// to sign in with Google (Code Assist free tier).
+			return a, a.runLogin()
+		case "logout":
+			// GORILLA OVERRIDE: /logout — drop stored OAuth creds
+			// and clear the gemini-oauth provider from config.
+			return a, a.runLogout()
 		default:
-			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /export, /clear, /context)", msg.Name))
+			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /login, /logout, /export, /clear, /context)", msg.Name))
 		}
 
 	case dialog.CloseLoadoutDialogMsg:
 		a.showLoadoutDialog = false
 		return a, nil
+
+	case loginResultMsg:
+		if msg.err != nil {
+			return a, util.ReportError(fmt.Errorf("login failed: %w", msg.err))
+		}
+		// Re-run config validation so the new OAuth creds are picked up
+		cfg := config.Get()
+		if cfg != nil {
+			if _, ok := cfg.Providers[models.ProviderGeminiCA]; !ok {
+				cfg.Providers[models.ProviderGeminiCA] = config.Provider{APIKey: "oauth-login"}
+			}
+		}
+		return a, util.ReportInfo(fmt.Sprintf("Signed in as %s. Select a Gemini Code Assist model to begin.", msg.Email))
+
+	case logoutDoneMsg:
+		if msg.err != nil {
+			return a, util.ReportError(fmt.Errorf("logout failed: %w", msg.err))
+		}
+		// Remove the gemini-oauth provider so it won't be used
+		cfg := config.Get()
+		if cfg != nil {
+			delete(cfg.Providers, models.ProviderGeminiCA)
+		}
+		return a, util.ReportInfo("Signed out. Use /login to sign in again, or type /model to pick a different provider.")
 
 	case dialog.LoadoutChangedMsg:
 		// Rebuild the coder agent's tools so toggles take effect now.
@@ -1036,4 +1070,42 @@ If there are Cursor rules (in .cursor/rules/ or .cursorrules) or Copilot rules (
 	}
 
 	return model
+}
+
+// ---- login / logout --------------------------------------------------------
+
+type loginResultMsg struct {
+	Email string
+	err   error
+}
+
+type logoutDoneMsg struct {
+	err error
+}
+
+func (a *appModel) runLogin() tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		creds, err := auth.Login(ctx)
+		if err != nil {
+			return loginResultMsg{err: err}
+		}
+		if err := creds.Save(); err != nil {
+			return loginResultMsg{err: fmt.Errorf("saving credentials: %w", err)}
+		}
+		if err := creds.SetupCodeAssist(ctx, ""); err != nil {
+			// Login still succeeded; surface the warning on next launch.
+			logging.Warn("Code Assist onboarding failed", "error", err)
+		}
+		return loginResultMsg{Email: creds.Email}
+	}
+}
+
+func (a *appModel) runLogout() tea.Cmd {
+	return func() tea.Msg {
+		if err := auth.Logout(); err != nil {
+			return logoutDoneMsg{err: err}
+		}
+		return logoutDoneMsg{}
+	}
 }
