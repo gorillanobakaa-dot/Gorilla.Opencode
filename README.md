@@ -100,11 +100,12 @@ Bedrock, Vertex, Copilot) remain wired as upstream left them.
 New to this kind of tool? The plain-English **[GUIDE](docs/GUIDE.md)**
 explains every part of the screen. Here's the short version.
 
-**The model picker — a ranked leaderboard of models that actually work.**
-We pinged every model on your key with a one-token message and kept only
-the ones that answered — the dead ones are gone. What's left is numbered
-best-for-coding first (1 = best), each with a plain description of its
-size and strength.
+**The model picker — a ranked leaderboard, with the full catalog behind it.**
+We pinged every model on your key with a one-token message and ranked the
+good ones for coding — numbered best-first (1 = best), each with a plain
+description of its size and strength. The rest of your provider's models
+still follow below (they're just unranked), so nothing is hidden: use the
+top for coding, reach past it for anything else. Your key, your call.
 
 ![The ranked model picker](docs/screenshots/gallery/10-09-02-16.png)
 
