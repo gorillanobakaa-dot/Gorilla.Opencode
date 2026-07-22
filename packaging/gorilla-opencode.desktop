@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Gorilla OpenCode
+Comment=Terminal AI coding agent (revived original OpenCode) — bring your own API keys
+Exec=gorilla-opencode launch
+Icon=gorilla-opencode
+Terminal=true
+Categories=Development;IDE;
+Keywords=ai;coding;agent;terminal;llm;
