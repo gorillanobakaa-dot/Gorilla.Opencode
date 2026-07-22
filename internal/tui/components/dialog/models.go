@@ -207,14 +207,19 @@ func (m *modelDialogCmp) View() string {
 		Width(w).
 		Render(fmt.Sprintf("Select %s Model", providerName))
 
-	// GORILLA OVERRIDE: for a curated provider (ranked list), tell the
-	// user these are only the models we pinged live and got a reply
-	// from — dead/junk models were dropped, and the number is the
-	// coding-quality rank (1 = best).
+	// GORILLA OVERRIDE: for a curated provider, tell the user the top of the
+	// list is the probe-verified coding ranking (1 = best), and that the
+	// rest of the provider's catalog follows below — nothing is hidden.
 	subtitle := ""
 	if len(m.models) > 0 && m.models[0].Rank > 0 {
+		ranked := 0
+		for _, mm := range m.models {
+			if mm.Rank > 0 {
+				ranked++
+			}
+		}
 		subtitle = baseStyle.Foreground(t.TextMuted()).Width(w).Padding(0, 0, 1).
-			Render(fmt.Sprintf("%d models — pinged live with 1 token, only responders kept; ranked 1=best", len(m.models)))
+			Render(fmt.Sprintf("%d ranked best-first (1=best); %d more below — full catalog, your call", ranked, len(m.models)-ranked))
 	} else {
 		title = baseStyle.Foreground(t.Primary()).Bold(true).Width(w).Padding(0, 0, 1).
 			Render(fmt.Sprintf("Select %s Model", providerName))
@@ -399,32 +404,35 @@ func getModelsForProvider(provider models.ModelProvider) []models.Model {
 		}
 	}
 
-	// GORILLA OVERRIDE: if this provider has a curated, probe-verified
-	// ranking (Rank > 0), show ONLY those models, ordered 1..N — the
-	// user doesn't want 118 models including dead and junk ones, just
-	// the best. Providers without ranks (e.g. Gemini) keep the
-	// coding-usefulness heuristic order and show everything.
-	var ranked []models.Model
-	for _, m := range providerModels {
-		if m.Rank > 0 {
-			ranked = append(ranked, m)
-		}
-	}
-	if len(ranked) > 0 {
-		slices.SortFunc(ranked, func(a, b models.Model) int { return a.Rank - b.Rank })
-		return ranked
-	}
-
-	// Fallback: rank by coding usefulness (keyword heuristic).
-	slices.SortFunc(providerModels, func(a, b models.Model) int {
+	// Coding-usefulness heuristic order — used for unranked models and for
+	// providers that have no curated ranking at all.
+	byCoding := func(a, b models.Model) int {
 		ra, rb := codingRank(string(a.ID)), codingRank(string(b.ID))
 		if ra != rb {
 			return ra - rb
 		}
 		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
-	})
+	}
 
-	return providerModels
+	// GORILLA OVERRIDE: show EVERY model the provider offers — the curated,
+	// probe-verified best ones first (Rank 1..N), then everything else below.
+	// The ranking is guidance, not a gate: someone else may legitimately want
+	// a smaller/older/"shit tier" model, and it's not our place to hide it.
+	// Providers without ranks (e.g. Gemini) fall through to coding order.
+	var ranked, rest []models.Model
+	for _, m := range providerModels {
+		if m.Rank > 0 {
+			ranked = append(ranked, m)
+		} else {
+			rest = append(rest, m)
+		}
+	}
+	slices.SortFunc(ranked, func(a, b models.Model) int { return a.Rank - b.Rank })
+	slices.SortFunc(rest, byCoding)
+	if len(ranked) > 0 {
+		return append(ranked, rest...)
+	}
+	return rest
 }
 
 // codingRank scores a model id by coding usefulness (lower = better).
