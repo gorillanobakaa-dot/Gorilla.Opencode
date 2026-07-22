@@ -18,7 +18,7 @@
   "name": "Jamba 1.5 Large"
  },
  "aisingapore/sea-lion-7b-instruct": {
-  "description": "shit tier \u2014 . Southeast-Asian-language-focused 7B model. Not built for\u2026",
+  "description": "shit tier \u2014 . Southeast-Asian-language-focused 7B model. Not built for coding.",
   "name": "SEA-LION 7B"
  },
  "baai/bge-m3": {
@@ -89,11 +89,11 @@
   "name": "Gemma 3n E4B"
  },
  "google/gemma-4-31b-it": {
-  "description": "shit tier \u2014 . 31B general instruct model, no coding specialization \u2014\u2026",
+  "description": "shit tier \u2014 . 31B general instruct model, no coding specialization \u2014 skip it for code.",
   "name": "Gemma 4 31B-it"
  },
  "google/recurrentgemma-2b": {
-  "description": "shit tier \u2014 . Research-oriented recurrent architecture at toy scale \u2014 not\u2026",
+  "description": "shit tier \u2014 . Research-oriented recurrent architecture at toy scale \u2014 not for real work.",
   "name": "RecurrentGemma 2B"
  },
  "ibm/granite-3.0-3b-a800m-instruct": {
@@ -101,7 +101,7 @@
   "name": "Granite 3.0 3B"
  },
  "ibm/granite-3.0-8b-instruct": {
-  "description": "shit tier \u2014 . General 8B chat model, not the code-tuned Granite variant \u2014\u2026",
+  "description": "shit tier \u2014 . General 8B chat model, not the code-tuned Granite variant \u2014 use that instead.",
   "name": "Granite 3.0 8B"
  },
  "ibm/granite-34b-code-instruct": {
@@ -120,12 +120,12 @@
  },
  "meta/llama-3.1-405b-instruct": {
   "context_window": 131072,
-  "description": "405B dense, 128K ctx. Largest open dense model \u2014 capable but slow, and not\u2026",
+  "description": "405B dense, 128K ctx. Largest open dense model \u2014 capable but slow, and not worth the latency over 70B for coding.",
   "name": "Llama 3.1 405B"
  },
  "meta/llama-3.1-70b-instruct": {
   "context_window": 131072,
-  "description": "70B dense, 128K ctx. Same tier as 3.3 above \u2014 prefer 3.3 if both are\u2026",
+  "description": "70B dense, 128K ctx. Same tier as 3.3 above \u2014 prefer 3.3 if both are available.",
   "name": "Llama 3.1 70B",
   "rank": 20
  },
@@ -134,7 +134,7 @@
   "name": "Llama 3.2 11B Vision"
  },
  "meta/llama-3.2-1b-instruct": {
-  "description": "shit tier \u2014 . 1B \u2014 genuinely too small to reason about a single function,\u2026",
+  "description": "shit tier \u2014 . 1B \u2014 genuinely too small to reason about a single function, let alone a codebase.",
   "name": "Llama 3.2 1B"
  },
  "meta/llama-3.2-3b-instruct": {
@@ -147,7 +147,7 @@
  },
  "meta/llama-3.3-70b-instruct": {
   "context_window": 131072,
-  "description": "70B dense, 128K ctx. Solid generalist fallback, better\u2026",
+  "description": "70B dense, 128K ctx. Solid generalist fallback, better than 3.1 for most tasks.",
   "name": "Llama 3.3 70B",
   "rank": 19
  },
@@ -162,7 +162,7 @@
   "name": "Llama Guard 4 12B"
  },
  "meta/llama2-70b": {
-  "description": "shit tier \u2014 . 2023-generation dense model, no meaningful code training,\u2026",
+  "description": "shit tier \u2014 . 2023-generation dense model, no meaningful code training, long superseded.",
   "name": "Llama 2 70B"
  },
  "microsoft/kosmos-2": {
@@ -174,7 +174,7 @@
   "name": "Phi-3 Vision 128K"
  },
  "microsoft/phi-3.5-moe-instruct": {
-  "description": "shit tier \u2014 small general MoE, dated, no coding edge worth using over Tier\u2026",
+  "description": "shit tier \u2014 small general MoE, dated, no coding edge worth using over the Tier-1 models.",
   "name": "Phi-3.5 MoE"
  },
  "minimaxai/minimax-m2.7": {
@@ -195,13 +195,13 @@
   "name": "Codestral 22B"
  },
  "mistralai/ministral-14b-instruct-2512": {
-  "description": "14B dense. Small, fast, general-purpose \u2014 fine for quick chat-style Q&A\u2026",
+  "description": "14B dense. Small, fast, general-purpose \u2014 fine for quick chat-style Q&A, not heavy coding.",
   "name": "Ministral 14B",
   "rank": 23
  },
  "mistralai/mistral-7b-instruct-v0.3": {
   "context_window": 32768,
-  "description": "shit tier \u2014 . 7B general chat model, 32K ctx. Can produce syntactically OK\u2026",
+  "description": "shit tier \u2014 . 7B general chat model, 32K ctx. Can produce syntactically OK code, but nothing you'd ship.",
   "name": "Mistral 7B v0.3"
  },
  "mistralai/mistral-large": {
@@ -252,7 +252,7 @@
   "name": "Kimi K2.6"
  },
  "nv-mistralai/mistral-nemo-12b-instruct": {
-  "description": "shit tier \u2014 . 12B general chat model, decent multilingual but no coding\u2026",
+  "description": "shit tier \u2014 . 12B general chat model, decent multilingual but no coding edge.",
   "name": "Mistral NeMo 12B"
  },
  "nvidia/ai-synthetic-video-detector": {
@@ -260,7 +260,7 @@
   "name": "AI Synthetic Video Detector"
  },
  "nvidia/cosmos-reason2-8b": {
-  "description": "shit tier \u2014 NVIDIA's physical-world/robotics reasoning model, unrelated to\u2026",
+  "description": "shit tier \u2014 NVIDIA's physical-world/robotics reasoning model, unrelated to coding.",
   "name": "Cosmos Reason2 8B"
  },
  "nvidia/embed-qa-4": {
@@ -272,7 +272,7 @@
   "name": "GLiNER PII"
  },
  "nvidia/ising-calibration-1-35b-a3b": {
-  "description": "shit tier \u2014 appears to be a specialized physics/optimization calibration\u2026",
+  "description": "shit tier \u2014 appears to be a specialized physics/optimization calibration model, not a coder.",
   "name": "Ising Calibration 1 35B-A3B"
  },
  "nvidia/llama-3.1-nemoguard-8b-content-safety": {
@@ -284,11 +284,11 @@
   "name": "NemoGuard Topic Control 8B"
  },
  "nvidia/llama-3.1-nemotron-51b-instruct": {
-  "description": "shit tier \u2014 2024-era general instruct model, no coding tune, superseded by\u2026",
+  "description": "shit tier \u2014 2024-era general instruct model, no coding tune, superseded by the newer Nemotron builds.",
   "name": "Nemotron 51B (v1, dated)"
  },
  "nvidia/llama-3.1-nemotron-70b-instruct": {
-  "description": "shit tier \u2014 same story, dated general-purpose tune, skip in favor of the\u2026",
+  "description": "shit tier \u2014 same story, dated general-purpose tune, skip in favor of the newer Nemotron Super.",
   "name": "Nemotron 70B (v1, dated)"
  },
  "nvidia/llama-3.1-nemotron-nano-8b-v1": {
@@ -387,15 +387,15 @@
   "name": "Nemotron 4 340B"
  },
  "nvidia/nemotron-4-340b-reward": {
-  "description": "shit tier \u2014 a reward model for RLHF pipelines, not something you chat with\u2026",
+  "description": "shit tier \u2014 a reward model for RLHF pipelines, not something you chat with or code with.",
   "name": "Nemotron 4 340B Reward"
  },
  "nvidia/nemotron-mini-4b-instruct": {
-  "description": "shit tier \u2014 . 4B \u2014 fine for a phone, not for reasoning about a kernel\u2026",
+  "description": "shit tier \u2014 . 4B \u2014 fine for a phone, not for reasoning about a kernel or a codebase.",
   "name": "Nemotron Mini 4B"
  },
  "nvidia/nemotron-nano-3-30b-a3b": {
-  "description": "Listed in the catalog but appears to be a duplicate/variant of\u2026",
+  "description": "Listed in the catalog but appears to be a duplicate/variant of another Nemotron Nano entry.",
   "name": "Nemotron Nano 3 30B-A3B (unverified listing)"
  },
  "nvidia/nemotron-parse": {
@@ -411,7 +411,7 @@
   "name": "NV-Embed v1"
  },
  "nvidia/nv-embedcode-7b-v1": {
-  "description": "shit tier \u2014 as a chat model \u2014 this is a code embedding model for semantic\u2026",
+  "description": "shit tier \u2014 as a chat model \u2014 this is a code embedding model for semantic search, not chat.",
   "name": "NV-EmbedCode 7B"
  },
  "nvidia/nv-embedqa-e5-v5": {
@@ -419,7 +419,7 @@
   "name": "NV-EmbedQA E5 v5"
  },
  "nvidia/nv-embedqa-mistral-7b-v2": {
-  "description": "shit tier \u2014 embedding model built on Mistral 7B, but embedding-only, not\u2026",
+  "description": "shit tier \u2014 embedding model built on Mistral 7B, but embedding-only, not a chat model.",
   "name": "NV-EmbedQA Mistral 7B v2"
  },
  "nvidia/nvclip": {
@@ -472,7 +472,7 @@
   "rank": 6
  },
  "sarvamai/sarvam-m": {
-  "description": "shit tier \u2014 . Indic-language-focused model. Wrong tool entirely for\u2026",
+  "description": "shit tier \u2014 . Indic-language-focused model. Wrong tool entirely for coding.",
   "name": "Sarvam-M"
  },
  "snowflake/arctic-embed-l": {
@@ -522,7 +522,7 @@
   "rank": 2
  },
  "zyphra/zamba2-7b-instruct": {
-  "description": "shit tier \u2014 . Small hybrid SSM-transformer, general chat only. No coding\u2026",
+  "description": "shit tier \u2014 . Small hybrid SSM-transformer, general chat only. No coding ability.",
   "name": "Zamba2 7B"
  }
 }
