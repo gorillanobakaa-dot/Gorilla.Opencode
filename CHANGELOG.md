@@ -1,3 +1,21 @@
+## v0.1.26 — 2026-07-22 — Model picker: no more half-finished descriptions
+
+- **Every model blurb in the NIM picker now reads as a complete sentence.**
+  24 of the curated descriptions were stored cut off mid-sentence with a
+  trailing "…" — e.g. "Solid generalist fallback, better…" and "fine for
+  quick chat-style Q&A…". It *looked* like the dialog was clipping text to
+  the window width, but the ellipsis was baked into the **data**, not added
+  by the renderer — so resizing the terminal or rebuilding never helped. All
+  24 are now finished. Pure data fix (`internal/llm/models/metadata/nim.json`);
+  no code changed, and the deliberately blunt "shit tier" model ratings are
+  kept intact.
+
+  **Plain-language version:** the little grey descriptions next to each model
+  used to trail off with "…" like an unfinished thought. That missing text
+  wasn't hidden off the edge of the screen — it was never in the file to
+  begin with. Now every description ends properly. (Takes effect after a
+  rebuild, since the model list is baked into the program when it's built.)
+
 ## v0.1.25 — 2026-07-21 — Gemini 3.6 Flash, and making it actually reachable
 
 - **Newest Google models, verified live**: `gemini-3.6-flash` and
