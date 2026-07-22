@@ -1,3 +1,19 @@
+## v0.1.27 — 2026-07-22 — The .deb now gives you an app-grid launcher
+
+- **Installing the package now creates a desktop entry + icons**, so
+  Gorilla OpenCode shows up in your application grid without the extra
+  `gorilla-opencode install` step. The `.deb`/`.rpm` ship the `.desktop`
+  file into `/usr/share/applications/` and the icons (128/256/512/1024 +
+  scalable SVG) into the hicolor theme; dpkg's own triggers refresh the
+  icon and desktop caches automatically. Packaging is now committed in
+  `.goreleaser.yml` (`nfpms.contents`) + `packaging/gorilla-opencode.desktop`
+  so it's reproducible, not a one-off.
+
+  **Plain-language version:** before, if you installed the `.deb` you got a
+  working command but no clickable icon in your apps menu — you had to run a
+  second command to get one. Now the icon appears the moment you install the
+  package. (The app is otherwise unchanged from v0.1.26.)
+
 ## v0.1.26 — 2026-07-22 — Model picker: no more half-finished descriptions
 
 - **Every model blurb in the NIM picker now reads as a complete sentence.**
