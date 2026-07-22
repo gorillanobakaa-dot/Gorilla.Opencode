@@ -1,3 +1,19 @@
+## v0.1.28 — 2026-07-22 — Model picker shows the whole catalog again
+
+- **The picker no longer hides unranked models.** The curated, probe-verified
+  best models still sit at the top, numbered 1..N (1 = best for coding) — but
+  the rest of the provider's catalog now follows below them instead of being
+  dropped. The ranking is guidance, not a gate: if you want a smaller, older,
+  or frankly worse model, it's your key and your call, and the tool won't
+  decide for you. (`getModelsForProvider` now appends the unranked models,
+  sorted by the coding heuristic, after the ranked ones.)
+- The picker subtitle now reads honestly — "N ranked best-first; M more below
+  — full catalog" — instead of implying the junk was removed.
+
+  **Plain-language version:** the model list used to show only the 30 hand-picked
+  best; the couple hundred other models your NVIDIA NIM key can reach were
+  hidden. Now they all show — the good ones on top, everything else underneath.
+
 ## v0.1.27 — 2026-07-22 — The .deb now gives you an app-grid launcher
 
 - **Installing the package now creates a desktop entry + icons**, so
