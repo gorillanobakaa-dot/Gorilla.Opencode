@@ -62,6 +62,23 @@ nfpms:
       {{ .ProjectName }}-
       {{- if eq .Os "darwin" }}mac
       {{- else }}{{ .Os }}{{ end }}-{{ .Arch }}
+    # GORILLA OVERRIDE: ship a desktop entry + hicolor icons so the .deb/.rpm
+    # give an app-grid launcher on install (dpkg auto-fires the hicolor +
+    # desktop-file-utils triggers to refresh caches). Mirrors what the
+    # `gorilla-opencode install` subcommand does per-user, but system-wide.
+    contents:
+      - src: ./packaging/gorilla-opencode.desktop
+        dst: /usr/share/applications/gorilla-opencode.desktop
+      - src: ./internal/assets/icons/gorilla-opencode-128.png
+        dst: /usr/share/icons/hicolor/128x128/apps/gorilla-opencode.png
+      - src: ./internal/assets/icons/gorilla-opencode-256.png
+        dst: /usr/share/icons/hicolor/256x256/apps/gorilla-opencode.png
+      - src: ./internal/assets/icons/gorilla-opencode-512.png
+        dst: /usr/share/icons/hicolor/512x512/apps/gorilla-opencode.png
+      - src: ./internal/assets/icons/gorilla-opencode-1024.png
+        dst: /usr/share/icons/hicolor/1024x1024/apps/gorilla-opencode.png
+      - src: ./internal/assets/icons/gorilla-opencode.svg
+        dst: /usr/share/icons/hicolor/scalable/apps/gorilla-opencode.svg
 
 changelog:
   sort: asc
