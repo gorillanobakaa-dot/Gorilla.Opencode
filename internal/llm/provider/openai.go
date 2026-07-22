@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/openai/openai-go"
@@ -228,9 +230,11 @@ func (o *openaiClient) send(ctx context.Context, messages []message.Message, too
 			params,
 			o.cacheOptions()...,
 		)
-		// If there is an error we are going to see if we can retry the call
+		// If there is an error we are going to see if we can retry the call.
+		// Non-streaming: nothing was emitted, so a transport drop is always
+		// safe to retry (contentEmitted=false).
 		if err != nil {
-			retry, after, retryErr := o.shouldRetry(attempts, err)
+			retry, after, retryErr := o.shouldRetry(attempts, err, false)
 			if retryErr != nil {
 				return nil, retryErr
 			}
@@ -334,8 +338,11 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 				return
 			}
 
-			// If there is an error we are going to see if we can retry the call
-			retry, after, retryErr := o.shouldRetry(attempts, err)
+			// If there is an error we are going to see if we can retry the call.
+			// Pass whether we've already streamed visible content: a transport
+			// drop can only be safely retried before the first token, else the
+			// restarted stream would duplicate the answer mid-flight.
+			retry, after, retryErr := o.shouldRetry(attempts, err, currentContent != "")
 			if retryErr != nil {
 				eventChan <- ProviderEvent{Type: EventError, Error: retryErr}
 				close(eventChan)
@@ -364,10 +371,29 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 	return eventChan
 }
 
-func (o *openaiClient) shouldRetry(attempts int, err error) (bool, int64, error) {
+func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool) (bool, int64, error) {
 	var apierr *openai.Error
 	if !errors.As(err, &apierr) {
-		return false, 0, err
+		// GORILLA OVERRIDE: not an API error — this is a transport/stream
+		// failure (dropped SSE connection, unexpected EOF, connection reset,
+		// read timeout). These are common when a big model is slow to its
+		// first token (an idle proxy drops the stream) and on flaky mobile
+		// links — the "SSE existential crisis" reported by users on 550B-class
+		// models. Retry them too, but ONLY before any visible content has been
+		// streamed: a retry restarts the stream from scratch, so retrying mid-
+		// answer would duplicate output.
+		if contentEmitted || !isTransientStreamError(err) {
+			return false, 0, err
+		}
+		if attempts > maxRetries {
+			return false, 0, fmt.Errorf("the token stream kept dropping after %d retries — the model is very slow to respond or the connection is unstable; try a smaller model or check your network: %w", maxRetries, err)
+		}
+		retryMs := 500 * (1 << (attempts - 1)) // 0.5,1,2,4,8...
+		if retryMs > 6000 {
+			retryMs = 6000
+		}
+		retryMs += int(float64(retryMs) * 0.2) // jitter
+		return true, int64(retryMs), nil
 	}
 
 	if apierr.StatusCode != 429 && apierr.StatusCode != 500 {
@@ -398,6 +424,35 @@ func (o *openaiClient) shouldRetry(attempts int, err error) (bool, int64, error)
 		}
 	}
 	return true, int64(retryMs), nil
+}
+
+// isTransientStreamError reports whether err is a recoverable transport-level
+// failure of the token stream (dropped connection, truncated body, timeout) as
+// opposed to a genuine API/application error. A clean io.EOF is NOT included —
+// that is a normal end-of-stream and is treated as success before we ever get
+// here.
+func isTransientStreamError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	for _, s := range []string{
+		"connection reset", "reset by peer", "broken pipe",
+		"unexpected eof", "connection closed", "use of closed",
+		"timeout", "stream error", "goaway", "server closed",
+	} {
+		if strings.Contains(msg, s) {
+			return true
+		}
+	}
+	return false
 }
 
 func (o *openaiClient) toolCalls(completion openai.ChatCompletion) []message.ToolCall {
