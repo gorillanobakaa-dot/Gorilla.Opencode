@@ -1,3 +1,22 @@
+## v0.1.29 — 2026-07-22 — Streaming survives slow big models (the "SSE existential crisis")
+
+- **A dropped token stream is now retried instead of killing the whole turn.**
+  The streaming path only retried HTTP 429/500 (rate-limit / server) errors —
+  any transport-level failure (dropped SSE connection, unexpected EOF, reset,
+  read timeout) was fatal and surfaced as `failed to process events`. Big, slow
+  models (Nemotron 550B, Yi Large) are slow to their *first* token, so an idle
+  proxy or a flaky mobile/4G link drops the stream before it even starts — which
+  isn't a 429/500, so it was never retried. Now such drops are retried with
+  backoff, but **only before any content has streamed** (a mid-answer retry
+  would duplicate output). Reported by users running big NIM models on a phone.
+  (`openai.go`: `shouldRetry` gains transport-error handling + a tested
+  `isTransientStreamError` classifier; the non-streaming path retries too.)
+
+  **Plain-language version:** on the huge, slow models the reply sometimes just
+  died with an error — worse on a phone or a patchy connection. The app now
+  quietly re-tries the connection a few times *before* the answer starts, so the
+  big models get a chance to wake up instead of the app giving up on them.
+
 ## v0.1.28 — 2026-07-22 — Model picker shows the whole catalog again
 
 - **The picker no longer hides unranked models.** The curated, probe-verified
