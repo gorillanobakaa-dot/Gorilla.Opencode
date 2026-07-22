@@ -8,7 +8,7 @@ const (
 	// names + ID strings because config.go, openrouter.go and vertexai.go
 	// reference them — renaming would break those.
 	Gemini25Flash ModelID = "gemini-2.5-flash" // → gemini-flash-latest
-	Gemini25      ModelID = "gemini-2.5"       // → gemini-pro-latest
+	Gemini25      ModelID = "gemini-2.5"       // → gemini-pro-latest (FIXED 2026-07-22)
 
 	Gemini20Flash     ModelID = "gemini-2.0-flash"
 	Gemini20FlashLite ModelID = "gemini-2.0-flash-lite"
@@ -59,7 +59,8 @@ var GeminiModels = map[ModelID]Model{
 		Name:        "Gemini Pro (latest)",
 		Description: "Rolling Pro alias — Google keeps it current, 1M ctx",
 		Provider:    ProviderGemini,
-		// GORILLA OVERRIDE: same as above — rolling alias, never stale.
+		// GORILLA OVERRIDE 2026-07-22: gemini-2.5 was removed by Google (HTTP 404).
+		// Use gemini-pro-latest (same rolling alias) instead.
 		APIModel:            "gemini-pro-latest",
 		CostPer1MIn:         1.25,
 		CostPer1MInCached:   0,
