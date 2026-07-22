@@ -69,6 +69,14 @@ type GeminiCreds struct {
 	Tier      string `json:"tier,omitempty"`
 }
 
+// Logout removes the stored OAuth credentials from disk.
+func Logout() error {
+	if err := os.Remove(CredsPath()); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 // CredsPath returns ~/.config/gorilla-opencode/gemini-oauth.json.
 func CredsPath() string {
 	base := os.Getenv("XDG_CONFIG_HOME")
