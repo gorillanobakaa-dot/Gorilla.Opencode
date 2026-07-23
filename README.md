@@ -157,20 +157,22 @@ explains every part of the screen. Here's the short version.
 **The model picker — a ranked leaderboard, with the full catalog behind it.**
 We pinged every model on your key with a one-token message and ranked the
 good ones for coding — numbered best-first (1 = best), each with a plain
-description of its size and strength. The rest of your provider's models
-still follow below (they're just unranked), so nothing is hidden: use the
-top for coding, reach past it for anything else. Your key, your call.
+description of its size and strength (here: NVIDIA NIM, DeepSeek V4 Pro at #1,
+118 models deep). The rest still follow below, unranked — nothing is hidden.
+Your key, your call.
 
-![The ranked model picker](docs/screenshots/gallery/10-09-02-16.png)
+![The ranked NVIDIA NIM model picker](docs/screenshots/gallery/v0130-picker-nim.png)
 
-**Switching to the Google models — press the → (right arrow).** Your
-models are grouped by provider. Up/down moves through the list; **left/
-right switches provider.** Press → until the title says "Select Gemini
-Model" (the `1/4 →` at the bottom shows which provider page you're on).
-Bottom-left, "Context: 6.9K" is how much the assistant sends each
-message — smaller is leaner and faster.
+**One tool, every provider — switch with the ← → arrows.** Your models are
+grouped by provider; up/down moves through a list, **left/right pages between
+providers.** Gemini (2.0 → **3.6 Flash**), Groq (Llama 4, Qwen QwQ), Cerebras
+(GLM 4.7 on wafer-scale silicon), NVIDIA NIM — the same terminal reaches all of
+them. Here's the Gemini page; the counter (e.g. `10/14 →`) shows where you are.
 
-![Reaching the Google models with the arrow key](docs/screenshots/gallery/15-09-12-23.png)
+![Reaching the Google/Gemini models with the arrow key](docs/screenshots/gallery/v0130-picker-gemini.png)
+
+More providers (Groq, Cerebras, NIM) side by side:
+**[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md#one-tool-every-provider--the-latest-models-v0130)**.
 
 **The `/context` menu — see (and control) exactly what every message costs.**
 The top **🦍 GORILLA CONTROLS** section holds two live dials you drive with the
