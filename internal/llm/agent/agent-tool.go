@@ -78,7 +78,16 @@ func (b *agentTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolRes
 		return tools.ToolResponse{}, fmt.Errorf("error creating session: %s", err)
 	}
 
-	done, err := agent.Run(ctx, session.ID, params.Prompt)
+	// GORILLA OVERRIDE: register this helper so the user can SEE it (/tasks,
+	// status bar) and KILL it — one by one or via the Nuclear Option. The
+	// helper runs under its own cancelable context; killing it cancels that
+	// context, which unblocks the <-done wait below with a cancellation error.
+	taskCtx, taskCancel := context.WithCancel(ctx)
+	defer taskCancel()
+	entry := RegisterSubAgent(session.ID, sessionID, call.ID, params.Prompt, taskCancel)
+	defer UnregisterSubAgent(entry.ID)
+
+	done, err := agent.Run(taskCtx, session.ID, params.Prompt)
 	if err != nil {
 		return tools.ToolResponse{}, fmt.Errorf("error generating agent: %s", err)
 	}

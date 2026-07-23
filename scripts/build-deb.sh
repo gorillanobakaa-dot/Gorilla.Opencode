@@ -38,14 +38,18 @@ Keywords=ai;coding;agent;terminal;llm;
 EOF
 
 install -Dm644 "$ROOT/README.md" "$PKG/usr/share/doc/gorilla-opencode/README.md"
-install -Dm644 "$ROOT/DOCUMENTATION.dual-track.md" "$PKG/usr/share/doc/gorilla-opencode/DOCUMENTATION.dual-track.md"
+# GORILLA: changelogs and the dual-track doc now live under Changelogs/ to keep
+# the repo root tidy — reference them there.
+install -Dm644 "$ROOT/Changelogs/DOCUMENTATION.dual-track.md" "$PKG/usr/share/doc/gorilla-opencode/DOCUMENTATION.dual-track.md"
 install -Dm644 "$ROOT/PHILOSOPHY.md" "$PKG/usr/share/doc/gorilla-opencode/PHILOSOPHY.md"
 install -Dm644 "$ROOT/LICENSE" "$PKG/usr/share/doc/gorilla-opencode/copyright"
 # GORILLA OVERRIDE: ship the standalone teaching lesson (tokens, agents, and the
 # cost/pace/leash controls — dual-track, with sources and a recreate-it guide)
-# and the dated release changelog, so the .deb carries the "why & how" too.
+# and every dated release changelog, so the .deb carries the "why & how" too.
 install -Dm644 "$ROOT/docs/CONTROL-AND-COST.md" "$PKG/usr/share/doc/gorilla-opencode/CONTROL-AND-COST.md"
-[ -f "$ROOT/CHANGELOG_2026-07-23.md" ] && install -Dm644 "$ROOT/CHANGELOG_2026-07-23.md" "$PKG/usr/share/doc/gorilla-opencode/CHANGELOG_2026-07-23.md"
+for cl in "$ROOT"/Changelogs/CHANGELOG*.md; do
+  [ -f "$cl" ] && install -Dm644 "$cl" "$PKG/usr/share/doc/gorilla-opencode/$(basename "$cl")"
+done
 
 install -d "$PKG/DEBIAN"
 SIZE_KB=$(du -sk "$PKG" | cut -f1)
