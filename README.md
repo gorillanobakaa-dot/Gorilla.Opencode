@@ -172,13 +172,16 @@ message — smaller is leaner and faster.
 
 ![Reaching the Google models with the arrow key](docs/screenshots/gallery/15-09-12-23.png)
 
-**The `/context` menu — see exactly what every message costs.** It lists
-everything sent to the model each turn with its token cost, and lets you
-switch any of it off. The `⚠` marks things the assistant can't work
-without. Turning off the big ones (like "Environment info") drops the
-number immediately.
+**The `/context` menu — see (and control) exactly what every message costs.**
+The top **🦍 GORILLA CONTROLS** section holds two live dials you drive with the
+arrow keys: an **AI-server request pace-setter** (requests/min, to glide under
+free-tier limits) and a **GORILLA AGENTS/SUBAGENTS leash** (cap helper agents,
+right down to the ☢ Nuclear Option). Below, every tool and prompt block is a
+switch, each with its **token *and* dollar cost**; the `⚠` marks what the
+assistant can't work without. Turning off the big ones drops the number — and the
+bill — immediately.
 
-![The context loadout menu](docs/screenshots/02-context-loadout.png)
+![The context loadout menu with the Gorilla controls](docs/screenshots/02-context-loadout.png)
 
 More full-resolution screenshots and captions:
 **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)** ·

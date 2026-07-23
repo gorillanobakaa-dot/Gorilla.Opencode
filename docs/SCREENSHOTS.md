@@ -26,12 +26,17 @@ shows you're on the Gemini page. Bottom-left shows the context down to
 
 ![Gemini model page](screenshots/gallery/15-09-12-23.png)
 
-## The context loadout — every token accounted for
+## The context loadout & Gorilla controls — every token (and dollar) accounted for
 
-`/context` shows exactly what's sent to the model every turn and lets you
-switch any of it off. See the [gallery](screenshots/gallery/) for the
-menu, and the [GUIDE](GUIDE.md#the-context-loadout-context--your-token-budget)
-for how to use it.
+`/context` shows exactly what's sent to the model every turn — with its **token
+*and* dollar cost** — and lets you switch any of it off. The top **🦍 GORILLA
+CONTROLS** section adds two arrow-key dials: an **AI-server request pace-setter**
+(requests/min, to stay under free-tier limits) and a **GORILLA AGENTS/SUBAGENTS
+leash** (cap helper agents down to the ☢ Nuclear Option). Full write-up:
+[CONTROL-AND-COST.md](CONTROL-AND-COST.md); how-to in the
+[GUIDE](GUIDE.md#the-context-loadout-context--your-token-budget).
+
+![The context loadout with Gorilla controls](screenshots/02-context-loadout.png)
 
 ---
 
