@@ -356,6 +356,12 @@ func (a *anthropicClient) stream(ctx context.Context, messages []message.Message
 			}
 
 			err := anthropicStream.Err()
+			// GORILLA FIX: release the stream's underlying HTTP/2 connection on
+			// every exit (success, retry, error). The SDK does not auto-close
+			// the body on drain; leaking it keeps the request in flight on the
+			// server and, over a long agentic session, exhausts per-worker
+			// in-flight limits. Mirrors the same fix in openai.go.
+			anthropicStream.Close()
 			if err == nil || errors.Is(err, io.EOF) {
 				close(eventChan)
 				return
