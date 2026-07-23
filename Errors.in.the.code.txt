@@ -13,6 +13,55 @@ fix · files. Newest first.
 
 
 ================================================================================
+#003  —  2026-07-23  —  HARDENED (v0.1.33)
+Network layer not fit for the mission profile (satellite uplink)
+================================================================================
+
+CONTEXT / MISSION
+  Target deployment: laptops and phones in remote/hostile environments whose
+  only uplink is a satellite phone link — high RTT, frequent drops, single-digit
+  KB/s. The network code must be resilient to that, not just to a home LAN.
+
+FINDINGS (ours vs upstream behaviour)
+  a) Providers used the SDK DEFAULT http.Client — no connection tuning, and one
+     path (copilot) hard-coded a 30s wall-clock Timeout that would ABORT a slow
+     big-model stream outright. On a satellite link a fixed timeout kills valid
+     slow replies (a 550B model's first token can take tens of seconds).
+  b) NIM "ResourceExhausted / request limit reached" (and other rate-limit /
+     overloaded signals that arrive IN-BAND on the SSE stream, not as an HTTP
+     status) were surfaced immediately and failed the turn — no retry. On a link
+     where every round-trip is precious, a transient "server busy" should
+     self-heal.
+  c) The typed-error retry path only covered 429/500, missing 503/529 overloaded.
+
+FIX (v0.1.33)
+  - internal/llm/provider/httpclient.go (new): one shared, satellite-tuned
+    *http.Client — keep-alive + 120s idle reuse (pay the TLS handshake once and
+    reuse the warm conn across the tool loop), ForceAttemptHTTP2 (multiplex on
+    one connection), finite 30s dial/TLS timeouts, NO wall-clock Timeout, NO
+    ResponseHeaderTimeout, Proxy from environment. Wired into openai.go +
+    anthropic.go via option.WithHTTPClient.
+  - openai.go: new isServerBusyError() classifier; server-busy errors retry with
+    a LONGER back-off (2->4->8->16->20s) than transport blips (0.5->..->6s),
+    before content only, capped at maxRetries. Typed path now also retries
+    503/529.
+
+  NOTE: this builds on #001 — connection reuse only works because we now Close()
+  streams. Leak fix + keep-alive together = frugal, warm, reused connections.
+
+VERIFIED
+  go build/vet/test ./... all pass; new busyerror_test.go covers the classifier
+  incl. the exact NIM message.
+
+RELATED — CI (the through-line for #001/#002/#003)
+  Added .github/workflows/ci.yml (build + vet + test on push/PR, no secrets).
+  #001 and #002 both hid because nothing ran `go test ./...`. IMPORTANT: the
+  repo's existing goreleaser workflows have NEVER run (zero Actions runs ever) —
+  GitHub Actions must be enabled once in the repo's Actions tab for any workflow,
+  including ci.yml, to execute.
+
+
+================================================================================
 #002  —  2026-07-23  —  FIXED (test-only, no version bump)
 Inherited broken test: TestLsTool_Run panicked "config not loaded"
 ================================================================================

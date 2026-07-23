@@ -42,6 +42,8 @@ func newAnthropicClient(opts providerClientOptions) AnthropicClient {
 	}
 
 	anthropicClientOptions := []option.RequestOption{}
+	// GORILLA OVERRIDE: satellite-hardened HTTP client (see httpclient.go).
+	anthropicClientOptions = append(anthropicClientOptions, option.WithHTTPClient(resilientHTTPClient()))
 	if opts.apiKey != "" {
 		anthropicClientOptions = append(anthropicClientOptions, option.WithAPIKey(opts.apiKey))
 	}

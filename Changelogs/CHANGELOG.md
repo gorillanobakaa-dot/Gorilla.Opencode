@@ -1,3 +1,27 @@
+## v0.1.33 — 2026-07-23 — Satellite-grade networking + a real CI gate
+
+- **Providers now use a satellite-hardened HTTP client** (`httpclient.go`): keeps
+  one TLS connection warm and reuses it across the whole tool loop (redialing is
+  expensive on a high-latency uplink), prefers HTTP/2 multiplexing, sets finite
+  dial/TLS timeouts so a dead link fails fast — but has **no wall-clock timeout**,
+  so a slow big-model reply over satellite isn't aborted mid-answer. Respects
+  `HTTP(S)_PROXY`. Wired into the OpenAI/NIM and Anthropic paths.
+- **`ResourceExhausted` / server-busy now retries with back-off** instead of
+  failing the turn. A new classifier catches NIM's in-band
+  "request limit reached", plus rate-limit/overloaded/503/529, and backs off
+  longer (2→20s) than transport blips — self-healing on a flaky link without
+  hammering a congested endpoint. Retries only before content streams.
+- **New `ci` workflow**: `go build` + `go vet` + `go test ./...` on every push
+  and PR — no secrets needed. This is the gate that was missing; the last two
+  inherited bugs (stream leak, test panic) both hid because nothing ran the
+  tests. (Existing goreleaser workflows have never run — Actions needs enabling
+  in the repo settings.)
+
+  **Plain-language version:** the app is now much tougher on a bad satellite
+  connection — it keeps the line warm, never hangs up on a slow answer, and waits
+  politely when the server says "too busy" instead of giving up. And a robot now
+  runs all the tests on every change so these bugs can't sneak back.
+
 ## v0.1.32 — 2026-07-23 — Stop leaking streams (the NIM "ResourceExhausted" fix)
 
 - **Provider streams are now closed after every request.** On longer agent runs,
