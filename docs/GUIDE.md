@@ -98,6 +98,38 @@ the AI the git status of your whole folder every message, which in a
 huge home directory can be ~9,000 tokens on its own. Turn it off when
 you don't need it and the number drops immediately.
 
+## Works on a terrible connection (satellite, a few KB/s)
+
+You don't have to do anything for this — but it's the reason the tool
+exists, so it's worth knowing.
+
+Gorilla is built to keep working where the internet is *awful*: a
+satellite phone link pushing only a few kilobytes a second, high delay,
+dropping in and out — a mountainside, a jungle village, a boat, a
+disaster zone. Most apps assume a fast city connection and simply give
+up when they don't get one. This one is built the other way.
+
+In plain terms, on a bad line it now:
+
+- **Keeps the connection open and reuses it** instead of re-dialling from
+  scratch every message (re-dialling is painfully slow over satellite).
+- **Waits patiently for slow replies** — a big model's first words can
+  take tens of seconds to arrive on a weak link, and that's fine; it
+  won't hang up on you.
+- **Rides out "server busy" hiccups** — if the AI provider says "too many
+  requests, try again," it waits a moment and retries by itself instead
+  of dying with an error.
+
+If you *do* have a tight connection, also open **`/context`** and turn on
+the low-bandwidth preset (press **`l`**) — it strips the tool down to the
+fewest, smallest messages, so every reply moves less data.
+
+There's nothing to configure for the resilience itself. It just holds on
+where other tools let go. (If you're curious about the two bugs we had to
+fix to get here — both inherited from the original code, never fixed
+because whoever wrote them never had to live on a bad line — the whole
+story is in `Errors.in.the.code.txt`.)
+
 ## Before and after
 
 The screenshots in `gallery/` show the journey: early ones with the

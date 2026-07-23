@@ -75,6 +75,45 @@ genuinely free, contains no advertising for anyone's paid service, sends
 no usage statistics to anyone, and is small enough that one person can
 read and understand all of it. Those properties were worth rescuing.
 
+## Who is this really for? (the part that matters most)
+
+For anyone stuck on a connection the rest of the software world pretends
+doesn't exist. Most AI tools are written and tested on fast office fibre,
+so they quietly assume the network is always quick and always there.
+Point one at a **satellite phone uplink pushing a few kilobytes a
+second** — a mountainside in Afghanistan, a village deep in the Nigerian
+bush, a fishing boat, a disaster zone, a refugee camp — and it falls
+over. That fails exactly the people who have the least and could use the
+help the most: not only service members deployed somewhere austere, but
+the kids for whom a crawling, dropping, few-KB/s connection isn't an
+emergency — it's just Tuesday.
+
+If you've never heard a dial-up modem screech its handshake, never
+rationed megabytes to the end of the month, never watched a single reply
+trickle in one line at a time, you don't think to check whether your
+software survives on a bad line. We do. So we went looking, and found two
+bugs that made the tool give up on a weak connection — and we didn't
+write either of them. We **inherited** them from the upstream code, where
+they'd sat unfixed because the low-bandwidth path was never walked and
+nothing ever ran the tests. (Provenance with `git blame` receipts:
+`../Errors.in.the.code.txt`.)
+
+In plain terms, what we fixed:
+
+- **It never hung up the phone.** Each question to the AI opened a
+  connection and left it open. A real task asks dozens of questions, so
+  the open lines stacked up until the provider refused to talk and the
+  session died with a cryptic "ResourceExhausted" error. Now it hangs up
+  after every call.
+- **It assumed a fast line and quit at the first hiccup.** It re-dialled
+  from scratch constantly, aborted slow replies on a timer, and gave up
+  the instant the server said "busy." Now it keeps one connection warm
+  and reuses it, waits for slow replies, and retries "busy" by itself.
+
+What it means: on a link most modern apps refuse to even attempt, you can
+hold a real conversation with an AI and actually get your problem
+solved — from the edge of the map. That was the whole point.
+
 ## What did the revival actually change?
 
 The frozen 2025 code no longer worked with the AI services of 2026. We
