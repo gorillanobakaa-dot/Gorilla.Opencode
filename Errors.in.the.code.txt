@@ -13,6 +13,54 @@ fix · files. Newest first.
 
 
 ================================================================================
+#002  —  2026-07-23  —  FIXED (test-only, no version bump)
+Inherited broken test: TestLsTool_Run panicked "config not loaded"
+================================================================================
+
+SYMPTOM
+  `go test ./internal/llm/tools/` panicked:
+    --- FAIL: TestLsTool_Run/handles_empty_path_parameter
+    panic: config not loaded
+
+DID WE INHERIT IT?  YES — straight from upstream opencode.
+  - ls_test.go's only commit is "rework llm" (afd9ad0), part of the upstream
+    opencode-ai/opencode history — not a Gorilla change.
+  - The test author even left a comment admitting it:
+      "we need to mock the config.WorkingDirectory function. Since we can't
+       easily do that, we'll just check ..."
+    …then called tool.Run with an empty Path anyway, which hits
+    ls.go:98-99 → config.WorkingDirectory() → panic("config not loaded")
+    (config.go:982) because the global config was never initialised.
+
+WHY IT WAS NEVER FIXED
+  There is NO CI running `go test ./...` on this repo (GitHub Actions has zero
+  runs ever — see the release investigation). A panicking test simply sat there
+  unnoticed. A panic in one subtest fails the whole test binary, which is why it
+  also HID a second latent failure (below).
+
+SECOND (HIDDEN) BUG, unmasked by the fix
+  TestLsTool_Run/handles_relative_path assumed the ls tool resolves a relative
+  path against the live os.Getwd(); the tool actually joins it onto
+  config.WorkingDirectory() (ls.go:103), a fixed value. It never ran before
+  because the empty-path panic aborted the binary first.
+
+FIX
+  - internal/llm/tools/main_test.go (new): TestMain loads a throwaway config so
+    config.WorkingDirectory() works for the whole package.
+  - internal/llm/tools/ls_test.go: the relative-path case now sets
+    config.Get().WorkingDir to the dir it cd'd into (and restores it), matching
+    the tool's real contract.
+
+VERIFIED
+  go test ./internal/llm/tools/ → ok · full `go test ./internal/...` → ALL PASS.
+
+NOTE
+  Test-only change (no shipped-binary impact), so no new release/version.
+  Broader lesson: stand up CI (`go test ./...`) — #001 and #002 both hid behind
+  the absence of it.
+
+
+================================================================================
 #001  —  2026-07-23  —  FIXED (v0.1.32)
 Streaming connections were never closed → NVIDIA NIM "ResourceExhausted"
 ================================================================================
