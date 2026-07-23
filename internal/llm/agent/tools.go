@@ -45,12 +45,17 @@ func CoderAgentTools(
 	add("tool.view", tools.NewViewTool(lspClients))
 	add("tool.patch", tools.NewPatchTool(lspClients, permissions, history))
 	add("tool.write", tools.NewWriteTool(lspClients, permissions, history))
-	add("tool.agent", NewAgentTool(sessions, messages, lspClients))
-	add("tool.sourcegraph", tools.NewSourcegraphTool())
+	// GORILLA OVERRIDE: on the Nuclear Option (helper-leash = 0) omit the
+	// agent tool entirely, so its schema tokens vanish too — not just its
+	// spawns (which subagent_guard.go would refuse anyway).
+	if config.MaxSubAgents() != config.SubAgentsNuclear {
+		add("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions))
+	}
+	add("tool.sourcegraph", tools.NewSourcegraphTool(permissions))
 	return append(coderTools, otherTools...)
 }
 
-func TaskAgentTools(lspClients map[string]*lsp.Client) []tools.BaseTool {
+func TaskAgentTools(lspClients map[string]*lsp.Client, permissions permission.Service) []tools.BaseTool {
 	var taskTools []tools.BaseTool
 	add := func(id string, t tools.BaseTool) {
 		if loadoutOn(id) {
@@ -61,6 +66,6 @@ func TaskAgentTools(lspClients map[string]*lsp.Client) []tools.BaseTool {
 	add("tool.grep", tools.NewGrepTool())
 	add("tool.ls", tools.NewLsTool())
 	add("tool.view", tools.NewViewTool(lspClients))
-	add("tool.sourcegraph", tools.NewSourcegraphTool())
+	add("tool.sourcegraph", tools.NewSourcegraphTool(permissions))
 	return taskTools
 }

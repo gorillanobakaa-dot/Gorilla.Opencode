@@ -195,6 +195,11 @@ func (p *baseProvider[C]) cleanMessages(messages []message.Message) (cleaned []m
 }
 
 func (p *baseProvider[C]) SendMessages(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (*ProviderResponse, error) {
+	// GORILLA OVERRIDE: proactive pace-setter (see ratelimit.go). Space
+	// requests under the user's configured RPM cap before sending.
+	if err := paceRequest(ctx); err != nil {
+		return nil, err
+	}
 	messages = p.cleanMessages(messages)
 	return p.client.send(ctx, messages, tools)
 }
@@ -204,6 +209,15 @@ func (p *baseProvider[C]) Model() models.Model {
 }
 
 func (p *baseProvider[C]) StreamResponse(ctx context.Context, messages []message.Message, tools []tools.BaseTool) <-chan ProviderEvent {
+	// GORILLA OVERRIDE: proactive pace-setter (see ratelimit.go). If the wait
+	// is cancelled, surface it as an error event so the caller's channel-range
+	// loop terminates cleanly instead of hitting the provider.
+	if err := paceRequest(ctx); err != nil {
+		ch := make(chan ProviderEvent, 1)
+		ch <- ProviderEvent{Type: EventError, Error: err}
+		close(ch)
+		return ch
+	}
 	messages = p.cleanMessages(messages)
 	return p.client.stream(ctx, messages, tools)
 }

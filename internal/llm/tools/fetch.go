@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -14,6 +16,43 @@ import (
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/permission"
 )
+
+// blockedFetchTarget returns a non-empty reason if the URL points at a host
+// the fetch tool must not reach: loopback, link-local (incl. cloud metadata
+// 169.254.169.254), private LAN ranges, or an unqualified/empty host. Empty
+// string means "allowed". This is a best-effort SSRF guard on the literal
+// host in the URL; it does not (yet) re-check the IP after DNS resolution.
+func blockedFetchTarget(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "could not parse the URL"
+	}
+	host := u.Hostname()
+	if host == "" {
+		return "no host in URL"
+	}
+	// Obvious loopback names.
+	switch strings.ToLower(host) {
+	case "localhost", "ip6-localhost", "ip6-loopback":
+		return "loopback address (localhost) is not allowed"
+	}
+	// If it's a literal IP, classify it directly.
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsLoopback() {
+			return "loopback IP is not allowed"
+		}
+		if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			return "link-local address (e.g. cloud metadata 169.254.x.x) is not allowed"
+		}
+		if ip.IsPrivate() {
+			return "private LAN address is not allowed"
+		}
+		if ip.IsUnspecified() {
+			return "unspecified address (0.0.0.0/::) is not allowed"
+		}
+	}
+	return ""
+}
 
 type FetchParams struct {
 	URL     string `json:"url"`
@@ -114,6 +153,15 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 
 	if !strings.HasPrefix(params.URL, "http://") && !strings.HasPrefix(params.URL, "https://") {
 		return NewTextErrorResponse("URL must start with http:// or https://"), nil
+	}
+
+	// GORILLA OVERRIDE (SSRF guard): upstream fetched any host the model
+	// named, including loopback / link-local / private-LAN addresses. On a
+	// networked deployment that is a server-side-request-forgery vector —
+	// e.g. cloud metadata (169.254.169.254) or intranet hosts. Refuse those
+	// before we even prompt. Public internet only.
+	if reason := blockedFetchTarget(params.URL); reason != "" {
+		return NewTextErrorResponse("Refusing to fetch that URL: " + reason), nil
 	}
 
 	sessionID, messageID := GetContextValues(ctx)

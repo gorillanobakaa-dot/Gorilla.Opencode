@@ -9,13 +9,15 @@ import (
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 	"github.com/opencode-ai/opencode/internal/lsp"
 	"github.com/opencode-ai/opencode/internal/message"
+	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/session"
 )
 
 type agentTool struct {
-	sessions   session.Service
-	messages   message.Service
-	lspClients map[string]*lsp.Client
+	sessions    session.Service
+	messages    message.Service
+	lspClients  map[string]*lsp.Client
+	permissions permission.Service
 }
 
 const (
@@ -54,7 +56,19 @@ func (b *agentTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolRes
 		return tools.ToolResponse{}, fmt.Errorf("session_id and message_id are required")
 	}
 
-	agent, err := NewAgent(config.AgentTask, b.sessions, b.messages, TaskAgentTools(b.lspClients))
+	// GORILLA OVERRIDE: enforce the user's helper-leash (config.MaxSubAgents,
+	// "Dial 2" in /context). A refusal is returned as a normal tool result so
+	// the model adapts (does the work inline) rather than erroring the turn.
+	switch limit := config.MaxSubAgents(); {
+	case limit == config.SubAgentsNuclear:
+		return tools.NewTextErrorResponse("Sub-agents are DISABLED (Gorilla Nuclear Option). Do this task yourself with the direct tools, or the user can re-enable helpers in /context."), nil
+	case limit != config.SubAgentsUnlimited:
+		if ok, used := reserveSubAgentSpawn(sessionID, limit); !ok {
+			return tools.NewTextErrorResponse(fmt.Sprintf("Helper-agent limit reached for this turn (%d used of %d allowed). Continue this task with the direct tools instead of spawning another helper.", used, limit)), nil
+		}
+	}
+
+	agent, err := NewAgent(config.AgentTask, b.sessions, b.messages, TaskAgentTools(b.lspClients, b.permissions))
 	if err != nil {
 		return tools.ToolResponse{}, fmt.Errorf("error creating agent: %s", err)
 	}
@@ -100,10 +114,12 @@ func NewAgentTool(
 	Sessions session.Service,
 	Messages message.Service,
 	LspClients map[string]*lsp.Client,
+	Permissions permission.Service,
 ) tools.BaseTool {
 	return &agentTool{
-		sessions:   Sessions,
-		messages:   Messages,
-		lspClients: LspClients,
+		sessions:    Sessions,
+		messages:    Messages,
+		lspClients:  LspClients,
+		permissions: Permissions,
 	}
 }

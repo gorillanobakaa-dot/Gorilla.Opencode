@@ -21,6 +21,11 @@ API keys or run models on your own machine.
 > reproducible network audit (`ss`/`tshark`/`strace`) proving it connects
 > only to the provider you choose: **[SECURITY.md](SECURITY.md)**.
 >
+> **💸 What am I actually paying for — and how do I control it?** A free,
+> plain-English lesson on how AI tools bill you by the token, why agents multiply
+> requests, and exactly what our cost/pace/agent controls do (with the source
+> files so you can recreate them): **[docs/CONTROL-AND-COST.md](docs/CONTROL-AND-COST.md)**.
+>
 > **🔑 Free Gemini with no API key.** Sign in with your Gmail
 > (`gorilla-opencode login`) to use Google's Code Assist free tier — the same
 > login Gemini CLI/Antigravity use, so your quota lasts: **[docs/GOOGLE-LOGIN.md](docs/GOOGLE-LOGIN.md)**.
@@ -43,6 +48,55 @@ API keys or run models on your own machine.
 > changed, is documented for both humans and developers in
 > [DOCUMENTATION.dual-track.md](DOCUMENTATION.dual-track.md), per this
 > project's [Open Source Philosophy](PHILOSOPHY.md).
+
+## Why this exists
+
+An AI coding tool is billed by the **token** — the small chunks of text it sends
+to and from the model. Nearly every cost you pay, and every free-tier limit you
+hit, comes down to *how much* text is sent, *how often*, and *how many times* the
+agent loops or spawns helper agents to finish a job. Most tools keep all of that
+under the hood. This one puts it in your hands, in one menu (`/context`):
+
+- **See the bill.** Every block of context sent each turn is listed with its
+  token cost *and* its dollar cost at your model's real price — so "what does it
+  cost just to say *yo*?" has a number, not a shrug. Free/flat tiers show `$0.00`
+  honestly rather than a fake estimate.
+- **Set the request pace.** A user-adjustable speed limit spaces calls to the
+  provider so you glide *under* an undocumented, moving free-tier ceiling (NVIDIA
+  NIM advertises only "up to 40/min") instead of slamming into it and triggering
+  retry storms.
+- **Hold the leash on agents.** The main agent can spawn helper agents that each
+  run their own request loop — fine on a paid plan, punishing on a metered one.
+  One dial caps how many it may spawn, from unlimited down to the **🦍 Gorilla
+  Nuclear Option**: all agents/subagents off, main agent works solo, fewest
+  possible calls.
+- **Strip the loadout.** Every tool and prompt block is a switch; turn off what
+  you don't need and its cost leaves every future turn.
+
+None of this is exotic — it's a few hundred lines. It's *uncommon* because the
+incentives usually run the other way: a service **paid by the token** has little
+reason to ship you dials whose whole purpose is to send fewer of them. That's not
+a claim about anyone's motives — just the shape of the incentive. This project's
+bias is the opposite one, stated plainly in its [Philosophy](PHILOSOPHY.md):
+**measure it, show the user, and give them the switch.** Your key, your machine,
+your call — every turn.
+
+Every one of these knobs exists *somewhere* — but buried in a config file, an
+environment variable, or an external gateway, and set once at startup. What we
+haven't found anywhere else is having them **live and together**: token *and*
+dollar cost, a request pace-setter, and an agent leash with a real off-switch,
+all adjustable from **one terminal menu, mid-session, with the arrow keys**, in a
+self-contained tool.
+
+| Control *(as of July 2026 — corrections welcome via an issue)* | **Gorilla OpenCode** | Claude Code | Codex CLI | aider |
+| --- | :--: | :--: | :--: | :--: |
+| Per-turn cost shown in **dollars**, in-app | ✅ tokens **+ $** | ✅ session $ | ❌ dashboard only | ~ estimate |
+| **Live** requests/min pace dial (mid-session) | ✅ | ❌ | ❌ | ❌ |
+| Cap on **agents/subagents** spawned | ✅ | ✅ env var (dflt 200) | ✅ config (dflt 6) | — (no subagents) |
+| **True off-switch** for agents (fully disable) | ✅ Nuclear | ❌ "can't be turned off" | ❌ | — |
+| Adjustable **in-UI, no config/env edit** | ✅ arrow keys | ❌ | ❌ (`config.toml`) | ❌ |
+
+<sub>Basis: Claude Code exposes `CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION` (default 200) and states the limit **can't be turned off**; Codex CLI sets `agents.max_threads` (default 6) in `config.toml` and has **no built-in in-CLI usage/cost command**; aider reports token/cost **estimates** but "never enforces" limits — pacing is left to the provider. Every competitor sets these once, in config/env, before launch. Spot an error? Open an issue and we'll fix the cell.</sub>
 
 ## Install
 
@@ -141,9 +195,15 @@ More full-resolution screenshots and captions:
 - **Slash commands**: `/model` `/models` (picker), `/export` (session →
   Markdown in the cwd), `/clear` (fresh session), `/context` (loadout).
 - **Context loadout** (`/context`): a transparent, total-control menu
-  showing exactly what's sent to the model every turn and its token
-  cost, with a switch for every tool and prompt block — strip it to the
-  bone at your own risk, one key resets defaults.
+  showing exactly what's sent to the model every turn — now with its
+  **dollar cost** at your model's live price, not just tokens — plus a
+  switch for every tool and prompt block. Strip it to the bone at your
+  own risk; one key resets defaults.
+- **Request pace-setter & agents/subagents leash** (`/context`, arrow
+  keys): a user-adjustable requests-per-minute limiter that spaces calls
+  to glide under undocumented free-tier ceilings, and a cap on how many
+  helper agents the main agent may spawn — down to the 🦍 Gorilla Nuclear
+  Option (all agents/subagents off). Both persist and apply mid-session.
 - **Prompt caching** (opt-in, `OPENCODE_PROMPT_CACHE=1`) for endpoints
   that support it; Anthropic caching always on. See the changelog for
   the honest note on NIM.
