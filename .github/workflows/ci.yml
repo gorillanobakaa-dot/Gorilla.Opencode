@@ -1,0 +1,42 @@
+name: ci
+
+# Build + vet + test on every push and PR. No secrets required, so this runs
+# anywhere Actions is enabled — unlike release.yml/build.yml (goreleaser, needs
+# tokens). This is the gate that would have caught the inherited stream-leak and
+# the "config not loaded" test panic (see Errors.in.the.code.txt #001/#002),
+# both of which hid because nothing ran `go test ./...`.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      - name: build
+        run: go build ./...
+
+      - name: vet
+        run: go vet ./...
+
+      - name: test
+        run: go test ./... -count=1

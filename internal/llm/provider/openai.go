@@ -50,6 +50,9 @@ func newOpenAIClient(opts providerClientOptions) OpenAIClient {
 	}
 
 	openaiClientOptions := []option.RequestOption{}
+	// GORILLA OVERRIDE: use the satellite-hardened HTTP client (keep-alive,
+	// HTTP/2, no wall-clock stream timeout) instead of the SDK default.
+	openaiClientOptions = append(openaiClientOptions, option.WithHTTPClient(resilientHTTPClient()))
 	if opts.apiKey != "" {
 		openaiClientOptions = append(openaiClientOptions, option.WithAPIKey(opts.apiKey))
 	}
@@ -392,21 +395,44 @@ func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool)
 		// models. Retry them too, but ONLY before any visible content has been
 		// streamed: a retry restarts the stream from scratch, so retrying mid-
 		// answer would duplicate output.
-		if contentEmitted || !isTransientStreamError(err) {
+		if contentEmitted {
+			// A retry restarts the stream from scratch; retrying mid-answer
+			// would duplicate output. Never safe once content has streamed.
+			return false, 0, err
+		}
+		// GORILLA OVERRIDE: two recoverable classes reach here as plain
+		// (non-*openai.Error) stream errors:
+		//   1. server-busy — NVIDIA NIM's "ResourceExhausted: ... request
+		//      limit reached", "overloaded", "rate limit", 503, etc. These
+		//      arrive in-band on the SSE stream, so they never surface as an
+		//      HTTP status we can match below. Back off LONGER: hammering a
+		//      congested endpoint makes it worse and burns scarce satellite
+		//      bandwidth.
+		//   2. transport blips — dropped SSE, unexpected EOF, reset, timeout
+		//      (the "SSE existential crisis" on slow 550B models / flaky
+		//      links). Back off SHORT and try again.
+		busy := isServerBusyError(err)
+		if !busy && !isTransientStreamError(err) {
 			return false, 0, err
 		}
 		if attempts > maxRetries {
-			return false, 0, fmt.Errorf("the token stream kept dropping after %d retries — the model is very slow to respond or the connection is unstable; try a smaller model or check your network: %w", maxRetries, err)
+			return false, 0, fmt.Errorf("still failing after %d retries — the provider is busy/rate-limiting or the connection is unstable; wait a moment, lower the request pace in /context, or switch to a smaller model: %w", maxRetries, err)
 		}
-		retryMs := 500 * (1 << (attempts - 1)) // 0.5,1,2,4,8...
-		if retryMs > 6000 {
-			retryMs = 6000
+		baseMs, capMs := 500, 6000 // transport: 0.5,1,2,4,6...
+		if busy {
+			baseMs, capMs = 2000, 20000 // server-busy: 2,4,8,16,20...
+		}
+		retryMs := baseMs * (1 << (attempts - 1))
+		if retryMs > capMs {
+			retryMs = capMs
 		}
 		retryMs += int(float64(retryMs) * 0.2) // jitter
 		return true, int64(retryMs), nil
 	}
 
-	if apierr.StatusCode != 429 && apierr.StatusCode != 500 {
+	// Retry on rate-limit (429) and server-side errors (500/503) and the
+	// "overloaded" 529 some providers use.
+	if apierr.StatusCode != 429 && apierr.StatusCode != 500 && apierr.StatusCode != 503 && apierr.StatusCode != 529 {
 		return false, 0, err
 	}
 
@@ -434,6 +460,34 @@ func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool)
 		}
 	}
 	return true, int64(retryMs), nil
+}
+
+// isServerBusyError reports whether err signals a transient server-side
+// capacity/rate condition that is worth retrying after a longer back-off —
+// most importantly NVIDIA NIM's in-band stream error
+//
+//	"ResourceExhausted: Worker local total request limit reached (N/…)"
+//
+// which arrives on the SSE stream (not as an HTTP status), plus the usual
+// rate-limit / overloaded phrasings from other providers. Matched on message
+// text because these do not surface as a typed *openai.Error.
+func isServerBusyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	for _, s := range []string{
+		"resourceexhausted", "resource exhausted",
+		"request limit reached", "total request limit",
+		"too many requests", "rate limit", "rate-limit", "ratelimit",
+		"overloaded", "server is busy", "service unavailable",
+		"try again later", "please retry", "temporarily unavailable",
+	} {
+		if strings.Contains(msg, s) {
+			return true
+		}
+	}
+	return false
 }
 
 // isTransientStreamError reports whether err is a recoverable transport-level
