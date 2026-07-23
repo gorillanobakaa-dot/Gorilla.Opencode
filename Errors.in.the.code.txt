@@ -80,6 +80,17 @@ LAYMAN
   NVIDIA's switchboard hits its limit and refuses new calls. Fix: hang up after
   each call.
 
+DID WE INHERIT IT?  YES — from upstream opencode-ai/opencode (Go).
+  git blame on the leaking stream() scaffold (NewStreaming + drain loop) points
+  to commits bbfa60c "reimplement agent,provider and add file history" and
+  afd9ad0 "rework llm" — both upstream imports (afd9ad0 is the SAME commit that
+  introduced broken test #002). The original Go opencode never closed the stream;
+  Gorilla's later reworks touched the retry/backoff around it (GORILLA OVERRIDE on
+  shouldRetry) but never noticed the missing Close(). Only the Close() line is ours.
+  NOTE: today's official TypeScript opencode (1.18.4) does NOT have this bug — it
+  is a different codebase built on the Vercel AI SDK (auto-teardown). The leak is
+  specific to the older Go opencode lineage we forked from.
+
 ROOT CAUSE (ours)
   internal/llm/provider/openai.go — stream(): each turn calls
     openaiStream := o.client.Chat.Completions.NewStreaming(ctx, params, ...)
