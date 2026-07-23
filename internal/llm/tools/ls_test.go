@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -194,7 +195,18 @@ func TestLsTool_Run(t *testing.T) {
 		parentDir := filepath.Dir(tempDir)
 		err = os.Chdir(parentDir)
 		require.NoError(t, err)
-		
+
+		// GORILLA FIX: the ls tool resolves a relative path against
+		// config.WorkingDirectory() (ls.go), NOT the live os.Getwd(). This
+		// inherited test assumed cwd-based resolution and only ever "passed"
+		// because an earlier subtest panicked ("config not loaded") and
+		// aborted the binary before this ran. Point the working dir at the
+		// parent we just cd'd into so the relative base resolves to tempDir.
+		cfg := config.Get()
+		origWorkDir := cfg.WorkingDir
+		cfg.WorkingDir = parentDir
+		defer func() { cfg.WorkingDir = origWorkDir }()
+
 		tool := NewLsTool()
 		params := LSParams{
 			Path: filepath.Base(tempDir),
