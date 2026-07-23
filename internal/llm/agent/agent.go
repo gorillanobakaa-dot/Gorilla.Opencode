@@ -240,6 +240,12 @@ func (a *agent) Run(ctx context.Context, sessionID string, content string, attac
 		return nil, ErrSessionBusy
 	}
 
+	// GORILLA OVERRIDE: reset the per-turn helper-leash tally for a new
+	// top-level (coder) request. Sub-agent (task) runs must NOT reset it.
+	if a.agentName == config.AgentCoder {
+		resetSubAgentSpawns(sessionID)
+	}
+
 	genCtx, cancel := context.WithCancel(ctx)
 
 	a.activeRequests.Store(sessionID, cancel)
