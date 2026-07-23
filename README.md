@@ -198,7 +198,14 @@ More full-resolution screenshots and captions:
   names + capability descriptions ("DeepSeek V4 Pro — 1.6T MoE, 1M ctx,
   80.6% SWE-bench"), ranked best-coder-first, with a position counter.
 - **Slash commands**: `/model` `/models` (picker), `/export` (session →
-  Markdown in the cwd), `/clear` (fresh session), `/context` (loadout).
+  Markdown in the cwd), `/clear` (fresh session), `/context` (loadout),
+  `/tasks` (live helper-agent monitor + kill switch).
+- **Agent transparency & kill switch** (`/tasks`): whenever the main agent
+  spawns helper sub-agents, a `🦍 N helper(s) · /tasks` badge lights up in
+  the status bar and a toast announces each spawn. `/tasks` lists every live
+  helper — kill one (`enter`/`x`), or the Nuclear Option `X`: *kill 'em all,
+  their tasks, and the horse they rode in on.* (This **terminates** running
+  helpers; the `/context` Nuclear dial **prevents** them from starting.)
 - **Context loadout** (`/context`): a transparent, total-control menu
   showing exactly what's sent to the model every turn — now with its
   **dollar cost** at your model's live price, not just tokens — plus a

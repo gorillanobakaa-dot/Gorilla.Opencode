@@ -249,11 +249,14 @@ func generateMarkdownStyleConfig() ansi.StyleConfig {
 			},
 		},
 		Table: ansi.StyleTable{
+			// GORILLA FIX: do NOT set BlockPrefix/BlockSuffix to "\n" here.
+			// Glamour applies a table block's prefix/suffix to *every cell*,
+			// which blanked the header row, inserted a blank line between
+			// every row, and forced cells to wrap short — rendering tables
+			// tall, sparse and misaligned. Leaving them empty (as in the
+			// upstream default style) renders tidy, tight tables.
 			StyleBlock: ansi.StyleBlock{
-				StylePrimitive: ansi.StylePrimitive{
-					BlockPrefix: "\n",
-					BlockSuffix: "\n",
-				},
+				StylePrimitive: ansi.StylePrimitive{},
 			},
 			CenterSeparator: stringPtr("┼"),
 			ColumnSeparator: stringPtr("│"),

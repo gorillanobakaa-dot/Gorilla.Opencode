@@ -281,6 +281,9 @@ func setupSubscriptions(app *app.App, parentCtx context.Context) (chan tea.Msg, 
 	setupSubscriber(ctx, &wg, "messages", app.Messages.Subscribe, ch)
 	setupSubscriber(ctx, &wg, "permissions", app.Permissions.Subscribe, ch)
 	setupSubscriber(ctx, &wg, "coderAgent", app.CoderAgent.Subscribe, ch)
+	// GORILLA OVERRIDE: live sub-agent spawn/exit events → status bar, /tasks
+	// list, and spawn toasts. Keeps the user aware of every helper deployed.
+	setupSubscriber(ctx, &wg, "subAgents", agent.SubAgentSubscribe, ch)
 
 	cleanupFunc := func() {
 		logging.Info("Cancelling all subscriptions")

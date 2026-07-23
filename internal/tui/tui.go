@@ -130,6 +130,10 @@ type appModel struct {
 	showLoadoutDialog bool
 	loadoutDialog     dialog.LoadoutDialog
 
+	// GORILLA OVERRIDE: live sub-agent monitor (/tasks)
+	showTasksDialog bool
+	tasksDialog     dialog.TasksDialog
+
 	showInitDialog bool
 	initDialog     dialog.InitDialogCmp
 
@@ -189,6 +193,21 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
+	case tea.MouseMsg:
+		// GORILLA FIX: only wheel events drive scrolling. Motion/press/
+		// release events are unused by any component (verified: nothing
+		// reads them, no bubblezone click handling). Forwarding every
+		// motion event — e.g. a mouse drag while trying to select text —
+		// through the full status+dialog+page update chain saturated the
+		// event loop. That lag let bubbletea's stdin parser fall behind and
+		// leak raw SGR mouse codes (ESC[<..M) into the editor, and made the
+		// view stutter/jump. Dropping non-wheel events keeps wheel scroll
+		// working while eliminating the flood.
+		if !tea.MouseEvent(msg).IsWheel() {
+			return a, nil
+		}
+		a.pages[a.currentPage], cmd = a.pages[a.currentPage].Update(msg)
+		return a, cmd
 	case tea.WindowSizeMsg:
 		msg.Height -= 1 // Make space for the status bar
 		a.width, a.height = msg.Width, msg.Height
@@ -224,6 +243,10 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		loadoutModel, loadoutCmd := a.loadoutDialog.Update(msg)
 		a.loadoutDialog = loadoutModel.(dialog.LoadoutDialog)
 		cmds = append(cmds, loadoutCmd)
+
+		tasksModel, tasksSizeCmd := a.tasksDialog.Update(msg)
+		a.tasksDialog = tasksModel.(dialog.TasksDialog)
+		cmds = append(cmds, tasksSizeCmd)
 
 		modelModel, modelSizeCmd := a.modelDialog.Update(msg)
 		a.modelDialog = modelModel.(dialog.ModelDialog)
@@ -426,6 +449,11 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "context", "loadout", "tokens":
 			a.showLoadoutDialog = true
 			return a, nil
+		case "task", "tasks", "agents", "kill":
+			// GORILLA OVERRIDE: /tasks — live monitor of running helper
+			// agents; kill one, or the Nuclear Option (kill 'em all).
+			a.showTasksDialog = true
+			return a, nil
 		case "login":
 			// GORILLA OVERRIDE: /login — run the browser OAuth flow
 			// to sign in with Google (Code Assist free tier).
@@ -435,11 +463,24 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// and clear the gemini-oauth provider from config.
 			return a, a.runLogout()
 		default:
-			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /login, /logout, /export, /clear, /context)", msg.Name))
+			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /login, /logout, /export, /clear, /context, /tasks)", msg.Name))
 		}
 
 	case dialog.CloseLoadoutDialogMsg:
 		a.showLoadoutDialog = false
+		return a, nil
+
+	case dialog.CloseTasksDialogMsg:
+		a.showTasksDialog = false
+		return a, nil
+
+	case pubsub.Event[agent.SubAgentInfo]:
+		// GORILLA OVERRIDE: transparency — surface helper spawn/exit. The
+		// event itself also triggers a re-render, keeping the /tasks list and
+		// status-bar count live while they're on screen.
+		if msg.Type == pubsub.CreatedEvent {
+			return a, util.ReportInfo(fmt.Sprintf("🦍 helper %s spawned — %s  (/tasks to view or kill)", msg.Payload.ID, truncatePrompt(msg.Payload.Prompt, 40)))
+		}
 		return a, nil
 
 	case loginResultMsg:
@@ -552,6 +593,9 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if a.showLoadoutDialog {
 				a.showLoadoutDialog = false
+			}
+			if a.showTasksDialog {
+				a.showTasksDialog = false
 			}
 			if a.showMultiArgumentsDialog {
 				a.showMultiArgumentsDialog = false
@@ -728,6 +772,15 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if a.showTasksDialog {
+		d, tasksCmd := a.tasksDialog.Update(msg)
+		a.tasksDialog = d.(dialog.TasksDialog)
+		cmds = append(cmds, tasksCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
 	if a.showInitDialog {
 		d, initCmd := a.initDialog.Update(msg)
 		a.initDialog = d.(dialog.InitDialogCmp)
@@ -753,6 +806,19 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	a.pages[a.currentPage], cmd = a.pages[a.currentPage].Update(msg)
 	cmds = append(cmds, cmd)
 	return a, tea.Batch(cmds...)
+}
+
+// truncatePrompt shortens a helper's prompt for one-line toasts/labels.
+func truncatePrompt(s string, max int) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	if max < 1 {
+		return "…"
+	}
+	return string(r[:max-1]) + "…"
 }
 
 // RegisterCommand adds a command to the command dialog
@@ -946,6 +1012,21 @@ func (a appModel) View() string {
 		)
 	}
 
+	if a.showTasksDialog {
+		overlay := a.tasksDialog.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(
+			col,
+			row,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
 	if a.showCommandDialog {
 		overlay := a.commandDialog.View()
 		row := lipgloss.Height(appView) / 2
@@ -1017,6 +1098,7 @@ func New(app *app.App) tea.Model {
 		commandDialog: dialog.NewCommandDialogCmp(),
 		modelDialog:   dialog.NewModelDialogCmp(),
 		loadoutDialog: dialog.NewLoadoutDialogCmp(),
+		tasksDialog:   dialog.NewTasksDialogCmp(),
 		permissions:   dialog.NewPermissionDialogCmp(),
 		initDialog:    dialog.NewInitDialogCmp(),
 		themeDialog:   dialog.NewThemeDialogCmp(),

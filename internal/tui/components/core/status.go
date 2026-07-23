@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/lsp"
 	"github.com/opencode-ai/opencode/internal/lsp/protocol"
@@ -164,7 +165,20 @@ func (m statusCmp) View() string {
 		Background(t.BackgroundDarker()).
 		Render(m.projectDiagnostics())
 
-	availableWidht := max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(m.model())-lipgloss.Width(diagnostics)-tokenInfoWidth)
+	// GORILLA OVERRIDE: live helper-agent count. Transparency — the user
+	// always sees how many sub-agents are running on their behalf, and that
+	// /tasks can stop them.
+	helpers := ""
+	helpersWidth := 0
+	if n := agent.ActiveSubAgentCount(); n > 0 {
+		helpers = styles.Padded().
+			Background(t.Warning()).
+			Foreground(t.Background()).
+			Render(fmt.Sprintf("🦍 %d helper(s) · /tasks", n))
+		helpersWidth = lipgloss.Width(helpers)
+	}
+
+	availableWidht := max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(m.model())-lipgloss.Width(diagnostics)-tokenInfoWidth-helpersWidth)
 
 	if m.info.Msg != "" {
 		infoStyle := styles.Padded().
@@ -195,6 +209,7 @@ func (m statusCmp) View() string {
 			Render("")
 	}
 
+	status += helpers
 	status += diagnostics
 	status += m.model()
 	return status
