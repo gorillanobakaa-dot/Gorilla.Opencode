@@ -1,3 +1,44 @@
+## v0.1.31 — 2026-07-23 — Tidy tables, calm scrolling, and a kill switch for helper agents
+
+- **Markdown tables render correctly again.** They were coming out tall and
+  sparse — blank header row, a blank line between every row, columns stretched
+  into huge empty gaps. The cause was the app's own markdown theme: the table
+  style set a `"\n"` block prefix/suffix, which glamour applies to *every cell*.
+  Removed it; tables are now tight, aligned, and single-spaced.
+  (`internal/tui/styles/markdown.go`.)
+
+  **Plain-language version:** the AI wasn't printing broken tables — the app was
+  mangling them on the way to your screen. Tables look like tables now.
+
+- **Scrolling back through long output no longer lags, jumps, or types gibberish
+  into your prompt.** Those random `[<65;119;22M` characters were mouse
+  escape-codes leaking in: a mouse *drag* (e.g. selecting text without Shift)
+  flooded the app with motion events, saturating the render loop until the input
+  parser fell behind and spilled half-parsed sequences into the editor. The app
+  now ignores non-wheel mouse events entirely; wheel scrolling still works.
+  (`internal/tui/tui.go`.)
+
+  **Plain-language version:** scrolling up to re-read a long answer used to make
+  the app stutter and dribble weird numbers into your input box. Fixed.
+  (To copy the whole session, use `/export` — `Ctrl+A` only ever sees the
+  current screen because the app runs on the terminal's alternate screen.)
+
+- **New: `/tasks` — see and kill the helper agents working for you.** If the
+  model spawns "helper" sub-agents, a `🦍 N helper(s) · /tasks` badge now lights
+  up in the status bar and a toast tells you the moment one starts. `/tasks`
+  opens a live monitor: pick a helper and kill it (`enter`/`x`), or hit `X` for
+  the Nuclear Option — *"kill 'em all, their tasks, and the horse they rode in
+  on."* A shared registry gives each helper a cancelable context so a kill
+  actually stops it. Tested under `-race`.
+  (`internal/llm/agent/subagent_registry.go`, `agent-tool.go`,
+  `internal/tui/components/dialog/tasks.go`, `tui.go`, `core/status.go`,
+  `cmd/root.go`.)
+
+  **Plain-language version:** you can now always see when the AI puts other
+  agents to work for you — and stop them, one at a time or all at once. This is
+  different from `/context`'s Nuclear dial, which *prevents* helpers from
+  starting; `/tasks` *terminates* ones already running.
+
 ## v0.1.29 — 2026-07-22 — Streaming survives slow big models (the "SSE existential crisis")
 
 - **A dropped token stream is now retried instead of killing the whole turn.**
