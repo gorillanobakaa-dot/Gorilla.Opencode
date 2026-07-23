@@ -315,6 +315,16 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			}
 
 			err := openaiStream.Err()
+			// GORILLA FIX: always release the stream's underlying HTTP/2
+			// connection. The SDK does NOT auto-close the body when the
+			// stream is drained; leaving it open keeps the request "in
+			// flight" on the server side. On NVIDIA NIM (HTTP/2 endpoint with
+			// a low per-worker in-flight cap) these half-open streams pile up
+			// over an agentic session — every tool-loop round opens another —
+			// until the worker refuses new requests with
+			//   "ResourceExhausted: Worker local total request limit reached (N/…)".
+			// Closing here covers all three exits below: success, retry, error.
+			openaiStream.Close()
 			if err == nil || errors.Is(err, io.EOF) {
 				// Stream completed successfully
 				finishReason := o.finishReason(string(acc.ChatCompletion.Choices[0].FinishReason))

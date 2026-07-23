@@ -1,3 +1,23 @@
+## v0.1.32 — 2026-07-23 — Stop leaking streams (the NIM "ResourceExhausted" fix)
+
+- **Provider streams are now closed after every request.** On longer agent runs,
+  NVIDIA NIM would eventually reject the turn with
+  `ResourceExhausted: Worker local total request limit reached (46/…)` — even
+  though the same model + key work fine in official opencode. Cause: our
+  streaming code (`internal/llm/provider/openai.go`, `anthropic.go`) opened an
+  SSE stream each turn, drained it, and never called `Close()`. The openai-go
+  SDK doesn't auto-close on drain, so over an HTTP/2 connection each stream
+  stayed half-open and NIM counted it as an active request — they piled up until
+  the worker's in-flight cap was hit. Official opencode routes everything through
+  the AI SDK with an AbortController that always tears the stream down; we
+  hand-rolled the loop and missed the cleanup. Fixed by calling `stream.Close()`
+  on every exit path (success/retry/error) in both providers.
+
+  **Plain-language version:** every AI call opens a phone line to NVIDIA. The
+  official app hangs up when done; we left the line open, so on a long task the
+  lines stacked up until NVIDIA's switchboard refused new calls — that was the
+  error. Now we hang up after each call. (Full write-up: `Errors.in.the.code.txt`.)
+
 ## v0.1.31 — 2026-07-23 — Tidy tables, calm scrolling, and a kill switch for helper agents
 
 - **Markdown tables render correctly again.** They were coming out tall and
