@@ -9,6 +9,9 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/permission"
 )
 
 type SourcegraphParams struct {
@@ -24,7 +27,8 @@ type SourcegraphResponseMetadata struct {
 }
 
 type sourcegraphTool struct {
-	client *http.Client
+	client      *http.Client
+	permissions permission.Service
 }
 
 const (
@@ -125,11 +129,12 @@ TIPS:
 - Use type:file to find relevant files`
 )
 
-func NewSourcegraphTool() BaseTool {
+func NewSourcegraphTool(permissions permission.Service) BaseTool {
 	return &sourcegraphTool{
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		permissions: permissions,
 	}
 }
 
@@ -167,6 +172,28 @@ func (t *sourcegraphTool) Run(ctx context.Context, call ToolCall) (ToolResponse,
 
 	if params.Query == "" {
 		return NewTextErrorResponse("Query parameter is required"), nil
+	}
+
+	// GORILLA OVERRIDE: every other outbound/mutating tool asks first;
+	// sourcegraph used to silently POST the query to sourcegraph.com. Gate
+	// it like the rest so a search query never leaves the machine without
+	// the user's consent (matters on metered / OPSEC-sensitive links).
+	sessionID, _ := GetContextValues(ctx)
+	if sessionID == "" {
+		return ToolResponse{}, fmt.Errorf("session ID is required to run a sourcegraph search")
+	}
+	if t.permissions != nil {
+		granted := t.permissions.Request(permission.CreatePermissionRequest{
+			SessionID:   sessionID,
+			Path:        config.WorkingDirectory(),
+			ToolName:    SourcegraphToolName,
+			Action:      "search",
+			Description: fmt.Sprintf("Search public code on sourcegraph.com for: %s", params.Query),
+			Params:      params,
+		})
+		if !granted {
+			return ToolResponse{}, permission.ErrorPermissionDenied
+		}
 	}
 
 	if params.Count <= 0 {

@@ -41,6 +41,11 @@ install -Dm644 "$ROOT/README.md" "$PKG/usr/share/doc/gorilla-opencode/README.md"
 install -Dm644 "$ROOT/DOCUMENTATION.dual-track.md" "$PKG/usr/share/doc/gorilla-opencode/DOCUMENTATION.dual-track.md"
 install -Dm644 "$ROOT/PHILOSOPHY.md" "$PKG/usr/share/doc/gorilla-opencode/PHILOSOPHY.md"
 install -Dm644 "$ROOT/LICENSE" "$PKG/usr/share/doc/gorilla-opencode/copyright"
+# GORILLA OVERRIDE: ship the standalone teaching lesson (tokens, agents, and the
+# cost/pace/leash controls — dual-track, with sources and a recreate-it guide)
+# and the dated release changelog, so the .deb carries the "why & how" too.
+install -Dm644 "$ROOT/docs/CONTROL-AND-COST.md" "$PKG/usr/share/doc/gorilla-opencode/CONTROL-AND-COST.md"
+[ -f "$ROOT/CHANGELOG_2026-07-23.md" ] && install -Dm644 "$ROOT/CHANGELOG_2026-07-23.md" "$PKG/usr/share/doc/gorilla-opencode/CHANGELOG_2026-07-23.md"
 
 install -d "$PKG/DEBIAN"
 SIZE_KB=$(du -sk "$PKG" | cut -f1)

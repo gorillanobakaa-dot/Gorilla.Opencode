@@ -14,6 +14,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/opencode-ai/opencode/internal/llm/models"
 )
 
 // LoadoutComponent is one switchable piece of per-turn context.
@@ -42,8 +44,25 @@ var LoadoutComponents = []LoadoutComponent{
 	{"tool.diagnostics", "Diagnostics tool", "agent can't read LSP errors/warnings", 400, true, false},
 	{"tool.agent", "Sub-agent tool", "agent can't spawn read-only search sub-agents", 200, true, false},
 	{"tool.sourcegraph", "Sourcegraph tool", "agent can't search public code on the web", 1000, false, false},
-	{"prompt.env", "Environment info", "agent won't be told your cwd, OS, or git status", 150, true, false},
+	// GORILLA OVERRIDE: env estimate was 150 when the block was a recursive
+	// 1000-file tree dump (real cost often 10k–30k). After the shallow
+	// project_summary refactor it really is ~100–200 tokens; calibrate
+	// still overwrites this at startup with a measured value.
+	{"prompt.env", "Environment info", "agent won't be told your cwd, OS, top-level files, or short git status", 150, true, false},
 	{"prompt.lsp", "LSP info", "agent won't be told which language servers are active", 100, true, false},
+}
+
+// lowBandwidthOff lists components switched OFF by ApplyLowBandwidthLoadout.
+// Critical tools (bash/edit/write/view) stay on; optional network/LSP/extra
+// edit surfaces and the LSP prompt blurb drop. Env stays ON — it is cheap
+// after the shallow project_summary change and still useful on remote links.
+var lowBandwidthOff = map[string]bool{
+	"tool.patch":       true,
+	"tool.fetch":       true,
+	"tool.diagnostics": true,
+	"tool.agent":       true,
+	"tool.sourcegraph": true,
+	"prompt.lsp":       true,
 }
 
 const loadoutFileName = "loadout.json"
@@ -177,6 +196,26 @@ func ResetLoadout() {
 	saveLoadout()
 }
 
+// ApplyLowBandwidthLoadout turns off optional tools/blocks that are not
+// required for core edit/build loops. Intended for metered, satellite, or
+// high-latency links. Persists like any other loadout change. Returns the
+// new active token estimate (after current calibration overrides).
+func ApplyLowBandwidthLoadout() int {
+	initLoadout()
+	loadoutMu.Lock()
+	for _, c := range LoadoutComponents {
+		if lowBandwidthOff[c.ID] {
+			loadoutState[c.ID] = false
+		} else {
+			// Keep shipped defaults for everything else (including critical tools).
+			loadoutState[c.ID] = c.Default
+		}
+	}
+	loadoutMu.Unlock()
+	saveLoadout()
+	return LoadoutActiveTokens()
+}
+
 func saveLoadout() {
 	loadoutMu.RLock()
 	data, _ := json.MarshalIndent(loadoutState, "", " ")
@@ -205,4 +244,38 @@ func LoadoutBaseTokens() int {
 	tokenOverrideMu.RLock()
 	defer tokenOverrideMu.RUnlock()
 	return basePromptTokens
+}
+
+// LoadoutCost is the money side of the token counter: what the fixed
+// per-turn context (LoadoutActiveTokens) actually costs, priced at the
+// active coder model's INPUT rate. Same formula the agent uses to bill a
+// real turn (CostPer1MIn/1e6 * inputTokens), so the numbers line up.
+//
+//   - dollars:   cost of one turn's fixed overhead in USD.
+//   - per1MIn:   the model's input price per 1M tokens (0 = free/flat/OAuth).
+//   - modelName: human name of the active model (for the label).
+//   - priced:    false when we have no model or no price table entry, so the
+//     UI can say "unpriced" instead of a misleading $0.00.
+//
+// On a free or flat-rate tier (per1MIn == 0) dollars is genuinely 0 — that
+// is the real bill, not missing data; priced stays true.
+func LoadoutCost() (dollars, per1MIn float64, modelName string, priced bool) {
+	tokens := LoadoutActiveTokens()
+	if cfg == nil {
+		return 0, 0, "", false
+	}
+	agent, ok := cfg.Agents[AgentCoder]
+	if !ok {
+		return 0, 0, "", false
+	}
+	m, ok := models.SupportedModels[agent.Model]
+	if !ok {
+		// Unknown/custom model: tokens are real but we can't price them.
+		return 0, 0, string(agent.Model), false
+	}
+	name := m.Name
+	if name == "" {
+		name = string(m.ID)
+	}
+	return float64(tokens) / 1e6 * m.CostPer1MIn, m.CostPer1MIn, name, true
 }
