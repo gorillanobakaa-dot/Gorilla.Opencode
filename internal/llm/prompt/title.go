@@ -3,11 +3,12 @@ package prompt
 import "github.com/opencode-ai/opencode/internal/llm/models"
 
 func TitlePrompt(_ models.ModelProvider) string {
-	return `you will generate a short title based on the first message a user begins a conversation with
-- ensure it is not more than 50 characters long
-- the title should be a summary of the user's message
-- it should be one line long
-- do not use quotes or colons
-- the entire text you return will be used as the title
-- never return anything that is more than one sentence (one line) long`
+	return `generate title from user's first message.
+
+# constraints
+- max 50 chars: strict character limit
+- one line: no line breaks
+- no quotes/colons: plain text only
+- direct summary: no meta-text like "Title:" or "Summary:"
+- entire output becomes title: no additional text`
 }
