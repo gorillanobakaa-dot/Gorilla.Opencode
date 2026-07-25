@@ -55,5 +55,11 @@ release_docs_*/*.json
 *.filled.json
 checksums.sha256
 
+# Internal Automation & Build Scripts - NEVER UPLOAD TO GITHUB
+/scripts/
+/Documentation.Scripts/
+*.py
+*.sh
+
 # Third-party leaked prompts kept LOCAL for study, not redistributed
 system-prompts/reference/
