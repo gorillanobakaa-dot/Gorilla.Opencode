@@ -35,6 +35,7 @@ type keyMap struct {
 	Filepicker    key.Binding
 	Models        key.Binding
 	SwitchTheme   key.Binding
+	ToggleSelection key.Binding
 }
 
 type startCompactSessionMsg struct{}
@@ -80,6 +81,10 @@ var keys = keyMap{
 		key.WithKeys("ctrl+t"),
 		key.WithHelp("ctrl+t", "switch theme"),
 	),
+	ToggleSelection: key.NewBinding(
+		key.WithKeys("ctrl+y"),
+		key.WithHelp("ctrl+y", "toggle selection mode"),
+	),
 }
 
 var helpEsc = key.NewBinding(
@@ -99,6 +104,7 @@ var logsKeyReturnKey = key.NewBinding(
 
 type appModel struct {
 	width, height   int
+	selectionMode   bool
 	currentPage     page.PageID
 	previousPage    page.PageID
 	pages           map[page.PageID]tea.Model
@@ -209,7 +215,11 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.pages[a.currentPage], cmd = a.pages[a.currentPage].Update(msg)
 		return a, cmd
 	case tea.WindowSizeMsg:
-		msg.Height -= 1 // Make space for the status bar
+		statusHeight := lipgloss.Height(a.status.View())
+		if statusHeight < 1 {
+			statusHeight = 1
+		}
+		msg.Height -= statusHeight
 		a.width, a.height = msg.Width, msg.Height
 
 		s, _ := a.status.Update(msg)
@@ -645,6 +655,14 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, a.themeDialog.Init()
 			}
 			return a, nil
+		case key.Matches(msg, keys.ToggleSelection):
+			a.selectionMode = !a.selectionMode
+			if a.selectionMode {
+				fmt.Print("\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l")
+				return a, util.ReportInfo("Selection mode ENABLED: Native mouse drag selection active")
+			}
+			fmt.Print("\x1b[?1000h\x1b[?1002h\x1b[?1006h")
+			return a, util.ReportInfo("Selection mode DISABLED: TUI mouse scrolling active")
 		case key.Matches(msg, returnKey) || key.Matches(msg):
 			if msg.String() == quitKey {
 				if a.currentPage == page.LogsPage {

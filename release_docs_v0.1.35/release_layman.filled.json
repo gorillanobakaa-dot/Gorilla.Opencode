@@ -1,0 +1,62 @@
+{
+  "title": "v0.1.35 Text Selection Mode & Status Bar Rendering Fixes",
+  "story": "Users reported text selection being impossible due to mouse trapping, along with visual glitches including duplicated status bars and ANSI escape codes bleeding into standard views.",
+  "before_after": [
+    {
+      "area": "Text Selection",
+      "before": "Mouse drag selection failed or was trapped by TUI cell motion.",
+      "after": "Pressing ctrl+y toggles native terminal text selection mode.",
+      "who_it_affects": "All interactive TUI users"
+    },
+    {
+      "area": "Status Bar Display",
+      "before": "Duplicate status bars appeared at screen bottom with line overflow.",
+      "after": "Status bar renders cleanly in a single clamped row.",
+      "who_it_affects": "All users"
+    }
+  ],
+  "decisions": [
+    {
+      "change": "Added ctrl+y selection toggle",
+      "why": "Allows toggling mouse cell motion dynamically to enable native terminal mouse selection without breaking scroll wheel functionality.",
+      "who_benefits": "Users selecting text from chat buffers.",
+      "tradeoff": "Mouse wheel scroll is disabled while in native selection mode."
+    }
+  ],
+  "deliberately_not_done": [
+    {
+      "item": "Full custom internal selection buffer across viewports",
+      "why_not": "Extremely complex rewrite that would require tracking custom text selections across multiple lipgloss components."
+    }
+  ],
+  "privacy_and_security": "No changes to data handling or permissions.",
+  "risks_and_recovery": {
+    "backup_needed": "None",
+    "install_time": "< 1 minute",
+    "restart_required": "Restart gorilla-opencode TUI",
+    "rollback_steps": "Reinstall v0.1.34 .deb package if needed."
+  },
+  "install_steps": [
+    {
+      "step": 1,
+      "instructions": "Install updated Debian package",
+      "command": "sudo dpkg -i gorilla-opencode_0.1.35_amd64.deb",
+      "success_looks_like": "Unpacking gorilla-opencode (0.1.35)... Setting up gorilla-opencode (0.1.35)..."
+    }
+  ],
+  "known_issues": [],
+  "faq": [
+    {
+      "question": "How do I select text in the TUI now?",
+      "answer": "Press ctrl+y to enable selection mode, select text natively with your mouse, then press ctrl+y again when done."
+    }
+  ],
+  "bottom_line": "This maintenance release resolves core UI glitches and unlocks standard mouse text selection via ctrl+y toggle.",
+  "claim_sources": [
+    {
+      "claim": "Text selection fixed via ctrl+y keybinding",
+      "basis": "model_inference",
+      "evidence": null
+    }
+  ]
+}

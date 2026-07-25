@@ -212,7 +212,11 @@ func (m statusCmp) View() string {
 	status += helpers
 	status += diagnostics
 	status += m.model()
-	return status
+
+	return lipgloss.NewStyle().
+		MaxWidth(m.width).
+		MaxHeight(1).
+		Render(status)
 }
 
 func (m *statusCmp) projectDiagnostics() string {

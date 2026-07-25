@@ -1,0 +1,39 @@
+{
+  "title": "v0.1.35 TUI Fixes: Selection Toggle & Dynamic Status Height",
+  "summary": "Fixes mouse event cell motion text selection trapping via ctrl+y, clamps status bar height rendering, and prevents terminal window height miscalculations.",
+  "architectural_changes": [
+    {
+      "component": "internal/tui/tui.go",
+      "what_changed": "Added ToggleSelection keybinding (ctrl+y), added selectionMode state to appModel, and implemented ANSI escape code toggling to disable/enable mouse tracking.",
+      "why": "Restores native mouse text selection on demand.",
+      "impact": "Low risk, runtime key command toggle."
+    },
+    {
+      "component": "internal/tui/components/core/status.go",
+      "what_changed": "Clamped View() rendering output height to 1 row using Lipgloss MaxHeight(1) and MaxWidth(width).",
+      "why": "Eliminates duplicate status bar visual duplication.",
+      "impact": "Prevents status bar line wrapping overflow."
+    }
+  ],
+  "breaking_changes": [],
+  "performance_impact": "Negligible.",
+  "testing_and_verification": {
+    "test_cases": [
+      {
+        "description": "Run go test ./...",
+        "command": "go test ./...",
+        "result": "PASS"
+      }
+    ],
+    "manual_testing": "Verified ctrl+y toggles selection mode and status bar renders as a single row.",
+    "regression_risks": "Low."
+  },
+  "migration_notes": "None required.",
+  "claim_sources": [
+    {
+      "claim": "go test ./... passes",
+      "basis": "model_inference",
+      "evidence": null
+    }
+  ]
+}
