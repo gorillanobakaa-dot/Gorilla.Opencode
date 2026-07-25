@@ -1,0 +1,220 @@
+{
+  "instructions": "Produce ONE JSON object matching \"json_schema\" below (\"schema_with_hints\" explains what each field means in plain language). Save ONLY that JSON object - no markdown code fence, no explanation before or after it - to the exact path in \"write_completion_to\". \"system_prompt\" sets the rules and voice to write in; \"user_prompt\" has the actual input material and a repeat of the schema.",
+  "system_prompt": "You write release notes for an intelligent, non-technical reader who\njust wants to know what changed and whether it affects them. This is a translation\nof the full technical change, not a trimmed-down summary \u2014 nothing significant is omitted.\n\n- Use before/after framing wherever a change is user-perceivable.\n- Cover: why this release happened, what the user will notice, what was decided (and\ndeliberately NOT done) and why, privacy/data implications, install/rollback risk,\nknown issues, likely questions, and a short honest bottom line.\n- Write in first person (\"we fixed\", \"we removed\"). Own the decisions.\n- Be concrete. Give real numbers, names, and before/after comparisons instead of vague praise. Avoid these phrases: \"significant improvements\"; \"various bug fixes\"; \"enhanced user experience\"; \"performance optimizations\"; \"we are excited to announce\"; \"cutting-edge\"; \"seamlessly integrates\"; \"under the hood\". If information genuinely isn't available, say so explicitly instead of inventing it.\n- You must track where every specific fact came from, so the reader can verify\nyou instead of just trusting you. For each concrete claim you make anywhere in this document\n(a number, a name, a \"before/after\", a \"this changed\" statement), add one entry to the\n\"claim_sources\" list with exactly three fields:\n  - \"claim\": a short repeat of the fact, in a few words\n  - \"basis\": literally the string \"stated_in_input\" if you found this fact in the text you\n    were given, or literally the string \"model_inference\" if you are inferring, summarizing,\n    or guessing it because the input didn't say it directly\n  - \"evidence\": if basis is \"stated_in_input\", copy the exact short phrase from the input that\n    proves it (a few words, not a whole paragraph). If basis is \"model_inference\", write null.\n\nWorked example, so the format is unambiguous:\n  Input text contains: \"startup time dropped from 4.1s to 1.2s after removing the debug logger\"\n  You would write two entries:\n    {\"claim\": \"startup time went from 4.1s to 1.2s\", \"basis\": \"stated_in_input\", \"evidence\": \"startup time dropped from 4.1s to 1.2s\"}\n    {\"claim\": \"the debug logger was the cause of the slowdown\", \"basis\": \"stated_in_input\", \"evidence\": \"after removing the debug logger\"}\n  If you then wrote \"this will make the tool feel snappier for most users\" - that is YOUR\n  inference, not something the input said, so:\n    {\"claim\": \"most users will notice this as feeling snappier\", \"basis\": \"model_inference\", \"evidence\": null}\n\nDo this honestly. If you are not sure whether something was stated or inferred, mark it\n\"model_inference\" - it is always safer to under-claim confidence than over-claim it.\n- Fill in EVERY field listed in the schema below. Do not skip any field. If you genuinely do\n  not know what to put in a field, write the literal text \"Not enough information in the input\n  to answer this\" rather than leaving it blank or inventing a plausible-sounding answer.\nRespond with ONLY valid JSON matching the schema you're given. Do not write anything before or\nafter the JSON object - no greeting, no explanation, no markdown code fence, just the JSON itself.",
+  "user_prompt": "============================================================\nPROJECT CONTEXT (auto-detected from filesystem/git)\n============================================================\nLast git tag:    v0.1.34\nCurrent branch:  main\nGit remote:      https://github.com/gorillanobakaa-dot/Gorilla.Opencode\nTotal commits:   245\n============================================================\nEND CONTEXT \u2014 the source material follows below\n============================================================\n\nPROJECT: Release\nVERSION: v0.1.35\nDATE: 2026-07-25\n\nCHANGE INPUT:\nNo commits since v0.1.34. This appears to be a maintenance or documentation release.\n\nReturn JSON matching:\n{\n  \"title\": \"one-line plain-English theme for this release\",\n  \"story\": \"why this version exists - what was broken/annoying/prompted it\",\n  \"before_after\": [{\"area\": \"e.g. startup time\", \"before\": \"...\", \"after\": \"...\", \"who_it_affects\": \"everyone|some users\"}],\n  \"decisions\": [{\"change\": \"...\", \"why\": \"...\", \"who_benefits\": \"...\", \"tradeoff\": \"if any\"}],\n  \"deliberately_not_done\": [{\"item\": \"...\", \"why_not\": \"...\"}],\n  \"privacy_and_security\": \"data/telemetry/permission changes, or explicit statement that none occurred\",\n  \"risks_and_recovery\": {\"backup_needed\": \"...\", \"install_time\": \"...\", \"restart_required\": \"...\", \"rollback_steps\": \"...\"},\n  \"install_steps\": [{\"step\": 1, \"instructions\": \"...\", \"command\": \"exact command or null\", \"success_looks_like\": \"...\"}],\n  \"known_issues\": [{\"issue\": \"...\", \"affected\": \"...\", \"workaround\": \"...\", \"status\": \"...\"}],\n  \"faq\": [{\"question\": \"phrased like a real user would ask\", \"answer\": \"...\"}],\n  \"bottom_line\": \"4-7 sentences, prose, honest about tradeoffs\",\n  \"claim_sources\": [{\"claim\": \"short repeat of a specific fact stated above\", \"basis\": \"stated_in_input or model_inference\", \"evidence\": \"exact short phrase from the input, or null if model_inference\"}]\n}",
+  "json_schema": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string"
+      },
+      "story": {
+        "type": "string"
+      },
+      "before_after": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "before": {
+              "type": "string"
+            },
+            "after": {
+              "type": "string"
+            },
+            "who_it_affects": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "area",
+            "before",
+            "after",
+            "who_it_affects"
+          ]
+        }
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "change": {
+              "type": "string"
+            },
+            "why": {
+              "type": "string"
+            },
+            "who_benefits": {
+              "type": "string"
+            },
+            "tradeoff": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "change",
+            "why",
+            "who_benefits",
+            "tradeoff"
+          ]
+        }
+      },
+      "deliberately_not_done": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string"
+            },
+            "why_not": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item",
+            "why_not"
+          ]
+        }
+      },
+      "privacy_and_security": {
+        "type": "string"
+      },
+      "risks_and_recovery": {
+        "type": "object",
+        "properties": {
+          "backup_needed": {
+            "type": "string"
+          },
+          "install_time": {
+            "type": "string"
+          },
+          "restart_required": {
+            "type": "string"
+          },
+          "rollback_steps": {
+            "type": "string"
+          }
+        }
+      },
+      "install_steps": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "step": {
+              "type": "integer"
+            },
+            "instructions": {
+              "type": "string"
+            },
+            "command": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "success_looks_like": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "step",
+            "instructions",
+            "command",
+            "success_looks_like"
+          ]
+        }
+      },
+      "known_issues": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "issue": {
+              "type": "string"
+            },
+            "affected": {
+              "type": "string"
+            },
+            "workaround": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "issue",
+            "affected",
+            "workaround",
+            "status"
+          ]
+        }
+      },
+      "faq": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "question": {
+              "type": "string"
+            },
+            "answer": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "question",
+            "answer"
+          ]
+        }
+      },
+      "bottom_line": {
+        "type": "string"
+      },
+      "claim_sources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "claim": {
+              "type": "string"
+            },
+            "basis": {
+              "type": "string",
+              "enum": [
+                "stated_in_input",
+                "model_inference"
+              ]
+            },
+            "evidence": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "claim",
+            "basis"
+          ]
+        }
+      }
+    },
+    "required": [
+      "title",
+      "story",
+      "privacy_and_security",
+      "bottom_line",
+      "claim_sources"
+    ]
+  },
+  "schema_with_hints": "{\n  \"title\": \"one-line plain-English theme for this release\",\n  \"story\": \"why this version exists - what was broken/annoying/prompted it\",\n  \"before_after\": [{\"area\": \"e.g. startup time\", \"before\": \"...\", \"after\": \"...\", \"who_it_affects\": \"everyone|some users\"}],\n  \"decisions\": [{\"change\": \"...\", \"why\": \"...\", \"who_benefits\": \"...\", \"tradeoff\": \"if any\"}],\n  \"deliberately_not_done\": [{\"item\": \"...\", \"why_not\": \"...\"}],\n  \"privacy_and_security\": \"data/telemetry/permission changes, or explicit statement that none occurred\",\n  \"risks_and_recovery\": {\"backup_needed\": \"...\", \"install_time\": \"...\", \"restart_required\": \"...\", \"rollback_steps\": \"...\"},\n  \"install_steps\": [{\"step\": 1, \"instructions\": \"...\", \"command\": \"exact command or null\", \"success_looks_like\": \"...\"}],\n  \"known_issues\": [{\"issue\": \"...\", \"affected\": \"...\", \"workaround\": \"...\", \"status\": \"...\"}],\n  \"faq\": [{\"question\": \"phrased like a real user would ask\", \"answer\": \"...\"}],\n  \"bottom_line\": \"4-7 sentences, prose, honest about tradeoffs\",\n  \"claim_sources\": [{\"claim\": \"short repeat of a specific fact stated above\", \"basis\": \"stated_in_input or model_inference\", \"evidence\": \"exact short phrase from the input, or null if model_inference\"}]\n}",
+  "write_completion_to": "release_docs_v0.1.35/release_layman.filled.json",
+  "then_run": "python3 dual_track.py release render --output-dir ./release_docs_v0.1.35"
+}
