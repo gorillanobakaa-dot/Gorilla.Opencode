@@ -48,6 +48,11 @@ opencode.md
 gorilla-opencode
 *.deb
 gorilla-opencode-linux-amd64
+
+# Documentation intermediate build artifacts
+release_docs_*/*.json
+*.prep.json
+*.filled.json
 checksums.sha256
 
 # Third-party leaked prompts kept LOCAL for study, not redistributed
