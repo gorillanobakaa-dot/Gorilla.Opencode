@@ -40,18 +40,22 @@
   "description": "6.7B dense, 16K ctx, trivial fixes only",
   "name": "DeepSeek Coder 6.7B"
  },
- "deepseek-ai/deepseek-v4-flash": {
-  "context_window": 1000000,
-  "description": "284B MoE, 1M ctx, 79% SWE-bench, fast",
-  "name": "DeepSeek V4 Flash",
-  "rank": 4
- },
- "deepseek-ai/deepseek-v4-pro": {
-  "context_window": 1000000,
-  "description": "1.6T MoE, 1M ctx, 80.6% SWE-bench",
-  "name": "DeepSeek V4 Pro",
-  "rank": 1
- },
+"deepseek-ai/deepseek-v4-flash": {
+    "context_window": 1000000,
+    "description": "284B MoE, 1M ctx, 79% SWE-bench, fast",
+    "name": "DeepSeek V4 Flash",
+    "rank": 4,
+    "cost_in": 0.1,
+    "cost_out": 0.3
+  },
+  "deepseek-ai/deepseek-v4-pro": {
+    "context_window": 1000000,
+    "description": "1.6T MoE, 1M ctx, 80.6% SWE-bench",
+    "name": "DeepSeek V4 Pro",
+    "rank": 1,
+    "cost_in": 0.5,
+    "cost_out": 2.0
+  },
  "google/codegemma-1.1-7b": {
   "description": "shit tier \u2014 minor revision of the above, same limitations.",
   "name": "CodeGemma 1.1 7B"
@@ -118,11 +122,13 @@
   "description": "70B dense, 16K ctx, coding specialist",
   "name": "CodeLlama 70B"
  },
- "meta/llama-3.1-405b-instruct": {
-  "context_window": 131072,
-  "description": "405B dense, 128K ctx. Largest open dense model \u2014 capable but slow, and not worth the latency over 70B for coding.",
-  "name": "Llama 3.1 405B"
- },
+"meta/llama-3.1-405b-instruct": {
+    "context_window": 131072,
+    "description": "405B dense, 128K ctx. Largest open dense model \u2014 capable but slow, and not worth the latency over 70B for coding.",
+    "name": "Llama 3.1 405B",
+    "cost_in": 0.6,
+    "cost_out": 2.4
+  },
  "meta/llama-3.1-70b-instruct": {
   "context_window": 131072,
   "description": "70B dense, 128K ctx. Same tier as 3.3 above \u2014 prefer 3.3 if both are available.",
@@ -365,27 +371,33 @@
   "name": "Nemotron 3 Nano Omni 30B",
   "rank": 17
  },
- "nvidia/nemotron-3-super-120b-a12b": {
-  "context_window": 1000000,
-  "description": "120B MoE, 1M ctx, best speed/quality NVIDIA tier",
-  "name": "Nemotron 3 Super 120B",
-  "rank": 9
- },
- "nvidia/nemotron-3-ultra-550b-a55b": {
-  "context_window": 1000000,
-  "description": "550B MoE, 1M ctx, hybrid Mamba-Transformer",
-  "name": "Nemotron 3 Ultra 550B",
-  "rank": 5
- },
+"nvidia/nemotron-3-super-120b-a12b": {
+    "context_window": 1000000,
+    "description": "120B MoE, 1M ctx, best speed/quality NVIDIA tier",
+    "name": "Nemotron 3 Super 120B",
+    "rank": 9,
+    "cost_in": 0.2,
+    "cost_out": 0.8
+  },
+"nvidia/nemotron-3-ultra-550b-a55b": {
+    "context_window": 1000000,
+    "description": "550B MoE, 1M ctx, hybrid Mamba-Transformer",
+    "name": "Nemotron 3 Ultra 550B",
+    "rank": 5,
+    "cost_in": 0.4,
+    "cost_out": 1.6
+  },
  "nvidia/nemotron-3.5-content-safety": {
   "description": "shit tier \u2014 content moderation model, not for code.",
   "name": "Nemotron 3.5 Content Safety"
  },
- "nvidia/nemotron-4-340b-instruct": {
-  "context_window": 4096,
-  "description": "340B dense, 4K ctx (short!)",
-  "name": "Nemotron 4 340B"
- },
+"nvidia/nemotron-4-340b-instruct": {
+    "context_window": 4096,
+    "description": "340B dense, 4K ctx (short!)",
+    "name": "Nemotron 4 340B",
+    "cost_in": 0.5,
+    "cost_out": 2.0
+  },
  "nvidia/nemotron-4-340b-reward": {
   "description": "shit tier \u2014 a reward model for RLHF pipelines, not something you chat with or code with.",
   "name": "Nemotron 4 340B Reward"
@@ -453,24 +465,30 @@
   "name": "Poolside Laguna XS 2.1",
   "rank": 30
  },
- "qwen/qwen3-next-80b-a3b-instruct": {
-  "context_window": 262144,
-  "description": "80B MoE, 256K ctx, fast but shallow",
-  "name": "Qwen3-Next 80B",
-  "rank": 11
- },
- "qwen/qwen3.5-122b-a10b": {
-  "context_window": 268288,
-  "description": "122B MoE, 262K ctx",
-  "name": "Qwen 3.5 122B",
-  "rank": 10
- },
- "qwen/qwen3.5-397b-a17b": {
-  "context_window": 268288,
-  "description": "397B MoE, 262K ctx, 76.4% SWE-bench",
-  "name": "Qwen 3.5 397B",
-  "rank": 6
- },
+"qwen/qwen3-next-80b-a3b-instruct": {
+    "context_window": 262144,
+    "description": "80B MoE, 256K ctx, fast but shallow",
+    "name": "Qwen3-Next 80B",
+    "rank": 11,
+    "cost_in": 0.2,
+    "cost_out": 0.6
+  },
+  "qwen/qwen3.5-122b-a10b": {
+    "context_window": 268288,
+    "description": "122B MoE, 262K ctx",
+    "name": "Qwen 3.5 122B",
+    "rank": 10,
+    "cost_in": 0.3,
+    "cost_out": 0.9
+  },
+  "qwen/qwen3.5-397b-a17b": {
+    "context_window": 268288,
+    "description": "397B MoE, 262K ctx, 76.4% SWE-bench",
+    "name": "Qwen 3.5 397B",
+    "rank": 6,
+    "cost_in": 1.0,
+    "cost_out": 3.0
+  },
  "sarvamai/sarvam-m": {
   "description": "shit tier \u2014 . Indic-language-focused model. Wrong tool entirely for coding.",
   "name": "Sarvam-M"

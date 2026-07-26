@@ -40,6 +40,9 @@ type Client struct {
 	notificationHandlers map[string]NotificationHandler
 	notificationMu       sync.RWMutex
 
+	// Semaphore to limit concurrent notification handlers (prevents goroutine explosion)
+	notificationSem chan struct{}
+
 	// Diagnostic cache
 	diagnostics   map[protocol.DocumentUri][]protocol.Diagnostic
 	diagnosticsMu sync.RWMutex
@@ -72,7 +75,7 @@ func NewClient(ctx context.Context, command string, args ...string) (*Client, er
 		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
 	}
 
-	client := &Client{
+client := &Client{
 		Cmd:                   cmd,
 		stdin:                 stdin,
 		stdout:                bufio.NewReader(stdout),
@@ -82,6 +85,7 @@ func NewClient(ctx context.Context, command string, args ...string) (*Client, er
 		serverRequestHandlers: make(map[string]ServerRequestHandler),
 		diagnostics:           make(map[protocol.DocumentUri][]protocol.Diagnostic),
 		openFiles:             make(map[string]*OpenFileInfo),
+		notificationSem:       make(chan struct{}, 32),
 	}
 
 	// Initialize server state
@@ -118,6 +122,13 @@ func (c *Client) RegisterNotificationHandler(method string, handler Notification
 	c.notificationMu.Lock()
 	defer c.notificationMu.Unlock()
 	c.notificationHandlers[method] = handler
+}
+
+// DeregisterNotificationHandler removes a notification handler for the given method
+func (c *Client) DeregisterNotificationHandler(method string) {
+	c.notificationMu.Lock()
+	defer c.notificationMu.Unlock()
+	delete(c.notificationHandlers, method)
 }
 
 func (c *Client) RegisterServerRequestHandler(method string, handler ServerRequestHandler) {
@@ -690,6 +701,9 @@ func (c *Client) CloseFile(ctx context.Context, filepath string) error {
 	c.openFilesMu.Lock()
 	delete(c.openFiles, uri)
 	c.openFilesMu.Unlock()
+
+	// Clear diagnostics for this file to prevent memory leak
+	c.ClearDiagnosticsForURI(protocol.DocumentUri(uri))
 
 	return nil
 }

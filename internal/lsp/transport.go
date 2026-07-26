@@ -160,7 +160,18 @@ func (c *Client) handleMessages() {
 				if cnf.DebugLSP {
 					logging.Debug("Handling notification", "method", msg.Method)
 				}
-				go handler(msg.Params)
+				// Limit concurrent notification handlers to avoid goroutine explosion
+				select {
+				case c.notificationSem <- struct{}{}:
+					go func() {
+						defer func() { <-c.notificationSem }()
+						handler(msg.Params)
+					}()
+				default:
+					if cnf.DebugLSP {
+						logging.Warn("Notification handler semaphore full, dropping notification", "method", msg.Method)
+					}
+				}
 			} else if cnf.DebugLSP {
 				logging.Debug("No handler for notification", "method", msg.Method)
 			}
@@ -177,8 +188,16 @@ func (c *Client) handleMessages() {
 				if cnf.DebugLSP {
 					logging.Debug("Received response for request", "id", msg.ID)
 				}
-				ch <- msg
-				close(ch)
+				// Non-blocking send: if the Call goroutine has already moved on (context cancelled),
+				// don't block handleMessages. Just drop the response.
+				select {
+				case ch <- msg:
+					close(ch)
+				default:
+					if cnf.DebugLSP {
+						logging.Debug("Handler channel full or closed, dropping response", "id", msg.ID)
+					}
+				}
 			} else if cnf.DebugLSP {
 				logging.Debug("No handler for response", "id", msg.ID)
 			}
@@ -222,29 +241,36 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 	}
 
 	// Wait for response
-	resp := <-ch
-
-	if cnf.DebugLSP {
-		logging.Debug("Received response", "id", id)
-	}
-
-	if resp.Error != nil {
-		return fmt.Errorf("request failed: %s (code: %d)", resp.Error.Message, resp.Error.Code)
-	}
-
-	if result != nil {
-		// If result is a json.RawMessage, just copy the raw bytes
-		if rawMsg, ok := result.(*json.RawMessage); ok {
-			*rawMsg = resp.Result
-			return nil
+	select {
+	case resp := <-ch:
+		if cnf.DebugLSP {
+			logging.Debug("Received response", "id", id)
 		}
-		// Otherwise unmarshal into the provided type
-		if err := json.Unmarshal(resp.Result, result); err != nil {
-			return fmt.Errorf("failed to unmarshal result: %w", err)
-		}
-	}
 
-	return nil
+		if resp.Error != nil {
+			return fmt.Errorf("request failed: %s (code: %d)", resp.Error.Message, resp.Error.Code)
+		}
+
+		if result != nil {
+			// If result is a json.RawMessage, just copy the raw bytes
+			if rawMsg, ok := result.(*json.RawMessage); ok {
+				*rawMsg = resp.Result
+				return nil
+			}
+			// Otherwise unmarshal into the provided type
+			if err := json.Unmarshal(resp.Result, result); err != nil {
+				return fmt.Errorf("failed to unmarshal result: %w", err)
+			}
+		}
+
+		return nil
+	case <-ctx.Done():
+		// Context cancelled or timed out - clean up and return error
+		c.handlersMu.Lock()
+		delete(c.handlers, id)
+		c.handlersMu.Unlock()
+		return ctx.Err()
+	}
 }
 
 // Notify sends a notification (a request without an ID that doesn't expect a response)

@@ -142,6 +142,11 @@ func waitForLspDiagnostics(ctx context.Context, filePath string, lsps map[string
 	case <-time.After(5 * time.Second):
 	case <-ctx.Done():
 	}
+
+	// Deregister handlers to prevent accumulating closures
+	for _, client := range lsps {
+		client.DeregisterNotificationHandler("textDocument/publishDiagnostics")
+	}
 }
 
 func hasDiagnosticsChanged(current, original map[protocol.DocumentUri][]protocol.Diagnostic) bool {
