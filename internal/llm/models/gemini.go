@@ -47,9 +47,8 @@ var GeminiModels = map[ModelID]Model{
 		// rolling alias tracks whatever Google currently serves.
 		APIModel:            "gemini-flash-latest",
 		CostPer1MIn:         0.15,
-		CostPer1MInCached:   0,
-		CostPer1MOutCached:  0,
 		CostPer1MOut:        0.60,
+		CostPer1MOutCached:  0.015, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    50000,
 		SupportsAttachments: true,
@@ -63,9 +62,8 @@ var GeminiModels = map[ModelID]Model{
 		// Use gemini-pro-latest (same rolling alias) instead.
 		APIModel:            "gemini-pro-latest",
 		CostPer1MIn:         1.25,
-		CostPer1MInCached:   0,
-		CostPer1MOutCached:  0,
 		CostPer1MOut:        10,
+		CostPer1MOutCached:  0.125, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    50000,
 		SupportsAttachments: true,
@@ -76,6 +74,9 @@ var GeminiModels = map[ModelID]Model{
 		Description:         "Rolling Flash-Lite alias — cheapest/fastest, 1M ctx",
 		Provider:            ProviderGemini,
 		APIModel:            "gemini-flash-lite-latest",
+		CostPer1MIn:         0.30, // rolling → currently 3.5-flash-lite
+		CostPer1MOut:        2.50,
+		CostPer1MOutCached:  0.03, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    16000,
 		SupportsAttachments: true,
@@ -98,6 +99,9 @@ var GeminiModels = map[ModelID]Model{
 		Description:         "Newest Flash workhorse — coding + computer use, fewer tool loops, 1M ctx",
 		Provider:            ProviderGemini,
 		APIModel:            "gemini-3.6-flash",
+		CostPer1MIn:         1.50,
+		CostPer1MOut:        7.50,
+		CostPer1MOutCached:  0.15, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    50000,
 		SupportsAttachments: true,
@@ -108,6 +112,9 @@ var GeminiModels = map[ModelID]Model{
 		Description:         "High-throughput / low-latency Flash-Lite — 350 tok/s, 1M ctx",
 		Provider:            ProviderGemini,
 		APIModel:            "gemini-3.5-flash-lite",
+		CostPer1MIn:         0.30,
+		CostPer1MOut:        2.50,
+		CostPer1MOutCached:  0.03, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    16000,
 		SupportsAttachments: true,
@@ -118,6 +125,9 @@ var GeminiModels = map[ModelID]Model{
 		Description:         "Google flagship — strongest reasoning, 1M ctx",
 		Provider:            ProviderGemini,
 		APIModel:            "gemini-3-pro-preview",
+		CostPer1MIn:         2.00, // ≤200K ctx; $4/$18 above 200K
+		CostPer1MOut:        12.00,
+		CostPer1MOutCached:  0.2, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    50000,
 		SupportsAttachments: true,
@@ -128,6 +138,9 @@ var GeminiModels = map[ModelID]Model{
 		Description:         "Gen-3.1 Pro — deep reasoning, 1M ctx",
 		Provider:            ProviderGemini,
 		APIModel:            "gemini-3.1-pro-preview",
+		CostPer1MIn:         2.00, // ≤200K ctx; $4/$18 above 200K
+		CostPer1MOut:        12.00,
+		CostPer1MOutCached:  0.2, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    50000,
 		SupportsAttachments: true,
@@ -138,6 +151,9 @@ var GeminiModels = map[ModelID]Model{
 		Description:         "Newest Flash — fast + strong general/coding, 1M ctx",
 		Provider:            ProviderGemini,
 		APIModel:            "gemini-3.5-flash",
+		CostPer1MIn:         1.50,
+		CostPer1MOut:        9.00,
+		CostPer1MOutCached:  0.15, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    50000,
 		SupportsAttachments: true,
@@ -148,6 +164,9 @@ var GeminiModels = map[ModelID]Model{
 		Description:         "Gen-3 Flash — fast, 1M ctx",
 		Provider:            ProviderGemini,
 		APIModel:            "gemini-3-flash-preview",
+		CostPer1MIn:         0.50,
+		CostPer1MOut:        3.00,
+		CostPer1MOutCached:  0.05, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    50000,
 		SupportsAttachments: true,
@@ -158,6 +177,9 @@ var GeminiModels = map[ModelID]Model{
 		Description:         "Gen-3.1 Flash-Lite — cheapest/fastest gen-3, 1M ctx",
 		Provider:            ProviderGemini,
 		APIModel:            "gemini-3.1-flash-lite",
+		CostPer1MIn:         0.20, // est — between 2.5 ($0.10/$0.40) and 3.5 flash-lite ($0.30/$2.50)
+		CostPer1MOut:        1.00,
+		CostPer1MOutCached:  0.02, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    16000,
 		SupportsAttachments: true,
@@ -172,6 +194,7 @@ var GeminiModels = map[ModelID]Model{
 		APIModel:            "gemini-2.5-pro",
 		CostPer1MIn:         1.25,
 		CostPer1MOut:        10,
+		CostPer1MOutCached:  0.125, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    50000,
 		SupportsAttachments: true,
@@ -182,6 +205,9 @@ var GeminiModels = map[ModelID]Model{
 		Description:         "Gemini 2.5 Flash-Lite — cheap + fast, 1M ctx",
 		Provider:            ProviderGemini,
 		APIModel:            "gemini-2.5-flash-lite",
+		CostPer1MIn:         0.10,
+		CostPer1MOut:        0.40,
+		CostPer1MOutCached:  0.01, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    16000,
 		SupportsAttachments: true,
@@ -195,9 +221,8 @@ var GeminiModels = map[ModelID]Model{
 		Provider:            ProviderGemini,
 		APIModel:            "gemini-2.0-flash",
 		CostPer1MIn:         0.10,
-		CostPer1MInCached:   0,
-		CostPer1MOutCached:  0,
 		CostPer1MOut:        0.40,
+		CostPer1MOutCached:  0.01, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    6000,
 		SupportsAttachments: true,
@@ -209,9 +234,8 @@ var GeminiModels = map[ModelID]Model{
 		Provider:            ProviderGemini,
 		APIModel:            "gemini-2.0-flash-lite",
 		CostPer1MIn:         0.05,
-		CostPer1MInCached:   0,
-		CostPer1MOutCached:  0,
 		CostPer1MOut:        0.30,
+		CostPer1MOutCached:  0.005, // cache-read ~= 10% of input (Google)
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    6000,
 		SupportsAttachments: true,
