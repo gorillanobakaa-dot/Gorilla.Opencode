@@ -150,9 +150,12 @@ func (p *chatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (p *chatPage) setSidebar() tea.Cmd {
+	// No container padding: the sidebar paints its own panel background edge to
+	// edge (top→bottom, and up to the seam). Its own PaddingLeft/Right handle
+	// text spacing. Container padding here would frame the panel with rows of
+	// the MAIN background, leaving the gaps the panel is meant to avoid.
 	sidebarContainer := layout.NewContainer(
 		chat.NewSidebarCmp(p.session, p.app.History),
-		layout.WithPadding(1, 1, 1, 1),
 	)
 	return tea.Batch(p.layout.SetRightPanel(sidebarContainer), sidebarContainer.Init())
 }

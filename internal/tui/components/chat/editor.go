@@ -246,9 +246,13 @@ func (m *editorCmp) View() string {
 func (m *editorCmp) SetSize(width, height int) tea.Cmd {
 	m.width = width
 	m.height = height
+	// GORILLA OVERRIDE: the textarea must leave room for the "> " prompt that
+	// View() prepends via JoinHorizontal, otherwise the editor renders WIDER
+	// than its allotment — which shoves the sidebar's bottom rows out of the
+	// layout (they then get clipped, showing an unpainted gap). A stray
+	// SetWidth(width) here used to clobber this width-3 and cause exactly that.
 	m.textarea.SetWidth(width - 3) // account for the prompt and padding right
 	m.textarea.SetHeight(height)
-	m.textarea.SetWidth(width)
 	return nil
 }
 

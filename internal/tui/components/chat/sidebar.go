@@ -11,6 +11,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/diff"
 	"github.com/opencode-ai/opencode/internal/history"
+	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/session"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
@@ -106,6 +107,12 @@ func (m *sidebarCmp) View() string {
 				spacer,
 				m.sessionSection(),
 				spacer,
+				m.contextSection(),
+				spacer,
+				m.tokenUsageSection(),
+				spacer,
+				m.mcpSection(),
+				spacer,
 				lspsConfigured(m.width, baseStyle),
 				spacer,
 				m.modifiedFiles(),
@@ -132,6 +139,92 @@ func (m *sidebarCmp) sessionSection() string {
 		sessionKey,
 		sessionValue,
 	)
+}
+
+// formatTokens renders a token count compactly (4500 -> "4.5K", 1200000 -> "1.2M").
+func formatTokens(n int64) string {
+	switch {
+	case n >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+	case n >= 1_000:
+		return fmt.Sprintf("%.1fK", float64(n)/1_000)
+	default:
+		return fmt.Sprintf("%d", n)
+	}
+}
+
+// contextSection shows the session's total context size, how much of the
+// model's window it fills, and the running cost — like OpenCode/Kilo.
+func (m *sidebarCmp) contextSection() string {
+	t := theme.CurrentTheme()
+	baseStyle := sidebarStyle()
+
+	used := m.session.PromptTokens + m.session.CompletionTokens
+
+	var ctxWindow int64
+	if cfg := config.Get(); cfg != nil {
+		if a, ok := cfg.Agents[config.AgentCoder]; ok {
+			if mdl, ok := models.SupportedModels[a.Model]; ok {
+				ctxWindow = mdl.ContextWindow
+			}
+		}
+	}
+
+	lines := []string{
+		baseStyle.Foreground(t.Primary()).Bold(true).Width(m.width).Render("Context"),
+		baseStyle.Foreground(t.Text()).Width(m.width).Render(fmt.Sprintf("%s tokens", formatTokens(used))),
+	}
+	if ctxWindow > 0 {
+		pct := float64(used) / float64(ctxWindow) * 100
+		lines = append(lines, baseStyle.Foreground(t.TextMuted()).Width(m.width).Render(fmt.Sprintf("%.0f%% used", pct)))
+	}
+	lines = append(lines, baseStyle.Foreground(t.TextMuted()).Width(m.width).Render(fmt.Sprintf("$%.2f spent", m.session.Cost)))
+
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+}
+
+// tokenUsageSection breaks the session tokens into input (prompt) and output
+// (completion). Cache metrics aren't stored per-session, so they're omitted.
+func (m *sidebarCmp) tokenUsageSection() string {
+	t := theme.CurrentTheme()
+	baseStyle := sidebarStyle()
+
+	row := func(label string, v int64) string {
+		return baseStyle.Foreground(t.Text()).Width(m.width).Render(
+			fmt.Sprintf("%-8s%s", label, formatTokens(v)))
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		baseStyle.Foreground(t.Primary()).Bold(true).Width(m.width).Render("Token Usage"),
+		row("Input", m.session.PromptTokens),
+		row("Output", m.session.CompletionTokens),
+	)
+}
+
+// mcpSection lists configured MCP servers. Live connection status isn't
+// available to the sidebar, so we list what's configured rather than fake it.
+func (m *sidebarCmp) mcpSection() string {
+	t := theme.CurrentTheme()
+	baseStyle := sidebarStyle()
+
+	var servers []string
+	if cfg := config.Get(); cfg != nil {
+		for name := range cfg.MCPServers {
+			servers = append(servers, name)
+		}
+	}
+	sort.Strings(servers)
+
+	lines := []string{baseStyle.Foreground(t.Primary()).Bold(true).Width(m.width).Render("MCP")}
+	if len(servers) == 0 {
+		lines = append(lines, baseStyle.Foreground(t.TextMuted()).Width(m.width).Render("No MCP servers"))
+	} else {
+		for _, s := range servers {
+			lines = append(lines, baseStyle.Foreground(t.Text()).Width(m.width).Render("• "+s))
+		}
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
 func (m *sidebarCmp) modifiedFile(filePath string, additions, removals int) string {
