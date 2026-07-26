@@ -86,29 +86,32 @@ func (s *splitPaneLayout) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (s *splitPaneLayout) View() string {
-	var topSection string
-
-	if s.leftPanel != nil && s.rightPanel != nil {
-		leftView := s.leftPanel.View()
-		rightView := s.rightPanel.View()
-		topSection = lipgloss.JoinHorizontal(lipgloss.Top, leftView, rightView)
-	} else if s.leftPanel != nil {
-		topSection = s.leftPanel.View()
-	} else if s.rightPanel != nil {
-		topSection = s.rightPanel.View()
-	} else {
-		topSection = ""
+	// GORILLA OVERRIDE: compose as [ messages-over-editor | sidebar ] so the
+	// sidebar (right panel) spans the FULL height down to the status bar,
+	// instead of stopping above a full-width editor band.
+	leftColumn := ""
+	if s.leftPanel != nil {
+		leftColumn = s.leftPanel.View()
+	}
+	if s.bottomPanel != nil {
+		bottomView := s.bottomPanel.View()
+		if leftColumn != "" {
+			leftColumn = lipgloss.JoinVertical(lipgloss.Left, leftColumn, bottomView)
+		} else {
+			leftColumn = bottomView
+		}
 	}
 
 	var finalView string
-
-	if s.bottomPanel != nil && topSection != "" {
-		bottomView := s.bottomPanel.View()
-		finalView = lipgloss.JoinVertical(lipgloss.Left, topSection, bottomView)
-	} else if s.bottomPanel != nil {
-		finalView = s.bottomPanel.View()
+	if s.rightPanel != nil {
+		rightView := s.rightPanel.View()
+		if leftColumn != "" {
+			finalView = lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, rightView)
+		} else {
+			finalView = rightView
+		}
 	} else {
-		finalView = topSection
+		finalView = leftColumn
 	}
 
 	if finalView != "" {
@@ -145,7 +148,7 @@ func (s *splitPaneLayout) SetSize(width, height int) tea.Cmd {
 		// GORILLA OVERRIDE: the sidebar (cwd/session/LSP/modified files) needs
 		// only a modest width; a fixed 30% share wastes a lot of columns on a
 		// wide terminal. Cap it so the extra width goes to the chat instead.
-		const maxRightPanelWidth = 48
+		const maxRightPanelWidth = 42
 		if rightWidth > maxRightPanelWidth {
 			rightWidth = maxRightPanelWidth
 			leftWidth = width - rightWidth
@@ -158,6 +161,13 @@ func (s *splitPaneLayout) SetSize(width, height int) tea.Cmd {
 		rightWidth = width
 	}
 
+	// GORILLA OVERRIDE: the sidebar spans the full height beside the messages+
+	// editor column; the editor (bottom) is only as wide as the messages.
+	bottomWidth := width
+	if s.rightPanel != nil {
+		bottomWidth = leftWidth
+	}
+
 	var cmds []tea.Cmd
 	if s.leftPanel != nil {
 		cmd := s.leftPanel.SetSize(leftWidth, topHeight)
@@ -165,12 +175,12 @@ func (s *splitPaneLayout) SetSize(width, height int) tea.Cmd {
 	}
 
 	if s.rightPanel != nil {
-		cmd := s.rightPanel.SetSize(rightWidth, topHeight)
+		cmd := s.rightPanel.SetSize(rightWidth, height)
 		cmds = append(cmds, cmd)
 	}
 
 	if s.bottomPanel != nil {
-		cmd := s.bottomPanel.SetSize(width, bottomHeight)
+		cmd := s.bottomPanel.SetSize(bottomWidth, bottomHeight)
 		cmds = append(cmds, cmd)
 	}
 	return tea.Batch(cmds...)

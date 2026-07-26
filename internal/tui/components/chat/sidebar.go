@@ -13,7 +13,6 @@ import (
 	"github.com/opencode-ai/opencode/internal/history"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/session"
-	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
 
@@ -81,23 +80,34 @@ func (m *sidebarCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// sidebarStyle is the panel style: a distinct (lighter) background so the
+// sidebar reads as its own panel instead of blending into the chat. Uses the
+// theme's BackgroundSecondary, so it adapts across themes.
+func sidebarStyle() lipgloss.Style {
+	t := theme.CurrentTheme()
+	return lipgloss.NewStyle().
+		Background(t.BackgroundSecondary()).
+		Foreground(t.Text())
+}
+
 func (m *sidebarCmp) View() string {
-	baseStyle := styles.BaseStyle()
+	baseStyle := sidebarStyle()
+	spacer := baseStyle.Width(m.width).Render("")
 
 	return baseStyle.
 		Width(m.width).
 		PaddingLeft(4).
 		PaddingRight(2).
-		Height(m.height - 1).
+		Height(m.height).
 		Render(
 			lipgloss.JoinVertical(
 				lipgloss.Top,
-				header(m.width),
-				" ",
+				header(m.width, baseStyle),
+				spacer,
 				m.sessionSection(),
-				" ",
-				lspsConfigured(m.width),
-				" ",
+				spacer,
+				lspsConfigured(m.width, baseStyle),
+				spacer,
 				m.modifiedFiles(),
 			),
 		)
@@ -105,7 +115,7 @@ func (m *sidebarCmp) View() string {
 
 func (m *sidebarCmp) sessionSection() string {
 	t := theme.CurrentTheme()
-	baseStyle := styles.BaseStyle()
+	baseStyle := sidebarStyle()
 
 	sessionKey := baseStyle.
 		Foreground(t.Primary()).
@@ -126,7 +136,7 @@ func (m *sidebarCmp) sessionSection() string {
 
 func (m *sidebarCmp) modifiedFile(filePath string, additions, removals int) string {
 	t := theme.CurrentTheme()
-	baseStyle := styles.BaseStyle()
+	baseStyle := sidebarStyle()
 
 	stats := ""
 	if additions > 0 && removals > 0 {
@@ -171,7 +181,7 @@ func (m *sidebarCmp) modifiedFile(filePath string, additions, removals int) stri
 
 func (m *sidebarCmp) modifiedFiles() string {
 	t := theme.CurrentTheme()
-	baseStyle := styles.BaseStyle()
+	baseStyle := sidebarStyle()
 
 	modifiedFiles := baseStyle.
 		Width(m.width).

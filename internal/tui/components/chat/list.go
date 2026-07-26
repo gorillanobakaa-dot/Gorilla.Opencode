@@ -428,9 +428,9 @@ func (m *messagesCmp) initialScreen() string {
 	return baseStyle.Width(m.width).Render(
 		lipgloss.JoinVertical(
 			lipgloss.Top,
-			header(m.width),
+			header(m.width, baseStyle),
 			"",
-			lspsConfigured(m.width),
+			lspsConfigured(m.width, baseStyle),
 		),
 	)
 }
