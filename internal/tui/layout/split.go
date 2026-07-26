@@ -142,6 +142,14 @@ func (s *splitPaneLayout) SetSize(width, height int) tea.Cmd {
 	if s.leftPanel != nil && s.rightPanel != nil {
 		leftWidth = int(float64(width) * s.ratio)
 		rightWidth = width - leftWidth
+		// GORILLA OVERRIDE: the sidebar (cwd/session/LSP/modified files) needs
+		// only a modest width; a fixed 30% share wastes a lot of columns on a
+		// wide terminal. Cap it so the extra width goes to the chat instead.
+		const maxRightPanelWidth = 48
+		if rightWidth > maxRightPanelWidth {
+			rightWidth = maxRightPanelWidth
+			leftWidth = width - rightWidth
+		}
 	} else if s.leftPanel != nil {
 		leftWidth = width
 		rightWidth = 0

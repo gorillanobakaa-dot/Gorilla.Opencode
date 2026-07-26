@@ -57,6 +57,17 @@ type Provider struct {
 	Disabled bool   `json:"disabled"`
 }
 
+// LocalEndpoint defines one OpenAI-compatible endpoint (NVIDIA NIM, Ollama,
+// Kilo, LM Studio, or any custom /v1 server). GORILLA OVERRIDE: multiple may
+// be configured and coexist — each contributes its /v1/models to the picker
+// and routes with its own BaseURL + APIKey, instead of a single shared slot.
+type LocalEndpoint struct {
+	Name     string `json:"name"`
+	BaseURL  string `json:"baseURL"`
+	APIKey   string `json:"apiKey,omitempty"`
+	Disabled bool   `json:"disabled,omitempty"`
+}
+
 // Data defines storage configuration.
 type Data struct {
 	Directory string `json:"directory,omitempty"`
@@ -83,18 +94,19 @@ type ShellConfig struct {
 
 // Config is the main configuration structure for the application.
 type Config struct {
-	Data         Data                              `json:"data"`
-	WorkingDir   string                            `json:"wd,omitempty"`
-	MCPServers   map[string]MCPServer              `json:"mcpServers,omitempty"`
-	Providers    map[models.ModelProvider]Provider `json:"providers,omitempty"`
-	LSP          map[string]LSPConfig              `json:"lsp,omitempty"`
-	Agents       map[AgentName]Agent               `json:"agents,omitempty"`
-	Debug        bool                              `json:"debug,omitempty"`
-	DebugLSP     bool                              `json:"debugLSP,omitempty"`
-	ContextPaths []string                          `json:"contextPaths,omitempty"`
-	TUI          TUIConfig                         `json:"tui"`
-	Shell        ShellConfig                       `json:"shell,omitempty"`
-	AutoCompact  bool                              `json:"autoCompact,omitempty"`
+	Data           Data                              `json:"data"`
+	WorkingDir     string                            `json:"wd,omitempty"`
+	MCPServers     map[string]MCPServer              `json:"mcpServers,omitempty"`
+	Providers      map[models.ModelProvider]Provider `json:"providers,omitempty"`
+	LocalEndpoints []LocalEndpoint                   `json:"localEndpoints,omitempty"`
+	LSP            map[string]LSPConfig              `json:"lsp,omitempty"`
+	Agents         map[AgentName]Agent               `json:"agents,omitempty"`
+	Debug          bool                              `json:"debug,omitempty"`
+	DebugLSP       bool                              `json:"debugLSP,omitempty"`
+	ContextPaths   []string                          `json:"contextPaths,omitempty"`
+	TUI            TUIConfig                         `json:"tui"`
+	Shell          ShellConfig                       `json:"shell,omitempty"`
+	AutoCompact    bool                              `json:"autoCompact,omitempty"`
 }
 
 // Application constants
@@ -157,6 +169,11 @@ func Load(workingDir string, debug bool) (*Config, error) {
 	}
 
 	applyDefaultValues()
+
+	// GORILLA OVERRIDE: register every configured OpenAI-compatible local
+	// endpoint (NIM, Ollama, ...) so their models coexist in the picker.
+	registerLocalEndpoints()
+
 	defaultLevel := slog.LevelInfo
 	if cfg.Debug {
 		defaultLevel = slog.LevelDebug
@@ -968,6 +985,128 @@ func updateCfgFile(updateCfg func(config *Config)) error {
 	}
 
 	return nil
+}
+
+// registerLocalEndpoints loads every enabled OpenAI-compatible local endpoint
+// into the model registry so their models coexist. GORILLA OVERRIDE: falls
+// back to the legacy single LOCAL_ENDPOINT env vars when none are configured,
+// so existing setups keep working untouched.
+func registerLocalEndpoints() {
+	// Backward-compat: the legacy LOCAL_ENDPOINT env (NIM) is not stored in
+	// config.json, so append it as a "nim" endpoint whenever it's set and not
+	// already listed — regardless of what else is configured. (Previously this
+	// only ran when the list was empty, so adding any endpoint via /connect
+	// silently dropped NIM.)
+	if ep := os.Getenv("LOCAL_ENDPOINT"); ep != "" {
+		exists := false
+		for _, le := range cfg.LocalEndpoints {
+			if le.BaseURL == ep || le.Name == "nim" {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			cfg.LocalEndpoints = append(cfg.LocalEndpoints, LocalEndpoint{
+				Name:    "nim",
+				BaseURL: ep,
+				APIKey:  os.Getenv("LOCAL_ENDPOINT_API_KEY"),
+			})
+		}
+	}
+	var first models.ModelID
+	for _, ep := range cfg.LocalEndpoints {
+		if ep.Disabled || ep.BaseURL == "" {
+			continue
+		}
+		if n, id := models.RegisterLocalEndpoint(ep.Name, ep.BaseURL, ep.APIKey); n > 0 && first == "" {
+			first = id
+		}
+	}
+	// Default the agents to a local model only if nothing else set one.
+	if first != "" {
+		if cfg.Agents == nil {
+			cfg.Agents = make(map[AgentName]Agent)
+		}
+		for _, name := range []AgentName{AgentCoder, AgentSummarizer, AgentTask, AgentTitle} {
+			if cfg.Agents[name].Model == "" {
+				a := cfg.Agents[name]
+				a.Model = first
+				cfg.Agents[name] = a
+			}
+		}
+	}
+}
+
+// UpsertProviderKey stores/updates a provider's API key (enabling it) and
+// persists it to the config file. Used by the /connect dialog.
+func UpsertProviderKey(provider models.ModelProvider, apiKey string) error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	set := func(c *Config) {
+		if c.Providers == nil {
+			c.Providers = make(map[models.ModelProvider]Provider)
+		}
+		p := c.Providers[provider]
+		p.APIKey = apiKey
+		p.Disabled = false
+		c.Providers[provider] = p
+	}
+	set(cfg)
+	return updateCfgFile(set)
+}
+
+// SetProviderDisabled toggles a keyed provider on/off and persists it.
+func SetProviderDisabled(provider models.ModelProvider, disabled bool) error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	set := func(c *Config) {
+		if c.Providers == nil {
+			c.Providers = make(map[models.ModelProvider]Provider)
+		}
+		p := c.Providers[provider]
+		p.Disabled = disabled
+		c.Providers[provider] = p
+	}
+	set(cfg)
+	return updateCfgFile(set)
+}
+
+// UpsertLocalEndpoint adds or updates a local endpoint (matched by Name) and
+// persists it. Used by the /connect dialog.
+func UpsertLocalEndpoint(ep LocalEndpoint) error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	apply := func(list []LocalEndpoint) []LocalEndpoint {
+		for i := range list {
+			if list[i].Name == ep.Name {
+				list[i] = ep
+				return list
+			}
+		}
+		return append(list, ep)
+	}
+	cfg.LocalEndpoints = apply(cfg.LocalEndpoints)
+	return updateCfgFile(func(c *Config) { c.LocalEndpoints = apply(c.LocalEndpoints) })
+}
+
+// SetLocalEndpointDisabled toggles a local endpoint on/off and persists it.
+func SetLocalEndpointDisabled(name string, disabled bool) error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	apply := func(list []LocalEndpoint) []LocalEndpoint {
+		for i := range list {
+			if list[i].Name == name {
+				list[i].Disabled = disabled
+			}
+		}
+		return list
+	}
+	cfg.LocalEndpoints = apply(cfg.LocalEndpoints)
+	return updateCfgFile(func(c *Config) { c.LocalEndpoints = apply(c.LocalEndpoints) })
 }
 
 // Get returns the current configuration.

@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"unicode"
 
 	"github.com/opencode-ai/opencode/internal/logging"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -21,43 +19,86 @@ const (
 	lmStudioBetaModelsPath = "api/v0/models"
 )
 
-func init() {
-	if endpoint := os.Getenv("LOCAL_ENDPOINT"); endpoint != "" {
-		localEndpoint, err := url.Parse(endpoint)
-		if err != nil {
-			logging.Debug("Failed to parse local endpoint",
-				"error", err,
-				"endpoint", endpoint,
-			)
-			return
-		}
+// GORILLA OVERRIDE: multiple OpenAI-compatible endpoints (NIM, Ollama, Kilo,
+// LM Studio, ...) can be registered and coexist. Each model routes to the
+// endpoint it came from via its own baseURL + apiKey, recorded here.
+type localRouteInfo struct {
+	BaseURL string
+	APIKey  string
+}
 
-		load := func(url *url.URL, path string) []localModel {
-			url.Path = path
-			return listLocalModels(url.String())
-		}
+var localRoute = map[ModelID]localRouteInfo{}
 
-		models := load(localEndpoint, lmStudioBetaModelsPath)
+// LocalRouteFor returns the endpoint baseURL + apiKey a given local model
+// should be reached with. ok is false for non-local / unknown models.
+func LocalRouteFor(id ModelID) (baseURL, apiKey string, ok bool) {
+	r, ok := localRoute[id]
+	return r.BaseURL, r.APIKey, ok
+}
 
-		if len(models) == 0 {
-			models = load(localEndpoint, localModelsPath)
-		}
-
-		if len(models) == 0 {
-			logging.Debug("No local models found",
-				"endpoint", endpoint,
-			)
-			return
-		}
-
-		loadLocalModels(models)
-
-		// GORILLA OVERRIDE: chat completions must authenticate with the
-		// real endpoint key (NVIDIA NIM etc.), not the hardcoded "dummy".
-		viper.SetDefault("providers.local.apiKey",
-			cmp.Or(os.Getenv("LOCAL_ENDPOINT_API_KEY"), "dummy"))
-		ProviderPopularity[ProviderLocal] = 0
+// RegisterLocalEndpoint fetches an OpenAI-compatible endpoint's model list and
+// registers each model into SupportedModels, routing every one to this
+// endpoint's baseURL + apiKey. Returns how many were discovered and the first
+// registered model id. IDs stay flat ("local.<rawID>") so existing config
+// references keep resolving; only a cross-endpoint id collision is namespaced
+// as "local.<name>/<rawID>". Safe to call at runtime (e.g. from /connect).
+func RegisterLocalEndpoint(name, baseURL, apiKey string) (int, ModelID) {
+	raw := fetchLocalModels(baseURL, apiKey)
+	if len(raw) == 0 {
+		logging.Debug("No local models found", "endpoint", baseURL)
+		return 0, ""
 	}
+	ProviderPopularity[ProviderLocal] = 0
+	var first ModelID
+	n := 0
+	for _, m := range raw {
+		model := convertLocalModel(m)
+		if existing, dup := SupportedModels[model.ID]; dup {
+			if r, routed := localRoute[model.ID]; routed && r.BaseURL != baseURL {
+				// same model id from a different endpoint -> namespace newcomer
+				model.ID = ModelID("local." + name + "/" + m.ID)
+			}
+			_ = existing
+		}
+		SupportedModels[model.ID] = model
+		localRoute[model.ID] = localRouteInfo{BaseURL: baseURL, APIKey: apiKey}
+		if first == "" {
+			first = model.ID
+		}
+		n++
+	}
+	return n, first
+}
+
+// UnregisterLocalEndpoint drops every model routed to baseURL (used when a
+// connection is disabled/removed so its models vanish from the picker).
+func UnregisterLocalEndpoint(baseURL string) {
+	for id, r := range localRoute {
+		if r.BaseURL == baseURL {
+			delete(localRoute, id)
+			delete(SupportedModels, id)
+		}
+	}
+}
+
+// fetchLocalModels tries the LM Studio beta path first, then the standard
+// OpenAI /v1/models path, against baseURL (authenticating with apiKey).
+func fetchLocalModels(baseURL, apiKey string) []localModel {
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		logging.Debug("Failed to parse local endpoint", "error", err, "endpoint", baseURL)
+		return nil
+	}
+	try := func(path string) []localModel {
+		u := *base
+		u.Path = path
+		return listLocalModels(u.String(), apiKey)
+	}
+	models := try(lmStudioBetaModelsPath)
+	if len(models) == 0 {
+		models = try(localModelsPath)
+	}
+	return models
 }
 
 type localModelList struct {
@@ -77,7 +118,7 @@ type localModel struct {
 	LoadedContextLength int64  `json:"loaded_context_length"`
 }
 
-func listLocalModels(modelsEndpoint string) []localModel {
+func listLocalModels(modelsEndpoint, apiKey string) []localModel {
 	req, err := http.NewRequest(http.MethodGet, modelsEndpoint, nil)
 	if err != nil {
 		logging.Debug("Failed to build local models request",
@@ -89,8 +130,8 @@ func listLocalModels(modelsEndpoint string) []localModel {
 	// GORILLA OVERRIDE: allow authenticated OpenAI-compatible endpoints
 	// (e.g. NVIDIA NIM) to act as the "local" provider — the original
 	// unauthenticated http.Get gets 401 from any keyed endpoint.
-	if key := os.Getenv("LOCAL_ENDPOINT_API_KEY"); key != "" {
-		req.Header.Set("Authorization", "Bearer "+key)
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
 	}
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -140,20 +181,6 @@ func listLocalModels(modelsEndpoint string) []localModel {
 	return supportedModels
 }
 
-func loadLocalModels(models []localModel) {
-	for i, m := range models {
-		model := convertLocalModel(m)
-		SupportedModels[model.ID] = model
-
-		if i == 0 || m.State == "loaded" {
-			viper.SetDefault("agents.coder.model", model.ID)
-			viper.SetDefault("agents.summarizer.model", model.ID)
-			viper.SetDefault("agents.task.model", model.ID)
-			viper.SetDefault("agents.title.model", model.ID)
-		}
-	}
-}
-
 func convertLocalModel(model localModel) Model {
 	// GORILLA OVERRIDE: enrich discovered models with bundled metadata
 	// (curated name, capability description, real context window, pricing) so a
@@ -188,8 +215,8 @@ func convertLocalModel(model localModel) Model {
 		// bundled metadata, then a conservative 32K floor. 4096 (the
 		// original) crippled endpoints that report nothing (Ollama
 		// /v1/models, NVIDIA NIM).
-		ContextWindow:       ctx,
-		DefaultMaxTokens:    min(ctx/2, 8192),
+		ContextWindow:    ctx,
+		DefaultMaxTokens: min(ctx/2, 8192),
 		// GORILLA OVERRIDE: local models must not be assumed reasoning-capable.
 		// CanReason=true made the OpenAI-compat client send reasoning_effort,
 		// which Ollama (2026) rejects with 400 "does not support thinking"

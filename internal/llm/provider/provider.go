@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
@@ -169,8 +168,11 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 			client:  newOpenAIClient(clientOptions),
 		}, nil
 	case models.ProviderLocal:
+		// GORILLA OVERRIDE: route each local model to the endpoint it was
+		// discovered from (NIM, Ollama, ...), not a single shared env var.
+		baseURL, _, _ := models.LocalRouteFor(clientOptions.model.ID)
 		clientOptions.openaiOptions = append(clientOptions.openaiOptions,
-			WithOpenAIBaseURL(os.Getenv("LOCAL_ENDPOINT")),
+			WithOpenAIBaseURL(baseURL),
 		)
 		return &baseProvider[OpenAIClient]{
 			options: clientOptions,
