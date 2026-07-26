@@ -170,6 +170,9 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.attachments = append(m.attachments, msg.Attachment)
 	case tea.KeyMsg:
+		if msg.Type == tea.KeyRelease {
+			return m, nil
+		}
 		if key.Matches(msg, DeleteKeyMaps.AttachmentDeleteMode) {
 			m.deleteMode = true
 			return m, nil

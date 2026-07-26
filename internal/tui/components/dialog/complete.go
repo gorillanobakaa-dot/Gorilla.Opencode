@@ -137,6 +137,9 @@ func (c *completionDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if msg.Type == tea.KeyRelease {
+			return c, nil
+		}
 		if c.pseudoSearchTextArea.Focused() {
 
 			if !key.Matches(msg, completionDialogKeys.Complete) {
