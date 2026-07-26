@@ -26,6 +26,12 @@ type splitPaneLayout struct {
 	ratio         float64
 	verticalRatio float64
 
+	// Resolved panel widths from the last SetSize, so View() can clamp each
+	// column to exactly its allotment (a child that renders wider/taller than
+	// allotted would otherwise shift or clip its neighbour).
+	leftWidth  int
+	rightWidth int
+
 	rightPanel  Container
 	leftPanel   Container
 	bottomPanel Container
@@ -102,11 +108,28 @@ func (s *splitPaneLayout) View() string {
 		}
 	}
 
+	// Clamp each column to EXACTLY its allotted box before joining. A child that
+	// renders wider or taller than allotted (e.g. a growing textarea) would
+	// otherwise shift its neighbour sideways and get clipped by the outer
+	// Width(), leaving unpainted gaps. MaxWidth/MaxHeight make that impossible.
+	clamp := func(v string, w, h int) string {
+		if w <= 0 || h <= 0 {
+			return v
+		}
+		return lipgloss.NewStyle().
+			Width(w).Height(h).
+			MaxWidth(w).MaxHeight(h).
+			Render(v)
+	}
+
 	var finalView string
 	if s.rightPanel != nil {
 		rightView := s.rightPanel.View()
 		if leftColumn != "" {
-			finalView = lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, rightView)
+			finalView = lipgloss.JoinHorizontal(lipgloss.Top,
+				clamp(leftColumn, s.leftWidth, s.height),
+				clamp(rightView, s.rightWidth, s.height),
+			)
 		} else {
 			finalView = rightView
 		}
@@ -148,7 +171,7 @@ func (s *splitPaneLayout) SetSize(width, height int) tea.Cmd {
 		// GORILLA OVERRIDE: the sidebar (cwd/session/LSP/modified files) needs
 		// only a modest width; a fixed 30% share wastes a lot of columns on a
 		// wide terminal. Cap it so the extra width goes to the chat instead.
-		const maxRightPanelWidth = 42
+		const maxRightPanelWidth = 35
 		if rightWidth > maxRightPanelWidth {
 			rightWidth = maxRightPanelWidth
 			leftWidth = width - rightWidth
@@ -167,6 +190,7 @@ func (s *splitPaneLayout) SetSize(width, height int) tea.Cmd {
 	if s.rightPanel != nil {
 		bottomWidth = leftWidth
 	}
+	s.leftWidth, s.rightWidth = leftWidth, rightWidth
 
 	var cmds []tea.Cmd
 	if s.leftPanel != nil {

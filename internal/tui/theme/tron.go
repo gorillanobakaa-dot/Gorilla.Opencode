@@ -15,7 +15,6 @@ func NewTronTheme() *TronTheme {
 	// Tron color palette
 	// Inspired by the Tron movie's neon aesthetic
 	darkBackground := "#0c141f"
-	darkCurrentLine := "#1a2633"
 	darkSelection := "#1a2633"
 	darkForeground := "#caf0ff"
 	darkComment := "#4d6b87"
@@ -99,7 +98,7 @@ func NewTronTheme() *TronTheme {
 		Light: lightBackground,
 	}
 	theme.BackgroundSecondaryColor = lipgloss.AdaptiveColor{
-		Dark:  darkCurrentLine,
+		Dark:  "#161f28", // GORILLA: distinct sidebar-panel background
 		Light: lightCurrentLine,
 	}
 	theme.BackgroundDarkerColor = lipgloss.AdaptiveColor{
