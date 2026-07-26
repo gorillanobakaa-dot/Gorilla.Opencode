@@ -27,14 +27,14 @@ import (
 )
 
 type keyMap struct {
-	Logs          key.Binding
-	Quit          key.Binding
-	Help          key.Binding
-	SwitchSession key.Binding
-	Commands      key.Binding
-	Filepicker    key.Binding
-	Models        key.Binding
-	SwitchTheme   key.Binding
+	Logs            key.Binding
+	Quit            key.Binding
+	Help            key.Binding
+	SwitchSession   key.Binding
+	Commands        key.Binding
+	Filepicker      key.Binding
+	Models          key.Binding
+	SwitchTheme     key.Binding
 	ToggleSelection key.Binding
 }
 
@@ -140,6 +140,10 @@ type appModel struct {
 	showTasksDialog bool
 	tasksDialog     dialog.TasksDialog
 
+	// GORILLA OVERRIDE: provider connection manager (/connect)
+	showConnectDialog bool
+	connectDialog     dialog.ConnectDialog
+
 	showInitDialog bool
 	initDialog     dialog.InitDialogCmp
 
@@ -172,6 +176,8 @@ func (a appModel) Init() tea.Cmd {
 	cmd = a.commandDialog.Init()
 	cmds = append(cmds, cmd)
 	cmd = a.modelDialog.Init()
+	cmds = append(cmds, cmd)
+	cmd = a.connectDialog.Init()
 	cmds = append(cmds, cmd)
 	cmd = a.initDialog.Init()
 	cmds = append(cmds, cmd)
@@ -261,6 +267,10 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		modelModel, modelSizeCmd := a.modelDialog.Update(msg)
 		a.modelDialog = modelModel.(dialog.ModelDialog)
 		cmds = append(cmds, modelSizeCmd)
+
+		connectModel, connectSizeCmd := a.connectDialog.Update(msg)
+		a.connectDialog = connectModel.(dialog.ConnectDialog)
+		cmds = append(cmds, connectSizeCmd)
 
 		a.initDialog.SetSize(msg.Width, msg.Height)
 
@@ -406,6 +416,18 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.showModelDialog = false
 		return a, nil
 
+	case dialog.CloseConnectDialogMsg:
+		a.showConnectDialog = false
+		return a, nil
+
+	case dialog.ConnectionChangedMsg:
+		// Connection was added/toggled; models are already live in the
+		// registry. Keep the dialog open so the user can add more.
+		return a, util.ReportInfo(msg.Info)
+
+	case dialog.RunGoogleLoginMsg:
+		return a, a.runLogin()
+
 	case dialog.ModelSelectedMsg:
 		a.showModelDialog = false
 
@@ -447,6 +469,10 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "model", "models":
 			a.modelDialog.Init()
 			a.showModelDialog = true
+			return a, nil
+		case "connect", "connections", "providers":
+			a.connectDialog.Init()
+			a.showConnectDialog = true
 			return a, nil
 		case "export":
 			return a, a.exportSession()
@@ -606,6 +632,9 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if a.showTasksDialog {
 				a.showTasksDialog = false
+			}
+			if a.showConnectDialog {
+				a.showConnectDialog = false
 			}
 			if a.showMultiArgumentsDialog {
 				a.showMultiArgumentsDialog = false
@@ -794,6 +823,15 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d, tasksCmd := a.tasksDialog.Update(msg)
 		a.tasksDialog = d.(dialog.TasksDialog)
 		cmds = append(cmds, tasksCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showConnectDialog {
+		d, connectCmd := a.connectDialog.Update(msg)
+		a.connectDialog = d.(dialog.ConnectDialog)
+		cmds = append(cmds, connectCmd)
 		if _, ok := msg.(tea.KeyMsg); ok {
 			return a, tea.Batch(cmds...)
 		}
@@ -1045,6 +1083,21 @@ func (a appModel) View() string {
 		)
 	}
 
+	if a.showConnectDialog {
+		overlay := a.connectDialog.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(
+			col,
+			row,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
 	if a.showCommandDialog {
 		overlay := a.commandDialog.View()
 		row := lipgloss.Height(appView) / 2
@@ -1115,6 +1168,7 @@ func New(app *app.App) tea.Model {
 		sessionDialog: dialog.NewSessionDialogCmp(),
 		commandDialog: dialog.NewCommandDialogCmp(),
 		modelDialog:   dialog.NewModelDialogCmp(),
+		connectDialog: dialog.NewConnectDialogCmp(),
 		loadoutDialog: dialog.NewLoadoutDialogCmp(),
 		tasksDialog:   dialog.NewTasksDialogCmp(),
 		permissions:   dialog.NewPermissionDialogCmp(),

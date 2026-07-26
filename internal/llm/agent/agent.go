@@ -766,19 +766,27 @@ func createAgentProvider(agentName config.AgentName) (provider.Provider, error) 
 		return nil, fmt.Errorf("model %s not supported", agentConfig.Model)
 	}
 
-	providerCfg, ok := cfg.Providers[model.Provider]
-	if !ok {
-		return nil, fmt.Errorf("provider %s not supported", model.Provider)
-	}
-	if providerCfg.Disabled {
-		return nil, fmt.Errorf("provider %s is not enabled", model.Provider)
+	// GORILLA OVERRIDE: local models don't use a single providers.local key —
+	// each routes to its own endpoint with that endpoint's key (multi-endpoint).
+	var apiKey string
+	if model.Provider == models.ProviderLocal {
+		_, apiKey, _ = models.LocalRouteFor(model.ID)
+	} else {
+		providerCfg, ok := cfg.Providers[model.Provider]
+		if !ok {
+			return nil, fmt.Errorf("provider %s not supported", model.Provider)
+		}
+		if providerCfg.Disabled {
+			return nil, fmt.Errorf("provider %s is not enabled", model.Provider)
+		}
+		apiKey = providerCfg.APIKey
 	}
 	maxTokens := model.DefaultMaxTokens
 	if agentConfig.MaxTokens > 0 {
 		maxTokens = agentConfig.MaxTokens
 	}
 	opts := []provider.ProviderClientOption{
-		provider.WithAPIKey(providerCfg.APIKey),
+		provider.WithAPIKey(apiKey),
 		provider.WithModel(model),
 		provider.WithSystemMessage(prompt.GetAgentPrompt(agentName, model.Provider)),
 		provider.WithMaxTokens(maxTokens),
