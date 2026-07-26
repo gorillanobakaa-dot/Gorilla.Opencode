@@ -168,6 +168,12 @@ func Load(workingDir string, debug bool) (*Config, error) {
 		return cfg, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// GORILLA OVERRIDE: an empty apiKey in config.json must not shadow a key
+	// present in the environment. The /connect dialog can persist empty-key
+	// provider entries when toggling enable/disable; without this, that empty
+	// value would disable a provider whose real key lives in the env file.
+	backfillProviderKeysFromEnv()
+
 	applyDefaultValues()
 
 	// GORILLA OVERRIDE: register every configured OpenAI-compatible local
@@ -700,6 +706,35 @@ func validateAgent(cfg *Config, name AgentName, agent Agent) error {
 }
 
 // Validate checks if the configuration is valid and applies defaults where needed.
+// backfillProviderKeysFromEnv fills any provider whose config apiKey is empty
+// with the matching environment variable, so an explicit "" in config.json
+// does not shadow an env-provided key (which would wrongly disable it).
+func backfillProviderKeysFromEnv() {
+	if cfg.Providers == nil {
+		return
+	}
+	envFor := map[models.ModelProvider]string{
+		models.ProviderAnthropic:  "ANTHROPIC_API_KEY",
+		models.ProviderOpenAI:     "OPENAI_API_KEY",
+		models.ProviderGemini:     "GEMINI_API_KEY",
+		models.ProviderGROQ:       "GROQ_API_KEY",
+		models.ProviderCerebras:   "CEREBRAS_API_KEY",
+		models.ProviderOpenRouter: "OPENROUTER_API_KEY",
+		models.ProviderXAI:        "XAI_API_KEY",
+		models.ProviderAzure:      "AZURE_OPENAI_API_KEY",
+	}
+	for p, env := range envFor {
+		pc, ok := cfg.Providers[p]
+		if !ok || pc.APIKey != "" {
+			continue
+		}
+		if v := os.Getenv(env); v != "" {
+			pc.APIKey = v
+			cfg.Providers[p] = pc
+		}
+	}
+}
+
 func Validate() error {
 	if cfg == nil {
 		return fmt.Errorf("config not loaded")
