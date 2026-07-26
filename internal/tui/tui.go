@@ -663,7 +663,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			fmt.Print("\x1b[?1000h\x1b[?1002h\x1b[?1006h")
 			return a, util.ReportInfo("Selection mode DISABLED: TUI mouse scrolling active")
-		case key.Matches(msg, returnKey) || key.Matches(msg):
+		case key.Matches(msg, returnKey) || key.Matches(msg, logsKeyReturnKey):
 			if msg.String() == quitKey {
 				if a.currentPage == page.LogsPage {
 					return a, a.moveToPage(page.ChatPage)
