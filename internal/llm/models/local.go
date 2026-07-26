@@ -156,13 +156,14 @@ func loadLocalModels(models []localModel) {
 
 func convertLocalModel(model localModel) Model {
 	// GORILLA OVERRIDE: enrich discovered models with bundled metadata
-	// (curated name, capability description, real context window) so a
+	// (curated name, capability description, real context window, pricing) so a
 	// user facing 100+ NVIDIA NIM models can tell them apart. Falls
 	// back to the auto-generated name when a model isn't in the bundle.
 	name := friendlyModelName(model.ID)
 	description := ""
 	var metaCtx int64
 	rank := 0
+	var costIn, costInCached, costOut, costOutCached float64
 	if meta, ok := lookupModelMeta(model.ID); ok {
 		if meta.Name != "" {
 			name = meta.Name
@@ -170,6 +171,10 @@ func convertLocalModel(model localModel) Model {
 		description = meta.Description
 		metaCtx = meta.ContextWindow
 		rank = meta.Rank
+		costIn = meta.CostIn
+		costInCached = meta.CostInCached
+		costOut = meta.CostOut
+		costOutCached = meta.CostOutCached
 	}
 	ctx := cmp.Or(model.LoadedContextLength, metaCtx, 32768)
 	return Model{
@@ -183,14 +188,20 @@ func convertLocalModel(model localModel) Model {
 		// bundled metadata, then a conservative 32K floor. 4096 (the
 		// original) crippled endpoints that report nothing (Ollama
 		// /v1/models, NVIDIA NIM).
-		ContextWindow:    ctx,
-		DefaultMaxTokens: min(ctx/2, 8192),
+		ContextWindow:       ctx,
+		DefaultMaxTokens:    min(ctx/2, 8192),
 		// GORILLA OVERRIDE: local models must not be assumed reasoning-capable.
 		// CanReason=true made the OpenAI-compat client send reasoning_effort,
 		// which Ollama (2026) rejects with 400 "does not support thinking"
 		// for non-thinking models like qwen2.5-coder.
 		CanReason:           false,
 		SupportsAttachments: true,
+		// GORILLA OVERRIDE: copy token pricing from curated metadata
+		// so the cost meter moves for NIM/Ollama/LM Studio models.
+		CostPer1MIn:        costIn,
+		CostPer1MOut:       costOut,
+		CostPer1MInCached:  costInCached,
+		CostPer1MOutCached: costOutCached,
 	}
 }
 
