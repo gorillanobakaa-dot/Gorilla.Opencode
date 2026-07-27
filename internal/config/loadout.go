@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/opencode-ai/opencode/internal/llm/models"
@@ -256,12 +257,82 @@ func LoadoutEnabled(id string) bool {
 }
 
 // ToggleLoadout flips a component and persists.
+//
+// GORILLA OVERRIDE: reads the CURRENT value the way LoadoutEnabled does, where
+// an absent key means enabled.
+//
+// The old `loadoutState[id] = !loadoutState[id]` took the zero value for a
+// missing key — false — and flipped it to true. But LoadoutEnabled reports a
+// missing key as ENABLED, so for any component with no saved entry the first
+// press set it from "on" to on: a toggle that visibly did nothing. That is every
+// component registered after the state was first loaded, which includes the
+// language servers, since those rows come from the config at Load time.
 func ToggleLoadout(id string) {
 	initLoadout()
 	loadoutMu.Lock()
-	loadoutState[id] = !loadoutState[id]
+	cur, ok := loadoutState[id]
+	if !ok {
+		cur = true
+	}
+	loadoutState[id] = !cur
 	loadoutMu.Unlock()
 	saveLoadout()
+}
+
+// SetAllLSPs switches every registered language server on or off at once.
+// Returns how many rows changed.
+//
+// GORILLA OVERRIDE: with nine servers configured, turning them all off meant
+// nine separate toggles, and the granular control is only pleasant once there is
+// a bulk switch beside it. Nothing else is touched — the prompt blocks and tool
+// rows keep their settings, because "no language servers" is a common working
+// mode and "no tools" is not.
+func SetAllLSPs(enabled bool) int {
+	initLoadout()
+	loadoutMu.Lock()
+	changed := 0
+	for _, c := range LoadoutComponents {
+		if !strings.HasPrefix(c.ID, "lsp.") {
+			continue
+		}
+		// An ABSENT key means enabled — the same rule LoadoutEnabled applies, so
+		// that a component added after the state was loaded is never silently
+		// dropped. Comparing the raw map value instead reads absent as false and
+		// skips exactly those rows: a newly configured language server would be
+		// left running by "switch them all off".
+		cur, ok := loadoutState[c.ID]
+		if !ok {
+			cur = true
+		}
+		if cur != enabled {
+			loadoutState[c.ID] = enabled
+			changed++
+		}
+	}
+	loadoutMu.Unlock()
+	if changed > 0 {
+		saveLoadout()
+	}
+	return changed
+}
+
+// LSPLoadoutCounts reports how many language-server rows are on and off, so the
+// UI can label a bulk switch with what it will actually do.
+func LSPLoadoutCounts() (on, off int) {
+	initLoadout()
+	loadoutMu.RLock()
+	defer loadoutMu.RUnlock()
+	for _, c := range LoadoutComponents {
+		if !strings.HasPrefix(c.ID, "lsp.") {
+			continue
+		}
+		if v, ok := loadoutState[c.ID]; !ok || v {
+			on++
+		} else {
+			off++
+		}
+	}
+	return on, off
 }
 
 // ResetLoadout restores every component to its shipped default.

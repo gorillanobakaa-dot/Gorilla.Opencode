@@ -69,12 +69,24 @@ func lspsConfigured(width int, base lipgloss.Style) string {
 		Bold(true).
 		Render(title)
 
-	// Get LSP names and sort them for consistent ordering
-	var lspNames []string
+	// GORILLA OVERRIDE: list only the servers actually RUNNING, and say how many
+	// are switched off.
+	//
+	// This iterated cfg.LSP raw, so a server disabled in /context still appeared
+	// here exactly as before — which reads as "your toggle did nothing". It did
+	// work (with all nine off, zero language-server processes spawn; with them on,
+	// clangd, gopls and five node servers do), but a panel that keeps listing them
+	// is indistinguishable from a broken switch.
+	var lspNames, disabled []string
 	for name := range cfg.LSP {
-		lspNames = append(lspNames, name)
+		if config.LSPEnabled(name) {
+			lspNames = append(lspNames, name)
+		} else {
+			disabled = append(disabled, name)
+		}
 	}
 	sort.Strings(lspNames)
+	sort.Strings(disabled)
 
 	var lspViews []string
 	for _, name := range lspNames {
@@ -101,6 +113,19 @@ func lspsConfigured(width int, base lipgloss.Style) string {
 					),
 				),
 		)
+	}
+
+	// Say what is off, so the panel is a complete picture rather than a filtered
+	// one. Silence here would make a fully-disabled setup look unconfigured.
+	if len(disabled) > 0 {
+		note := fmt.Sprintf("%d off (/context to change)", len(disabled))
+		if len(lspNames) == 0 {
+			note = fmt.Sprintf("all %d off (/context to change)", len(disabled))
+		}
+		lspViews = append(lspViews, baseStyle.
+			Width(width).
+			Foreground(t.TextMuted()).
+			Render(ansi.Truncate(note, width, "…")))
 	}
 
 	return baseStyle.

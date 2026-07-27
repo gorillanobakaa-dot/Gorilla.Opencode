@@ -55,6 +55,8 @@ func (m *loadoutDialogCmp) width() int {
 
 type loadoutKeyMap struct {
 	Up, Down, Left, Right, Toggle, Reset, LowBW, RateDown, RateUp, LeashDown, LeashUp, Escape key.Binding
+	// AllLSP is the bulk language-server switch. GORILLA OVERRIDE.
+	AllLSP key.Binding
 }
 
 var loadoutKeys = loadoutKeyMap{
@@ -69,6 +71,10 @@ var loadoutKeys = loadoutKeyMap{
 	Reset:  key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reset defaults")),
 	// GORILLA OVERRIDE: one-key low-bandwidth profile (optional tools off).
 	LowBW: key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "low-bandwidth preset")),
+	// GORILLA OVERRIDE: bulk switch for the language servers. Nine configured
+	// servers meant nine toggles to get to a quiet session; granular control is
+	// only usable with an "all" beside it.
+	AllLSP: key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "all LSPs on/off")),
 	// Legacy power-user shortcuts (still work regardless of what's selected).
 	RateDown:  key.NewBinding(key.WithKeys("-", "_")),
 	RateUp:    key.NewBinding(key.WithKeys("+", "=")),
@@ -119,6 +125,23 @@ func (m *loadoutDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, loadoutKeys.Reset):
 			config.ResetLoadout()
 			return m, util.CmdHandler(LoadoutChangedMsg{})
+		case key.Matches(msg, loadoutKeys.AllLSP):
+			// Turn them all off unless they are already all off, in which case
+			// this is the way back on — one key, both directions.
+			on, off := config.LSPLoadoutCounts()
+			if on+off == 0 {
+				return m, util.ReportInfo("No language servers are configured")
+			}
+			enable := on == 0
+			n := config.SetAllLSPs(enable)
+			word := "off"
+			if enable {
+				word = "on"
+			}
+			return m, tea.Batch(
+				util.CmdHandler(LoadoutChangedMsg{}),
+				util.ReportInfo(fmt.Sprintf("Switched %d language server(s) %s — applies at next launch", n, word)),
+			)
 		case key.Matches(msg, loadoutKeys.LowBW):
 			n := config.ApplyLowBandwidthLoadout()
 			return m, tea.Batch(
@@ -219,7 +242,7 @@ func (m *loadoutDialogCmp) View() string {
 	}
 
 	help := base.Foreground(t.TextMuted()).Width(w).
-		Render("↑↓ pick · ←→ change dial · space toggle feature · l low-bw · r reset · esc close   ⚠ = disabling cripples the agent")
+		Render("↑↓ pick · ←→ dial · space toggle · L all LSPs · l low-bw · r reset · esc close   ⚠ = disabling cripples the agent")
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		header, sub, fixed, "",
