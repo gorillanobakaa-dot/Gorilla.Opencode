@@ -1,7 +1,7 @@
 {
   "project": "Gorilla OpenCode",
-  "version": "v0.1.38",
-  "previous": "v0.1.37",
+  "version": "v0.1.39-wip",
+  "previous": "v0.1.38",
   "target": "Debian 13 / amd64",
   "date": "2026-07-27"
 }
