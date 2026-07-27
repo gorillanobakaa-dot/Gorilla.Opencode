@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
@@ -59,8 +60,14 @@ type Service interface {
 	ReloadTools(newTools []tools.BaseTool)
 	// RebuildProvider recreates the provider so a fresh system prompt
 	// (which now honours the loadout's env/LSP toggles) takes effect
-	// without a restart. No-op while a request is in flight.
-	RebuildProvider()
+	// without a restart.
+	//
+	// Returns true when the rebuild had to be DEFERRED because a request is in
+	// flight. It is remembered and applied when the turn ends, so the caller
+	// must tell the user "after this turn" rather than implying it already
+	// happened. It previously returned nothing and silently dropped the
+	// request, which made a setting look applied when it was not.
+	RebuildProvider() (deferred bool)
 }
 
 type agent struct {
@@ -77,6 +84,10 @@ type agent struct {
 	summarizeProvider provider.Provider
 
 	activeRequests sync.Map
+
+	// GORILLA OVERRIDE: a provider rebuild requested while a turn is in flight
+	// is recorded here and applied when the turn ends, instead of being dropped.
+	pendingRebuild atomic.Bool
 }
 
 func NewAgent(
@@ -138,15 +149,45 @@ func (a *agent) ReloadTools(newTools []tools.BaseTool) {
 	a.toolsMu.Unlock()
 }
 
-// RebuildProvider recreates the provider so the system prompt is
-// re-rendered against the current loadout (env/LSP blocks). Skipped
-// while busy to avoid swapping the provider mid-request.
-func (a *agent) RebuildProvider() {
+// RebuildProvider recreates the provider so the system prompt is re-rendered
+// against the current loadout (env/LSP blocks). The provider must not be swapped
+// mid-request, so while busy the rebuild is REMEMBERED and applied when the turn
+// ends (see the drain in Run).
+//
+// GORILLA OVERRIDE: this used to `return` while busy and drop the request on the
+// floor, with no return value and no feedback. A /context toggle made during a
+// turn therefore reported a new token count and changed nothing — the exact
+// class of quiet dishonesty this fork exists to avoid. It now reports that it
+// deferred so the UI can say so.
+func (a *agent) RebuildProvider() (deferred bool) {
 	if a.IsBusy() {
-		return
+		a.pendingRebuild.Store(true)
+		return true
 	}
+	a.rebuildProviderNow()
+	return false
+}
+
+func (a *agent) rebuildProviderNow() {
 	if p, err := createAgentProvider(a.agentName); err == nil {
 		a.provider = p
+	} else {
+		logging.Error("failed to rebuild agent provider", "agent", a.agentName, "error", err)
+	}
+}
+
+// drainPendingRebuild applies a rebuild that was requested while a turn was in
+// flight. Called once a request finishes. It re-checks IsBusy because a
+// concurrent session may still be running, in which case the flag stays set and
+// the next completion picks it up.
+func (a *agent) drainPendingRebuild() {
+	if !a.pendingRebuild.Load() || a.IsBusy() {
+		return
+	}
+	// CompareAndSwap so two sessions finishing together rebuild once, not twice.
+	if a.pendingRebuild.CompareAndSwap(true, false) {
+		logging.Info("applying deferred provider rebuild", "agent", a.agentName)
+		a.rebuildProviderNow()
 	}
 }
 
@@ -265,6 +306,10 @@ func (a *agent) Run(ctx context.Context, sessionID string, content string, attac
 		logging.Debug("Request completed", "sessionID", sessionID)
 		a.activeRequests.Delete(sessionID)
 		cancel()
+		// Delete first, so IsBusy inside the drain sees this session as finished.
+		// This is the single point a request completes on both the success and
+		// the error path, which is why the drain belongs here.
+		a.drainPendingRebuild()
 		a.Publish(pubsub.CreatedEvent, result)
 		events <- result
 		close(events)
@@ -757,6 +802,14 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 
 func createAgentProvider(agentName config.AgentName) (provider.Provider, error) {
 	cfg := config.Get()
+	// GORILLA OVERRIDE: config.Get() returns nil until Load() has run, and
+	// cfg.Agents on a nil *Config panics. Production always loads first, so this
+	// was never hit in anger — but RebuildProvider now calls this from a deferred
+	// drain at the end of a turn, and a panic there would take down the request
+	// goroutine. An error is the right answer for "not configured yet".
+	if cfg == nil {
+		return nil, fmt.Errorf("config not loaded")
+	}
 	agentConfig, ok := cfg.Agents[agentName]
 	if !ok {
 		return nil, fmt.Errorf("agent %s not found", agentName)
