@@ -79,8 +79,18 @@ func getContextFromPaths() string {
 		return contextContent
 	}
 
+	// GORILLA OVERRIDE: read context files from EVERY workspace root, not just
+	// the primary one. This is what makes /add-dir mean anything — a root whose
+	// CLAUDE.md is never read is just a directory the agent was already able to
+	// open by absolute path.
 	cfg := config.Get()
-	contextContent = processContextPaths(cfg.WorkingDir, cfg.ContextPaths)
+	var parts []string
+	for _, root := range config.Roots() {
+		if s := processContextPaths(root, cfg.ContextPaths); s != "" {
+			parts = append(parts, s)
+		}
+	}
+	contextContent = strings.Join(parts, "\n")
 	contextLoaded = true
 	return contextContent
 }

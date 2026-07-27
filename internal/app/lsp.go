@@ -124,7 +124,22 @@ func (app *App) runWorkspaceWatcher(ctx context.Context, name string, workspaceW
 		app.restartLSPClient(ctx, name)
 	})
 
-	workspaceWatcher.WatchWorkspace(ctx, config.WorkingDirectory())
+	// GORILLA OVERRIDE: watch EVERY workspace root, not only the primary. An
+	// /add-dir root whose files are never watched gets no diagnostics on change,
+	// which is half the point of registering it.
+	//
+	// WatchWorkspace blocks for the life of the context, so extra roots each get
+	// their own goroutine and the primary keeps this one — preserving the
+	// "watcher stopped" signal that the caller's defer relies on.
+	roots := config.Roots()
+	for _, extra := range roots[1:] {
+		go func(path string) {
+			defer logging.RecoverPanic("LSP-watch-"+name+"-"+path, nil)
+			logging.Info("Watching additional workspace root", "client", name, "path", path)
+			workspaceWatcher.WatchWorkspace(ctx, path)
+		}(extra)
+	}
+	workspaceWatcher.WatchWorkspace(ctx, roots[0])
 	logging.Info("Workspace watcher stopped", "client", name)
 }
 

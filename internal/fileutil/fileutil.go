@@ -50,9 +50,34 @@ func GetRgCmd(globPattern string) *exec.Cmd {
 		}
 		rgArgs = append(rgArgs, "--glob", globPattern)
 	}
+	// GORILLA OVERRIDE: search EVERY workspace root, not just the process cwd.
+	// cmd.Dir = "." made ripgrep list only the primary root, so @-file completion
+	// could not see files in a directory added with /add-dir — the root was
+	// registered, its context loaded, its permissions scoped, and yet you still
+	// could not @-mention a file in it. Passing the roots as explicit search
+	// paths fixes that; ripgrep prints paths relative to each argument it was
+	// given, so absolute roots yield absolute results the tools can open.
+	if roots := workspaceRoots(); len(roots) > 0 {
+		rgArgs = append(rgArgs, roots...)
+	}
 	cmd := exec.Command(rgPath, rgArgs...)
 	cmd.Dir = "."
 	return cmd
+}
+
+// workspaceRoots is set by config at startup. fileutil cannot import config
+// (config is the higher layer), so the dependency is inverted with a hook —
+// keeping this package free of config knowledge while still honouring /add-dir.
+var workspaceRootsFn func() []string
+
+// SetWorkspaceRootsFn registers the accessor. Called once from config.Load.
+func SetWorkspaceRootsFn(fn func() []string) { workspaceRootsFn = fn }
+
+func workspaceRoots() []string {
+	if workspaceRootsFn == nil {
+		return nil
+	}
+	return workspaceRootsFn()
 }
 
 func GetFzfCmd(query string) *exec.Cmd {

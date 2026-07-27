@@ -14,6 +14,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/llm/prompt"
+	"github.com/opencode-ai/opencode/internal/llm/tools/shell"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/pubsub"
@@ -144,6 +145,10 @@ type appModel struct {
 	// GORILLA OVERRIDE: provider connection manager (/connect)
 	showConnectDialog bool
 	connectDialog     dialog.ConnectDialog
+
+	// GORILLA OVERRIDE: /add-dir and /cd — workspace roots.
+	showAddDirDialog bool
+	addDirDialog     dialog.AddDirDialog
 
 	showInitDialog bool
 	initDialog     dialog.InitDialogCmp
@@ -426,6 +431,30 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// registry. Keep the dialog open so the user can add more.
 		return a, util.ReportInfo(msg.Info)
 
+	case dialog.CloseAddDirDialogMsg:
+		a.showAddDirDialog = false
+		return a, nil
+
+	// GORILLA OVERRIDE: a root change must reach the MODEL, not just the config
+	// file. Three things have to happen or the control is a silent no-op:
+	//   1. the project-context cache is invalidated, so the new root's CLAUDE.md
+	//      is actually read (P1 exists precisely for this)
+	//   2. the provider is rebuilt so the env block re-renders with the new root
+	//      list (ReloadCoderTools, deferred if a turn is in flight — P4)
+	//   3. on a PRIMARY change, the persistent bash shell is torn down; it holds
+	//      its own cwd from spawn time and would otherwise keep running commands
+	//      in the previous directory while everything else believed it had moved
+	case dialog.RootsChangedMsg:
+		prompt.InvalidateContextCache()
+		if msg.PrimaryChanged {
+			shell.ResetPersistentShell(config.WorkingDirectory())
+		}
+		info := msg.Info
+		if a.app.ReloadCoderTools() {
+			info += " — takes effect after the current turn finishes"
+		}
+		return a, util.ReportInfo(info)
+
 	case dialog.RunGoogleLoginMsg:
 		return a, a.runLogin()
 
@@ -489,6 +518,15 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.connectDialog.Init()
 			a.showConnectDialog = true
 			return a, nil
+		// GORILLA OVERRIDE: /add-dir manages workspace roots; /cd opens the same
+		// dialog positioned to promote one. Adding a root does not grant access
+		// (there is no sandbox) — it loads that root's context files, scopes
+		// permissions to it, tells the model it exists, and watches it for
+		// diagnostics.
+		case "add-dir", "adddir", "dirs", "roots", "cd":
+			a.addDirDialog.Init()
+			a.showAddDirDialog = true
+			return a, nil
 		case "export":
 			return a, a.exportSession()
 		case "clear", "new":
@@ -514,7 +552,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// and clear the gemini-oauth provider from config.
 			return a, a.runLogout()
 		default:
-			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /provider, /login, /logout, /export, /clear, /context, /tasks)", msg.Name))
+			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /provider, /add-dir, /login, /logout, /export, /clear, /context, /tasks)", msg.Name))
 		}
 
 	case dialog.CloseLoadoutDialogMsg:
@@ -666,6 +704,9 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if a.showConnectDialog {
 				a.showConnectDialog = false
+			}
+			if a.showAddDirDialog {
+				a.showAddDirDialog = false
 			}
 			if a.showMultiArgumentsDialog {
 				a.showMultiArgumentsDialog = false
@@ -854,6 +895,15 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d, tasksCmd := a.tasksDialog.Update(msg)
 		a.tasksDialog = d.(dialog.TasksDialog)
 		cmds = append(cmds, tasksCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showAddDirDialog {
+		d, addDirCmd := a.addDirDialog.Update(msg)
+		a.addDirDialog = d.(dialog.AddDirDialog)
+		cmds = append(cmds, addDirCmd)
 		if _, ok := msg.(tea.KeyMsg); ok {
 			return a, tea.Batch(cmds...)
 		}
@@ -1114,6 +1164,15 @@ func (a appModel) View() string {
 		)
 	}
 
+	if a.showAddDirDialog {
+		overlay := a.addDirDialog.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+	}
+
 	if a.showConnectDialog {
 		overlay := a.connectDialog.View()
 		row := lipgloss.Height(appView) / 2
@@ -1200,6 +1259,7 @@ func New(app *app.App) tea.Model {
 		commandDialog: dialog.NewCommandDialogCmp(),
 		modelDialog:   dialog.NewModelDialogCmp(),
 		connectDialog: dialog.NewConnectDialogCmp(),
+		addDirDialog:  dialog.NewAddDirDialogCmp(),
 		loadoutDialog: dialog.NewLoadoutDialogCmp(),
 		tasksDialog:   dialog.NewTasksDialogCmp(),
 		permissions:   dialog.NewPermissionDialogCmp(),
