@@ -94,8 +94,13 @@ type ShellConfig struct {
 
 // Config is the main configuration structure for the application.
 type Config struct {
-	Data           Data                              `json:"data"`
-	WorkingDir     string                            `json:"wd,omitempty"`
+	Data       Data   `json:"data"`
+	WorkingDir string `json:"wd,omitempty"`
+	// GORILLA OVERRIDE: extra workspace roots added with /add-dir. WorkingDir
+	// stays the PRIMARY root — relative paths still resolve against it, so no
+	// tool call site changes. These extend context-file loading, permission
+	// scoping, the env block and LSP watching. See internal/config/roots.go.
+	AdditionalDirs []string                          `json:"additionalDirs,omitempty"`
 	MCPServers     map[string]MCPServer              `json:"mcpServers,omitempty"`
 	Providers      map[models.ModelProvider]Provider `json:"providers,omitempty"`
 	LocalEndpoints []LocalEndpoint                   `json:"localEndpoints,omitempty"`
