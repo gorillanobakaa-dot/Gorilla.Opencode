@@ -16,6 +16,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -294,4 +295,118 @@ func SetWorkingDir(dir string, keepOld bool) (string, error) {
 		return "", err
 	}
 	return clean, nil
+}
+
+// SetSkipWorkspacePrompt turns the startup workspace question off (or back on).
+// Also exposed as a row in /settings, because the standing rule here is that
+// anything added has to be switchable.
+func SetSkipWorkspacePrompt(skip bool) error {
+	set := func(c *Config) { c.SkipWorkspacePrompt = skip }
+	if cfg != nil {
+		set(cfg)
+	}
+	return updateCfgFile(set)
+}
+
+// PersistedWorkingDir returns the workspace root saved in config.json, or "" if
+// there is none, it no longer exists, or it is not a directory.
+//
+// Read BEFORE config.Load, because the caller has to decide what to hand Load as
+// the working directory and only the caller knows whether the user passed an
+// explicit -c/--cwd.
+//
+// GORILLA OVERRIDE — why this exists at all. config.json's "wd" was WRITE-ONLY.
+// updateCfgFile persists it through encoding/json (which honours the `json:"wd"`
+// tag), but Load reads config with viper.Unmarshal, and viper uses mapstructure
+// tags — WorkingDir has none, so viper looked for a key called "workingdir" and
+// never saw "wd". The value was saved on every /cd and silently ignored on every
+// launch.
+//
+// That matters far more than it sounds. The desktop entry runs
+// `gorilla-opencode launch` with no working directory, so an icon launch — which
+// is how essentially everyone starts the program — inherited $HOME. On a machine
+// holding a kernel tree and a browser tree that is over a million files in the
+// agent's discovery scope, every single time, and /cd fixed exactly one session
+// before forgetting.
+func PersistedWorkingDir() string {
+	return PeekStartupWorkspace().WorkingDir
+}
+
+// StartupWorkspace is what the launcher needs to know about the saved workspace
+// BEFORE config.Load runs.
+type StartupWorkspace struct {
+	// WorkingDir is the saved primary root, or "" if there is none or it no
+	// longer exists on disk.
+	WorkingDir string
+	// Recent are other saved roots, offered as one-keypress choices.
+	Recent []string
+	// Ask reports whether to show the startup workspace picker. Defaults to
+	// true when the key is absent, so a fresh install asks.
+	Ask bool
+}
+
+// PeekStartupWorkspace reads the saved workspace choice straight out of
+// config.json, before config.Load.
+//
+// It has to happen before Load because the working directory is not a
+// preference the program can adopt late: the context files it reads, the
+// permission scope it grants, the LSP roots it hands the language servers and
+// the directories @-completion walks are all fixed from it at startup. Choosing
+// after Load would mean re-doing all of that, and the LSP clients cannot
+// currently be re-rooted at all.
+//
+// GORILLA OVERRIDE — why any of this exists. config.json's "wd" was WRITE-ONLY.
+// updateCfgFile persists it through encoding/json, which honours the
+// `json:"wd"` tag, but Load reads config through viper.Unmarshal, and viper
+// keys off mapstructure tags — WorkingDir has none, so viper looked for
+// "workingdir" and never saw "wd". Every /cd saved the choice and every launch
+// ignored it.
+//
+// That is worse than it sounds, because of how the program is actually started.
+// The desktop entry is `Exec=gorilla-opencode launch` with no Path=, so an icon
+// click — which is how nearly everyone opens it — inherits $HOME. On a machine
+// holding a kernel tree and a browser tree, that is over a million files inside
+// the agent's reach on every launch, and a /cd bought exactly one session
+// before being forgotten.
+func PeekStartupWorkspace() StartupWorkspace {
+	out := StartupWorkspace{Ask: true}
+
+	data, err := os.ReadFile(GorillaConfigFile())
+	if err != nil {
+		return out
+	}
+	// Deliberately a minimal struct rather than the full Config: this runs
+	// before Load, and an unrelated malformed key must not stop us reading the
+	// workspace. A parse failure falls back to asking, which is safe.
+	var probe struct {
+		WD             string   `json:"wd"`
+		AdditionalDirs []string `json:"additionalDirs"`
+		// Stored INVERTED. A plain `ask` bool would need omitempty (every other
+		// field has it), and omitempty drops false — so turning the prompt OFF
+		// would write nothing and read back as ON. The negative default is the
+		// one that survives being omitted.
+		Skip bool `json:"skipWorkspacePrompt"`
+	}
+	if json.Unmarshal(data, &probe) != nil {
+		return out
+	}
+	out.Ask = !probe.Skip
+
+	// A saved root that has since been deleted or renamed must not strand the
+	// user in a directory that is not there; the caller falls back to the real
+	// cwd. Same for the recents list, which would otherwise offer dead paths.
+	if dir := strings.TrimSpace(probe.WD); dir != "" && isDir(dir) {
+		out.WorkingDir = dir
+	}
+	for _, d := range probe.AdditionalDirs {
+		if d = strings.TrimSpace(d); d != "" && d != out.WorkingDir && isDir(d) {
+			out.Recent = append(out.Recent, d)
+		}
+	}
+	return out
+}
+
+func isDir(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }

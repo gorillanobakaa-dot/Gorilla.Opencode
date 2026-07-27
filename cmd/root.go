@@ -17,10 +17,89 @@ import (
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/tui"
+	"github.com/opencode-ai/opencode/internal/tui/startup"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 	"github.com/opencode-ai/opencode/internal/version"
 	"github.com/spf13/cobra"
 )
+
+// resolveWorkspace decides which folder this session works in, and reports
+// whether the user asked not to be prompted again. An empty first return means
+// the user quit the picker and the launch must abort.
+//
+// GORILLA OVERRIDE: this whole step is new. The problem it solves is that the
+// desktop entry is `Exec=gorilla-opencode launch` with no Path=, so an icon
+// click — how nearly everyone starts the program — inherits $HOME. On a machine
+// holding a kernel tree and a browser tree, that puts over a million files
+// inside the agent's default reach before a word is typed, and the saved
+// workspace could not rescue it because config.json's "wd" was write-only
+// (see config.PeekStartupWorkspace).
+//
+// The precedence is deliberate:
+//  1. An explicit -c/--cwd always wins. The user was specific; do not
+//     second-guess them, and never interrupt a scripted invocation.
+//  2. Non-interactive runs (-p) never prompt — there is no one to answer. They
+//     fall back to the saved workspace, then to the real cwd.
+//  3. Otherwise ask, unless the user has turned the question off, in which case
+//     the saved workspace is used silently.
+func resolveWorkspace(flagCwd string, nonInteractive bool) (dir, alreadySaved string, remember bool, err error) {
+	saved := config.PeekStartupWorkspace()
+
+	if flagCwd != "" {
+		abs, err := startup.ResolveDir(flagCwd)
+		if err != nil {
+			return "", "", false, fmt.Errorf("--cwd: %v", err)
+		}
+		return abs, saved.WorkingDir, false, nil
+	}
+
+	realCwd, err := os.Getwd()
+	if err != nil {
+		return "", "", false, fmt.Errorf("failed to get current working directory: %v", err)
+	}
+
+	if nonInteractive || !saved.Ask || !interactiveTerminal() {
+		if saved.WorkingDir != "" {
+			return saved.WorkingDir, saved.WorkingDir, false, nil
+		}
+		return realCwd, saved.WorkingDir, false, nil
+	}
+
+	choice, err := startup.Ask(startup.Options{
+		LastUsed: saved.WorkingDir,
+		Cwd:      realCwd,
+		Recent:   saved.Recent,
+		Home:     homeDir(),
+	})
+	if err != nil {
+		// A picker that cannot run must not block the program. Fall back to what
+		// the non-interactive path would have done and say why.
+		fmt.Fprintf(os.Stderr, "could not show the workspace picker (%v); using %s\n", err, realCwd)
+		return realCwd, saved.WorkingDir, false, nil
+	}
+	if choice.Quit {
+		return "", saved.WorkingDir, false, nil
+	}
+	return choice.Dir, saved.WorkingDir, choice.Remember, nil
+}
+
+// interactiveTerminal reports whether there is a human at a terminal to answer.
+// Piped or redirected stdin means a script, and a prompt would hang it.
+func interactiveTerminal() bool {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
+}
+
+func homeDir() string {
+	h, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return h
+}
 
 var rootCmd = &cobra.Command{
 	Use:   appBinName,
@@ -75,22 +154,45 @@ understanding code directly from the terminal.`,
 			return fmt.Errorf("invalid format option: %s\n%s", outputFormat, format.GetHelpText())
 		}
 
-		if cwd != "" {
-			err := os.Chdir(cwd)
-			if err != nil {
-				return fmt.Errorf("failed to change directory: %v", err)
-			}
+		// GORILLA OVERRIDE: resolve the working folder BEFORE config.Load, because
+		// everything that follows is derived from it and cannot be re-pointed
+		// afterwards. See resolveWorkspace.
+		cwd, saved, remember, err := resolveWorkspace(cwd, prompt != "")
+		if err != nil {
+			return err
 		}
 		if cwd == "" {
-			c, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("failed to get current working directory: %v", err)
-			}
-			cwd = c
+			// The user quit the picker. Nothing has been started yet, so there is
+			// nothing to report — leaving silently is the correct outcome.
+			return nil
 		}
+		if err := os.Chdir(cwd); err != nil {
+			return fmt.Errorf("failed to change directory: %v", err)
+		}
+
 		cfg, err := config.Load(cwd, debug)
 		if err != nil {
 			return err
+		}
+
+		// Persist the choice only now that Load has succeeded, so a launch that
+		// dies on a bad config does not also rewrite the saved workspace.
+		//
+		// keepOld is FALSE deliberately. Picking a folder at startup means "work
+		// here", not "work here as well as wherever I was last time" — keeping
+		// the previous primary would add one root per launch, quietly growing the
+		// scope this whole feature exists to shrink. Roots added on purpose with
+		// /add-dir are not affected; SetWorkingDir only drops the old primary and
+		// any root that contains the new one.
+		if cwd != config.WorkingDirectory() || cwd != saved {
+			if _, err := config.SetWorkingDir(cwd, false); err != nil {
+				logging.Warn("could not save the working folder: %v", err)
+			}
+		}
+		if remember {
+			if err := config.SetSkipWorkspacePrompt(true); err != nil {
+				logging.Warn("could not save the don't-ask-again choice: %v", err)
+			}
 		}
 
 		// GORILLA OVERRIDE: fill the /settings theme row's options from the theme

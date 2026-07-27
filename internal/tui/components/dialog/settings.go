@@ -177,6 +177,15 @@ func (m *settingsDialogCmp) firstSelectable() int {
 	return 0
 }
 
+func (m *settingsDialogCmp) lastSelectable() int {
+	for i := len(m.rows) - 1; i >= 0; i-- {
+		if m.selectable(i) {
+			return i
+		}
+	}
+	return 0
+}
+
 // move steps to the next selectable row in the given direction, skipping headers
 // and pointer rows so navigation never lands somewhere inert.
 func (m *settingsDialogCmp) move(delta int) {
@@ -260,6 +269,26 @@ func (m *settingsDialogCmp) ensureVisible() {
 	if m.selectedIdx >= m.scrollTop+capacity {
 		m.scrollTop = m.selectedIdx - capacity + 1
 	}
+
+	// The rows after the last editable one — the "owned by other commands"
+	// pointers — are not selectable, and scrolling follows the selection, so
+	// once the registry outgrew the terminal height they became permanently
+	// unreachable: /settings claimed to be a complete inventory while hiding
+	// part of it. When the selection reaches the last editable row, scroll on to
+	// the end of the list.
+	if m.selectedIdx >= m.lastSelectable() {
+		maxTop := len(m.rows) - capacity
+		// Never so far that the selected row itself scrolls off the top:
+		// capacity is estimated at two lines per row, and the trailing pointers
+		// are one, so this bound can otherwise overshoot.
+		if maxTop > m.selectedIdx {
+			maxTop = m.selectedIdx
+		}
+		if maxTop > m.scrollTop {
+			m.scrollTop = maxTop
+		}
+	}
+
 	if m.scrollTop < 0 {
 		m.scrollTop = 0
 	}

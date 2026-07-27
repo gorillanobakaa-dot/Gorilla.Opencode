@@ -222,10 +222,25 @@ func TestSettingsShowsValueRangeAndDefault(t *testing.T) {
 	}
 
 	// The inventory pointers keep /settings complete without duplicating other
-	// commands' ownership.
+	// commands' ownership. They sit after the last row, so they are asserted as
+	// REACHABLE rather than visible on first paint: the dialog scrolls with the
+	// selection, and once the registry outgrew the terminal height, demanding
+	// they be on screen immediately would only ever be satisfied by shrinking
+	// the settings list.
+	bottom := joined
+	for i := 0; i < len(config.Settings)+len(config.ModelOwnedElsewhere)+10; i++ {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		if sm, ok := next.(SettingsDialog); ok {
+			m = sm
+		}
+		bottom = strings.Join(renderAt(t, m, 130, 60), "\n")
+		if strings.Contains(bottom, "/context") {
+			break
+		}
+	}
 	for _, want := range []string{"/model", "/connect", "/context"} {
-		if !strings.Contains(joined, want) {
-			t.Errorf("settings view does not point at %s for what it does not own:\n%s", want, joined)
+		if !strings.Contains(joined+bottom, want) {
+			t.Errorf("settings never points at %s for what it does not own, even scrolled to the end:\n%s", want, bottom)
 		}
 	}
 }

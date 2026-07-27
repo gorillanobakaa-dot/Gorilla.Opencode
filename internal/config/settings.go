@@ -422,6 +422,27 @@ var Settings = []Setting{
 		},
 	},
 	{
+		ID:     "askWorkspaceOnStartup",
+		Group:  GroupFiles,
+		Name:   "Ask which folder to work in at startup",
+		Layman: "Whether the program asks you to pick a working folder each time it starts.",
+		WhenOn: "you pick the folder on launch, so clicking the desktop icon does not scope the AI to your whole home folder",
+		// Stored inverted (SkipWorkspacePrompt) because omitempty drops a false
+		// and an "ask" bool could then never be saved as off. The row reads the
+		// way the user thinks about it; only the storage is negative.
+		WhenOff: "it starts silently in the folder you last used, and you change it with /cd",
+		Kind:    KindBool,
+		Default: true,
+		Get:     func() any { return cfg == nil || !cfg.SkipWorkspacePrompt },
+		Set: func(v any) error {
+			b, err := asBool(v)
+			if err != nil {
+				return err
+			}
+			return SetSkipWorkspacePrompt(!b)
+		},
+	},
+	{
 		ID:      "data.directory",
 		Group:   GroupFiles,
 		Name:    "Program data folder",
