@@ -11,6 +11,12 @@ type Container interface {
 	tea.Model
 	Sizeable
 	Bindings
+
+	// VerticalChrome reports the rows this container spends on its OWN border
+	// and padding — height that never reaches the content. A caller sizing the
+	// container from a desired *content* height must add this, or the content
+	// gets squeezed to zero rows and renders as nothing.
+	VerticalChrome() int
 }
 type container struct {
 	width  int
@@ -76,6 +82,19 @@ func (c *container) View() string {
 		PaddingLeft(c.paddingLeft)
 
 	return style.Render(c.content.View())
+}
+
+// VerticalChrome implements Container. Kept in sync with the verticalSpace
+// calculation in SetSize below.
+func (c *container) VerticalChrome() int {
+	n := c.paddingTop + c.paddingBottom
+	if c.borderTop {
+		n++
+	}
+	if c.borderBottom {
+		n++
+	}
+	return n
 }
 
 func (c *container) SetSize(width, height int) tea.Cmd {

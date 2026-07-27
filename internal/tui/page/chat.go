@@ -67,7 +67,9 @@ func (p *chatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case chat.EditorHeightMsg:
 		// GORILLA OVERRIDE: the editor grew/shrank with its content — give it
 		// exactly the rows it asked for and let the message list take the rest.
-		cmds = append(cmds, p.layout.SetBottomHeight(msg.Height))
+		// msg.Height is CONTENT rows, so add the container's own border/padding
+		// or the content gets squeezed to zero rows and the input box vanishes.
+		cmds = append(cmds, p.layout.SetBottomHeight(msg.Height+p.editor.VerticalChrome()))
 	case dialog.CompletionDialogCloseMsg:
 		p.showCompletionDialog = false
 	case chat.SendMsg:
