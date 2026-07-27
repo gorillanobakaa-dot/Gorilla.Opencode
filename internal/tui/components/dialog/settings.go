@@ -201,17 +201,18 @@ func (m *settingsDialogCmp) move(delta int) {
 }
 
 func (m *settingsDialogCmp) contentWidth() int {
-	if m.width > 0 {
-		w := m.width - settingsHChrome
-		if w < 60 {
-			return 60
-		}
-		if w > settingsDialogWidth {
-			return settingsDialogWidth
-		}
+	// Full terminal width minus chrome, NO cap — see the note in adddir.go. This
+	// is the longest-text dialog in the app; capping it truncated every
+	// description with an ellipsis. The floor only applies on a terminal too
+	// narrow to hold the dialog, where cramped beats overflowing.
+	const minWidth = 30
+	if m.width <= 0 {
+		return settingsDialogWidth
+	}
+	if w := m.width - settingsHChrome; w > minWidth {
 		return w
 	}
-	return settingsDialogWidth
+	return minWidth
 }
 
 // visibleRows is how many list rows fit. Terminal height MINUS this dialog's own

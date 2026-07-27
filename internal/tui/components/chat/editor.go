@@ -175,7 +175,15 @@ func (m *editorCmp) send() tea.Cmd {
 	// intercepted and dispatched instead of being sent to the model —
 	// the ergonomics users expect from the current OpenCode.
 	if cmd := strings.TrimSpace(value); strings.HasPrefix(cmd, "/") {
-		return util.CmdHandler(SlashCommandMsg{Name: strings.ToLower(strings.TrimPrefix(cmd, "/"))})
+		// GORILLA OVERRIDE: split the command word from its arguments, so
+		// `/cd ~/src/linux` reaches the handler with the path intact. Previously
+		// the entire line became the command Name, so anything with an argument
+		// fell through to "Unknown command".
+		word, args, _ := strings.Cut(strings.TrimPrefix(cmd, "/"), " ")
+		return util.CmdHandler(SlashCommandMsg{
+			Name: strings.ToLower(strings.TrimSpace(word)),
+			Args: strings.TrimSpace(args),
+		})
 	}
 	return tea.Batch(
 		util.CmdHandler(SendMsg{

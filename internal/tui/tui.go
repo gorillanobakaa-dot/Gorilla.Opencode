@@ -596,10 +596,37 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// (there is no sandbox) — it loads that root's context files, scopes
 		// permissions to it, tells the model it exists, and watches it for
 		// diagnostics.
-		case "add-dir", "adddir", "dirs", "roots", "cd":
+		case "add-dir", "adddir", "dirs", "roots":
 			a.addDirDialog.Init()
 			a.showAddDirDialog = true
 			return a, nil
+
+		// GORILLA OVERRIDE: /cd narrows the workspace to one directory, in one
+		// step, with the path on the command line. This is the operation the
+		// whole roots feature exists for: an agent started in a home directory
+		// that holds a kernel tree and a browser tree will walk millions of
+		// files, and the fix is to point it at ONE project.
+		//
+		// keepOld is false and SetWorkingDir additionally drops any root that
+		// CONTAINS the new one, so this genuinely narrows instead of leaving the
+		// wide tree in scope while reporting success. Bare /cd opens the dialog.
+		case "cd":
+			if msg.Args == "" {
+				a.addDirDialog.Init()
+				a.showAddDirDialog = true
+				return a, nil
+			}
+			target, err := config.SetWorkingDir(msg.Args, false)
+			if err != nil {
+				return a, util.ReportError(err)
+			}
+			prompt.InvalidateContextCache()
+			shell.ResetPersistentShell(config.WorkingDirectory())
+			info := fmt.Sprintf("workspace is now %s", target)
+			if a.app.ReloadCoderTools() {
+				info += " — takes effect after the current turn finishes"
+			}
+			return a, util.ReportInfo(info)
 		// GORILLA OVERRIDE: /prompts — see exactly what the AI is told, edit it
 		// in $EDITOR, or switch individual sections of the coder prompt off.
 		case "prompts", "prompt":

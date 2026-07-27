@@ -60,7 +60,7 @@ const (
 const addDirDialogWidth = 76
 
 type addDirKeyMap struct {
-	Up, Down, Add, Remove, Promote, Escape, Submit, Cancel key.Binding
+	Up, Down, Add, Remove, Promote, Escape, Submit, Cancel, Narrow key.Binding
 }
 
 // Arrow keys only for navigation — `-`/`+`/`[`/`]` are awkward or hidden on
@@ -74,6 +74,12 @@ var addDirKeys = addDirKeyMap{
 	Escape:  key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
 	Submit:  key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "confirm")),
 	Cancel:  key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
+	// GORILLA OVERRIDE: `p` in the add form makes the typed path the PRIMARY root
+	// rather than an extra. This is the operation most users actually want and
+	// the reason the command exists — pointing the agent at one project instead
+	// of a home directory holding millions of files. It works even when the path
+	// is inside the current root, which adding deliberately refuses.
+	Narrow: key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "make primary")),
 }
 
 type addDirDialogCmp struct {
@@ -104,23 +110,29 @@ func (m *addDirDialogCmp) refresh() {
 }
 
 func (m *addDirDialogCmp) width_() int {
-	// GORILLA OVERRIDE: the terminal width MINUS this dialog's own chrome, not a
-	// content width the chrome is then added to. The border (1+1) and padding
-	// (2+2) cost 6 columns; ignoring them made the dialog 82 columns wide in an
-	// 80-column terminal, which clips or wraps. Same trap as the v0.1.38
-	// invisible input box — a wrapper is never free.
-	const chrome = 6
-	if m.width > 0 {
-		w := m.width - chrome
-		if w < 40 {
-			return 40
-		}
-		if w > addDirDialogWidth {
-			return addDirDialogWidth
-		}
+	// GORILLA OVERRIDE: full terminal width minus this dialog's own chrome, with
+	// NO upper cap — matching /context (loadout.go). An earlier version capped the
+	// width, which truncated the explanatory text with an ellipsis on a wide
+	// terminal and left an unused black margin. The whole point of these rows is
+	// that the description is readable.
+	//
+	// chrome is this dialog's border (1+1) plus padding (2+2). SUBTRACTED from the
+	// terminal, never added on top — a wrapper is never free, and adding it made
+	// the dialog 82 columns wide in an 80-column terminal.
+	//
+	// The floor is deliberately small: it only applies on a terminal too narrow to
+	// hold the dialog at all, where cramped beats overflowing.
+	const (
+		chrome   = 6
+		minWidth = 30
+	)
+	if m.width <= 0 {
+		return addDirDialogWidth
+	}
+	if w := m.width - chrome; w > minWidth {
 		return w
 	}
-	return addDirDialogWidth
+	return minWidth
 }
 
 func (m *addDirDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -221,6 +233,18 @@ func (m *addDirDialogCmp) updateForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = addDirModeList
 		m.formErr = ""
 		return m, nil
+
+	// Narrow the workspace to the typed path. Deliberately checked BEFORE the
+	// textinput gets the key, and deliberately allowed for a path inside the
+	// current root — that is the case adding refuses and narrowing is for.
+	case key.Matches(msg, addDirKeys.Narrow):
+		dir := strings.TrimSpace(m.input.Value())
+		if dir == "" {
+			m.formErr = "enter a path first"
+			return m, nil
+		}
+		return m, m.narrowTo(dir)
+
 	case key.Matches(msg, addDirKeys.Submit):
 		dir := strings.TrimSpace(m.input.Value())
 		if dir == "" {
@@ -243,6 +267,26 @@ func (m *addDirDialogCmp) updateForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
 	return m, cmd
+}
+
+// narrowTo makes dir the primary workspace root. keepOld is false: the caller
+// asked to work in dir, and config.SetWorkingDir additionally drops any root
+// that CONTAINS dir, so a narrowing operation genuinely narrows rather than
+// leaving the wide tree in scope while reporting success.
+func (m *addDirDialogCmp) narrowTo(dir string) tea.Cmd {
+	target, err := config.SetWorkingDir(dir, false)
+	if err != nil {
+		m.formErr = err.Error()
+		return nil
+	}
+	m.mode = addDirModeList
+	m.formErr = ""
+	m.refresh()
+	m.selectedIdx = 0
+	return util.CmdHandler(RootsChangedMsg{
+		Info:           fmt.Sprintf("workspace narrowed to %s", target),
+		PrimaryChanged: true,
+	})
 }
 
 func (m *addDirDialogCmp) View() string {
@@ -293,7 +337,7 @@ func (m *addDirDialogCmp) listView() string {
 	rows = append(rows,
 		base.Width(w).Render(""),
 		base.Foreground(t.TextMuted()).Width(w).
-			Render("a add   d remove   c make primary   ↑↓ move   esc close"),
+			Render("a add / switch   d remove   c make primary   ↑↓ move   esc close"),
 	)
 
 	return base.Padding(1, 2).Border(lipgloss.RoundedBorder()).
@@ -306,7 +350,13 @@ func (m *addDirDialogCmp) formView() string {
 	w := m.width_()
 
 	rows := []string{
-		base.Foreground(t.Primary()).Bold(true).Width(w).Render("Add a workspace root"),
+		base.Foreground(t.Primary()).Bold(true).Width(w).Render("Add or switch to a workspace root"),
+		base.Foreground(t.TextMuted()).Width(w).
+			Render("enter adds it alongside the current root. p makes it THE root instead,"),
+		base.Foreground(t.TextMuted()).Width(w).
+			Render("which is what you want when the current root is too broad — a home"),
+		base.Foreground(t.TextMuted()).Width(w).
+			Render("directory holding a kernel tree and a browser tree is millions of files."),
 		base.Width(w).Render(""),
 		base.Width(w).Render(m.input.View()),
 	}
@@ -315,7 +365,8 @@ func (m *addDirDialogCmp) formView() string {
 	}
 	rows = append(rows,
 		base.Width(w).Render(""),
-		base.Foreground(t.TextMuted()).Width(w).Render("enter: add   esc: back"),
+		base.Foreground(t.TextMuted()).Width(w).
+			Render("enter: add alongside   p: make it the only root   esc: back"),
 	)
 
 	return base.Padding(1, 2).Border(lipgloss.RoundedBorder()).

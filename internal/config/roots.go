@@ -147,7 +147,18 @@ func AddDir(dir string) (string, error) {
 		case root == clean:
 			return "", fmt.Errorf("%s is already a workspace root", clean)
 		case containsPath(root, clean):
-			return "", fmt.Errorf("%s is already covered by the root %s", clean, root)
+			// GORILLA OVERRIDE: this used to be a flat refusal, which was the wrong
+			// answer to the question actually being asked. A user pointing at a
+			// SUBDIRECTORY of the current root is almost never trying to add a
+			// redundant extra root — they are trying to NARROW the workspace to
+			// that directory, because the current root is too broad. The canonical
+			// case: the primary root is a home directory holding a kernel tree and
+			// a browser tree, and the agent's file discovery walks millions of
+			// files. Telling them it is "already covered" is both true and useless.
+			return "", fmt.Errorf(
+				"%s is inside the existing root %s — to work in just that directory, "+
+					"narrow the workspace to it instead of adding it (press p in the add form, "+
+					"or run /cd %s)", clean, root, clean)
 		case containsPath(clean, root):
 			return "", fmt.Errorf("%s contains the existing root %s — adding it would shadow that root and widen its permission scope; remove %s first", clean, root, root)
 		}
@@ -207,9 +218,19 @@ func RemoveDir(dir string) error {
 
 // SetWorkingDir repoints the PRIMARY workspace root, for /cd.
 //
-// keepOld retains the previous primary as an additional root. The caller
-// decides: dropping it silently would remove context files and permission
-// scoping the user never asked to lose.
+// keepOld asks to retain the previous primary as an additional root. It is
+// HONOURED ONLY when the new primary is not inside the old one.
+//
+// GORILLA OVERRIDE — the narrowing case. When the new primary IS inside the old
+// (the common /cd: from a home directory down into one project), keeping the old
+// as an extra root would defeat the entire operation. The user narrows precisely
+// to stop the agent seeing the wider tree — its context files, its permission
+// scope, its @-completion file walk. Retaining the parent would leave all of that
+// in place while reporting success. So a narrowing /cd drops the old primary and
+// says so.
+//
+// Widening or moving sideways still honours keepOld, because there the old root
+// is genuinely separate work the user may not want to lose.
 //
 // Callers MUST also invalidate derived state — prompt.InvalidateContextCache(),
 // and the persistent bash shell, which holds its own cwd for the process
@@ -228,12 +249,28 @@ func SetWorkingDir(dir string, keepOld bool) (string, error) {
 
 	old := cfg.WorkingDir
 
-	// The new primary must not remain in the extras list, or it would appear twice.
+	// Two separate rules, because conflating them either keeps the broad tree or
+	// throws away unrelated work:
+	//
+	//  1. If the OLD PRIMARY contains the new one, this is a narrowing and
+	//     keepOld is ignored. Retaining the parent would leave the wide tree in
+	//     scope — its context files, its permission scope, its @-completion file
+	//     walk — while reporting success.
+	//  2. Any EXTRA root that contains the new primary is dropped regardless,
+	//     since leaving a parent in the extras list is the same defeat by another
+	//     route. Unrelated extras are separate work and survive.
+	if old != "" && old != clean && containsPath(old, clean) {
+		keepOld = false
+	}
+
+	// The new primary must not remain in the extras list, or it would appear
+	// twice. Rule 2 above: an extra that CONTAINS the new primary is dropped.
 	extras := make([]string, 0, len(cfg.AdditionalDirs)+1)
 	for _, d := range cfg.AdditionalDirs {
-		if d != clean {
-			extras = append(extras, d)
+		if d == clean || containsPath(d, clean) {
+			continue
 		}
+		extras = append(extras, d)
 	}
 	if keepOld && old != "" && old != clean {
 		alreadyListed := false
