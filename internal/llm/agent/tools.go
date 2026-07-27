@@ -51,6 +51,8 @@ func CoderAgentTools(
 	if config.MaxSubAgents() != config.SubAgentsNuclear {
 		add("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions))
 	}
+	// GORILLA OVERRIDE: kernel semantic checker, default off in the loadout.
+	add("tool.sparse", tools.NewSparseTool(permissions))
 	return append(coderTools, otherTools...)
 }
 

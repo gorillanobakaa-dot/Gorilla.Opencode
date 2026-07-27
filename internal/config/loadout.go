@@ -44,6 +44,12 @@ var LoadoutComponents = []LoadoutComponent{
 	{"tool.fetch", "Fetch tool", "agent can't fetch URLs", 300, true, false},
 	{"tool.diagnostics", "Diagnostics tool", "agent can't read LSP errors/warnings", 400, true, false},
 	{"tool.agent", "Sub-agent tool", "agent can't spawn read-only search sub-agents", 200, true, false},
+	// GORILLA OVERRIDE: default OFF. sparse is the kernel's own semantic checker
+	// (__user/__kernel pointers, endianness, lock imbalance) — invaluable on
+	// kernel work, meaningless everywhere else, so its schema should not ride
+	// every request for a user who never touches the kernel. Turn it on when
+	// starting kernel patches.
+	{"tool.sparse", "Sparse checker (kernel)", "agent can't check kernel semantics (__user pointers, endianness, lock imbalance) — needs a build to catch them instead", 180, false, false},
 	// GORILLA OVERRIDE: env estimate was 150 when the block was a recursive
 	// 1000-file tree dump (real cost often 10k–30k). After the shallow
 	// project_summary refactor it really is ~100–200 tokens; calibrate
