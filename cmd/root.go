@@ -254,6 +254,11 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 			// needs Shift held down (mouse events go to the app).
 			tea.WithMouseCellMotion(),
 		)
+		// Let background goroutines push messages into the event loop. The OAuth
+		// flow needs this: it must report its sign-in URL while blocking on the
+		// browser callback, and printing it instead paints over a screen Bubble
+		// Tea owns, where it can never be cleared.
+		tui.SetProgram(program)
 
 		// Setup the subscriptions, this will send services events to the TUI
 		ch, cancelSubs := setupSubscriptions(app, ctx)

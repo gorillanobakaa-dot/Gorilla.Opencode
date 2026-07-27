@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -148,7 +149,9 @@ type appModel struct {
 
 	// GORILLA OVERRIDE: /add-dir and /cd — workspace roots.
 	showAddDirDialog bool
-	addDirDialog     dialog.AddDirDialog
+	// loginURL is the pending sign-in URL, shown as an overlay. GORILLA OVERRIDE.
+	loginURL     string
+	addDirDialog dialog.AddDirDialog
 
 	// GORILLA OVERRIDE: /prompts — view, edit, section-toggle the system prompts.
 	showPromptsDialog bool
@@ -690,7 +693,15 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, nil
 
+	case loginURLMsg:
+		// Render it, do not print it. A dialog is part of the frame, so it can be
+		// dismissed and redrawn; a stdout write cannot be taken back.
+		a.loginURL = msg.URL
+		return a, nil
+
 	case loginResultMsg:
+		// The sign-in finished (either way), so retire the URL overlay.
+		a.loginURL = ""
 		if msg.err != nil {
 			return a, util.ReportError(fmt.Errorf("login failed: %w", msg.err))
 		}
@@ -825,6 +836,12 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if a.showAddDirDialog {
 				a.showAddDirDialog = false
+			}
+			// Dismissing only hides the URL; the flow keeps waiting for the
+			// browser callback, so a user who dismisses by accident can still
+			// finish signing in.
+			if a.loginURL != "" {
+				a.loginURL = ""
 			}
 			if a.showPromptsDialog {
 				a.showPromptsDialog = false
@@ -1318,6 +1335,15 @@ func (a appModel) View() string {
 		)
 	}
 
+	if a.loginURL != "" {
+		overlay := a.loginURLOverlay()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+	}
+
 	if a.showAddDirDialog {
 		overlay := a.addDirDialog.View()
 		row := lipgloss.Height(appView) / 2
@@ -1428,6 +1454,20 @@ func (a appModel) View() string {
 	return appView
 }
 
+// runningProgram is the live tea.Program, recorded by SetProgram so a
+// background goroutine can push a message into the event loop.
+//
+// GORILLA OVERRIDE: needed because the OAuth flow has to report its URL WHILE it
+// blocks waiting for the browser callback — there is no return value to carry it.
+// It used to fmt.Println the URL onto the screen Bubble Tea owns, which no redraw
+// could clear, so the sign-in URL stayed burned across the interface for the rest
+// of the session.
+var runningProgram atomic.Pointer[tea.Program]
+
+// SetProgram records the running program. Call it once, immediately after
+// tea.NewProgram and before Run.
+func SetProgram(p *tea.Program) { runningProgram.Store(p) }
+
 func New(app *app.App) tea.Model {
 	startPage := page.ChatPage
 	model := &appModel{
@@ -1508,13 +1548,29 @@ type loginResultMsg struct {
 	err   error
 }
 
+// loginURLMsg carries the sign-in URL out of the OAuth flow so the TUI can
+// render it. GORILLA OVERRIDE: the flow used to fmt.Println it straight onto the
+// screen Bubble Tea owns, which no redraw could ever clear.
+type loginURLMsg struct {
+	URL string
+}
+
 type logoutDoneMsg struct {
 	err error
 }
 
 func (a *appModel) runLogin() tea.Cmd {
+	// The URL is reported through the context and pushed into the TUI as a
+	// message. Send() is safe from this goroutine and is how a background task
+	// hands work back to the event loop; writing to stdout instead is what
+	// burned the URL permanently into the interface.
+	prog := runningProgram.Load()
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := auth.WithAuthPrompt(context.Background(), func(url string) {
+			if prog != nil {
+				prog.Send(loginURLMsg{URL: url})
+			}
+		})
 		creds, err := auth.Login(ctx)
 		if err != nil {
 			return loginResultMsg{err: err}
@@ -1551,4 +1607,52 @@ func withDeferredNote(info string, deferred bool) string {
 		return info
 	}
 	return info + " — takes effect after the current turn finishes"
+}
+
+// loginURLOverlay renders the pending sign-in URL.
+//
+// GORILLA OVERRIDE: this exists because the OAuth flow used to fmt.Println the
+// URL. Under the TUI that writes into a screen Bubble Tea owns: the text lands on
+// top of the interface, Bubble Tea has no record of drawing it, and so no redraw
+// can remove it. The URL stayed on screen for the rest of the session, overlapping
+// the editor and the status bar.
+//
+// The URL is shown UNWRAPPED on its own line even when that is wider than the
+// dialog. It has to be selectable and copyable as one string — a URL broken
+// across lines by a renderer is a URL that cannot be pasted, which defeats the
+// entire purpose of showing it. The surrounding box is sized to the terminal, and
+// the line scrolls rather than folding.
+func (a *appModel) loginURLOverlay() string {
+	t := theme.CurrentTheme()
+
+	width := a.width - 8
+	if width < 30 {
+		width = 30
+	}
+	if width > 100 {
+		width = 100
+	}
+
+	line := func(s string, style lipgloss.Style) string {
+		return style.Width(width).MaxWidth(width).Render(s)
+	}
+
+	parts := []string{
+		line("Sign in with Google", lipgloss.NewStyle().Bold(true).Foreground(t.Primary())),
+		line("", lipgloss.NewStyle()),
+		line("Your browser should have opened. If it did not, visit:", lipgloss.NewStyle().Foreground(t.Text())),
+		line("", lipgloss.NewStyle()),
+		// Deliberately NOT width-clamped: see the note above about copyability.
+		lipgloss.NewStyle().Foreground(t.Primary()).Render(a.loginURL),
+		line("", lipgloss.NewStyle()),
+		line("Waiting for you to finish… esc hides this (sign-in keeps running)",
+			lipgloss.NewStyle().Foreground(t.TextMuted())),
+	}
+
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(t.Primary()).
+		Background(t.Background()).
+		Padding(1, 2).
+		Render(lipgloss.JoinVertical(lipgloss.Left, parts...))
 }
