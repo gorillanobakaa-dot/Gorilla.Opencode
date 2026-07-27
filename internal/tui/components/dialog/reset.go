@@ -190,23 +190,29 @@ func buildResetScopes() []resetScope {
 }
 
 func (m *resetDialogCmp) width_() int {
-	// GORILLA OVERRIDE: the terminal width MINUS this dialog's own chrome, not a
-	// content width the chrome is then added to. The border (1+1) and padding
-	// (2+2) cost 6 columns; ignoring them made the dialog 82 columns wide in an
-	// 80-column terminal, which clips or wraps. Same trap as the v0.1.38
-	// invisible input box — a wrapper is never free.
-	const chrome = 6
-	if m.width > 0 {
-		w := m.width - chrome
-		if w < 46 {
-			return 46
-		}
-		if w > resetDialogWidth {
-			return resetDialogWidth
-		}
+	// GORILLA OVERRIDE: full terminal width minus this dialog's own chrome, with
+	// NO upper cap — matching /context (loadout.go). An earlier version capped the
+	// width, which truncated the explanatory text with an ellipsis on a wide
+	// terminal and left an unused black margin. The whole point of these rows is
+	// that the description is readable.
+	//
+	// chrome is this dialog's border (1+1) plus padding (2+2). SUBTRACTED from the
+	// terminal, never added on top — a wrapper is never free, and adding it made
+	// the dialog 82 columns wide in an 80-column terminal.
+	//
+	// The floor is deliberately small: it only applies on a terminal too narrow to
+	// hold the dialog at all, where cramped beats overflowing.
+	const (
+		chrome   = 6
+		minWidth = 30
+	)
+	if m.width <= 0 {
+		return resetDialogWidth
+	}
+	if w := m.width - chrome; w > minWidth {
 		return w
 	}
-	return resetDialogWidth
+	return minWidth
 }
 
 func (m *resetDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

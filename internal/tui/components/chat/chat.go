@@ -23,6 +23,12 @@ type SendMsg struct {
 // editor (e.g. /model, /models, /export). Handled centrally in the TUI.
 type SlashCommandMsg struct {
 	Name string
+	// GORILLA OVERRIDE: everything after the command word, untouched. Needed so
+	// `/cd /path/to/project` can narrow the workspace in one step instead of
+	// opening a dialog — which is the whole point of the command: pointing the
+	// agent at ONE directory instead of a home directory holding millions of
+	// files across a kernel tree and a browser tree.
+	Args string
 }
 
 // GORILLA OVERRIDE: request a fresh session. Handled by the chat PAGE so
