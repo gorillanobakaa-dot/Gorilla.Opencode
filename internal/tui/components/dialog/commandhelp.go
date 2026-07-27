@@ -301,8 +301,13 @@ func (m *commandHelpCmp) View() string {
 	w := m.contentWidth()
 	base := lipgloss.NewStyle().Background(t.Background())
 
+	// Only sizes. It must NOT set the background: doing so clobbered the
+	// selected row's highlight, leaving foreground equal to background — the
+	// selected command rendered as an invisible blank line, so /help appeared to
+	// be missing whichever command you were reading about. Every caller derives
+	// its style from base, which already carries the panel background.
 	line := func(s string, st lipgloss.Style) string {
-		return st.Background(t.Background()).Width(w).MaxWidth(w).Render(s)
+		return st.Width(w).MaxWidth(w).Render(s)
 	}
 
 	var b []string
@@ -332,11 +337,7 @@ func (m *commandHelpCmp) View() string {
 		}
 		// Two columns, so the eye can run down the names.
 		row := padRight(name, 18) + r.cmd.Summary
-		st := base.Foreground(t.Text())
-		if i == m.selectedIdx {
-			st = base.Background(t.Primary()).Foreground(t.Background()).Bold(true)
-		}
-		b = append(b, line("  "+row, st))
+		b = append(b, line("  "+row, rowStyle(base, t, i == m.selectedIdx)))
 	}
 
 	// The selected command's full explanation, in place. This is the part the
@@ -357,6 +358,18 @@ func (m *commandHelpCmp) View() string {
 		Background(t.Background()).
 		Padding(1, 2).
 		Render(lipgloss.JoinVertical(lipgloss.Left, b...))
+}
+
+// rowStyle is the style for one command row. Extracted so the invariant that
+// actually matters can be asserted directly: a rendered row still CONTAINS its
+// text even when foreground and background are identical, so a test that greps
+// the view for "/clear" passes while the row is invisible on screen. That is
+// exactly how the invisible-selection bug shipped.
+func rowStyle(base lipgloss.Style, t theme.Theme, selected bool) lipgloss.Style {
+	if selected {
+		return base.Background(t.Primary()).Foreground(t.Background()).Bold(true)
+	}
+	return base.Foreground(t.Text())
 }
 
 func padRight(s string, n int) string {
