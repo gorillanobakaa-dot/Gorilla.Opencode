@@ -17,6 +17,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/tui"
+	"github.com/opencode-ai/opencode/internal/tui/theme"
 	"github.com/opencode-ai/opencode/internal/version"
 	"github.com/spf13/cobra"
 )
@@ -91,6 +92,12 @@ understanding code directly from the terminal.`,
 		if err != nil {
 			return err
 		}
+
+		// GORILLA OVERRIDE: fill the /settings theme row's options from the theme
+		// registry. theme imports config, so config cannot import it back — the
+		// list is pushed in here, the same inversion used for prompt sections and
+		// the fileutil roots hook.
+		config.SetThemeOptions(theme.AvailableThemes())
 
 		// GORILLA OVERRIDE: without any provider the old code died later
 		// with the cryptic "agent coder not found". Say what is actually
