@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/tui/util"
 )
 
@@ -44,8 +45,11 @@ func LoadCustomCommands() ([]Command, error) {
 		userCommandsDir := filepath.Join(xdgConfigHome, "opencode", "commands")
 		userCommands, err := loadCommandsFromDir(userCommandsDir, UserCommandPrefix)
 		if err != nil {
-			// Log error but continue - we'll still try to load other commands
-			fmt.Printf("Warning: failed to load user commands from XDG_CONFIG_HOME: %v\n", err)
+			// GORILLA OVERRIDE: log, do not print. This runs while the TUI owns
+			// the screen, so a stdout write lands on top of the interface with no
+			// record in Bubble Tea's frame — nothing can ever clear it. Same
+			// failure as the sign-in URL that stayed burned across the session.
+			logging.Warn("failed to load user commands from XDG_CONFIG_HOME", "error", err)
 		} else {
 			commands = append(commands, userCommands...)
 		}
@@ -57,8 +61,7 @@ func LoadCustomCommands() ([]Command, error) {
 		homeCommandsDir := filepath.Join(home, ".opencode", "commands")
 		homeCommands, err := loadCommandsFromDir(homeCommandsDir, UserCommandPrefix)
 		if err != nil {
-			// Log error but continue - we'll still try to load other commands
-			fmt.Printf("Warning: failed to load home commands: %v\n", err)
+			logging.Warn("failed to load home commands", "error", err)
 		} else {
 			commands = append(commands, homeCommands...)
 		}
@@ -68,8 +71,7 @@ func LoadCustomCommands() ([]Command, error) {
 	projectCommandsDir := filepath.Join(cfg.Data.Directory, "commands")
 	projectCommands, err := loadCommandsFromDir(projectCommandsDir, ProjectCommandPrefix)
 	if err != nil {
-		// Log error but return what we have so far
-		fmt.Printf("Warning: failed to load project commands: %v\n", err)
+		logging.Warn("failed to load project commands", "error", err)
 	} else {
 		commands = append(commands, projectCommands...)
 	}

@@ -191,11 +191,20 @@ func Login(ctx context.Context) (*GeminiCreds, error) {
 	go srv.Serve(ln)
 	defer srv.Close()
 
-	fmt.Println("Opening your browser to sign in with Google.")
-	fmt.Println("If it does not open, paste this URL into your browser:")
-	fmt.Println()
-	fmt.Println("  " + authURL)
-	fmt.Println()
+	// GORILLA OVERRIDE: report the URL through the callback instead of printing
+	// it.
+	//
+	// These were five fmt.Println calls straight to stdout. Under the TUI that is
+	// a write into a screen Bubble Tea believes it owns: the text lands on top of
+	// whatever was there, Bubble Tea has no record of it, and so nothing ever
+	// clears it. The sign-in URL stayed burned across the interface for the rest
+	// of the session, overlapping the editor and the status bar.
+	//
+	// Printing is still right for a bare terminal (`gorilla-opencode auth login`),
+	// so the default reporter keeps doing it — see PrintAuthPrompt. The TUI passes
+	// its own, which renders a dismissible dialog.
+	report := AuthPromptFrom(ctx)
+	report(authURL)
 	_ = openBrowser(authURL)
 
 	var code string
