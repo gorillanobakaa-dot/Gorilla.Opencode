@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
@@ -13,8 +15,39 @@ import (
 func (app *App) initLSPClients(ctx context.Context) {
 	cfg := config.Get()
 
-	// Initialize LSP clients
+	// GORILLA OVERRIDE: de-duplicate by (command, args) before starting anything.
+	// The config maps a LANGUAGE to a server, but several languages share one
+	// binary — clangd serves both "c" and "cpp", typescript-language-server
+	// serves both "javascript" and "typescript". Starting one process per
+	// language spawned redundant servers: an observed run had TWO clangd
+	// processes (PIDs 228951/228952) idling on the same workspace, and clangd
+	// on a large tree is 500MB-2GB each. One process per distinct command
+	// answers for every language it covers.
+	started := make(map[string]string, len(cfg.LSP))
 	for name, clientConfig := range cfg.LSP {
+		// Honour the per-server /context toggle. Skipping here means the process
+		// never starts — the real saving is memory and CPU, not tokens. A toggle
+		// applies on the next launch; we do not hot-stop a running server.
+		if !config.LSPEnabled(name) {
+			logging.Info("LSP client disabled, not starting", "name", name)
+			continue
+		}
+		// Resolve the command to its absolute path first, so "gopls" and
+		// "/home/gorilla/go/bin/gopls" — two config entries naming the SAME
+		// binary — collapse to one fingerprint. Without this a bare name that
+		// is not on PATH also starts a doomed second process alongside the
+		// working absolute-path one.
+		resolved := clientConfig.Command
+		if abs, err := exec.LookPath(clientConfig.Command); err == nil {
+			resolved = abs
+		}
+		fingerprint := resolved + "\x00" + strings.Join(clientConfig.Args, "\x00")
+		if first, dup := started[fingerprint]; dup {
+			logging.Info("LSP client shares a command with an already-started server, reusing it",
+				"name", name, "already_started_as", first, "command", clientConfig.Command)
+			continue
+		}
+		started[fingerprint] = name
 		// Start each client initialization in its own goroutine
 		go app.createAndStartLSPClient(ctx, name, clientConfig.Command, clientConfig.Args...)
 	}
@@ -25,7 +58,7 @@ func (app *App) initLSPClients(ctx context.Context) {
 func (app *App) createAndStartLSPClient(ctx context.Context, name string, command string, args ...string) {
 	// Create a specific context for initialization with a timeout
 	logging.Info("Creating LSP client", "name", name, "command", command, "args", args)
-	
+
 	// Create the LSP client
 	lspClient, err := lsp.NewClient(ctx, command, args...)
 	if err != nil {
@@ -36,7 +69,7 @@ func (app *App) createAndStartLSPClient(ctx context.Context, name string, comman
 	// Create a longer timeout for initialization (some servers take time to start)
 	initCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	
+
 	// Initialize with the initialization context
 	_, err = lspClient.InitializeLSPClient(initCtx, config.WorkingDirectory())
 	if err != nil {
@@ -57,13 +90,13 @@ func (app *App) createAndStartLSPClient(ctx context.Context, name string, comman
 	}
 
 	logging.Info("LSP client initialized", "name", name)
-	
+
 	// Create a child context that can be canceled when the app is shutting down
 	watchCtx, cancelFunc := context.WithCancel(ctx)
-	
+
 	// Create a context with the server name for better identification
 	watchCtx = context.WithValue(watchCtx, "serverName", name)
-	
+
 	// Create the workspace watcher
 	workspaceWatcher := watcher.NewWorkspaceWatcher(lspClient)
 
