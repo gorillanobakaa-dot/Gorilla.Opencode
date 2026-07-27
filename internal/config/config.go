@@ -1211,11 +1211,41 @@ func registerLocalEndpoints() {
 			})
 		}
 	}
-	var first models.ModelID
+	// GORILLA OVERRIDE: collapse endpoints that share a baseURL, preferring one
+	// that carries a key.
+	//
+	// Two facts combine into a silent failure. NVIDIA NIM serves /v1/models
+	// WITHOUT authentication, so listing succeeds for any entry aimed at that
+	// URL — even one with no key or a malformed one — and registration looks
+	// healthy. And every entry sharing a baseURL registers the SAME model ids,
+	// each overwriting the previous route. So the last entry wins, and if its key
+	// is wrong (a key pasted without its "nvapi-" prefix, say) all 102 models are
+	// routed through it and every inference returns 401 — while the picker shows
+	// a full, apparently working model list.
+	seenURL := map[string]LocalEndpoint{}
+	order := []string{}
 	for _, ep := range cfg.LocalEndpoints {
 		if ep.Disabled || ep.BaseURL == "" {
 			continue
 		}
+		prev, dup := seenURL[ep.BaseURL]
+		if !dup {
+			seenURL[ep.BaseURL] = ep
+			order = append(order, ep.BaseURL)
+			continue
+		}
+		// Prefer a keyed entry; between two keyed entries keep the first, so
+		// re-adding a connection cannot silently steal a working route.
+		if prev.APIKey == "" && ep.APIKey != "" {
+			seenURL[ep.BaseURL] = ep
+		}
+		logging.Warn("ignoring duplicate local endpoint",
+			"kept", seenURL[ep.BaseURL].Name, "ignored", ep.Name, "baseURL", ep.BaseURL)
+	}
+
+	var first models.ModelID
+	for _, url := range order {
+		ep := seenURL[url]
 		if n, id := models.RegisterLocalEndpoint(ep.Name, ep.BaseURL, ep.APIKey); n > 0 && first == "" {
 			first = id
 		}
