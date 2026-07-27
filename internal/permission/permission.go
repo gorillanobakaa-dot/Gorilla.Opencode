@@ -121,7 +121,7 @@ func NewPermissionService() Service {
 // GORILLA OVERRIDE: this was filepath.Dir(opts.Path), taking the PARENT of a path
 // the caller had already resolved to a directory. Every caller passes a
 // directory: edit/write pass the workspace root chosen by tools.permissionScope,
-// patch passes filepath.Dir of the file, and bash/fetch/sourcegraph/MCP pass
+// patch passes filepath.Dir of the file, and bash/fetch/MCP pass
 // config.WorkingDirectory(). Taking Dir of those widened every grant by one
 // level — a request scoped to /home/user/project was stored as /home/user — and
 // because the session-permission check compares Path exactly, a single grant in

@@ -38,9 +38,6 @@ Every outbound connection in the code falls into three buckets, all of which
    (`generativelanguage.googleapis.com`). GitHub Copilot
    (`api.github.com` + `api.githubcopilot.com`) only if you pick Copilot.
 2. **Your own `LOCAL_ENDPOINT`** (Ollama / a local NIM) for listing models.
-3. **One optional third party:** `sourcegraph.com` — a public code-search
-   tool the model can invoke. It sends the *search query*, not your code, and
-   only if the model uses that tool.
 
 Reproduce the source scan:
 
@@ -155,8 +152,6 @@ chat app) and disappeared the instant we attributed traffic to the PID.
   source; the vendored provider SDKs connect to their own documented
   endpoints and none are analytics libraries, but that is a statement about
   their purpose, not a line-by-line proof of every dep.
-- The optional `sourcegraph.com` code-search tool only connects if the model
-  invokes it; it did not in our window.
 
 ---
 

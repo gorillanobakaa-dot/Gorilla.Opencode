@@ -82,29 +82,24 @@ agent cost — and the thing the controls in §3 attack.
 
 ## Plain language
 
-We audited all 13 things the AI can ask for. **Good news: not one charges a
+We audited all 11 things the AI can ask for. **Good news: not one charges a
 hidden fee.** You pay for words, full stop — this tool ships **no** "the-provider-
 runs-it-for-you" tools that bill extra.
 
-- **11 of 13 never leave your laptop** — reading, writing, editing, listing,
+- **10 of 11 never leave your laptop** — reading, writing, editing, listing,
   searching, running commands. Private, and free beyond the words.
-- **2 reach the internet:** *Fetch* ("go to this web address") and *Sourcegraph*
-  ("search public code for me").
+- **1 reaches the internet:** *Fetch* ("go to this web address"). Off by default.
 
-### 🔎 Sidebar: what is "Sourcegraph"?
-
-A **giant search engine for source code** — like Google, but it searches the
-actual code inside millions of public open-source projects. The AI can use it to
-see **how thousands of other programmers really used** some library, instead of
-guessing. Handy for an obscure or brand-new library; **unnecessary most of the
-time**, which is why it ships **off by default**. When on, your search query
-leaves your machine (to sourcegraph.com) — so we made it **ask permission first**,
-like every other tool that reaches outside. Off = nothing leaves, and its chunky
-tool description (~1,000 words) stops riding every turn.
+> **Sourcegraph removed.** A previous version included a tool that could search
+> public open-source code on sourcegraph.com. It was removed 2026-07-27:
+> ~1,200 tokens of tool schema were riding every request even for users who
+> never invoked it, it duplicated capability better served locally (`ripgrep`,
+> project searchfoxes) and sent queries to a third party. Off-by-default made
+> it cheap-not-free; removed is free.
 
 ## Developer track
 
-Only `internal/llm/tools/fetch.go` and `sourcegraph.go` open sockets; the rest
+Only `internal/llm/tools/fetch.go` opens sockets; the rest
 (`bash`, `edit`, `write`, `patch`, `view`, `ls`, `glob`, `grep`, `diagnostics`)
 run locally. Cost model = **100% tokens**; no provider-billed hosted tools ship.
 `tool.agent` (sub-agent) isn't a network tool but a **token multiplier** — it
@@ -173,17 +168,18 @@ spawns as a **normal tool result** so the model adapts. On Nuclear,
 Verified: `TaskAgentTools` excludes `tool.agent` (depth capped at 1) and tool
 calls run sequentially. Tests in `subagent_guard_test.go`.
 
-## 3.5 Two security fixes we did along the way
+## 3.5 A security fix we did along the way
 
 **Plain:** *Fetch* would visit **any** web address the AI named — including sneaky
 "inside" addresses pointing back at your own machine or network. Now it refuses
-those automatically. And *Sourcegraph* used to search **without asking**; now it
-asks first, like everything else.
+those automatically.
 
 **Developer:** `fetch.go` — `blockedFetchTarget()` rejects loopback / link-local
 (incl. cloud metadata `169.254.169.254`) / private / unspecified hosts before the
-prompt (`fetch_ssrf_test.go`; known gap: pre-DNS host only). `sourcegraph.go` —
-added a `permission.Request(...)` gate, threaded through the sub-agent toolset.
+prompt (`fetch_ssrf_test.go`; known gap: pre-DNS host only).
+
+*(A second fix — a permission gate on the Sourcegraph tool — is no longer part
+of the tree; Sourcegraph itself was removed 2026-07-27, see §3 sidebar.)*
 
 ---
 
@@ -271,7 +267,7 @@ The files that matter, by change:
 | Dollar cost (§3.2) | `internal/config/loadout.go`, `internal/tui/components/dialog/loadout.go` |
 | Pace-setter (§3.3) | `internal/llm/provider/{ratelimit.go,provider.go}`, `internal/config/ratelimit.go` |
 | Agents/subagents leash (§3.4) | `internal/config/subagents.go`, `internal/llm/agent/{subagent_guard.go,agent-tool.go,tools.go,agent.go}` |
-| Security (§3.5) | `internal/llm/tools/{fetch.go,sourcegraph.go}` |
+| Security (§3.5) | `internal/llm/tools/fetch.go` |
 | The `/context` UI | `internal/tui/components/dialog/loadout.go` |
 
 Full dated history: [CHANGELOG.md](../CHANGELOG.md).

@@ -51,7 +51,6 @@ func CoderAgentTools(
 	if config.MaxSubAgents() != config.SubAgentsNuclear {
 		add("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions))
 	}
-	add("tool.sourcegraph", tools.NewSourcegraphTool(permissions))
 	return append(coderTools, otherTools...)
 }
 
@@ -66,6 +65,5 @@ func TaskAgentTools(lspClients map[string]*lsp.Client, permissions permission.Se
 	add("tool.grep", tools.NewGrepTool())
 	add("tool.ls", tools.NewLsTool())
 	add("tool.view", tools.NewViewTool(lspClients))
-	add("tool.sourcegraph", tools.NewSourcegraphTool(permissions))
 	return taskTools
 }
