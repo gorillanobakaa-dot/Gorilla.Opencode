@@ -2,7 +2,6 @@ package permission
 
 import (
 	"errors"
-	"path/filepath"
 	"slices"
 	"sync"
 
@@ -75,10 +74,7 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	if slices.Contains(s.autoApproveSessions, opts.SessionID) {
 		return true
 	}
-	dir := filepath.Dir(opts.Path)
-	if dir == "." {
-		dir = config.WorkingDirectory()
-	}
+	dir := normalisePermissionPath(opts.Path)
 	permission := PermissionRequest{
 		ID:          uuid.New().String(),
 		Path:        dir,
@@ -116,4 +112,28 @@ func NewPermissionService() Service {
 		Broker:             pubsub.NewBroker[PermissionRequest](),
 		sessionPermissions: make([]PermissionRequest, 0),
 	}
+}
+
+// normalisePermissionPath returns the path a permission request is recorded
+// against. It is the scope of a "allow for this session" grant, so it must be
+// exactly what the caller asked for and never wider.
+//
+// GORILLA OVERRIDE: this was filepath.Dir(opts.Path), taking the PARENT of a path
+// the caller had already resolved to a directory. Every caller passes a
+// directory: edit/write pass the workspace root chosen by tools.permissionScope,
+// patch passes filepath.Dir of the file, and bash/fetch/sourcegraph/MCP pass
+// config.WorkingDirectory(). Taking Dir of those widened every grant by one
+// level — a request scoped to /home/user/project was stored as /home/user — and
+// because the session-permission check compares Path exactly, a single grant in
+// one project then also matched edits in every SIBLING directory, which
+// collapsed to the same stored parent. That silently undid the per-root scoping
+// the tool layer computes.
+//
+// A path with no directory component still falls back to the working directory,
+// which is what the old `dir == "."` branch existed for.
+func normalisePermissionPath(p string) string {
+	if p == "" || p == "." {
+		return config.WorkingDirectory()
+	}
+	return p
 }

@@ -196,11 +196,7 @@ func (e *editTool) createNewFile(ctx context.Context, filePath, content string) 
 		content,
 		filePath,
 	)
-	rootDir := config.WorkingDirectory()
-	permissionPath := filepath.Dir(filePath)
-	if strings.HasPrefix(filePath, rootDir) {
-		permissionPath = rootDir
-	}
+	permissionPath := permissionScope(filePath)
 	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
 			SessionID:   sessionID,
@@ -307,11 +303,7 @@ func (e *editTool) deleteContent(ctx context.Context, filePath, oldString string
 		filePath,
 	)
 
-	rootDir := config.WorkingDirectory()
-	permissionPath := filepath.Dir(filePath)
-	if strings.HasPrefix(filePath, rootDir) {
-		permissionPath = rootDir
-	}
+	permissionPath := permissionScope(filePath)
 	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
 			SessionID:   sessionID,
@@ -427,11 +419,7 @@ func (e *editTool) replaceContent(ctx context.Context, filePath, oldString, newS
 		newContent,
 		filePath,
 	)
-	rootDir := config.WorkingDirectory()
-	permissionPath := filepath.Dir(filePath)
-	if strings.HasPrefix(filePath, rootDir) {
-		permissionPath = rootDir
-	}
+	permissionPath := permissionScope(filePath)
 	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
 			SessionID:   sessionID,
