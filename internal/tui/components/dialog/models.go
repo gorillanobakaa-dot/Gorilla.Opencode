@@ -36,6 +36,14 @@ type CloseModelDialogMsg struct{}
 type ModelDialog interface {
 	tea.Model
 	layout.Bindings
+	// SwitchToProvider pre-scrolls the picker to the given provider's column
+	// and rebuilds the model list for it. A no-op if the provider is not in
+	// the current getEnabledProviders set — the picker opens on its default
+	// column rather than an empty screen.
+	//
+	// GORILLA OVERRIDE: needed for the /connect "u" (use for session) flow so
+	// UseProviderMsg can land the user on the right tab in one keypress.
+	SwitchToProvider(p models.ModelProvider)
 }
 
 type modelDialogCmp struct {
@@ -185,6 +193,31 @@ func (m *modelDialogCmp) switchProvider(offset int) {
 
 	m.hScrollOffset = newOffset
 	m.provider = m.availableProviders[m.hScrollOffset]
+	m.setupModelsForProvider(m.provider)
+}
+
+// SwitchToProvider pre-scrolls the picker to `p`'s column. Rebuilds the
+// enabled-providers list first, so a provider that was added via /connect a
+// moment ago is picked up. If `p` is not enabled, the picker opens on its
+// default column — the caller (typically a UseProviderMsg handler) is
+// responsible for ensuring the provider is registered first.
+//
+// GORILLA OVERRIDE: added for the /connect u=use-for-session flow.
+func (m *modelDialogCmp) SwitchToProvider(p models.ModelProvider) {
+	cfg := config.Get()
+	m.availableProviders = getEnabledProviders(cfg)
+	m.hScrollPossible = len(m.availableProviders) > 1
+	if len(m.availableProviders) == 0 {
+		return
+	}
+	idx := findProviderIndex(m.availableProviders, p)
+	if idx < 0 {
+		idx = 0
+	}
+	m.hScrollOffset = idx
+	m.provider = m.availableProviders[idx]
+	m.selectedIdx = 0
+	m.scrollOffset = 0
 	m.setupModelsForProvider(m.provider)
 }
 

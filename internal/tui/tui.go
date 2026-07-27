@@ -429,6 +429,16 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dialog.RunGoogleLoginMsg:
 		return a, a.runLogin()
 
+	// GORILLA OVERRIDE: /connect `u` — close the connect dialog, open the
+	// model picker pre-scrolled to the requested provider's tab. Replaces
+	// the "close, open /model, arrow across three tabs" ritual with one keypress.
+	case dialog.UseProviderMsg:
+		a.showConnectDialog = false
+		a.modelDialog.Init()
+		a.modelDialog.SwitchToProvider(msg.Provider)
+		a.showModelDialog = true
+		return a, util.ReportInfo(fmt.Sprintf("Switched to %s — pick a model", msg.Provider))
+
 	case dialog.ModelSelectedMsg:
 		a.showModelDialog = false
 
@@ -471,7 +481,11 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.modelDialog.Init()
 			a.showModelDialog = true
 			return a, nil
-		case "connect", "connections", "providers":
+		// GORILLA OVERRIDE: /provider and /switch are natural aliases —
+		// "I want to switch provider" maps intuitively to /connect, and
+		// /provider mirrors the /model → /provider parallel in
+		// Claude / Codex CLIs.
+		case "connect", "connections", "providers", "provider", "switch":
 			a.connectDialog.Init()
 			a.showConnectDialog = true
 			return a, nil
@@ -500,7 +514,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// and clear the gemini-oauth provider from config.
 			return a, a.runLogout()
 		default:
-			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /login, /logout, /export, /clear, /context, /tasks)", msg.Name))
+			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /provider, /login, /logout, /export, /clear, /context, /tasks)", msg.Name))
 		}
 
 	case dialog.CloseLoadoutDialogMsg:

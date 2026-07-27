@@ -31,6 +31,17 @@ type ConnectionChangedMsg struct{ Info string }
 // RunGoogleLoginMsg asks the TUI to run the existing Google OAuth flow.
 type RunGoogleLoginMsg struct{}
 
+// UseProviderMsg is emitted when the user presses `u` on a connected provider
+// in the /connect list. The TUI closes /connect and opens the model picker
+// pre-scrolled to that provider's tab — a one-keypress replacement for the
+// old "close, open /model, arrow across to the right tab" flow.
+//
+// GORILLA OVERRIDE: message did not exist upstream. Paired with
+// ModelDialog.SwitchToProvider and the handler in tui.go.
+type UseProviderMsg struct {
+	Provider models.ModelProvider
+}
+
 // ConnectDialog is the /connect dialog.
 type ConnectDialog interface {
 	tea.Model
@@ -84,6 +95,11 @@ type connectKeyMap struct {
 	Escape key.Binding
 	Toggle key.Binding
 	Tab    key.Binding
+	// GORILLA OVERRIDE: `u` = "use this provider for the current session".
+	// On a connected & enabled row, emits UseProviderMsg which the TUI turns
+	// into a jump to /model on the right tab. On a not-connected row we
+	// short-circuit to a status message rather than pretending to switch.
+	Use key.Binding
 }
 
 var connectKeys = connectKeyMap{
@@ -93,6 +109,7 @@ var connectKeys = connectKeyMap{
 	Escape: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close/back")),
 	Toggle: key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "enable/disable")),
 	Tab:    key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next field")),
+	Use:    key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "use for session")),
 }
 
 type connectDialogCmp struct {
@@ -164,6 +181,35 @@ func (m *connectDialogCmp) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, util.CmdHandler(CloseConnectDialogMsg{})
 	case key.Matches(msg, connectKeys.Toggle):
 		return m, m.toggleSelected()
+
+	// GORILLA OVERRIDE: `u` — jump directly to /model on this provider's tab.
+	// Only meaningful for a provider that is actually reachable — for a not-
+	// connected or disabled entry we tell the user what's missing rather than
+	// silently switching to a broken tab.
+	case key.Matches(msg, connectKeys.Use):
+		e := connectEntries[m.selectedIdx]
+		connected, disabled := m.status(e)
+		if !connected {
+			return m, util.CmdHandler(ConnectionChangedMsg{
+				Info: fmt.Sprintf("%s not connected yet — press enter to add a key or endpoint first", e.label),
+			})
+		}
+		if disabled {
+			return m, util.CmdHandler(ConnectionChangedMsg{
+				Info: fmt.Sprintf("%s is disabled — press space to enable, then u", e.label),
+			})
+		}
+		// Local endpoints all share ProviderLocal — the model picker
+		// distinguishes them by ID prefix, not by provider tab.
+		target := e.provider
+		if e.kind == kindLocal {
+			target = models.ProviderLocal
+		}
+		return m, tea.Batch(
+			util.CmdHandler(CloseConnectDialogMsg{}),
+			util.CmdHandler(UseProviderMsg{Provider: target}),
+		)
+
 	case key.Matches(msg, connectKeys.Enter):
 		e := connectEntries[m.selectedIdx]
 		if e.kind == kindGoogle {
@@ -404,7 +450,7 @@ func (m *connectDialogCmp) listView() string {
 	title := base.Foreground(t.Primary()).Bold(true).Width(w).
 		Render("Connections — coexist, never disable each other")
 	hint := base.Foreground(t.TextMuted()).Width(w).
-		Render("enter: add/edit   space: enable/disable   esc: close")
+		Render("enter: add/edit   space: enable/disable   u: use now   esc: close")
 
 	rows := make([]string, 0, len(connectEntries))
 	for i, e := range connectEntries {
