@@ -25,6 +25,11 @@ const (
 type localRouteInfo struct {
 	BaseURL string
 	APIKey  string
+	// Endpoint is the user's name for the connection ("Gorilla.FREE.NVIDIA.NIM",
+	// "ollama"). Every OpenAI-compatible endpoint lands under the single "local"
+	// provider, so without this a picker showing 104 models cannot say which of
+	// them is NVIDIA and which is the local Ollama.
+	Endpoint string
 }
 
 var localRoute = map[ModelID]localRouteInfo{}
@@ -48,7 +53,11 @@ func RegisterLocalEndpoint(name, baseURL, apiKey string) (int, ModelID) {
 		logging.Debug("No local models found", "endpoint", baseURL)
 		return 0, ""
 	}
-	ProviderPopularity[ProviderLocal] = 0
+	// Sort local first. It was 0, and getEnabledProviders maps 0 to 999 ("not
+	// ranked, show last") — so a deliberately configured endpoint sorted BELOW
+	// every provider the user has never touched. An endpoint someone added by
+	// hand is the one they are looking for.
+	ProviderPopularity[ProviderLocal] = 1
 	var first ModelID
 	n := 0
 	for _, m := range raw {
@@ -61,7 +70,7 @@ func RegisterLocalEndpoint(name, baseURL, apiKey string) (int, ModelID) {
 			_ = existing
 		}
 		SupportedModels[model.ID] = model
-		localRoute[model.ID] = localRouteInfo{BaseURL: baseURL, APIKey: apiKey}
+		localRoute[model.ID] = localRouteInfo{BaseURL: baseURL, APIKey: apiKey, Endpoint: name}
 		if first == "" {
 			first = model.ID
 		}
@@ -296,10 +305,23 @@ func friendlyModelName(modelID string) string {
 // listing — but config's validateAgent needs to be testable against a routed
 // model without standing up a real endpoint. GORILLA OVERRIDE.
 func RegisterLocalRouteForTest(id ModelID, baseURL, apiKey string) {
-	localRoute[id] = struct {
-		BaseURL string
-		APIKey  string
-	}{BaseURL: baseURL, APIKey: apiKey}
+	localRoute[id] = localRouteInfo{BaseURL: baseURL, APIKey: apiKey, Endpoint: "test"}
 }
 
 func ClearLocalRouteForTest(id ModelID) { delete(localRoute, id) }
+
+// LocalEndpointFor returns the user's name for the connection a local model is
+// served by, or "" if the model is not local.
+func LocalEndpointFor(id ModelID) string { return localRoute[id].Endpoint }
+
+// HasLocalModels reports whether any OpenAI-compatible endpoint successfully
+// registered models.
+//
+// GORILLA OVERRIDE: the /model picker builds its provider list from
+// cfg.Providers plus the *_API_KEY environment variables. ProviderLocal appears
+// in neither — local endpoints are configured as localEndpoints entries and
+// authenticate with their own per-endpoint key — so every discovered local
+// model was invisible in the picker. With an NVIDIA NIM key added through
+// /connect that meant 102 working models registered and none selectable, which
+// looks exactly like the key having been rejected.
+func HasLocalModels() bool { return len(localRoute) > 0 }

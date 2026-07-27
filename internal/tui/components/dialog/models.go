@@ -270,6 +270,14 @@ func (m *modelDialogCmp) View() string {
 		if d := m.models[i].Description; d != "" {
 			label = fmt.Sprintf("%s — %s", m.models[i].Name, d)
 		}
+		// GORILLA OVERRIDE: every OpenAI-compatible endpoint lands under the one
+		// "local" provider, so name the connection each model comes from.
+		// Otherwise a list mixing 102 NVIDIA NIM models with the two served by a
+		// local Ollama gives no way to tell which is the cloud quota and which is
+		// the machine in the room.
+		if ep := models.LocalEndpointFor(m.models[i].ID); ep != "" {
+			label = fmt.Sprintf("[%s] %s", ep, label)
+		}
 		if r := m.models[i].Rank; r > 0 {
 			label = fmt.Sprintf("%2d. %s", r, label)
 		}
@@ -400,6 +408,20 @@ func getEnabledProviders(cfg *config.Config) []models.ModelProvider {
 		}
 		providers = append(providers, p)
 		seen[p] = true
+	}
+
+	// GORILLA OVERRIDE: local (OpenAI-compatible) endpoints are configured as
+	// localEndpoints entries with their own per-endpoint key, so ProviderLocal
+	// appears in neither cfg.Providers nor the *_API_KEY environment scan above.
+	// Without this it was never listed, and every model discovered from NVIDIA
+	// NIM, Ollama or LM Studio was unselectable — 102 working NVIDIA models
+	// registered and none reachable, which is indistinguishable from the key
+	// having been refused.
+	if !seen[models.ProviderLocal] && models.HasLocalModels() {
+		if entry, ok := cfg.Providers[models.ProviderLocal]; !ok || !entry.Disabled {
+			providers = append(providers, models.ProviderLocal)
+			seen[models.ProviderLocal] = true
+		}
 	}
 
 	// Sort by provider popularity
