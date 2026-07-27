@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/app"
 	"github.com/opencode-ai/opencode/internal/auth"
+	"github.com/opencode-ai/opencode/internal/commands"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/llm/models"
@@ -130,7 +131,10 @@ type appModel struct {
 
 	showCommandDialog bool
 	commandDialog     dialog.CommandDialog
-	commands          []dialog.Command
+	// commandHelp is the /help and /commands plain-language reference.
+	// GORILLA OVERRIDE.
+	commandHelp dialog.CommandHelpDialog
+	commands    []dialog.Command
 
 	showModelDialog bool
 	modelDialog     dialog.ModelDialog
@@ -149,6 +153,7 @@ type appModel struct {
 
 	// GORILLA OVERRIDE: /add-dir and /cd — workspace roots.
 	showAddDirDialog bool
+	showCommandHelp  bool
 	// loginURL is the pending sign-in URL, shown as an overlay. GORILLA OVERRIDE.
 	loginURL     string
 	addDirDialog dialog.AddDirDialog
@@ -664,6 +669,14 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// agents; kill one, or the Nuclear Option (kill 'em all).
 			a.showTasksDialog = true
 			return a, nil
+		// GORILLA OVERRIDE: /help and /commands open the plain-language command
+		// reference. The program grew past the point where anyone could hold its
+		// command list in their head, including the person who asked for them.
+		case "help", "commands", "?":
+			a.commandHelp.Init()
+			a.commandHelp.SetSize(a.width, a.height)
+			a.showCommandHelp = true
+			return a, nil
 		case "login":
 			// GORILLA OVERRIDE: /login — run the browser OAuth flow
 			// to sign in with Google (Code Assist free tier).
@@ -673,8 +686,19 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// and clear the gemini-oauth provider from config.
 			return a, a.runLogout()
 		default:
-			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /provider, /settings, /add-dir, /prompts, /reset, /login, /logout, /export, /clear, /context, /tasks)", msg.Name))
+			// GORILLA OVERRIDE: suggest, then point at the reference. The old
+			// message recited a dozen command names regardless of what was typed,
+			// which is the least useful moment to hand someone a full list.
+			if s := commands.Suggest(msg.Name, 3); len(s) > 0 {
+				return a, util.ReportWarn(fmt.Sprintf("Unknown command /%s — did you mean /%s?  (/help lists them all)",
+					msg.Name, strings.Join(s, ", /")))
+			}
+			return a, util.ReportWarn(fmt.Sprintf("Unknown command /%s — type /help to see every command and what it does", msg.Name))
 		}
+
+	case dialog.CloseCommandHelpMsg:
+		a.showCommandHelp = false
+		return a, nil
 
 	case dialog.CloseLoadoutDialogMsg:
 		a.showLoadoutDialog = false
@@ -1044,6 +1068,12 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if a.showCommandHelp {
+		d, helpCmd := a.commandHelp.Update(msg)
+		a.commandHelp = d.(dialog.CommandHelpDialog)
+		return a, helpCmd
+	}
+
 	if a.showAddDirDialog {
 		d, addDirCmd := a.addDirDialog.Update(msg)
 		a.addDirDialog = d.(dialog.AddDirDialog)
@@ -1335,6 +1365,15 @@ func (a appModel) View() string {
 		)
 	}
 
+	if a.showCommandHelp {
+		overlay := a.commandHelp.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+	}
+
 	if a.loginURL != "" {
 		overlay := a.loginURLOverlay()
 		row := lipgloss.Height(appView) / 2
@@ -1478,6 +1517,7 @@ func New(app *app.App) tea.Model {
 		quit:           dialog.NewQuitCmp(),
 		sessionDialog:  dialog.NewSessionDialogCmp(),
 		commandDialog:  dialog.NewCommandDialogCmp(),
+		commandHelp:    dialog.NewCommandHelpCmp(),
 		modelDialog:    dialog.NewModelDialogCmp(),
 		connectDialog:  dialog.NewConnectDialogCmp(),
 		addDirDialog:   dialog.NewAddDirDialogCmp(),
