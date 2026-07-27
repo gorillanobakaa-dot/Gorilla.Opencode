@@ -48,6 +48,10 @@ opencode.md
 gorilla-opencode
 *.deb
 gorilla-opencode-linux-amd64
+# Per-release checksums: generated at release time and uploaded as a release
+# asset, which is where users verify against. Keeping copies in the repo just
+# accumulates stale duplicates of what GitHub already serves.
+SHA256SUMS-*.txt
 
 # Documentation intermediate build artifacts
 release_docs_*/*.json
