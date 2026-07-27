@@ -255,7 +255,10 @@ func (a *agent) generateTitle(ctx context.Context, sessionID string, content str
 		return err
 	}
 
-	title := strings.TrimSpace(strings.ReplaceAll(response.Content, "\n", " "))
+	// GORILLA OVERRIDE: the reply is untrusted text, not a title. See title.go —
+	// small models narrate, and the old trim-and-store put the narration in the
+	// sidebar. The user's own first message is the fallback.
+	title := sanitiseTitle(response.Content, content)
 	if title == "" {
 		return nil
 	}
