@@ -34,7 +34,10 @@ var baseModernCoderPrompt string
 // GORILLA OVERRIDE: exported so the context loadout can measure it.
 // Provider-neutral now — the modern prompt works across providers.
 func BaseCoderPrompt(provider models.ModelProvider) string {
-	return strings.TrimSpace(baseModernCoderPrompt)
+	// GORILLA OVERRIDE: assembled from the sections the /context loadout leaves
+	// enabled, over the ACTIVE prompt text (user override if present, else the
+	// embedded factory copy). Was a flat return of the embedded constant.
+	return assembleCoderPrompt()
 }
 
 // EnvironmentInfoBlock / LSPInfoBlock expose the switchable prompt blocks

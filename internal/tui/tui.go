@@ -150,6 +150,14 @@ type appModel struct {
 	showAddDirDialog bool
 	addDirDialog     dialog.AddDirDialog
 
+	// GORILLA OVERRIDE: /prompts — view, edit, section-toggle the system prompts.
+	showPromptsDialog bool
+	promptsDialog     dialog.PromptsDialog
+
+	// GORILLA OVERRIDE: /reset — scoped undo of configuration changes.
+	showResetDialog bool
+	resetDialog     dialog.ResetDialog
+
 	showInitDialog bool
 	initDialog     dialog.InitDialogCmp
 
@@ -273,6 +281,18 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		modelModel, modelSizeCmd := a.modelDialog.Update(msg)
 		a.modelDialog = modelModel.(dialog.ModelDialog)
 		cmds = append(cmds, modelSizeCmd)
+
+		addDirModel, addDirSizeCmd := a.addDirDialog.Update(msg)
+		a.addDirDialog = addDirModel.(dialog.AddDirDialog)
+		cmds = append(cmds, addDirSizeCmd)
+
+		promptsModel, promptsSizeCmd := a.promptsDialog.Update(msg)
+		a.promptsDialog = promptsModel.(dialog.PromptsDialog)
+		cmds = append(cmds, promptsSizeCmd)
+
+		resetModel, resetSizeCmd := a.resetDialog.Update(msg)
+		a.resetDialog = resetModel.(dialog.ResetDialog)
+		cmds = append(cmds, resetSizeCmd)
 
 		connectModel, connectSizeCmd := a.connectDialog.Update(msg)
 		a.connectDialog = connectModel.(dialog.ConnectDialog)
@@ -435,6 +455,34 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.showAddDirDialog = false
 		return a, nil
 
+	case dialog.ClosePromptsDialogMsg:
+		a.showPromptsDialog = false
+		return a, nil
+
+	case dialog.CloseResetDialogMsg:
+		a.showResetDialog = false
+		return a, nil
+
+	// A prompt edit or section toggle changes the system prompt, so the provider
+	// must be rebuilt for it to reach the model. ReloadCoderTools reports whether
+	// it had to defer because a turn is in flight (P4).
+	case dialog.PromptsChangedMsg:
+		info := msg.Info
+		if a.app.ReloadCoderTools() {
+			info += " — takes effect after the current turn finishes"
+		}
+		return a, util.ReportInfo(info)
+
+	// A reset can touch roots (context files) and prompts, so invalidate the
+	// context cache as well as rebuilding the provider.
+	case dialog.ResetAppliedMsg:
+		prompt.InvalidateContextCache()
+		info := msg.Info
+		if a.app.ReloadCoderTools() {
+			info += " — takes effect after the current turn finishes"
+		}
+		return a, util.ReportInfo(info)
+
 	// GORILLA OVERRIDE: a root change must reach the MODEL, not just the config
 	// file. Three things have to happen or the control is a silent no-op:
 	//   1. the project-context cache is invalidated, so the new root's CLAUDE.md
@@ -527,6 +575,18 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.addDirDialog.Init()
 			a.showAddDirDialog = true
 			return a, nil
+		// GORILLA OVERRIDE: /prompts — see exactly what the AI is told, edit it
+		// in $EDITOR, or switch individual sections of the coder prompt off.
+		case "prompts", "prompt":
+			a.promptsDialog.Init()
+			a.showPromptsDialog = true
+			return a, nil
+		// GORILLA OVERRIDE: /reset — undo config changes by scope. Never touches
+		// credentials (that is /connect) or sessions (that is /clear).
+		case "reset", "defaults":
+			a.resetDialog.Init()
+			a.showResetDialog = true
+			return a, nil
 		case "export":
 			return a, a.exportSession()
 		case "clear", "new":
@@ -552,7 +612,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// and clear the gemini-oauth provider from config.
 			return a, a.runLogout()
 		default:
-			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /provider, /add-dir, /login, /logout, /export, /clear, /context, /tasks)", msg.Name))
+			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /provider, /add-dir, /prompts, /reset, /login, /logout, /export, /clear, /context, /tasks)", msg.Name))
 		}
 
 	case dialog.CloseLoadoutDialogMsg:
@@ -707,6 +767,12 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if a.showAddDirDialog {
 				a.showAddDirDialog = false
+			}
+			if a.showPromptsDialog {
+				a.showPromptsDialog = false
+			}
+			if a.showResetDialog {
+				a.showResetDialog = false
 			}
 			if a.showMultiArgumentsDialog {
 				a.showMultiArgumentsDialog = false
@@ -904,6 +970,24 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d, addDirCmd := a.addDirDialog.Update(msg)
 		a.addDirDialog = d.(dialog.AddDirDialog)
 		cmds = append(cmds, addDirCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showPromptsDialog {
+		d, promptsCmd := a.promptsDialog.Update(msg)
+		a.promptsDialog = d.(dialog.PromptsDialog)
+		cmds = append(cmds, promptsCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showResetDialog {
+		d, resetCmd := a.resetDialog.Update(msg)
+		a.resetDialog = d.(dialog.ResetDialog)
+		cmds = append(cmds, resetCmd)
 		if _, ok := msg.(tea.KeyMsg); ok {
 			return a, tea.Batch(cmds...)
 		}
@@ -1173,6 +1257,24 @@ func (a appModel) View() string {
 		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
 	}
 
+	if a.showPromptsDialog {
+		overlay := a.promptsDialog.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+	}
+
+	if a.showResetDialog {
+		overlay := a.resetDialog.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+	}
+
 	if a.showConnectDialog {
 		overlay := a.connectDialog.View()
 		row := lipgloss.Height(appView) / 2
@@ -1260,6 +1362,8 @@ func New(app *app.App) tea.Model {
 		modelDialog:   dialog.NewModelDialogCmp(),
 		connectDialog: dialog.NewConnectDialogCmp(),
 		addDirDialog:  dialog.NewAddDirDialogCmp(),
+		promptsDialog: dialog.NewPromptsDialogCmp(),
+		resetDialog:   dialog.NewResetDialogCmp(),
 		loadoutDialog: dialog.NewLoadoutDialogCmp(),
 		tasksDialog:   dialog.NewTasksDialogCmp(),
 		permissions:   dialog.NewPermissionDialogCmp(),

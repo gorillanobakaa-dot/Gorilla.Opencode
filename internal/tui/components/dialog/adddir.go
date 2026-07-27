@@ -104,8 +104,21 @@ func (m *addDirDialogCmp) refresh() {
 }
 
 func (m *addDirDialogCmp) width_() int {
-	if m.width > 0 && m.width-8 > addDirDialogWidth {
-		return m.width - 8
+	// GORILLA OVERRIDE: the terminal width MINUS this dialog's own chrome, not a
+	// content width the chrome is then added to. The border (1+1) and padding
+	// (2+2) cost 6 columns; ignoring them made the dialog 82 columns wide in an
+	// 80-column terminal, which clips or wraps. Same trap as the v0.1.38
+	// invisible input box — a wrapper is never free.
+	const chrome = 6
+	if m.width > 0 {
+		w := m.width - chrome
+		if w < 40 {
+			return 40
+		}
+		if w > addDirDialogWidth {
+			return addDirDialogWidth
+		}
+		return w
 	}
 	return addDirDialogWidth
 }

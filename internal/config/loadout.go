@@ -58,6 +58,33 @@ var LoadoutComponents = []LoadoutComponent{
 	{"prompt.lsp", "LSP info", "agent won't be told which language servers are active", 100, true, false},
 }
 
+// RegisterLoadoutComponents appends dynamically discovered switchable
+// components — prompt sections, language servers — to the registry.
+//
+// Idempotent by ID so calling it twice (config reload, a second Load in a test
+// binary) cannot duplicate a row. Sorted by the caller; append order is kept so
+// related rows stay together in the /context menu.
+//
+// GORILLA OVERRIDE: the registry was a fixed var. Prompt sections are only
+// knowable after parsing the ACTIVE prompt, and config cannot import prompt
+// (prompt imports config), so registration is pushed in from the other side.
+func RegisterLoadoutComponents(extra []LoadoutComponent) {
+	if len(extra) == 0 {
+		return
+	}
+	existing := make(map[string]bool, len(LoadoutComponents))
+	for _, c := range LoadoutComponents {
+		existing[c.ID] = true
+	}
+	for _, c := range extra {
+		if c.ID == "" || existing[c.ID] {
+			continue
+		}
+		LoadoutComponents = append(LoadoutComponents, c)
+		existing[c.ID] = true
+	}
+}
+
 // LSPComponentID is the loadout id for one configured language server.
 // Keeping the prefix in one function means the gate in internal/app/lsp.go and
 // the registration below cannot drift apart.
