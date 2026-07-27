@@ -102,18 +102,22 @@ type Config struct {
 	// stays the PRIMARY root — relative paths still resolve against it, so no
 	// tool call site changes. These extend context-file loading, permission
 	// scoping, the env block and LSP watching. See internal/config/roots.go.
-	AdditionalDirs []string                          `json:"additionalDirs,omitempty"`
-	MCPServers     map[string]MCPServer              `json:"mcpServers,omitempty"`
-	Providers      map[models.ModelProvider]Provider `json:"providers,omitempty"`
-	LocalEndpoints []LocalEndpoint                   `json:"localEndpoints,omitempty"`
-	LSP            map[string]LSPConfig              `json:"lsp,omitempty"`
-	Agents         map[AgentName]Agent               `json:"agents,omitempty"`
-	Debug          bool                              `json:"debug,omitempty"`
-	DebugLSP       bool                              `json:"debugLSP,omitempty"`
-	ContextPaths   []string                          `json:"contextPaths,omitempty"`
-	TUI            TUIConfig                         `json:"tui"`
-	Shell          ShellConfig                       `json:"shell,omitempty"`
-	AutoCompact    bool                              `json:"autoCompact,omitempty"`
+	AdditionalDirs []string `json:"additionalDirs,omitempty"`
+	// GORILLA OVERRIDE: suppresses the startup workspace picker. Stored as the
+	// negative because omitempty drops a false, so an "ask" bool could never be
+	// persisted as off. See PeekStartupWorkspace.
+	SkipWorkspacePrompt bool                              `json:"skipWorkspacePrompt,omitempty"`
+	MCPServers          map[string]MCPServer              `json:"mcpServers,omitempty"`
+	Providers           map[models.ModelProvider]Provider `json:"providers,omitempty"`
+	LocalEndpoints      []LocalEndpoint                   `json:"localEndpoints,omitempty"`
+	LSP                 map[string]LSPConfig              `json:"lsp,omitempty"`
+	Agents              map[AgentName]Agent               `json:"agents,omitempty"`
+	Debug               bool                              `json:"debug,omitempty"`
+	DebugLSP            bool                              `json:"debugLSP,omitempty"`
+	ContextPaths        []string                          `json:"contextPaths,omitempty"`
+	TUI                 TUIConfig                         `json:"tui"`
+	Shell               ShellConfig                       `json:"shell,omitempty"`
+	AutoCompact         bool                              `json:"autoCompact,omitempty"`
 }
 
 // Application constants

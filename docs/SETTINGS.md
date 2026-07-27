@@ -119,6 +119,17 @@ Filenames the program looks for in each of your folders and feeds to the AI as p
 - **Accepts:** comma-separated list
 - **Default:** `.github/copilot-instructions.md, .cursorrules, .cursor/rules/, CLAUDE.md, CLAUDE.local.md, opencode.md, opencode.local.md, OpenCode.md, OpenCode.local.md, OPENCODE.md, OPENCODE.local.md`
 
+### Ask which folder to work in at startup
+
+Whether the program asks you to pick a working folder each time it starts.
+
+- **ON:** you pick the folder on launch, so clicking the desktop icon does not scope the AI to your whole home folder
+- **OFF:** it starts silently in the folder you last used, and you change it with /cd
+- **Setting:** `askWorkspaceOnStartup`
+- **Type:** on/off
+- **Accepts:** on or off
+- **Default:** `ON`
+
 ### Program data folder
 
 Folder inside your project where this program keeps its database and logs.
