@@ -60,6 +60,7 @@ func CalibrateLoadout(
 	set("tool.patch", tools.NewPatchTool(lspClients, permissions, history))
 	set("tool.write", tools.NewWriteTool(lspClients, permissions, history))
 	set("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions))
+	set("tool.sparse", tools.NewSparseTool(permissions))
 	if len(lspClients) > 0 {
 		set("tool.diagnostics", tools.NewDiagnosticsTool(lspClients))
 	}
