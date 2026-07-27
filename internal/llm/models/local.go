@@ -289,3 +289,17 @@ func friendlyModelName(modelID string) string {
 
 	return strings.Join(parts, " ")
 }
+
+// RegisterLocalRouteForTest and ClearLocalRouteForTest expose the route table to
+// tests in other packages. localRoute is intentionally unexported — a route is
+// only legitimately created by RegisterLocalEndpoint after a successful /v1/models
+// listing — but config's validateAgent needs to be testable against a routed
+// model without standing up a real endpoint. GORILLA OVERRIDE.
+func RegisterLocalRouteForTest(id ModelID, baseURL, apiKey string) {
+	localRoute[id] = struct {
+		BaseURL string
+		APIKey  string
+	}{BaseURL: baseURL, APIKey: apiKey}
+}
+
+func ClearLocalRouteForTest(id ModelID) { delete(localRoute, id) }

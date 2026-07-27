@@ -641,6 +641,21 @@ func validateAgent(cfg *Config, name AgentName, agent Agent) error {
 		return revertAgentToDefault(name, agent, "unknown model")
 	}
 
+	// GORILLA OVERRIDE: a model served by a configured local endpoint (Ollama,
+	// NIM, LM Studio) is reachable by definition — models.RegisterLocalEndpoint
+	// only registers a model after successfully listing it from that endpoint,
+	// and LocalRouteFor carries its baseURL and key. But ProviderLocal has no
+	// entry in cfg.Providers and no *_API_KEY, so the checks below judged every
+	// local model "not configured" and silently swapped the agent onto a cloud
+	// model. With Ollama running and gemma3:270m registered, three agents were
+	// reverted on every single startup and the user saw three "is unusable"
+	// notes for a setup that was working.
+	if model.Provider == models.ProviderLocal {
+		if _, _, routed := models.LocalRouteFor(agent.Model); routed {
+			return validateAgentMaxTokens(cfg, name, agent, model)
+		}
+	}
+
 	// Check if provider for the model is configured
 	provider := model.Provider
 	providerCfg, providerExists := cfg.Providers[provider]
@@ -666,6 +681,14 @@ func validateAgent(cfg *Config, name AgentName, agent Agent) error {
 		return revertAgentToDefault(name, agent, reason)
 	}
 
+	return validateAgentMaxTokens(cfg, name, agent, model)
+}
+
+// validateAgentMaxTokens clamps an agent's max-tokens and reasoning effort to
+// what its model supports. Split out of validateAgent so the local-endpoint
+// path can run the same checks without going through the provider-key logic
+// that does not apply to a locally-served model. GORILLA OVERRIDE.
+func validateAgentMaxTokens(cfg *Config, name AgentName, agent Agent, model models.Model) error {
 	// Validate max tokens
 	if agent.MaxTokens <= 0 {
 		logging.Warn("invalid max tokens, setting to default",
@@ -699,7 +722,7 @@ func validateAgent(cfg *Config, name AgentName, agent Agent) error {
 	// GORILLA OVERRIDE: operator-precedence bug — the original condition
 	// parsed as (CanReason && OpenAI) || Local, forcing reasoning effort
 	// onto every local-provider model whether it can reason or not.
-	if model.CanReason && (provider == models.ProviderOpenAI || provider == models.ProviderLocal) {
+	if model.CanReason && (model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal) {
 		if agent.ReasoningEffort == "" {
 			// Set default reasoning effort for models that support it
 			logging.Info("setting default reasoning effort for model that supports reasoning",
