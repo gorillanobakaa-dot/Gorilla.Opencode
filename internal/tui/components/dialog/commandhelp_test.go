@@ -1,12 +1,15 @@
 package dialog
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"github.com/opencode-ai/opencode/internal/commands"
+	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
 
 func newHelpAt(t *testing.T, w, h int) *commandHelpCmp {
@@ -143,5 +146,105 @@ func TestEscapeClosesTheReference(t *testing.T) {
 	}
 	if _, ok := cmd().(CloseCommandHelpMsg); !ok {
 		t.Errorf("esc emitted %T, want CloseCommandHelpMsg", cmd())
+	}
+}
+
+// The bug the user's screenshots caught: the SELECTED command rendered as a
+// blank line, so /help looked like it was missing whichever command you were
+// currently reading about — /clear absent with /clear's explanation below it.
+//
+// Cause: the row style set a highlight background, and the shared line() helper
+// then reset the background to the panel colour, leaving foreground equal to
+// background. Invisible text.
+//
+// Note why the earlier tests all passed: a row still CONTAINS its text when
+// foreground and background match, so asserting `strings.Contains(view, "/clear")`
+// says nothing about whether a human can see it. The colours have to be asserted.
+func TestSelectedRowIsVisible(t *testing.T) {
+	th := theme.CurrentTheme()
+	base := lipgloss.NewStyle().Background(th.Background())
+
+	sel := rowStyle(base, th, true)
+	if sel.GetForeground() == sel.GetBackground() {
+		t.Errorf("selected row has foreground == background (%v) — it renders as an invisible blank line",
+			sel.GetForeground())
+	}
+
+	unsel := rowStyle(base, th, false)
+	if unsel.GetForeground() == unsel.GetBackground() {
+		t.Errorf("unselected row has foreground == background (%v)", unsel.GetForeground())
+	}
+
+	// And the highlight must actually distinguish the row, or there is no visible
+	// cursor at all.
+	if sel.GetBackground() == unsel.GetBackground() {
+		t.Errorf("selected and unselected share background %v — nothing marks the cursor", sel.GetBackground())
+	}
+}
+
+// End-to-end guard on the same fault, at the render level.
+//
+// Two earlier versions of this test were wrong, which is worth recording because
+// each failure mode is easy to repeat:
+//  1. Asserting the selected line carried SOME background escape. The buggy code
+//     also does — it inherits the panel background — so the test passed against
+//     the bug.
+//  2. Taking the FIRST background escape on the line. That is the box's leading
+//     padding, not the row, so the test failed against correct code.
+//
+// The background that matters is the one in force where the command name is
+// printed: the LAST background set before that text.
+func TestSelectedRowCarriesAHighlightInTheRender(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(prev) })
+
+	m := newHelpAt(t, 100, 40)
+	view := m.View()
+
+	sel := m.rows[m.selectedIdx].cmd
+	if sel == nil {
+		t.Fatal("nothing selected")
+	}
+
+	bgRe := regexp.MustCompile(`48;2;(\d+;\d+;\d+)`)
+	// bgAtText returns the background in force where needle is printed.
+	bgAtText := func(line, needle string) (string, bool) {
+		i := strings.Index(line, needle)
+		if i < 0 {
+			return "", false
+		}
+		all := bgRe.FindAllStringSubmatch(line[:i], -1)
+		if len(all) == 0 {
+			return "", true
+		}
+		return all[len(all)-1][1], true
+	}
+
+	var selBG, otherBG string
+	var haveSel, haveOther bool
+	for _, l := range strings.Split(view, "\n") {
+		if bg, ok := bgAtText(l, "/"+sel.Name+" "); ok && !haveSel {
+			selBG, haveSel = bg, true
+			continue
+		}
+		for _, c := range commands.All {
+			if c.Name == sel.Name || haveOther {
+				continue
+			}
+			if bg, ok := bgAtText(l, "/"+c.Name+" "); ok {
+				otherBG, haveOther = bg, true
+			}
+		}
+	}
+
+	if !haveSel {
+		t.Fatalf("the selected command /%s is not in the view at all", sel.Name)
+	}
+	if !haveOther {
+		t.Fatal("could not find an unselected command row to compare against")
+	}
+	if selBG == otherBG {
+		t.Errorf("the selected row's background (%s) equals an unselected row's — nothing marks the cursor, and if the foreground also matches it the row reads as blank", selBG)
 	}
 }
