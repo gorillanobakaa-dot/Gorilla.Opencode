@@ -158,6 +158,10 @@ type appModel struct {
 	showResetDialog bool
 	resetDialog     dialog.ResetDialog
 
+	// GORILLA OVERRIDE: /settings — every tunable option with its range and default.
+	showSettingsDialog bool
+	settingsDialog     dialog.SettingsDialog
+
 	showInitDialog bool
 	initDialog     dialog.InitDialogCmp
 
@@ -293,6 +297,10 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		resetModel, resetSizeCmd := a.resetDialog.Update(msg)
 		a.resetDialog = resetModel.(dialog.ResetDialog)
 		cmds = append(cmds, resetSizeCmd)
+
+		settingsModel, settingsSizeCmd := a.settingsDialog.Update(msg)
+		a.settingsDialog = settingsModel.(dialog.SettingsDialog)
+		cmds = append(cmds, settingsSizeCmd)
 
 		connectModel, connectSizeCmd := a.connectDialog.Update(msg)
 		a.connectDialog = connectModel.(dialog.ConnectDialog)
@@ -463,6 +471,23 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.showResetDialog = false
 		return a, nil
 
+	case dialog.CloseSettingsDialogMsg:
+		a.showSettingsDialog = false
+		return a, nil
+
+	// A setting change may alter the prompt (contextPaths) or the tool set, so it
+	// goes through the same rebuild path as everything else and reports honestly
+	// when a turn is in flight.
+	case dialog.SettingsChangedMsg:
+		if msg.InvalidateCtx {
+			prompt.InvalidateContextCache()
+		}
+		info := msg.Info
+		if a.app.ReloadCoderTools() {
+			info += " — takes effect after the current turn finishes"
+		}
+		return a, util.ReportInfo(info)
+
 	// A prompt edit or section toggle changes the system prompt, so the provider
 	// must be rebuilt for it to reach the model. ReloadCoderTools reports whether
 	// it had to defer because a turn is in flight (P4).
@@ -587,6 +612,12 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.resetDialog.Init()
 			a.showResetDialog = true
 			return a, nil
+		// GORILLA OVERRIDE: /settings — every option, its plain-language
+		// description, what it accepts, and its default, all on screen.
+		case "settings", "config", "prefs":
+			a.settingsDialog.Init()
+			a.showSettingsDialog = true
+			return a, nil
 		case "export":
 			return a, a.exportSession()
 		case "clear", "new":
@@ -612,7 +643,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// and clear the gemini-oauth provider from config.
 			return a, a.runLogout()
 		default:
-			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /provider, /add-dir, /prompts, /reset, /login, /logout, /export, /clear, /context, /tasks)", msg.Name))
+			return a, util.ReportWarn(fmt.Sprintf("Unknown command: /%s (try /model, /provider, /settings, /add-dir, /prompts, /reset, /login, /logout, /export, /clear, /context, /tasks)", msg.Name))
 		}
 
 	case dialog.CloseLoadoutDialogMsg:
@@ -773,6 +804,9 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if a.showResetDialog {
 				a.showResetDialog = false
+			}
+			if a.showSettingsDialog {
+				a.showSettingsDialog = false
 			}
 			if a.showMultiArgumentsDialog {
 				a.showMultiArgumentsDialog = false
@@ -988,6 +1022,15 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d, resetCmd := a.resetDialog.Update(msg)
 		a.resetDialog = d.(dialog.ResetDialog)
 		cmds = append(cmds, resetCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showSettingsDialog {
+		d, settingsCmd := a.settingsDialog.Update(msg)
+		a.settingsDialog = d.(dialog.SettingsDialog)
+		cmds = append(cmds, settingsCmd)
 		if _, ok := msg.(tea.KeyMsg); ok {
 			return a, tea.Batch(cmds...)
 		}
@@ -1275,6 +1318,15 @@ func (a appModel) View() string {
 		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
 	}
 
+	if a.showSettingsDialog {
+		overlay := a.settingsDialog.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+	}
+
 	if a.showConnectDialog {
 		overlay := a.connectDialog.View()
 		row := lipgloss.Height(appView) / 2
@@ -1352,25 +1404,26 @@ func (a appModel) View() string {
 func New(app *app.App) tea.Model {
 	startPage := page.ChatPage
 	model := &appModel{
-		currentPage:   startPage,
-		loadedPages:   make(map[page.PageID]bool),
-		status:        core.NewStatusCmp(app.LSPClients),
-		help:          dialog.NewHelpCmp(),
-		quit:          dialog.NewQuitCmp(),
-		sessionDialog: dialog.NewSessionDialogCmp(),
-		commandDialog: dialog.NewCommandDialogCmp(),
-		modelDialog:   dialog.NewModelDialogCmp(),
-		connectDialog: dialog.NewConnectDialogCmp(),
-		addDirDialog:  dialog.NewAddDirDialogCmp(),
-		promptsDialog: dialog.NewPromptsDialogCmp(),
-		resetDialog:   dialog.NewResetDialogCmp(),
-		loadoutDialog: dialog.NewLoadoutDialogCmp(),
-		tasksDialog:   dialog.NewTasksDialogCmp(),
-		permissions:   dialog.NewPermissionDialogCmp(),
-		initDialog:    dialog.NewInitDialogCmp(),
-		themeDialog:   dialog.NewThemeDialogCmp(),
-		app:           app,
-		commands:      []dialog.Command{},
+		currentPage:    startPage,
+		loadedPages:    make(map[page.PageID]bool),
+		status:         core.NewStatusCmp(app.LSPClients),
+		help:           dialog.NewHelpCmp(),
+		quit:           dialog.NewQuitCmp(),
+		sessionDialog:  dialog.NewSessionDialogCmp(),
+		commandDialog:  dialog.NewCommandDialogCmp(),
+		modelDialog:    dialog.NewModelDialogCmp(),
+		connectDialog:  dialog.NewConnectDialogCmp(),
+		addDirDialog:   dialog.NewAddDirDialogCmp(),
+		promptsDialog:  dialog.NewPromptsDialogCmp(),
+		resetDialog:    dialog.NewResetDialogCmp(),
+		settingsDialog: dialog.NewSettingsDialogCmp(),
+		loadoutDialog:  dialog.NewLoadoutDialogCmp(),
+		tasksDialog:    dialog.NewTasksDialogCmp(),
+		permissions:    dialog.NewPermissionDialogCmp(),
+		initDialog:     dialog.NewInitDialogCmp(),
+		themeDialog:    dialog.NewThemeDialogCmp(),
+		app:            app,
+		commands:       []dialog.Command{},
 		pages: map[page.PageID]tea.Model{
 			page.ChatPage: page.NewChatPage(app),
 			page.LogsPage: page.NewLogsPage(),

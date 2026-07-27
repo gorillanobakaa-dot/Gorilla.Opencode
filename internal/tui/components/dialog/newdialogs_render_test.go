@@ -1,6 +1,7 @@
 package dialog
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -164,5 +165,67 @@ func TestNewDialogsFitNarrowTerminals(t *testing.T) {
 		}
 		lines := renderAt(t, m, 60, 20)
 		assertUniformWidth(t, name+"/narrow", lines)
+	}
+}
+
+// /settings is the first dialog whose list can exceed the terminal height, so it
+// is the one most at risk from the container-chrome trap that made the v0.1.38
+// input box invisible. These assertions check it at heights from cramped to large.
+func TestSettingsDialogRendersAtEveryHeight(t *testing.T) {
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	m := NewSettingsDialogCmp()
+	m.Init()
+
+	for _, tc := range []struct{ w, h int }{
+		{120, 50}, // roomy
+		{120, 24}, // typical
+		{100, 14}, // cramped — the case that breaks naive height maths
+		{80, 10},  // absurdly short
+		{200, 60}, // wide
+	} {
+		lines := renderAt(t, m, tc.w, tc.h)
+		assertUniformWidth(t, fmt.Sprintf("settings@%dx%d", tc.w, tc.h), lines)
+
+		if got := lipgloss.Width(lines[0]); got > tc.w {
+			t.Errorf("settings is %d columns wide in a %d-column terminal", got, tc.w)
+		}
+		// It must never render taller than the terminal, or it scrolls the
+		// screen and destroys the layout.
+		if len(lines) > tc.h {
+			t.Errorf("settings rendered %d lines in a %d-line terminal", len(lines), tc.h)
+		}
+	}
+}
+
+// The requirement is that value, accepted range and default are all visible on
+// the row — not buried in a help page.
+func TestSettingsShowsValueRangeAndDefault(t *testing.T) {
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	m := NewSettingsDialogCmp()
+	m.Init()
+	joined := strings.Join(renderAt(t, m, 130, 60), "\n")
+
+	for _, want := range []string{
+		"Settings",
+		"default",      // every row states its default
+		"Conversation", // group headers present
+		"Network and pace",
+		"differ from the shipped defaults",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("settings view missing %q:\n%s", want, joined)
+		}
+	}
+
+	// The inventory pointers keep /settings complete without duplicating other
+	// commands' ownership.
+	for _, want := range []string{"/model", "/connect", "/context"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("settings view does not point at %s for what it does not own:\n%s", want, joined)
+		}
 	}
 }
