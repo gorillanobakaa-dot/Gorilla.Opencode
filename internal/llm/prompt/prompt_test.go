@@ -34,6 +34,13 @@ func TestGetContextFromPaths(t *testing.T) {
 
 	createTestFiles(t, tmpDir, testFiles)
 
+	// The context cache is process-wide and config.Load() is a no-op once
+	// something else has loaded it, so a fresh temp dir is not enough — the
+	// cache has to be told the roots changed. This is the same call /add-dir
+	// and /cd make. Without it this test passes at -count=1 and fails at
+	// -count=2+, being served the first run's content.
+	InvalidateContextCache()
+
 	context := getContextFromPaths()
 	expectedContext := fmt.Sprintf("# From:%s/file.txt\nfile.txt: test content\n# From:%s/directory/file_a.txt\ndirectory/file_a.txt: test content\n# From:%s/directory/file_b.txt\ndirectory/file_b.txt: test content\n# From:%s/directory/file_c.txt\ndirectory/file_c.txt: test content", tmpDir, tmpDir, tmpDir, tmpDir)
 	assert.Equal(t, expectedContext, context)
