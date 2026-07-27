@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/auth"
@@ -192,6 +193,11 @@ func Load(workingDir string, debug bool) (*Config, error) {
 	// GORILLA OVERRIDE: register every configured OpenAI-compatible local
 	// endpoint (NIM, Ollama, ...) so their models coexist in the picker.
 	registerLocalEndpoints()
+
+	// GORILLA OVERRIDE: one switchable /context row per configured language
+	// server, so clangd/gopls/rust-analyzer can be turned off individually
+	// rather than only in bulk. Must run after the LSP map is unmarshalled.
+	registerLSPLoadoutRows()
 
 	defaultLevel := slog.LevelInfo
 	if cfg.Debug {
@@ -826,6 +832,54 @@ func getProviderAPIKey(provider models.ModelProvider) string {
 		}
 	}
 	return ""
+}
+
+// registerLSPLoadoutRows creates a /context row per configured language server.
+// GORILLA OVERRIDE.
+func registerLSPLoadoutRows() {
+	if len(cfg.LSP) == 0 {
+		return
+	}
+	disabled := make(map[string]bool, len(cfg.LSP))
+	for name, l := range cfg.LSP {
+		disabled[name] = l.Disabled
+	}
+	RegisterLSPComponents(disabled)
+}
+
+// LSPEnabled reports whether a configured language server should run. It ANDs
+// the config's own Disabled flag with the /context loadout toggle, so either
+// switch can turn a server off and neither silently overrides the other.
+//
+// GORILLA OVERRIDE: the gate consulted by internal/app/lsp.go before starting
+// a client. Turning a row off in /context therefore prevents the process from
+// starting at all on the next launch — the memory and CPU saving, not just a
+// token one.
+func LSPEnabled(name string) bool {
+	if cfg == nil {
+		return true
+	}
+	if l, ok := cfg.LSP[name]; ok && l.Disabled {
+		return false
+	}
+	return LoadoutEnabled(LSPComponentID(name))
+}
+
+// EnabledLSPNames returns the sorted names of language servers that are both
+// configured and enabled. Used by the prompt's LSP block so it can name the
+// servers actually watching the user's edits.
+func EnabledLSPNames() []string {
+	if cfg == nil {
+		return nil
+	}
+	var out []string
+	for name := range cfg.LSP {
+		if LSPEnabled(name) {
+			out = append(out, name)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // AvailableViaEnv returns providers whose API-key environment variable is

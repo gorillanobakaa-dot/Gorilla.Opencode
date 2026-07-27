@@ -205,23 +205,24 @@ func gitStatusBrief(dir string, maxLines int) string {
 }
 
 func lspInformation() string {
-	cfg := config.Get()
-	hasLSP := false
-	for _, v := range cfg.LSP {
-		if !v.Disabled {
-			hasLSP = true
-			break
-		}
-	}
-	if !hasLSP {
+	// GORILLA OVERRIDE: name the servers that are actually running instead of a
+	// generic paragraph. The model can then reason about which languages have
+	// live diagnostics — previously it was told diagnostics "may" appear with no
+	// way to know for which files, so it either ignored them or assumed
+	// coverage it did not have.
+	active := config.EnabledLSPNames()
+	if len(active) == 0 {
 		return ""
 	}
-	return `# LSP Information
-Tools that support it will also include useful diagnostics such as linting and typechecking.
-- These diagnostics will be automatically enabled when you run the tool, and will be displayed in the output at the bottom within the <file_diagnostics></file_diagnostics> and <project_diagnostics></project_diagnostics> tags.
-- Take necessary actions to fix the issues.
-- You should ignore diagnostics of files that you did not change or are not related or caused by your changes unless the user explicitly asks you to fix them.
-`
+	return fmt.Sprintf(`# LSP Information
+Active language servers: %s. Edits to files they cover come back with live
+compiler/linter diagnostics in <file_diagnostics></file_diagnostics> and
+<project_diagnostics></project_diagnostics> tags.
+- Fix diagnostics your change caused, in the same turn.
+- Ignore diagnostics in files you did not touch unless asked.
+- A language not listed above has NO live diagnostics: verify those edits by
+  building or running tests instead of assuming they are clean.
+`, strings.Join(active, ", "))
 }
 
 func boolToYesNo(b bool) string {

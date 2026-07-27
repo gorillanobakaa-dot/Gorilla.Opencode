@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/opencode-ai/opencode/internal/llm/models"
@@ -49,6 +50,58 @@ var LoadoutComponents = []LoadoutComponent{
 	// still overwrites this at startup with a measured value.
 	{"prompt.env", "Environment info", "agent won't be told your cwd, OS, top-level files, or short git status", 150, true, false},
 	{"prompt.lsp", "LSP info", "agent won't be told which language servers are active", 100, true, false},
+}
+
+// LSPComponentID is the loadout id for one configured language server.
+// Keeping the prefix in one function means the gate in internal/app/lsp.go and
+// the registration below cannot drift apart.
+func LSPComponentID(name string) string { return "lsp." + name }
+
+// RegisterLSPComponents adds one switchable loadout row per configured language
+// server, so clangd / gopls / rust-analyzer can be turned off individually
+// instead of only in bulk via the single "LSP info" row.
+//
+// GORILLA OVERRIDE: idempotent by id, so calling it twice (or after a config
+// reload) does not duplicate rows. The default follows the config's own
+// Disabled flag — a server the user disabled in config.json starts life as an
+// off row rather than silently re-enabling itself.
+//
+// What turning a row OFF actually saves: the LSP process never starts (real
+// memory and CPU — clangd on Firefox is 500MB-2GB), the per-edit diagnostics
+// for that language stop riding tool responses, and the language stops being
+// named in the prompt's LSP block. It is NOT primarily a token saving; the
+// honest win is process weight and per-edit diagnostic volume.
+func RegisterLSPComponents(lspNames map[string]bool) {
+	existing := make(map[string]bool, len(LoadoutComponents))
+	for _, c := range LoadoutComponents {
+		existing[c.ID] = true
+	}
+
+	names := make([]string, 0, len(lspNames))
+	for n := range lspNames {
+		names = append(names, n)
+	}
+	sort.Strings(names) // stable row order in the /context menu
+
+	for _, name := range names {
+		id := LSPComponentID(name)
+		if existing[id] {
+			continue
+		}
+		LoadoutComponents = append(LoadoutComponents, LoadoutComponent{
+			ID:   id,
+			Name: "LSP: " + name,
+			Tradeoff: "agent gets no live compiler/linter feedback for " + name +
+				" files, and that language server does not run at all",
+			// Measured by agent.CalibrateLoadout at startup where possible.
+			// The per-turn prompt cost of one named server is small (a word in
+			// the LSP block); the real cost is the process and its per-edit
+			// diagnostics, which no per-turn number can represent.
+			Tokens:   10,
+			Default:  !lspNames[name], // map value is "disabled"
+			Critical: false,
+		})
+	}
 }
 
 // lowBandwidthOff lists components switched OFF by ApplyLowBandwidthLoadout.
