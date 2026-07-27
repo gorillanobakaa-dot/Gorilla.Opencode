@@ -15,6 +15,11 @@ type SplitPaneLayout interface {
 	SetRightPanel(panel Container) tea.Cmd
 	SetBottomPanel(panel Container) tea.Cmd
 
+	// SetBottomHeight pins the bottom panel to an exact row count instead of
+	// deriving it from verticalRatio, so a growing editor can claim rows from
+	// the panel above it. Pass 0 to go back to the ratio.
+	SetBottomHeight(rows int) tea.Cmd
+
 	ClearLeftPanel() tea.Cmd
 	ClearRightPanel() tea.Cmd
 	ClearBottomPanel() tea.Cmd
@@ -25,6 +30,10 @@ type splitPaneLayout struct {
 	height        int
 	ratio         float64
 	verticalRatio float64
+
+	// bottomFixedHeight, when > 0, pins the bottom panel to that many rows
+	// (see SetBottomHeight) instead of using verticalRatio.
+	bottomFixedHeight int
 
 	// Resolved panel widths from the last SetSize, so View() can clamp each
 	// column to exactly its allotment (a child that renders wider/taller than
@@ -157,8 +166,18 @@ func (s *splitPaneLayout) SetSize(width, height int) tea.Cmd {
 
 	var topHeight, bottomHeight int
 	if s.bottomPanel != nil {
-		topHeight = int(float64(height) * s.verticalRatio)
-		bottomHeight = height - topHeight
+		if s.bottomFixedHeight > 0 {
+			// Pinned: the bottom panel takes exactly the rows it asked for,
+			// leaving at least one row for the panel above it.
+			bottomHeight = s.bottomFixedHeight
+			if bottomHeight > height-1 {
+				bottomHeight = max(1, height-1)
+			}
+			topHeight = height - bottomHeight
+		} else {
+			topHeight = int(float64(height) * s.verticalRatio)
+			bottomHeight = height - topHeight
+		}
 	} else {
 		topHeight = height
 		bottomHeight = 0
@@ -224,6 +243,20 @@ func (s *splitPaneLayout) SetLeftPanel(panel Container) tea.Cmd {
 
 func (s *splitPaneLayout) SetRightPanel(panel Container) tea.Cmd {
 	s.rightPanel = panel
+	if s.width > 0 && s.height > 0 {
+		return s.SetSize(s.width, s.height)
+	}
+	return nil
+}
+
+func (s *splitPaneLayout) SetBottomHeight(rows int) tea.Cmd {
+	if rows < 0 {
+		rows = 0
+	}
+	if s.bottomFixedHeight == rows {
+		return nil // no-op: avoid a needless resize storm on every keystroke
+	}
+	s.bottomFixedHeight = rows
 	if s.width > 0 && s.height > 0 {
 		return s.SetSize(s.width, s.height)
 	}
