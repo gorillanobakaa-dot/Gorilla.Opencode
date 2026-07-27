@@ -191,9 +191,15 @@ func (app *App) Shutdown() {
 
 // GORILLA OVERRIDE: rebuild the coder agent's tool set from the current
 // context loadout so /context toggles take effect without a restart.
-func (app *App) ReloadCoderTools() {
+//
+// Returns true when the system-prompt rebuild had to be DEFERRED because a turn
+// is in flight. The tool set swaps immediately either way (it is read under a
+// lock per tool call), but the provider cannot be replaced mid-request. Callers
+// must surface a deferred result — reporting a new token count for a change that
+// has not taken effect is exactly the silent-failure this returns to prevent.
+func (app *App) ReloadCoderTools() (deferred bool) {
 	if app.CoderAgent == nil {
-		return
+		return false
 	}
 	app.CoderAgent.ReloadTools(agent.CoderAgentTools(
 		app.Permissions,
@@ -205,5 +211,5 @@ func (app *App) ReloadCoderTools() {
 	// GORILLA OVERRIDE: also re-render the system prompt so env/LSP
 	// loadout toggles (the env block can be thousands of tokens) take
 	// effect immediately, not on restart.
-	app.CoderAgent.RebuildProvider()
+	return app.CoderAgent.RebuildProvider()
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/llm/models"
+	"github.com/opencode-ai/opencode/internal/llm/prompt"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/pubsub"
@@ -545,8 +546,24 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case dialog.LoadoutChangedMsg:
 		// Rebuild the coder agent's tools so toggles take effect now.
-		a.app.ReloadCoderTools()
-		return a, util.ReportInfo(fmt.Sprintf("Loadout: ~%d tokens/turn", config.LoadoutActiveTokens()))
+		// GORILLA OVERRIDE: this used to report the new token count
+		// unconditionally. While a turn is in flight the system prompt cannot be
+		// re-rendered, so the reported figure was not what the model would
+		// actually receive on the current turn. Say so instead.
+		deferred := a.app.ReloadCoderTools()
+		return a, util.ReportInfo(withDeferredNote(
+			fmt.Sprintf("Loadout: ~%d tokens/turn", config.LoadoutActiveTokens()), deferred))
+
+	case dialog.ConfigChangedMsg:
+		// GORILLA OVERRIDE: the single hot-apply path for every settings, roots
+		// and prompt change. InvalidateCtx is set by anything that changes WHICH
+		// files are in scope (workspace roots, contextPaths) — without it the
+		// context cache holds and the change is invisible to the model.
+		if msg.InvalidateCtx {
+			prompt.InvalidateContextCache()
+		}
+		deferred := a.app.ReloadCoderTools()
+		return a, util.ReportInfo(withDeferredNote(msg.Info, deferred))
 
 	case chat.SessionSelectedMsg:
 		a.selectedSession = msg
@@ -1262,4 +1279,18 @@ func (a *appModel) runLogout() tea.Cmd {
 		}
 		return logoutDoneMsg{}
 	}
+}
+
+// withDeferredNote appends an explanation when a change could not be applied
+// immediately because a turn is in flight.
+//
+// GORILLA OVERRIDE: the provider (and so the system prompt) cannot be swapped
+// mid-request, so such a change is queued and applied when the turn ends. Saying
+// nothing would leave the user believing a setting took effect when it did not —
+// and the previous code did exactly that.
+func withDeferredNote(info string, deferred bool) string {
+	if !deferred {
+		return info
+	}
+	return info + " — takes effect after the current turn finishes"
 }
