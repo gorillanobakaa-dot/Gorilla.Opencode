@@ -1,3 +1,85 @@
+## v0.1.41 — 2026-07-27 — Five bugs from real use, two of them misdiagnosed by the symptom
+
+Every item here came from one person using v0.1.40 properly and writing down what
+went wrong. Two of the five were the program reporting the truth badly rather than
+doing the wrong thing — which is worse than it sounds, because a control that
+works but looks broken teaches you to distrust the others.
+
+- **Local/self-hosted models were unselectable** (`internal/tui/components/dialog/models.go`,
+  `internal/llm/models/local.go`, `internal/config/config.go`) — two independent faults stacked,
+  either alone enough to produce "I added my NVIDIA key and still only get Google models":
+  1. `getEnabledProviders` drew from `cfg.Providers` + the `*_API_KEY` env scan. `ProviderLocal`
+     is in neither (endpoints live in `cfg.LocalEndpoints` with per-endpoint keys), so **104
+     local models registered and zero were reachable**.
+  2. NVIDIA serves `/v1/models` **unauthenticated** (verified: `http=200`, 102 models, no
+     `Authorization` header), so an entry with a missing or malformed key registers and looks
+     healthy. Entries sharing a `baseURL` register identical model ids and overwrite each
+     other's route, so the **last** entry captured all 102 — here one whose key had lost its
+     `nvapi-` prefix, giving `http=401` on every completion behind a full model list.
+  Fixed: include `ProviderLocal` when routes exist (honouring an explicit disable); collapse
+  endpoints by `baseURL` preferring a keyed entry, keeping the first of two so re-adding cannot
+  steal a working route; label each model with its connection; sort local first (its popularity
+  was `0`, which maps to "unranked, last").
+
+- **The first `/context` toggle press did nothing** (`internal/config/loadout.go`) — a real bug,
+  not cosmetic. `LoadoutEnabled` reports an **absent** key as enabled; `ToggleLoadout` did
+  `state[id] = !state[id]`, taking the zero value `false` and flipping it to `true`. Every
+  `lsp.*` row is in that state, because those components register from `cfg.LSP` at `Load` time,
+  *after* the state has been read. `SetAllLSPs` had the same flaw.
+
+- **The LSP panel listed servers you had switched off** (`internal/tui/components/chat/chat.go`) —
+  it iterated `cfg.LSP` raw. They *were* being disabled: same config, all 9 off → **0**
+  language-server processes; on → clangd 1, gopls 2, 5 node servers. Now lists only what runs,
+  plus `N off (/context to change)` so a quietened setup is distinguishable from an
+  unconfigured one. **Bulk switch added**: `L` in `/context`, deliberately scoped to `lsp.*`.
+
+- **The session title was the model's narration** (`internal/llm/agent/title.go`, new) — the old
+  code stored `TrimSpace(ReplaceAll(reply, "\n", " "))`, so
+  `Here's a possible title, keeping the constraints in mind: **Title:** Your Business Brief`
+  became the title verbatim. Tightening the prompt was not an option: it already forbids exactly
+  that and the model ignored it. The reply is now reduced to the part that is a title, falling
+  back to the user's own first message.
+
+- **The `/login` URL could never disappear** (`internal/auth/prompt.go`, new) — five
+  `fmt.Println` calls into a screen Bubble Tea owns: painted over the frame with no record in
+  the renderer, so no redraw could clear it. Now injected via context and drawn as a dismissible
+  overlay (URL line intentionally unwrapped to stay copyable; `esc` hides without cancelling).
+  Swept the class — three more in `custom_commands.go`.
+
+- **`/help` and `/commands`** (`internal/commands/`, `dialog/commandhelp.go`, both new) — every
+  command in plain language, grouped by *what you are trying to do* rather than alphabetically,
+  because someone who does not know a command's name cannot look it up alphabetically. A
+  bidirectional drift test reads the dispatch switch in `tui.go` and fails on
+  typable-but-undocumented or documented-but-dead; it caught `/help` itself as unwired.
+  Unknown commands now suggest a near miss (Levenshtein — "modl" shares no substring with "model").
+
+- **Startup workspace picker** (`internal/tui/startup/`, `internal/config/roots.go`) —
+  `config.json`'s `"wd"` was **write-only**: persisted via `encoding/json` (`json:"wd"`) but read
+  via `viper.Unmarshal`, which keys off *mapstructure* tags, so viper looked for `"workingdir"`.
+  Probed: launched from `/home/gorilla` with `wd` saved as the repo, `Roots()` returned
+  `[/home/gorilla]`. With `Exec=gorilla-opencode launch` and no `Path=`, every icon click
+  inherited `$HOME` — **1,327,750 files** vs **305** scoped to one project. Now asks, remembers,
+  and can be switched off (`askWorkspaceOnStartup`).
+
+- **`/settings` cross-references were unreachable** — scrolling follows the selection and those
+  rows are not selectable, so once the registry outgrew the terminal height the list claimed to
+  be complete while hiding part of itself.
+
+**Verification:** every fix checked non-vacuously — old behaviour restored, test confirmed
+failing (69 width overflows; "resolved to $HOME despite a saved workspace"; "still listed after
+being disabled"; "still enabled after one press"; "local is absent from the picker ([])"; a
+15-line dialog in a 10-line terminal). **Not covered:** interactive keystrokes — a minimal
+Bubble Tea program cannot receive piped PTY input in this environment, so no TUI is drivable
+end-to-end from a shell.
+
+**Plain-language version:** Five things were reported broken. Two of them — your language
+servers and their switches — were actually working; the panel was showing the wrong list, which
+is arguably worse, because a switch that looks dead makes you distrust every other switch. The
+serious one was that NVIDIA and Ollama models could not be selected at all, from two separate
+faults at once, and no amount of re-entering your key could have fixed it. Titles no longer
+contain the AI thinking out loud, the sign-in link can be dismissed, `L` turns all language
+servers off in one press, and `/help` finally explains every command in plain words.
+
 ## v0.1.34 — 2026-07-24 — System Prompt Optimization Phase 2: Claude Code Analysis
 
 - **Coder System Prompt Refinements** (`internal/llm/prompt/coder-modern.txt`): 304 → 332 tokens (+28, +9%)
