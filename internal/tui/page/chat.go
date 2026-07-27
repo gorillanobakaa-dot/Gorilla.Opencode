@@ -64,6 +64,10 @@ func (p *chatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		cmd := p.layout.SetSize(msg.Width, msg.Height)
 		cmds = append(cmds, cmd)
+	case chat.EditorHeightMsg:
+		// GORILLA OVERRIDE: the editor grew/shrank with its content — give it
+		// exactly the rows it asked for and let the message list take the rest.
+		cmds = append(cmds, p.layout.SetBottomHeight(msg.Height))
 	case dialog.CompletionDialogCloseMsg:
 		p.showCompletionDialog = false
 	case chat.SendMsg:

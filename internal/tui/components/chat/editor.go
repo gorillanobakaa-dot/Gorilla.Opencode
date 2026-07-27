@@ -31,6 +31,44 @@ type editorCmp struct {
 	textarea    textarea.Model
 	attachments []message.Attachment
 	deleteMode  bool
+	// lastReportedHeight is the desired height we last told the layout about,
+	// so we only emit EditorHeightMsg when it actually changes.
+	lastReportedHeight int
+}
+
+// GORILLA OVERRIDE: the input box grows with what you type (like every modern
+// chat input) instead of being pinned to a fixed slice of the window.
+const (
+	minEditorHeight = 1  // one row when empty
+	maxEditorHeight = 12 // then the textarea scrolls internally
+)
+
+// EditorHeightMsg asks the layout to give the editor exactly Height rows.
+type EditorHeightMsg struct{ Height int }
+
+// wrappedRows reports how many terminal rows `value` occupies once soft-wrapped
+// at `width`. bubbles' textarea has no exported "total visual rows" (LineCount()
+// counts LOGICAL lines only, and LineInfo() covers just the cursor's line), so
+// measure it with lipgloss — which word-wraps the same way and can count the
+// result. This is the "reference dimensions dynamically" rule, not a guess.
+func wrappedRows(value string, width int) int {
+	if width <= 0 {
+		return minEditorHeight
+	}
+	if value == "" {
+		return minEditorHeight
+	}
+	return lipgloss.Height(lipgloss.NewStyle().Width(width).Render(value))
+}
+
+// desiredHeight is the row count the editor wants for its current content,
+// clamped so it never collapses or eats the whole window.
+func (m *editorCmp) desiredHeight() int {
+	rows := wrappedRows(m.textarea.Value(), m.textarea.Width())
+	if len(m.attachments) > 0 {
+		rows++ // the attachments line sits above the input
+	}
+	return max(minEditorHeight, min(maxEditorHeight, rows))
 }
 
 type EditorKeyMaps struct {
@@ -213,13 +251,29 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textarea.SetValue(value[:len(value)-1] + "\n")
 				return m, nil
 			} else {
-				// Otherwise, send the message
-				return m, m.send()
+				// Otherwise, send the message. send() resets the textarea, so
+				// re-measure afterwards and let the layout shrink the box back
+				// down. Recomputing (rather than assuming the minimum) stays
+				// correct when send() bails out early, e.g. agent busy.
+				sendCmd := m.send()
+				if h := m.desiredHeight(); h != m.lastReportedHeight {
+					m.lastReportedHeight = h
+					return m, tea.Batch(sendCmd, util.CmdHandler(EditorHeightMsg{Height: h}))
+				}
+				return m, sendCmd
 			}
 		}
 
 	}
 	m.textarea, cmd = m.textarea.Update(msg)
+
+	// GORILLA OVERRIDE: tell the layout when the content's row count changes so
+	// the input box grows/shrinks with what's typed. Only fires on an actual
+	// change, so ordinary keystrokes don't trigger a resize every time.
+	if h := m.desiredHeight(); h != m.lastReportedHeight {
+		m.lastReportedHeight = h
+		return m, tea.Batch(cmd, util.CmdHandler(EditorHeightMsg{Height: h}))
+	}
 	return m, cmd
 }
 
