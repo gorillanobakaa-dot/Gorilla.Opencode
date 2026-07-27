@@ -55,6 +55,15 @@ type Client struct {
 	serverState atomic.Value
 }
 
+// debugLSPEnabled reports whether raw language-server stderr should also go to
+// the terminal. Off by default because that terminal is the TUI's canvas.
+func debugLSPEnabled() bool {
+	if cfg := config.Get(); cfg != nil && cfg.DebugLSP {
+		return true
+	}
+	return os.Getenv("DEBUG_LSP") == "true"
+}
+
 func NewClient(ctx context.Context, command string, args ...string) (*Client, error) {
 	cmd := exec.CommandContext(ctx, command, args...)
 	// Copy env
@@ -75,7 +84,7 @@ func NewClient(ctx context.Context, command string, args ...string) (*Client, er
 		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
 	}
 
-client := &Client{
+	client := &Client{
 		Cmd:                   cmd,
 		stdin:                 stdin,
 		stdout:                bufio.NewReader(stdout),
@@ -96,14 +105,40 @@ client := &Client{
 		return nil, fmt.Errorf("failed to start LSP server: %w", err)
 	}
 
-	// Handle stderr in a separate goroutine
+	// Handle stderr in a separate goroutine.
+	//
+	// GORILLA OVERRIDE: this used to write every language-server stderr line
+	// straight to os.Stderr, unconditionally. That is the same terminal the
+	// Bubble Tea TUI is drawing on, so a chatty server scribbled over the
+	// interface — observed with clangd and rust-analyzer flooding the screen
+	// so the TUI never rendered at all, and later a stray
+	// "--> textDocument/publishDiagnostics" line painted across the status bar
+	// mid-session. It got dramatically worse once several servers were
+	// configured at once.
+	//
+	// Server stderr now goes to the app's own logger, which writes to
+	// .opencode/debug.log rather than the screen. Set debugLSP: true in config
+	// (or DEBUG_LSP=true) to also see it live; that is an explicit opt-in for
+	// someone debugging a server, and it will still interleave with the TUI
+	// because there is nowhere else for a live stream to go.
 	go func() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
-			fmt.Fprintf(os.Stderr, "LSP Server: %s\n", scanner.Text())
+			line := scanner.Text()
+			if debugLSPEnabled() {
+				fmt.Fprintf(os.Stderr, "LSP Server: %s\n", line)
+				continue
+			}
+			// Route to the log file. Genuine server errors keep ERROR level so
+			// they are findable; routine protocol chatter stays at debug.
+			if strings.Contains(line, "ERROR") || strings.Contains(line, "error:") {
+				logging.Error("lsp server", "output", line)
+			} else {
+				logging.Debug("lsp server", "output", line)
+			}
 		}
 		if err := scanner.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading stderr: %v\n", err)
+			logging.Error("reading lsp server stderr", "error", err)
 		}
 	}()
 
