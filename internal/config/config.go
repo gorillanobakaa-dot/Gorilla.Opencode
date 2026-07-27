@@ -263,13 +263,10 @@ func GorillaConfigFile() string {
 	return filepath.Join(base, "config.json")
 }
 
-func gorillaConfigBase() string {
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, gorillaConfigDir)
-	}
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", gorillaConfigDir)
-}
+// gorillaConfigBase is retained as the in-package name for ConfigBase(); the
+// body moved to store.go, which is now the single owner of this directory. It
+// used to be duplicated byte-for-byte as loadoutConfigBase() in loadout.go.
+func gorillaConfigBase() string { return ConfigBase() }
 
 // migrateLegacyConfig moves an old ~/.opencode.json (or the opencode
 // XDG dir) into the unified gorilla-opencode/config.json, once.
@@ -288,8 +285,11 @@ func migrateLegacyConfig() {
 	}
 	for _, src := range candidates {
 		if data, err := os.ReadFile(src); err == nil {
-			_ = os.MkdirAll(gorillaConfigBase(), 0o755)
-			if os.WriteFile(dst, data, 0o644) == nil {
+			// GORILLA OVERRIDE: 0o600, not 0o644. The migrated file is a
+			// config.json and carries the provider apiKey fields with it, so
+			// migrating a legacy config used to publish those keys to every
+			// account on the machine.
+			if writeSecretFile(dst, data) == nil {
 				_ = os.Remove(src)
 				return
 			}
@@ -1026,8 +1026,8 @@ func updateCfgFile(updateCfg func(config *Config)) error {
 		// GORILLA OVERRIDE: create the config in the unified
 		// ~/.config/gorilla-opencode/config.json, not a home dotfile.
 		configFile = GorillaConfigFile()
-		if err := os.MkdirAll(gorillaConfigBase(), 0o755); err != nil {
-			return fmt.Errorf("failed to create config dir: %w", err)
+		if err := ensureConfigDir(ConfigBase()); err != nil {
+			return err
 		}
 		logging.Info("config file not found, creating new one", "path", configFile)
 		configData = []byte(`{}`)
@@ -1054,7 +1054,13 @@ func updateCfgFile(updateCfg func(config *Config)) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(configFile, updatedData, 0o644); err != nil {
+	// GORILLA OVERRIDE: 0o600, not 0o644. This file holds provider API keys in
+	// plain text, and every sidecar beside it (loadout.json, ratelimit.json,
+	// subagents.json) was already 0o600 — the file with the secrets was the
+	// loosest in the directory. writeSecretFile also chmods an existing file, so
+	// a config.json left at 0o644 by an older version is tightened on first
+	// write rather than staying world-readable forever.
+	if err := writeSecretFile(configFile, updatedData); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

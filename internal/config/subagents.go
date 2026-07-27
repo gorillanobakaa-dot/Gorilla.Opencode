@@ -42,7 +42,7 @@ var (
 )
 
 func subAgentsPath() string {
-	return filepath.Join(loadoutConfigBase(), subAgentsFileName)
+	return filepath.Join(ConfigBase(), subAgentsFileName)
 }
 
 type subAgentsFile struct {
@@ -128,7 +128,6 @@ func nearestSubAgentPresetIdx(v int) int {
 }
 
 func saveSubAgents(n int) {
-	_ = os.MkdirAll(loadoutConfigBase(), 0o755)
 	data, _ := json.MarshalIndent(subAgentsFile{MaxSubAgents: n}, "", " ")
-	_ = os.WriteFile(subAgentsPath(), data, 0o600)
+	_ = writeSecretFile(subAgentsPath(), data)
 }

@@ -114,18 +114,14 @@ var (
 // ("opencode") polluted that other app's dir and split our own config.
 const gorillaConfigDir = "gorilla-opencode"
 
-func loadoutConfigBase() string {
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, gorillaConfigDir)
-	}
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", gorillaConfigDir)
-}
+// GORILLA OVERRIDE: loadoutConfigBase() lived here with a body byte-identical to
+// gorillaConfigBase() in config.go. Both are now ConfigBase() in store.go, the
+// single owner of this directory.
 
 func loadoutPath() string {
 	// One-time migration: move a loadout.json left in the old
 	// (~/.config/opencode) location into the correct dir.
-	newPath := filepath.Join(loadoutConfigBase(), loadoutFileName)
+	newPath := filepath.Join(ConfigBase(), loadoutFileName)
 	if _, err := os.Stat(newPath); os.IsNotExist(err) {
 		var oldPath string
 		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
@@ -135,8 +131,7 @@ func loadoutPath() string {
 			oldPath = filepath.Join(home, ".config", appName, loadoutFileName)
 		}
 		if data, err := os.ReadFile(oldPath); err == nil {
-			_ = os.MkdirAll(loadoutConfigBase(), 0o755)
-			if os.WriteFile(newPath, data, 0o600) == nil {
+			if writeSecretFile(newPath, data) == nil {
 				_ = os.Remove(oldPath)
 			}
 		}
@@ -220,9 +215,7 @@ func saveLoadout() {
 	loadoutMu.RLock()
 	data, _ := json.MarshalIndent(loadoutState, "", " ")
 	loadoutMu.RUnlock()
-	path := loadoutPath()
-	_ = os.MkdirAll(filepath.Dir(path), 0o755)
-	_ = os.WriteFile(path, data, 0o600)
+	_ = writeSecretFile(loadoutPath(), data)
 }
 
 // LoadoutActiveTokens is the approximate per-turn overhead of everything
