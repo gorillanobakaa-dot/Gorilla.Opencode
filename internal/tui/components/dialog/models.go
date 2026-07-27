@@ -337,11 +337,36 @@ func GetSelectedModel(cfg *config.Config) models.Model {
 }
 
 func getEnabledProviders(cfg *config.Config) []models.ModelProvider {
+	seen := make(map[models.ModelProvider]bool)
 	var providers []models.ModelProvider
+
+	// Providers saved in config (added via /connect, or backfilled from env
+	// at Load time).
 	for providerId, provider := range cfg.Providers {
 		if !provider.Disabled {
 			providers = append(providers, providerId)
+			seen[providerId] = true
 		}
+	}
+
+	// GORILLA OVERRIDE: also include providers whose API key is present in
+	// the environment but never persisted to cfg.Providers. Without this,
+	// exporting GROQ_API_KEY (or any other *_API_KEY) leaves the provider
+	// invisible in /model until the user goes through /connect → save — a
+	// step that only exists to write a file the user did not ask to write.
+	//
+	// A provider EXPLICITLY disabled in cfg wins over its env var — the seen
+	// map has already recorded the disabled entry above, so a matching env
+	// var below is skipped rather than overriding the user's choice.
+	for _, p := range config.AvailableViaEnv() {
+		if seen[p] {
+			continue
+		}
+		if entry, ok := cfg.Providers[p]; ok && entry.Disabled {
+			continue // user explicitly disabled it; do not resurrect via env
+		}
+		providers = append(providers, p)
+		seen[p] = true
 	}
 
 	// Sort by provider popularity
