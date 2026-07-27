@@ -1,8 +1,3 @@
 {
-  "$schema": "./opencode-schema.json",
-  "lsp": {
-    "gopls": {
-      "command": "gopls"
-    }
-  }
+  "$schema": "./opencode-schema.json"
 }
