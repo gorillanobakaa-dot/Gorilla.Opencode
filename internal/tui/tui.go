@@ -861,12 +861,10 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.showAddDirDialog {
 				a.showAddDirDialog = false
 			}
-			// Dismissing only hides the URL; the flow keeps waiting for the
-			// browser callback, so a user who dismisses by accident can still
-			// finish signing in.
-			if a.loginURL != "" {
-				a.loginURL = ""
-			}
+			// NOT the sign-in overlay. Every other overlay here can simply be
+			// reopened; the sign-in URL cannot — it would mean restarting /login.
+			// So the quit key does not discard it. esc does, handled after the
+			// dialog routing below.
 			if a.showPromptsDialog {
 				a.showPromptsDialog = false
 			}
@@ -1137,6 +1135,20 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if _, ok := msg.(tea.KeyMsg); ok {
 			return a, tea.Batch(cmds...)
 		}
+	}
+
+	// GORILLA OVERRIDE: dismiss the sign-in overlay.
+	//
+	// Placed HERE, after every dialog's routing block, deliberately. Each of those
+	// blocks returns early for a key message when its dialog is open, so reaching
+	// this line proves no dialog wanted the key — which gives a deliberately
+	// opened dialog first claim on esc, and makes any dialog added later take
+	// precedence automatically without touching this code.
+	//
+	// The first attempt at this put the clear inside the `keys.Quit` branch, so
+	// esc never reached it and the overlay could not be dismissed at all.
+	if a.tryDismissLoginOverlay(msg) {
+		return a, tea.Batch(cmds...)
 	}
 
 	s, _ := a.status.Update(msg)
@@ -1649,45 +1661,101 @@ func withDeferredNote(info string, deferred bool) string {
 	return info + " — takes effect after the current turn finishes"
 }
 
+// tryDismissLoginOverlay clears the sign-in overlay if msg is esc and the
+// overlay is up. Returns true if it handled the key.
+//
+// Split out as its own method so the behaviour is unit-testable: reaching it
+// through appModel.Update needs a fully constructed app, and the bug it fixes
+// (esc doing nothing) is exactly the kind that a test should have caught.
+func (a *appModel) tryDismissLoginOverlay(msg tea.Msg) bool {
+	if a.loginURL == "" {
+		return false
+	}
+	km, ok := msg.(tea.KeyMsg)
+	if !ok || !key.Matches(km, returnKey) {
+		return false
+	}
+	// Only hides it. The flow keeps waiting for the browser callback, so
+	// dismissing by accident does not force the user to start over.
+	a.loginURL = ""
+	return true
+}
+
 // loginURLOverlay renders the pending sign-in URL.
 //
 // GORILLA OVERRIDE: this exists because the OAuth flow used to fmt.Println the
 // URL. Under the TUI that writes into a screen Bubble Tea owns: the text lands on
 // top of the interface, Bubble Tea has no record of drawing it, and so no redraw
-// can remove it. The URL stayed on screen for the rest of the session, overlapping
-// the editor and the status bar.
+// can remove it.
 //
-// The URL is shown UNWRAPPED on its own line even when that is wider than the
-// dialog. It has to be selectable and copyable as one string — a URL broken
-// across lines by a renderer is a URL that cannot be pasted, which defeats the
-// entire purpose of showing it. The surrounding box is sized to the terminal, and
-// the line scrolls rather than folding.
+// The URL is WRAPPED across lines, and every line is padded to the same width.
+//
+// The first version left the URL on one unwrapped line, on the argument that a
+// URL folded across lines cannot be pasted. That argument was wrong in practice
+// and the screenshot showed why: the line was far wider than the terminal, so the
+// box grew with it and the URL was simply cut off at the screen edge — unreadable
+// AND unpastable. It also meant every other line was shorter than the box, and
+// lipgloss does not pad the short lines of a multi-line render, so the unpainted
+// remainder showed as black bars beside the text.
 func (a *appModel) loginURLOverlay() string {
 	t := theme.CurrentTheme()
 
-	width := a.width - 8
-	if width < 30 {
-		width = 30
-	}
-	if width > 100 {
-		width = 100
+	// Chrome is subtracted from the terminal width, never added to the content.
+	const (
+		chrome    = 6 // border 2 + padding 4
+		preferred = 92
+		minimum   = 24
+	)
+	w := preferred
+	if a.width > 0 {
+		w = max(minimum, min(preferred, a.width-chrome))
 	}
 
-	line := func(s string, style lipgloss.Style) string {
-		return style.Width(width).MaxWidth(width).Render(s)
+	body := lipgloss.NewStyle().Background(t.Background()).Foreground(t.Text())
+	line := func(s string, st lipgloss.Style) string {
+		// Width pads, MaxWidth clips: together they guarantee every line is
+		// exactly w columns, which is what keeps the box rectangular.
+		return st.Background(t.Background()).Width(w).MaxWidth(w).Render(s)
 	}
 
-	parts := []string{
-		line("Sign in with Google", lipgloss.NewStyle().Bold(true).Foreground(t.Primary())),
-		line("", lipgloss.NewStyle()),
-		line("Your browser should have opened. If it did not, visit:", lipgloss.NewStyle().Foreground(t.Text())),
-		line("", lipgloss.NewStyle()),
-		// Deliberately NOT width-clamped: see the note above about copyability.
-		lipgloss.NewStyle().Foreground(t.Primary()).Render(a.loginURL),
-		line("", lipgloss.NewStyle()),
-		line("Waiting for you to finish… esc hides this (sign-in keeps running)",
-			lipgloss.NewStyle().Foreground(t.TextMuted())),
+	urlLines := hardWrap(a.loginURL, w)
+
+	head := []string{
+		line("Sign in with Google", body.Bold(true).Foreground(t.Primary())),
+		line("", body),
+		line("Your browser should have opened. If it did not, visit:", body),
+		line("", body),
 	}
+	foot := []string{
+		line("", body),
+		line("esc hides this — signing in keeps running", body.Foreground(t.TextMuted())),
+	}
+
+	// Fit the height by shedding explanation, never the URL: a partial URL is
+	// worthless, whereas the prose is only helpful.
+	if a.height > 0 {
+		const vChrome = 4 // border 2 + padding 2
+		budget := a.height - vChrome
+		for len(head)+len(urlLines)+len(foot) > budget {
+			switch {
+			case len(head) > 1:
+				head = head[:len(head)-1] // drop from the bottom, keep the title
+			case len(foot) > 1:
+				foot = foot[:1]
+			case len(foot) > 0:
+				foot = nil
+			default:
+				// Nothing left to shed; the URL stays whole and the overlay is
+				// taller than the terminal. Better a scrolled URL than half a URL.
+				budget = 0
+			}
+			if budget == 0 {
+				break
+			}
+		}
+	}
+
+	parts := append(append(head, renderEach(urlLines, body.Foreground(t.Primary()), w)...), foot...)
 
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -1695,4 +1763,34 @@ func (a *appModel) loginURLOverlay() string {
 		Background(t.Background()).
 		Padding(1, 2).
 		Render(lipgloss.JoinVertical(lipgloss.Left, parts...))
+}
+
+// renderEach pads each line individually. A single Render of a multi-line string
+// leaves the short lines unpadded, which is what produced black bars beside the
+// text — the trap this codebase has hit more than once.
+func renderEach(lines []string, st lipgloss.Style, w int) []string {
+	out := make([]string, 0, len(lines))
+	for _, l := range lines {
+		out = append(out, st.Width(w).MaxWidth(w).Render(l))
+	}
+	return out
+}
+
+// hardWrap splits s into chunks of at most w columns, breaking mid-token.
+// Word-wrapping is wrong here: a URL is one token, so a word-wrapper would leave
+// it on a single over-wide line — the original bug.
+func hardWrap(s string, w int) []string {
+	if w < 1 {
+		return []string{s}
+	}
+	r := []rune(s)
+	if len(r) == 0 {
+		return nil
+	}
+	var out []string
+	for len(r) > w {
+		out = append(out, string(r[:w]))
+		r = r[w:]
+	}
+	return append(out, string(r))
 }
