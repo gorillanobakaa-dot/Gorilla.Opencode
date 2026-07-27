@@ -828,6 +828,37 @@ func getProviderAPIKey(provider models.ModelProvider) string {
 	return ""
 }
 
+// AvailableViaEnv returns providers whose API-key environment variable is
+// currently set, regardless of whether they appear in cfg.Providers.
+//
+// GORILLA OVERRIDE: exists so the /model picker can show a provider the
+// instant its env var is exported — no /connect → save round-trip required.
+// getEnabledProviders unions this with cfg.Providers to build the tab list.
+// Copilot / AWS Bedrock / VertexAI are intentionally omitted: they authenticate
+// via richer credentials than a single env-var key, and getProviderAPIKey
+// above already surfaces them through their own paths.
+func AvailableViaEnv() []models.ModelProvider {
+	candidates := []struct {
+		provider models.ModelProvider
+		envKey   string
+	}{
+		{models.ProviderAnthropic, "ANTHROPIC_API_KEY"},
+		{models.ProviderOpenAI, "OPENAI_API_KEY"},
+		{models.ProviderGemini, "GEMINI_API_KEY"},
+		{models.ProviderGROQ, "GROQ_API_KEY"},
+		{models.ProviderCerebras, "CEREBRAS_API_KEY"},
+		{models.ProviderOpenRouter, "OPENROUTER_API_KEY"},
+		{models.ProviderXAI, "XAI_API_KEY"},
+	}
+	var out []models.ModelProvider
+	for _, c := range candidates {
+		if os.Getenv(c.envKey) != "" {
+			out = append(out, c.provider)
+		}
+	}
+	return out
+}
+
 // setDefaultModelForAgent sets a default model for an agent based on available providers
 func setDefaultModelForAgent(agent AgentName) bool {
 	if hasCopilotCredentials() {
