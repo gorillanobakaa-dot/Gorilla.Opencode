@@ -24,6 +24,7 @@ func (m *overflowPanel) Update(tea.Msg) (tea.Model, tea.Cmd) { return m, nil }
 func (m *overflowPanel) SetSize(w, h int) tea.Cmd            { m.w, m.h = w, h; return nil }
 func (m *overflowPanel) GetSize() (int, int)                 { return m.w, m.h }
 func (m *overflowPanel) BindingKeys() []key.Binding          { return nil }
+func (m *overflowPanel) VerticalChrome() int                 { return 0 }
 func (m *overflowPanel) View() string {
 	line := strings.Repeat(m.ch, m.w+m.extraW)
 	rows := make([]string, m.h+m.extraLines)
