@@ -4,11 +4,20 @@ const (
 	ProviderGemini ModelProvider = "gemini"
 
 	// Rolling aliases (Google keeps these pointed at whatever it currently
-	// serves, so they never go stale). Kept with their historical constant
-	// names + ID strings because config.go, openrouter.go and vertexai.go
-	// reference them — renaming would break those.
-	Gemini25Flash ModelID = "gemini-2.5-flash" // → gemini-flash-latest
-	Gemini25      ModelID = "gemini-2.5"       // → gemini-pro-latest (FIXED 2026-07-22)
+	// serves, so they never go stale).
+	//
+	// GORILLA OVERRIDE 2026-07-27: these used to keep the historical ids
+	// "gemini-2.5-flash" / "gemini-2.5", which named a version they had long
+	// stopped serving — the id, the display name and the APIModel all
+	// disagreed. That mismatch is what let a dead model reach Code Assist
+	// unnoticed (the exclusion list filtered on id and never saw that
+	// "gemini-2.5" was really gemini-pro-latest), and it meant a config.json
+	// saying "gemini-2.5-flash" had no matching row in the model picker.
+	// The id is now the APIModel. LegacyModelIDs maps the old ids forward so
+	// existing configs keep working.
+	GeminiFlashLatest     ModelID = "gemini-flash-latest"
+	GeminiProLatest       ModelID = "gemini-pro-latest"
+	GeminiFlashLiteLatest ModelID = "gemini-flash-lite-latest"
 
 	Gemini20Flash     ModelID = "gemini-2.0-flash"
 	Gemini20FlashLite ModelID = "gemini-2.0-flash-lite"
@@ -31,13 +40,26 @@ const (
 	Gemini3Flash      ModelID = "gemini-3-flash-preview"
 	Gemini25Pro       ModelID = "gemini-2.5-pro"
 	Gemini25FlashLite ModelID = "gemini-2.5-flash-lite"
-	GeminiFlashLite   ModelID = "gemini-flash-lite-latest"
 )
+
+// LegacyModelIDs maps retired model ids to their current equivalent, so a
+// config.json written before a rename keeps working instead of falling back to
+// some unrelated default. Applied during agent validation.
+var LegacyModelIDs = map[ModelID]ModelID{
+	"gemini-2.5":       GeminiProLatest,
+	"gemini-2.5-flash": GeminiFlashLatest,
+
+	// The Code Assist clones of the two rolling aliases. Code Assist cannot
+	// resolve rolling aliases at all (they 404), so these never worked —
+	// point them at the nearest tier that does.
+	"gemini-oauth.gemini-2.5":       GeminiCAPro,
+	"gemini-oauth.gemini-2.5-flash": GeminiCAFlash,
+}
 
 var GeminiModels = map[ModelID]Model{
 	// ---- rolling aliases -------------------------------------------------
-	Gemini25Flash: {
-		ID:          Gemini25Flash,
+	GeminiFlashLatest: {
+		ID:          GeminiFlashLatest,
 		Name:        "Gemini Flash (latest)",
 		Description: "Rolling Flash alias — Google keeps it current, 1M ctx",
 		Provider:    ProviderGemini,
@@ -53,8 +75,8 @@ var GeminiModels = map[ModelID]Model{
 		DefaultMaxTokens:    50000,
 		SupportsAttachments: true,
 	},
-	Gemini25: {
-		ID:          Gemini25,
+	GeminiProLatest: {
+		ID:          GeminiProLatest,
 		Name:        "Gemini Pro (latest)",
 		Description: "Rolling Pro alias — Google keeps it current, 1M ctx",
 		Provider:    ProviderGemini,
@@ -68,8 +90,8 @@ var GeminiModels = map[ModelID]Model{
 		DefaultMaxTokens:    50000,
 		SupportsAttachments: true,
 	},
-	GeminiFlashLite: {
-		ID:                  GeminiFlashLite,
+	GeminiFlashLiteLatest: {
+		ID:                  GeminiFlashLiteLatest,
 		Name:                "Gemini Flash Lite (latest)",
 		Description:         "Rolling Flash-Lite alias — cheapest/fastest, 1M ctx",
 		Provider:            ProviderGemini,
