@@ -20,47 +20,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"syscall"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/spf13/cobra"
 )
 
 // envFilePath returns ~/.config/gorilla-opencode/env.
-func envFilePath() string {
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, appBinName, "env")
-	}
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", appBinName, "env")
-}
+//
+// The parsing and the path both live in internal/config now: config.Load
+// reads the same file so that a plain terminal run sees the keys too, and
+// two copies of the parser would be two things to keep in sync.
+func envFilePath() string { return config.EnvFilePath() }
 
 // loadEnvFile parses simple KEY=VALUE lines; '#' starts a comment.
 // Variables already present in the process environment win, so a
 // terminal user's explicit exports are never overridden.
-func loadEnvFile(path string) []string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	var extra []string
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		k, v, ok := strings.Cut(line, "=")
-		if !ok || strings.TrimSpace(k) == "" {
-			continue
-		}
-		k = strings.TrimSpace(k)
-		v = strings.Trim(strings.TrimSpace(v), `"'`)
-		if os.Getenv(k) == "" {
-			extra = append(extra, k+"="+v)
-		}
-	}
-	return extra
-}
+func loadEnvFile(path string) []string { return config.ParseEnvFile(path) }
 
 const envTemplate = `# Gorilla OpenCode — API keys for desktop launches.
 # Lines are KEY=VALUE. '#' starts a comment. This file is read by
@@ -108,6 +84,12 @@ var launchCmd = &cobra.Command{
 	Use:    "launch",
 	Hidden: true, // desktop-entry plumbing, not part of the CLI surface
 	Short:  "Run with keys from the env file; hold the window open on error",
+	// GORILLA OVERRIDE: `launch` is a pass-through wrapper — every argument
+	// after it belongs to the real program, not to this command. Without
+	// this, cobra tried to parse them against launchCmd's (empty) flag set
+	// and `launch -p "hi"` died on "unknown shorthand flag: 'p'". With it,
+	// args arrives verbatim and is handed to the exec'd binary below.
+	DisableFlagParsing: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// First desktop launch after a .deb install: create the key
 		// file and tell the user where it is, instead of flash-dying.
@@ -137,7 +119,11 @@ var launchCmd = &cobra.Command{
 		// which is how every env-loading launcher (env, direnv, …)
 		// hands off. We keep the keys loaded from the env file.
 		env := append(os.Environ(), loadEnvFile(envFilePath())...)
-		if err := syscall.Exec(self, []string{self}, env); err != nil {
+		// Forward the remaining argv. Passing only []string{self} silently
+		// dropped every flag, so `gorilla-opencode launch -p "hi"` started
+		// the interactive TUI instead of running the prompt.
+		argv := append([]string{self}, args...)
+		if err := syscall.Exec(self, argv, env); err != nil {
 			fmt.Fprintf(os.Stderr, "\nfailed to start gorilla-opencode: %v\n", err)
 			fmt.Fprint(os.Stderr, "Press Enter to close this window... ")
 			_, _ = bufio.NewReader(os.Stdin).ReadString('\n')

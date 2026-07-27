@@ -155,6 +155,14 @@ func Load(workingDir string, debug bool) (*Config, error) {
 		LSP:        make(map[string]LSPConfig),
 	}
 
+	// GORILLA OVERRIDE: load ~/.config/gorilla-opencode/env before anything
+	// reads the environment. It used to be parsed only by the hidden `launch`
+	// subcommand the desktop entry runs, so keys in that file were invisible
+	// to a terminal user and providers were silently disabled. Doing it here
+	// makes the desktop icon and the shell behave identically. Variables
+	// already exported win — see ParseEnvFile.
+	applyEnvFile()
+
 	configureViper()
 	setDefaults(debug)
 
@@ -573,25 +581,58 @@ func applyDefaultValues() {
 	}
 }
 
-// It validates model IDs and providers, ensuring they are supported.
+// revertAgentToDefault swaps an agent onto a default model because its
+// configured one is unusable, and says so on stderr.
+//
+// GORILLA OVERRIDE 2026-07-27: this used to be a bare logging.Warn at each
+// call site. Nothing renders those on the non-interactive (-p) path, so a
+// configured model could be silently replaced and the user would only see the
+// downstream API error from a model they never chose — with no hint the swap
+// had happened. Substituting someone's model is worth a line of output.
+func revertAgentToDefault(name AgentName, agent Agent, reason string) error {
+	logging.Warn("reverting agent to default model",
+		"agent", name, "configured_model", agent.Model, "reason", reason)
+
+	if !setDefaultModelForAgent(name) {
+		return fmt.Errorf("no valid provider available for agent %s", name)
+	}
+	fmt.Fprintf(os.Stderr, "note: agent %q model %q is unusable (%s) — falling back to %q\n",
+		name, agent.Model, reason, cfg.Agents[name].Model)
+	logging.Info("set default model for agent", "agent", name, "model", cfg.Agents[name].Model)
+	return nil
+}
+
+// validateAgent validates an agent's model ID and provider, ensuring they are
+// supported, and clamps its max-tokens to the model's limits.
+//
+// Every path that swaps the model RETURNS immediately: setDefaultModelForAgent
+// has already written a coherent Model+MaxTokens pair, and the checks below are
+// written against `model` — the model that was just REJECTED. Falling through
+// would clamp the fallback's max-tokens using the rejected model's context
+// window. With today's numbers that is inert (both fallbacks and the common
+// rejects have 1M windows, so the clamp never fires), but the arithmetic is
+// wrong and becomes visible as soon as the two windows differ — e.g. a rejected
+// openai model with a 1047576 window would clamp to 523788 on a 1M fallback.
 func validateAgent(cfg *Config, name AgentName, agent Agent) error {
 	// Check if model exists
 	// TODO:	If a copilot model is specified, but model is not found,
 	// 		 	it might be new model. The https://api.githubcopilot.com/models
 	// 		 	endpoint should be queried to validate if the model is supported.
+	// GORILLA OVERRIDE: translate ids retired by a rename before deciding the
+	// model is unknown, so an older config.json keeps the model it asked for
+	// instead of being silently dropped onto an unrelated default.
+	if current, isLegacy := models.LegacyModelIDs[agent.Model]; isLegacy {
+		logging.Info("migrating legacy model id",
+			"agent", name, "from", agent.Model, "to", current)
+		agent.Model = current
+		updated := cfg.Agents[name]
+		updated.Model = current
+		cfg.Agents[name] = updated
+	}
+
 	model, modelExists := models.SupportedModels[agent.Model]
 	if !modelExists {
-		logging.Warn("unsupported model configured, reverting to default",
-			"agent", name,
-			"configured_model", agent.Model)
-
-		// Set default model based on available providers
-		if setDefaultModelForAgent(name) {
-			logging.Info("set default model for agent", "agent", name, "model", cfg.Agents[name].Model)
-		} else {
-			return fmt.Errorf("no valid provider available for agent %s", name)
-		}
-		return nil
+		return revertAgentToDefault(name, agent, "unknown model")
 	}
 
 	// Check if provider for the model is configured
@@ -602,17 +643,8 @@ func validateAgent(cfg *Config, name AgentName, agent Agent) error {
 		// Provider not configured, check if we have environment variables
 		apiKey := getProviderAPIKey(provider)
 		if apiKey == "" {
-			logging.Warn("provider not configured for model, reverting to default",
-				"agent", name,
-				"model", agent.Model,
-				"provider", provider)
-
-			// Set default model based on available providers
-			if setDefaultModelForAgent(name) {
-				logging.Info("set default model for agent", "agent", name, "model", cfg.Agents[name].Model)
-			} else {
-				return fmt.Errorf("no valid provider available for agent %s", name)
-			}
+			return revertAgentToDefault(name, agent,
+				fmt.Sprintf("provider %s is not configured", provider))
 		} else {
 			// Add provider with API key from environment
 			cfg.Providers[provider] = Provider{
@@ -621,18 +653,11 @@ func validateAgent(cfg *Config, name AgentName, agent Agent) error {
 			logging.Info("added provider from environment", "provider", provider)
 		}
 	} else if providerCfg.Disabled || providerCfg.APIKey == "" {
-		// Provider is disabled or has no API key
-		logging.Warn("provider is disabled or has no API key, reverting to default",
-			"agent", name,
-			"model", agent.Model,
-			"provider", provider)
-
-		// Set default model based on available providers
-		if setDefaultModelForAgent(name) {
-			logging.Info("set default model for agent", "agent", name, "model", cfg.Agents[name].Model)
-		} else {
-			return fmt.Errorf("no valid provider available for agent %s", name)
+		reason := fmt.Sprintf("provider %s is disabled", provider)
+		if !providerCfg.Disabled {
+			reason = fmt.Sprintf("provider %s has no API key", provider)
 		}
+		return revertAgentToDefault(name, agent, reason)
 	}
 
 	// Validate max tokens
@@ -755,7 +780,7 @@ func Validate() error {
 	// Validate providers
 	for provider, providerCfg := range cfg.Providers {
 		if providerCfg.APIKey == "" && !providerCfg.Disabled {
-			fmt.Printf("provider has no API key, marking as disabled %s", provider)
+			fmt.Fprintf(os.Stderr, "note: provider %s has no API key, marking as disabled\n", provider)
 			logging.Warn("provider has no API key, marking as disabled", "provider", provider)
 			providerCfg.Disabled = true
 			cfg.Providers[provider] = providerCfg
@@ -887,14 +912,19 @@ func setDefaultModelForAgent(agent AgentName) bool {
 	}
 
 	if apiKey := os.Getenv("GEMINI_API_KEY"); apiKey != "" {
+		// GORILLA OVERRIDE 2026-07-27: Flash, not Pro. This is a fallback the
+		// user never chose — reaching for the $1.25/$10-per-1M Pro alias to
+		// summarize a session or name a title spends real money on work the
+		// Flash tier handles. Coder gets Flash too; anyone wanting Pro can
+		// select it explicitly.
 		var model models.ModelID
 		maxTokens := int64(5000)
 
 		if agent == AgentTitle {
-			model = models.Gemini25Flash
+			model = models.GeminiFlashLiteLatest
 			maxTokens = 80
 		} else {
-			model = models.Gemini25
+			model = models.GeminiFlashLatest
 		}
 
 		cfg.Agents[agent] = Agent{
@@ -910,10 +940,14 @@ func setDefaultModelForAgent(agent AgentName) bool {
 	// the free tier instead of falling through to a provider whose key may
 	// be missing (that is the "title generation failed on Groq" trap).
 	if creds, _ := auth.LoadGeminiCreds(); creds != nil && creds.AccessToken != "" {
-		model := models.GeminiCAPro
+		// GORILLA OVERRIDE 2026-07-27: default to the Flash tier, not Pro. This
+		// is the free tier: Pro models resolve but answer "you have exhausted
+		// your capacity" on an ordinary account, so a Pro fallback fails on
+		// first use. Flash / Flash-Lite were probed working against cloudcode-pa.
+		model := models.GeminiCAFlash
 		maxTokens := int64(5000)
 		if agent == AgentTitle {
-			model = models.GeminiCAFlash
+			model = models.GeminiCA31FlashLite
 			maxTokens = 80
 		}
 		cfg.Agents[agent] = Agent{Model: model, MaxTokens: maxTokens}
