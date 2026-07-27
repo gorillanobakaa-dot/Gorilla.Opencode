@@ -34,7 +34,7 @@ var (
 )
 
 func rateLimitPath() string {
-	return filepath.Join(loadoutConfigBase(), rateLimitFileName)
+	return filepath.Join(ConfigBase(), rateLimitFileName)
 }
 
 type rateLimitFile struct {
@@ -110,7 +110,6 @@ func StepRateLimitRPM(dir int) int {
 }
 
 func saveRateLimit(n int) {
-	_ = os.MkdirAll(loadoutConfigBase(), 0o755)
 	data, _ := json.MarshalIndent(rateLimitFile{RequestsPerMinute: n}, "", " ")
-	_ = os.WriteFile(rateLimitPath(), data, 0o600)
+	_ = writeSecretFile(rateLimitPath(), data)
 }
