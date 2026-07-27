@@ -79,14 +79,40 @@ func CoderPrompt(provider models.ModelProvider) string {
 const (
 	maxTopLevelEntries = 25
 	maxGitStatusLines  = 10
+	// GORILLA OVERRIDE: extra /add-dir roots get a shallower listing than the
+	// primary. Budget ~40-60 tokens per added root in a block that ships every
+	// turn.
+	maxExtraRootEntries = 12
 )
 
 func getEnvironmentInfo() string {
-	cwd := config.WorkingDirectory()
+	roots := config.Roots()
+	cwd := roots[0]
 	isGit := isGitRepo(cwd)
 	platform := runtime.GOOS
 	date := time.Now().Format("1/2/2006")
 	summary := projectSummary(cwd, isGit)
+
+	// GORILLA OVERRIDE: additional roots from /add-dir are advertised here, or
+	// the model has no idea they are in play and will not look in them. Kept
+	// deliberately shallower than the primary root — this block rides EVERY
+	// turn, and extra roots are the one place /add-dir can quietly cost tokens.
+	// gitStatusBrief is NOT called for extras: it shells out to git with a 2s
+	// timeout, and doing that per root per render is a latency risk on a slow
+	// link.
+	extra := ""
+	if len(roots) > 1 {
+		var b strings.Builder
+		b.WriteString("\nAdditional workspace roots (also yours to work in):\n")
+		for _, r := range roots[1:] {
+			fmt.Fprintf(&b, "- %s (git repo: %s)\n", r, boolToYesNo(isGitRepo(r)))
+			for _, line := range strings.Split(listTopLevelBrief(r, maxExtraRootEntries), "\n") {
+				fmt.Fprintf(&b, "    %s\n", line)
+			}
+		}
+		extra = b.String()
+	}
+
 	return fmt.Sprintf(`Here is useful information about the environment you are running in:
 <env>
 Working directory: %s
@@ -97,7 +123,7 @@ Today's date: %s
 <project_summary>
 %s
 </project_summary>
-`, cwd, boolToYesNo(isGit), platform, date, summary)
+%s`, cwd, boolToYesNo(isGit), platform, date, summary, extra)
 }
 
 func isGitRepo(dir string) bool {

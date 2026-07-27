@@ -40,44 +40,74 @@ type commandResult struct {
 }
 
 var (
-	shellInstance     *PersistentShell
-	shellInstanceOnce sync.Once
+	shellInstance *PersistentShell
+	// GORILLA OVERRIDE: was a sync.Once, which cannot be reset — so
+	// ResetPersistentShell (needed by /cd) had no way to force a respawn. A
+	// mutex plus a nil check gives the same once-only behaviour AND allows a
+	// deliberate teardown.
+	shellMu sync.Mutex
 )
 
+// ResetPersistentShell tears down the current shell so the next GetPersistentShell
+// starts a fresh one in newCwd.
+//
+// GORILLA OVERRIDE: the shell is a process-lifetime singleton holding its OWN
+// working directory (cmd.Dir, set once at spawn). Repointing config.WorkingDir
+// with /cd therefore did NOT move the shell — every bash call kept running in the
+// old directory while the rest of the app believed it had moved. That is the
+// trap: a relative `make` or `ls` would silently operate on the previous project.
+//
+// Killing and respawning is the honest fix. Shell state the user set up by hand
+// (exported vars, activated venv, cd'd subdirectory) is lost — that is inherent
+// to changing the working directory, and losing it loudly beats keeping a shell
+// pointed somewhere the user no longer means.
+func ResetPersistentShell(newCwd string) {
+	shellMu.Lock()
+	old := shellInstance
+	shellInstance = nil
+	shellMu.Unlock()
+
+	if old != nil {
+		old.Close()
+	}
+	// Next GetPersistentShell call spawns in newCwd. Done lazily rather than
+	// eagerly so /cd does not pay for a shell the user may never use.
+	_ = newCwd
+}
+
 func GetPersistentShell(workingDir string) *PersistentShell {
-	shellInstanceOnce.Do(func() {
-		shellInstance = newPersistentShell(workingDir)
-	})
+	shellMu.Lock()
+	defer shellMu.Unlock()
 
 	if shellInstance == nil {
 		shellInstance = newPersistentShell(workingDir)
 	} else if !shellInstance.isAlive {
+		// Respawn where the dead shell was, not where the caller happens to be.
 		shellInstance = newPersistentShell(shellInstance.cwd)
 	}
-
 	return shellInstance
 }
 
 func newPersistentShell(cwd string) *PersistentShell {
 	// Get shell configuration from config
 	cfg := config.Get()
-	
+
 	// Default to environment variable if config is not set or nil
 	var shellPath string
 	var shellArgs []string
-	
+
 	if cfg != nil {
 		shellPath = cfg.Shell.Path
 		shellArgs = cfg.Shell.Args
 	}
-	
+
 	if shellPath == "" {
 		shellPath = os.Getenv("SHELL")
 		if shellPath == "" {
 			shellPath = "/bin/bash"
 		}
 	}
-	
+
 	// Default shell args
 	if len(shellArgs) == 0 {
 		shellArgs = []string{"-l"}

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/auth"
+	"github.com/opencode-ai/opencode/internal/fileutil"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/spf13/viper"
@@ -198,6 +199,11 @@ func Load(workingDir string, debug bool) (*Config, error) {
 	// server, so clangd/gopls/rust-analyzer can be turned off individually
 	// rather than only in bulk. Must run after the LSP map is unmarshalled.
 	registerLSPLoadoutRows()
+
+	// GORILLA OVERRIDE: let fileutil's ripgrep search every workspace root so
+	// @-file completion spans /add-dir roots. Inverted dependency — fileutil is
+	// the lower layer and must not import config.
+	fileutil.SetWorkspaceRootsFn(Roots)
 
 	defaultLevel := slog.LevelInfo
 	if cfg.Debug {
