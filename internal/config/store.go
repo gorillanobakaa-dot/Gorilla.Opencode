@@ -103,3 +103,27 @@ func removeOverride(dir, name string) error {
 	}
 	return nil
 }
+
+// ReadPromptOverride returns the contents of PromptsDir()/name and whether it
+// exists. A missing file is the normal case — it means "no override".
+func ReadPromptOverride(name string) (string, bool) {
+	return readOverride(PromptsDir(), name)
+}
+
+// WritePromptOverride saves a user-edited prompt (0o600, dir created as needed).
+func WritePromptOverride(name, content string) error {
+	return writeOverride(PromptsDir(), name, content)
+}
+
+// RemovePromptOverride deletes an override, restoring the built-in default.
+// Removing one that is already absent succeeds: the caller asked for "no
+// override" and that is the resulting state either way.
+func RemovePromptOverride(name string) error {
+	return removeOverride(PromptsDir(), name)
+}
+
+// PromptOverridePath is the on-disk path for a prompt override, for the UI to
+// display and for $EDITOR to open.
+func PromptOverridePath(name string) string {
+	return filepath.Join(PromptsDir(), name)
+}

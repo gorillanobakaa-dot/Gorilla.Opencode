@@ -14,6 +14,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/format"
 	"github.com/opencode-ai/opencode/internal/history"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
+	"github.com/opencode-ai/opencode/internal/llm/prompt"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/lsp"
 	"github.com/opencode-ai/opencode/internal/message"
@@ -58,6 +59,10 @@ func New(ctx context.Context, conn *sql.DB) (*App, error) {
 
 	// GORILLA OVERRIDE: measure the real per-turn token cost of every
 	// tool and the base prompt so the /context loadout reports truth.
+	// GORILLA OVERRIDE: register a /context row per prompt section BEFORE
+	// calibration, so the measured token cost lands on rows that already exist.
+	prompt.RegisterSectionComponents()
+
 	agent.CalibrateLoadout(app.Permissions, app.Sessions, app.Messages, app.History, app.LSPClients)
 
 	// Initialize LSP clients in the background
