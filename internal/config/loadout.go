@@ -43,7 +43,6 @@ var LoadoutComponents = []LoadoutComponent{
 	{"tool.fetch", "Fetch tool", "agent can't fetch URLs", 300, true, false},
 	{"tool.diagnostics", "Diagnostics tool", "agent can't read LSP errors/warnings", 400, true, false},
 	{"tool.agent", "Sub-agent tool", "agent can't spawn read-only search sub-agents", 200, true, false},
-	{"tool.sourcegraph", "Sourcegraph tool", "agent can't search public code on the web", 1000, false, false},
 	// GORILLA OVERRIDE: env estimate was 150 when the block was a recursive
 	// 1000-file tree dump (real cost often 10k–30k). After the shallow
 	// project_summary refactor it really is ~100–200 tokens; calibrate
@@ -61,7 +60,6 @@ var lowBandwidthOff = map[string]bool{
 	"tool.fetch":       true,
 	"tool.diagnostics": true,
 	"tool.agent":       true,
-	"tool.sourcegraph": true,
 	"prompt.lsp":       true,
 }
 
