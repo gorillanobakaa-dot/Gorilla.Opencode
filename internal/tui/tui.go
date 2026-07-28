@@ -154,9 +154,12 @@ type appModel struct {
 	// GORILLA OVERRIDE: /add-dir and /cd — workspace roots.
 	showAddDirDialog bool
 	showCommandHelp  bool
+	// GORILLA OVERRIDE: /export now asks where to write and what to call it.
+	showExportDialog bool
 	// loginURL is the pending sign-in URL, shown as an overlay. GORILLA OVERRIDE.
 	loginURL     string
 	addDirDialog dialog.AddDirDialog
+	exportDialog dialog.ExportDialog
 
 	// GORILLA OVERRIDE: /prompts — view, edit, section-toggle the system prompts.
 	showPromptsDialog bool
@@ -297,6 +300,10 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		addDirModel, addDirSizeCmd := a.addDirDialog.Update(msg)
 		a.addDirDialog = addDirModel.(dialog.AddDirDialog)
 		cmds = append(cmds, addDirSizeCmd)
+
+		exportModel, exportSizeCmd := a.exportDialog.Update(msg)
+		a.exportDialog = exportModel.(dialog.ExportDialog)
+		cmds = append(cmds, exportSizeCmd)
 
 		promptsModel, promptsSizeCmd := a.promptsDialog.Update(msg)
 		a.promptsDialog = promptsModel.(dialog.PromptsDialog)
@@ -470,6 +477,14 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dialog.CloseAddDirDialogMsg:
 		a.showAddDirDialog = false
 		return a, nil
+
+	case dialog.CloseExportDialogMsg:
+		a.showExportDialog = false
+		return a, nil
+
+	case dialog.ExportConfirmedMsg:
+		a.showExportDialog = false
+		return a, a.writeExport(msg.Dir, msg.Name)
 
 	case dialog.ClosePromptsDialogMsg:
 		a.showPromptsDialog = false
@@ -654,7 +669,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.showSettingsDialog = true
 			return a, nil
 		case "export":
-			return a, a.exportSession()
+			return a, a.openExportDialog()
 		case "clear", "new":
 			// GORILLA OVERRIDE: /clear starts a fresh session, dropping
 			// the accumulated context. Routed through the chat page's
@@ -860,6 +875,9 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if a.showAddDirDialog {
 				a.showAddDirDialog = false
+			}
+			if a.showExportDialog {
+				a.showExportDialog = false
 			}
 			// NOT the sign-in overlay. Every other overlay here can simply be
 			// reopened; the sign-in URL cannot — it would mean restarting /login.
@@ -1070,6 +1088,15 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d, helpCmd := a.commandHelp.Update(msg)
 		a.commandHelp = d.(dialog.CommandHelpDialog)
 		return a, helpCmd
+	}
+
+	if a.showExportDialog {
+		d, exportCmd := a.exportDialog.Update(msg)
+		a.exportDialog = d.(dialog.ExportDialog)
+		cmds = append(cmds, exportCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
 	}
 
 	if a.showAddDirDialog {
@@ -1395,6 +1422,15 @@ func (a appModel) View() string {
 		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
 	}
 
+	if a.showExportDialog {
+		overlay := a.exportDialog.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+	}
+
 	if a.showAddDirDialog {
 		overlay := a.addDirDialog.View()
 		row := lipgloss.Height(appView) / 2
@@ -1533,6 +1569,7 @@ func New(app *app.App) tea.Model {
 		modelDialog:    dialog.NewModelDialogCmp(),
 		connectDialog:  dialog.NewConnectDialogCmp(),
 		addDirDialog:   dialog.NewAddDirDialogCmp(),
+		exportDialog:   dialog.NewExportDialogCmp(),
 		promptsDialog:  dialog.NewPromptsDialogCmp(),
 		resetDialog:    dialog.NewResetDialogCmp(),
 		settingsDialog: dialog.NewSettingsDialogCmp(),
