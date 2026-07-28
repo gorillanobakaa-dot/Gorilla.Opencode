@@ -2,6 +2,7 @@ package styles
 
 import (
 	"github.com/charmbracelet/lipgloss"
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
 
@@ -9,13 +10,49 @@ var (
 	ImageBakcground = "#212121"
 )
 
+// PanelBackground is the colour to fill a panel or a line with.
+//
+// GORILLA OVERRIDE: it is TRANSPARENT — the terminal's own background — whenever
+// the program is not drawing on the alternate screen.
+//
+// The reasoning is about what we control. On the alternate screen the program owns
+// every cell, so filling them with the theme's background produces a complete,
+// deliberate-looking surface. Outside it we own only the cells we write, and the
+// terminal's background shows through everything else: the rows above the
+// conversation, the startup padding, anything the shell left on screen, and every
+// span we forget to style. The result is a coloured slab with holes punched in it,
+// which reads as unfinished rather than as a theme. Measured example: the footer's
+// field separators were raw strings, so a 100-column line changed background at
+// column 19.
+//
+// Painting nothing removes the entire class of defect rather than the instances of
+// it — there is no such thing as a half-painted transparent background. The text
+// keeps every one of the theme's foreground colours, so the palette survives; only
+// the fills go. This is what Gemini CLI and Claude Code do, and it is why neither
+// ever looks patchy.
+//
+// The alternative was to set the terminal's own background with OSC 11, which was
+// verified to work here (queried black, set #282a36, queried it back and got
+// 2828/2a2a/3636). Rejected because it changes a setting the user owns and does not
+// change back if the program is killed hard.
+//
+// Deliberate highlights — a selected row, a warning, an error bar — are NOT routed
+// through here. Those carry meaning and must stay painted in both modes.
+func PanelBackground() lipgloss.TerminalColor {
+	if config.AlternateScreenEnabled() {
+		return theme.CurrentTheme().Background()
+	}
+	// NoColor emits no escape at all, which is precisely "whatever the terminal is".
+	return lipgloss.NoColor{}
+}
+
 // Style generation functions that use the current theme
 
 // BaseStyle returns the base style with background and foreground colors
 func BaseStyle() lipgloss.Style {
 	t := theme.CurrentTheme()
 	return lipgloss.NewStyle().
-		Background(t.Background()).
+		Background(PanelBackground()).
 		Foreground(t.Text())
 }
 

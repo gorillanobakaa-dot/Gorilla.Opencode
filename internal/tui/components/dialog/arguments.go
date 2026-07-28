@@ -72,9 +72,9 @@ func NewMultiArgumentsDialogCmp(commandID, content string, argNames []string) Mu
 		ti.Placeholder = fmt.Sprintf("Enter value for %s...", name)
 		ti.Width = 40
 		ti.Prompt = ""
-		ti.PlaceholderStyle = ti.PlaceholderStyle.Background(t.Background())
-		ti.PromptStyle = ti.PromptStyle.Background(t.Background())
-		ti.TextStyle = ti.TextStyle.Background(t.Background())
+		ti.PlaceholderStyle = ti.PlaceholderStyle.Background(styles.PanelBackground())
+		ti.PromptStyle = ti.PromptStyle.Background(styles.PanelBackground())
+		ti.TextStyle = ti.TextStyle.Background(styles.PanelBackground())
 
 		// Only focus the first input initially
 		if i == 0 {
@@ -188,14 +188,14 @@ func (m MultiArgumentsDialogCmp) View() string {
 		Bold(true).
 		Width(maxWidth).
 		Padding(0, 1).
-		Background(t.Background()).
+		Background(styles.PanelBackground()).
 		Render("Command Arguments")
 
 	explanation := lipgloss.NewStyle().
 		Foreground(t.Text()).
 		Width(maxWidth).
 		Padding(0, 1).
-		Background(t.Background()).
+		Background(styles.PanelBackground()).
 		Render("This command requires multiple arguments. Please enter values for each:")
 
 	// Create input fields for each argument
@@ -205,7 +205,7 @@ func (m MultiArgumentsDialogCmp) View() string {
 		labelStyle := lipgloss.NewStyle().
 			Width(maxWidth).
 			Padding(1, 1, 0, 1).
-			Background(t.Background())
+			Background(styles.PanelBackground())
 
 		if i == m.focusIndex {
 			labelStyle = labelStyle.Foreground(t.Primary()).Bold(true)
@@ -219,7 +219,7 @@ func (m MultiArgumentsDialogCmp) View() string {
 			Foreground(t.Text()).
 			Width(maxWidth).
 			Padding(0, 1).
-			Background(t.Background()).
+			Background(styles.PanelBackground()).
 			Render(input.View())
 
 		inputFields[i] = lipgloss.JoinVertical(lipgloss.Left, label, field)
@@ -238,9 +238,9 @@ func (m MultiArgumentsDialogCmp) View() string {
 
 	return baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
+		BorderBackground(styles.PanelBackground()).
 		BorderForeground(t.TextMuted()).
-		Background(t.Background()).
+		Background(styles.PanelBackground()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)
 }

@@ -35,7 +35,7 @@ func (ci *CompletionItem) Render(selected bool, width int) string {
 
 	if selected {
 		itemStyle = itemStyle.
-			Background(t.Background()).
+			Background(styles.PanelBackground()).
 			Foreground(t.Primary()).
 			Bold(true)
 	}
@@ -226,7 +226,7 @@ func (c *completionDialogCmp) View() string {
 		BorderBottom(false).
 		BorderRight(false).
 		BorderLeft(false).
-		BorderBackground(t.Background()).
+		BorderBackground(styles.PanelBackground()).
 		BorderForeground(t.TextMuted()).
 		Width(c.width).
 		Render(c.listView.View())

@@ -112,7 +112,7 @@ func (s *sessionDialogCmp) View() string {
 	if len(s.sessions) == 0 {
 		return baseStyle.Padding(1, 2).
 			Border(lipgloss.RoundedBorder()).
-			BorderBackground(t.Background()).
+			BorderBackground(styles.PanelBackground()).
 			BorderForeground(t.TextMuted()).
 			Width(40).
 			Render("No sessions available")
@@ -179,7 +179,7 @@ func (s *sessionDialogCmp) View() string {
 
 	return baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
+		BorderBackground(styles.PanelBackground()).
 		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)

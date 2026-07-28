@@ -87,14 +87,14 @@ func (q *quitDialogCmp) View() string {
 
 	yesStyle := baseStyle
 	noStyle := baseStyle
-	spacerStyle := baseStyle.Background(t.Background())
+	spacerStyle := baseStyle.Background(styles.PanelBackground())
 
 	if q.selectedNo {
 		noStyle = noStyle.Background(t.Primary()).Foreground(t.Background())
-		yesStyle = yesStyle.Background(t.Background()).Foreground(t.Primary())
+		yesStyle = yesStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
 	} else {
 		yesStyle = yesStyle.Background(t.Primary()).Foreground(t.Background())
-		noStyle = noStyle.Background(t.Background()).Foreground(t.Primary())
+		noStyle = noStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
 	}
 
 	yesButton := yesStyle.Padding(0, 1).Render("Yes")
@@ -119,7 +119,7 @@ func (q *quitDialogCmp) View() string {
 
 	return baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
+		BorderBackground(styles.PanelBackground()).
 		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)

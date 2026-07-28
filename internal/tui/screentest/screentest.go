@@ -29,6 +29,7 @@
 package screentest
 
 import (
+	"image/color"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -197,4 +198,56 @@ func (s *Screen) WidestRow() (cols, row int) {
 		}
 	}
 	return cols, row
+}
+
+// BackgroundBreak reports the first column on row y whose background differs from
+// column 0's, or -1 if the whole row shares one background.
+//
+// This catches the defect that a width assertion cannot see: a row that is the
+// right length but painted in patches, because some spans were styled and the text
+// between them was not. On screen that reads as black rectangles punched through a
+// coloured bar — present, correctly sized, and visibly unfinished.
+//
+// Outside the alternate screen it matters more than it looks. There the terminal's
+// own background shows through anything unpainted, so an unstyled separator is not
+// a subtle shade difference; it is a hole.
+func (s *Screen) BackgroundBreak(y int) int {
+	if y < 0 || y >= s.height {
+		return -1
+	}
+	first := s.buf.Cell(0, y)
+	if first == nil {
+		return -1
+	}
+	want := first.Style.Bg
+	for x := 1; x < s.width; x++ {
+		c := s.buf.Cell(x, y)
+		if c == nil || c.Width == 0 {
+			continue // continuation cell of a wide rune: carries no style of its own
+		}
+		if !sameColour(c.Style.Bg, want) {
+			return x
+		}
+	}
+	return -1
+}
+
+// UniformBackground reports whether every row shares a single background colour,
+// naming the first row and column that does not.
+func (s *Screen) UniformBackground() (ok bool, row, col int) {
+	for y := 0; y < s.height; y++ {
+		if x := s.BackgroundBreak(y); x >= 0 {
+			return false, y, x
+		}
+	}
+	return true, -1, -1
+}
+
+func sameColour(a, b color.Color) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	ar, ag, ab, aa := a.RGBA()
+	br, bg, bb, ba := b.RGBA()
+	return ar == br && ag == bg && ab == bb && aa == ba
 }

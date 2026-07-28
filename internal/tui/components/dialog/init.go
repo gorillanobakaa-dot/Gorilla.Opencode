@@ -128,7 +128,7 @@ func (m InitDialogCmp) View() string {
 			Foreground(t.Background()).
 			Bold(true)
 		noStyle = noStyle.
-			Background(t.Background()).
+			Background(styles.PanelBackground()).
 			Foreground(t.Primary())
 	} else {
 		noStyle = noStyle.
@@ -136,7 +136,7 @@ func (m InitDialogCmp) View() string {
 			Foreground(t.Background()).
 			Bold(true)
 		yesStyle = yesStyle.
-			Background(t.Background()).
+			Background(styles.PanelBackground()).
 			Foreground(t.Primary())
 	}
 
@@ -161,7 +161,7 @@ func (m InitDialogCmp) View() string {
 
 	return baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
+		BorderBackground(styles.PanelBackground()).
 		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)

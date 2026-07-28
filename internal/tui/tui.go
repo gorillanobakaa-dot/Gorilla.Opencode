@@ -26,6 +26,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/tui/components/dialog"
 	"github.com/opencode-ai/opencode/internal/tui/layout"
 	"github.com/opencode-ai/opencode/internal/tui/page"
+	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 	"github.com/opencode-ai/opencode/internal/tui/util"
 )
@@ -1377,9 +1378,9 @@ func (a appModel) View() string {
 		style := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(t.BorderFocused()).
-			BorderBackground(t.Background()).
+			BorderBackground(styles.PanelBackground()).
 			Padding(1, 2).
-			Background(t.Background()).
+			Background(styles.PanelBackground()).
 			Foreground(t.Text())
 
 		overlay := style.Render("Summarizing\n" + a.compactingMessage)
@@ -1675,12 +1676,12 @@ func New(app *app.App) tea.Model {
 		permissions:    dialog.NewPermissionDialogCmp(),
 		initDialog:     dialog.NewInitDialogCmp(),
 		themeDialog:    dialog.NewThemeDialogCmp(),
-		app: app,
+		app:            app,
 		// GORILLA OVERRIDE: read once. The buffer is chosen when the program starts,
 		// so this cannot change mid-session, and a View() that re-read it every frame
 		// could start drawing a full screen over text it had already printed.
-		scrollback:     !config.AlternateScreenEnabled(),
-		commands:       []dialog.Command{},
+		scrollback: !config.AlternateScreenEnabled(),
+		commands:   []dialog.Command{},
 		pages: map[page.PageID]tea.Model{
 			page.ChatPage: page.NewChatPage(app),
 			page.LogsPage: page.NewLogsPage(),
@@ -1849,11 +1850,11 @@ func (a *appModel) loginURLOverlay() string {
 		w = max(minimum, min(preferred, a.width-chrome))
 	}
 
-	body := lipgloss.NewStyle().Background(t.Background()).Foreground(t.Text())
+	body := lipgloss.NewStyle().Background(styles.PanelBackground()).Foreground(t.Text())
 	line := func(s string, st lipgloss.Style) string {
 		// Width pads, MaxWidth clips: together they guarantee every line is
 		// exactly w columns, which is what keeps the box rectangular.
-		return st.Background(t.Background()).Width(w).MaxWidth(w).Render(s)
+		return st.Background(styles.PanelBackground()).Width(w).MaxWidth(w).Render(s)
 	}
 
 	urlLines := hardWrap(a.loginURL, w)
@@ -1898,7 +1899,7 @@ func (a *appModel) loginURLOverlay() string {
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(t.Primary()).
-		Background(t.Background()).
+		Background(styles.PanelBackground()).
 		Padding(1, 2).
 		Render(lipgloss.JoinVertical(lipgloss.Left, parts...))
 }

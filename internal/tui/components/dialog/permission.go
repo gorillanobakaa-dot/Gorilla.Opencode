@@ -155,21 +155,21 @@ func (p *permissionDialogCmp) renderButtons() string {
 	allowStyle := baseStyle
 	allowSessionStyle := baseStyle
 	denyStyle := baseStyle
-	spacerStyle := baseStyle.Background(t.Background())
+	spacerStyle := baseStyle.Background(styles.PanelBackground())
 
 	// Style the selected button
 	switch p.selectedOption {
 	case 0:
 		allowStyle = allowStyle.Background(t.Primary()).Foreground(t.Background())
-		allowSessionStyle = allowSessionStyle.Background(t.Background()).Foreground(t.Primary())
-		denyStyle = denyStyle.Background(t.Background()).Foreground(t.Primary())
+		allowSessionStyle = allowSessionStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
+		denyStyle = denyStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
 	case 1:
-		allowStyle = allowStyle.Background(t.Background()).Foreground(t.Primary())
+		allowStyle = allowStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
 		allowSessionStyle = allowSessionStyle.Background(t.Primary()).Foreground(t.Background())
-		denyStyle = denyStyle.Background(t.Background()).Foreground(t.Primary())
+		denyStyle = denyStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
 	case 2:
-		allowStyle = allowStyle.Background(t.Background()).Foreground(t.Primary())
-		allowSessionStyle = allowSessionStyle.Background(t.Background()).Foreground(t.Primary())
+		allowStyle = allowStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
+		allowSessionStyle = allowSessionStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
 		denyStyle = denyStyle.Background(t.Primary()).Foreground(t.Background())
 	}
 
@@ -264,7 +264,7 @@ func (p *permissionDialogCmp) renderHeader() string {
 		headerParts = append(headerParts, baseStyle.Foreground(t.TextMuted()).Width(p.width).Bold(true).Render("URL"))
 	}
 
-	return lipgloss.NewStyle().Background(t.Background()).Render(lipgloss.JoinVertical(lipgloss.Left, headerParts...))
+	return lipgloss.NewStyle().Background(styles.PanelBackground()).Render(lipgloss.JoinVertical(lipgloss.Left, headerParts...))
 }
 
 func (p *permissionDialogCmp) renderBashContent() string {
@@ -376,9 +376,8 @@ func (p *permissionDialogCmp) renderDefaultContent() string {
 }
 
 func (p *permissionDialogCmp) styleViewport() string {
-	t := theme.CurrentTheme()
 	contentStyle := lipgloss.NewStyle().
-		Background(t.Background())
+		Background(styles.PanelBackground())
 
 	return contentStyle.Render(p.contentViewPort.View())
 }
@@ -431,7 +430,7 @@ func (p *permissionDialogCmp) render() string {
 	return baseStyle.
 		Padding(1, 0, 0, 1).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
+		BorderBackground(styles.PanelBackground()).
 		BorderForeground(t.TextMuted()).
 		Width(p.width).
 		Height(p.height).

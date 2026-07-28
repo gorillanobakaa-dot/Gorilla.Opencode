@@ -26,7 +26,7 @@ func (ci Command) Render(selected bool, width int) string {
 	descStyle := baseStyle.Width(width).Foreground(t.TextMuted())
 	itemStyle := baseStyle.Width(width).
 		Foreground(t.Text()).
-		Background(t.Background())
+		Background(styles.PanelBackground())
 
 	if selected {
 		itemStyle = itemStyle.
@@ -152,7 +152,7 @@ func (c *commandDialogCmp) View() string {
 
 	return baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
+		BorderBackground(styles.PanelBackground()).
 		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)
