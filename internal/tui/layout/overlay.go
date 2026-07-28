@@ -33,6 +33,21 @@ func getLines(s string) (lines []string, widest int) {
 }
 
 // PlaceOverlay places fg on top of bg.
+//
+// GORILLA OVERRIDE: fg is CLAMPED to the background's height and width.
+//
+// A dialog taller than the screen used to push the composed frame past the
+// terminal, which scrolls it and destroys the layout for the rest of the session —
+// far worse than losing the bottom of a dialog. Rendering into a terminal cell grid
+// found seven of eight dialogs asking for more rows than they had at some size,
+// two of them (/context at 37 rows, /connect at 26) on an ordinary 80x24 terminal.
+//
+// This is a NET, not a fix. A clamped dialog is still truncated, and the honest
+// answer is for each one to shrink itself — see layout.FitHeight, and the
+// per-dialog invariants in components/dialog/screen_invariants_test.go which
+// measure the dialog alone, before this clamp applies. The net exists because the
+// consequence of a miss should be a cut-off box rather than a wrecked screen, and
+// because it covers dialogs that do not exist yet.
 func PlaceOverlay(
 	x, y int,
 	fg, bg string,
@@ -42,6 +57,29 @@ func PlaceOverlay(
 	bgLines, bgWidth := getLines(bg)
 	bgHeight := len(bgLines)
 	fgHeight := len(fgLines)
+
+	clamped := false
+	if bgHeight > 0 && fgHeight > bgHeight {
+		fgLines = fgLines[:bgHeight]
+		fgHeight = bgHeight
+		clamped = true
+	}
+	if bgWidth > 0 && fgWidth > bgWidth {
+		for i, l := range fgLines {
+			fgLines[i] = chAnsi.Truncate(l, bgWidth, "")
+		}
+		fgWidth = bgWidth
+		clamped = true
+	}
+	if clamped {
+		// Rebuild fg from the clamped lines. Without this the early return below
+		// hands back the ORIGINAL string: clamping fgLines alone left fg untouched,
+		// so an overlay both taller and wider than the background — the only case
+		// that reaches that return — was still emitted at full size. The clamp did
+		// nothing on the single path it existed for, and a first version of the test
+		// missed it by using an overlay that was merely taller.
+		fg = strings.Join(fgLines, "\n")
+	}
 
 	if shadow {
 		t := theme.CurrentTheme()

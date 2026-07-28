@@ -38,6 +38,14 @@ type LoadoutDialog interface {
 type loadoutDialogCmp struct {
 	selectedIdx int
 	termWidth   int
+	// GORILLA OVERRIDE: the terminal HEIGHT, which this dialog previously never
+	// recorded. That is why it could not size itself: it rendered every dial, every
+	// feature row and every extra unconditionally, asking for 37 rows. A cell-grid
+	// test found it cut off on an ordinary 80x24 terminal, and even on 100x30.
+	termHeight int
+	// featureTop is the first feature row shown, so a long list scrolls instead of
+	// running off the screen.
+	featureTop int
 }
 
 // width returns the dialog inner width — as wide as the terminal allows,
@@ -122,6 +130,7 @@ func (m *loadoutDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.termWidth = msg.Width
+		m.termHeight = msg.Height
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, loadoutKeys.Up):
@@ -216,7 +225,52 @@ func (m *loadoutDialogCmp) adjustSelected(dir int) tea.Cmd {
 	return nil
 }
 
+// View renders at a height that is MEASURED to fit the terminal.
+//
+// GORILLA OVERRIDE: it used to render every row unconditionally and never even
+// recorded the terminal height, so it asked for 37 rows and was silently cut off on
+// an 80x24 screen. layout.FitHeight brings the feature window down until the whole
+// dialog genuinely fits.
 func (m *loadoutDialogCmp) View() string {
+	total := max(1, len(config.LoadoutComponents))
+	// Progressively leaner, in priority order: the switches are the point of this
+	// dialog, so explanatory prose gives way before any row does. Same approach as
+	// /help and the sign-in overlay.
+	for _, compact := range []bool{false, true} {
+		view, _ := layout.FitHeight(m.termHeight, total, 1, func(rows int) string {
+			return m.renderAt(rows, compact)
+		})
+		if m.termHeight <= 0 || lipgloss.Height(view) <= m.termHeight {
+			return view
+		}
+	}
+	view, _ := layout.FitHeight(m.termHeight, total, 1, func(rows int) string {
+		return m.renderAt(rows, true)
+	})
+	return view
+}
+
+// clampFeatureTop keeps the selected feature row inside the visible window.
+func (m *loadoutDialogCmp) clampFeatureTop(window, total int) {
+	if window >= total {
+		m.featureTop = 0
+		return
+	}
+	sel := m.selectedIdx - numDials // -1 or less means a dial is selected
+	if sel < 0 {
+		m.featureTop = 0
+		return
+	}
+	if sel < m.featureTop {
+		m.featureTop = sel
+	}
+	if sel >= m.featureTop+window {
+		m.featureTop = sel - window + 1
+	}
+	m.featureTop = max(0, min(m.featureTop, total-window))
+}
+
+func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	t := theme.CurrentTheme()
 	base := styles.BaseStyle()
 	w := m.width()
@@ -301,17 +355,49 @@ func (m *loadoutDialogCmp) View() string {
 	help := base.Foreground(t.TextMuted()).Width(w).
 		Render("↑↓ pick · ←→ dial · space toggle · L all LSPs · l low-bw · r reset · esc close   ⚠ = disabling cripples the agent")
 
-	content := lipgloss.JoinVertical(lipgloss.Left,
-		header, sub, fixed, "",
+	// Window the feature rows rather than rendering all of them. featureRows is
+	// decided by measurement in View(), not by a guess at how much chrome the rest
+	// of the dialog takes.
+	feature := rows[numDials:]
+	m.clampFeatureTop(featureRows, len(feature))
+	end := min(m.featureTop+featureRows, len(feature))
+	shown := feature[m.featureTop:end]
+
+	// Say so when rows are off-screen, or a hidden switch looks like a missing one.
+	scrollNote := ""
+	if len(shown) < len(feature) {
+		scrollNote = base.Foreground(t.TextMuted()).Width(w).
+			Render(fitLine(fmt.Sprintf("  showing %d-%d of %d — ↑↓ to reach the rest",
+				m.featureTop+1, end, len(feature))))
+	}
+
+	parts := []string{header}
+	if !compact {
+		// The subtitle and the context-size line explain; they are not state you
+		// act on, so they are the first to go on a short terminal.
+		parts = append(parts, sub, fixed, "")
+	}
+	parts = append(parts,
 		dialHeader,
 		rows[rowPace], rows[rowLeash], "",
 		featHeader,
-		lipgloss.JoinVertical(lipgloss.Left, rows[numDials:]...), "",
+		lipgloss.JoinVertical(lipgloss.Left, shown...),
+	)
+	if scrollNote != "" {
+		parts = append(parts, scrollNote)
+	}
+	if !compact {
+		parts = append(parts, "")
+	}
+	parts = append(parts,
 		extrasHeader,
 		lipgloss.JoinVertical(lipgloss.Left, extraRows...),
-		extrasNote, "",
-		help,
 	)
+	if !compact {
+		parts = append(parts, extrasNote, "")
+	}
+	parts = append(parts, help)
+	content := lipgloss.JoinVertical(lipgloss.Left, parts...)
 	return base.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
 		BorderBackground(t.Background()).

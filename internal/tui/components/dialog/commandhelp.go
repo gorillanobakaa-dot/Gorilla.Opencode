@@ -296,7 +296,47 @@ func (m *commandHelpCmp) contentWidth() int {
 	return max(minimum, min(preferred, m.width-chrome))
 }
 
+// View renders the dialog at a size that is MEASURED to fit, not predicted.
+//
+// GORILLA OVERRIDE: this used to compute its capacity from
+// commandHelpFixedLines — a constant standing in for border, padding, title,
+// subtitle and a blank line. That constant was wrong, and a minimum-rows floor
+// silently overrode the height limit on top of it, so the dialog asked for 11 rows
+// in a 10-row terminal and 13 in an 8-row one. Both were found by rendering into a
+// terminal cell grid (internal/tui/screentest), not by reading the arithmetic.
+//
+// Now the frame is rendered and measured. layout.FitHeight brings the row count
+// down until the result genuinely fits, so whatever the chrome happens to be it is
+// counted because it exists rather than because someone predicted it. If even the
+// smallest list still does not fit, the explanation is dropped — the list of
+// commands is the point of the dialog, the explanation is the extra.
 func (m *commandHelpCmp) View() string {
+	// Progressively leaner variants, in priority order. The list of commands is the
+	// reason the dialog exists, so it is the last thing to give ground: first the
+	// explanation goes, then the search hint and the blank line under the title.
+	// Same approach as the sign-in overlay, which sheds its prose before it sheds a
+	// single character of the URL.
+	for _, v := range []struct{ detail, subtitle bool }{
+		{true, true},
+		{false, true},
+		{false, false},
+	} {
+		view, _ := layout.FitHeight(m.height, len(m.rows), 1, func(rows int) string {
+			return m.renderAt(rows, v.detail, v.subtitle)
+		})
+		if m.height <= 0 || lipgloss.Height(view) <= m.height {
+			return view
+		}
+	}
+	// Nothing fits: return the leanest form rather than nothing at all. A clipped
+	// dialog is still usable; an empty one is not.
+	view, _ := layout.FitHeight(m.height, len(m.rows), 1, func(rows int) string {
+		return m.renderAt(rows, false, false)
+	})
+	return view
+}
+
+func (m *commandHelpCmp) renderAt(listRows int, withDetail, withSubtitle bool) string {
 	t := theme.CurrentTheme()
 	w := m.contentWidth()
 	base := lipgloss.NewStyle().Background(t.Background())
@@ -313,18 +353,26 @@ func (m *commandHelpCmp) View() string {
 	var b []string
 	b = append(b, line("Commands — what each one does", base.Bold(true).Foreground(t.Primary())))
 
-	sub := "type / to search · ↑↓ to read · esc to close"
-	if m.filtering || m.filter != "" {
-		sub = "search: " + m.filter + "_"
+	// The hint and the blank under it are the first prose to go on a very short
+	// terminal — except while searching, when the query being typed IS the state
+	// the user needs to see and dropping it would look like the search broke.
+	searching := m.filtering || m.filter != ""
+	if withSubtitle || searching {
+		sub := "type / to search · ↑↓ to read · esc to close"
+		if searching {
+			sub = "search: " + m.filter + "_"
+		}
+		b = append(b, line(sub, base.Foreground(t.TextMuted())))
+		if withSubtitle {
+			b = append(b, line("", base))
+		}
 	}
-	b = append(b, line(sub, base.Foreground(t.TextMuted())))
-	b = append(b, line("", base))
 
 	if len(m.rows) == 0 {
 		b = append(b, line("Nothing matches "+m.filter, base.Foreground(t.TextMuted())))
 	}
 
-	end := min(m.scrollTop+m.listCapacity(), len(m.rows))
+	end := min(m.scrollTop+listRows, len(m.rows))
 	for i := m.scrollTop; i < end; i++ {
 		r := m.rows[i]
 		if r.heading != "" {
@@ -344,7 +392,11 @@ func (m *commandHelpCmp) View() string {
 	// user is actually missing; a list of names they already half-know is not.
 	// Rendered from the same detailBlock that listCapacity measured, so the
 	// height budget and the output cannot disagree.
-	for _, l := range m.detailBlock(w) {
+	detail := m.detailBlock(w)
+	if !withDetail {
+		detail = nil
+	}
+	for _, l := range detail {
 		st := base.Foreground(t.Text())
 		if strings.HasPrefix(l, "also: ") {
 			st = base.Foreground(t.TextMuted())

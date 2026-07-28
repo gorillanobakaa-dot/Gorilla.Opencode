@@ -197,6 +197,8 @@ type connectDialogCmp struct {
 
 	// The endpoint awaiting a y/n in modeConfirmDelete.
 	pendingDelete connectEntry
+	// listTop is the first visible row, for scrolling a list taller than the screen.
+	listTop int
 }
 
 // NewConnectDialogCmp builds the /connect dialog.
@@ -544,7 +546,24 @@ func (m *connectDialogCmp) status(e connectEntry) (connected, disabled bool) {
 	return false, false
 }
 
+// View renders at a size MEASURED to fit, by shrinking the connection list until
+// the ENTIRE framed dialog fits the terminal.
+//
+// GORILLA OVERRIDE, and a caution. The first attempt measured only the list body
+// and subtracted a `frame = 4` constant for the border and padding — the very kind
+// of guess this work exists to remove. It was wrong, because the view also carries
+// six lines of header art outside the body, so the dialog still asked for 26 rows in
+// a 24-row terminal. Measuring the whole thing counts the art because the art is
+// rendered, not because anyone remembered it.
 func (m *connectDialogCmp) View() string {
+	if m.mode != modeList {
+		return m.frameAt(len(m.entries()))
+	}
+	view, _ := layout.FitHeight(m.height, len(m.entries()), 1, m.frameAt)
+	return view
+}
+
+func (m *connectDialogCmp) frameAt(visible int) string {
 	t := theme.CurrentTheme()
 	base := styles.BaseStyle()
 	// Render EACH line at full width (lipgloss .Width() does not pad every line
@@ -572,7 +591,7 @@ func (m *connectDialogCmp) View() string {
 	case modeConfirmDelete:
 		body = m.confirmDeleteView()
 	default:
-		body = m.listView()
+		body = m.listViewAt(visible)
 	}
 	content := lipgloss.JoinVertical(lipgloss.Left, gorilla, base.Width(connectDialogWidth).Render(""), body)
 	return base.Padding(1, 2).
@@ -583,7 +602,29 @@ func (m *connectDialogCmp) View() string {
 		Render(content)
 }
 
-func (m *connectDialogCmp) listView() string {
+// listRow tracks the first visible connection, so a long list scrolls rather than
+// running past the bottom of the screen.
+//
+// GORILLA OVERRIDE: this dialog rendered every preset plus every configured
+// endpoint unconditionally, asking for 26 rows — cut off on an ordinary 80x24
+// terminal. Found by rendering into a terminal cell grid, not by reading the code.
+func (m *connectDialogCmp) clampListTop(window, total int) {
+	if window >= total {
+		m.listTop = 0
+		return
+	}
+	if m.selectedIdx < m.listTop {
+		m.listTop = m.selectedIdx
+	}
+	if m.selectedIdx >= m.listTop+window {
+		m.listTop = m.selectedIdx - window + 1
+	}
+	m.listTop = max(0, min(m.listTop, total-window))
+}
+
+func (m *connectDialogCmp) listView() string { return m.listViewAt(len(m.entries())) }
+
+func (m *connectDialogCmp) listViewAt(visible int) string {
 	t := theme.CurrentTheme()
 	base := styles.BaseStyle()
 	w := connectDialogWidth
@@ -631,12 +672,20 @@ func (m *connectDialogCmp) listView() string {
 		rows = append(rows, st.Render(line))
 	}
 
+	m.clampListTop(visible, len(rows))
+	end := min(m.listTop+visible, len(rows))
+	shown := rows[m.listTop:end]
+
 	blank := base.Width(w).Render("")
-	return lipgloss.JoinVertical(lipgloss.Left,
-		title, blank,
-		lipgloss.JoinVertical(lipgloss.Left, rows...),
-		blank, hint1, hint2,
-	)
+	out := []string{title, blank, lipgloss.JoinVertical(lipgloss.Left, shown...)}
+	if len(shown) < len(rows) {
+		// Say so, or a scrolled-off connection looks like a missing one.
+		out = append(out, base.Foreground(t.TextMuted()).Width(w).
+			Render(truncateTo(fmt.Sprintf("  showing %d-%d of %d — ↑↓ for the rest",
+				m.listTop+1, end, len(rows)), w)))
+	}
+	out = append(out, blank, hint1, hint2)
+	return lipgloss.JoinVertical(lipgloss.Left, out...)
 }
 
 // confirmDeleteView asks before removing an endpoint, and names what will be
