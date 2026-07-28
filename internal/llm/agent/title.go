@@ -37,7 +37,7 @@ var (
 	titleBulletRe = regexp.MustCompile(`^\s*(?:[-*+>]|#{1,6}|\d+[.)])\s*`)
 	// Markdown emphasis and code ticks. Removed rather than parsed: the goal is
 	// plain text, and a stray unmatched ** is more likely than real markup.
-	titleEmphasisRe = regexp.MustCompile(`[*_`+"`"+`~]+`)
+	titleEmphasisRe = regexp.MustCompile(`[*_` + "`" + `~]+`)
 	titleSpaceRe    = regexp.MustCompile(`\s+`)
 	// Phrases that mean the model narrated instead of answering. If this is all
 	// that is left, the title is worthless and the user's own words are better.
