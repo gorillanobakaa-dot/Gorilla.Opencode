@@ -235,6 +235,14 @@ bill — immediately.
 
 ![The context loadout menu with the Gorilla controls](docs/screenshots/02-context-loadout.png)
 
+**Lost? `/help` explains every command in plain language.** Grouped by what you
+are trying to do rather than alphabetically — because someone who does not know a
+command's name cannot look it up alphabetically. The selected command's full
+explanation, including what it costs, shows in place; `/` searches the
+descriptions as well as the names.
+
+[![The /help command reference](docs/screenshots/gallery/v0142-help.png)](docs/screenshots/gallery/v0142-help.png)
+
 More full-resolution screenshots and captions:
 **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)** ·
 **[docs/GUIDE.md](docs/GUIDE.md)**.

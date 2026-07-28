@@ -1,3 +1,70 @@
+## v0.1.42 — 2026-07-28 — Three bugs the screenshots found that the tests did not
+
+Taking screenshots of v0.1.41 for the release page turned up three display bugs.
+Two had no test that could have caught them, and the reason why is the useful part.
+
+- **`/help` hid the selected command** (`internal/tui/components/dialog/commandhelp.go`) —
+  whichever row the cursor sat on rendered as a blank line, with its explanation
+  still shown below. Three screenshots each lost a different command (`/clear`,
+  then `/export`, then `/cd`; later `/logout` and `/context`), which is what
+  identified it as the cursor rather than missing data. `rowStyle` set a highlight
+  background and the shared `line()` helper then reset the background to the panel
+  colour, leaving **foreground equal to background**. `line()` now only sizes.
+
+  **Why the tests passed:** a row still *contains* its text when foreground and
+  background match, so `strings.Contains(view, "/clear")` matched while nothing was
+  visible on screen. Presence is not visibility. The style decision is now its own
+  function and the colour invariants are asserted directly.
+
+- **`esc` did not dismiss the sign-in overlay** (`internal/tui/tui.go`) — the clear
+  was written into the `keys.Quit` branch, not an escape branch, so esc never
+  reached it. The overlay added in v0.1.41 to fix an un-clearable printed URL was
+  itself un-clearable. Now handled *after* every dialog's routing block: each
+  returns early for a `KeyMsg` when open, so reaching that line proves no dialog
+  claimed the key — dialogs keep first claim on esc and any added later inherit
+  precedence. The quit key deliberately does **not** clear it; every other overlay
+  can be reopened, this one cannot.
+
+- **The sign-in box drew black bars and clipped the URL** (`internal/tui/tui.go`) —
+  I had left the URL unwrapped, arguing a folded URL cannot be pasted. Wrong in
+  practice: the line was wider than the terminal, so the box grew with it and the
+  URL was cut off at the screen edge — unreadable *and* unpastable — while the
+  remaining lines, padded only to the intended width, left unpainted cells that
+  render as black bars, because lipgloss does not pad the short lines of a
+  multi-line render. Now hard-wrapped mid-token (a word-wrapper leaves a URL on one
+  over-wide line) with every line padded individually; a short terminal sheds prose,
+  never URL characters.
+
+- **Six screenshots** added to `docs/SCREENSHOTS.md`, `/help` surfaced in the
+  README, each image linking to full resolution — downscaling makes terminal
+  screenshots unreadable.
+
+**Verification:** 8 tests for the overlay (esc dismissal, consuming nothing but esc
+since it is non-modal, uniform width and terminal fit at six widths, whole-URL
+recoverability, prose-not-URL shedding) plus colour invariants for `/help`; first
+tests in package `tui`. Non-vacuous throughout — restoring the unwrapped line gives
+68 width failures, the misplaced clear gives "esc was not handled while the overlay
+was up", the background clobber gives "the selected row's background (32;32;32)
+equals an unselected row's". The render-level colour test took **three** attempts
+and both wrong versions are documented in place: asserting *some* background escape
+passed against the bug, and taking the *first* escape on the line failed against
+correct code (that is the box's padding, not the row).
+
+**Operational note that cost real debugging time:** a running process keeps the
+binary it started with. After installing the fix the bug appeared unchanged, because
+the window predated the install — `readlink /proc/<pid>/exe` showed
+`/usr/bin/gorilla-opencode (deleted)` and the title bar still showed the older build
+hash. Restart every window before concluding a fix is absent.
+
+**Plain-language version:** Three things looked wrong on screen. The command list
+was hiding whichever command you had selected — the text was there all along, drawn
+in the same colour as its background, which is why an automated check kept saying it
+was fine while a person saw a blank line. The sign-in box ignored the escape key,
+and printed its link so wide it ran off the edge of the screen. All three are fixed,
+with six screenshots added showing the results. One thing worth knowing: if you
+install an update while the program is open, the open window keeps running the old
+version — close it and open a new one.
+
 ## v0.1.41 — 2026-07-27 — Five bugs from real use, two of them misdiagnosed by the symptom
 
 Every item here came from one person using v0.1.40 properly and writing down what
