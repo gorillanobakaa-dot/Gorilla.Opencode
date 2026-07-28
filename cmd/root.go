@@ -15,6 +15,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/format"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/logging"
+	"github.com/opencode-ai/opencode/internal/plain"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/tui"
 	"github.com/opencode-ai/opencode/internal/tui/startup"
@@ -148,6 +149,7 @@ understanding code directly from the terminal.`,
 		prompt, _ := cmd.Flags().GetString("prompt")
 		outputFormat, _ := cmd.Flags().GetString("output-format")
 		quiet, _ := cmd.Flags().GetBool("quiet")
+		plainMode, _ := cmd.Flags().GetBool("plain")
 
 		// Validate format option
 		if !format.IsValid(outputFormat) {
@@ -255,6 +257,12 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 		if prompt != "" {
 			// Run non-interactive flow using the App method
 			return app.RunNonInteractive(ctx, prompt, outputFormat, quiet)
+		}
+
+		// GORILLA OVERRIDE: plain interactive mode. Deliberately before the TUI
+		// setup so none of the screen handling runs at all.
+		if plainMode {
+			return plain.New(app, os.Stdin, os.Stdout).Run(ctx)
 		}
 
 		// Interactive mode
@@ -456,6 +464,13 @@ func init() {
 
 	// Add quiet flag to hide spinner in non-interactive mode
 	rootCmd.Flags().BoolP("quiet", "q", false, "Hide spinner in non-interactive mode")
+	// GORILLA OVERRIDE: --plain runs an interactive session with no TUI, so every
+	// byte goes to ordinary terminal scrollback and the whole conversation can be
+	// selected and copied. The TUI uses the terminal's ALTERNATE screen, which has
+	// no scrollback by design — measured: lines pushed via tea.Println reach the
+	// terminal 0 times out of 3 with the altscreen active, 3 of 3 without. No
+	// amount of work inside the TUI can make Ctrl+A work there.
+	rootCmd.Flags().Bool("plain", false, "Interactive mode with no TUI, so the whole session can be selected and copied")
 
 	// Register custom validation for the format flag
 	rootCmd.RegisterFlagCompletionFunc("output-format", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

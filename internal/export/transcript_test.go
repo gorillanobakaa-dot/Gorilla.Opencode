@@ -258,3 +258,40 @@ func header(out string) string {
 
 // plain strips markdown emphasis so content assertions survive formatting changes.
 func plain(s string) string { return strings.ReplaceAll(s, "**", "") }
+
+// The honest form of "reasoning costs extra": report what was actually captured.
+//
+// Exact reasoning-token counts are NOT available — measured against NVIDIA NIM,
+// the usage object carries only prompt/completion/total tokens. So the header
+// reports stored characters plus an estimate, and must SAY it is an estimate.
+func TestReasoningVolumeIsReportedAsAnEstimateNotAFact(t *testing.T) {
+	sess, msgs := fixture()
+	out := header(Render(sess, msgs, time.Unix(realStoredTimestamp+100, 0)))
+
+	if !strings.Contains(out, "Reasoning captured:") {
+		t.Errorf("the header does not report how much reasoning was generated:\n%s", out)
+	}
+	if !strings.Contains(out, "estimate") {
+		t.Error("the token figure is not marked as an estimate — a derived number presented as exact is worse than an obviously rough one")
+	}
+	if !strings.Contains(out, "does not report an exact count") {
+		t.Error("the header does not explain why the count is approximate, which reads as sloppiness rather than honesty")
+	}
+	if !strings.Contains(out, "4 chars/token") {
+		t.Error("the estimation method is not stated, so the number cannot be checked")
+	}
+}
+
+// A session with no reasoning must not claim a zero volume — that would read as
+// "reasoning ran and cost nothing", which is a different claim entirely.
+func TestNoReasoningMeansNoVolumeLine(t *testing.T) {
+	sess := session.Session{ID: "s1", Title: "no thinking here"}
+	msgs := []message.Message{{
+		ID: "m1", Role: message.Assistant, CreatedAt: realStoredTimestamp,
+		Parts: []message.ContentPart{message.TextContent{Text: "just an answer"}},
+	}}
+
+	if out := header(Render(sess, msgs, time.Unix(realStoredTimestamp, 0))); strings.Contains(out, "Reasoning captured") {
+		t.Errorf("a session with no reasoning reported a volume:\n%s", out)
+	}
+}
