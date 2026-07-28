@@ -119,6 +119,19 @@ real confusion; they are not optional.
   wins. Collapse by URL, prefer a keyed entry, keep the first of two.
 - **Scroll that follows the selection makes non-selectable trailing rows
   unreachable.**
+- **The desktop entry passes NO arguments** (`Exec=gorilla-opencode launch`), and
+  clicking the icon is how most people start this program. Anything reachable only
+  by typing a flag is a capability those users do not have. This has now landed
+  twice: the working directory defaulting to `$HOME`, and plain mode shipping as
+  `--plain` only in v0.1.43. Every user-facing capability needs a route that does
+  not involve typing — a persisted setting, a slash command, or a Desktop Action.
+- **The launcher exists in THREE places** — `packaging/gorilla-opencode.desktop`,
+  the `desktopEntry` string in `cmd/install.go`, and (until v0.1.44) a third copy
+  inlined in `scripts/build-deb.sh`. Adding the plain-mode action updated the first
+  two and missed the third, so the built `.deb` shipped a launcher with no action.
+  The script now installs the tracked file; `cmd/desktop_entry_test.go` holds the
+  remaining two in step. **Always extract the built `.deb` and check the artefact,
+  not the source.**
 - **viper reads a DOTTED map key as NESTING.** An `extras` map keyed
   `"extra.timestamps.show"` unmarshalled as `{extra:{timestamps:{show:true}}}` and
   then failed to decode into `map[string]bool`, breaking `config.Load` for the
