@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/app"
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/session"
@@ -39,9 +40,31 @@ type editorCmp struct {
 // GORILLA OVERRIDE: the input box grows with what you type (like every modern
 // chat input) instead of being pinned to a fixed slice of the window.
 const (
-	minEditorHeight = 1  // one row when empty
-	maxEditorHeight = 12 // then the textarea scrolls internally
+	minEditorHeight = 1 // one row when empty
+	// maxEditorHeight is how tall the input may grow before it starts scrolling
+	// internally.
+	//
+	// GORILLA OVERRIDE: raised from 12. Measured rather than picked: at a typical
+	// 96-column input, English prose averages a shade under 6 columns per word
+	// including its space, so 20 rows holds roughly 320 words — comfortably past the
+	// 300 asked for. The footer's own budget clamps this further on short windows,
+	// which is correct: it is a ceiling, not a demand.
+	maxEditorHeight = 20
+	// editorBufferLines is how many LOGICAL lines the input will accept.
+	//
+	// bubbles' textarea defaults MaxHeight to 99 and then refuses to add lines past
+	// it (textarea.go:1028), so a long pasted prompt was silently truncated at 99
+	// newlines regardless of CharLimit being -1. 300 lines holds ~2000 words even if
+	// every line is short.
+	editorBufferLines = 300
 )
+
+// overflowArrow marks lines scrolled out of sight above the input.
+//
+// U+25B2 rather than a heavier arrow like U+2B06: the latter is rendered as an
+// emoji by most fonts, which makes it double-width, and a glyph whose width the
+// renderer guesses wrong shifts everything after it.
+const overflowArrow = "▲"
 
 // EditorHeightMsg asks the layout to give the editor exactly Height rows.
 type EditorHeightMsg struct{ Height int }
@@ -285,8 +308,57 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// hiddenLines is how many wrapped rows of the current input are scrolled out of
+// sight above the visible field, or 0 if all of it fits.
+func (m *editorCmp) hiddenLines() int {
+	wanted := wrappedRows(m.textarea.Value(), m.textarea.Width())
+	if shown := m.textarea.Height(); wanted > shown {
+		return wanted - shown
+	}
+	return 0
+}
+
+// overflowNotice is the line shown above the input when part of what you typed has
+// scrolled out of view.
+//
+// It exists because the failure it replaces was silent: with the field one row
+// tall, typing past the width scrolled the earlier rows away with no indication
+// that anything was there, so a long prompt appeared to be losing words. Saying how
+// many lines are hidden turns an apparent bug into a fact about the window.
+func (m *editorCmp) overflowNotice() string {
+	n := m.hiddenLines()
+	if n == 0 {
+		return ""
+	}
+	word := "lines"
+	if n == 1 {
+		word = "line"
+	}
+	return lipgloss.NewStyle().
+		Bold(true).
+		Foreground(theme.CurrentTheme().Primary()).
+		Render(fmt.Sprintf(" %s %d more %s", overflowArrow, n, word))
+}
+
 func (m *editorCmp) View() string {
 	t := theme.CurrentTheme()
+
+	// GORILLA OVERRIDE: size ourselves rather than waiting to be sized.
+	//
+	// The height used to arrive only via the layout: the editor emitted
+	// EditorHeightMsg, the page forwarded it to the split pane, and the pane resized
+	// this container on a later frame. Outside the alternate screen the pane is not
+	// even rendered, so that round trip is pure indirection — and while it was in
+	// flight the field stayed one row tall, showing only the wrapped row under the
+	// cursor. That is the reported "it only shows one word".
+	//
+	// The message is still emitted, because the alternate-screen layout needs it to
+	// give the transcript the remaining rows. But the field no longer waits for it.
+	if !config.AlternateScreenEnabled() {
+		if h := m.desiredHeight(); m.textarea.Height() != h {
+			m.textarea.SetHeight(h)
+		}
+	}
 
 	// Style the prompt with theme colors
 	style := lipgloss.NewStyle().
@@ -295,7 +367,11 @@ func (m *editorCmp) View() string {
 		Foreground(t.Primary())
 
 	if len(m.attachments) == 0 {
-		return lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"), m.textarea.View())
+		field := lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"), m.textarea.View())
+		if notice := m.overflowNotice(); notice != "" {
+			return lipgloss.JoinVertical(lipgloss.Left, notice, field)
+		}
+		return field
 	}
 	m.textarea.SetHeight(m.height - 1)
 	return lipgloss.JoinVertical(lipgloss.Top,
@@ -354,11 +430,16 @@ func (m *editorCmp) BindingKeys() []key.Binding {
 
 func CreateTextArea(existing *textarea.Model) textarea.Model {
 	t := theme.CurrentTheme()
-	bgColor := t.Background()
 	textColor := t.Text()
 	textMutedColor := t.TextMuted()
 
 	ta := textarea.New()
+	// GORILLA OVERRIDE: the fill comes from styles.PanelBackground(), not the theme
+	// background directly, so the input is unpainted outside the alternate screen
+	// like everything else. bgColor was a local variable, which is why the sweep that
+	// routed every other fill did not reach these — a component that copies a colour
+	// into a variable first is invisible to a search for the colour.
+	bgColor := styles.PanelBackground()
 	ta.BlurredStyle.Base = styles.BaseStyle().Background(bgColor).Foreground(textColor)
 	ta.BlurredStyle.CursorLine = styles.BaseStyle().Background(bgColor)
 	ta.BlurredStyle.Placeholder = styles.BaseStyle().Background(bgColor).Foreground(textMutedColor)
@@ -371,6 +452,9 @@ func CreateTextArea(existing *textarea.Model) textarea.Model {
 	ta.Prompt = " "
 	ta.ShowLineNumbers = false
 	ta.CharLimit = -1
+	// Without this, bubbles refuses to add a logical line past its default of 99, so
+	// a long pasted prompt is silently truncated no matter what CharLimit says.
+	ta.MaxHeight = editorBufferLines
 
 	if existing != nil {
 		ta.SetValue(existing.Value())
