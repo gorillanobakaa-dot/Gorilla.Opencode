@@ -118,8 +118,10 @@ type appModel struct {
 	// pinnedOnce and pinnedRows track the one-off scroll that puts the prompt on
 	// the window's last row, so it is done exactly once and redone only when the
 	// window grows. See pin_bottom.go.
-	pinnedOnce      bool
-	pinnedRows      int
+	pinnedOnce bool
+	pinnedRows int
+	// bannerShown keeps the identity banner to exactly one printing per session.
+	bannerShown     bool
 	selectionMode   bool
 	currentPage     page.PageID
 	previousPage    page.PageID
@@ -299,6 +301,9 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// as replies accumulate. Uses the FULL window height, not the reduced one
 		// above: the status line occupies real rows on screen too.
 		if cmd := a.pinCmd(msg.Height + statusHeight); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		if cmd := a.bannerCmd(); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 

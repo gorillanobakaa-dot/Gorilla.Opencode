@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/opencode-ai/opencode/internal/tui/components/chat"
 )
 
 // pinToBottom returns a command that scrolls the window so the cursor sits on its
@@ -71,4 +72,23 @@ func (a *appModel) pinCmd(rows int) tea.Cmd {
 	}
 	a.pinnedRows = rows
 	return nil
+}
+
+// bannerCmd prints the session's identity once, and only after the frame has been
+// pinned — the pin scrolls the window, so anything printed before it is scrolled
+// straight back out of view.
+//
+// Kept separate from pinCmd rather than batched into it: pinCmd's whole contract is
+// "how many lines does it scroll", and wrapping that in a sequence made it
+// unmeasurable, which broke its test while the behaviour was still correct.
+func (a *appModel) bannerCmd() tea.Cmd {
+	if !a.scrollback || a.bannerShown || !a.pinnedOnce || a.width <= 0 {
+		return nil
+	}
+	banner := chat.SessionBanner(a.width)
+	if banner == "" {
+		return nil
+	}
+	a.bannerShown = true
+	return tea.Println(banner)
 }
