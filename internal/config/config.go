@@ -116,18 +116,26 @@ type Config struct {
 	Extras map[string]bool `json:"extras,omitempty"`
 	// ExtrasChoiceMade records that the cost explanation has been shown and
 	// answered, so it is asked exactly once rather than every launch.
-	ExtrasChoiceMade bool                              `json:"extrasChoiceMade,omitempty"`
-	MCPServers       map[string]MCPServer              `json:"mcpServers,omitempty"`
-	Providers        map[models.ModelProvider]Provider `json:"providers,omitempty"`
-	LocalEndpoints   []LocalEndpoint                   `json:"localEndpoints,omitempty"`
-	LSP              map[string]LSPConfig              `json:"lsp,omitempty"`
-	Agents           map[AgentName]Agent               `json:"agents,omitempty"`
-	Debug            bool                              `json:"debug,omitempty"`
-	DebugLSP         bool                              `json:"debugLSP,omitempty"`
-	ContextPaths     []string                          `json:"contextPaths,omitempty"`
-	TUI              TUIConfig                         `json:"tui"`
-	Shell            ShellConfig                       `json:"shell,omitempty"`
-	AutoCompact      bool                              `json:"autoCompact,omitempty"`
+	ExtrasChoiceMade bool `json:"extrasChoiceMade,omitempty"`
+	// GORILLA OVERRIDE: which interface to start. "full" (default) or "plain".
+	//
+	// This is a persisted SETTING and not only a flag because the desktop entry
+	// runs `gorilla-opencode launch` with no arguments — clicking the icon is how
+	// nearly everyone starts this program, and a capability reachable only by
+	// typing --plain is a capability most users do not have. Same lesson as the
+	// working directory defaulting to $HOME on an icon launch.
+	Interface      string                            `json:"interface,omitempty"`
+	MCPServers     map[string]MCPServer              `json:"mcpServers,omitempty"`
+	Providers      map[models.ModelProvider]Provider `json:"providers,omitempty"`
+	LocalEndpoints []LocalEndpoint                   `json:"localEndpoints,omitempty"`
+	LSP            map[string]LSPConfig              `json:"lsp,omitempty"`
+	Agents         map[AgentName]Agent               `json:"agents,omitempty"`
+	Debug          bool                              `json:"debug,omitempty"`
+	DebugLSP       bool                              `json:"debugLSP,omitempty"`
+	ContextPaths   []string                          `json:"contextPaths,omitempty"`
+	TUI            TUIConfig                         `json:"tui"`
+	Shell          ShellConfig                       `json:"shell,omitempty"`
+	AutoCompact    bool                              `json:"autoCompact,omitempty"`
 }
 
 // Application constants

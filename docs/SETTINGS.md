@@ -115,6 +115,16 @@ you can tell exactly when something happened and build a timeline.
 - **Accepts:** on or off
 - **Default:** `ON`
 
+### Which interface to start
+
+"full" draws panels and dialogs on screen. "plain" writes ordinary text instead, so you can select and copy the whole conversation with your terminal's own keys — which the full interface cannot do, because it draws on a screen buffer your terminal keeps no history of.
+
+- **Setting:** `interface`
+- **Type:** choice
+- **Accepts:** full / plain
+- **Default:** `full`
+- **Takes effect:** next launch
+
 ## Network and pace
 
 ### Requests per minute

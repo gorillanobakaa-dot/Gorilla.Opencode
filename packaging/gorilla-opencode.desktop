@@ -7,3 +7,21 @@ Icon=gorilla-opencode
 Terminal=true
 Categories=Development;IDE;
 Keywords=ai;coding;agent;terminal;llm;
+
+# GORILLA OVERRIDE: a right-click action for the copyable interface.
+#
+# Clicking the icon is how most people start this program, and the icon runs
+# `launch` with no arguments — so a mode reachable only by typing --plain is a
+# mode most users do not have. This puts it one right-click away. `launch` passes
+# its arguments straight through to the real binary (DisableFlagParsing), so the
+# flag arrives intact.
+#
+# The standing preference lives in /settings ("Which interface to start"), which
+# is what makes the choice stick for an ordinary left-click too. This action is
+# for using plain mode once without changing that preference.
+Actions=plain;
+
+[Desktop Action plain]
+Name=Plain mode (selectable and copyable)
+Exec=gorilla-opencode launch --plain
+Icon=gorilla-opencode

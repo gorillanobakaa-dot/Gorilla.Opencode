@@ -55,11 +55,20 @@ The normal interface draws in the terminal's *alternate* screen, which has no
 scrollback — so `Ctrl+A` has nothing to select. That is how alternate screens work,
 not something that can be fixed inside the interface.
 
-For a session you can select, copy and search with your terminal's own keys:
+For a session you can select, copy and search with your terminal's own keys, pick
+whichever suits how you start the program:
 
-```sh
-gorilla-opencode --plain
-```
+- **Clicking the icon?** Right-click it and choose **Plain mode (selectable and
+  copyable)**. No typing.
+- **Want it every time?** `/settings` → *Which interface to start* → `plain`. The
+  choice sticks however you launch, including from the icon.
+- **Already inside?** Type `/plain`. It applies next launch — the current screen is
+  already running.
+- **From a shell, once:** `gorilla-opencode --plain`
+
+The flag is only one of four routes on purpose: the desktop entry runs
+`gorilla-opencode launch` with no arguments, so a mode reachable only by typing a
+flag would be a mode most people never get.
 
 Plain mode has no panels and no redraws. Every byte is ordinary terminal output.
 It carries a smaller set of commands (`/help` lists them); anything else needs the

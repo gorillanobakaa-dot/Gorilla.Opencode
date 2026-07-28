@@ -670,6 +670,16 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		case "export":
 			return a, a.openExportDialog()
+		// GORILLA OVERRIDE: /plain switches to the copyable interface. It cannot
+		// take effect now — the renderer is already running and owns the screen —
+		// so it records the preference and says plainly that it applies next
+		// launch, rather than appearing to do nothing. The preference is what makes
+		// the mode reachable from the desktop icon, which passes no flags.
+		case "plain", "copy", "copyable":
+			if err := config.SetInterfaceMode(config.InterfacePlain); err != nil {
+				return a, util.ReportError(err)
+			}
+			return a, util.ReportInfo("Plain mode is set — quit and start again to use it. Everything will be ordinary terminal text you can select and copy. Use /settings to switch back.")
 		case "clear", "new":
 			// GORILLA OVERRIDE: /clear starts a fresh session, dropping
 			// the accumulated context. Routed through the chat page's

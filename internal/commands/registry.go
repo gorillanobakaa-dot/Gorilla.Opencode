@@ -65,6 +65,19 @@ var All = []Command{
 			"because the whole history is sent each time.",
 	},
 	{
+		Name:    "plain",
+		Aliases: []string{"copy", "copyable"},
+		Group:   GroupSession,
+		Summary: "Switch to the interface you can select and copy.",
+		Detail: "This interface draws on a screen your terminal keeps no history of, " +
+			"which is why Ctrl+A selects nothing here. Plain mode writes ordinary " +
+			"text instead, so you can select, copy and search the whole conversation " +
+			"with your terminal's own keys. It has fewer commands. This takes effect " +
+			"next time you start the program \u2014 the current screen is already " +
+			"running. Switch back in /settings, or right-click the desktop icon for " +
+			"a one-off.",
+	},
+	{
 		Name:    "export",
 		Group:   GroupSession,
 		Summary: "Save this conversation to a file.",
