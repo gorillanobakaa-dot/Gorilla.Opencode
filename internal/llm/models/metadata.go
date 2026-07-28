@@ -18,19 +18,19 @@ var metadataFS embed.FS
 
 // ModelMeta is one curated metadata entry.
 type ModelMeta struct {
-	Name          string  `json:"name"`
-	Description   string  `json:"description"`
-	ContextWindow int64   `json:"context_window"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	ContextWindow int64  `json:"context_window"`
 	// GORILLA OVERRIDE: Rank > 0 means this model is on the curated,
 	// probe-verified "best models" list (1 = best). Rank 0 = not curated.
 	Rank int `json:"rank,omitempty"`
 
 	// GORILLA OVERRIDE: Token pricing in USD per 1M tokens.
 	// Filled from NVIDIA build.nvidia.com pricing page.
-	CostIn         float64 `json:"cost_in,omitempty"`
-	CostInCached   float64 `json:"cost_in_cached,omitempty"`
-	CostOut        float64 `json:"cost_out,omitempty"`
-	CostOutCached  float64 `json:"cost_out_cached,omitempty"`
+	CostIn        float64 `json:"cost_in,omitempty"`
+	CostInCached  float64 `json:"cost_in_cached,omitempty"`
+	CostOut       float64 `json:"cost_out,omitempty"`
+	CostOutCached float64 `json:"cost_out_cached,omitempty"`
 }
 
 var modelMetaByID = loadModelMeta()

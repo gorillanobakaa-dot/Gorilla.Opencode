@@ -159,14 +159,14 @@ func assembleCoderPrompt() string {
 // Written per section rather than generated, because "you lose the honesty
 // rules" needs to say what that actually means.
 var SectionTradeoff = map[string]string{
-	SectionID(preambleSlug):        "the AI is not told what it is or what it specialises in — expect generic answers",
-	SectionID("method"):            "the AI may rewrite working code instead of making the smallest fix, and may not read files before editing them",
-	SectionID("build-discipline"):  "the AI may retry the same failed build repeatedly instead of stopping and telling you what is blocked",
-	SectionID("verification"):      "the AI may report a job done without building or testing it first",
-	SectionID("tools"):             "the AI runs tool calls one at a time instead of in parallel — slower, more requests",
-	SectionID("honesty"):           "the AI becomes MORE LIKELY to claim success it did not observe, and to invent file paths and flags",
-	SectionID("output"):            "replies get longer and more padded, and the AI may add explanatory comments to your code",
-	SectionID("conduct"):           "the AI may stop halfway to ask what to do next, and may take destructive actions without confirming",
+	SectionID(preambleSlug):       "the AI is not told what it is or what it specialises in — expect generic answers",
+	SectionID("method"):           "the AI may rewrite working code instead of making the smallest fix, and may not read files before editing them",
+	SectionID("build-discipline"): "the AI may retry the same failed build repeatedly instead of stopping and telling you what is blocked",
+	SectionID("verification"):     "the AI may report a job done without building or testing it first",
+	SectionID("tools"):            "the AI runs tool calls one at a time instead of in parallel — slower, more requests",
+	SectionID("honesty"):          "the AI becomes MORE LIKELY to claim success it did not observe, and to invent file paths and flags",
+	SectionID("output"):           "replies get longer and more padded, and the AI may add explanatory comments to your code",
+	SectionID("conduct"):          "the AI may stop halfway to ask what to do next, and may take destructive actions without confirming",
 }
 
 // criticalSections are the ones whose loss materially degrades trustworthiness
