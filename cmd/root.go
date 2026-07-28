@@ -261,7 +261,12 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 
 		// GORILLA OVERRIDE: plain interactive mode. Deliberately before the TUI
 		// setup so none of the screen handling runs at all.
-		if plainMode {
+		//
+		// The flag is an override, not the only way in. The desktop entry runs
+		// `gorilla-opencode launch` with no arguments, so a flag-only mode would be
+		// unreachable for anyone who starts the program by clicking its icon — and
+		// that is most people. The persisted setting is what makes the choice stick.
+		if plainMode || config.InterfaceMode() == config.InterfacePlain {
 			return plain.New(app, os.Stdin, os.Stdout).Run(ctx)
 		}
 

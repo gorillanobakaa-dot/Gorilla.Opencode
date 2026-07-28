@@ -264,3 +264,65 @@ func init() {
 		Settings = append(Settings, row)
 	}
 }
+
+// ── Which interface to start ────────────────────────────────────────────────
+
+const (
+	// InterfaceFull is the normal screen-drawing interface.
+	InterfaceFull = "full"
+	// InterfacePlain is ordinary terminal output, so the session can be selected
+	// and copied with the terminal's own keys.
+	InterfacePlain = "plain"
+)
+
+// InterfaceMode reports which interface to start.
+//
+// GORILLA OVERRIDE: persisted rather than flag-only. The desktop entry is
+// `Exec=gorilla-opencode launch` with no arguments, so anyone who starts the
+// program by clicking its icon can never reach a flag-only mode. An explicit
+// --plain still wins for a one-off; this is the standing preference.
+func InterfaceMode() string {
+	if cfg != nil && cfg.Interface == InterfacePlain {
+		return InterfacePlain
+	}
+	return InterfaceFull
+}
+
+// SetInterfaceMode records the preference and persists it.
+func SetInterfaceMode(mode string) error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	switch mode {
+	case InterfaceFull, InterfacePlain:
+	default:
+		return fmt.Errorf("unknown interface %q — use %q or %q", mode, InterfaceFull, InterfacePlain)
+	}
+	cfg.Interface = mode
+	return updateCfgFile(func(c *Config) { c.Interface = mode })
+}
+
+func init() {
+	Settings = append(Settings, Setting{
+		ID:     "interface",
+		Group:  GroupExtras,
+		Name:   "Which interface to start",
+		Layman: "\"full\" draws panels and dialogs on screen. \"plain\" writes ordinary text instead, so you can select and copy the whole conversation with your terminal's own keys — which the full interface cannot do, because it draws on a screen buffer your terminal keeps no history of.",
+		Kind:   KindEnum,
+		// full stays the default: it is what everyone already has, and plain
+		// carries fewer commands.
+		Default: InterfaceFull,
+		Options: []string{InterfaceFull, InterfacePlain},
+		// Choosing an interface cannot take effect mid-session — the renderer is
+		// already running — and saying so beats appearing to do nothing.
+		Restart: true,
+		Get:     func() any { return InterfaceMode() },
+		Set: func(v any) error {
+			s, err := asString(v)
+			if err != nil {
+				return err
+			}
+			return SetInterfaceMode(strings.ToLower(strings.TrimSpace(s)))
+		},
+	})
+}

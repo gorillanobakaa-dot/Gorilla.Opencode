@@ -28,6 +28,18 @@ Icon=` + appBinName + `
 Terminal=true
 Categories=Development;IDE;
 Keywords=ai;coding;agent;terminal;llm;
+
+# GORILLA OVERRIDE: a right-click action for the copyable interface. The icon runs
+# ` + "`launch`" + ` with no arguments, so a mode reachable only by typing --plain is a
+# mode most users never get. The standing preference lives in /settings; this is
+# for using it once. Keep in step with packaging/gorilla-opencode.desktop — the
+# .deb installs that file, this string serves ` + "`" + appBinName + ` install` + "`" + `.
+Actions=plain;
+
+[Desktop Action plain]
+Name=Plain mode (selectable and copyable)
+Exec=` + appBinName + ` launch --plain
+Icon=` + appBinName + `
 `
 )
 
