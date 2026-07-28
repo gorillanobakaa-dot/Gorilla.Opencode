@@ -45,6 +45,7 @@ type commandHelpRow struct {
 }
 
 type commandHelpCmp struct {
+	fitter      layout.Fitter
 	rows        []commandHelpRow
 	selectedIdx int
 	scrollTop   int
@@ -316,12 +317,15 @@ func (m *commandHelpCmp) View() string {
 	// explanation goes, then the search hint and the blank line under the title.
 	// Same approach as the sign-in overlay, which sheds its prose before it sheds a
 	// single character of the URL.
-	for _, v := range []struct{ detail, subtitle bool }{
+	for i, v := range []struct{ detail, subtitle bool }{
 		{true, true},
 		{false, true},
 		{false, false},
 	} {
-		view, _ := layout.FitHeight(m.height, len(m.rows), 1, func(rows int) string {
+		// The explanation block's length depends on the selection, and the search
+		// hint on the filter, so both belong in the key.
+		key := uint64(m.selectedIdx)*1315423911 + uint64(len(m.filter))*31 + uint64(i)
+		view := m.fitter.Fit(m.height, len(m.rows), 1, key, func(rows int) string {
 			return m.renderAt(rows, v.detail, v.subtitle)
 		})
 		if m.height <= 0 || lipgloss.Height(view) <= m.height {
@@ -330,10 +334,9 @@ func (m *commandHelpCmp) View() string {
 	}
 	// Nothing fits: return the leanest form rather than nothing at all. A clipped
 	// dialog is still usable; an empty one is not.
-	view, _ := layout.FitHeight(m.height, len(m.rows), 1, func(rows int) string {
-		return m.renderAt(rows, false, false)
-	})
-	return view
+	return m.fitter.Fit(m.height, len(m.rows), 1,
+		uint64(m.selectedIdx)*1315423911+uint64(len(m.filter))*31+99,
+		func(rows int) string { return m.renderAt(rows, false, false) })
 }
 
 func (m *commandHelpCmp) renderAt(listRows int, withDetail, withSubtitle bool) string {
