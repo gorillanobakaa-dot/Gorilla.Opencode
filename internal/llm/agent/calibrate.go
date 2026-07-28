@@ -61,9 +61,13 @@ func CalibrateLoadout(
 	set("tool.write", tools.NewWriteTool(lspClients, permissions, history))
 	set("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions))
 	set("tool.sparse", tools.NewSparseTool(permissions))
-	if len(lspClients) > 0 {
-		set("tool.diagnostics", tools.NewDiagnosticsTool(lspClients))
-	}
+	// GORILLA OVERRIDE: measure diagnostics unconditionally. This was guarded on
+	// having LSP clients, but the tool's SCHEMA is static — the clients only affect
+	// what it returns at call time, not what it costs to declare. With every
+	// language server switched off (a supported and common setup) the guard left
+	// /context showing the hand-written estimate for this one row while every other
+	// row showed a measured value, which is the worst of both.
+	set("tool.diagnostics", tools.NewDiagnosticsTool(lspClients))
 
 	// Base system prompt (always on) and the switchable env/lsp blocks.
 	// Measure the full prompt, then the marginal cost of each block by
