@@ -36,7 +36,24 @@ If you add tooling, put it here.
 - Its resume logic can decide the state is already `INSTALLED` and skip phases,
   including git operations. Read the log; do not assume a quiet run did the work.
 
-Two guards were added to it on 2026-07-28, both from real incidents:
+**Its state detection was broken in four ways, all fixed on 2026-07-28.** It infers
+"how far along is this release" from side-effects, and every inference was wrong:
+- `verify_cmd` succeeding meant `INSTALLED` — i.e. ANY build on `$PATH`. So a release
+  after the first skipped every phase and then failed verification. **This is the most
+  likely reason earlier sessions abandoned the script.**
+- A binary existing in the tree meant `BUILT`, without asking its version — so it
+  packaged last release's binary under the new number.
+- A `.deb` NAMED for the version meant `PACKAGED`, without checking its contents. This
+  one actually published: a package whose control file said 0.1.46 containing a binary
+  that reported v0.1.45. Caught by extracting the artefact, after upload.
+- A tag existing meant `COMMITTED` ⇒ built and packaged. But step 1 of this checklist
+  says TAG FIRST, then build, so the tag routinely exists before any binary — build and
+  packaging were skipped and upload failed with "Asset not found".
+
+All four now verify what they assume. The lesson generalises: **an artefact's name is
+not its contents, and a side-effect is not a state.**
+
+Two more guards were added the same day, both from real incidents:
 - **It refuses to commit deletions** (`--allow-deletions` to override). `git add -A`
   had no such guard, and nine files of published research were sitting deleted in the
   working tree at the time — one release away from being baked into a tag.
