@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/app"
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/session"
@@ -39,6 +40,15 @@ type messagesCmp struct {
 	attachments   viewport.Model
 	// GORILLA OVERRIDE: throttle streaming re-renders (see below).
 	lastStreamRender time.Time
+	// GORILLA OVERRIDE: scrollback mode. When the alternate screen is off — the
+	// default — settled messages are PRINTED into the terminal's own output
+	// instead of being drawn into the viewport, so the terminal owns the history
+	// and can scroll, select and copy it. See printer.go.
+	scrollback bool
+	// printed records which message IDs have already been written out. Printing
+	// is irreversible, and every pubsub update carries the WHOLE message, so
+	// without this a streaming reply would be emitted again on every token.
+	printed map[string]bool
 }
 type renderFinishedMsg struct{}
 
@@ -89,6 +99,10 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.messages = make([]message.Message, 0)
 		m.currentMsgID = ""
 		m.rendering = false
+		// GORILLA OVERRIDE: forget what was printed, without trying to unprint it.
+		// The old session's text stays in the terminal's scrollback, which is the
+		// point of putting it there.
+		m.forgetPrinted()
 		return m, nil
 
 	case tea.MouseMsg:
@@ -163,6 +177,15 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if needsRerender {
+			// GORILLA OVERRIDE: in scrollback mode there is no viewport to
+			// re-render. Settled messages are printed into the terminal's own
+			// output, which also means the O(n^2) re-render below never runs —
+			// each message's Markdown is rendered exactly once, when it settles,
+			// rather than again on every token.
+			if m.scrollback {
+				cmds = append(cmds, m.printPending()...)
+				return m, tea.Batch(cmds...)
+			}
 			// GORILLA OVERRIDE: re-rendering the whole growing message's
 			// Markdown on EVERY streamed token is O(n^2) and makes long
 			// answers crawl. Throttle intermediate deltas to ~every
@@ -191,6 +214,15 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *messagesCmp) IsAgentWorking() bool {
+	// GORILLA OVERRIDE: tolerate a missing agent instead of dereferencing blindly.
+	// This is consulted from the footer, which is rendered on every single frame,
+	// so a nil here is not a rare edge — it is a crash on the next keystroke. It
+	// also mattered less when the transcript lived in a screen buffer that vanished
+	// on exit; now that finished messages are printed into the terminal, a panic
+	// leaves a half-written transcript the user cannot un-see.
+	if m.app == nil || m.app.CoderAgent == nil {
+		return false
+	}
 	return m.app.CoderAgent.IsSessionBusy(m.session.ID)
 }
 
@@ -474,6 +506,15 @@ func (m *messagesCmp) SetSession(session session.Session) tea.Cmd {
 		m.currentMsgID = m.messages[len(m.messages)-1].ID
 	}
 	delete(m.cachedContent, m.currentMsgID)
+	// GORILLA OVERRIDE: in scrollback mode, loading a session prints its history
+	// into the terminal rather than filling a viewport. printed is reset first so
+	// the newly loaded messages are emitted; anything already in the terminal from
+	// a previous session stays there, as history should.
+	if m.scrollback {
+		m.forgetPrinted()
+		m.rendering = false
+		return tea.Batch(m.printPending()...)
+	}
 	m.rendering = true
 	return func() tea.Msg {
 		m.renderView()
@@ -505,5 +546,11 @@ func NewMessagesCmp(app *app.App) tea.Model {
 		viewport:      vp,
 		spinner:       s,
 		attachments:   attachmets,
+		// GORILLA OVERRIDE: read once, at construction. The buffer the program
+		// draws on is chosen when the program starts, so this cannot change
+		// mid-session — and a component that re-read it every frame could end up
+		// printing into a screen that keeps no history of the print.
+		scrollback: !config.AlternateScreenEnabled(),
+		printed:    make(map[string]bool),
 	}
 }
