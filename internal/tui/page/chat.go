@@ -20,13 +20,36 @@ import (
 var ChatPage PageID = "chat"
 
 type chatPage struct {
-	app                  *app.App
-	editor               layout.Container
-	messages             layout.Container
+	app      *app.App
+	editor   layout.Container
+	messages layout.Container
+	// GORILLA OVERRIDE: the transcript component, typed for FooterView. Used only
+	// when the alternate screen is off, where the conversation is printed into the
+	// terminal and the pane itself is never drawn.
+	messagesFooter       chat.ScrollbackFooter
 	layout               layout.SplitPaneLayout
 	session              session.Session
 	completionDialog     dialog.CompletionDialog
 	showCompletionDialog bool
+}
+
+// FooterView is everything this page draws when the conversation lives in the
+// terminal's scrollback instead of a pane: a capped preview of the reply in
+// flight, and the prompt.
+//
+// It must stay short. Outside the alternate screen bubbletea erases its previous
+// frame by counting logical lines, so a frame taller than the window leaves the
+// erase in the wrong place — one stale copy per redraw. The preview's own cap is
+// what bounds this; see chat.livePreviewRows.
+func (p *chatPage) FooterView() string {
+	parts := make([]string, 0, 2)
+	if p.messagesFooter != nil {
+		if live := p.messagesFooter.FooterView(); strings.TrimSpace(live) != "" {
+			parts = append(parts, live)
+		}
+	}
+	parts = append(parts, p.editor.View())
+	return lipgloss.JoinVertical(lipgloss.Top, parts...)
 }
 
 type ChatKeyMap struct {
@@ -234,18 +257,25 @@ func NewChatPage(app *app.App) tea.Model {
 	cg := completions.NewFileAndFolderContextGroup()
 	completionDialog := dialog.NewCompletionDialogCmp(cg)
 
+	messagesModel := chat.NewMessagesCmp(app)
 	messagesContainer := layout.NewContainer(
-		chat.NewMessagesCmp(app),
+		messagesModel,
 		layout.WithPadding(1, 1, 0, 1),
 	)
 	editorContainer := layout.NewContainer(
 		chat.NewEditorCmp(app),
 		layout.WithBorder(true, false, false, false),
 	)
+	// GORILLA OVERRIDE: keep a typed handle on the transcript component so the
+	// footer can be rendered without the messages pane. The container deliberately
+	// hides its content, and the handle stays valid because the component's Update
+	// returns the same pointer it was called on.
+	footer, _ := messagesModel.(chat.ScrollbackFooter)
 	return &chatPage{
 		app:              app,
 		editor:           editorContainer,
 		messages:         messagesContainer,
+		messagesFooter:   footer,
 		completionDialog: completionDialog,
 		layout: layout.NewSplitPane(
 			layout.WithLeftPanel(messagesContainer),
