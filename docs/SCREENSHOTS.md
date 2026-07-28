@@ -6,8 +6,65 @@ OpenCode on an NVIDIA NIM key. **New here? Read the plain-English
 menus, and the not-obvious ← → arrow trick to switch to the Google
 models.
 
-All screenshots are full-resolution (1600×899) so the terminal text is
-readable — the complete set is in [`screenshots/gallery/`](screenshots/gallery/).
+Every screenshot is unscaled, at whatever size the window was captured
+(1583–1600 px wide), so the terminal text stays readable — the complete
+set is in [`screenshots/gallery/`](screenshots/gallery/).
+
+## v0.1.46 — two interfaces, one program
+
+Gorilla OpenCode has **two front ends**, and these four shots are the same
+machine running both at once. Left window: **plain mode** — every line is
+ordinary terminal output, so `Ctrl+A` / `Ctrl+Shift+C` copies a five-hour
+session into a text editor. Right window: the **full interface**, with the
+sidebar, live token counter and running cost.
+
+You do not need a command line flag for either. Plain mode is a **right-click
+action on the desktop icon** ("Plain mode (copyable output)"); launching
+normally gives the full interface.
+
+### Plain mode and the full interface, side by side
+
+Plain mode announces what it is and what it costs you: the folder, the model,
+and `showing: 4 on, 0 off — thinking is ON and uses extra tokens`. Both windows
+carry **timestamps** (`19:47:08`) and both show the model's **thinking** before
+its answer — the display toggles added in v0.1.44, on by default except the one
+that actually costs money.
+
+[![Plain mode and the full interface running side by side](screenshots/gallery/v0146-plain-and-tui-thinking.png)](screenshots/gallery/v0146-plain-and-tui-thinking.png)
+
+### `/help` in plain mode, and the sidebar's live accounting
+
+Plain mode carries a deliberately smaller command set and says so —
+*"Anything not listed here needs the full interface."* On the right, the sidebar
+accounts for the session with no guessing: `Input 9.1K / Output 61`, `MCP: no
+MCP servers`, `LSP: all 9 off (/context to change)`, `Modified Files: none`.
+
+[![The plain-mode command list beside the full interface sidebar](screenshots/gallery/v0146-plain-help-and-sidebar.png)](screenshots/gallery/v0146-plain-help-and-sidebar.png)
+
+### Both interfaces answering the same question
+
+A non-coding question, asked of a local model served over an OpenAI-compatible
+endpoint (MiniMax M3). Plain mode's answer is four lines; the full interface's
+is a structured comparison with the elapsed time attached — `MiniMax M3 (2.4m)`.
+Same program, same key, two ways to read the result.
+
+[![The same question answered in plain mode and the full interface](screenshots/gallery/v0146-plain-and-tui.png)](screenshots/gallery/v0146-plain-and-tui.png)
+
+### What showing the thinking also shows you — an honest caveat
+
+Turn the reasoning display on and you see everything the model reasoned,
+including the parts it should have kept to itself. In the shot above, MiniMax M3
+quotes **our own instructions back at the user**, mangled:
+
+> `Per my conduct guidelines: "match answer: simple question gets direct sentence."`
+
+That string is a garbled paraphrase of a line in our prompt. No prompt text is
+secret — [`system-prompts/`](../system-prompts/) is in this repository — but it
+is worth knowing that a reasoning window is a window into the *whole* request,
+not a curated summary. That is the trade the `/extras` toggle exists to let you
+make deliberately, in either direction.
+
+[![The full interface mid-generation, thinking visible](screenshots/gallery/v0146-tui-generating.png)](screenshots/gallery/v0146-tui-generating.png)
 
 ## v0.1.42 — the release the screenshots caught bugs in
 
