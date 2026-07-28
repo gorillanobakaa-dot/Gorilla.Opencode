@@ -117,6 +117,9 @@ type Config struct {
 	// ExtrasChoiceMade records that the cost explanation has been shown and
 	// answered, so it is asked exactly once rather than every launch.
 	ExtrasChoiceMade bool `json:"extrasChoiceMade,omitempty"`
+	// GORILLA OVERRIDE: report mouse events to the program. OFF by default because
+	// enabling it takes drag-to-select away from the terminal. See extras.go.
+	MouseWheel bool `json:"mouseWheel,omitempty"`
 	// GORILLA OVERRIDE: which interface to start. "full" (default) or "plain".
 	//
 	// This is a persisted SETTING and not only a flag because the desktop entry

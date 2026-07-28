@@ -125,6 +125,18 @@ you can tell exactly when something happened and build a timeline.
 - **Default:** `full`
 - **Takes effect:** next launch
 
+### Mouse wheel scrolling
+
+Whether the mouse wheel scrolls the conversation. Turning this on has a cost that is easy to miss: the terminal hands the mouse over to this program, so click-and-drag stops selecting text and you have to hold Shift to select.
+
+- **ON:** the wheel scrolls, but selecting text with the mouse needs Shift held, and a long drag can briefly stutter the display
+- **OFF:** your mouse selects text exactly as it does anywhere else; scroll with PageUp and PageDown
+- **Setting:** `mouseWheel`
+- **Type:** on/off
+- **Accepts:** on or off
+- **Default:** `OFF`
+- **Takes effect:** next launch
+
 ## Network and pace
 
 ### Requests per minute
