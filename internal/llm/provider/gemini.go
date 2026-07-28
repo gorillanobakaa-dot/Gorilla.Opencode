@@ -364,9 +364,23 @@ func (g *geminiClient) stream(ctx context.Context, messages []message.Message, t
 				if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
 					for _, part := range resp.Candidates[0].Content.Parts {
 						switch {
-						// GORILLA OVERRIDE: !part.Thought keeps Gemini 3 internal
-				// reasoning summaries out of the visible chat content.
-				case part.Text != "" && !part.Thought:
+						// GORILLA OVERRIDE: a thought part is Gemini's reasoning
+						// summary. Keeping it out of the visible chat content was
+						// right, but it was then dropped altogether — so /export
+						// could show what the model concluded and never how it got
+						// there. Route it to the reasoning channel instead, where
+						// it is persisted as a ReasoningContent part.
+						//
+						// It must NOT be added to currentContent: that is what
+						// gets sent back as the assistant's prior turn, and
+						// feeding a model its own thoughts as output corrupts the
+						// next round.
+						case part.Text != "" && part.Thought:
+							eventChan <- ProviderEvent{
+								Type:    EventThinkingDelta,
+								Content: string(part.Text),
+							}
+						case part.Text != "" && !part.Thought:
 							delta := string(part.Text)
 							if delta != "" {
 								eventChan <- ProviderEvent{

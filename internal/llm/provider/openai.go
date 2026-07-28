@@ -220,8 +220,11 @@ func (o *openaiClient) cacheOptions() []option.RequestOption {
 
 func (o *openaiClient) send(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (response *ProviderResponse, err error) {
 	params := o.preparedParams(o.convertMessages(messages), o.convertTools(tools))
-	cfg := config.Get()
-	if cfg.Debug {
+	// GORILLA OVERRIDE: nil-guard. config.Get() returns nil until Load has run,
+	// and dereferencing it here panicked — which made this path impossible to
+	// test against a fake server without booting the whole application. A debug
+	// log line must never be the reason a stream cannot start.
+	if cfg := config.Get(); cfg != nil && cfg.Debug {
 		jsonData, _ := json.Marshal(params)
 		logging.Debug("Prepared messages", "messages", string(jsonData))
 	}
@@ -280,11 +283,20 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 		IncludeUsage: openai.Bool(true),
 	}
 
-	cfg := config.Get()
-	if cfg.Debug {
+	// GORILLA OVERRIDE: nil-guard. config.Get() returns nil until Load has run,
+	// and dereferencing it here panicked — which made this path impossible to
+	// test against a fake server without booting the whole application. A debug
+	// log line must never be the reason a stream cannot start.
+	if cfg := config.Get(); cfg != nil && cfg.Debug {
 		jsonData, _ := json.Marshal(params)
 		logging.Debug("Prepared messages", "messages", string(jsonData))
 	}
+
+	// GORILLA OVERRIDE: the wire model name, used to remember per-model whether
+	// this server accepts the reasoning parameter. The APIModel rather than the
+	// internal ID, because two configured endpoints can serve the same model and
+	// it is the server's opinion we are recording.
+	modelID := string(o.providerOptions.model.APIModel)
 
 	attempts := 0
 	eventChan := make(chan ProviderEvent)
@@ -292,10 +304,14 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 	go func() {
 		for {
 			attempts++
+			// GORILLA OVERRIDE: ask the server to emit its reasoning. Measured:
+			// without this, GLM-5.2 on NIM streams only [content, role] and the
+			// reasoning reader below never fires. See reasoning.go.
+			reqOpts := append(o.cacheOptions(), thinkingRequestOptions(modelID)...)
 			openaiStream := o.client.Chat.Completions.NewStreaming(
 				ctx,
 				params,
-				o.cacheOptions()...,
+				reqOpts...,
 			)
 
 			acc := openai.ChatCompletionAccumulator{}
@@ -307,6 +323,22 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 				acc.AddChunk(chunk)
 
 				for _, choice := range chunk.Choices {
+					// GORILLA OVERRIDE: forward the model's reasoning before its
+					// answer, so it is persisted and can be shown. Every
+					// OpenAI-compatible backend we actually use — NIM, GLM,
+					// Ollama, DeepSeek — streams this in a vendor-specific field
+					// the SDK has no type for, and it was being dropped on the
+					// floor. Read from the raw delta; see reasoning.go.
+					//
+					// Deliberately not added to currentContent: it is not part of
+					// the answer, and mixing it in would send the reasoning back to
+					// the model as its own prior output on the next turn.
+					if r := reasoningDelta(choice.Delta.RawJSON()); r != "" {
+						eventChan <- ProviderEvent{
+							Type:    EventThinkingDelta,
+							Content: r,
+						}
+					}
 					if choice.Delta.Content != "" {
 						eventChan <- ProviderEvent{
 							Type:    EventContentDelta,
@@ -349,6 +381,20 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 				}
 				close(eventChan)
 				return
+			}
+
+			// GORILLA OVERRIDE: a server that refuses the thinking parameter must
+			// not cost the user their turn. Drop it for this model and retry once,
+			// rather than surfacing an error or maintaining a list of which
+			// backends accept a vendor extension.
+			//
+			// Guarded on currentContent: once tokens have been streamed, retrying
+			// would duplicate the answer, so reasoning is sacrificed instead.
+			if currentContent == "" && thinkingWasRequested(modelID) && isParameterRejection(err) {
+				noteThinkingRejected(modelID)
+				logging.Warn("server refused the reasoning parameter; retrying without it",
+					"model", modelID, "err", err)
+				continue
 			}
 
 			// If there is an error we are going to see if we can retry the call.
