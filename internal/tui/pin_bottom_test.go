@@ -89,3 +89,43 @@ func TestDegenerateWindowSizesArePinnedSafely(t *testing.T) {
 		}
 	}
 }
+
+// The identity banner must be printed exactly once, and only after the frame has
+// been pinned.
+//
+// Once, because printing cannot be withdrawn: a second copy would sit in the user's
+// scrollback forever. After pinning, because the pin scrolls the window — anything
+// printed first is scrolled straight back out of sight, which is the same
+// "where did it go" that losing the sidebar caused in the first place.
+func TestBannerIsPrintedOnceAndOnlyAfterPinning(t *testing.T) {
+	a := &appModel{scrollback: true, width: 100}
+
+	if cmd := a.bannerCmd(); cmd != nil {
+		t.Error("the banner was printed before the frame was pinned; the pin scrolls " +
+			"the window, so it would be scrolled out of view immediately")
+	}
+
+	a.pinCmd(40) // establishes the bottom
+	if cmd := a.bannerCmd(); cmd == nil {
+		t.Fatal("no banner after pinning, so the program's name and version are " +
+			"unreachable from the interface")
+	}
+	if cmd := a.bannerCmd(); cmd != nil {
+		t.Error("the banner was printed a second time; printed output cannot be " +
+			"withdrawn, so the duplicate is permanent")
+	}
+
+	// On the alternate screen the sidebar still shows all of this, and tea.Println is
+	// discarded there anyway.
+	alt := &appModel{scrollback: false, width: 100, pinnedOnce: true}
+	if cmd := alt.bannerCmd(); cmd != nil {
+		t.Error("the banner was printed on the alternate screen, where the call is " +
+			"discarded and the sidebar already shows it")
+	}
+
+	// And never at an unknown width.
+	noWidth := &appModel{scrollback: true, pinnedOnce: true}
+	if cmd := noWidth.bannerCmd(); cmd != nil {
+		t.Error("the banner was printed before the width was known")
+	}
+}

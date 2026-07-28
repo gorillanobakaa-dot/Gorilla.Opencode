@@ -27,6 +27,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
+	"github.com/opencode-ai/opencode/internal/version"
 )
 
 // FooterInfo is the sidebar seen from outside the package, reduced to its compact
@@ -64,7 +65,9 @@ func (m *sidebarCmp) CompactView(width int) string {
 		return key.Render(k+" ") + val.Render(v)
 	}
 
-	first := join(base, width,
+	name := lipgloss.NewStyle().Foreground(t.TextMuted()).
+		Render("Gorilla OpenCode " + version.Version)
+	first := joinWithTrailer(base, width, name,
 		pair("model", m.modelName()),
 		pair("in", m.folderName()),
 		pair("context", m.contextSummary()),
@@ -119,7 +122,29 @@ func join(base lipgloss.Style, width int, fields ...string) string {
 		return ""
 	}
 	line := strings.Join(kept, base.Render(fieldSep))
+	if width <= 0 {
+		return line // unpadded: the caller is composing a wider line itself
+	}
 	return base.Width(width).MaxWidth(width).Render(ansi.Truncate(line, width, "…"))
+}
+
+// joinWithTrailer lays fields out on the left and pins one field to the RIGHT edge,
+// filling the gap between them.
+//
+// The footer's right-hand side was empty, and the program's name and version had
+// nowhere to live once the sidebar stopped being drawn. If the two would collide the
+// trailer is dropped rather than truncated: half a version string is worse than
+// none, and the left-hand fields are the ones that change.
+func joinWithTrailer(base lipgloss.Style, width int, trailer string, fields ...string) string {
+	left := join(base, 0, fields...)
+	if trailer == "" {
+		return base.Width(width).MaxWidth(width).Render(ansi.Truncate(left, width, "…"))
+	}
+	gap := width - lipgloss.Width(left) - lipgloss.Width(trailer)
+	if gap < 2 {
+		return base.Width(width).MaxWidth(width).Render(ansi.Truncate(left, width, "…"))
+	}
+	return base.MaxWidth(width).Render(left + base.Render(strings.Repeat(" ", gap)) + trailer)
 }
 
 // modelName is the model in use, by its display name rather than its ID.
