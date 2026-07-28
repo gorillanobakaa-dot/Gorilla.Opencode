@@ -68,7 +68,12 @@ var All = []Command{
 		Name:    "export",
 		Group:   GroupSession,
 		Summary: "Save this conversation to a file.",
-		Detail:  "Writes the whole exchange out as text, so you can keep it or share it.",
+		Detail: "Asks you which folder and what to call it, then writes the whole " +
+			"session out as text: every message with its date and time, how far " +
+			"into the session it happened, which model answered, the model's " +
+			"reasoning, and every tool it ran with the result that came back — " +
+			"including the ones that failed. Use it when you need to know exactly " +
+			"what happened and when.",
 	},
 
 	// ─── Which files the AI can see ──────────────────────────────────
@@ -111,7 +116,9 @@ var All = []Command{
 		Summary: "Add or manage your AI accounts and keys.",
 		Detail: "Where you paste an API key, add a local server such as Ollama or " +
 			"NVIDIA, or turn a connection off without deleting it. Adding a " +
-			"connection makes its models appear in /model.",
+			"connection makes its models appear in /model. The list shows the " +
+			"servers you have added as well as the ones on offer; press d to " +
+			"remove one of yours for good, or space to just switch it off.",
 	},
 	{
 		Name:    "login",

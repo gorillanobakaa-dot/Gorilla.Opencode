@@ -62,10 +62,21 @@ type connectEntry struct {
 	provider models.ModelProvider // kindKey / kindGoogle
 	epName   string               // kindLocal preset name
 	epURL    string               // kindLocal preset base URL
+	// custom marks a row built from the user's config rather than the preset
+	// catalog. Only these can be removed — deleting a preset row would mean
+	// deleting the offer to connect, which is not a thing.
+	custom bool
 }
 
 // The catalog of things you can connect. Adding any one never disables another.
-var connectEntries = []connectEntry{
+//
+// This is the PRESET list only — see entries(), which appends the endpoints the
+// user has actually configured. Rendering the presets alone was a real gap: an
+// endpoint saved under any name other than "nim" or "ollama" had no row here at
+// all, so it could not be edited, disabled or removed from inside the app. One
+// config accumulated four NVIDIA entries that were completely invisible to
+// /connect for exactly that reason.
+var connectPresets = []connectEntry{
 	{kind: kindKey, label: "Anthropic", provider: models.ProviderAnthropic},
 	{kind: kindKey, label: "OpenAI", provider: models.ProviderOpenAI},
 	{kind: kindKey, label: "Google Gemini (API key)", provider: models.ProviderGemini},
@@ -79,11 +90,63 @@ var connectEntries = []connectEntry{
 	{kind: kindLocal, label: "Custom OpenAI-compatible endpoint"},
 }
 
+// entries returns the rows to display: the presets, then one row per configured
+// local endpoint that no preset already covers.
+//
+// GORILLA OVERRIDE: computed per call rather than stored, because adding or
+// removing an endpoint changes the row count mid-dialog. Anything caching this
+// slice across an Update would index a stale list.
+func (m *connectDialogCmp) entries() []connectEntry {
+	out := make([]connectEntry, 0, len(connectPresets)+4)
+	out = append(out, connectPresets...)
+
+	cfg := config.Get()
+	if cfg == nil {
+		return out
+	}
+	covered := map[string]bool{}
+	for _, p := range connectPresets {
+		if p.epName != "" {
+			covered[p.epName] = true
+		}
+	}
+	for _, ep := range cfg.LocalEndpoints {
+		if covered[ep.Name] {
+			continue
+		}
+		out = append(out, connectEntry{
+			kind:   kindLocal,
+			label:  ep.Name,
+			epName: ep.Name,
+			epURL:  ep.BaseURL,
+			custom: true,
+		})
+	}
+	return out
+}
+
+// selected returns the highlighted entry, guarding against a selection left
+// dangling past the end after a removal shortened the list.
+func (m *connectDialogCmp) selected() connectEntry {
+	e := m.entries()
+	if len(e) == 0 {
+		return connectEntry{}
+	}
+	if m.selectedIdx >= len(e) {
+		m.selectedIdx = len(e) - 1
+	}
+	return e[m.selectedIdx]
+}
+
 type connectMode int
 
 const (
 	modeList connectMode = iota
 	modeForm
+	// GORILLA OVERRIDE: removal is not reversible from the UI — the key is gone
+	// from config.json once written — so it gets an explicit confirm step rather
+	// than acting on a single keypress next to the arrow keys.
+	modeConfirmDelete
 )
 
 const connectDialogWidth = 54
@@ -100,6 +163,12 @@ type connectKeyMap struct {
 	// into a jump to /model on the right tab. On a not-connected row we
 	// short-circuit to a status message rather than pretending to switch.
 	Use key.Binding
+	// GORILLA OVERRIDE: `d` — remove a configured endpoint. Only rows built from
+	// the user's config can be removed; presets are offers to connect, not state.
+	Delete key.Binding
+	// Confirm / cancel for the removal prompt.
+	Yes key.Binding
+	No  key.Binding
 }
 
 var connectKeys = connectKeyMap{
@@ -110,6 +179,9 @@ var connectKeys = connectKeyMap{
 	Toggle: key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "enable/disable")),
 	Tab:    key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next field")),
 	Use:    key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "use for session")),
+	Delete: key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "remove endpoint")),
+	Yes:    key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "confirm")),
+	No:     key.NewBinding(key.WithKeys("n", "esc"), key.WithHelp("n", "cancel")),
 }
 
 type connectDialogCmp struct {
@@ -122,6 +194,9 @@ type connectDialogCmp struct {
 	inputs    []textinput.Model
 	focusIdx  int
 	formErr   string
+
+	// The endpoint awaiting a y/n in modeConfirmDelete.
+	pendingDelete connectEntry
 }
 
 // NewConnectDialogCmp builds the /connect dialog.
@@ -145,6 +220,12 @@ func (m *connectDialogCmp) Init() tea.Cmd {
 	m.mode = modeList
 	m.inputs = nil
 	m.formErr = ""
+	// A pending removal must not survive a close and reopen, or the next `y`
+	// typed in the list would delete an endpoint the user had walked away from.
+	m.pendingDelete = connectEntry{}
+	if n := len(m.entries()); m.selectedIdx >= n {
+		m.selectedIdx = max(0, n-1)
+	}
 	return nil
 }
 
@@ -155,8 +236,11 @@ func (m *connectDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 	case tea.KeyMsg:
-		if m.mode == modeForm {
+		switch m.mode {
+		case modeForm:
 			return m.updateForm(msg)
+		case modeConfirmDelete:
+			return m.updateConfirmDelete(msg)
 		}
 		return m.updateList(msg)
 	}
@@ -164,15 +248,16 @@ func (m *connectDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *connectDialogCmp) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	n := len(m.entries())
 	switch {
 	case key.Matches(msg, connectKeys.Up):
 		if m.selectedIdx > 0 {
 			m.selectedIdx--
 		} else {
-			m.selectedIdx = len(connectEntries) - 1
+			m.selectedIdx = n - 1
 		}
 	case key.Matches(msg, connectKeys.Down):
-		if m.selectedIdx < len(connectEntries)-1 {
+		if m.selectedIdx < n-1 {
 			m.selectedIdx++
 		} else {
 			m.selectedIdx = 0
@@ -182,12 +267,25 @@ func (m *connectDialogCmp) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, connectKeys.Toggle):
 		return m, m.toggleSelected()
 
+	// GORILLA OVERRIDE: `d` — remove a configured endpoint, so a fumbled paste
+	// no longer needs a hand-edit of config.json to undo.
+	case key.Matches(msg, connectKeys.Delete):
+		e := m.selected()
+		if !e.custom {
+			return m, util.CmdHandler(ConnectionChangedMsg{
+				Info: "only endpoints you added can be removed — press space to disable a built-in one",
+			})
+		}
+		m.mode = modeConfirmDelete
+		m.pendingDelete = e
+		return m, nil
+
 	// GORILLA OVERRIDE: `u` — jump directly to /model on this provider's tab.
 	// Only meaningful for a provider that is actually reachable — for a not-
 	// connected or disabled entry we tell the user what's missing rather than
 	// silently switching to a broken tab.
 	case key.Matches(msg, connectKeys.Use):
-		e := connectEntries[m.selectedIdx]
+		e := m.selected()
 		connected, disabled := m.status(e)
 		if !connected {
 			return m, util.CmdHandler(ConnectionChangedMsg{
@@ -211,7 +309,7 @@ func (m *connectDialogCmp) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		)
 
 	case key.Matches(msg, connectKeys.Enter):
-		e := connectEntries[m.selectedIdx]
+		e := m.selected()
 		if e.kind == kindGoogle {
 			return m, tea.Batch(
 				util.CmdHandler(CloseConnectDialogMsg{}),
@@ -221,6 +319,28 @@ func (m *connectDialogCmp) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.openForm(e)
 	}
 	return m, nil
+}
+
+// updateConfirmDelete handles the y/n on a pending removal. Anything that is not
+// a confirmation cancels — a stray keypress must not delete a credential.
+func (m *connectDialogCmp) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if !key.Matches(msg, connectKeys.Yes) {
+		m.mode = modeList
+		m.pendingDelete = connectEntry{}
+		return m, nil
+	}
+
+	name := m.pendingDelete.epName
+	m.mode = modeList
+	m.pendingDelete = connectEntry{}
+	if err := config.RemoveLocalEndpoint(name); err != nil {
+		return m, util.CmdHandler(ConnectionChangedMsg{Info: err.Error()})
+	}
+	// The list just got shorter; keep the selection inside it.
+	if n := len(m.entries()); m.selectedIdx >= n {
+		m.selectedIdx = max(0, n-1)
+	}
+	return m, util.CmdHandler(ConnectionChangedMsg{Info: fmt.Sprintf("Removed %s", name)})
 }
 
 func (m *connectDialogCmp) openForm(e connectEntry) {
@@ -330,6 +450,14 @@ func (m *connectDialogCmp) submitForm() tea.Cmd {
 			m.formErr = "name and base URL are required"
 			return nil
 		}
+		// GORILLA OVERRIDE: repair a key pasted without its provider prefix
+		// BEFORE saving. NVIDIA serves /v1/models unauthenticated, so a
+		// prefix-less key produces a full model list and a "connected" endpoint,
+		// then 401s on every actual request — the failure surfaces far from its
+		// cause. Selecting the "nvapi-" by double-click drops it, which is how
+		// one config came to hold the same key twice with and twice without.
+		keyv, note := config.NormaliseLocalAPIKey(url, keyv)
+
 		ep := config.LocalEndpoint{Name: name, BaseURL: url, APIKey: keyv}
 		if err := config.UpsertLocalEndpoint(ep); err != nil {
 			m.formErr = err.Error()
@@ -338,16 +466,23 @@ func (m *connectDialogCmp) submitForm() tea.Cmd {
 		n, _ := models.RegisterLocalEndpoint(name, url, keyv)
 		m.mode = modeList
 		m.inputs = nil
-		if n == 0 {
-			return util.CmdHandler(ConnectionChangedMsg{Info: fmt.Sprintf("%s saved — no models found at %s", name, url)})
+
+		// Say what was changed. A silent repair leaves the user believing the
+		// key they pasted was fine, and they will paste it that way again.
+		suffix := ""
+		if note != "" {
+			suffix = " — " + note
 		}
-		return util.CmdHandler(ConnectionChangedMsg{Info: fmt.Sprintf("%s: %d model(s) added", name, n)})
+		if n == 0 {
+			return util.CmdHandler(ConnectionChangedMsg{Info: fmt.Sprintf("%s saved — no models found at %s%s", name, url, suffix)})
+		}
+		return util.CmdHandler(ConnectionChangedMsg{Info: fmt.Sprintf("%s: %d model(s) added%s", name, n, suffix)})
 	}
 	return nil
 }
 
 func (m *connectDialogCmp) toggleSelected() tea.Cmd {
-	e := connectEntries[m.selectedIdx]
+	e := m.selected()
 	cfg := config.Get()
 	switch e.kind {
 	case kindKey, kindGoogle:
@@ -380,7 +515,10 @@ func (m *connectDialogCmp) toggleSelected() tea.Cmd {
 			return util.CmdHandler(ConnectionChangedMsg{Info: err.Error()})
 		}
 		if newDisabled {
-			models.UnregisterLocalEndpoint(found.BaseURL)
+			// By name, not by URL: several configured endpoints may aim at the
+			// same baseURL, and only one of them owns the registered models.
+			// Dropping by URL would unregister a different endpoint's models.
+			models.UnregisterLocalEndpointByName(found.Name)
 			return util.CmdHandler(ConnectionChangedMsg{Info: fmt.Sprintf("%s disabled", found.Name)})
 		}
 		n, _ := models.RegisterLocalEndpoint(found.Name, found.BaseURL, found.APIKey)
@@ -428,9 +566,12 @@ func (m *connectDialogCmp) View() string {
 	gorilla := lipgloss.JoinVertical(lipgloss.Left, styledGorilla...)
 
 	var body string
-	if m.mode == modeForm {
+	switch m.mode {
+	case modeForm:
 		body = m.formView()
-	} else {
+	case modeConfirmDelete:
+		body = m.confirmDeleteView()
+	default:
 		body = m.listView()
 	}
 	content := lipgloss.JoinVertical(lipgloss.Left, gorilla, base.Width(connectDialogWidth).Render(""), body)
@@ -449,11 +590,16 @@ func (m *connectDialogCmp) listView() string {
 
 	title := base.Foreground(t.Primary()).Bold(true).Width(w).
 		Render("Connections — coexist, never disable each other")
-	hint := base.Foreground(t.TextMuted()).Width(w).
-		Render("enter: add/edit   space: enable/disable   u: use now   esc: close")
+	// Two lines: one row of keys no longer fits 54 columns, and truncating the
+	// list of what the dialog can do is how a feature becomes undiscoverable.
+	hint1 := base.Foreground(t.TextMuted()).Width(w).
+		Render("enter: add/edit   space: enable/disable   u: use now")
+	hint2 := base.Foreground(t.TextMuted()).Width(w).
+		Render("d: remove (yours only)   esc: close")
 
-	rows := make([]string, 0, len(connectEntries))
-	for i, e := range connectEntries {
+	entries := m.entries()
+	rows := make([]string, 0, len(entries))
+	for i, e := range entries {
 		connected, disabled := m.status(e)
 		badge := "  ·  "
 		switch {
@@ -489,8 +635,46 @@ func (m *connectDialogCmp) listView() string {
 	return lipgloss.JoinVertical(lipgloss.Left,
 		title, blank,
 		lipgloss.JoinVertical(lipgloss.Left, rows...),
-		blank, hint,
+		blank, hint1, hint2,
 	)
+}
+
+// confirmDeleteView asks before removing an endpoint, and names what will be
+// lost. Every line is rendered at full width — lipgloss does not pad the short
+// lines of a multi-line render, and unpainted cells show as black bars.
+func (m *connectDialogCmp) confirmDeleteView() string {
+	t := theme.CurrentTheme()
+	base := styles.BaseStyle()
+	w := connectDialogWidth
+
+	name := m.pendingDelete.epName
+	url := m.pendingDelete.epURL
+
+	lines := []string{
+		base.Foreground(t.Error()).Bold(true).Width(w).Render("Remove this endpoint?"),
+		base.Width(w).Render(""),
+		base.Foreground(t.Text()).Width(w).Render(truncateTo(name, w)),
+		base.Foreground(t.TextMuted()).Width(w).Render(truncateTo(url, w)),
+		base.Width(w).Render(""),
+		base.Foreground(t.TextMuted()).Width(w).Render("Its models leave the picker and its stored key is"),
+		base.Foreground(t.TextMuted()).Width(w).Render("deleted from config.json. This cannot be undone here."),
+		base.Width(w).Render(""),
+		base.Foreground(t.Text()).Width(w).Render("y: remove   n / esc: keep it"),
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+}
+
+// truncateTo clips to w columns with an ellipsis, so a long base URL cannot push
+// the confirmation box wider than the dialog.
+func truncateTo(s string, w int) string {
+	r := []rune(s)
+	if len(r) <= w {
+		return s
+	}
+	if w <= 1 {
+		return "…"
+	}
+	return string(r[:w-1]) + "…"
 }
 
 func (m *connectDialogCmp) formView() string {
