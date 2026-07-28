@@ -44,8 +44,66 @@ func toMarkdown(content string, focused bool, width int) string {
 	return rendered
 }
 
+// renderMessageFlat is the message as ordinary terminal text: no fill, no border,
+// no bubble.
+//
+// GORILLA OVERRIDE. Outside the alternate screen a message is not a panel — it is a
+// paragraph printed into the terminal's scrollback, which will still be there in an
+// hour and can be selected with the mouse. Wrapping it in a coloured slab with a
+// thick left rule made every reply look like a widget floating on the terminal's own
+// background, which is what "get rid of the ridiculous greys" was about.
+//
+// The two speakers are told apart by TYPE rather than by decoration, the way agy and
+// Gemini CLI do it: what you typed is prefixed and emphasised, what the model said
+// is plain prose. That survives being copied into a text file, which a background
+// colour does not.
+func renderMessageFlat(msg string, isUser bool, width int, info ...string) string {
+	t := theme.CurrentTheme()
+
+	var body string
+	if isUser {
+		// Deliberately NOT Markdown. Running a question through a document renderer
+		// re-indents it and styles stray punctuation as formatting, so what you see
+		// is not quite what you typed. A prefix per line keeps a multi-line question
+		// visually attached to itself.
+		style := lipgloss.NewStyle().Bold(true).Foreground(t.Secondary())
+		lines := strings.Split(strings.TrimRight(msg, "\n"), "\n")
+		for i, l := range lines {
+			lines[i] = style.Render("> " + l)
+		}
+		body = strings.Join(lines, "\n")
+	} else {
+		// The model's answer keeps Markdown: code blocks and lists are the point of
+		// it. No background is stamped on, so glamour's own colours sit directly on
+		// the terminal.
+		body = strings.TrimSuffix(toMarkdown(msg, false, width), "\n")
+	}
+
+	// Hard-wrap as a final guarantee, not as formatting.
+	//
+	// Dropping the panel also dropped the lipgloss Width that used to bound every
+	// line, and an existing test caught the consequence immediately: a 440-character
+	// unbreakable token — a long URL, a base64 blob, a minified line — came out 441
+	// columns wide. Markdown wrapping does not help, because there is no space to
+	// break on. An over-wide line is not merely ugly here: the terminal wraps it into
+	// rows the renderer did not count, so every erase after it lands in the wrong
+	// place.
+	//
+	// ansi.Hardwrap rather than lipgloss's Width because the text already carries
+	// colour sequences, and a wrapper that cannot see them splits escapes in half.
+	parts := make([]string, 0, 1+len(info))
+	for _, part := range append([]string{body}, info...) {
+		parts = append(parts, ansi.Hardwrap(part, width, false))
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+}
+
 func renderMessage(msg string, isUser bool, isFocused bool, width int, info ...string) string {
 	t := theme.CurrentTheme()
+
+	if !config.AlternateScreenEnabled() {
+		return renderMessageFlat(msg, isUser, width, info...)
+	}
 
 	style := styles.BaseStyle().
 		Width(width - 1).
@@ -60,7 +118,7 @@ func renderMessage(msg string, isUser bool, isFocused bool, width int, info ...s
 
 	// Apply markdown formatting and handle background color
 	parts := []string{
-		styles.ForceReplaceBackgroundWithLipgloss(toMarkdown(msg, isFocused, width), t.Background()),
+		styles.ApplyPanelBackground(toMarkdown(msg, isFocused, width)),
 	}
 
 	// Remove newline at the end
@@ -489,16 +547,10 @@ func renderToolResponse(toolCall message.ToolCall, response message.ToolResult, 
 	resultContent := truncateHeight(response.Content, maxResultHeight)
 	switch toolCall.Name {
 	case agent.AgentToolName:
-		return styles.ForceReplaceBackgroundWithLipgloss(
-			toMarkdown(resultContent, false, width),
-			t.Background(),
-		)
+		return styles.ApplyPanelBackground(toMarkdown(resultContent, false, width))
 	case tools.BashToolName:
 		resultContent = fmt.Sprintf("```bash\n%s\n```", resultContent)
-		return styles.ForceReplaceBackgroundWithLipgloss(
-			toMarkdown(resultContent, true, width),
-			t.Background(),
-		)
+		return styles.ApplyPanelBackground(toMarkdown(resultContent, true, width))
 	case tools.EditToolName:
 		metadata := tools.EditResponseMetadata{}
 		json.Unmarshal([]byte(response.Metadata), &metadata)
@@ -516,10 +568,7 @@ func renderToolResponse(toolCall message.ToolCall, response message.ToolResult, 
 			mdFormat = "html"
 		}
 		resultContent = fmt.Sprintf("```%s\n%s\n```", mdFormat, resultContent)
-		return styles.ForceReplaceBackgroundWithLipgloss(
-			toMarkdown(resultContent, true, width),
-			t.Background(),
-		)
+		return styles.ApplyPanelBackground(toMarkdown(resultContent, true, width))
 	case tools.GlobToolName:
 		return baseStyle.Width(width).Foreground(t.TextMuted()).Render(resultContent)
 	case tools.GrepToolName:
@@ -536,10 +585,7 @@ func renderToolResponse(toolCall message.ToolCall, response message.ToolResult, 
 			ext = strings.ToLower(ext[1:])
 		}
 		resultContent = fmt.Sprintf("```%s\n%s\n```", ext, truncateHeight(metadata.Content, maxResultHeight))
-		return styles.ForceReplaceBackgroundWithLipgloss(
-			toMarkdown(resultContent, true, width),
-			t.Background(),
-		)
+		return styles.ApplyPanelBackground(toMarkdown(resultContent, true, width))
 	case tools.WriteToolName:
 		params := tools.WriteParams{}
 		json.Unmarshal([]byte(toolCall.Input), &params)
@@ -552,16 +598,10 @@ func renderToolResponse(toolCall message.ToolCall, response message.ToolResult, 
 			ext = strings.ToLower(ext[1:])
 		}
 		resultContent = fmt.Sprintf("```%s\n%s\n```", ext, truncateHeight(params.Content, maxResultHeight))
-		return styles.ForceReplaceBackgroundWithLipgloss(
-			toMarkdown(resultContent, true, width),
-			t.Background(),
-		)
+		return styles.ApplyPanelBackground(toMarkdown(resultContent, true, width))
 	default:
 		resultContent = fmt.Sprintf("```text\n%s\n```", resultContent)
-		return styles.ForceReplaceBackgroundWithLipgloss(
-			toMarkdown(resultContent, true, width),
-			t.Background(),
-		)
+		return styles.ApplyPanelBackground(toMarkdown(resultContent, true, width))
 	}
 }
 
