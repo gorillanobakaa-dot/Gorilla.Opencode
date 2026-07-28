@@ -4,6 +4,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -106,18 +107,27 @@ type Config struct {
 	// GORILLA OVERRIDE: suppresses the startup workspace picker. Stored as the
 	// negative because omitempty drops a false, so an "ask" bool could never be
 	// persisted as off. See PeekStartupWorkspace.
-	SkipWorkspacePrompt bool                              `json:"skipWorkspacePrompt,omitempty"`
-	MCPServers          map[string]MCPServer              `json:"mcpServers,omitempty"`
-	Providers           map[models.ModelProvider]Provider `json:"providers,omitempty"`
-	LocalEndpoints      []LocalEndpoint                   `json:"localEndpoints,omitempty"`
-	LSP                 map[string]LSPConfig              `json:"lsp,omitempty"`
-	Agents              map[AgentName]Agent               `json:"agents,omitempty"`
-	Debug               bool                              `json:"debug,omitempty"`
-	DebugLSP            bool                              `json:"debugLSP,omitempty"`
-	ContextPaths        []string                          `json:"contextPaths,omitempty"`
-	TUI                 TUIConfig                         `json:"tui"`
-	Shell               ShellConfig                       `json:"shell,omitempty"`
-	AutoCompact         bool                              `json:"autoCompact,omitempty"`
+	SkipWorkspacePrompt bool `json:"skipWorkspacePrompt,omitempty"`
+	// GORILLA OVERRIDE: per-feature switches for the optional behaviours that
+	// show the agent's working — see extras.go. A map rather than named bools so
+	// an explicit false survives: omitempty drops a false field, but a false
+	// VALUE inside a present map is preserved, which is what lets "I turned this
+	// off deliberately" be distinguished from "never chose".
+	Extras map[string]bool `json:"extras,omitempty"`
+	// ExtrasChoiceMade records that the cost explanation has been shown and
+	// answered, so it is asked exactly once rather than every launch.
+	ExtrasChoiceMade bool                              `json:"extrasChoiceMade,omitempty"`
+	MCPServers       map[string]MCPServer              `json:"mcpServers,omitempty"`
+	Providers        map[models.ModelProvider]Provider `json:"providers,omitempty"`
+	LocalEndpoints   []LocalEndpoint                   `json:"localEndpoints,omitempty"`
+	LSP              map[string]LSPConfig              `json:"lsp,omitempty"`
+	Agents           map[AgentName]Agent               `json:"agents,omitempty"`
+	Debug            bool                              `json:"debug,omitempty"`
+	DebugLSP         bool                              `json:"debugLSP,omitempty"`
+	ContextPaths     []string                          `json:"contextPaths,omitempty"`
+	TUI              TUIConfig                         `json:"tui"`
+	Shell            ShellConfig                       `json:"shell,omitempty"`
+	AutoCompact      bool                              `json:"autoCompact,omitempty"`
 }
 
 // Application constants
@@ -195,6 +205,19 @@ func Load(workingDir string, debug bool) (*Config, error) {
 
 	applyDefaultValues()
 
+	// GORILLA OVERRIDE: point the logger at its file BEFORE any of the steps
+	// below can log. This used to sit ~50 lines further down, after
+	// registerLocalEndpoints, so every warning those steps emitted went to
+	// slog's built-in default handler — which writes to STDERR. The duplicate
+	// local-endpoint warnings therefore printed straight onto the user's
+	// terminal on every launch, and because the TUI takes the screen a moment
+	// later, that text is painted over the frame with no record in the
+	// renderer: no redraw can ever clear it. Same class of bug as the /login
+	// URL, different mechanism — a log line, not a fmt.Print.
+	if err := configureLogging(); err != nil {
+		return cfg, err
+	}
+
 	// GORILLA OVERRIDE: register every configured OpenAI-compatible local
 	// endpoint (NIM, Ollama, ...) so their models coexist in the picker.
 	registerLocalEndpoints()
@@ -208,48 +231,6 @@ func Load(workingDir string, debug bool) (*Config, error) {
 	// @-file completion spans /add-dir roots. Inverted dependency — fileutil is
 	// the lower layer and must not import config.
 	fileutil.SetWorkspaceRootsFn(Roots)
-
-	defaultLevel := slog.LevelInfo
-	if cfg.Debug {
-		defaultLevel = slog.LevelDebug
-	}
-	if os.Getenv("OPENCODE_DEV_DEBUG") == "true" {
-		loggingFile := fmt.Sprintf("%s/%s", cfg.Data.Directory, "debug.log")
-		messagesPath := fmt.Sprintf("%s/%s", cfg.Data.Directory, "messages")
-
-		// if file does not exist create it
-		if _, err := os.Stat(loggingFile); os.IsNotExist(err) {
-			if err := os.MkdirAll(cfg.Data.Directory, 0o755); err != nil {
-				return cfg, fmt.Errorf("failed to create directory: %w", err)
-			}
-			if _, err := os.Create(loggingFile); err != nil {
-				return cfg, fmt.Errorf("failed to create log file: %w", err)
-			}
-		}
-
-		if _, err := os.Stat(messagesPath); os.IsNotExist(err) {
-			if err := os.MkdirAll(messagesPath, 0o756); err != nil {
-				return cfg, fmt.Errorf("failed to create directory: %w", err)
-			}
-		}
-		logging.MessageDir = messagesPath
-
-		sloggingFileWriter, err := os.OpenFile(loggingFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
-		if err != nil {
-			return cfg, fmt.Errorf("failed to open log file: %w", err)
-		}
-		// Configure logger
-		logger := slog.New(slog.NewTextHandler(sloggingFileWriter, &slog.HandlerOptions{
-			Level: defaultLevel,
-		}))
-		slog.SetDefault(logger)
-	} else {
-		// Configure logger
-		logger := slog.New(slog.NewTextHandler(logging.NewWriter(), &slog.HandlerOptions{
-			Level: defaultLevel,
-		}))
-		slog.SetDefault(logger)
-	}
 
 	// Validate configuration
 	if err := Validate(); err != nil {
@@ -1139,7 +1120,6 @@ func updateCfgFile(updateCfg func(config *Config)) error {
 
 	// Get the config file path
 	configFile := viper.ConfigFileUsed()
-	var configData []byte
 	if configFile == "" {
 		// GORILLA OVERRIDE: create the config in the unified
 		// ~/.config/gorilla-opencode/config.json, not a home dotfile.
@@ -1148,14 +1128,29 @@ func updateCfgFile(updateCfg func(config *Config)) error {
 			return err
 		}
 		logging.Info("config file not found, creating new one", "path", configFile)
-		configData = []byte(`{}`)
-	} else {
-		// Read the existing config file
-		data, err := os.ReadFile(configFile)
-		if err != nil {
-			return fmt.Errorf("failed to read config file: %w", err)
-		}
+		// Record the path with viper so later writes in this process resolve to
+		// the same file through the branch above. See the read below for why
+		// that matters.
+		viper.SetConfigFile(configFile)
+	}
+
+	// GORILLA OVERRIDE: read whatever is on disk, whether or not viper found a
+	// file at startup. This branch used to substitute a literal `{}` whenever
+	// ConfigFileUsed() was empty — and it stays empty for the whole process when
+	// no config.json existed at launch, because nothing re-runs ReadInConfig.
+	// So on a fresh install EVERY write re-based from an empty document and
+	// discarded the one before it: paste an API key in /connect, then add a local
+	// endpoint, and the key was gone. Silent, and only on first-run configs,
+	// which is why it survived. Found by a test asserting a removal persisted;
+	// nothing was left on disk to remove from.
+	var configData []byte
+	switch data, err := os.ReadFile(configFile); {
+	case err == nil:
 		configData = data
+	case os.IsNotExist(err):
+		configData = []byte(`{}`)
+	default:
+		return fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	// Parse the JSON
@@ -1182,6 +1177,54 @@ func updateCfgFile(updateCfg func(config *Config)) error {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
+	return nil
+}
+
+// configureLogging installs the process-wide slog handler.
+//
+// GORILLA OVERRIDE: extracted from Load and moved earlier. Until this runs,
+// slog's default handler is in force and it writes to stderr — which the TUI is
+// about to cover. Anything that logs before this point leaves text burned onto
+// the user's screen for the rest of the session. Call it as early as cfg.Debug
+// and cfg.Data.Directory are known, and never log above the call site.
+func configureLogging() error {
+	defaultLevel := slog.LevelInfo
+	if cfg.Debug {
+		defaultLevel = slog.LevelDebug
+	}
+
+	dest := io.Writer(logging.NewWriter())
+	if os.Getenv("OPENCODE_DEV_DEBUG") == "true" {
+		loggingFile := fmt.Sprintf("%s/%s", cfg.Data.Directory, "debug.log")
+		messagesPath := fmt.Sprintf("%s/%s", cfg.Data.Directory, "messages")
+
+		// if file does not exist create it
+		if _, err := os.Stat(loggingFile); os.IsNotExist(err) {
+			if err := os.MkdirAll(cfg.Data.Directory, 0o755); err != nil {
+				return fmt.Errorf("failed to create directory: %w", err)
+			}
+			if _, err := os.Create(loggingFile); err != nil {
+				return fmt.Errorf("failed to create log file: %w", err)
+			}
+		}
+
+		if _, err := os.Stat(messagesPath); os.IsNotExist(err) {
+			if err := os.MkdirAll(messagesPath, 0o756); err != nil {
+				return fmt.Errorf("failed to create directory: %w", err)
+			}
+		}
+		logging.MessageDir = messagesPath
+
+		f, err := os.OpenFile(loggingFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
+		if err != nil {
+			return fmt.Errorf("failed to open log file: %w", err)
+		}
+		dest = f
+	}
+
+	slog.SetDefault(slog.New(slog.NewTextHandler(dest, &slog.HandlerOptions{
+		Level: defaultLevel,
+	})))
 	return nil
 }
 
@@ -1319,6 +1362,77 @@ func UpsertLocalEndpoint(ep LocalEndpoint) error {
 	cfg.LocalEndpoints = apply(cfg.LocalEndpoints)
 	return updateCfgFile(func(c *Config) { c.LocalEndpoints = apply(c.LocalEndpoints) })
 }
+
+// RemoveLocalEndpoint deletes a local endpoint by name and persists the change.
+//
+// GORILLA OVERRIDE: /connect could add and disable endpoints but never remove
+// one, so a fumbled paste left a permanent entry that only a hand-edit of
+// config.json could clear. One user config accumulated four entries for the same
+// NVIDIA URL — the same key four times, twice with its "nvapi-" prefix missing —
+// and every launch logged two "ignoring duplicate local endpoint" warnings with
+// no way to act on them from inside the app.
+//
+// Its models and route are dropped too, so the endpoint stops being selectable
+// immediately rather than lingering until the next launch.
+func RemoveLocalEndpoint(name string) error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	found := false
+	apply := func(list []LocalEndpoint) []LocalEndpoint {
+		kept := make([]LocalEndpoint, 0, len(list))
+		for _, ep := range list {
+			if ep.Name == name {
+				found = true
+				continue
+			}
+			kept = append(kept, ep)
+		}
+		return kept
+	}
+	cfg.LocalEndpoints = apply(cfg.LocalEndpoints)
+	if !found {
+		return fmt.Errorf("no local endpoint named %q", name)
+	}
+	// By NAME, not by baseURL: the duplicates being cleaned up share their URL
+	// with the endpoint that is staying, and dropping by URL would unregister
+	// that one's models too.
+	models.UnregisterLocalEndpointByName(name)
+	return updateCfgFile(func(c *Config) { c.LocalEndpoints = apply(c.LocalEndpoints) })
+}
+
+// NormaliseLocalAPIKey repairs the paste mistakes that produce a credential
+// which lists models happily and 401s on every actual request.
+//
+// GORILLA OVERRIDE: NVIDIA keys carry an "nvapi-" prefix, and NIM serves
+// /v1/models with NO authentication — so a key pasted without its prefix looks
+// perfectly healthy (full model list, endpoint "connected") and fails only at
+// inference. Selecting the prefix by double-click drops it, which is how one
+// config ended up holding the same key twice with and twice without it. Repair
+// it at the moment of entry and say so; a silent fix teaches nothing.
+//
+// Returns the cleaned key and a note for the user, empty when nothing was wrong.
+func NormaliseLocalAPIKey(baseURL, key string) (string, string) {
+	cleaned := strings.TrimSpace(key)
+	note := ""
+	if cleaned != key {
+		note = "trimmed surrounding whitespace"
+	}
+	if cleaned == "" {
+		return cleaned, note
+	}
+
+	// Only NVIDIA's endpoints have a known prefix to check against; guessing at
+	// other providers' key shapes would do more harm than good.
+	if strings.Contains(baseURL, "api.nvidia.com") && !strings.HasPrefix(cleaned, nvidiaKeyPrefix) {
+		cleaned = nvidiaKeyPrefix + cleaned
+		note = "added the missing \"" + nvidiaKeyPrefix + "\" prefix — without it NVIDIA lists models fine but returns 401 on every request"
+	}
+	return cleaned, note
+}
+
+// nvidiaKeyPrefix is the prefix every NVIDIA NIM API key carries.
+const nvidiaKeyPrefix = "nvapi-"
 
 // SetLocalEndpointDisabled toggles a local endpoint on/off and persists it.
 func SetLocalEndpointDisabled(name string, disabled bool) error {

@@ -90,6 +90,26 @@ func UnregisterLocalEndpoint(baseURL string) {
 	}
 }
 
+// UnregisterLocalEndpointByName drops the models registered BY A NAMED endpoint.
+//
+// GORILLA OVERRIDE: the baseURL variant above is wrong for removal. Several
+// configured endpoints may share one baseURL (the duplicate-NVIDIA case), and
+// after collapsing, exactly one of them owns the registered models. Deleting by
+// URL would therefore take the surviving endpoint's models down with the
+// redundant entry being removed. The route records which endpoint registered it,
+// so match on that.
+func UnregisterLocalEndpointByName(name string) int {
+	n := 0
+	for id, r := range localRoute {
+		if r.Endpoint == name {
+			delete(localRoute, id)
+			delete(SupportedModels, id)
+			n++
+		}
+	}
+	return n
+}
+
 // fetchLocalModels tries the LM Studio beta path first, then the standard
 // OpenAI /v1/models path, against baseURL (authenticating with apiKey).
 func fetchLocalModels(baseURL, apiKey string) []localModel {
@@ -309,6 +329,13 @@ func RegisterLocalRouteForTest(id ModelID, baseURL, apiKey string) {
 }
 
 func ClearLocalRouteForTest(id ModelID) { delete(localRoute, id) }
+
+// RegisterLocalRouteForTestNamed is the same but records the OWNING endpoint,
+// which matters for any test about removal: routes are dropped by endpoint name,
+// not by baseURL, precisely because several endpoints can share a URL.
+func RegisterLocalRouteForTestNamed(id ModelID, baseURL, apiKey, endpoint string) {
+	localRoute[id] = localRouteInfo{BaseURL: baseURL, APIKey: apiKey, Endpoint: endpoint}
+}
 
 // LocalEndpointFor returns the user's name for the connection a local model is
 // served by, or "" if the model is not local.

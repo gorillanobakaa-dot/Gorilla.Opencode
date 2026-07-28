@@ -60,11 +60,16 @@ const (
 	GroupNetwork      SettingGroup = "Network and pace"
 	GroupFiles        SettingGroup = "Files and shell"
 	GroupDiagnostics  SettingGroup = "Diagnostics"
+	// GORILLA OVERRIDE: the optional behaviours that show the agent's working.
+	// Its rows are generated from the Extras registry in extras.go rather than
+	// written out again here, so the cost wording cannot drift between the
+	// first-run screen, /context and this dialog.
+	GroupExtras SettingGroup = "Show me the working"
 )
 
 // GroupOrder is the display order; a map would reshuffle between renders.
 var GroupOrder = []SettingGroup{
-	GroupConversation, GroupNetwork, GroupFiles, GroupAppearance, GroupDiagnostics,
+	GroupConversation, GroupExtras, GroupNetwork, GroupFiles, GroupAppearance, GroupDiagnostics,
 }
 
 // Setting is one knob, fully self-describing.
