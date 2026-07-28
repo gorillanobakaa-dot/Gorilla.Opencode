@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
 
 var ansiEscape = regexp.MustCompile("\x1b\\[[0-9;]*m")
@@ -120,4 +122,25 @@ func ForceReplaceBackgroundWithLipgloss(input string, newBgColor lipgloss.Termin
 
 		return "\x1b[" + sb.String() + "m"
 	})
+}
+
+// ApplyPanelBackground stamps the panel background onto already-rendered content —
+// or leaves it alone entirely when there is no panel to match.
+//
+// GORILLA OVERRIDE. Markdown arrives from glamour carrying its own colour
+// sequences, including backgrounds it chose for code blocks and quotes. On the
+// alternate screen those must be overwritten with the theme's background, or each
+// block sits in a differently-coloured rectangle on a surface the program owns.
+//
+// Outside the alternate screen the opposite is true: the program owns nothing, the
+// terminal's background is the surface, and stamping ANY background on rendered
+// text turns every message into a painted slab floating on the terminal's own
+// colour. That was the reported symptom — "get rid of the ridiculous greys".
+//
+// So this is the single place that decides, and callers stop naming a colour.
+func ApplyPanelBackground(rendered string) string {
+	if !config.AlternateScreenEnabled() {
+		return rendered
+	}
+	return ForceReplaceBackgroundWithLipgloss(rendered, theme.CurrentTheme().Background())
 }

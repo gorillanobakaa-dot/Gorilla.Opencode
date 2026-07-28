@@ -268,7 +268,6 @@ func (p *permissionDialogCmp) renderHeader() string {
 }
 
 func (p *permissionDialogCmp) renderBashContent() string {
-	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
 	if pr, ok := p.permission.Params.(tools.BashPermissionsParams); ok {
@@ -278,7 +277,7 @@ func (p *permissionDialogCmp) renderBashContent() string {
 		renderedContent := p.GetOrSetMarkdown(p.permission.ID, func() (string, error) {
 			r := styles.GetMarkdownRenderer(p.width - 10)
 			s, err := r.Render(content)
-			return styles.ForceReplaceBackgroundWithLipgloss(s, t.Background()), err
+			return styles.ApplyPanelBackground(s), err
 		})
 
 		finalContent := baseStyle.
@@ -328,7 +327,6 @@ func (p *permissionDialogCmp) renderWriteContent() string {
 }
 
 func (p *permissionDialogCmp) renderFetchContent() string {
-	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
 	if pr, ok := p.permission.Params.(tools.FetchPermissionsParams); ok {
@@ -338,7 +336,7 @@ func (p *permissionDialogCmp) renderFetchContent() string {
 		renderedContent := p.GetOrSetMarkdown(p.permission.ID, func() (string, error) {
 			r := styles.GetMarkdownRenderer(p.width - 10)
 			s, err := r.Render(content)
-			return styles.ForceReplaceBackgroundWithLipgloss(s, t.Background()), err
+			return styles.ApplyPanelBackground(s), err
 		})
 
 		finalContent := baseStyle.
@@ -351,7 +349,6 @@ func (p *permissionDialogCmp) renderFetchContent() string {
 }
 
 func (p *permissionDialogCmp) renderDefaultContent() string {
-	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
 	content := p.permission.Description
@@ -360,7 +357,7 @@ func (p *permissionDialogCmp) renderDefaultContent() string {
 	renderedContent := p.GetOrSetMarkdown(p.permission.ID, func() (string, error) {
 		r := styles.GetMarkdownRenderer(p.width - 10)
 		s, err := r.Render(content)
-		return styles.ForceReplaceBackgroundWithLipgloss(s, t.Background()), err
+		return styles.ApplyPanelBackground(s), err
 	})
 
 	finalContent := baseStyle.
