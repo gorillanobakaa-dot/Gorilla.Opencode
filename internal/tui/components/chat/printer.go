@@ -16,6 +16,16 @@ import (
 	"github.com/opencode-ai/opencode/internal/message"
 )
 
+// ScrollbackFooter is the transcript component seen from outside the package,
+// reduced to the one thing a caller needs when the conversation is being printed
+// rather than drawn: what still has to appear in the frame.
+//
+// It exists because layout.Container hides its content, and the page needs the
+// footer without the pane.
+type ScrollbackFooter interface {
+	FooterView() string
+}
+
 // livePreviewRows caps how much of an in-flight reply is shown in the footer
 // while it streams.
 //

@@ -107,7 +107,13 @@ var logsKeyReturnKey = key.NewBinding(
 )
 
 type appModel struct {
-	width, height   int
+	width, height int
+	// GORILLA OVERRIDE: scrollback means the alternate screen is OFF, so the
+	// conversation is printed into the terminal's own output and only the prompt is
+	// drawn in place. Dialogs still need a whole screen, so they are shown by
+	// entering the alternate screen briefly and leaving it again — see
+	// anyOverlayOpen in overlay_state.go.
+	scrollback      bool
 	selectionMode   bool
 	currentPage     page.PageID
 	previousPage    page.PageID
@@ -230,7 +236,31 @@ func (a appModel) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// Update wraps the real update so the terminal buffer can follow the dialogs.
+//
+// GORILLA OVERRIDE: dialogs are written to paint a whole screen, and outside the
+// alternate screen there is no whole screen to paint — only a short footer above
+// the printed conversation. So opening any dialog enters the alternate screen and
+// closing it leaves again, which is why this is a wrapper: the decision is made
+// once, from the overlay state before and after, rather than at each of the ~18
+// places a dialog is opened. Doing it at the call sites is the version that gets
+// one path right and forgets another.
 func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	wasOpen := a.anyOverlayOpen()
+
+	updated, cmd := a.update(msg)
+
+	next, ok := updated.(appModel)
+	if !ok {
+		return updated, cmd
+	}
+	if buffer := next.bufferCmd(wasOpen); buffer != nil {
+		cmd = tea.Batch(cmd, buffer)
+	}
+	return next, cmd
+}
+
+func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
@@ -1244,7 +1274,39 @@ func (a *appModel) moveToPage(pageID page.PageID) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// footerView is the whole frame when the conversation lives in the terminal's
+// scrollback: the prompt, a capped preview of any reply in flight, and the status
+// line. Everything settled has already been printed and is the terminal's to
+// scroll, select and copy.
+//
+// It must stay shorter than the window. Outside the alternate screen bubbletea
+// erases its previous frame by walking the cursor up by the number of LOGICAL
+// lines it last drew; if the frame is taller than the window, the lines that
+// scrolled off are not where that count believes they are and every later erase
+// lands wrong — one stale copy per redraw, which is the failure the startup
+// picker demonstrated before it was moved.
+func (a appModel) footerView() string {
+	type footerer interface{ FooterView() string }
+
+	page, ok := a.pages[a.currentPage].(footerer)
+	if !ok {
+		// A page with nothing to contribute (the log viewer) still needs its status
+		// line, and drawing its full body inline would be the very overflow this
+		// mode exists to avoid.
+		return a.status.View()
+	}
+	return lipgloss.JoinVertical(lipgloss.Top, page.FooterView(), a.status.View())
+}
+
 func (a appModel) View() string {
+	// GORILLA OVERRIDE: with the alternate screen off and no dialog open, the frame
+	// is only the footer. Rendering the full-screen layout here would paint a whole
+	// window's worth of panels on top of text already printed to the terminal, and
+	// none of it could be erased cleanly.
+	if a.scrollback && !a.anyOverlayOpen() {
+		return a.footerView()
+	}
+
 	components := []string{
 		a.pages[a.currentPage].View(),
 	}
@@ -1588,7 +1650,11 @@ func New(app *app.App) tea.Model {
 		permissions:    dialog.NewPermissionDialogCmp(),
 		initDialog:     dialog.NewInitDialogCmp(),
 		themeDialog:    dialog.NewThemeDialogCmp(),
-		app:            app,
+		app: app,
+		// GORILLA OVERRIDE: read once. The buffer is chosen when the program starts,
+		// so this cannot change mid-session, and a View() that re-read it every frame
+		// could start drawing a full screen over text it had already printed.
+		scrollback:     !config.AlternateScreenEnabled(),
 		commands:       []dialog.Command{},
 		pages: map[page.PageID]tea.Model{
 			page.ChatPage: page.NewChatPage(app),
