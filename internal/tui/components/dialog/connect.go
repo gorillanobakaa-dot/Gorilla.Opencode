@@ -211,7 +211,7 @@ func NewConnectDialogCmp() ConnectDialog {
 // blends into the dialog instead of rendering as a black box.
 func applyInputTheme(in *textinput.Model) {
 	t := theme.CurrentTheme()
-	bg := lipgloss.NewStyle().Background(t.Background())
+	bg := lipgloss.NewStyle().Background(styles.PanelBackground())
 	in.PromptStyle = bg.Foreground(t.Primary())
 	in.TextStyle = bg.Foreground(t.Text())
 	in.PlaceholderStyle = bg.Foreground(t.TextMuted())
@@ -597,7 +597,7 @@ func (m *connectDialogCmp) frameAt(visible int) string {
 	content := lipgloss.JoinVertical(lipgloss.Left, gorilla, base.Width(connectDialogWidth).Render(""), body)
 	return base.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
+		BorderBackground(styles.PanelBackground()).
 		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)

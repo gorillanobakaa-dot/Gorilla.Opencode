@@ -64,13 +64,13 @@ func (m *sidebarCmp) CompactView(width int) string {
 		return key.Render(k+" ") + val.Render(v)
 	}
 
-	first := join(width,
+	first := join(base, width,
 		pair("model", m.modelName()),
 		pair("in", m.folderName()),
 		pair("context", m.contextSummary()),
 		pair("spent", fmt.Sprintf("$%.2f", m.session.Cost)),
 	)
-	second := join(width,
+	second := join(base, width,
 		pair("tokens", fmt.Sprintf("%s in / %s out",
 			formatTokens(m.session.PromptTokens), formatTokens(m.session.CompletionTokens))),
 		pair("mcp", m.mcpSummary()),
@@ -90,12 +90,25 @@ func (m *sidebarCmp) CompactView(width int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
-// join lays fields out on one line, dropping empties, and truncates to width.
+// join lays fields out on one line, dropping empties, truncating to width, and
+// painting the WHOLE line — separators and trailing space included.
 //
-// Truncation rather than wrapping is the point: a wrapped line silently becomes two
-// rows, which is exactly how a two-row footer turns into a three-row one and breaks
-// the height guarantee this file is built around.
-func join(width int, fields ...string) string {
+// Two things here are load-bearing, both learned from the same screenshot.
+//
+// The separators are rendered through the style rather than concatenated raw. An
+// unstyled separator inherits the terminal's own background, and outside the
+// alternate screen that is not a subtle shade difference — it is a hole. The
+// measured symptom was a background break at column 19 of a 100-column line, which
+// on screen reads as black rectangles punched through a coloured bar.
+//
+// The line is then padded to the full width by the same style, because a row that
+// stops at its last character leaves the rest of the row unpainted for exactly the
+// same reason.
+//
+// Truncation rather than wrapping is the third: a wrapped line silently becomes two
+// rows, which is how a two-row footer turns into a three-row one and breaks the
+// height guarantee this file is built around.
+func join(base lipgloss.Style, width int, fields ...string) string {
 	kept := make([]string, 0, len(fields))
 	for _, f := range fields {
 		if strings.TrimSpace(f) != "" {
@@ -105,7 +118,8 @@ func join(width int, fields ...string) string {
 	if len(kept) == 0 {
 		return ""
 	}
-	return ansi.Truncate(strings.Join(kept, fieldSep), width, "…")
+	line := strings.Join(kept, base.Render(fieldSep))
+	return base.Width(width).MaxWidth(width).Render(ansi.Truncate(line, width, "…"))
 }
 
 // modelName is the model in use, by its display name rather than its ID.

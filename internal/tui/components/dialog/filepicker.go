@@ -320,10 +320,10 @@ func (f *filepickerCmp) View() string {
 
 	viewportstyle := lipgloss.NewStyle().
 		Width(f.viewport.Width).
-		Background(t.Background()).
+		Background(styles.PanelBackground()).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(t.TextMuted()).
-		BorderBackground(t.Background()).
+		BorderBackground(styles.PanelBackground()).
 		Padding(2).
 		Render(f.viewport.View())
 	var insertExitText string
@@ -345,7 +345,7 @@ func (f *filepickerCmp) View() string {
 	f.cwd.SetValue(f.cwd.Value())
 	contentStyle := styles.BaseStyle().Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
+		BorderBackground(styles.PanelBackground()).
 		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4)
 

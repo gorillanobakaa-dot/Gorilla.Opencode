@@ -188,3 +188,83 @@ func TestFinishedMessagesAreNotAlsoShownInTheFooter(t *testing.T) {
 			"it would appear twice: %q", preview)
 	}
 }
+
+// The live preview must cost the SAME whether the reply is short or enormous.
+//
+// It runs on every frame while a reply streams, so any cost that scales with the
+// answer's length means the interface slows down as the answer grows — reported as
+// "it gets sluggish". The original version called the full Markdown renderer over
+// the whole growing reply to display six lines of it: measured at 0.96ms/348KB per
+// frame at 50 words and 21ms/3.4MB at 3200 words.
+//
+// This asserts the shape of the cost, not a wall-clock figure, because a timing
+// threshold would be flaky on a loaded machine while the SHAPE is the actual
+// property that matters.
+func TestLivePreviewCostDoesNotGrowWithTheReply(t *testing.T) {
+	preview := func(words int) (string, int) {
+		body := strings.Repeat("the quick brown fox jumps over the lazy dog ", words/9+1)
+		m := printerFor(t, 100, streamingAssistant("m1", body, 1785228225))
+		out := m.livePreview()
+		return out, len(out)
+	}
+
+	// Compare two replies that BOTH exceed the row cap. Comparing a short reply
+	// against a long one measures nothing: a 50-word reply does not fill six rows,
+	// so its preview is legitimately smaller. Once the cap is reached, more input
+	// must produce no more output — that is the property.
+	long, longLen := preview(4_000)
+	huge, hugeLen := preview(40_000)
+
+	if strings.TrimSpace(long) == "" || strings.TrimSpace(huge) == "" {
+		t.Fatal("no preview rendered, so the comparison below is vacuous")
+	}
+	if hugeLen != longLen {
+		t.Errorf("a 40,000-word reply previews as %d bytes but a 4,000-word one as %d; "+
+			"both exceed the %d-row cap, so the output must be identical in size. A "+
+			"difference means the whole reply is being processed, which is what made "+
+			"the interface slow down as answers grew", hugeLen, longLen, livePreviewRows)
+	}
+
+	// And a short reply must still render, or the cheap path has broken the feature.
+	if short, _ := preview(50); strings.TrimSpace(short) == "" {
+		t.Error("a short reply previews as nothing")
+	}
+
+	// Output size alone cannot see the defect: the preview is capped to six rows
+	// either way, so an implementation that processes the entire reply and then
+	// throws almost all of it away produces identical output at enormous cost. That
+	// is exactly what the original did. Allocation count is what distinguishes them
+	// — measured at 88 per call when the input is bounded, against 15,281 and 52,368
+	// for 800- and 3200-word replies when it is not.
+	allocs := func(words int) float64 {
+		body := strings.Repeat("the quick brown fox jumps over the lazy dog ", words/9+1)
+		m := printerFor(t, 100, streamingAssistant("m1", body, 1785228225))
+		return testing.AllocsPerRun(20, func() { _ = m.livePreview() })
+	}
+	small, big := allocs(4_000), allocs(40_000)
+	if big > small*2 {
+		t.Errorf("previewing a 40,000-word reply allocates %.0f objects against %.0f for "+
+			"a 4,000-word one. The cost is scaling with the reply, so the interface "+
+			"slows down as answers grow — bound the input BEFORE wrapping it", big, small)
+	}
+
+	for _, out := range []string{long, huge} {
+		if got := lipgloss.Height(out); got > livePreviewRows {
+			t.Errorf("preview is %d rows, cap is %d", got, livePreviewRows)
+		}
+	}
+}
+
+// A model that thinks before answering must not look like a model that has hung.
+func TestLivePreviewFallsBackToReasoningBeforeAnyAnswer(t *testing.T) {
+	msg := message.Message{
+		ID: "m1", Role: message.Assistant, CreatedAt: 1785228225,
+		Parts: []message.ContentPart{message.ReasoningContent{Thinking: "weighing the options"}},
+	}
+	m := printerFor(t, 100, msg)
+
+	if out := m.livePreview(); !strings.Contains(out, "weighing") {
+		t.Errorf("with reasoning but no answer yet the preview is %q; a thinking model "+
+			"would be indistinguishable from a stalled one", out)
+	}
+}

@@ -58,12 +58,12 @@ func (h *helpCmp) render() string {
 	baseStyle := styles.BaseStyle()
 
 	helpKeyStyle := styles.Bold().
-		Background(t.Background()).
+		Background(styles.PanelBackground()).
 		Foreground(t.Text()).
 		Padding(0, 1, 0, 0)
 
 	helpDescStyle := styles.Regular().
-		Background(t.Background()).
+		Background(styles.PanelBackground()).
 		Foreground(t.TextMuted())
 
 	// Compile list of bindings to render
@@ -144,7 +144,7 @@ func (h *helpCmp) render() string {
 			lipgloss.Left,              // x
 			lipgloss.Top,               // y
 			lastPair,                   // content
-			lipgloss.WithWhitespaceBackground(t.Background()),
+			lipgloss.WithWhitespaceBackground(styles.PanelBackground()),
 		))
 		content := baseStyle.Width(h.width).Render(
 			lipgloss.JoinHorizontal(
@@ -180,7 +180,7 @@ func (h *helpCmp) View() string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(t.TextMuted()).
 		Width(h.width).
-		BorderBackground(t.Background()).
+		BorderBackground(styles.PanelBackground()).
 		Render(
 			lipgloss.JoinVertical(lipgloss.Center,
 				header,

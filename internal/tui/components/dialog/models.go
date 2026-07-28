@@ -306,7 +306,7 @@ func (m *modelDialogCmp) View() string {
 
 	return baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
+		BorderBackground(styles.PanelBackground()).
 		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)

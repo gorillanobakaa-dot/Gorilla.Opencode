@@ -24,6 +24,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/commands"
 	"github.com/opencode-ai/opencode/internal/tui/layout"
+	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
 
@@ -342,7 +343,7 @@ func (m *commandHelpCmp) View() string {
 func (m *commandHelpCmp) renderAt(listRows int, withDetail, withSubtitle bool) string {
 	t := theme.CurrentTheme()
 	w := m.contentWidth()
-	base := lipgloss.NewStyle().Background(t.Background())
+	base := lipgloss.NewStyle().Background(styles.PanelBackground())
 
 	// Only sizes. It must NOT set the background: doing so clobbered the
 	// selected row's highlight, leaving foreground equal to background — the
@@ -410,7 +411,7 @@ func (m *commandHelpCmp) renderAt(listRows int, withDetail, withSubtitle bool) s
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(t.Primary()).
-		Background(t.Background()).
+		Background(styles.PanelBackground()).
 		Padding(1, 2).
 		Render(lipgloss.JoinVertical(lipgloss.Left, b...))
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
 
@@ -53,7 +54,7 @@ func (c *container) View() string {
 	width := c.width
 	height := c.height
 
-	style = style.Background(t.Background())
+	style = style.Background(styles.PanelBackground())
 
 	// Apply border if any side is enabled
 	if c.borderTop || c.borderRight || c.borderBottom || c.borderLeft {
@@ -71,7 +72,7 @@ func (c *container) View() string {
 			width--
 		}
 		style = style.Border(c.borderStyle, c.borderTop, c.borderRight, c.borderBottom, c.borderLeft)
-		style = style.BorderBackground(t.Background()).BorderForeground(t.BorderNormal())
+		style = style.BorderBackground(styles.PanelBackground()).BorderForeground(t.BorderNormal())
 	}
 	style = style.
 		Width(width).

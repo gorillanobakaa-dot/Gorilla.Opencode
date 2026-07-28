@@ -129,7 +129,7 @@ func (t *themeDialogCmp) View() string {
 	if len(t.themes) == 0 {
 		return baseStyle.Padding(1, 2).
 			Border(lipgloss.RoundedBorder()).
-			BorderBackground(currentTheme.Background()).
+			BorderBackground(styles.PanelBackground()).
 			BorderForeground(currentTheme.TextMuted()).
 			Width(40).
 			Render("No themes available")
@@ -177,7 +177,7 @@ func (t *themeDialogCmp) View() string {
 
 	return baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(currentTheme.Background()).
+		BorderBackground(styles.PanelBackground()).
 		BorderForeground(currentTheme.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)

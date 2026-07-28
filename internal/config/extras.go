@@ -370,10 +370,10 @@ func SetAlternateScreen(on bool) error {
 
 func init() {
 	Settings = append(Settings, Setting{
-		ID:     "alternateScreen",
-		Group:  GroupExtras,
-		Name:   "Draw on a separate screen",
-		Layman: "Whether the interface takes over the screen on a scratch buffer your terminal keeps no history of. Leaving this OFF is what lets you scroll back through the whole conversation with the wheel, select it with Ctrl+A and copy it with Ctrl+Shift+C — because the text is really in your terminal, not painted over it.",
+		ID:      "alternateScreen",
+		Group:   GroupExtras,
+		Name:    "Draw on a separate screen",
+		Layman:  "Whether the interface takes over the screen on a scratch buffer your terminal keeps no history of. Leaving this OFF is what lets you scroll back through the whole conversation with the wheel, select it with Ctrl+A and copy it with Ctrl+Shift+C — because the text is really in your terminal, not painted over it.",
 		WhenOn:  "panels stay put and streaming never flickers, but the conversation cannot be scrolled back to, selected or copied — the terminal keeps no history of this buffer",
 		WhenOff: "finished messages go into your terminal's own scrollback, so the wheel, Select-All and copy all work; only the prompt and status line are redrawn in place",
 		Kind:    KindBool,

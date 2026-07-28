@@ -6,7 +6,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/tui/layout"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
-	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
 
 type SimpleListItem interface {
@@ -110,7 +109,6 @@ func (c *simpleListCmp[T]) SetMaxWidth(width int) {
 }
 
 func (c *simpleListCmp[T]) View() string {
-	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
 	items := c.items
@@ -120,7 +118,7 @@ func (c *simpleListCmp[T]) View() string {
 
 	if len(items) <= 0 {
 		return baseStyle.
-			Background(t.Background()).
+			Background(styles.PanelBackground()).
 			Padding(0, 1).
 			Width(maxWidth).
 			Render(c.fallbackMsg)

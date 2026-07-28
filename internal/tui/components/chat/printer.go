@@ -14,6 +14,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/message"
+	"github.com/opencode-ai/opencode/internal/tui/styles"
+	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
 
 // ScrollbackFooter is the transcript component seen from outside the package,
@@ -108,16 +110,41 @@ func (m *messagesCmp) livePreview() string {
 		return ""
 	}
 
-	text := RenderForScrollback(last, len(m.messages)-1, m.messages, m.messagesService(), m.width)
+	// Raw text, NOT the full message renderer.
+	//
+	// This used to call RenderForScrollback, which runs the whole Markdown pipeline
+	// over the entire reply — on every frame, while the reply is still growing, to
+	// display six lines of it. Measured: 0.96ms and 348KB per frame at 50 words,
+	// rising to 21ms and 3.4MB at 3200 words. Linear in the length of the answer, so
+	// the longer the reply the slower the interface, plus megabytes of garbage per
+	// frame. That is a worse version of the O(n^2) streaming cost this mode was
+	// supposed to remove.
+	//
+	// The preview is transient: it is overwritten on the next frame and never
+	// scrolled back to. It does not need syntax highlighting or wrapped tables. The
+	// finished message gets the full renderer exactly once, when it settles.
+	text := last.Content().String()
+	if strings.TrimSpace(text) == "" {
+		// Nothing written yet — show the reasoning instead, so a model that thinks
+		// for a while does not look like a model that has stalled.
+		text = last.ReasoningContent().Thinking
+	}
 	if strings.TrimSpace(text) == "" {
 		return ""
 	}
 
-	lines := strings.Split(text, "\n")
-	if len(lines) > livePreviewRows {
-		lines = lines[len(lines)-livePreviewRows:]
+	// Bound the input BEFORE any wrapping, so the cost cannot grow with the reply.
+	// Only the tail can survive the row cap, and a generous overshoot covers the
+	// case where every line is one character long.
+	if budget := livePreviewRows * (m.width + 1) * 2; len(text) > budget {
+		text = text[len(text)-budget:]
 	}
-	return strings.Join(lines, "\n")
+
+	lines := tailLines(lipgloss.NewStyle().Width(m.width).Render(text), livePreviewRows)
+	if strings.TrimSpace(lines) == "" {
+		return ""
+	}
+	return styles.BaseStyle().Foreground(theme.CurrentTheme().TextMuted()).Render(lines)
 }
 
 // FooterView is the whole of what the transcript contributes to the screen when
@@ -138,4 +165,13 @@ func (m *messagesCmp) FooterView() string {
 		return ""
 	}
 	return lipgloss.JoinVertical(lipgloss.Top, parts...)
+}
+
+// tailLines returns at most n trailing lines of s.
+func tailLines(s string, n int) string {
+	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return strings.Join(lines, "\n")
 }
