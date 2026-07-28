@@ -8,10 +8,46 @@ Mark every intentional divergence from upstream with a `GORILLA OVERRIDE:` comme
 that says **why**, not what. Future readers need the reason; the diff already shows
 the change.
 
+## Releasing — read this first
+
+**There is a script: `Documentation.Scripts/Documentation.Writing.Scripts/release_pipeline.py`,
+with a `go_gorilla` profile built for this repo.** It knows the ldflags path, calls
+`scripts/build-deb.sh`, uploads assets with checksums, and can purge and reinstall
+(`--action install-purge`). It is resumable — it recovers state if an earlier run was
+interrupted. Start with `--dry-run --yes`.
+
+```sh
+python3 Documentation.Scripts/Documentation.Writing.Scripts/release_pipeline.py \
+  --profile go_gorilla --version X.Y.Z --dry-run --yes      # see the plan
+```
+
+It was undocumented until 2026-07-28, and the cost of that was four consecutive
+releases driven by hand, one step at a time, by agents who had no idea it existed.
+If you add tooling, put it here.
+
+**What the script does NOT do**, and you must:
+- Write the dual-track docs and the changelog. It can call `dual_track.py`, but the
+  *content* — honest claim sourcing, what was not verified — is judgement.
+- **Inspect the built `.deb`.** `dpkg-deb -c` and confirm this release's notes are in
+  it and the inner binary hash matches. This is how the missing plain-mode desktop
+  action was caught in v0.1.44, after the source was correct but a third copy of the
+  launcher inside the packaging script was not.
+- Verify non-vacuously that whatever you fixed is actually fixed.
+- Its resume logic can decide the state is already `INSTALLED` and skip phases,
+  including git operations. Read the log; do not assume a quiet run did the work.
+
+Two guards were added to it on 2026-07-28, both from real incidents:
+- **It refuses to commit deletions** (`--allow-deletions` to override). `git add -A`
+  had no such guard, and nine files of published research were sitting deleted in the
+  working tree at the time — one release away from being baked into a tag.
+- **It fast-forwards `main` to the tag**, only ever as a fast-forward. It previously
+  pushed just the current branch, which is how `main` sat 43 commits behind.
+
 ## Releasing — the checklist
 
-Follow it in order. Steps 6 and 7 exist because they were forgotten and it cost
-real confusion; they are not optional.
+The script covers much of this. Follow it in order when working by hand, and use it
+to check the script's log. Steps 6 and 7 exist because they were forgotten and it
+cost real confusion; they are not optional.
 
 1. **Tag first, then build**, so the version stamp is real:
    ```sh
@@ -159,6 +195,12 @@ decision. **Do not commit them.** They exist on the developer's machine:
 - `scripts/build-deb.sh` — packaging
 - `scripts/setup-lsps.py` — language-server installer
 - `Documentation.Scripts/Documentation.Writing.Scripts/dual_track.py` — release docs
+- `Documentation.Scripts/Documentation.Writing.Scripts/release_pipeline.py` — the
+  release pipeline; see "Releasing — read this first" above. **Inventory this whole
+  directory before building any release tooling of your own.**
+- `Documentation.Scripts/Code.review/code_review_toolkit/` — a code-review toolkit
+  (`code_review.py`, `tools_registry.py`, a PLAYBOOK). Not yet used by any session;
+  read it before hand-rolling a review process.
 
 `gorilla-opencode` (the built binary) and `*.deb` are also ignored; they are build
 outputs and must never be committed.
