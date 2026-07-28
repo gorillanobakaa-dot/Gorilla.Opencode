@@ -17,7 +17,7 @@ import (
 //
 //	Summarizer bytes=351
 //	Title      bytes=267
-//	BaseCoder  bytes=1847  (already file-backed, kept as a control)
+//	BaseCoder  bytes=1855  (already file-backed, kept as a control)
 //	TaskPrompt total=591, instruction fragment ends at index 228
 //	  (last 20 chars before env block: "ever relative paths\n")
 //
@@ -35,8 +35,18 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 	}{
 		{"summarizer", SummarizerPrompt(models.ProviderLocal), 351, "error states, decisions made"},
 		{"title", TitlePrompt(models.ProviderLocal), 267, "no additional text"},
+		// 1847 -> 1855 on 2026-07-28, deliberately. One prescriptive line was
+		// relaxed following Anthropic's own guidance for Claude 5 generation
+		// models, which uses this exact rule as its worked example:
+		//   "no comments: unless non-obvious constraint: never explain WHAT/WHY"
+		//   -> "comments: match surrounding density and idiom: explain
+		//       non-obvious constraints only"
+		// The other six "do not"/"never" rules in this prompt were reviewed and
+		// KEPT: they are verification and honesty rules ("never claim unobserved
+		// success", "do not invent paths"), not style prescriptions, and the
+		// guidance is about relaxing style. The pronoun default was kept too.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 1847, "never infer from name"},
+			BaseCoderPrompt(models.ProviderLocal), 1855, "never infer from name"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {
