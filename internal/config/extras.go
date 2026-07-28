@@ -327,6 +327,72 @@ func init() {
 	})
 }
 
+// ── Alternate screen ────────────────────────────────────────────────────────
+
+// AlternateScreenEnabled reports whether the full interface draws on the
+// terminal's alternate screen buffer.
+//
+// GORILLA OVERRIDE: OFF by default, and this is the single most consequential
+// default in the program.
+//
+// The alternate screen is a scratch buffer with no history: your terminal keeps
+// no scrollback for it, so nothing drawn there can be scrolled back to, selected
+// or copied. Everything that felt missing followed from that one choice — the
+// wheel did nothing useful, Select-All returned an empty selection, and copying
+// an hours-old reply was impossible. The workarounds people reach for (drawing a
+// scrollbar, shipping a clipboard helper, the OSC 52 escape) are all compensation
+// for a buffer we chose to use.
+//
+// Measured, not assumed (internal/tui/inline/scrollback_test.go):
+//
+//   - Outside the alternate screen, tea.Println puts a line into the terminal's
+//     real output exactly ONCE — that is history the terminal owns.
+//   - Inside it, the same call is discarded: 0 of 3 lines reach the output.
+//
+// So with this OFF, finished messages are printed into your scrollback and only
+// the editor and status bar are redrawn in place. The wheel scrolls because the
+// TERMINAL is scrolling, and copying works because the text is really there.
+//
+// Turning it ON restores the previous behaviour: one full-screen frame, panels
+// that never scroll away, no flicker while streaming — and no history, no
+// selection, no copy. Google made the same call in Gemini CLI, whose
+// useAlternateBuffer setting also defaults to false.
+func AlternateScreenEnabled() bool { return cfg != nil && cfg.AlternateScreen }
+
+// SetAlternateScreen records the preference and persists it.
+func SetAlternateScreen(on bool) error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	cfg.AlternateScreen = on
+	return updateCfgFile(func(c *Config) { c.AlternateScreen = on })
+}
+
+func init() {
+	Settings = append(Settings, Setting{
+		ID:     "alternateScreen",
+		Group:  GroupExtras,
+		Name:   "Draw on a separate screen",
+		Layman: "Whether the interface takes over the screen on a scratch buffer your terminal keeps no history of. Leaving this OFF is what lets you scroll back through the whole conversation with the wheel, select it with Ctrl+A and copy it with Ctrl+Shift+C — because the text is really in your terminal, not painted over it.",
+		WhenOn:  "panels stay put and streaming never flickers, but the conversation cannot be scrolled back to, selected or copied — the terminal keeps no history of this buffer",
+		WhenOff: "finished messages go into your terminal's own scrollback, so the wheel, Select-All and copy all work; only the prompt and status line are redrawn in place",
+		Kind:    KindBool,
+		Default: false,
+		// The buffer is entered once, as the program starts. Switching mid-session
+		// would mean tearing down the renderer, and pretending otherwise would look
+		// like the setting had done nothing.
+		Restart: true,
+		Get:     func() any { return AlternateScreenEnabled() },
+		Set: func(v any) error {
+			b, err := asBool(v)
+			if err != nil {
+				return err
+			}
+			return SetAlternateScreen(b)
+		},
+	})
+}
+
 // ── Mouse reporting ─────────────────────────────────────────────────────────
 
 // MouseWheelEnabled reports whether the program asks the terminal for mouse events.
@@ -347,6 +413,17 @@ func init() {
 // With it ON the wheel scrolls the conversation and text selection needs Shift.
 func MouseWheelEnabled() bool { return cfg != nil && cfg.MouseWheel }
 
+// RequestMouseEvents reports whether the program should actually ask the terminal
+// to report mouse events, as opposed to whether the user asked for the wheel.
+//
+// They differ, and the difference matters: without the alternate screen the
+// TERMINAL already scrolls the conversation with the wheel, because the
+// conversation is in its scrollback. Asking for mouse events there would take
+// that working scroll away, hand us events for a viewport that no longer exists,
+// and break drag-to-select for nothing in return. So the preference is honoured
+// only where it can buy anything.
+func RequestMouseEvents() bool { return AlternateScreenEnabled() && MouseWheelEnabled() }
+
 // SetMouseWheel records the preference and persists it.
 func SetMouseWheel(on bool) error {
 	if cfg == nil {
@@ -361,9 +438,9 @@ func init() {
 		ID:      "mouseWheel",
 		Group:   GroupExtras,
 		Name:    "Mouse wheel scrolling",
-		Layman:  "Whether the mouse wheel scrolls the conversation. Turning this on has a cost that is easy to miss: the terminal hands the mouse over to this program, so click-and-drag stops selecting text and you have to hold Shift to select.",
-		WhenOn:  "the wheel scrolls, but selecting text with the mouse needs Shift held, and a long drag can briefly stutter the display",
-		WhenOff: "your mouse selects text exactly as it does anywhere else; scroll with PageUp and PageDown",
+		Layman:  "Only does anything when \"Draw on a separate screen\" is ON. With that off, your terminal already scrolls the conversation with the wheel, and asking for mouse events would take that away for nothing. When it does apply, the cost is easy to miss: the terminal hands the mouse to this program, so click-and-drag stops selecting text unless you hold Shift.",
+		WhenOn:  "on a separate screen, the wheel scrolls but selecting text needs Shift held, and a long drag can briefly stutter the display; ignored otherwise",
+		WhenOff: "your mouse selects text exactly as it does anywhere else; scroll with your terminal's own wheel, or with PageUp and PageDown if you are drawing on a separate screen",
 		Kind:    KindBool,
 		Default: false,
 		Restart: true, // mouse mode is requested once, when the program starts
