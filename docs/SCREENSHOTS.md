@@ -9,6 +9,78 @@ models.
 All screenshots are full-resolution (1600×899) so the terminal text is
 readable — the complete set is in [`screenshots/gallery/`](screenshots/gallery/).
 
+## v0.1.42 — the release the screenshots caught bugs in
+
+Every shot below is 1600x900, unscaled. **Click any image for full resolution** —
+terminal screenshots become unreadable the moment they are downscaled to fit.
+
+Two of these fixes exist *because* of screenshots. The `/help` list was hiding
+whichever command the cursor sat on, and the sign-in box was printing an
+un-clearable URL across the interface. Neither was caught by a test; both were
+obvious the moment someone photographed the screen.
+
+### `/help` — every command, in plain language
+
+Grouped by what you are trying to do rather than alphabetically, because someone
+who does not know a command's name cannot look it up alphabetically. The selected
+row's full explanation shows in place, and `/` searches the descriptions as well
+as the names.
+
+[![The /help command reference](screenshots/gallery/v0142-help.png)](screenshots/gallery/v0142-help.png)
+
+This is also the fix: the highlighted row used to render as a blank line, because
+the row's highlight background was being overwritten with the panel background,
+leaving dark text on dark. Whichever command you were reading about was the one
+that vanished.
+
+### The sign-in box — dismissible, and a URL you can actually read
+
+[![The Google sign-in overlay](screenshots/gallery/v0142-login-overlay.png)](screenshots/gallery/v0142-login-overlay.png)
+
+This used to be five `fmt.Println` calls straight to the terminal while the
+interface was drawing to the same screen — so the URL was painted over the top
+with no record of it in the renderer, and **no redraw could ever remove it**. It
+stayed for the rest of the session. It is now part of the frame: `esc` hides it,
+and sign-in carries on regardless.
+
+### `/context` — what every message costs, and the bulk LSP switch
+
+[![The context loadout menu](screenshots/gallery/v0142-context-loadout.png)](screenshots/gallery/v0142-context-loadout.png)
+
+Note `L all LSPs` in the footer. Nine configured language servers meant nine
+separate toggles to get a quiet session. Also fixed here: the **first** press on
+any of those rows used to do nothing at all, because an absent entry reads as
+"enabled" everywhere else but the toggle was flipping the map's zero value.
+
+### The sidebar tells the truth about language servers
+
+[![The sidebar showing all 9 language servers off](screenshots/gallery/v0142-sidebar-lsp-off.png)](screenshots/gallery/v0142-sidebar-lsp-off.png)
+
+`all 9 off (/context to change)`. This panel used to list every configured server
+whether or not it was running, which reads exactly like a switch that does
+nothing. They were being disabled the whole time — measured: with all nine off,
+**zero** language-server processes start; with them on, one clangd, two gopls and
+five Node servers. The panel was the liar, not the switch.
+
+### `/settings` — every option, what it accepts, its default
+
+[![The settings list](screenshots/gallery/v0142-settings.png)](screenshots/gallery/v0142-settings.png)
+
+Including *Ask which folder to work in at startup*, which exists because clicking
+the desktop icon used to start the agent in your home folder — on this machine,
+over a million files in scope before typing anything.
+
+### `/connect` — accounts that coexist
+
+[![The connect dialog](screenshots/gallery/v0142-connect.png)](screenshots/gallery/v0142-connect.png)
+
+Adding one never disables another. NVIDIA NIM and a local Ollama can both be live;
+`/model` then labels each model with the connection serving it. In v0.1.41 those
+models registered successfully and were **unselectable**, because the picker built
+its provider list from saved accounts and environment keys, and a local endpoint is
+neither.
+
+
 ## The model picker, full width (v0.1.16)
 
 118 models, each with a capability description, sorted best-for-coding
