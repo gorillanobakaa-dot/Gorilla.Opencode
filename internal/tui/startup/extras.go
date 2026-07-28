@@ -283,7 +283,11 @@ func AskExtras(rows []ExtraRow) (ExtrasChoice, error) {
 		return ExtrasChoice{}, nil
 	}
 	m := &extrasModel{rows: rows}
-	final, err := tea.NewProgram(m, tea.WithOutput(os.Stderr)).Run()
+	// GORILLA OVERRIDE: alternate screen, for the same reason as the workspace
+	// picker — bubbletea's inline renderer leaves one stale half-drawn frame per
+	// resize step, because it erases by logical line count and never repaints on
+	// a resize. See the comment on Ask in workspace.go.
+	final, err := tea.NewProgram(m, tea.WithOutput(os.Stderr), tea.WithAltScreen()).Run()
 	if err != nil {
 		return ExtrasChoice{}, err
 	}

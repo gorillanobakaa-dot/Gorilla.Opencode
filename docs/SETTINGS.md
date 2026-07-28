@@ -125,12 +125,24 @@ you can tell exactly when something happened and build a timeline.
 - **Default:** `full`
 - **Takes effect:** next launch
 
+### Draw on a separate screen
+
+Whether the interface takes over the screen on a scratch buffer your terminal keeps no history of. Leaving this OFF is what lets you scroll back through the whole conversation with the wheel, select it with Ctrl+A and copy it with Ctrl+Shift+C — because the text is really in your terminal, not painted over it.
+
+- **ON:** panels stay put and streaming never flickers, but the conversation cannot be scrolled back to, selected or copied — the terminal keeps no history of this buffer
+- **OFF:** finished messages go into your terminal's own scrollback, so the wheel, Select-All and copy all work; only the prompt and status line are redrawn in place
+- **Setting:** `alternateScreen`
+- **Type:** on/off
+- **Accepts:** on or off
+- **Default:** `OFF`
+- **Takes effect:** next launch
+
 ### Mouse wheel scrolling
 
-Whether the mouse wheel scrolls the conversation. Turning this on has a cost that is easy to miss: the terminal hands the mouse over to this program, so click-and-drag stops selecting text and you have to hold Shift to select.
+Only does anything when "Draw on a separate screen" is ON. With that off, your terminal already scrolls the conversation with the wheel, and asking for mouse events would take that away for nothing. When it does apply, the cost is easy to miss: the terminal hands the mouse to this program, so click-and-drag stops selecting text unless you hold Shift.
 
-- **ON:** the wheel scrolls, but selecting text with the mouse needs Shift held, and a long drag can briefly stutter the display
-- **OFF:** your mouse selects text exactly as it does anywhere else; scroll with PageUp and PageDown
+- **ON:** on a separate screen, the wheel scrolls but selecting text needs Shift held, and a long drag can briefly stutter the display; ignored otherwise
+- **OFF:** your mouse selects text exactly as it does anywhere else; scroll with your terminal's own wheel, or with PageUp and PageDown if you are drawing on a separate screen
 - **Setting:** `mouseWheel`
 - **Type:** on/off
 - **Accepts:** on or off

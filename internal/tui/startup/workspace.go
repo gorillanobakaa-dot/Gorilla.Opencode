@@ -350,10 +350,22 @@ func truncatePath(p string, w int) string {
 // Ask runs the picker. It returns Choice{Quit: true} if the user aborted.
 func Ask(o Options) (Choice, error) {
 	m := newModel(o)
-	// The picker draws inline rather than in the alternate screen: it is a
-	// question asked before the session exists, and the answer stays visible
-	// above the TUI as a record of the scope that was chosen.
-	final, err := tea.NewProgram(m, tea.WithOutput(os.Stderr)).Run()
+	// GORILLA OVERRIDE: ask in the alternate screen, then print the answer.
+	//
+	// This used to draw inline, so that the answer stayed visible above the
+	// session as a record of the scope that was chosen. The intent was right but
+	// the mechanism leaked: bubbletea's inline renderer erases its previous frame
+	// by walking the cursor up by the number of LOGICAL lines it last drew, and
+	// nothing in bubbletea repaints on a resize. Narrow the window while the
+	// question is on screen and those lines wrap into more physical rows than the
+	// count knows about, so the cursor lands mid-frame and the next frame is
+	// painted over part of the old one — one stale, half-drawn copy per resize
+	// step, which is what the 2026-07-28 screencast recorded.
+	//
+	// Asking in the alternate screen makes resizing the terminal's problem, and
+	// printing the answer afterwards keeps the record the original comment wanted
+	// — a single durable line rather than a whole box.
+	final, err := tea.NewProgram(m, tea.WithOutput(os.Stderr), tea.WithAltScreen()).Run()
 	if err != nil {
 		return Choice{}, err
 	}
@@ -365,5 +377,16 @@ func Ask(o Options) (Choice, error) {
 	if err != nil {
 		return Choice{}, err
 	}
+	fmt.Fprintln(os.Stderr, AnswerLine(dir, fm.dontAsk))
 	return Choice{Dir: dir, Remember: fm.dontAsk}, nil
+}
+
+// AnswerLine is the durable record left above the session: which folder was
+// chosen, and whether the question will be asked again. Exported so a test can
+// assert the record survives, which is the whole reason the picker prints it.
+func AnswerLine(dir string, remembered bool) string {
+	if remembered {
+		return "folder: " + dir + " (remembered — /add-dir to add more)"
+	}
+	return "folder: " + dir
 }

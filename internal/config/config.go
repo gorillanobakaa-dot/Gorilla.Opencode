@@ -119,7 +119,18 @@ type Config struct {
 	ExtrasChoiceMade bool `json:"extrasChoiceMade,omitempty"`
 	// GORILLA OVERRIDE: report mouse events to the program. OFF by default because
 	// enabling it takes drag-to-select away from the terminal. See extras.go.
+	// Only consulted when AlternateScreen is on: without the alternate screen the
+	// terminal handles the wheel itself, so asking for mouse events would take a
+	// working scroll away and give nothing back.
 	MouseWheel bool `json:"mouseWheel,omitempty"`
+	// GORILLA OVERRIDE: draw the full interface on the terminal's alternate screen.
+	// OFF by default, which is what makes the conversation land in your terminal's
+	// own scrollback where the wheel, Select-All and Ctrl+Shift+C all work. See
+	// AlternateScreenEnabled in extras.go for the measurements behind that default.
+	//
+	// omitempty is safe here precisely because the default is false: an absent key
+	// and an explicit false mean the same thing, so nothing is lost by dropping it.
+	AlternateScreen bool `json:"alternateScreen,omitempty"`
 	// GORILLA OVERRIDE: which interface to start. "full" (default) or "plain".
 	//
 	// This is a persisted SETTING and not only a flag because the desktop entry

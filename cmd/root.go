@@ -84,14 +84,35 @@ func resolveWorkspace(flagCwd string, nonInteractive bool) (dir, alreadySaved st
 	return choice.Dir, saved.WorkingDir, choice.Remember, nil
 }
 
-// mouseOption asks the terminal for mouse events only when the user wants the
-// wheel. tea has no no-op ProgramOption, so the disabled case is a function that
-// changes nothing.
+// noProgramOption is the option that changes nothing. tea offers no no-op
+// ProgramOption, and the alternative — building the option slice conditionally at
+// every call site — is where a mode gets applied to one path and forgotten on
+// another.
+func noProgramOption() tea.ProgramOption { return func(*tea.Program) {} }
+
+// mouseOption asks the terminal for mouse events only where doing so can buy
+// anything. See config.RequestMouseEvents: without the alternate screen the
+// terminal is already scrolling the conversation, so requesting mouse events
+// would trade a working wheel for a broken text selection.
 func mouseOption() tea.ProgramOption {
-	if config.MouseWheelEnabled() {
+	if config.RequestMouseEvents() {
 		return tea.WithMouseCellMotion()
 	}
-	return func(*tea.Program) {}
+	return noProgramOption()
+}
+
+// altScreenOption decides where the interface draws.
+//
+// GORILLA OVERRIDE: off by default. The alternate screen is a buffer the terminal
+// keeps no scrollback for, which is why nothing drawn there could be scrolled
+// back to, selected or copied. With it off, finished messages are printed into
+// the terminal's real output and only the prompt is redrawn in place — see
+// config.AlternateScreenEnabled for the measurements.
+func altScreenOption() tea.ProgramOption {
+	if config.AlternateScreenEnabled() {
+		return tea.WithAltScreen()
+	}
+	return noProgramOption()
 }
 
 // interactiveTerminal reports whether there is a human at a terminal to answer.
@@ -285,15 +306,19 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 		zone.NewGlobal()
 		program := tea.NewProgram(
 			tui.New(app),
-			tea.WithAltScreen(),
-			// GORILLA OVERRIDE: enable mouse so the conversation scrolls
-			// with the wheel. Trade-off: selecting terminal text now
-			// needs Shift held down (mouse events go to the app).
-			// GORILLA OVERRIDE: mouse reporting is OPT-IN. Requesting it takes
-			// drag-to-select away from the terminal, and the only modes bubbletea
-			// offers report one event per cell crossed — a single drag fires
-			// hundreds, which is what stalled the loop and leaked raw escape codes
-			// into the editor. Off by default; /settings turns it on.
+			// GORILLA OVERRIDE: the alternate screen is now a SETTING, off by
+			// default, rather than something every launch takes. It is a buffer the
+			// terminal keeps no scrollback for, so everything drawn in it was
+			// unscrollable, unselectable and uncopyable — the actual reason the
+			// interface felt like it was missing ordinary terminal behaviour.
+			altScreenOption(),
+			// GORILLA OVERRIDE: mouse reporting is opt-in AND only requested when the
+			// alternate screen is on. Requesting it takes drag-to-select away from the
+			// terminal, and the only modes bubbletea offers report one event per cell
+			// crossed — a single drag fires hundreds, which stalled the loop badly
+			// enough that raw escape codes leaked into the editor. Without the
+			// alternate screen the terminal scrolls the conversation itself, so there
+			// is nothing left to buy.
 			mouseOption(),
 		)
 		// Let background goroutines push messages into the event loop. The OAuth
