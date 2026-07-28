@@ -69,6 +69,52 @@ How long the AI may think before answering. Only some models support this; on th
 - **Accepts:** low / medium / high
 - **Default:** `medium`
 
+## Show me the working
+
+### Ask the model to think out loud
+
+the model works through the problem step by step and you can read how it reached its answer.
+
+- **ON:** you can read how the model reached its answer — but it writes a lot more than the answer alone, so this uses more of your allowance (or more CPU on a local model) and every reply takes longer
+- **OFF:** you only get the answer, and nothing extra is generated or spent
+- **Setting:** `extras-reasoning-generate`
+- **Type:** on/off
+- **Accepts:** on or off
+- **Default:** `OFF`
+
+### Show that thinking on screen
+
+the reasoning appears in the conversation instead of only in an export.
+
+- **ON:** it is shown to you, at no extra cost
+- **OFF:** it is hidden — but this saves you NOTHING, because the work has already been done and paid for; you simply see less
+- **Setting:** `extras-reasoning-show`
+- **Type:** on/off
+- **Accepts:** on or off
+- **Default:** `ON`
+
+### Show tool calls and their results
+
+you see each command or file operation the agent runs, and what came back.
+
+- **ON:** it is shown to you, at no extra cost
+- **OFF:** it is hidden — but this saves you NOTHING, because the work has already been done and paid for; you simply see less
+- **Setting:** `extras-toolcalls-show`
+- **Type:** on/off
+- **Accepts:** on or off
+- **Default:** `ON`
+
+### Show a time on every message
+
+you can tell exactly when something happened and build a timeline.
+
+- **ON:** it is shown to you, at no extra cost
+- **OFF:** it is hidden — but this saves you NOTHING, because the work has already been done and paid for; you simply see less
+- **Setting:** `extras-timestamps-show`
+- **Type:** on/off
+- **Accepts:** on or off
+- **Default:** `ON`
+
 ## Network and pace
 
 ### Requests per minute

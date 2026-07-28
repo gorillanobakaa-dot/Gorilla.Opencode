@@ -91,7 +91,28 @@ const (
 	numDials = 2
 )
 
-func loadoutRowCount() int { return numDials + len(config.LoadoutComponents) }
+func loadoutRowCount() int {
+	return numDials + len(config.LoadoutComponents) + len(config.Extras)
+}
+
+// extrasFirstRow is the index where the "show me the working" section starts.
+//
+// GORILLA OVERRIDE: extras are a THIRD section, kept apart from the feature rows
+// above them on purpose. A loadout row's number is tokens added to the prompt on
+// every turn and feeds the context budget at the top of this dialog; extras do not
+// touch prompt size at all — one makes the model generate more, the rest only
+// change what is displayed. Listing them together would put figures into that
+// budget that do not belong to it.
+func extrasFirstRow() int { return numDials + len(config.LoadoutComponents) }
+
+// extraAtRow returns the extra a row index refers to, if it is in that section.
+func extraAtRow(idx int) (config.Extra, bool) {
+	i := idx - extrasFirstRow()
+	if i < 0 || i >= len(config.Extras) {
+		return config.Extra{}, false
+	}
+	return config.Extras[i], true
+}
 
 func NewLoadoutDialogCmp() LoadoutDialog { return &loadoutDialogCmp{} }
 
@@ -119,6 +140,18 @@ func (m *loadoutDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// On a dial, "change" nudges it up; on a tool row, it toggles.
 			if m.selectedIdx < numDials {
 				return m, m.adjustSelected(+1)
+			}
+			if e, ok := extraAtRow(m.selectedIdx); ok {
+				now := !config.ExtraEnabled(e.ID)
+				if err := config.SetExtra(e.ID, now); err != nil {
+					return m, util.ReportError(err)
+				}
+				// Say what it costs at the moment of the decision, not only on a
+				// screen the user saw once at first run.
+				if e.Cost == config.CostGeneration && now {
+					return m, util.ReportWarn(e.Name + " is ON — this makes the model generate more (see /settings for what that costs)")
+				}
+				return m, util.CmdHandler(LoadoutChangedMsg{})
 			}
 			config.ToggleLoadout(config.LoadoutComponents[m.selectedIdx-numDials].ID)
 			return m, util.CmdHandler(LoadoutChangedMsg{})
@@ -241,6 +274,30 @@ func (m *loadoutDialogCmp) View() string {
 		rows = append(rows, rowStyle(m.selectedIdx == i+numDials, !on).Render(line))
 	}
 
+	// --- Section 3: show me the working ---
+	// GORILLA OVERRIDE: every row states its own cost. Only one of these makes the
+	// model generate more; the rest are display-only and free, and saying so
+	// matters — a user told "extras cost money" would reasonably switch all of them
+	// off and lose the forensic record for no saving at all.
+	extrasHeader := base.Foreground(t.Primary()).Bold(true).Width(w).
+		Render("Show me the working  (space):")
+	var extraRows []string
+	for i, e := range config.Extras {
+		on := config.ExtraEnabled(e.ID)
+		box := "[ ]"
+		if on {
+			box = "[x]"
+		}
+		cost := "free"
+		if e.Cost == config.CostGeneration {
+			cost = "COSTS EXTRA"
+		}
+		line := fitLine(fmt.Sprintf("%s %-30s %-12s  %s", box, e.Name, cost, e.What))
+		extraRows = append(extraRows, rowStyle(m.selectedIdx == extrasFirstRow()+i, !on).Render(line))
+	}
+	extrasNote := base.Foreground(t.TextMuted()).Width(w).
+		Render(fitLine("  \"free\" = already generated and paid for; hiding it saves nothing. \"COSTS EXTRA\" = the model writes more."))
+
 	help := base.Foreground(t.TextMuted()).Width(w).
 		Render("↑↓ pick · ←→ dial · space toggle · L all LSPs · l low-bw · r reset · esc close   ⚠ = disabling cripples the agent")
 
@@ -250,6 +307,9 @@ func (m *loadoutDialogCmp) View() string {
 		rows[rowPace], rows[rowLeash], "",
 		featHeader,
 		lipgloss.JoinVertical(lipgloss.Left, rows[numDials:]...), "",
+		extrasHeader,
+		lipgloss.JoinVertical(lipgloss.Left, extraRows...),
+		extrasNote, "",
 		help,
 	)
 	return base.Padding(1, 2).

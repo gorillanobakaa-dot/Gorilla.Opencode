@@ -96,12 +96,26 @@ func renderUserMessage(msg message.Message, isFocused bool, width int, position 
 		}
 		styledAttachments = append(styledAttachments, attachmentStyles.Render(filename))
 	}
+	// GORILLA OVERRIDE: a clock on every message, so a timeline can be read live
+	// rather than only after exporting. Off is a real choice — see
+	// config.Extras — but it costs nothing, because created_at has been recorded
+	// since the first migration.
+	info := []string{}
+	if config.ExtraEnabled("extras-timestamps-show") {
+		if ts := messageTime(msg.CreatedAt); ts != "" {
+			info = append(info, styles.BaseStyle().
+				Width(width-1).
+				Foreground(t.TextMuted()).
+				Render(" "+ts))
+		}
+	}
+
 	content := ""
 	if len(styledAttachments) > 0 {
 		attachmentContent := styles.BaseStyle().Width(width).Render(lipgloss.JoinHorizontal(lipgloss.Left, styledAttachments...))
-		content = renderMessage(msg.Content().String(), true, isFocused, width, attachmentContent)
+		content = renderMessage(msg.Content().String(), true, isFocused, width, append([]string{attachmentContent}, info...)...)
 	} else {
-		content = renderMessage(msg.Content().String(), true, isFocused, width)
+		content = renderMessage(msg.Content().String(), true, isFocused, width, info...)
 	}
 	userMsg := uiMessage{
 		ID:          msg.ID,
@@ -165,9 +179,30 @@ func renderAssistantMessage(
 			)
 		}
 	}
+	// GORILLA OVERRIDE: same clock on the assistant side. Prepended so the time
+	// reads first, before the model name and duration already shown there.
+	if config.ExtraEnabled("extras-timestamps-show") {
+		if ts := messageTime(msg.CreatedAt); ts != "" {
+			info = append([]string{baseStyle.
+				Width(width - 1).
+				Foreground(t.TextMuted()).
+				Render(" " + ts)}, info...)
+		}
+	}
+
 	if content != "" || (finished && finishData.Reason == message.FinishReasonEndTurn) {
 		if content == "" {
 			content = "*Finished without output*"
+		}
+		// GORILLA OVERRIDE: show the reasoning next to the answer it produced.
+		// Previously the thinking was visible only while streaming and then
+		// vanished the moment the turn finished, so the one thing that explains
+		// how a conclusion was reached was the one thing you could not go back and
+		// read. Free to display: it has already been generated and paid for.
+		if config.ExtraEnabled("extras-reasoning-show") {
+			if q := reasoningQuote(thinkingContent); q != "" {
+				content = q + "\n\n" + content
+			}
 		}
 		if isSummary {
 			info = append(info, baseStyle.Width(width-1).Foreground(t.TextMuted()).Render(" (summary)"))
@@ -188,7 +223,15 @@ func renderAssistantMessage(
 		content = renderMessage(thinkingContent, false, msg.ID == focusedUIMessageId, width)
 	}
 
-	for i, toolCall := range msg.ToolCalls() {
+	// GORILLA OVERRIDE: tool calls can be hidden, but hiding them saves NOTHING —
+	// the calls already happened and were already billed. The switch exists for
+	// people who want a quieter screen, and it is labelled "free" precisely so
+	// nobody turns it off believing it reduces their bill.
+	toolCalls := msg.ToolCalls()
+	if !config.ExtraEnabled("extras-toolcalls-show") {
+		toolCalls = nil
+	}
+	for i, toolCall := range toolCalls {
 		toolCallContent := renderToolMessage(
 			toolCall,
 			allMessages,
@@ -637,13 +680,55 @@ func renderToolMessage(
 }
 
 // Helper function to format the time difference between two Unix timestamps
+// formatTimestampDiff renders how long a turn took.
+//
+// GORILLA OVERRIDE: the unit was wrong. Both arguments are UNIX SECONDS —
+// messages.created_at is written by a SQLite trigger using strftime('%s'), and
+// the Finish part's Time is seconds too — but this divided by 1000 as though they
+// were milliseconds. Every duration ever shown was therefore 1000x too small: a
+// 45-second turn displayed as "45ms", which made the agent look instantaneous and
+// made the number useless for spotting a slow model.
+//
+// The cause was a comment. Three places in the initial migration described these
+// columns as "Unix timestamp in milliseconds"; they never were. Those comments are
+// now corrected, and this is what believing them cost.
 func formatTimestampDiff(start, end int64) string {
-	diffSeconds := float64(end-start) / 1000.0 // Convert to seconds
+	diffSeconds := float64(end - start)
+	if diffSeconds < 0 {
+		diffSeconds = 0
+	}
 	if diffSeconds < 1 {
-		return fmt.Sprintf("%dms", int(diffSeconds*1000))
+		return "<1s"
 	}
 	if diffSeconds < 60 {
-		return fmt.Sprintf("%.1fs", diffSeconds)
+		return fmt.Sprintf("%.0fs", diffSeconds)
 	}
 	return fmt.Sprintf("%.1fm", diffSeconds/60)
+}
+
+// messageTime is the per-message clock shown when the timestamps extra is on.
+//
+// Time of day only, not the full date: at 80 columns a date on every row is
+// noise, and a session almost always sits inside one day. The exported
+// transcript carries the full date and an offset from the session start, which is
+// the right place for a record that will be read weeks later.
+func messageTime(unixSeconds int64) string {
+	if unixSeconds <= 0 {
+		return ""
+	}
+	return time.Unix(unixSeconds, 0).Format("15:04:05")
+}
+
+// reasoningQuote turns stored reasoning into a markdown blockquote so it reads as
+// an aside rather than as the answer. Matches the shape /export uses.
+func reasoningQuote(thinking string) string {
+	thinking = strings.TrimSpace(thinking)
+	if thinking == "" {
+		return ""
+	}
+	lines := strings.Split(thinking, "\n")
+	for i, l := range lines {
+		lines[i] = "> " + l
+	}
+	return "> **thinking**\n>\n" + strings.Join(lines, "\n")
 }
