@@ -269,6 +269,21 @@ descriptions as well as the names.
 
 [![The /help command reference](docs/screenshots/gallery/v0142-help.png)](docs/screenshots/gallery/v0142-help.png)
 
+**Two interfaces, one program — and no flags to remember.** Launch the icon
+normally for the full interface above. **Right-click the icon → "Plain mode
+(copyable output)"** and the same program runs with no interface at all: every
+line is ordinary terminal output, so `Ctrl+A` / `Ctrl+Shift+C` lifts a five-hour
+session straight into a text editor. Here they are running side by side — same
+machine, same key, both with timestamps and the model's thinking on show.
+
+[![Plain mode and the full interface running side by side](docs/screenshots/gallery/v0146-plain-and-tui-thinking.png)](docs/screenshots/gallery/v0146-plain-and-tui-thinking.png)
+
+Plain mode carries a smaller command set and says so; the sidebar on the right
+accounts for the session without guessing — input/output tokens, MCP servers,
+how many language servers are off, which files were touched.
+
+[![The plain-mode command list beside the full interface sidebar](docs/screenshots/gallery/v0146-plain-help-and-sidebar.png)](docs/screenshots/gallery/v0146-plain-help-and-sidebar.png)
+
 More full-resolution screenshots and captions:
 **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)** ·
 **[docs/GUIDE.md](docs/GUIDE.md)**.
