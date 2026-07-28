@@ -107,7 +107,19 @@ cost real confusion; they are not optional.
 8. **GitHub release** with all artifacts attached, then **download them back** and
    re-verify the checksums. Publishing is not proof of a good upload.
 9. Link release notes by **tag** (`blob/vX.Y.Z/…`), never by `main` — a `main` link
-   breaks the moment the file moves.
+   breaks the moment the file moves. If a docs-only commit lands after tagging and
+   the release body must reference it, verify `git diff --name-only TAG..main` is
+   docs-only, then move the tag — do not point the body at `main`.
+10. **The release body and `Changelogs/vX.Y.Z-release-notes.md` are two documents
+    with two jobs — never sync one over the other.** The Changelog file is the
+    long-form dual-track record that `build-deb.sh` ships *inside the package*, so
+    it must stay byte-identical to the copy in the `.deb`; the release body is the
+    short summary someone reads before downloading. Overwriting the former with the
+    latter silently deleted 213 lines once. Verify with
+    `md5sum` against the file extracted from the built `.deb`.
+11. Releases created by the pipeline start as **drafts**. `gh release view --json
+    isDraft` before calling a release done — a draft looks complete to its owner
+    and is invisible to everyone else.
 
 ## Verification standards
 
