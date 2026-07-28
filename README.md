@@ -49,6 +49,23 @@ API keys or run models on your own machine.
 > [DOCUMENTATION.dual-track.md](Changelogs/DOCUMENTATION.dual-track.md), per this
 > project's [Open Source Philosophy](PHILOSOPHY.md).
 
+## Copying a whole session
+
+The normal interface draws in the terminal's *alternate* screen, which has no
+scrollback — so `Ctrl+A` has nothing to select. That is how alternate screens work,
+not something that can be fixed inside the interface.
+
+For a session you can select, copy and search with your terminal's own keys:
+
+```sh
+gorilla-opencode --plain
+```
+
+Plain mode has no panels and no redraws. Every byte is ordinary terminal output.
+It carries a smaller set of commands (`/help` lists them); anything else needs the
+full interface. `/export` works in both and writes the complete record —
+timestamps, reasoning, tool calls and their results.
+
 ## Built to work where the internet barely does
 
 This is the part that matters most to us, so it goes near the top.

@@ -115,6 +115,24 @@ func writeHeader(b *strings.Builder, sess session.Session, msgs []message.Messag
 		}
 	}
 
+	// GORILLA OVERRIDE: how much reasoning this session actually generated.
+	//
+	// The honest version of "reasoning costs extra". Exact reasoning-token counts
+	// would be better, but they are NOT available: measured against NVIDIA NIM on
+	// 2026-07-28, the usage object carries only prompt_tokens, completion_tokens
+	// and total_tokens — no completion_tokens_details.reasoning_tokens. Reading
+	// that field would be dead code for the provider actually in use.
+	//
+	// So this reports what we own outright: the reasoning characters we captured
+	// and stored, plus an estimate at the ~4 chars/token convention already used
+	// for the loadout figures. Labelled as an estimate, with the method stated,
+	// because a precise-looking number derived from a guess is worse than a
+	// visibly approximate one.
+	if chars := reasoningChars(msgs); chars > 0 {
+		fmt.Fprintf(b, "- **Reasoning captured:** %d characters (~%d tokens at 4 chars/token — an estimate; this provider does not report an exact count)\n",
+			chars, chars/4)
+	}
+
 	// Anything that ended abnormally, surfaced up front rather than left for the
 	// reader to find by scrolling.
 	if flags := abnormalEndings(msgs); len(flags) > 0 {
@@ -260,6 +278,15 @@ func abnormalEndings(msgs []message.Message) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// reasoningChars totals the reasoning actually stored for this session.
+func reasoningChars(msgs []message.Message) int {
+	n := 0
+	for _, m := range msgs {
+		n += len(strings.TrimSpace(m.ReasoningContent().Thinking))
+	}
+	return n
 }
 
 func toolErrorCount(msgs []message.Message) int {
