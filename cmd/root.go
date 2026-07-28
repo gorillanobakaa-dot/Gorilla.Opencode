@@ -84,6 +84,16 @@ func resolveWorkspace(flagCwd string, nonInteractive bool) (dir, alreadySaved st
 	return choice.Dir, saved.WorkingDir, choice.Remember, nil
 }
 
+// mouseOption asks the terminal for mouse events only when the user wants the
+// wheel. tea has no no-op ProgramOption, so the disabled case is a function that
+// changes nothing.
+func mouseOption() tea.ProgramOption {
+	if config.MouseWheelEnabled() {
+		return tea.WithMouseCellMotion()
+	}
+	return func(*tea.Program) {}
+}
+
 // interactiveTerminal reports whether there is a human at a terminal to answer.
 // Piped or redirected stdin means a script, and a prompt would hang it.
 func interactiveTerminal() bool {
@@ -279,7 +289,12 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 			// GORILLA OVERRIDE: enable mouse so the conversation scrolls
 			// with the wheel. Trade-off: selecting terminal text now
 			// needs Shift held down (mouse events go to the app).
-			tea.WithMouseCellMotion(),
+			// GORILLA OVERRIDE: mouse reporting is OPT-IN. Requesting it takes
+			// drag-to-select away from the terminal, and the only modes bubbletea
+			// offers report one event per cell crossed — a single drag fires
+			// hundreds, which is what stalled the loop and leaked raw escape codes
+			// into the editor. Off by default; /settings turns it on.
+			mouseOption(),
 		)
 		// Let background goroutines push messages into the event loop. The OAuth
 		// flow needs this: it must report its sign-in URL while blocking on the

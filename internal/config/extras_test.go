@@ -230,3 +230,61 @@ func TestSummaryFlagsWhenTheExpensiveOneIsOn(t *testing.T) {
 		t.Errorf("the summary does not mention that thinking is on and costing: %q", ExtrasSummary())
 	}
 }
+
+// Mouse reporting must default OFF. Asking the terminal for mouse events takes
+// drag-to-select away from the user — in most terminals you then need Shift — and the
+// only modes available report one event per cell crossed, which is what flooded the
+// event loop badly enough to leak raw escape codes into the editor.
+func TestMouseReportingDefaultsOff(t *testing.T) {
+	if _, err := Load(t.TempDir(), false); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	prev := cfg.MouseWheel
+	t.Cleanup(func() { cfg.MouseWheel = prev })
+	cfg.MouseWheel = false
+
+	if MouseWheelEnabled() {
+		t.Error("mouse reporting is on by default — text selection would be broken out of the box")
+	}
+
+	var row *Setting
+	for i := range Settings {
+		if Settings[i].ID == "mouseWheel" {
+			row = &Settings[i]
+		}
+	}
+	if row == nil {
+		t.Fatal("no /settings row for mouse reporting, so the trade-off is invisible")
+	}
+	if row.Default != false {
+		t.Error("the settings row advertises a default of on")
+	}
+	if !row.Restart {
+		t.Error("not marked Restart — mouse mode is requested once at startup, so a change cannot take effect mid-session")
+	}
+	// The row must name the cost, not just the feature.
+	if !strings.Contains(row.WhenOn, "Shift") {
+		t.Errorf("WhenOn does not mention needing Shift to select: %q", row.WhenOn)
+	}
+	if !strings.Contains(row.WhenOff, "PageUp") {
+		t.Errorf("WhenOff does not say how to scroll instead: %q", row.WhenOff)
+	}
+}
+
+func TestMouseReportingPersists(t *testing.T) {
+	if _, err := Load(t.TempDir(), false); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	prev := cfg.MouseWheel
+	t.Cleanup(func() { cfg.MouseWheel = prev })
+
+	if err := SetMouseWheel(true); err != nil {
+		t.Fatalf("SetMouseWheel: %v", err)
+	}
+	raw, _ := os.ReadFile(GorillaConfigFile())
+	var onDisk Config
+	json.Unmarshal(raw, &onDisk)
+	if !onDisk.MouseWheel {
+		t.Errorf("the choice did not reach the file:\n%s", raw)
+	}
+}

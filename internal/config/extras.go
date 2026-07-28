@@ -326,3 +326,54 @@ func init() {
 		},
 	})
 }
+
+// ── Mouse reporting ─────────────────────────────────────────────────────────
+
+// MouseWheelEnabled reports whether the program asks the terminal for mouse events.
+//
+// GORILLA OVERRIDE: off by default, and that is the whole point.
+//
+// Asking for mouse events means the TERMINAL stops handling the mouse itself, so
+// click-and-drag no longer selects text — in most terminals you must hold Shift to
+// get it back, which nobody discovers by accident. Worse, the mode in use
+// (bubbletea offers only 1002 "cell motion" and 1003 "all motion") reports one event
+// per cell crossed, so a single drag across a wide terminal fires hundreds. That
+// flood is documented in tui.go as having stalled the event loop badly enough that
+// bubbletea's input parser fell behind and leaked raw escape codes into the editor —
+// a literal "[<32;71;41M" appearing where the user was typing.
+//
+// The trade, stated plainly: with this OFF you scroll with PageUp and PageDown
+// instead of the wheel, and your mouse selects text as it does in any other program.
+// With it ON the wheel scrolls the conversation and text selection needs Shift.
+func MouseWheelEnabled() bool { return cfg != nil && cfg.MouseWheel }
+
+// SetMouseWheel records the preference and persists it.
+func SetMouseWheel(on bool) error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	cfg.MouseWheel = on
+	return updateCfgFile(func(c *Config) { c.MouseWheel = on })
+}
+
+func init() {
+	Settings = append(Settings, Setting{
+		ID:      "mouseWheel",
+		Group:   GroupExtras,
+		Name:    "Mouse wheel scrolling",
+		Layman:  "Whether the mouse wheel scrolls the conversation. Turning this on has a cost that is easy to miss: the terminal hands the mouse over to this program, so click-and-drag stops selecting text and you have to hold Shift to select.",
+		WhenOn:  "the wheel scrolls, but selecting text with the mouse needs Shift held, and a long drag can briefly stutter the display",
+		WhenOff: "your mouse selects text exactly as it does anywhere else; scroll with PageUp and PageDown",
+		Kind:    KindBool,
+		Default: false,
+		Restart: true, // mouse mode is requested once, when the program starts
+		Get:     func() any { return MouseWheelEnabled() },
+		Set: func(v any) error {
+			b, err := asBool(v)
+			if err != nil {
+				return err
+			}
+			return SetMouseWheel(b)
+		},
+	})
+}
