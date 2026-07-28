@@ -195,6 +195,20 @@ understanding code directly from the terminal.`,
 			}
 		}
 
+		// GORILLA OVERRIDE: ask once, on first run, whether to show the agent's
+		// working — and be straight that one of those settings makes the model
+		// generate more. Anything that spends more of someone's allowance should
+		// be a decision, not a default they never saw.
+		//
+		// After config.Load because the answer is persisted, and skipped entirely
+		// when non-interactive (-p) or already answered.
+		if prompt == "" && !config.ExtrasChoiceMade() {
+			if err := askExtrasOnce(); err != nil {
+				// Never fatal: a session must still start if the question fails.
+				logging.Warn("could not ask about the optional extras", "err", err)
+			}
+		}
+
 		// GORILLA OVERRIDE: fill the /settings theme row's options from the theme
 		// registry. theme imports config, so config cannot import it back — the
 		// list is pushed in here, the same inversion used for prompt sections and
@@ -447,4 +461,42 @@ func init() {
 	rootCmd.RegisterFlagCompletionFunc("output-format", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return format.SupportedFormats, cobra.ShellCompDirectiveNoFileComp
 	})
+}
+
+// askExtrasOnce shows the first-run consent screen and persists the answers.
+//
+// GORILLA OVERRIDE: the startup package cannot import config — config is the
+// lower layer and startup runs before it — so the rows are built here, shown
+// there, and written back here. Same inversion as the workspace picker.
+func askExtrasOnce() error {
+	rows := make([]startup.ExtraRow, 0, len(config.Extras))
+	for _, e := range config.Extras {
+		rows = append(rows, startup.ExtraRow{
+			ID:    e.ID,
+			Name:  e.Name,
+			What:  e.What,
+			Costs: e.Cost == config.CostGeneration,
+			On:    config.ExtraEnabled(e.ID),
+		})
+	}
+
+	choice, err := startup.AskExtras(rows)
+	if err != nil {
+		return err
+	}
+	if choice.Quit {
+		// Treat esc as "not now": leave every setting at its default and ask
+		// again next launch rather than recording a decision nobody made.
+		return nil
+	}
+
+	for _, r := range choice.Rows {
+		if r.On == config.ExtraEnabled(r.ID) {
+			continue
+		}
+		if err := config.SetExtra(r.ID, r.On); err != nil {
+			return err
+		}
+	}
+	return config.MarkExtrasChoiceMade()
 }
