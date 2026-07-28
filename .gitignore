@@ -67,3 +67,8 @@ checksums.sha256
 
 # Third-party leaked prompts kept LOCAL for study, not redistributed
 system-prompts/reference/
+
+# Release checksums are build outputs, regenerated per release. One got
+# committed by the release pipeline's `git add -A` because nothing ignored it.
+*.sha256
+checksums.txt
