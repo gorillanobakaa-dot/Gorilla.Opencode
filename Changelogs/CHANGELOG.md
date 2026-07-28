@@ -1,3 +1,140 @@
+## v0.1.43 — 2026-07-28 — A session you can read afterwards
+
+Three complaints from ordinary use — warnings printing over the screen, a saved
+conversation you could not reconstruct events from, and no way to copy a session
+out — turned out to share a theme. Chasing them found two problems nobody had
+reported: on a fresh install, saving one setting silently deleted the one before
+it, and every duration the program displayed was 1000× too small.
+
+**Plain-language version:** you can now see what the agent did, understand why it
+did it, and copy the whole thing out. Saved sessions get times, the model's
+reasoning, and every tool call *with the result that came back* — previously you
+saw the decisions and none of the outcomes, and that works on conversations you
+already have. `--plain` gives you an interactive session that is ordinary terminal
+text, so `Ctrl+A` and `Ctrl+Shift+C` do what you expect. The one thing that can
+cost you more — asking the model to think out loud — is off until you choose it,
+and we tell you what it actually uses instead of inventing a price we cannot know.
+
+### Fixed
+
+- **Warnings printed over the interface and could not be cleared**
+  (`internal/config/config.go`) — `Load` configured the log handler ~50 lines
+  *after* the steps that log, so those warnings hit Go's built-in default slog
+  handler, which writes to **stderr**. The TUI then paints over that text with no
+  record in its renderer, so no redraw can clear it. Same unclearable-text bug as
+  the `/login` URL in v0.1.42, but caused by a log line rather than a print —
+  which is why grepping for `fmt.Print` never found it. Measured: **2 stderr lines
+  → 0**, same config, same command.
+
+- **Config writes discarded each other on a fresh install — silent data loss**
+  (`internal/config/config.go`) — `updateCfgFile` keyed "does a config exist?" off
+  `viper.ConfigFileUsed()`, which stays empty for the *whole process* when no
+  config.json existed at startup, and substituted a literal `{}`. Every write
+  re-based from empty and threw away the previous one: paste an API key in
+  `/connect`, add a local endpoint, key gone. Found by accident from a test
+  asserting a removal persisted — there was nothing on disk to remove from.
+
+- **Turn durations were 1000× too small** (`internal/tui/components/chat/message.go`)
+  — `formatTimestampDiff` divided by 1000, treating stored **seconds** as
+  milliseconds, so a 45-second turn displayed as `45ms`. The cause was a comment:
+  three places in the initial migration called `created_at` a "Unix timestamp in
+  milliseconds". It never was — the triggers use `strftime('%s')`. Comments
+  corrected; goose tracks migrations by version, not checksum, so installs are
+  unaffected.
+
+- **`/connect` hid most connections and could not remove any**
+  (`internal/tui/components/dialog/connect.go`) — the dialog rendered only its
+  built-in catalogue, so an endpoint saved under any other name had no row at all.
+  One real config accumulated **four invisible NVIDIA entries** — the same key
+  four times, twice with its `nvapi-` prefix missing. Now your own connections are
+  listed, `d` removes one behind a confirmation, and a prefix-less key is repaired
+  *with the repair stated*. Removal unregisters by endpoint **name**, not baseURL:
+  several endpoints can share a URL and only one owns the registered models.
+
+- **Nil dereference in the OpenAI request path** (`internal/llm/provider/openai.go`)
+  — `config.Get()` returns nil before `Load`, and `cfg.Debug` was dereferenced
+  unguarded in both `send` and `stream`. A debug log line must never be why a
+  request cannot start.
+
+### Added
+
+- **`/export` is a record you can reconstruct events from** (`internal/export/`) —
+  it had no timestamps, no tool **results** (the renderer handled only User and
+  Assistant, so every `tool`-role message was silently dropped), and no reasoning.
+  Now: absolute time plus offset from the session start on every message, tool
+  calls with their results including failures, the model's reasoning, and a header
+  covering elapsed time, models used, abnormal endings and tool-failure count. You
+  choose folder and filename; it refuses to overwrite; written `0600` because a
+  transcript holds file contents and command output. Rendering moved to a pure
+  function, which is how a real defect surfaced — stored tool results carry an
+  empty name, so failures read `← (ERROR)` with no clue what broke. They now
+  borrow the name of the call they answer.
+
+- **The model's reasoning is captured instead of discarded**
+  (`internal/llm/provider/reasoning.go`) — only Anthropic ever emitted a thinking
+  event. Everything else had its reasoning thrown away *while `reasoning_effort`
+  was still being sent* — paying the model to think, then dropping it. A real
+  session database: 81 text parts, 25 tool calls, 25 tool results, **zero
+  reasoning**. Measured against live NIM with `z-ai/glm-5.2`: plain → `[content,
+  role]`; `+reasoning_effort` → `[content, role]` (it is an OpenAI-only field, so
+  it did nothing); `+chat_template_kwargs{thinking:true}` → `[reasoning_content,
+  role]`. Reading was only half the job. A server refusing the parameter has it
+  dropped for that model and the request retried once, so a refusal never costs a
+  turn.
+
+- **Per-feature switches, each labelled with its true cost**
+  (`internal/config/extras.go`) — exactly **one** of the four costs anything.
+  Showing tool calls, timestamps and already-generated reasoning is free and says
+  so; bundling them would imply hiding tool calls saves money when it only loses
+  the record. **No price is quoted anywhere**: every local model carries a zero
+  cost in the bundled metadata and the endpoints in use bill nothing, so a figure
+  would be false on this machine — and a warning that can be caught out once
+  teaches you to ignore the rest. Asked once at first run; `esc` is not consent.
+  `/context` and `/settings` rows are generated from one registry so the wording
+  cannot drift.
+
+- **Timestamps and reasoning in the live interface** — a clock on every message,
+  and reasoning beside the answer it produced. It was previously visible only
+  while streaming and vanished on completion, so the one thing explaining a
+  conclusion was the one thing you could not go back and read.
+
+- **`--plain`: an interactive mode you can select and copy** (`internal/plain/`) —
+  the TUI draws in the terminal's **alternate screen**, which has no scrollback by
+  design, so `Ctrl+A` had nothing to select and no work inside the TUI could change
+  that. Measured with a minimal Bubble Tea program: with the alternate screen
+  active, pushed lines reach the terminal **0 of 3** times; without it, **3 of 3**.
+  `--plain` runs the same agent with no screen handling — verified against a live
+  model with **zero escape bytes** in the output. Permission requests are *asked*
+  on stdin rather than auto-approved, and input closing mid-question **denies**.
+
+### Changed
+
+- **Reasoning volume in the export header** — exact reasoning-token counts are not
+  available: NIM's usage object carries only prompt, completion and total tokens.
+  Reading a reasoning field would have been dead code for the provider in use. So
+  the header reports characters actually captured plus a 4-chars/token estimate,
+  **labelled as an estimate** with the method stated. No reasoning means no line —
+  `0` would read as "reasoning ran and cost nothing".
+
+- **Test isolation in every package that touches config** (`internal/config/configtest/`)
+  — any test calling `config.Load` can write the developer's real config through
+  the setters. That happened for a **third** time during this work. There is now a
+  one-line guard, in all five packages that call `Load`, and it **panics** rather
+  than falling back: silent damage is worse than a failed run.
+
+### Known issues
+
+- The main interface still cannot be selected or copied. Converting it means
+  rehoming 21 overlay sites across 15 dialog surfaces plus ~2,700 lines of chat and
+  layout code that assume a full-screen frame. `--plain` is the interim answer.
+- No exact reasoning-token count — the provider does not report one.
+- Reasoning capture was verified live only on NIM and Gemini; OpenRouter's
+  `reasoning` field and the `thinking` variant are covered by unit tests against
+  captured payload shapes, not a live call.
+- The display switches gate the TUI and plain renderers but not `/export`, which
+  always includes everything. Intentional for a forensic record.
+- Interactive keystrokes still cannot be driven in the development sandbox.
+
 ## v0.1.42 — 2026-07-28 — Three bugs the screenshots found that the tests did not
 
 Taking screenshots of v0.1.41 for the release page turned up three display bugs.
