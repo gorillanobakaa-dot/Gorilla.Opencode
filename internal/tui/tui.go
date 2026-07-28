@@ -113,7 +113,12 @@ type appModel struct {
 	// drawn in place. Dialogs still need a whole screen, so they are shown by
 	// entering the alternate screen briefly and leaving it again — see
 	// anyOverlayOpen in overlay_state.go.
-	scrollback      bool
+	scrollback bool
+	// pinnedOnce and pinnedRows track the one-off scroll that puts the prompt on
+	// the window's last row, so it is done exactly once and redone only when the
+	// window grows. See pin_bottom.go.
+	pinnedOnce      bool
+	pinnedRows      int
 	selectionMode   bool
 	currentPage     page.PageID
 	previousPage    page.PageID
@@ -286,6 +291,15 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		msg.Height -= statusHeight
 		a.width, a.height = msg.Width, msg.Height
+
+		// GORILLA OVERRIDE: put the prompt on the window's last row. Outside the
+		// alternate screen bubbletea draws its frame at the cursor, so without this
+		// the prompt sits wherever the last printed line left it and drifts downward
+		// as replies accumulate. Uses the FULL window height, not the reduced one
+		// above: the status line occupies real rows on screen too.
+		if cmd := a.pinCmd(msg.Height + statusHeight); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
 		s, _ := a.status.Update(msg)
 		a.status = s.(core.StatusCmp)
