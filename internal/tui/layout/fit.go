@@ -54,3 +54,47 @@ func FitHeight(available, maxRows, minRows int, render func(rows int) string) (v
 		}
 	}
 }
+
+// Fitter remembers the row count that last fitted, so a component that is
+// re-rendered without changing size does not pay for the search again.
+//
+// GORILLA OVERRIDE: FitHeight alone made dialogs 2.4x to 6.5x more expensive to
+// render — /context went from 1.02ms to 6.64ms per View() — because Bubble Tea calls
+// View() on every keystroke AND every streamed token, while FitHeight re-ran its
+// whole search each time. Measured, not assumed: 3 internal renders per View() for
+// /context, 2 for /help.
+//
+// The cache is verify-then-reuse rather than trust-the-cache. The remembered count
+// is rendered once and CHECKED; only if it no longer fits is the full search run.
+// So content that changed shape between frames — a longer explanation, a scroll
+// note appearing — cannot slip through and overflow. A change of terminal size or
+// item count invalidates it outright, because a bigger terminal should be allowed to
+// show more rows and a cache that only ever shrinks would never notice.
+type Fitter struct {
+	rows     int
+	forAvail int
+	forMax   int
+	forKey   uint64
+	valid    bool
+}
+
+// Fit renders at the remembered row count when the inputs are unchanged and it still
+// fits, and searches otherwise.
+//
+// key must capture everything OTHER than size that changes the rendered height —
+// typically the selection, because a per-selection explanation block varies in
+// length. Getting this wrong is not a performance bug but a correctness one: a first
+// version keyed on size alone, and because the check only asked "does the remembered
+// count still fit" and never "could more fit now", one tight selection locked in a
+// small list for the rest of the session and two commands became UNREACHABLE while
+// scrolling. Caught by an existing reachability test.
+func (f *Fitter) Fit(available, maxRows, minRows int, key uint64, render func(rows int) string) string {
+	if f.valid && f.forAvail == available && f.forMax == maxRows && f.forKey == key {
+		if view := render(f.rows); available <= 0 || lipgloss.Height(view) <= available {
+			return view
+		}
+	}
+	view, rows := FitHeight(available, maxRows, minRows, render)
+	f.rows, f.forAvail, f.forMax, f.forKey, f.valid = rows, available, maxRows, key, true
+	return view
+}

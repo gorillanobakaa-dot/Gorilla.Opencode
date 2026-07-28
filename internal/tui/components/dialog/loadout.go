@@ -43,6 +43,9 @@ type loadoutDialogCmp struct {
 	// feature row and every extra unconditionally, asking for 37 rows. A cell-grid
 	// test found it cut off on an ordinary 80x24 terminal, and even on 100x30.
 	termHeight int
+	// fitter caches the row count that last fitted, so an unchanged size costs one
+	// render instead of a fresh search on every keystroke.
+	fitter layout.Fitter
 	// featureTop is the first feature row shown, so a long list scrolls instead of
 	// running off the screen.
 	featureTop int
@@ -236,18 +239,18 @@ func (m *loadoutDialogCmp) View() string {
 	// Progressively leaner, in priority order: the switches are the point of this
 	// dialog, so explanatory prose gives way before any row does. Same approach as
 	// /help and the sign-in overlay.
-	for _, compact := range []bool{false, true} {
-		view, _ := layout.FitHeight(m.termHeight, total, 1, func(rows int) string {
+	for i, compact := range []bool{false, true} {
+		// The scroll note appears and disappears with the selection, so it counts.
+		key := uint64(m.selectedIdx)*1315423911 + uint64(i)
+		view := m.fitter.Fit(m.termHeight, total, 1, key, func(rows int) string {
 			return m.renderAt(rows, compact)
 		})
 		if m.termHeight <= 0 || lipgloss.Height(view) <= m.termHeight {
 			return view
 		}
 	}
-	view, _ := layout.FitHeight(m.termHeight, total, 1, func(rows int) string {
-		return m.renderAt(rows, true)
-	})
-	return view
+	return m.fitter.Fit(m.termHeight, total, 1, uint64(m.selectedIdx)*1315423911+99,
+		func(rows int) string { return m.renderAt(rows, true) })
 }
 
 // clampFeatureTop keeps the selected feature row inside the visible window.

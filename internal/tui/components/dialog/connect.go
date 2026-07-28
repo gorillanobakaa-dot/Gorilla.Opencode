@@ -199,6 +199,7 @@ type connectDialogCmp struct {
 	pendingDelete connectEntry
 	// listTop is the first visible row, for scrolling a list taller than the screen.
 	listTop int
+	fitter  layout.Fitter
 }
 
 // NewConnectDialogCmp builds the /connect dialog.
@@ -559,8 +560,8 @@ func (m *connectDialogCmp) View() string {
 	if m.mode != modeList {
 		return m.frameAt(len(m.entries()))
 	}
-	view, _ := layout.FitHeight(m.height, len(m.entries()), 1, m.frameAt)
-	return view
+	return m.fitter.Fit(m.height, len(m.entries()), 1,
+		uint64(m.selectedIdx)*1315423911+uint64(m.mode), m.frameAt)
 }
 
 func (m *connectDialogCmp) frameAt(visible int) string {
