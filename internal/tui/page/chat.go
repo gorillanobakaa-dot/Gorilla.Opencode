@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/app"
 	"github.com/opencode-ai/opencode/internal/completions"
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/session"
 	"github.com/opencode-ai/opencode/internal/tui/components/chat"
@@ -26,7 +27,15 @@ type chatPage struct {
 	// GORILLA OVERRIDE: the transcript component, typed for FooterView. Used only
 	// when the alternate screen is off, where the conversation is printed into the
 	// terminal and the pane itself is never drawn.
-	messagesFooter       chat.ScrollbackFooter
+	messagesFooter chat.ScrollbackFooter
+	// GORILLA OVERRIDE: scrollback mode has no right-hand panel, so the sidebar is
+	// held here for its compact rendering in the footer instead. sidebarModel is
+	// kept alongside it because the component is not in the layout in that mode and
+	// therefore receives no Update unless this page forwards one — without that its
+	// token counts and modified-files list would freeze at their initial values.
+	scrollback           bool
+	sidebarInfo          chat.FooterInfo
+	sidebarModel         tea.Model
 	layout               layout.SplitPaneLayout
 	session              session.Session
 	completionDialog     dialog.CompletionDialog
@@ -41,15 +50,80 @@ type chatPage struct {
 // frame by counting logical lines, so a frame taller than the window leaves the
 // erase in the wrong place — one stale copy per redraw. The preview's own cap is
 // what bounds this; see chat.livePreviewRows.
-func (p *chatPage) FooterView() string {
-	parts := make([]string, 0, 2)
+func (p *chatPage) FooterView(maxRows int) string {
+	width, _ := p.layout.GetSize()
+
+	// The prompt is not optional; everything else is shed to fit, least important
+	// first. Order matters and is deliberate: the session numbers are reference
+	// information you can also get from /context, whereas the live preview is the
+	// only sign that a reply is arriving at all.
+	prompt := p.editor.View()
+
+	var live, info string
 	if p.messagesFooter != nil {
-		if live := p.messagesFooter.FooterView(); strings.TrimSpace(live) != "" {
-			parts = append(parts, live)
+		live = p.messagesFooter.FooterView()
+	}
+	if p.sidebarInfo != nil {
+		info = p.sidebarInfo.CompactView(width)
+	}
+
+	return shedToFit(maxRows, footerArrangements(live, prompt, info))
+}
+
+// footerArrangements lists the footer's possible contents from most to least
+// complete. The order encodes what gets given up first when the window is short,
+// and it is a named function so a test can assert that priority — an order chosen
+// inline is an order nothing checks.
+//
+// The session's numbers are shed before the live preview: they are reference
+// information also reachable from /context, whereas the preview is the only sign
+// that a reply is arriving at all. The prompt appears in every arrangement, because
+// a program with no visible prompt looks broken rather than cramped.
+//
+// Within an arrangement the numbers sit BELOW the prompt: they change on every
+// token, and a block that reflows above the prompt would shift the line being
+// typed on.
+func footerArrangements(live, prompt, info string) [][]string {
+	return [][]string{
+		{live, prompt, info},
+		{live, prompt},
+		{prompt},
+	}
+}
+
+// shedToFit returns the first arrangement that fits maxRows, or the last one if
+// none do.
+//
+// Separated from FooterView so it can be tested without an app: the arithmetic is
+// the part that matters, and a test that drove a whole chatPage would need a
+// database, a history service and an agent to assert something about row counts.
+// maxRows <= 0 means "unknown size", where refusing to render is worse than
+// rendering the fullest arrangement.
+func shedToFit(maxRows int, attempts [][]string) string {
+	var view string
+	for _, attempt := range attempts {
+		view = joinNonEmpty(attempt)
+		if maxRows <= 0 || lipgloss.Height(view) <= maxRows {
+			return view
 		}
 	}
-	parts = append(parts, p.editor.View())
-	return lipgloss.JoinVertical(lipgloss.Top, parts...)
+	// Nothing fit, not even the last and smallest arrangement. Return it anyway: a
+	// window this short cannot really be used, but a program showing no prompt at
+	// all looks broken rather than cramped.
+	return view
+}
+
+func joinNonEmpty(parts []string) string {
+	kept := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if strings.TrimSpace(p) != "" {
+			kept = append(kept, p)
+		}
+	}
+	if len(kept) == 0 {
+		return ""
+	}
+	return lipgloss.JoinVertical(lipgloss.Top, kept...)
 }
 
 type ChatKeyMap struct {
@@ -175,21 +249,50 @@ func (p *chatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 	p.layout = u.(layout.SplitPaneLayout)
 
+	// GORILLA OVERRIDE: the sidebar is not in the layout in scrollback mode, so it
+	// would never see a message. Forward one, or its token counts and modified-files
+	// list stay frozen at whatever they were when the session opened.
+	if p.scrollback && p.sidebarModel != nil {
+		sm, sideCmd := p.sidebarModel.Update(msg)
+		p.sidebarModel = sm
+		if info, ok := sm.(chat.FooterInfo); ok {
+			p.sidebarInfo = info
+		}
+		cmds = append(cmds, sideCmd)
+	}
+
 	return p, tea.Batch(cmds...)
 }
 
 func (p *chatPage) setSidebar() tea.Cmd {
+	model := chat.NewSidebarCmp(p.session, p.app.History)
+
+	// GORILLA OVERRIDE: in scrollback mode there is no right-hand panel to put this
+	// in, so the same component is kept for its COMPACT rendering in the footer. It
+	// is still initialised, because Init is what starts the modified-files scan
+	// against the history service — the footer needs that data as much as the panel
+	// did.
+	if info, ok := model.(chat.FooterInfo); ok {
+		p.sidebarInfo = info
+	}
+	if p.scrollback {
+		p.sidebarModel = model
+		return model.Init()
+	}
+
 	// No container padding: the sidebar paints its own panel background edge to
 	// edge (top→bottom, and up to the seam). Its own PaddingLeft/Right handle
 	// text spacing. Container padding here would frame the panel with rows of
 	// the MAIN background, leaving the gaps the panel is meant to avoid.
-	sidebarContainer := layout.NewContainer(
-		chat.NewSidebarCmp(p.session, p.app.History),
-	)
+	sidebarContainer := layout.NewContainer(model)
 	return tea.Batch(p.layout.SetRightPanel(sidebarContainer), sidebarContainer.Init())
 }
 
 func (p *chatPage) clearSidebar() tea.Cmd {
+	p.sidebarInfo, p.sidebarModel = nil, nil
+	if p.scrollback {
+		return nil
+	}
 	return p.layout.ClearRightPanel()
 }
 
@@ -272,9 +375,12 @@ func NewChatPage(app *app.App) tea.Model {
 	// returns the same pointer it was called on.
 	footer, _ := messagesModel.(chat.ScrollbackFooter)
 	return &chatPage{
-		app:              app,
-		editor:           editorContainer,
-		messages:         messagesContainer,
+		app:      app,
+		editor:   editorContainer,
+		messages: messagesContainer,
+		// GORILLA OVERRIDE: read once, as the appModel does. The buffer is chosen
+		// when the program starts, so this cannot change mid-session.
+		scrollback:       !config.AlternateScreenEnabled(),
 		messagesFooter:   footer,
 		completionDialog: completionDialog,
 		layout: layout.NewSplitPane(

@@ -55,8 +55,16 @@ func (p tallPage) block(label string, n int) string {
 	return strings.Join(rows, "\n")
 }
 
-func (p tallPage) View() string       { return p.block("bodyline", p.rows) }
-func (p tallPage) FooterView() string { return p.block("footerline", p.footerRows) }
+func (p tallPage) View() string { return p.block("bodyline", p.rows) }
+func (p tallPage) FooterView(maxRows int) string {
+	// Honours the budget the same way the real page does: shed rows rather than
+	// overflow, since overflowing is the bug being guarded against.
+	n := p.footerRows
+	if maxRows > 0 && n > maxRows {
+		n = maxRows
+	}
+	return p.block("footerline", n)
+}
 
 // A page that offers no footer at all — the log viewer's shape.
 type plainPage struct{}
@@ -230,4 +238,37 @@ func cmdKind(cmd tea.Cmd) string {
 		return "exit"
 	}
 	return "other"
+}
+
+// The footer must fit the budget it is given, and must shed the RIGHT things. A
+// footer that fills the window is a full-screen layout by another name, and it is
+// exactly where bubbletea's logical-line erase stops matching the screen.
+func TestFooterIsGivenAHardRowBudget(t *testing.T) {
+	for _, height := range []int{6, 10, 24, 40} {
+		a := appModel{
+			width: 100, height: height,
+			scrollback:  true,
+			currentPage: page.ChatPage,
+			// Asks for far more rows than any budget would allow.
+			pages:  map[page.PageID]tea.Model{page.ChatPage: tallPage{rows: 24, footerRows: 40, cols: 100}},
+			status: stubStatus{rows: 1},
+		}
+		view := a.View()
+		rows := lipgloss.Height(view)
+
+		// The budget is half the window plus the status line; anything at or under
+		// that leaves at least half the screen for the conversation.
+		limit := height/2 + 1
+		if limit < 4 {
+			limit = 4
+		}
+		if rows > limit {
+			t.Errorf("height %d: frame is %d rows, limit %d. A footer this tall leaves no "+
+				"room for the conversation and breaks the renderer's erase arithmetic",
+				height, rows, limit)
+		}
+		if !strings.Contains(view, "status") {
+			t.Errorf("height %d: the status line was shed; it is not optional", height)
+		}
+	}
 }

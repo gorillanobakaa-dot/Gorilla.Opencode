@@ -1300,16 +1300,27 @@ func (a *appModel) moveToPage(pageID page.PageID) tea.Cmd {
 // lands wrong — one stale copy per redraw, which is the failure the startup
 // picker demonstrated before it was moved.
 func (a appModel) footerView() string {
-	type footerer interface{ FooterView() string }
+	type footerer interface{ FooterView(maxRows int) string }
 
+	status := a.status.View()
 	page, ok := a.pages[a.currentPage].(footerer)
 	if !ok {
 		// A page with nothing to contribute (the log viewer) still needs its status
 		// line, and drawing its full body inline would be the very overflow this
 		// mode exists to avoid.
-		return a.status.View()
+		return status
 	}
-	return lipgloss.JoinVertical(lipgloss.Top, page.FooterView(), a.status.View())
+
+	// Hand the page a hard row budget rather than trusting the parts to add up.
+	// a.height already has the status line subtracted, and half the window is left
+	// for the conversation: a footer that fills the screen is a full-screen layout
+	// by another name, and it is the case where the renderer's line arithmetic
+	// stops matching what is on screen.
+	budget := a.height / 2
+	if budget < 3 {
+		budget = 3
+	}
+	return lipgloss.JoinVertical(lipgloss.Top, page.FooterView(budget), status)
 }
 
 func (a appModel) View() string {
