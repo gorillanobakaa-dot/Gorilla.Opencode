@@ -1,82 +1,81 @@
-## v0.1.45 — 2026-07-28 — Two dialogs were cut off and nothing was checking
+## v0.1.46 — 2026-07-28 — Undoing a slowdown I caused, and giving the mouse back
 
-The screen-level test harness built after v0.1.44 was pointed at the dialogs and
-immediately reported overflow in **seven of eight**, two of them on an ordinary
-80×24 terminal: **`/context` wanted 37 rows** (cut off even at 100×30) and
-**`/connect` 26**. Both were being truncated on screen with nothing to indicate
-anything was missing.
+Three complaints, three real causes — but only one was what it looked like.
 
-**Plain-language version:** two menus were having their bottoms cut off on a
-normal-sized window, and nobody had noticed because nothing was checking what the
-screen actually showed. There is now a test that checks exactly that — it found
-these itself — and the menus size themselves by measuring rather than guessing. If
-you never opened `/context` or `/connect`, nothing else changes for you.
+**Plain-language version:** the interface genuinely had got slower, by code I added in
+v0.1.45; it is now slightly quicker than before that release. The *models* were never
+slower — v0.1.45 stopped under-reporting their time by a factor of a thousand, so an
+84-second reply that used to read `84ms` now reads what it always was. And dragging to
+select text typed garbage into the input box because the program had quietly taken the
+mouse away from your terminal; it no longer does.
 
 ### Fixed
 
-- **`/context` and `/connect` truncated on a standard terminal.** The cause was
-  arithmetic instead of measurement: capacity was derived by subtracting a constant
-  standing in for border, padding and title. `/help`'s constant
-  (`commandHelpFixedLines = 2+2+3`) was simply wrong, with a `minListRows` floor
-  that silently overrode the height limit on top of it. `layout.FitHeight` now
-  renders, measures, and reduces rows until the result genuinely fits.
+- **Dialog redraws were 2–3× more expensive** (`internal/tui/layout/fit.go`) —
+  `FitHeight` re-ran its whole render-and-measure search on every `View()`, and Bubble
+  Tea calls `View()` on every keystroke **and** every streamed token. Instrumented at
+  **3 internal renders per frame** for `/context`. `layout.Fitter` now caches the row
+  count that last fitted, verify-then-reuse. Measured like-for-like at 100×30:
 
-  `/context` additionally **never recorded the terminal height at all**, which is
-  why it could not size itself. It now stores it, windows its switch list around the
-  selection, and sheds explanatory prose before it sheds a switch. `37 → 19` rows;
-  `/connect` `26 → 17`. Anything scrolled out of view is announced, because a hidden
-  row is indistinguishable from a missing feature.
+  | | v0.1.44 | v0.1.45 | now |
+  |---|---|---|---|
+  | `/context` | 2.33 ms | **6.65 ms** | **2.05 ms** |
+  | `/help` | 1.28 | 2.70 | 1.35 |
 
-- **A clamp in `PlaceOverlay` that did nothing.** Added so an oversized dialog could
-  not push the composed frame past the terminal and scroll it. It trimmed `fgLines`
-  but the early return (`if fgWidth >= bgWidth && fgHeight >= bgHeight { return fg }`
-  — upstream's own `FIXME`) handed back the untouched original, so it had no effect
-  on the one path it existed for. Fixed, and it now has tests, which it did not
-  before.
+  The first version of that cache keyed on terminal size alone and only asked *"does
+  the remembered count still fit"*, never *"could more fit now"* — so one cramped
+  selection locked in a small list and **two commands became unreachable** while
+  scrolling `/help`. An existing reachability test caught it, not me.
 
-### Added
+- **Dragging to select typed raw escape codes into the editor** (`cmd/root.go`) —
+  reported as `[<32;71;41M`. The program requested cell-motion mouse tracking, which
+  takes the mouse from the terminal (Shift then needed to select) and reports **one
+  event per cell crossed**, so a single drag fires hundreds and stalls the loop until
+  the input parser spills raw codes. Dropping non-wheel events in `Update` was too
+  late — the cost is upstream of any handler. Mouse reporting is now **opt-in**, with a
+  `/settings` row that states the trade. Verified on the real binary under a pty:
+  **`?1002h` emitted 0 times off, once on.**
 
-- **`internal/tui/screentest` — assertions on a terminal cell grid.** Renders a
-  component into a fixed-size buffer and reports what each cell holds, including
-  whether its text is *legible* (foreground differs from background). This is the
-  tool that found the overflows.
+- **One `/context` figure was still a guess** (`internal/llm/agent/calibrate.go`) —
+  token costs are measured from real tool schemas at startup, except `diagnostics`,
+  which was guarded on having LSP clients. A schema is static, so with every language
+  server off — supported, and this developer's setup — that one row showed an estimate.
+  Now measured unconditionally, with a test asserting no component still reports its
+  declared value.
 
-  It exists because string matching cannot catch two of the three shapes of display
-  bug this project has shipped. Text present but invisible is a question about a
-  cell's two colours, not the byte stream — that was the v0.1.42 `/help` bug, and it
-  took three attempts to write a string test for it, the first of which *passed
-  against the bug*. And overrunning text is easy to miss because lipgloss **wraps
-  rather than overflows**, so an over-long line appears as extra height.
+### Changed
 
-  **Zero new dependencies:** `x/cellbuf` was already in the module graph.
+- **One prompt rule relaxed, six kept** (`coder-modern.txt`) — Anthropic's Claude 5
+  context-engineering guidance reports removing 80%+ of their coding agent's system
+  prompt with no eval loss, and its worked example is a rule we also had. Ours now
+  reads `comments: match surrounding density and idiom` instead of `never explain
+  WHAT/WHY`. The other six `do not`/`never` lines were reviewed and **kept**: five are
+  verification and honesty rules (*never claim unobserved success*, *do not invent
+  paths*), and the guidance is about trusting judgement on **style**, not about
+  trusting an agent's account of its own work.
 
-  The harness had two defects of its own, found before trusting it. lipgloss strips
-  styling when the output is not a terminal, so every styled string arrived plain
-  and every colour assertion passed vacuously — the package was *worse than useless*
-  in that state. And a double-width grapheme occupies two cells, so reading a space
-  for the second split `日本` into `日 本`.
+- **The release tooling refuses to commit deletions** (`release_pipeline.py`) — it ran
+  `git add -A` unguarded. **Nine files of published research under `system-prompts/`
+  were sitting deleted in the working tree while this was being written**, unnoticed
+  for hours, one release from being written permanently into a tag. Now it stops and
+  lists them. It also fast-forwards `main` to the tag, which it never did — the
+  omission behind `main` once sitting 43 commits behind.
+
+- **`CLAUDE.md` now documents `release_pipeline.py`**, which has a `go_gorilla` profile
+  built for this repo and was undocumented. That cost four consecutive releases driven
+  by hand by sessions that never knew it existed.
 
 ### Known issues
 
-- Dialogs still overflow terminals below 24 rows, held by a **ratchet** keyed by
-  dialog *and* size, asserted in both directions: worse fails, and **better also
-  fails** until the entry is lowered, so the record cannot rot. Keying on name alone
-  reported four false improvements immediately — a narrower terminal wraps more and
-  needs *more* rows.
-- The sweep covers 8 of ~15 dialog surfaces. The model picker, sessions, permissions,
-  tasks, filepicker, theme and arguments dialogs are not yet in it and may overflow
-  undetected.
-- `Legible()` treats a nil foreground or background as readable, since the terminal's
-  defaults are unknown — a one-sided colour matching the user's theme would slip past.
-- The main interface still cannot be selected or copied; `--plain` remains the answer.
-
-### On verification
-
-Reported plainly because it bears on how much the above should be trusted:
-per-call-site reverts were **inconclusive**, since each site kept a fallback that
-still measured. Only neutralising `FitHeight` itself was decisive — **10 failing
-subtests** across `/connect`, `/context` and `/help`. Forcing `compact=false` failed
-3 more including 80×24. One test I had written was **deleted**: it claimed `/context`
-keeps switches rather than prose, but measurement showed 10 switch rows visible with
-*and* without the shedding, so it could not fail for its stated reason.
+- **The display corruption reported alongside the mouse leak was never reproduced.**
+  Message rendering, the reasoning block, a 4,000-character unbreakable paste and the
+  split layout all produce uniform widths headlessly. Attributing it to the mouse flood
+  is reasoning, not proof — if it survives this release, that was wrong.
+- The size sweep covers **8 of ~15** dialog surfaces; the rest may overflow undetected.
+- **Tool descriptions are ~3,680 tokens against the prompt's ~464** and are the real
+  cost centre — but there is zero duplication and no prescriptive language left in
+  them, so the safe cuts are spent. Trimming further without an eval risks a quietly
+  worse agent. Not attempted.
+- `layout.Fitter`'s cache key is caller-supplied; nothing enforces completeness.
+- The main interface still cannot be selected or copied.
 
