@@ -83,8 +83,28 @@ real confusion; they are not optional.
   clear it. Route it through a `tea.Msg`, or log it. Grep `fmt.Print` under
   `internal/` before releasing; the only legitimate survivors are the `-p` output
   path and the deliberate mouse-mode escape sequences.
+- **Configure the logger before anything in `Load` can log.** Until
+  `slog.SetDefault` runs, slog's *built-in* default handler is in force and it
+  writes to **stderr** — so an early `logging.Warn` lands on the terminal and is
+  then painted over by the TUI, exactly like a stray `fmt.Print`. It is the same
+  bug with a different mechanism, and grepping for `fmt.Print` will not find it.
+  `configureLogging()` is called immediately after `applyDefaultValues()`; never
+  add a step that logs above that call.
 - **Container chrome is SUBTRACTED from the terminal size, never added to a content
   size.** Adding it shipped an invisible input box and four over-wide dialogs.
+- **lipgloss `.Width(w)` WRAPS text longer than `w`; it does not overflow.** So the
+  symptom of an untruncated long string is extra **height**, not extra width — a
+  width assertion passes against it. Test the height. (I wrote the width version
+  first and it passed against the bug.)
+- **`viper.ConfigFileUsed()` stays empty for the whole process if no config.json
+  existed at startup** — nothing re-runs `ReadInConfig`. `updateCfgFile` keyed
+  "does a config exist?" off it and substituted a literal `{}`, so on a fresh
+  install every write re-based from empty and discarded the one before: paste a
+  key in `/connect`, add an endpoint, key gone. Read the file from disk regardless,
+  and `viper.SetConfigFile` after creating it.
+- **Unregister local models by endpoint NAME, not baseURL.** Several configured
+  endpoints can aim at one URL and only one of them owns the registered models, so
+  dropping by URL takes the survivor's models down with the entry being removed.
 - **viper reads `mapstructure` tags, not `json` tags.** `Config.WorkingDir` had only
   `json:"wd"`, so the field was written and never read back — a write-only setting.
   Field names also match case-insensitively, which is why `additionalDirs` worked
@@ -99,6 +119,20 @@ real confusion; they are not optional.
   wins. Collapse by URL, prefer a keyed entry, keep the first of two.
 - **Scroll that follows the selection makes non-selectable trailing rows
   unreachable.**
+- **viper reads a DOTTED map key as NESTING.** An `extras` map keyed
+  `"extra.timestamps.show"` unmarshalled as `{extra:{timestamps:{show:true}}}` and
+  then failed to decode into `map[string]bool`, breaking `config.Load` for the
+  whole application. Keys of a viper-backed map must contain no dots
+  (`extras-timestamps-show`). The loadout registry gets away with dotted IDs only
+  because its state lives in `loadout.json`, written directly and never read by
+  viper.
+- **Any test package that calls `config.Load` MUST isolate the config**, via
+  `os.Exit(configtest.Isolate(m))` in `TestMain`. Without it, every setter
+  (`SetExtra`, `SetWorkingDir`, `UpsertProviderKey`, `AddDir`) writes through
+  `updateCfgFile` to the developer's real `~/.config/gorilla-opencode/config.json`.
+  `internal/config` had a guard; four other packages did not, and one new writing
+  test duly put a stray key in the live config. That is three times now. The guard
+  panics rather than falling back, because silent damage is worse than a failed run.
 - **Loadout/registry globals leak between tests in a package.** Helpers must replace
   the rows they own and restore both registry and state; assert persistence by
   reading the file, not by clearing global state. `sync.Once` cannot be reset —
