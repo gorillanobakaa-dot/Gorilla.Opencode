@@ -63,46 +63,86 @@ Here is an honest breakdown of what research ideas were included in the system p
 
 ---
 
-## SECTION 1: Absolute Repository Paths & Core Architecture
+## SECTION 1: Paper 1 — "The Compliance Gap" (arXiv:2605.01771)
 
-All prompt engineering and sub-agent controls in `v0.2.0` reside in the following canonical files:
+### 1. Research Core & Findings:
+- **Core Concept:** Distinguishes between *Outcome Compliance* (did the agent produce plausible output) vs *Process Compliance* (did the agent follow specified tool/inspection rules).
+- **Theorem 1 & Section 6 Infrastructure Recommendation 1:** "Behavioral-channel logging as default. For tool-using AI deployments... tool-call-log collection should be a default rather than an option."
+- **Theorem 2 (DPI Undetectability):** Verbal-only reporting obscures non-compliance. System MUST inspect structural execution logs rather than model self-reports.
 
-- **Active System Prompts:**
-  - Coder Prompt: [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md)
-  - Summarizer Prompt: [`internal/llm/prompt/summarizer.txt`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/summarizer.txt)
-  - Subagent / Task Prompt: [`system-prompts/current/task.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/task.md)
-- **Go Engine Mechanics:**
-  - Section Parser & Dynamic Assembler: [`internal/llm/prompt/sections.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/sections.go)
-  - Source Reader & Validation: [`internal/llm/prompt/source.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/source.go)
-  - Sub-agent Guard & Rate Limiter: [`internal/llm/agent/subagent_guard.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/subagent_guard.go)
-  - Sub-agent Registry & Termination: [`internal/llm/agent/subagent_registry.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/subagent_registry.go)
+### 2. Line-by-Line Codebase Mapping:
+1. **Research Requirement:** Process Compliance Enforcement & Verbal-Only Rejection.
+   - **File:** [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md)
+   - **Line 23:** `audit before reporting: every progress claim must point to a tool result from this session: no tool result means say unverified`
+   - **Line 24:** `report real output: never claim unobserved success: failed build = say failed and show the error: skipped step = say skipped`
+   - **Analysis:** Directly solves Section 1 "Verbal vs Behavioral divergence" by explicitly prohibiting ungrounded verbal claims.
 
----
+2. **Research Requirement:** Sub-agent Task Verification & Read-Only Constraints.
+   - **File:** [`system-prompts/current/task.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/task.md)
+   - **Line 1:** `you answer questions for a parent agent using available tools. report only what you actually read.`
+   - **Line 4:** `read before answering: never guess file contents or structure`
+   - **Line 5:** `cite evidence: name the file, and the line where it matters`
 
-## SECTION 2: Forensic Line-by-Line Research Mapping
-
-### 1. Paper 1: "The Compliance Gap" (arXiv:2605.01771)
-- **Finding:** Verbal-only reporting obscures non-compliance. System prompts must enforce Process Compliance over verbal claims.
-- **Code Mapping:**
-  - [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md) (Line 23): `audit before reporting: every progress claim must point to a tool result...`
-  - [`internal/llm/prompt/summarizer.txt`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/summarizer.txt) (Line 13): `do not promote attempts to successes: unverified in, unverified out`
-
-### 2. Paper 2: "Prompting Claude Fable 5" (Anthropic 2026)
-- **Finding:** Never end on a promise; re-ground reader after long unattended executions; enforce strict scope boundaries.
-- **Code Mapping:**
-  - [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md) (Line 57): `finish task: do not yield a plan instead of the work: do not end on a promise ("I'll now..."): if your last paragraph is a plan... do that work now`
-  - [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md) (Line 49): `re-ground the reader: after long unattended work your summary is their first look...`
-
-### 3. Paper 3: "MAS-PromptBench" (arXiv:2606.23664)
-- **Finding:** Un-leashed sub-agents degrade swarm accuracy and exhaust context buffers rapidly.
-- **Code Mapping:**
-  - [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md) (Line 37): `sub-agents: use task tool only for focused, read-only sub-tasks...`
-  - [`internal/llm/agent/subagent_guard.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/subagent_guard.go) (Lines 28–40): Reserve & guard sub-agent concurrency slots.
-  - [`internal/llm/agent/subagent_registry.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/subagent_registry.go) (Lines 57–74, 133–147): Full registry tracking and nuclear teardown.
+3. **Research Requirement:** Behavioral Audit Logs in Engine.
+   - **File:** [`internal/llm/prompt/summarizer.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/summarizer.go) & [`summarizer.txt`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/summarizer.txt)
+   - **Line 13:** `do not promote attempts to successes: unverified in, unverified out`
 
 ---
 
-# SECTION 3: PHILOSOPHY & METHODOLOGY
+## SECTION 2: Paper 2 — "Prompting Claude Fable 5" (Anthropic 2026)
+
+### 1. Research Core & Findings:
+- **Rule A:** "Do not end a turn on a promise" (If last paragraph is a plan or list of next steps, do the work immediately).
+- **Rule B:** Re-ground reader after long unattended runs (clear, non-shorthand summary of actual file edits).
+- **Rule C:** Scope boundaries (never perform unrequested actions, backup branches, or extra file creation).
+- **Rule D:** Context budget (do not stop or hand off because conversation history is long).
+
+### 2. Line-by-Line Codebase Mapping:
+1. **Rule A ("Do not end on a promise"):**
+   - **File:** [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md)
+   - **Line 57:** `finish task: do not yield a plan instead of the work: do not end on a promise ("I'll now..."): if your last paragraph is a plan, a question, or a next-steps list, do that work now`
+
+2. **Rule B ("Re-ground the reader"):**
+   - **File:** [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md)
+   - **Line 49:** `re-ground the reader: after long unattended work your summary is their first look: complete sentences, no working shorthand, no arrow chains, no labels you invented mid-task: give each file/flag/commit its own plain clause`
+
+3. **Rule C ("Scope boundaries"):**
+   - **File:** [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md)
+   - **Line 31:** `# scope: do requested work only: describing a problem or asking a question is an assessment request: do not invent extra tasks, backup branches, or unrequested refactorings`
+
+---
+
+## SECTION 3: Paper 3 — "MAS-PromptBench" (arXiv:2606.23664)
+
+### 1. Research Core & Findings:
+- **Core Concept:** Multi-agent swarms degrade rapidly without strict process limits, state isolation, and explicit parent-child bounds.
+
+### 2. Line-by-Line Codebase Mapping:
+1. **Sub-Agent Leashing & Purpose Limits:**
+   - **File:** [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md) (Line 37): `sub-agents: use task tool only for focused, read-only sub-tasks: single lookups, isolated file searches, or independent research: parent handles all edits and primary flow: do not delegate your main work`
+2. **Engine Concurrency Slot Guarding:**
+   - **File:** [`internal/llm/agent/subagent_guard.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/subagent_guard.go) (Lines 28–40): `reserveSubAgentSpawn` enforcing maximum parallel thread limits.
+3. **Sub-Agent Execution Intercept & Registry:**
+   - **File:** [`internal/llm/agent/agent-tool.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/agent-tool.go) (Lines 62–69): Intercepting sub-agent creation and preventing infinite recursive spawning.
+   - **File:** [`internal/llm/agent/subagent_registry.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/subagent_registry.go) (Lines 57–74 & 133–147): `RegisterSubAgent` and `KillAllSubAgents` cleanup routines.
+
+---
+
+## SECTION 4: Paper 4 — "Natural-Language Agent Harnesses" (arXiv:2603.25723)
+
+### 1. Research Core & Findings:
+- **Core Concept:** Prompts should be parsed dynamically as modular sections rather than monolithic static blobs.
+
+### 2. Line-by-Line Codebase Mapping:
+1. **Dynamic Section Parsing & Assembly:**
+   - **File:** [`internal/llm/prompt/sections.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/sections.go) (Lines 52–99): `ParseSections` splitting prompt files into addressable toggleable blocks.
+   - **File:** [`internal/llm/prompt/sections.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/sections.go) (Lines 141–156): `assembleCoderPrompt` building custom context assemblies per user settings.
+2. **Prompt Validation & Source Integrity:**
+   - **File:** [`internal/llm/prompt/source.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/source.go) (Lines 73–109): Loading prompt overrides and asserting valid UTF-8 boundaries.
+
+---
+
+# SECTION 5: PHILOSOPHY & METHODOLOGY
 *The Dual-Track Standard & Radical Transparency*
 
 Every piece of engineering documentation in `Gorilla.Opencode` is governed by the **Gorilla Open Source Philosophy**:
