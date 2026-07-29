@@ -43,7 +43,7 @@ You are not stuck with our judgement. In the app:
   off makes the AI *more* likely to claim success it never observed, and the
   menu says so rather than quietly letting you do it.
 
-## The v0.2.0 rewrite (2026-07-29)
+## The 2026-07-29 system prompt rewrite (shipped in v0.1.49)
 
 All four prompts were reworked against Anthropic's published guidance for
 **Claude Fable 5** — see the credit and citation in `RESEARCH-SOURCES.md`.
@@ -135,7 +135,7 @@ The high-value remainder is harness work, tracked for a future change:
   strategy-shift message.
 - [ ] **`yield_failure` / `yield_success` tools**: explicit exit ramps so the
   agent can declare an unresolvable toolchain issue instead of looping.
-- [ ] **Measure the v0.2.0 rewrite** against real Firefox 154/155 and kernel
+- [ ] **Measure the 2026-07-29 prompt rewrite** against real Firefox 154/155 and kernel
   builds. The changes above are grounded in published research and in
   Anthropic's own testing, **not** in our own A/B numbers. We have not run
   that experiment yet, and this line stays here until we have.
