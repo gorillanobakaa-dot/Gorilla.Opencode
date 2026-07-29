@@ -56,5 +56,6 @@ For security auditors and software engineers, here are the absolute file paths a
 
 ---
 
+**Full Dual-Track Report:** [`system-prompts/REPORT.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/REPORT.md)  
 **Install:** `sudo dpkg -i gorilla-opencode_0.2.0_amd64.deb`
 
