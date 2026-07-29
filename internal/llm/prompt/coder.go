@@ -18,14 +18,26 @@ import (
 
 // GORILLA OVERRIDE: the modern base prompt. Replaces the two 2023-era
 // prompts (baseOpenAICoderPrompt / baseAnthropicCoderPrompt, ~2,003
-// tokens, heavy ALL-CAPS + markdown headers). This one is ~924 tokens
-// of plain declarative prose — no shouty caps, no "#" scaffolding for a
-// swarm to echo — synthesised from the modern Claude Code prompt plus
-// the SOTA agentic-prompting research (neutral/imperative, faithful
+// tokens, heavy ALL-CAPS + threat-toned emphasis). Neutral and
+// declarative — no shouty caps, no "IMPORTANT"/"NEVER" stacking —
+// synthesised from the SOTA agentic-prompting research (faithful
 // outcome reporting, anti-hallucination, loop discipline) and
 // specialised for building large systems (Firefox/mach, Linux kernel,
-// Windows internals). Editable: internal/llm/prompt/coder-modern.txt;
-// study copy in system-prompts/proposed/.
+// Windows internals).
+//
+// v0.2.0 (2026-07-29): reworked against Anthropic's Claude Fable 5
+// prompting guidance, which is written for exactly this shape of
+// workload — long-horizon autonomous runs where nobody is watching.
+// Three sections are new (scope, delegation, memory) and honesty,
+// verification, output and conduct were expanded. Measured cost:
+// ~464 -> ~1058 estimated tokens per turn. That is a real regression in
+// per-turn overhead and it buys grounded progress claims, an explicit
+// stop rule, and no unrequested actions; every section remains
+// individually switchable in /context. See system-prompts/README.md for
+// the rationale and RESEARCH-SOURCES.md for the citations.
+//
+// Editable: internal/llm/prompt/coder-modern.txt; study copy in
+// system-prompts/current/coder-modern.md.
 //
 //go:embed coder-modern.txt
 var baseModernCoderPrompt string
