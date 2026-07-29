@@ -53,6 +53,29 @@ If you add tooling, put it here.
 All four now verify what they assume. The lesson generalises: **an artefact's name is
 not its contents, and a side-effect is not a state.**
 
+**A fifth bug, found during v0.2.0 (2026-07-29) and NOT yet fixed.** The upload
+phase's own verification step crashes after a *successful* upload:
+
+```
+[…] Uploaded checksums.txt
+[…] Verifying release assets on GitHub...
+[…] Error parsing release assets: 'binary'
+[…] Upload phase failed; aborting.
+```
+
+It is a `KeyError` on `'binary'` while parsing the release-asset list — the assets
+were all uploaded and the release was created correctly. The abort happens *before*
+the install phase, so `--action install-purge` silently never runs and the script
+exits non-zero on a release that actually succeeded. **Do not read that failure as
+"the release is broken" and re-run it**; check `gh release view` first. Everything
+after the upload phase (deb inspection, checksum round-trip, `dpkg -i`, confirming
+`main` is at the tag) had to be done by hand for v0.2.0.
+
+**Also: `--dual-track-path` defaults to `Changelogs/DOCUMENTATION.dual-track.md`,
+which is the project-wide document, not a release body.** Left alone it will publish
+a 20 KB July-23 project overview as the release notes for whatever you are shipping.
+Always pass `--dual-track-path` pointing at a short body written for that release.
+
 Two more guards were added the same day, both from real incidents:
 - **It refuses to commit deletions** (`--allow-deletions` to override). `git add -A`
   had no such guard, and nine files of published research were sitting deleted in the
