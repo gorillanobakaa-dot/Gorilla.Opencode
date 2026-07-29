@@ -1,10 +1,10 @@
 # Comprehensive Dual-Track Forensic Audit & Research Analysis
 
-**Target Release:** `Gorilla.Opencode` (`v0.2.0`)  
+**Target Release:** `Gorilla.Opencode` (`v0.1.49` — System Prompt Research Update)  
 **Methodology:** Gorilla Dual-Track Standard (Layman Track + Developer Track)  
 **Audit Scope:** Research Foundations, System Prompts, Go Engine Mechanics, Operational Trade-offs, & Omissions Analysis
 
-> *This document follows the [Gorilla Open Source Philosophy](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/TO.DO.TO.FIX/Antigravity.Analysis/PHILOSOPHY.md): every technical claim is presented twice — once in plain language for anyone, and once with exact file paths and line numbers for developers and auditors. Neither version is a summary of the other. Both are complete. Both are honest.*
+> *This document follows the [Gorilla Open Source Philosophy](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/PHILOSOPHY.md): every technical claim is presented twice — once in plain language for anyone, and once with exact file paths and line numbers for developers and auditors. Neither version is a summary of the other. Both are complete. Both are honest.*
 
 ---
 
@@ -19,7 +19,7 @@ When you type a question to an AI coding assistant, it does not start from scrat
 
 If that handbook is badly written, the AI will lie to you. It will tell you a build succeeded when it never checked. It will promise to run a test and then end its turn without running it. It will spawn dozens of helper processes that drain your money and crash your connection. These are not hypothetical failures — they are documented, researched, and published problems.
 
-In version `v0.2.0` of `Gorilla.Opencode`, every system prompt was completely rewritten based on five specific research papers published between 2024 and 2026. What follows is an honest, paper-by-paper explanation of what each piece of research found, what we did about it in the code, and what that means for you as a user.
+In version `v0.1.49` of `Gorilla.Opencode`, every system prompt was completely rewritten based on five specific research papers published between 2024 and 2026. What follows is an honest, paper-by-paper explanation of what each piece of research found, what we did about it in the code, and what that means for you as a user.
 
 ---
 
@@ -63,7 +63,7 @@ We wrote three specific rules into the system prompt that directly address this:
 
 ### What this means for you
 
-When `Gorilla.Opencode v0.2.0` tells you something worked, it actually checked. When it did not check, it will tell you it did not check. You no longer have to guess whether the AI is reporting facts or generating plausible fiction.
+When `Gorilla.Opencode v0.1.49` tells you something worked, it actually checked. When it did not check, it will tell you it did not check. You no longer have to guess whether the AI is reporting facts or generating plausible fiction.
 
 ---
 
@@ -191,25 +191,25 @@ The old system prompt used `IMPORTANT` seven times, along with extensive all-cap
 
 ## 1. Absolute File Paths & System Architecture Overview
 
-The system prompt engine in `Gorilla.Opencode` (`v0.2.0`) is structured across four primary code & prompt paths:
+The system prompt engine in `Gorilla.Opencode` (`v0.1.49` — System Prompt Research Update) is structured across four primary code & prompt paths:
 
 1. **System Prompt Source Specs (Embedded Factory Defaults & Text Copies):**
-   - Main Coder Prompt: [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md)
-   - Summarizer Prompt: [`internal/llm/prompt/summarizer.txt`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/summarizer.txt)
-   - Task Sub-Agent Prompt: [`system-prompts/current/task.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/task.md)
+   - Main Coder Prompt: [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/system-prompts/current/coder-modern.md)
+   - Summarizer Prompt: [`internal/llm/prompt/summarizer.txt`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/prompt/summarizer.txt)
+   - Task Sub-Agent Prompt: [`system-prompts/current/task.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/system-prompts/current/task.md)
 
 2. **Research Dossier & Citations File:**
-   - [`system-prompts/RESEARCH-SOURCES.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/RESEARCH-SOURCES.md)
+   - [`system-prompts/RESEARCH-SOURCES.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/system-prompts/RESEARCH-SOURCES.md)
 
 3. **Go Engine Prompt Construction Package:**
-   - Prompt Construction & Shallow Tree Summary: [`internal/llm/prompt/coder.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/coder.go)
-   - Section Parser & Dynamic Toggling: [`internal/llm/prompt/sections.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/sections.go)
-   - User Disk Override Layer: [`internal/llm/prompt/source.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/source.go)
+   - Prompt Construction & Shallow Tree Summary: [`internal/llm/prompt/coder.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/prompt/coder.go)
+   - Section Parser & Dynamic Toggling: [`internal/llm/prompt/sections.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/prompt/sections.go)
+   - User Disk Override Layer: [`internal/llm/prompt/source.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/prompt/source.go)
 
 4. **Go Engine Agent Execution & Leashing Package:**
-   - Sub-agent Spawn Guard & Leash: [`internal/llm/agent/subagent_guard.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/subagent_guard.go)
-   - Agent Tool Interception & Limits: [`internal/llm/agent/agent-tool.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/agent-tool.go)
-   - Process-Wide Helper Registry & Cancellation: [`internal/llm/agent/subagent_registry.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/subagent_registry.go)
+   - Sub-agent Spawn Guard & Leash: [`internal/llm/agent/subagent_guard.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/agent/subagent_guard.go)
+   - Agent Tool Interception & Limits: [`internal/llm/agent/agent-tool.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/agent/agent-tool.go)
+   - Process-Wide Helper Registry & Cancellation: [`internal/llm/agent/subagent_registry.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/agent/subagent_registry.go)
 
 ---
 
@@ -220,12 +220,12 @@ The system prompt engine in `Gorilla.Opencode` (`v0.2.0`) is structured across f
 - **Research Finding (Theorem 1 & 2):**  
   Language models under verbal-only feedback develop a gap between what they claim to do and what they actually execute.
 - **Exact System Prompt Reference:**  
-  File: [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md)
+  File: [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/system-prompts/current/coder-modern.md)
   - **Line 23:** `audit before reporting: every progress claim must point to a tool result from this session: no tool result means say unverified`
   - **Line 24:** `report real output: never claim unobserved success: failed build = say failed and show the error: skipped step = say skipped`
   - **Line 26:** `state unverified facts: do not invent paths symbols flags`
 - **Go Engine Support:**  
-  File: [`internal/llm/prompt/summarizer.txt`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/summarizer.txt)
+  File: [`internal/llm/prompt/summarizer.txt`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/prompt/summarizer.txt)
   - **Line 13:** `do not promote attempts to successes: unverified in, unverified out`
 
 ---
@@ -235,7 +235,7 @@ The system prompt engine in `Gorilla.Opencode` (`v0.2.0`) is structured across f
 - **Research Finding:**  
   Autonomous agents fail when they end turns with conversational promises, hand off work due to conversation length anxiety, or perform unrequested edits.
 - **Exact System Prompt Reference:**  
-  File: [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md)
+  File: [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/system-prompts/current/coder-modern.md)
   - **Line 31 (# scope):** `no unrequested actions: no drafts, backup branches, or extra files nobody asked for`
   - **Line 49 (# output):** `re-ground the reader: after long unattended work your summary is their first look: complete sentences, no working shorthand, no arrow chains...`
   - **Line 57 (# conduct):** `finish task: do not yield a plan instead of the work: do not end on a promise ("I'll now..."): if your last paragraph is a plan, a question, or a next-steps list, do that work now`
@@ -248,14 +248,14 @@ The system prompt engine in `Gorilla.Opencode` (`v0.2.0`) is structured across f
 - **Research Finding:**  
   Multi-agent delegation degrades rapidly without explicit spawn limits and cancellation primitives, leading to severe token burn and API rate-limit exhaustion.
 - **Exact System Prompt Reference:**  
-  File: [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/system-prompts/current/coder-modern.md)
+  File: [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/system-prompts/current/coder-modern.md)
   - **Line 37 (# delegation):** `respect the leash: honour the configured sub-agent limit`
 - **Go Engine Leash Guard Implementation:**  
-  File: [`internal/llm/agent/subagent_guard.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/subagent_guard.go)
+  File: [`internal/llm/agent/subagent_guard.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/agent/subagent_guard.go)
   - **Lines 19–23 (`resetSubAgentSpawns`):** Resets turn tally on each new top-level request.
   - **Lines 28–40 (`reserveSubAgentSpawn`):** Checks caller against configured `limit`.
 - **Go Engine Interception:**  
-  File: [`internal/llm/agent/agent-tool.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/agent-tool.go)
+  File: [`internal/llm/agent/agent-tool.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/agent/agent-tool.go)
   - **Lines 62–69:** Intercepts `agent` tool calls. Returns structured refusal responses if limit is hit or if `SubAgentsNuclear` (complete disablement) is active.
     ```go
     switch limit := config.MaxSubAgents(); {
@@ -268,7 +268,7 @@ The system prompt engine in `Gorilla.Opencode` (`v0.2.0`) is structured across f
     }
     ```
 - **Go Engine Process Registry:**  
-  File: [`internal/llm/agent/subagent_registry.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/agent/subagent_registry.go)
+  File: [`internal/llm/agent/subagent_registry.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/agent/subagent_registry.go)
   - **Lines 57–74 (`RegisterSubAgent`):** Registers helper with unique handle (`a1`, `a2`).
   - **Lines 133–147 (`KillAllSubAgents`):** Nuclear cancellation of all active sub-agents.
 
@@ -279,12 +279,12 @@ The system prompt engine in `Gorilla.Opencode` (`v0.2.0`) is structured across f
 - **Research Finding:**  
   Agent prompts must be natural-language modules parsed dynamically into inspectable, switchable sections rather than compiled into monolithic strings.
 - **Go Engine Implementation:**  
-  File: [`internal/llm/prompt/sections.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/sections.go)
+  File: [`internal/llm/prompt/sections.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/prompt/sections.go)
   - **Lines 52–99 (`ParseSections`):** Regex `(?m)^#\s+(.+)$` splits markdown headers into discrete section objects (`prompt.section.honesty`, `prompt.section.build-discipline`, etc.).
   - **Lines 141–156 (`assembleCoderPrompt`):** Re-assembles system prompt based on user `/context` loadout toggles.
   - **Lines 161–173 (`SectionTradeoff`):** Explicit tradeoff strings mapping prompt sections to user warnings.
 - **Disk Override Engine:**  
-  File: [`internal/llm/prompt/source.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/source.go)
+  File: [`internal/llm/prompt/source.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/prompt/source.go)
   - **Lines 43–55 (`Factory`):** Returns embedded default.
   - **Lines 73–109 (`Text`):** Loads user file override if non-blank; falls back safely to `Factory()` default if empty to prevent prompt corruption.
 
@@ -295,7 +295,7 @@ The system prompt engine in `Gorilla.Opencode` (`v0.2.0`) is structured across f
 - **Research Finding:**  
   Fixed system context overhead penalizes low-bandwidth connections and API rate limits.
 - **Go Engine Implementation:**  
-  File: [`internal/llm/prompt/coder.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.2.0/internal/llm/prompt/coder.go)
+  File: [`internal/llm/prompt/coder.go`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/internal/llm/prompt/coder.go)
   - **Lines 94–101:** Hard limits on workspace environment injection:
     - `maxTopLevelEntries = 25`
     - `maxGitStatusLines = 10`
@@ -320,6 +320,6 @@ The system prompt engine in `Gorilla.Opencode` (`v0.2.0`) is structured across f
 
 ## Verification Certification
 
-The `v0.2.0` release of `Gorilla.Opencode` demonstrates **direct code-level and prompt-level traceability** to the cited research. The prompt instructions are not generic boilerplate; they map line-for-line to Go control structures in `internal/llm/prompt/` and `internal/llm/agent/` that actively enforce process compliance, subagent leashing, dynamic sectioning, and context optimization.
+The `v0.1.49` release of `Gorilla.Opencode` demonstrates **direct code-level and prompt-level traceability** to the cited research. The prompt instructions are not generic boilerplate; they map line-for-line to Go control structures in `internal/llm/prompt/` and `internal/llm/agent/` that actively enforce process compliance, subagent leashing, dynamic sectioning, and context optimization.
 
-**Install:** `sudo dpkg -i gorilla-opencode_0.2.0_amd64.deb`
+**Install:** `sudo dpkg -i gorilla-opencode_0.1.49_amd64.deb`
