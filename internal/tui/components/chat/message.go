@@ -252,9 +252,33 @@ func renderAssistantMessage(
 		}
 	}
 
-	if content != "" || (finished && finishData.Reason == message.FinishReasonEndTurn) {
+	// GORILLA FIX: this used to read
+	//     content != "" || (finished && finishData.Reason == EndTurn)
+	// so a turn that finished for ANY OTHER reason with no text rendered
+	// absolutely nothing — no error, no model line, not even a timestamp. In
+	// scrollback mode that is total silence: the reasoning had already been
+	// printed live, then the close marker, then nothing at all, and the prompt
+	// came back. There was no way to tell a failed turn from a finished one.
+	//
+	// A turn that ends without an answer is exactly when the user most needs to
+	// be told why. Every finish reason now renders, and the empty-content
+	// placeholder names the reason instead of the generic "finished".
+	if content != "" || finished {
 		if content == "" {
-			content = "*Finished without output*"
+			switch finishData.Reason {
+			case message.FinishReasonError:
+				content = "*The model returned an error and produced no answer. " +
+					"If the context percentage in the footer is over 100%, the request " +
+					"was almost certainly rejected for being too large.*"
+			case message.FinishReasonMaxTokens:
+				content = "*Stopped at the model's output limit before finishing the answer.*"
+			case message.FinishReasonCanceled:
+				content = "*Canceled — no answer was produced.*"
+			case message.FinishReasonPermissionDenied:
+				content = "*Permission denied, so nothing was run and no answer was produced.*"
+			default:
+				content = "*Finished without output*"
+			}
 		}
 		// GORILLA OVERRIDE: show the reasoning next to the answer it produced.
 		// Previously the thinking was visible only while streaming and then
