@@ -67,7 +67,46 @@ func (p *chatPage) FooterView(maxRows int) string {
 		info = p.sidebarInfo.CompactView(width)
 	}
 
-	return shedToFit(maxRows, footerArrangements(live, prompt, info))
+	// GORILLA FIX: the live row must be RESERVED, not merely included.
+	//
+	// messagesCmp.FooterView returns the working indicator, or "" when the agent
+	// is idle. joinNonEmpty drops any part that is whitespace-only, so the whole
+	// frame was one row SHORTER while idle than while working — it grew the
+	// moment a turn started and shrank the moment it ended.
+	//
+	// Bubbletea erases its previous frame by walking the cursor UP by that
+	// frame's row count. A frame whose height changes between renders therefore
+	// erases the wrong number of rows every time the agent starts or stops, which
+	// is what made the footer march down the screen and then jump back up instead
+	// of settling at the bottom like gemini-cli or codex. Same root cause as the
+	// v0.1.50 "text vanishes" bug: a frame that shrinks over-reaches.
+	//
+	// Reserving the row here rather than making FooterView return padding keeps
+	// the fix where the height is decided. It also cannot be undone by a future
+	// change to joinNonEmpty, because the row no longer depends on being
+	// non-empty to survive.
+	return reserveLiveRow(live, shedToFit(maxRows-chat.FooterReservedRows,
+		footerArrangements("", prompt, info)))
+}
+
+// reserveLiveRow puts the working indicator above the rest of the footer,
+// always occupying exactly chat.FooterReservedRows rows whether or not it has
+// anything to say.
+func reserveLiveRow(live, rest string) string {
+	lines := make([]string, 0, chat.FooterReservedRows+1)
+	liveLines := strings.Split(live, "\n")
+	for i := 0; i < chat.FooterReservedRows; i++ {
+		if i < len(liveLines) && strings.TrimSpace(liveLines[i]) != "" {
+			lines = append(lines, liveLines[i])
+			continue
+		}
+		lines = append(lines, "")
+	}
+	if strings.TrimSpace(rest) != "" {
+		lines = append(lines, rest)
+	}
+	// JoinVertical, not joinNonEmpty: the blank reserved rows are the point.
+	return lipgloss.JoinVertical(lipgloss.Top, lines...)
 }
 
 // footerArrangements lists the footer's possible contents from most to least
