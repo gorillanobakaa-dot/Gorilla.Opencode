@@ -121,6 +121,38 @@ func escapeRegexPattern(pattern string) string {
 	return escaped
 }
 
+// Bounds on what a search may return.
+//
+// GORILLA FIX: the match COUNT was capped at 100 and the byte size was not.
+// That is not a bound. Measured 2026-07-30: a search that correctly reported
+// "100 matches, truncated" returned 2,438,026 bytes — 2.4 MB — because it
+// matched inside JSON files where a whole source file is embedded as one
+// escaped string. Eighty lines were over 10 KB, the longest 66,438 bytes, and
+// together they were 98% of the payload.
+//
+// The consequence is not cosmetic: that result went into the conversation and
+// took it from 15.9K tokens to 675K in a single turn, at real cost, for a
+// question that had already been answered. A tool whose output is unbounded is
+// a tool that can empty a wallet by accident.
+//
+// Two limits, because either alone leaks: a per-line cap stops one absurd line,
+// and a total cap stops a thousand merely-large ones.
+const (
+	maxGrepLineBytes   = 400
+	maxGrepOutputBytes = 100 * 1024
+)
+
+// clampMatchLine shortens a single matched line, saying so rather than
+// silently cutting it. A model that cannot tell it received a fragment will
+// reason about the fragment as though it were the whole line.
+func clampMatchLine(s string) string {
+	if len(s) <= maxGrepLineBytes {
+		return s
+	}
+	return s[:maxGrepLineBytes] + fmt.Sprintf(
+		"… [line truncated, %d bytes total]", len(s))
+}
+
 func (g *grepTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error) {
 	var params GrepParams
 	if err := json.Unmarshal([]byte(call.Input), &params); err != nil {
@@ -163,9 +195,18 @@ func (g *grepTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 				output += fmt.Sprintf("%s:\n", match.path)
 			}
 			if match.lineNum > 0 {
-				output += fmt.Sprintf("  Line %d: %s\n", match.lineNum, match.lineText)
+				output += fmt.Sprintf("  Line %d: %s\n", match.lineNum, clampMatchLine(match.lineText))
 			} else {
 				output += fmt.Sprintf("  %s\n", match.path)
+			}
+			// GORILLA FIX: stop on total SIZE as well as match count. See
+			// clampMatchLine below — capping matches alone is not a bound.
+			if len(output) >= maxGrepOutputBytes {
+				output += fmt.Sprintf(
+					"\n(Output stopped at %d KB. Narrow the pattern, or set include= to a "+
+						"file type.)\n", maxGrepOutputBytes/1024)
+				truncated = true
+				break
 			}
 		}
 
