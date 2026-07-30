@@ -85,6 +85,19 @@ func (p *chatPage) FooterView(maxRows int) string {
 	// the fix where the height is decided. It also cannot be undone by a future
 	// change to joinNonEmpty, because the row no longer depends on being
 	// non-empty to survive.
+	//
+	// GORILLA FIX: a blank row between what you are TYPING and the session
+	// numbers. Without it the input line butts straight against
+	// "model … context … spent …", so the prompt and the statistics read as one
+	// block and the cursor is hard to find. A gap already existed ABOVE the
+	// prompt (the reserved live row); this is its counterpart below.
+	//
+	// Added only when there is an info block to separate from, which keeps the
+	// frame height constant: info is empty only when the width is unknown, and
+	// nothing is drawn then anyway.
+	if strings.TrimSpace(info) != "" {
+		info = "\n" + info
+	}
 	return reserveLiveRow(live, shedToFit(maxRows-chat.FooterReservedRows,
 		footerArrangements("", prompt, info)))
 }
