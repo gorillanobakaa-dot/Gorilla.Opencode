@@ -226,6 +226,18 @@ cost real confusion; they are not optional.
   looking at a screenshot, which is why the same class of bug was "fixed"
   repeatedly and kept coming back — each regression cost another session to
   re-find. Assert on the reconstructed screen.
+- **A LIMIT MUST BE EXPRESSED IN THE UNIT OF THE RESOURCE IT PROTECTS.** The grep
+  tool capped MATCHES at 100 and honestly reported `truncated:true` — and returned
+  2,438,026 bytes, because it had matched inside JSON files where a whole source
+  file is one escaped string (80 lines over 10 KB, longest 66,438). That single
+  result took a conversation from 15.9K tokens to 675K in one turn. The resource
+  was BYTES; the cap counted ITEMS. Counting items is a proxy, and proxies fail
+  exactly when items are unusual — which is when the limit was needed. Every tool
+  result is re-sent on every later turn, so an unbounded result is a recurring
+  bill. Bounded now at one choke point, `NewTextResponse` (400 KB), because
+  twelve tools each measuring whatever was natural to them — files, lines,
+  matches, seconds — is how this was missed. Truncation always SAYS so: a model
+  handed a silent fragment reasons about the fragment as if it were complete.
 - **Container chrome is SUBTRACTED from the terminal size, never added to a content
   size.** Adding it shipped an invisible input box and four over-wide dialogs.
 - **lipgloss `.Width(w)` WRAPS text longer than `w`; it does not overflow.** So the
