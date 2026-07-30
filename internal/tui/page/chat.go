@@ -267,33 +267,20 @@ func (p *chatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (p *chatPage) setSidebar() tea.Cmd {
 	model := chat.NewSidebarCmp(p.session, p.app.History)
 
-	// GORILLA OVERRIDE: in scrollback mode there is no right-hand panel to put this
-	// in, so the same component is kept for its COMPACT rendering in the footer. It
-	// is still initialised, because Init is what starts the modified-files scan
-	// against the history service — the footer needs that data as much as the panel
-	// did.
+	// GORILLA OVERRIDE: sidebar is never added to the layout — no right panel, ever.
+	// The component is still initialised (Init starts the modified-files scan)
+	// and kept for its compact footer rendering in scrollback mode.
 	if info, ok := model.(chat.FooterInfo); ok {
 		p.sidebarInfo = info
 	}
-	if p.scrollback {
-		p.sidebarModel = model
-		return model.Init()
-	}
-
-	// No container padding: the sidebar paints its own panel background edge to
-	// edge (top→bottom, and up to the seam). Its own PaddingLeft/Right handle
-	// text spacing. Container padding here would frame the panel with rows of
-	// the MAIN background, leaving the gaps the panel is meant to avoid.
-	sidebarContainer := layout.NewContainer(model)
-	return tea.Batch(p.layout.SetRightPanel(sidebarContainer), sidebarContainer.Init())
+	p.sidebarModel = model
+	return model.Init()
 }
 
 func (p *chatPage) clearSidebar() tea.Cmd {
 	p.sidebarInfo, p.sidebarModel = nil, nil
-	if p.scrollback {
-		return nil
-	}
-	return p.layout.ClearRightPanel()
+	// GORILLA OVERRIDE: sidebar is never in the layout, nothing to clear there.
+	return nil
 }
 
 func (p *chatPage) sendMessage(text string, attachments []message.Attachment) tea.Cmd {

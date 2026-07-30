@@ -1317,14 +1317,13 @@ func (a appModel) footerView() string {
 		return status
 	}
 
-	// Hand the page a hard row budget rather than trusting the parts to add up.
-	// a.height already has the status line subtracted, and half the window is left
-	// for the conversation: a footer that fills the screen is a full-screen layout
-	// by another name, and it is the case where the renderer's line arithmetic
-	// stops matching what is on screen.
+	// Budget is half the window, but never less than FooterReservedRows+2
+	// (transcript block + prompt + status). Matches the padding in printer.go
+	// so the frame height stays constant and bubbletea's cursor-up erase
+	// always lands in the right place.
 	budget := a.height / 2
-	if budget < 3 {
-		budget = 3
+	if budget < chat.FooterReservedRows+2 {
+		budget = chat.FooterReservedRows + 2
 	}
 	return lipgloss.JoinVertical(lipgloss.Top, page.FooterView(budget), status)
 }

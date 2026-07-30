@@ -170,10 +170,13 @@ func TestLivePreviewIsCappedSoTheFooterStaysShort(t *testing.T) {
 	}
 
 	rows := lipgloss.Height(footer)
-	if rows > livePreviewRows+1 {
-		t.Errorf("footer is %d rows for a %d-line reply; the cap is %d (+1 for the "+
-			"working line). An unbounded footer breaks the renderer's line arithmetic",
-			rows, strings.Count(many, "\n"), livePreviewRows)
+	// GORILLA FIX: FooterView now always returns exactly FooterReservedRows rows
+	// (padded when the preview is short). This is the fixed-height contract that
+	// prevents bubbletea's cursor-up erase from over-reaching into the scrollback.
+	if rows > FooterReservedRows {
+		t.Errorf("footer is %d rows for a %d-line reply; the cap is FooterReservedRows=%d. "+
+			"An oversized footer breaks the renderer's line arithmetic",
+			rows, strings.Count(many, "\n"), FooterReservedRows)
 	}
 }
 
@@ -266,5 +269,42 @@ func TestLivePreviewFallsBackToReasoningBeforeAnyAnswer(t *testing.T) {
 	if out := m.livePreview(); !strings.Contains(out, "weighing") {
 		t.Errorf("with reasoning but no answer yet the preview is %q; a thinking model "+
 			"would be indistinguishable from a stalled one", out)
+	}
+}
+
+// THE assertion the fixed-height contract actually needs.
+//
+// TestLivePreviewIsCappedSoTheFooterStaysShort only checks an upper bound, and a
+// footer that SHRINKS when streaming ends satisfies an upper bound perfectly — so
+// that test passes against the very bug FooterReservedRows exists to kill. What
+// breaks the scrollback is not a tall footer, it is a footer whose height CHANGES
+// between renders: bubbletea walks the cursor up by the last frame's row count, so
+// a frame that was 8 rows and is now 1 erases 7 rows of already-printed
+// conversation above it. That is the "replies vanish" symptom.
+//
+// So: assert the height is IDENTICAL across every state the footer passes through
+// in a normal turn, not merely bounded.
+func TestFooterHeightIsConstantAcrossEveryStreamingState(t *testing.T) {
+	const at int64 = 1785228225
+
+	states := []struct {
+		name string
+		msgs []message.Message
+	}{
+		{"idle, no messages at all", nil},
+		{"idle, reply already finished and printed", []message.Message{finishedAssistant("m1", "the answer", at)}},
+		{"streaming a one-line reply", []message.Message{streamingAssistant("m1", "The", at)}},
+		{"streaming a reply the height of the preview", []message.Message{streamingAssistant("m1", strings.Repeat("line\n", livePreviewRows), at)}},
+		{"streaming a reply far taller than the preview", []message.Message{streamingAssistant("m1", strings.Repeat("a line of streamed reply\n", 60), at)}},
+	}
+
+	for _, s := range states {
+		m := printerFor(t, 80, s.msgs...)
+		if rows := lipgloss.Height(m.FooterView()); rows != FooterReservedRows {
+			t.Errorf("%s: footer is %d rows, want exactly FooterReservedRows=%d.\n"+
+				"A footer that changes height between renders makes bubbletea's "+
+				"cursor-up erase land in the printed scrollback and wipe it.",
+				s.name, rows, FooterReservedRows)
+		}
 	}
 }
