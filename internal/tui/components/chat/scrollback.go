@@ -78,6 +78,26 @@ func ScrollbackReady(msg message.Message) bool {
 	case message.Assistant:
 		return msg.IsFinished()
 	default:
-		return false
+		// GORILLA FIX: tool and system messages are SETTLED, not unsettled.
+		//
+		// This returned false, and printPending BREAKS on the first message that
+		// is not ready — so the first tool result halted the transcript
+		// permanently. Every later message, including the model's finished
+		// answer, was generated, stored in the database and never shown.
+		//
+		// Observed 2026-07-30: a bash call returned in two seconds, the model
+		// answered in full, and the screen sat on "Waiting for response..." for
+		// fifteen minutes. It looked exactly like the provider had hung. Nothing
+		// had hung — the printer had stopped, and every tool-using conversation
+		// had been silently truncated at its first tool call.
+		//
+		// "Ready" here means "will not change again", not "has something to
+		// show". A tool result is complete the moment it exists, exactly like a
+		// user message. It still renders to nothing — RenderForScrollback
+		// returns "" for these roles because their output reaches the screen
+		// through the assistant message that owns them — and printPending skips
+		// empty output while marking it printed, so the loop moves past it
+		// instead of stopping dead.
+		return true
 	}
 }

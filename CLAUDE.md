@@ -226,6 +226,18 @@ cost real confusion; they are not optional.
   looking at a screenshot, which is why the same class of bug was "fixed"
   repeatedly and kept coming back — each regression cost another session to
   re-find. Assert on the reconstructed screen.
+- **"Ready" means "will not change again", NOT "has something to show".**
+  `ScrollbackReady` returned false for tool messages to stop them being printed
+  twice — but `printPending` BREAKS on the first message that is not ready, so
+  the first tool result halted the transcript permanently. Every later message,
+  including the model's finished answer, was generated, stored in the database
+  and never displayed. Observed 2026-07-30: a bash call returned in two seconds,
+  the model answered in full, and the screen sat on "Waiting for response…" for
+  fifteen minutes — indistinguishable from a hung provider, and it had silently
+  truncated EVERY tool-using conversation at its first tool call. The goal was
+  right and the lever was wrong: duplication is prevented by
+  `RenderForScrollback` returning `""` for that role, not by withholding
+  readiness. When suppressing output, suppress the OUTPUT.
 - **A LIMIT MUST BE EXPRESSED IN THE UNIT OF THE RESOURCE IT PROTECTS.** The grep
   tool capped MATCHES at 100 and honestly reported `truncated:true` — and returned
   2,438,026 bytes, because it had matched inside JSON files where a whole source

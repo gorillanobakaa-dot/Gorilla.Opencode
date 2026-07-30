@@ -50,11 +50,22 @@ func TestOnlySettledMessagesAreReadyForScrollback(t *testing.T) {
 		t.Error("a finished assistant message is not considered settled, so nothing " +
 			"would ever reach the scrollback")
 	}
-	// A tool message reaches the pane only through the assistant message that owns
-	// it. Printing it in its own right would duplicate it.
-	if ScrollbackReady(message.Message{ID: "m3", Role: message.Tool}) {
-		t.Error("a tool message is printable on its own; its content is already " +
-			"rendered inside the assistant message that called it")
+	// A tool message IS settled — and this assertion used to say the opposite.
+	//
+	// The goal was right (its content is already rendered inside the assistant
+	// message that owns it, so printing it again would duplicate it) but the
+	// lever was wrong. "Ready" means "will not change again", not "has something
+	// to show". Marking tool results unready to suppress them made printPending
+	// BREAK on the first one, which halted the transcript permanently: every
+	// later message, including the model's finished answer, was generated,
+	// stored and never displayed.
+	//
+	// Duplication is prevented by RenderForScrollback returning "" for this role
+	// — see TestToolResultsPrintNothingOfTheirOwn, which asserts exactly that.
+	if !ScrollbackReady(message.Message{ID: "m3", Role: message.Tool}) {
+		t.Error("a tool result is treated as unsettled; printPending breaks on the " +
+			"first unsettled message, so this stops the transcript dead and no " +
+			"later reply is ever printed")
 	}
 }
 
