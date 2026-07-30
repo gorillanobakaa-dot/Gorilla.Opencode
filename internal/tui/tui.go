@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/opencode-ai/opencode/internal/app"
 	"github.com/opencode-ai/opencode/internal/auth"
 	"github.com/opencode-ai/opencode/internal/commands"
@@ -1316,7 +1317,45 @@ func (a appModel) footerView() string {
 	if budget < chat.FooterReservedRows+2 {
 		budget = chat.FooterReservedRows + 2
 	}
-	return lipgloss.JoinVertical(lipgloss.Top, page.FooterView(budget), status)
+	return clampToWidth(
+		lipgloss.JoinVertical(lipgloss.Top, page.FooterView(budget), status),
+		a.width)
+}
+
+// clampToWidth truncates every line of the frame to the terminal width.
+//
+// GORILLA FIX — this is the root cause of the footer "marching down the screen
+// and jumping back up", found 2026-07-30 by driving a real bubbletea program
+// headlessly and replaying its output through a terminal emulator
+// (internal/tui/inline/scroll_boundary_test.go).
+//
+// Bubbletea's inline renderer erases its previous frame by moving the cursor UP
+// by the number of LOGICAL lines it last drew. A line wider than the terminal
+// occupies TWO physical rows but counts as one logical line, so the erase
+// under-reaches by one row per wrapped line, every render. The un-erased rows
+// are left stranded in the output as footer debris and the frame drifts.
+//
+// Measured: a single over-wide footer line strands an orphaned fragment in the
+// middle of the printed transcript.
+//
+// It has to be fixed HERE rather than in each component. The footer is built
+// from the working indicator, the editor, the session info line and the status
+// bar, and every one of them uses lipgloss Width(), which WRAPS rather than
+// truncates (already a documented trap in CLAUDE.md — the symptom of an
+// over-long string is extra HEIGHT, not extra width). Fixing them one at a time
+// leaves the invariant one careless Render() away from breaking again. One choke
+// point, one rule: nothing in the frame is ever wider than the terminal.
+func clampToWidth(view string, width int) string {
+	if width <= 0 {
+		return view
+	}
+	lines := strings.Split(view, "\n")
+	for i, l := range lines {
+		if ansi.StringWidth(l) > width {
+			lines[i] = ansi.Truncate(l, width, "")
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (a appModel) View() string {
