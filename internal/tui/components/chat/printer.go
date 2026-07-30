@@ -40,6 +40,26 @@ type ScrollbackFooter interface {
 // footer well inside any usable window.
 const livePreviewRows = 6
 
+// FooterReservedRows is the number of rows the footer ALWAYS occupies when
+// streaming is possible, regardless of whether a reply is in flight.
+//
+// GORILLA FIX (bugs: text vanishes, prompt drifts):
+// Bubbletea erases its previous frame by walking the cursor UP by exactly the
+// logical row count of the last View() it drew. When the live-preview block
+// appears during streaming (up to livePreviewRows tall) and then disappears
+// when the reply finishes, the frame shrinks. That shrink makes the erase
+// over-reach: the cursor walks past the top of the frame and into real terminal
+// output above it, wiping lines that were already printed into the scrollback.
+//
+// The fix is to never let the frame shrink: always occupy the same number of
+// rows, padding with blank lines when the preview is absent. The frame height
+// stays constant, the erase always lands in the right place, and nothing is
+// wiped.
+//
+// Value: livePreviewRows (preview) + 1 (working indicator or blank) + 1 spare.
+// The +1 spare absorbs a single-line status message without changing the height.
+const FooterReservedRows = livePreviewRows + 2
+
 // messagesService reaches the message store, tolerating its absence.
 //
 // Only sub-agent task output needs it, so a component without an app can still
@@ -151,20 +171,41 @@ func (m *messagesCmp) livePreview() string {
 // the alternate screen is off: a capped preview of the reply in flight, plus the
 // working indicator. Everything settled has already been printed.
 //
-// It is guaranteed to be at most livePreviewRows+1 lines tall, which the caller
-// depends on to keep the frame smaller than the window.
+// GORILLA FIX: the returned string is ALWAYS exactly FooterReservedRows tall,
+// padded with blank lines at the top when the preview is shorter than the
+// reserved space. This keeps the frame height constant across all render cycles
+// so bubbletea's cursor-up erase never over-reaches into the printed scrollback.
 func (m *messagesCmp) FooterView() string {
-	parts := make([]string, 0, 2)
-	if preview := m.livePreview(); preview != "" {
-		parts = append(parts, preview)
+	preview := m.livePreview()
+	working := m.working()
+
+	content := ""
+	if preview != "" && strings.TrimSpace(working) != "" {
+		content = lipgloss.JoinVertical(lipgloss.Top, preview, working)
+	} else if preview != "" {
+		content = preview
+	} else if strings.TrimSpace(working) != "" {
+		content = working
 	}
-	if working := m.working(); strings.TrimSpace(working) != "" {
-		parts = append(parts, working)
+
+	// Pad to a fixed height so the frame never shrinks between renders.
+	// Without this, the transition from "streaming: 7 rows" to "idle: 0 rows"
+	// causes bubbletea to walk the cursor 7 rows too far when erasing, landing
+	// inside the printed scrollback and wiping it.
+	contentRows := lipgloss.Height(content)
+	if content == "" {
+		contentRows = 0
 	}
-	if len(parts) == 0 {
-		return ""
+	padding := FooterReservedRows - contentRows
+	if padding > 0 {
+		pad := strings.Repeat("\n", padding-1) // JoinVertical adds its own \n
+		if content == "" {
+			content = lipgloss.JoinVertical(lipgloss.Top, pad)
+		} else {
+			content = lipgloss.JoinVertical(lipgloss.Top, pad, content)
+		}
 	}
-	return lipgloss.JoinVertical(lipgloss.Top, parts...)
+	return content
 }
 
 // tailLines returns at most n trailing lines of s.
