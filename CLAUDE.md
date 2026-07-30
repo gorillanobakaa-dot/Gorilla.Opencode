@@ -200,6 +200,32 @@ cost real confusion; they are not optional.
   bug with a different mechanism, and grepping for `fmt.Print` will not find it.
   `configureLogging()` is called immediately after `applyDefaultValues()`; never
   add a step that logs above that call.
+- **NO LINE IN THE FRAME MAY BE WIDER THAN THE TERMINAL.** This is the root cause
+  of the footer "marching down the screen and jumping back up", found 2026-07-30
+  after three releases of wrong diagnoses. Bubbletea's inline renderer erases its
+  last frame by moving the cursor UP by the number of **logical** lines it drew. A
+  line wider than the terminal occupies **two physical rows** but counts as one, so
+  the erase under-reaches by a row per wrapped line, *every render*. The un-erased
+  rows are stranded in the transcript as footer debris and the frame drifts.
+  Measured: one over-wide line strands an orphaned fragment mid-transcript.
+  Enforced centrally by `clampToWidth` in `tui.go` — one choke point, because the
+  footer is assembled from four components that all use lipgloss `Width()`, and
+  fixing them individually leaves the invariant one careless `Render()` from
+  breaking again. Reproduction: `internal/tui/inline/scroll_boundary_test.go`.
+- **A frame that CHANGES HEIGHT is not the cause of that bug.** Driven headlessly
+  with a footer alternating 3↔4 rows, the screen came out perfect — bubbletea
+  clears leftover rows when a frame shrinks. v0.1.56's commit message says
+  otherwise and is wrong. Constant frame height is still the more predictable
+  design, and a frame taller than the window genuinely does break (see
+  `TestFooterMustStaySmallerThanTheWindow`), but height *oscillation* within the
+  window is handled. Do not spend another release on it.
+- **The scroll boundary is testable; test it there, not on screen.**
+  `internal/tui/inline/` drives a real bubbletea program headlessly and replays
+  its bytes through a terminal emulator that models scrolling
+  (`terminal_test.go`). Every earlier check of this behaviour ended with a human
+  looking at a screenshot, which is why the same class of bug was "fixed"
+  repeatedly and kept coming back — each regression cost another session to
+  re-find. Assert on the reconstructed screen.
 - **Container chrome is SUBTRACTED from the terminal size, never added to a content
   size.** Adding it shipped an invisible input box and four over-wide dialogs.
 - **lipgloss `.Width(w)` WRAPS text longer than `w`; it does not overflow.** So the
