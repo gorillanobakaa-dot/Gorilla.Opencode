@@ -1,9 +1,12 @@
 package chat
 
 import (
+	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/message"
 )
@@ -275,4 +278,64 @@ func TestReasoningDeliveredOnlyAtFinishIsStillPrintedOnce(t *testing.T) {
 		t.Error("the finished render still contains the reasoning, which was already " +
 			"printed line by line — the block would appear twice in the scrollback")
 	}
+}
+
+// The closing marker must be emitted BEFORE the message it closes.
+//
+// tea.Batch runs commands concurrently with no ordering guarantees, so batching
+// the prints let the answer land ahead of the "done thinking" marker that was
+// generated before it — reported from a screenshot showing the reply, then the
+// model/duration line, then the closing gorillas. printPending must therefore
+// emit in order AND its callers must use tea.Sequence, never tea.Batch.
+func TestClosingMarkerIsEmittedBeforeTheMessageItCloses(t *testing.T) {
+	msg := reasoningMsg("m1", "a thought\nanother thought")
+	msg.Parts = append(msg.Parts,
+		message.TextContent{Text: "the answer"},
+		message.Finish{Reason: message.FinishReasonEndTurn})
+
+	m := printerFor(t, 80, msg)
+	cmds := m.printPending()
+
+	// Styled output interleaves ANSI escapes, so match on the plain text.
+	ansi := regexp.MustCompile("\x1b\\[[0-9;]*m")
+	closeAt, answerAt := -1, -1
+	for i, cmd := range cmds {
+		raw, ok := printedBody(cmd)
+		if !ok {
+			continue
+		}
+		text := ansi.ReplaceAllString(raw, "")
+		if strings.Contains(text, "done thinking") {
+			closeAt = i
+		}
+		if strings.Contains(text, "the answer") {
+			answerAt = i
+		}
+	}
+	if closeAt < 0 || answerAt < 0 {
+		t.Fatalf("did not find both prints (close=%d, answer=%d); the test proves nothing",
+			closeAt, answerAt)
+	}
+	if closeAt > answerAt {
+		t.Errorf("the closing marker is emitted at %d, after the answer at %d. The "+
+			"reply would appear above the marker that is supposed to close the "+
+			"thinking block", closeAt, answerAt)
+	}
+}
+
+// printedBody reads the text out of a bubbletea print command. printLineMessage is
+// unexported, so this is reflective; the alternative is not asserting on printed
+// output at all, which is the entire subject of this file.
+func printedBody(cmd tea.Cmd) (string, bool) {
+	if cmd == nil {
+		return "", false
+	}
+	v := reflect.ValueOf(cmd())
+	if v.Kind() != reflect.Struct || !strings.Contains(v.Type().Name(), "printLineMessage") {
+		return "", false
+	}
+	if f := v.Field(0); f.Kind() == reflect.String {
+		return f.String(), true
+	}
+	return "", false
 }

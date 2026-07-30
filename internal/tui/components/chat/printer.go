@@ -15,7 +15,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
-	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
 
 // ScrollbackFooter is the transcript component seen from outside the package,
@@ -85,10 +84,22 @@ func completeReasoningLines(thinking string) []string {
 	return strings.Split(thinking[:idx], "\n")
 }
 
-// styleReasoning renders reasoning text the way the finished transcript does —
-// muted, so it reads as working-out rather than as the answer.
+// reasoningColor is what streamed thinking is printed in.
+//
+// GORILLA OVERRIDE: this deliberately does NOT use the theme's TextMuted. Muted
+// is the right weight for text inside a rendered pane, but reasoning is now
+// printed as ordinary terminal output on a black background, where it came out
+// too dull to read comfortably. Cyan reads clearly against black and is instantly
+// distinguishable from the answer.
+//
+// Still adaptive rather than a bare #00FFFF: pure cyan on a light background is
+// close to invisible, and this text is the whole point of the feature. The dark
+// value is the one that matters here; change either freely.
+var reasoningColor = lipgloss.AdaptiveColor{Dark: "#00FFFF", Light: "#00707A"}
+
+// styleReasoning renders reasoning so it reads as working-out, not as the answer.
 func styleReasoning(s string) string {
-	return styles.BaseStyle().Foreground(theme.CurrentTheme().TextMuted()).Render(s)
+	return styles.BaseStyle().Foreground(reasoningColor).Render(s)
 }
 
 // emitReasoning prints reasoning lines for a message that is still arriving,

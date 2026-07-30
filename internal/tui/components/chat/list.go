@@ -191,7 +191,15 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// each message's Markdown is rendered exactly once, when it settles,
 			// rather than again on every token.
 			if m.scrollback {
-				cmds = append(cmds, m.printPending()...)
+				// GORILLA FIX: tea.Batch runs commands CONCURRENTLY with no
+				// ordering guarantees (see its doc comment), so batching several
+				// prints let them land in any order — the answer beat the
+				// "done thinking" marker that was emitted before it. Printed
+				// output cannot be reordered afterwards, so the sequence is not
+				// optional: tea.Sequence runs them one at a time, in order.
+				if prints := m.printPending(); len(prints) > 0 {
+					cmds = append(cmds, tea.Sequence(prints...))
+				}
 				return m, tea.Batch(cmds...)
 			}
 			// GORILLA OVERRIDE: re-rendering the whole growing message's
@@ -524,7 +532,9 @@ func (m *messagesCmp) SetSession(session session.Session) tea.Cmd {
 	if m.scrollback {
 		m.forgetPrinted()
 		m.rendering = false
-		return tea.Batch(m.printPending()...)
+		// Ordered, not batched — see the note in Update. A session's history
+		// printed out of order cannot be repaired.
+		return tea.Sequence(m.printPending()...)
 	}
 	m.rendering = true
 	return func() tea.Msg {
