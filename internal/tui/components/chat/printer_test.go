@@ -211,8 +211,19 @@ func reasoningMsg(id, thinking string) message.Message {
 func TestReasoningIsPrintedLineByLineAsItArrives(t *testing.T) {
 	m := printerFor(t, 80, reasoningMsg("m1", "first thought\nsecond thought\n"))
 
-	if n := len(m.printPending()); n != 3 {
-		t.Fatalf("emitted %d prints for the marker plus two settled lines, want 3", n)
+	// Asserts the SHAPE, not a bare count. The count changed when blank lines
+	// were added around the markers, and a test that only counts cannot tell a
+	// deliberate spacing change from a lost line of reasoning.
+	got := plainLines(m.printPending())
+	want := []string{"", "🦍🦍🦍 thinking", "", "first thought", "second thought"}
+	if len(got) != len(want) {
+		t.Fatalf("printed %d line(s), want %d:\n got %#v\nwant %#v",
+			len(got), len(want), got, want)
+	}
+	for i := range want {
+		if strings.TrimSpace(got[i]) != strings.TrimSpace(want[i]) {
+			t.Errorf("line %d: got %q, want %q", i, got[i], want[i])
+		}
 	}
 	if got := m.reasonedLines["m1"]; got != 2 {
 		t.Errorf("watermark is %d, want 2", got)
