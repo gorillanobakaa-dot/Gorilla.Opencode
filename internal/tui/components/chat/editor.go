@@ -35,6 +35,73 @@ type editorCmp struct {
 	// lastReportedHeight is the desired height we last told the layout about,
 	// so we only emit EditorHeightMsg when it actually changes.
 	lastReportedHeight int
+
+	// GORILLA OVERRIDE: input history, recalled with Up/Down like any shell.
+	//
+	// history holds what you have SENT, oldest first. historyPos indexes it
+	// while browsing: len(history) means "not browsing". draft keeps whatever
+	// was half-typed when browsing started, so arrowing back down returns it
+	// instead of throwing it away.
+	history    []string
+	historyPos int
+	draft      string
+}
+
+// recallHistory replaces the input with an earlier (or later) message.
+//
+// Up only recalls when the cursor is on the FIRST line, so it still moves the
+// cursor inside a multi-line message — which is what makes it feel native
+// rather than hijacked. Down leaves history at the bottom and restores the
+// draft, so browsing is never destructive.
+//
+// Returns false when the key should be handled by the textarea instead.
+func (m *editorCmp) recallHistory(back bool) bool {
+	if len(m.history) == 0 {
+		return false
+	}
+	browsing := m.historyPos < len(m.history)
+
+	if back {
+		// Only take over Up when there is no line above to move to.
+		if !browsing && m.textarea.Line() > 0 {
+			return false
+		}
+		if browsing && m.historyPos == 0 {
+			return true // already at the oldest; swallow rather than escape
+		}
+		if !browsing {
+			m.draft = m.textarea.Value()
+			m.historyPos = len(m.history)
+		}
+		m.historyPos--
+	} else {
+		if !browsing {
+			return false
+		}
+		m.historyPos++
+		if m.historyPos >= len(m.history) {
+			// Past the newest: give the half-typed line back.
+			m.historyPos = len(m.history)
+			m.textarea.SetValue(m.draft)
+			return true
+		}
+	}
+	// SetValue resets then inserts, which leaves the cursor at the end — so the
+	// recalled line is ready to edit or send, not to overtype from column 0.
+	m.textarea.SetValue(m.history[m.historyPos])
+	return true
+}
+
+// rememberSent pushes a sent message onto the history and stops browsing.
+// Consecutive duplicates are collapsed, as a shell does.
+func (m *editorCmp) rememberSent(value string) {
+	value = strings.TrimRight(value, "\n")
+	if strings.TrimSpace(value) != "" &&
+		(len(m.history) == 0 || m.history[len(m.history)-1] != value) {
+		m.history = append(m.history, value)
+	}
+	m.historyPos = len(m.history)
+	m.draft = ""
 }
 
 // GORILLA OVERRIDE: the input box grows with what you type (like every modern
@@ -193,6 +260,7 @@ func (m *editorCmp) send() tea.Cmd {
 	if value == "" {
 		return nil
 	}
+	m.rememberSent(value)
 	// GORILLA OVERRIDE: slash commands. A message that is exactly a
 	// known slash command (e.g. "/model", "/models", "/export") is
 	// intercepted and dispatched instead of being sent to the model —
@@ -272,7 +340,32 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if key.Matches(msg, DeleteKeyMaps.Escape) {
 			m.deleteMode = false
+			// Leaving history browsing restores what you were typing.
+			if m.historyPos < len(m.history) {
+				m.historyPos = len(m.history)
+				m.textarea.SetValue(m.draft)
+			}
 			return m, nil
+		}
+		// History recall. Checked before the textarea so Up/Down can be taken
+		// over, but only when there is no line to move to — see recallHistory.
+		if m.textarea.Focused() && msg.String() == "up" {
+			if m.recallHistory(true) {
+				if h := m.desiredHeight(); h != m.lastReportedHeight {
+					m.lastReportedHeight = h
+					return m, util.CmdHandler(EditorHeightMsg{Height: h})
+				}
+				return m, nil
+			}
+		}
+		if m.textarea.Focused() && msg.String() == "down" {
+			if m.recallHistory(false) {
+				if h := m.desiredHeight(); h != m.lastReportedHeight {
+					m.lastReportedHeight = h
+					return m, util.CmdHandler(EditorHeightMsg{Height: h})
+				}
+				return m, nil
+			}
 		}
 		// Hanlde Enter key
 		if m.textarea.Focused() && key.Matches(msg, editorMaps.Send) {
