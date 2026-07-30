@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/message"
 )
 
@@ -41,6 +42,14 @@ func printerFor(t *testing.T, width int, msgs ...message.Message) *messagesCmp {
 // produce exactly one print, when it finishes.
 func TestStreamingRepliesArePrintedOnceWhenTheyFinish(t *testing.T) {
 	const at int64 = 1785228225
+	// This test is about print-once semantics, not about reasoning. Make the
+	// reasoning switches coherent so the "no thinking to show" notice does not
+	// fire and get counted as an extra print — a test that silently depends on
+	// unrelated extras defaults breaks for reasons that have nothing to do with
+	// what it is checking.
+	config.SetExtra("extras-reasoning-generate", true)
+	config.SetExtra("extras-reasoning-show", true)
+
 	m := printerFor(t, 80)
 
 	total := 0
