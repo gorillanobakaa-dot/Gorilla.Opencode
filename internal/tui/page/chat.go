@@ -43,13 +43,13 @@ type chatPage struct {
 }
 
 // FooterView is everything this page draws when the conversation lives in the
-// terminal's scrollback instead of a pane: a capped preview of the reply in
-// flight, and the prompt.
+// terminal's scrollback instead of a pane: the working indicator, and the prompt.
 //
 // It must stay short. Outside the alternate screen bubbletea erases its previous
 // frame by counting logical lines, so a frame taller than the window leaves the
-// erase in the wrong place — one stale copy per redraw. The preview's own cap is
-// what bounds this; see chat.livePreviewRows.
+// erase in the wrong place — one stale copy per redraw. Since the rolling preview
+// was removed the transcript contributes exactly chat.FooterReservedRows (one row),
+// so what remains is bounded by the prompt.
 func (p *chatPage) FooterView(maxRows int) string {
 	width, _ := p.layout.GetSize()
 

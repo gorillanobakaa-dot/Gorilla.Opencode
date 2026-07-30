@@ -47,7 +47,7 @@ func RenderForScrollback(
 		// has no cursor. Position is only used for click targeting, so it is 0.
 		blocks = append(blocks, renderUserMessage(msg, false, width, 0).content)
 	case message.Assistant:
-		for _, m := range renderAssistantMessage(msg, msgIndex, allMessages, svc, "", false, width, 0) {
+		for _, m := range renderAssistantMessage(msg, msgIndex, allMessages, svc, "", false, width, 0, true) {
 			if strings.TrimSpace(m.content) != "" {
 				blocks = append(blocks, m.content)
 			}

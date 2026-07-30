@@ -28,37 +28,21 @@ type ScrollbackFooter interface {
 	FooterView() string
 }
 
-// livePreviewRows caps how much of an in-flight reply is shown in the footer
-// while it streams.
+// FooterReservedRows is the number of rows the footer ALWAYS occupies.
 //
-// This is a correctness limit, not a taste one. Outside the alternate screen
-// bubbletea erases its previous frame by walking the cursor up by the number of
-// LOGICAL lines it last drew; if the frame is taller than the window, the lines
-// that scrolled off are not where the count thinks they are and every later
-// erase lands in the wrong place. That is precisely the failure recorded in the
-// 2026-07-28 screencast of the startup picker. A short, fixed preview keeps the
-// footer well inside any usable window.
-const livePreviewRows = 6
-
-// FooterReservedRows is the number of rows the footer ALWAYS occupies when
-// streaming is possible, regardless of whether a reply is in flight.
+// GORILLA OVERRIDE: this used to be eight, because the footer carried a
+// six-row rolling preview of the reply in flight. That preview is gone. It was
+// a second scrolling region competing with the terminal's own, it could not be
+// scrolled back to, and everything it showed is now printed into the scrollback
+// as it arrives — which is what the terminal is for. What remains is the
+// working indicator, and that is one row.
 //
-// GORILLA FIX (bugs: text vanishes, prompt drifts):
-// Bubbletea erases its previous frame by walking the cursor UP by exactly the
-// logical row count of the last View() it drew. When the live-preview block
-// appears during streaming (up to livePreviewRows tall) and then disappears
-// when the reply finishes, the frame shrinks. That shrink makes the erase
-// over-reach: the cursor walks past the top of the frame and into real terminal
-// output above it, wiping lines that were already printed into the scrollback.
-//
-// The fix is to never let the frame shrink: always occupy the same number of
-// rows, padding with blank lines when the preview is absent. The frame height
-// stays constant, the erase always lands in the right place, and nothing is
-// wiped.
-//
-// Value: livePreviewRows (preview) + 1 (working indicator or blank) + 1 spare.
-// The +1 spare absorbs a single-line status message without changing the height.
-const FooterReservedRows = livePreviewRows + 2
+// The height is still FIXED rather than merely bounded, and that part is not
+// taste. Bubbletea erases its previous frame by walking the cursor UP by the
+// logical row count of the last View() it drew; a frame that shrinks between
+// renders makes the erase over-reach into output already printed above it and
+// wipe it. That was the 2026-07-30 "text vanishes" bug. Pad, never shrink.
+const FooterReservedRows = 1
 
 // messagesService reaches the message store, tolerating its absence.
 //
@@ -73,6 +57,104 @@ func (m *messagesCmp) messagesService() message.Service {
 		return nil
 	}
 	return m.app.Messages
+}
+
+// Markers printed around a block of streamed reasoning.
+//
+// GORILLA OVERRIDE: reasoning is now written into the terminal as it arrives,
+// mixed into the same scrollback as everything else. Without a visible frame
+// there is no way to tell where the model stopped thinking and started
+// answering, so the block is delimited explicitly. These are printed to the
+// TERMINAL and never sent to a model, so they cost nothing in tokens.
+const (
+	thinkingOpenMarker  = "🦍🦍🦍 thinking"
+	thinkingCloseMarker = "🦍🦍🦍 done thinking (hard job...) 💪"
+)
+
+// completeReasoningLines splits reasoning into the lines that will never change
+// again.
+//
+// Reasoning is append-only: once a newline has arrived, the line before it is
+// final. The text after the last newline is still being written and must not be
+// printed, because printing cannot be taken back. Returns the settled lines.
+func completeReasoningLines(thinking string) []string {
+	idx := strings.LastIndex(thinking, "\n")
+	if idx < 0 {
+		return nil
+	}
+	return strings.Split(thinking[:idx], "\n")
+}
+
+// styleReasoning renders reasoning text the way the finished transcript does —
+// muted, so it reads as working-out rather than as the answer.
+func styleReasoning(s string) string {
+	return styles.BaseStyle().Foreground(theme.CurrentTheme().TextMuted()).Render(s)
+}
+
+// emitReasoning prints reasoning lines for a message that is still arriving,
+// opening the block on first sight.
+//
+// GORILLA OVERRIDE: this is the whole point of scrollback mode applied to
+// thinking. Previously reasoning existed only inside a six-row preview that was
+// overwritten every frame and never kept, so a model that thought for a minute
+// gave you sixty seconds of scrolling text you could not read and could not
+// scroll back to. Now each settled line is printed once, permanently, exactly
+// like every other line of the conversation.
+func (m *messagesCmp) emitReasoning(msg message.Message, upto []string) []tea.Cmd {
+	// Lazily initialised: a nil map here would panic mid-transcript, after part
+	// of the conversation had been written to the terminal and could not be
+	// withdrawn. Same reasoning as messagesService above — degrade, never die.
+	if m.reasonedLines == nil {
+		m.reasonedLines = make(map[string]int)
+	}
+	if m.reasoningOpened == nil {
+		m.reasoningOpened = make(map[string]bool)
+	}
+
+	var cmds []tea.Cmd
+	if !m.reasoningOpened[msg.ID] {
+		m.reasoningOpened[msg.ID] = true
+		cmds = append(cmds, tea.Println(styleReasoning(thinkingOpenMarker)))
+	}
+	from := m.reasonedLines[msg.ID]
+	if from >= len(upto) {
+		return cmds
+	}
+	for _, line := range upto[from:] {
+		cmds = append(cmds, tea.Println(styleReasoning(line)))
+	}
+	m.reasonedLines[msg.ID] = len(upto)
+	return cmds
+}
+
+// streamReasoning emits whatever reasoning has settled into complete lines for a
+// message still in flight.
+func (m *messagesCmp) streamReasoning(msg message.Message) []tea.Cmd {
+	thinking := msg.ReasoningContent().Thinking
+	if strings.TrimSpace(thinking) == "" {
+		return nil
+	}
+	return m.emitReasoning(msg, completeReasoningLines(thinking))
+}
+
+// flushReasoning closes out a message's reasoning as it settles: the trailing
+// partial line is now final, so it is printed, and the block is closed.
+//
+// It also covers the provider that delivers all its reasoning at once on finish,
+// having streamed none of it — the watermark is still 0, so everything is
+// printed here. That is why the finished render must ALWAYS drop the reasoning
+// quote (see RenderForScrollback): by this point it has been printed either way,
+// and printing it again would duplicate the whole block.
+func (m *messagesCmp) flushReasoning(msg message.Message) []tea.Cmd {
+	thinking := strings.TrimRight(msg.ReasoningContent().Thinking, "\n")
+	if strings.TrimSpace(thinking) == "" {
+		return nil
+	}
+	cmds := m.emitReasoning(msg, strings.Split(thinking, "\n"))
+	cmds = append(cmds, tea.Println(styleReasoning(thinkingCloseMarker)))
+	delete(m.reasonedLines, msg.ID)
+	delete(m.reasoningOpened, msg.ID)
+	return cmds
 }
 
 // printPending returns commands that print every message that has settled since
@@ -93,9 +175,12 @@ func (m *messagesCmp) printPending() []tea.Cmd {
 			continue
 		}
 		if !ScrollbackReady(msg) {
-			// Not settled: stop, so that whatever follows cannot overtake it.
+			// Not settled, but its reasoning may be: print the lines that can
+			// no longer change, then stop so nothing overtakes this message.
+			cmds = append(cmds, m.streamReasoning(msg)...)
 			break
 		}
+		cmds = append(cmds, m.flushReasoning(msg)...)
 		text := RenderForScrollback(msg, i, m.messages, m.messagesService(), m.width)
 		m.printed[msg.ID] = true
 		if strings.TrimSpace(text) == "" {
@@ -115,104 +200,25 @@ func (m *messagesCmp) forgetPrinted() {
 	m.printed = make(map[string]bool, len(m.printed))
 }
 
-// livePreview is what the footer shows while a reply is still arriving: the tail
-// of the message being generated, capped to livePreviewRows.
-//
-// It is not history and is never printed. The same text is printed in full, once,
-// when the message finishes — so this exists purely so that a long answer can be
-// watched as it forms rather than appearing all at once.
-func (m *messagesCmp) livePreview() string {
-	if !m.scrollback || m.width <= 0 || len(m.messages) == 0 {
-		return ""
-	}
-	last := m.messages[len(m.messages)-1]
-	if last.Role != message.Assistant || ScrollbackReady(last) {
-		return ""
-	}
-
-	// Raw text, NOT the full message renderer.
-	//
-	// This used to call RenderForScrollback, which runs the whole Markdown pipeline
-	// over the entire reply — on every frame, while the reply is still growing, to
-	// display six lines of it. Measured: 0.96ms and 348KB per frame at 50 words,
-	// rising to 21ms and 3.4MB at 3200 words. Linear in the length of the answer, so
-	// the longer the reply the slower the interface, plus megabytes of garbage per
-	// frame. That is a worse version of the O(n^2) streaming cost this mode was
-	// supposed to remove.
-	//
-	// The preview is transient: it is overwritten on the next frame and never
-	// scrolled back to. It does not need syntax highlighting or wrapped tables. The
-	// finished message gets the full renderer exactly once, when it settles.
-	text := last.Content().String()
-	if strings.TrimSpace(text) == "" {
-		// Nothing written yet — show the reasoning instead, so a model that thinks
-		// for a while does not look like a model that has stalled.
-		text = last.ReasoningContent().Thinking
-	}
-	if strings.TrimSpace(text) == "" {
-		return ""
-	}
-
-	// Bound the input BEFORE any wrapping, so the cost cannot grow with the reply.
-	// Only the tail can survive the row cap, and a generous overshoot covers the
-	// case where every line is one character long.
-	if budget := livePreviewRows * (m.width + 1) * 2; len(text) > budget {
-		text = text[len(text)-budget:]
-	}
-
-	lines := tailLines(lipgloss.NewStyle().Width(m.width).Render(text), livePreviewRows)
-	if strings.TrimSpace(lines) == "" {
-		return ""
-	}
-	return styles.BaseStyle().Foreground(theme.CurrentTheme().TextMuted()).Render(lines)
-}
-
 // FooterView is the whole of what the transcript contributes to the screen when
-// the alternate screen is off: a capped preview of the reply in flight, plus the
-// working indicator. Everything settled has already been printed.
+// the alternate screen is off: the working indicator, and nothing else.
+// Everything else has already been printed into the terminal.
 //
-// GORILLA FIX: the returned string is ALWAYS exactly FooterReservedRows tall,
-// padded with blank lines at the top when the preview is shorter than the
-// reserved space. This keeps the frame height constant across all render cycles
-// so bubbletea's cursor-up erase never over-reaches into the printed scrollback.
+// The returned string is ALWAYS exactly FooterReservedRows tall — padded, never
+// shrunk — so bubbletea's cursor-up erase cannot over-reach into the printed
+// scrollback above it.
 func (m *messagesCmp) FooterView() string {
-	preview := m.livePreview()
-	working := m.working()
-
 	content := ""
-	if preview != "" && strings.TrimSpace(working) != "" {
-		content = lipgloss.JoinVertical(lipgloss.Top, preview, working)
-	} else if preview != "" {
-		content = preview
-	} else if strings.TrimSpace(working) != "" {
+	if working := m.working(); strings.TrimSpace(working) != "" {
 		content = working
 	}
 
-	// Pad to a fixed height so the frame never shrinks between renders.
-	// Without this, the transition from "streaming: 7 rows" to "idle: 0 rows"
-	// causes bubbletea to walk the cursor 7 rows too far when erasing, landing
-	// inside the printed scrollback and wiping it.
-	contentRows := lipgloss.Height(content)
+	rows := lipgloss.Height(content)
 	if content == "" {
-		contentRows = 0
+		rows = 0
 	}
-	padding := FooterReservedRows - contentRows
-	if padding > 0 {
-		pad := strings.Repeat("\n", padding-1) // JoinVertical adds its own \n
-		if content == "" {
-			content = lipgloss.JoinVertical(lipgloss.Top, pad)
-		} else {
-			content = lipgloss.JoinVertical(lipgloss.Top, pad, content)
-		}
+	if padding := FooterReservedRows - rows; padding > 0 {
+		content = strings.TrimSuffix(strings.Repeat("\n", padding), "\n") + content
 	}
 	return content
-}
-
-// tailLines returns at most n trailing lines of s.
-func tailLines(s string, n int) string {
-	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
-	if len(lines) > n {
-		lines = lines[len(lines)-n:]
-	}
-	return strings.Join(lines, "\n")
 }

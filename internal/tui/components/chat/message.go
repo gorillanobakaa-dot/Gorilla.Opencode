@@ -195,6 +195,10 @@ func renderAssistantMessage(
 	isSummary bool,
 	width int,
 	position int,
+	// GORILLA OVERRIDE: in scrollback mode the reasoning has ALREADY been
+	// printed into the terminal, line by line, as it arrived. Rendering the
+	// quote here too would print the whole block a second time.
+	skipReasoning bool,
 ) []uiMessage {
 	messages := []uiMessage{}
 	content := msg.Content().String()
@@ -257,7 +261,7 @@ func renderAssistantMessage(
 		// vanished the moment the turn finished, so the one thing that explains
 		// how a conclusion was reached was the one thing you could not go back and
 		// read. Free to display: it has already been generated and paid for.
-		if config.ExtraEnabled("extras-reasoning-show") {
+		if !skipReasoning && config.ExtraEnabled("extras-reasoning-show") {
 			if q := reasoningQuote(thinkingContent); q != "" {
 				content = q + "\n\n" + content
 			}

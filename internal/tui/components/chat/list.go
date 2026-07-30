@@ -49,6 +49,14 @@ type messagesCmp struct {
 	// is irreversible, and every pubsub update carries the WHOLE message, so
 	// without this a streaming reply would be emitted again on every token.
 	printed map[string]bool
+	// reasonedLines is the watermark of how many COMPLETE reasoning lines have
+	// already been printed for a message still in flight, and reasoningOpened
+	// whether its "thinking" marker has been emitted. Both are keyed by message
+	// ID and dropped when the message settles. Reasoning is append-only, so a
+	// line before a newline is final and safe to print; the watermark is what
+	// stops every pubsub update reprinting the whole block.
+	reasonedLines   map[string]int
+	reasoningOpened map[string]bool
 }
 type renderFinishedMsg struct{}
 
@@ -281,6 +289,9 @@ func (m *messagesCmp) renderView() {
 				isSummary,
 				m.width,
 				pos,
+				// Alternate-screen path: the viewport owns the whole transcript
+				// and nothing was printed, so the reasoning quote belongs here.
+				false,
 			)
 			for _, msg := range assistantMessages {
 				m.uiMessages = append(m.uiMessages, msg)
@@ -552,5 +563,8 @@ func NewMessagesCmp(app *app.App) tea.Model {
 		// printing into a screen that keeps no history of the print.
 		scrollback: !config.AlternateScreenEnabled(),
 		printed:    make(map[string]bool),
+
+		reasonedLines:   make(map[string]int),
+		reasoningOpened: make(map[string]bool),
 	}
 }

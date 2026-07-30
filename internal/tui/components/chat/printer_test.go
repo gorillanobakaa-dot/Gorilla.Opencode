@@ -156,122 +156,6 @@ func TestNothingIsPrintedWhenTheAlternateScreenIsUsed(t *testing.T) {
 	}
 }
 
-// The footer is the only thing drawn in place, and bubbletea erases its previous
-// frame by counting logical lines — so a footer taller than the window makes every
-// later erase land in the wrong place. That is the bug the startup picker showed.
-func TestLivePreviewIsCappedSoTheFooterStaysShort(t *testing.T) {
-	const at int64 = 1785228225
-	many := strings.Repeat("a line of streamed reply\n", 60)
-
-	m := printerFor(t, 80, streamingAssistant("m1", many, at))
-	footer := m.FooterView()
-	if strings.TrimSpace(footer) == "" {
-		t.Fatal("no preview at all while a reply streams; a long answer could not be watched")
-	}
-
-	rows := lipgloss.Height(footer)
-	// GORILLA FIX: FooterView now always returns exactly FooterReservedRows rows
-	// (padded when the preview is short). This is the fixed-height contract that
-	// prevents bubbletea's cursor-up erase from over-reaching into the scrollback.
-	if rows > FooterReservedRows {
-		t.Errorf("footer is %d rows for a %d-line reply; the cap is FooterReservedRows=%d. "+
-			"An oversized footer breaks the renderer's line arithmetic",
-			rows, strings.Count(many, "\n"), FooterReservedRows)
-	}
-}
-
-// A settled message must never appear in the footer: it has already been printed,
-// so showing it again would duplicate it on screen.
-func TestFinishedMessagesAreNotAlsoShownInTheFooter(t *testing.T) {
-	const at int64 = 1785228225
-	m := printerFor(t, 80, finishedAssistant("m1", "the whole answer", at))
-
-	if preview := m.livePreview(); preview != "" {
-		t.Errorf("a finished reply is previewed in the footer as well as printed, so "+
-			"it would appear twice: %q", preview)
-	}
-}
-
-// The live preview must cost the SAME whether the reply is short or enormous.
-//
-// It runs on every frame while a reply streams, so any cost that scales with the
-// answer's length means the interface slows down as the answer grows — reported as
-// "it gets sluggish". The original version called the full Markdown renderer over
-// the whole growing reply to display six lines of it: measured at 0.96ms/348KB per
-// frame at 50 words and 21ms/3.4MB at 3200 words.
-//
-// This asserts the shape of the cost, not a wall-clock figure, because a timing
-// threshold would be flaky on a loaded machine while the SHAPE is the actual
-// property that matters.
-func TestLivePreviewCostDoesNotGrowWithTheReply(t *testing.T) {
-	preview := func(words int) (string, int) {
-		body := strings.Repeat("the quick brown fox jumps over the lazy dog ", words/9+1)
-		m := printerFor(t, 100, streamingAssistant("m1", body, 1785228225))
-		out := m.livePreview()
-		return out, len(out)
-	}
-
-	// Compare two replies that BOTH exceed the row cap. Comparing a short reply
-	// against a long one measures nothing: a 50-word reply does not fill six rows,
-	// so its preview is legitimately smaller. Once the cap is reached, more input
-	// must produce no more output — that is the property.
-	long, longLen := preview(4_000)
-	huge, hugeLen := preview(40_000)
-
-	if strings.TrimSpace(long) == "" || strings.TrimSpace(huge) == "" {
-		t.Fatal("no preview rendered, so the comparison below is vacuous")
-	}
-	if hugeLen != longLen {
-		t.Errorf("a 40,000-word reply previews as %d bytes but a 4,000-word one as %d; "+
-			"both exceed the %d-row cap, so the output must be identical in size. A "+
-			"difference means the whole reply is being processed, which is what made "+
-			"the interface slow down as answers grew", hugeLen, longLen, livePreviewRows)
-	}
-
-	// And a short reply must still render, or the cheap path has broken the feature.
-	if short, _ := preview(50); strings.TrimSpace(short) == "" {
-		t.Error("a short reply previews as nothing")
-	}
-
-	// Output size alone cannot see the defect: the preview is capped to six rows
-	// either way, so an implementation that processes the entire reply and then
-	// throws almost all of it away produces identical output at enormous cost. That
-	// is exactly what the original did. Allocation count is what distinguishes them
-	// — measured at 88 per call when the input is bounded, against 15,281 and 52,368
-	// for 800- and 3200-word replies when it is not.
-	allocs := func(words int) float64 {
-		body := strings.Repeat("the quick brown fox jumps over the lazy dog ", words/9+1)
-		m := printerFor(t, 100, streamingAssistant("m1", body, 1785228225))
-		return testing.AllocsPerRun(20, func() { _ = m.livePreview() })
-	}
-	small, big := allocs(4_000), allocs(40_000)
-	if big > small*2 {
-		t.Errorf("previewing a 40,000-word reply allocates %.0f objects against %.0f for "+
-			"a 4,000-word one. The cost is scaling with the reply, so the interface "+
-			"slows down as answers grow — bound the input BEFORE wrapping it", big, small)
-	}
-
-	for _, out := range []string{long, huge} {
-		if got := lipgloss.Height(out); got > livePreviewRows {
-			t.Errorf("preview is %d rows, cap is %d", got, livePreviewRows)
-		}
-	}
-}
-
-// A model that thinks before answering must not look like a model that has hung.
-func TestLivePreviewFallsBackToReasoningBeforeAnyAnswer(t *testing.T) {
-	msg := message.Message{
-		ID: "m1", Role: message.Assistant, CreatedAt: 1785228225,
-		Parts: []message.ContentPart{message.ReasoningContent{Thinking: "weighing the options"}},
-	}
-	m := printerFor(t, 100, msg)
-
-	if out := m.livePreview(); !strings.Contains(out, "weighing") {
-		t.Errorf("with reasoning but no answer yet the preview is %q; a thinking model "+
-			"would be indistinguishable from a stalled one", out)
-	}
-}
-
 // THE assertion the fixed-height contract actually needs.
 //
 // TestLivePreviewIsCappedSoTheFooterStaysShort only checks an upper bound, and a
@@ -279,7 +163,7 @@ func TestLivePreviewFallsBackToReasoningBeforeAnyAnswer(t *testing.T) {
 // that test passes against the very bug FooterReservedRows exists to kill. What
 // breaks the scrollback is not a tall footer, it is a footer whose height CHANGES
 // between renders: bubbletea walks the cursor up by the last frame's row count, so
-// a frame that was 8 rows and is now 1 erases 7 rows of already-printed
+// a frame that was taller and is now shorter erases rows of already-printed
 // conversation above it. That is the "replies vanish" symptom.
 //
 // So: assert the height is IDENTICAL across every state the footer passes through
@@ -294,7 +178,6 @@ func TestFooterHeightIsConstantAcrossEveryStreamingState(t *testing.T) {
 		{"idle, no messages at all", nil},
 		{"idle, reply already finished and printed", []message.Message{finishedAssistant("m1", "the answer", at)}},
 		{"streaming a one-line reply", []message.Message{streamingAssistant("m1", "The", at)}},
-		{"streaming a reply the height of the preview", []message.Message{streamingAssistant("m1", strings.Repeat("line\n", livePreviewRows), at)}},
 		{"streaming a reply far taller than the preview", []message.Message{streamingAssistant("m1", strings.Repeat("a line of streamed reply\n", 60), at)}},
 	}
 
@@ -306,5 +189,90 @@ func TestFooterHeightIsConstantAcrossEveryStreamingState(t *testing.T) {
 				"cursor-up erase land in the printed scrollback and wipe it.",
 				s.name, rows, FooterReservedRows)
 		}
+	}
+}
+
+// reasoningMsg builds an in-flight assistant message carrying only reasoning.
+func reasoningMsg(id, thinking string) message.Message {
+	return message.Message{
+		ID: id, Role: message.Assistant, CreatedAt: 1785228225,
+		Parts: []message.ContentPart{message.ReasoningContent{Thinking: thinking}},
+	}
+}
+
+// Reasoning must reach the terminal WHILE the model is thinking, not after.
+//
+// This is the whole point of removing the preview pane: a model that thinks for a
+// minute used to give a six-row window of text that scrolled past unreadably and
+// was never kept. Each settled line must now be printed, once, permanently.
+func TestReasoningIsPrintedLineByLineAsItArrives(t *testing.T) {
+	m := printerFor(t, 80, reasoningMsg("m1", "first thought\nsecond thought\n"))
+
+	if n := len(m.printPending()); n != 3 {
+		t.Fatalf("emitted %d prints for the marker plus two settled lines, want 3", n)
+	}
+	if got := m.reasonedLines["m1"]; got != 2 {
+		t.Errorf("watermark is %d, want 2", got)
+	}
+
+	// Nothing new has arrived: printing again would duplicate the block.
+	if n := len(m.printPending()); n != 0 {
+		t.Errorf("re-emitted %d prints with no new reasoning; every pubsub update "+
+			"carries the whole message, so this would reprint the block on every token", n)
+	}
+
+	// One more complete line, plus a partial that must NOT be printed yet.
+	m.messages = []message.Message{reasoningMsg("m1", "first thought\nsecond thought\nthird thought\npartial")}
+	cmds := m.printPending()
+	if len(cmds) != 1 {
+		t.Errorf("emitted %d prints for one newly-settled line, want 1 (the partial "+
+			"line is still being written and cannot be taken back once printed)", len(cmds))
+	}
+}
+
+// The trailing partial line is final once the message settles, and the block must
+// be closed so the answer that follows is distinguishable from the working-out.
+func TestReasoningIsFlushedAndClosedWhenTheMessageSettles(t *testing.T) {
+	m := printerFor(t, 80, reasoningMsg("m1", "a thought\nand a trailing partial"))
+	m.printPending() // streams "a thought" only
+
+	settled := reasoningMsg("m1", "a thought\nand a trailing partial")
+	settled.Parts = append(settled.Parts,
+		message.TextContent{Text: "the answer"},
+		message.Finish{Reason: message.FinishReasonEndTurn})
+	m.messages = []message.Message{settled}
+
+	if !ScrollbackReady(settled) {
+		t.Fatal("the message did not settle, so this test proves nothing")
+	}
+	if n := len(m.printPending()); n < 3 {
+		t.Errorf("emitted %d prints on settling; want at least 3 (the trailing partial "+
+			"line, the closing marker, and the message itself)", n)
+	}
+	if _, still := m.reasonedLines["m1"]; still {
+		t.Error("the watermark outlived the message it tracked; it would leak per turn")
+	}
+}
+
+// Providers that deliver all reasoning at once on finish, having streamed none,
+// must still get the full block — and exactly once.
+func TestReasoningDeliveredOnlyAtFinishIsStillPrintedOnce(t *testing.T) {
+	msg := reasoningMsg("m1", "thought one\nthought two\nthought three")
+	msg.Parts = append(msg.Parts,
+		message.TextContent{Text: "the answer"},
+		message.Finish{Reason: message.FinishReasonEndTurn})
+	m := printerFor(t, 80, msg)
+
+	if n := len(m.printPending()); n < 5 {
+		t.Errorf("emitted %d prints, want at least 5 (marker, three lines, close, message); "+
+			"a provider that streams no reasoning must not lose it", n)
+	}
+
+	// And the finished render must NOT carry the quote as well, or the whole block
+	// appears twice — once streamed, once quoted.
+	rendered := RenderForScrollback(msg, 0, []message.Message{msg}, nil, 80)
+	if strings.Contains(rendered, "thought two") {
+		t.Error("the finished render still contains the reasoning, which was already " +
+			"printed line by line — the block would appear twice in the scrollback")
 	}
 }
