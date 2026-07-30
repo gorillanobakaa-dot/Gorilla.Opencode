@@ -10,10 +10,12 @@ package chat
 
 import (
 	"strings"
+	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/wordwrap"
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
 )
@@ -192,7 +194,7 @@ func (m *messagesCmp) streamReasoning(msg message.Message) []tea.Cmd {
 func (m *messagesCmp) flushReasoning(msg message.Message) []tea.Cmd {
 	thinking := strings.TrimRight(msg.ReasoningContent().Thinking, "\n")
 	if strings.TrimSpace(thinking) == "" {
-		return nil
+		return reasoningSwitchedOffNotice()
 	}
 	cmds := m.emitReasoning(msg, strings.Split(thinking, "\n"))
 	// GORILLA OVERRIDE: blank lines on BOTH sides of the closing marker.
@@ -215,6 +217,41 @@ func (m *messagesCmp) flushReasoning(msg message.Message) []tea.Cmd {
 	)
 	delete(m.reasonedLines, msg.ID)
 	delete(m.reasoningOpened, msg.ID)
+	return cmds
+}
+
+// reasoningOffNoticed keeps the notice below to once per run.
+var reasoningOffNoticed sync.Once
+
+// reasoningSwitchedOffNotice explains, ONCE, why no thinking appeared when the
+// user has asked to see thinking.
+//
+// GORILLA OVERRIDE: "Show that thinking on screen" and "Ask the model to think
+// out loud" are separate switches, correctly — generating reasoning costs tokens,
+// displaying it does not. But with show ON and generate OFF the program produces
+// nothing, forever, and says nothing about why.
+//
+// That combination cost a real diagnosis on 2026-07-30: reasoning appeared for
+// Nemotron and vanished for DeepSeek and GLM, which looked exactly like a
+// display bug. It was not. Nemotron reasons by DEFAULT and emits it whether or
+// not we ask; the other two only reason when asked, and with the switch off we
+// never asked. Same config, opposite symptoms, decided entirely by the model's
+// default — which is unguessable from the outside.
+//
+// Printed into the transcript rather than logged, because the person who needs
+// it is looking at the transcript and wondering where the thinking went.
+func reasoningSwitchedOffNotice() []tea.Cmd {
+	if !config.ExtraEnabled("extras-reasoning-show") ||
+		config.ExtraEnabled("extras-reasoning-generate") {
+		return nil
+	}
+	var cmds []tea.Cmd
+	reasoningOffNoticed.Do(func() {
+		cmds = append(cmds, tea.Println(styleReasoning(
+			"🦍 no thinking to show — \"Ask the model to think out loud\" is off in "+
+				"/context. \"Show that thinking on screen\" only displays reasoning "+
+				"the model was asked to produce. Some models reason anyway; most do not.")))
+	})
 	return cmds
 }
 
