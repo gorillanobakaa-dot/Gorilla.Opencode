@@ -145,7 +145,16 @@ func (m *messagesCmp) emitReasoning(msg message.Message, upto []string) []tea.Cm
 	var cmds []tea.Cmd
 	if !m.reasoningOpened[msg.ID] {
 		m.reasoningOpened[msg.ID] = true
-		cmds = append(cmds, tea.Println(styleReasoning(thinkingOpenMarker)))
+		cmds = append(cmds, tea.Println(""), tea.Println(styleReasoning(thinkingOpenMarker)))
+		// Match the gap the closing marker gets, WITHOUT relying on the provider.
+		// Nemotron's reasoning happens to begin with a newline, which is why this
+		// end already looked right; another provider's would not, and spacing
+		// that changes with the backend is spacing nobody can rely on. Only add
+		// the blank when the reasoning does not already start with one, so the
+		// two cases converge on the same result instead of doubling up.
+		if len(upto) == 0 || strings.TrimSpace(upto[0]) != "" {
+			cmds = append(cmds, tea.Println(""))
+		}
 	}
 	from := m.reasonedLines[msg.ID]
 	if from >= len(upto) {
@@ -186,7 +195,24 @@ func (m *messagesCmp) flushReasoning(msg message.Message) []tea.Cmd {
 		return nil
 	}
 	cmds := m.emitReasoning(msg, strings.Split(thinking, "\n"))
-	cmds = append(cmds, tea.Println(styleReasoning(thinkingCloseMarker)))
+	// GORILLA OVERRIDE: blank lines on BOTH sides of the closing marker.
+	//
+	// Three different kinds of text meet at this point — the model's private
+	// working-out, the boundary marker, and the answer actually addressed to the
+	// reader — and they were stacked with no separation at all. The opening
+	// marker already gets a gap after it because reasoning streams tend to start
+	// with a newline; the closing one got nothing, so the answer began on the
+	// line immediately below the marker that exists to say it had ended.
+	//
+	// One blank line each side, not more: this is a transcript that scrolls, and
+	// every decorative row is a row of real content pushed off the screen. The
+	// gap is emitted HERE rather than left to the model's trailing newlines,
+	// which are stripped above, so the spacing is the same for every provider.
+	cmds = append(cmds,
+		tea.Println(""),
+		tea.Println(styleReasoning(thinkingCloseMarker)),
+		tea.Println(""),
+	)
 	delete(m.reasonedLines, msg.ID)
 	delete(m.reasoningOpened, msg.ID)
 	return cmds
