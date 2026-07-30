@@ -317,10 +317,31 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			acc := openai.ChatCompletionAccumulator{}
 			currentContent := ""
 			toolCalls := make([]message.ToolCall, 0)
+			// GORILLA FIX: usage must NOT come from the accumulator.
+			//
+			// openai-go's ChatCompletionAccumulator ADDS usage from every chunk
+			// (streamaccumulator.go: `cc.Usage.PromptTokens += chunk.Usage...`).
+			// With IncludeUsage set, backends that report usage on more than the
+			// final chunk therefore get their prompt tokens multiplied by roughly
+			// the number of chunks in the stream.
+			//
+			// Measured effect: a short six-message conversation reported 494.3K
+			// input tokens against a 131K window — 387% "used" — while the
+			// requests kept succeeding, which they could not have done had the
+			// figure been real. It also inflated the cost estimate by the same
+			// factor, so the session claimed $0.78 for a chat that read no files.
+			//
+			// The prompt token count is a property of the REQUEST: it is the same
+			// number no matter how many chunks the answer arrives in. So take the
+			// last non-zero report and overwrite, never accumulate.
+			var streamUsage openai.CompletionUsage
 
 			for openaiStream.Next() {
 				chunk := openaiStream.Current()
 				acc.AddChunk(chunk)
+				if chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
+					streamUsage = chunk.Usage
+				}
 
 				for _, choice := range chunk.Choices {
 					// GORILLA OVERRIDE: forward the model's reasoning before its
@@ -370,12 +391,23 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 					finishReason = message.FinishReasonToolUse
 				}
 
+				// Report the per-request usage captured above, not the
+				// accumulator's summed-over-chunks figure. Falls back to the
+				// accumulator only if no chunk ever carried usage, which keeps
+				// backends that report usage some other way working as before.
+				usage := o.usage(acc.ChatCompletion)
+				if streamUsage.PromptTokens > 0 || streamUsage.CompletionTokens > 0 {
+					final := acc.ChatCompletion
+					final.Usage = streamUsage
+					usage = o.usage(final)
+				}
+
 				eventChan <- ProviderEvent{
 					Type: EventComplete,
 					Response: &ProviderResponse{
 						Content:      currentContent,
 						ToolCalls:    toolCalls,
-						Usage:        o.usage(acc.ChatCompletion),
+						Usage:        usage,
 						FinishReason: finishReason,
 					},
 				}
