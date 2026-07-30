@@ -115,11 +115,6 @@ type appModel struct {
 	// entering the alternate screen briefly and leaving it again — see
 	// anyOverlayOpen in overlay_state.go.
 	scrollback bool
-	// pinnedOnce and pinnedRows track the one-off scroll that puts the prompt on
-	// the window's last row, so it is done exactly once and redone only when the
-	// window grows. See pin_bottom.go.
-	pinnedOnce bool
-	pinnedRows int
 	// bannerShown keeps the identity banner to exactly one printing per session.
 	bannerShown     bool
 	selectionMode   bool
@@ -295,14 +290,10 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		msg.Height -= statusHeight
 		a.width, a.height = msg.Width, msg.Height
 
-		// GORILLA OVERRIDE: put the prompt on the window's last row. Outside the
-		// alternate screen bubbletea draws its frame at the cursor, so without this
-		// the prompt sits wherever the last printed line left it and drifts downward
-		// as replies accumulate. Uses the FULL window height, not the reduced one
-		// above: the status line occupies real rows on screen too.
-		if cmd := a.pinCmd(msg.Height + statusHeight); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
+		// GORILLA OVERRIDE: nothing is scrolled or padded here. The frame is drawn
+		// at the cursor, immediately after the last printed line, exactly as a
+		// shell prompt is — see session_banner.go for why the old bottom-pinning
+		// was removed rather than repaired.
 		if cmd := a.bannerCmd(); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
