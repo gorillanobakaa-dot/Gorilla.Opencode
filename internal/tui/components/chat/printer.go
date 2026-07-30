@@ -13,6 +13,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/wordwrap"
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
 )
@@ -102,6 +103,25 @@ func styleReasoning(s string) string {
 	return styles.BaseStyle().Foreground(reasoningColor).Render(s)
 }
 
+// wrapReasoning breaks a reasoning line at word boundaries to fit the terminal.
+//
+// GORILLA FIX: a model emits one paragraph as ONE line with no newlines in it,
+// often several hundred characters. Printed raw, the terminal hard-wraps it at
+// the last column and splits words down the middle — "avail/able",
+// "developm/ent", "the g/rep tool". The text was all there and readable only
+// with effort, which defeats the point of printing it at all.
+//
+// Wrapped with wordwrap rather than lipgloss's Width(): Width() also PADS every
+// line out to the full width, and trailing spaces on hundreds of reasoning lines
+// end up in the user's clipboard the moment they select any of it. Scrollback
+// text is meant to be copied, so it must not carry invisible padding.
+func wrapReasoning(s string, width int) []string {
+	if width <= 0 {
+		return []string{s}
+	}
+	return strings.Split(wordwrap.String(s, width), "\n")
+}
+
 // emitReasoning prints reasoning lines for a message that is still arriving,
 // opening the block on first sight.
 //
@@ -132,7 +152,11 @@ func (m *messagesCmp) emitReasoning(msg message.Message, upto []string) []tea.Cm
 		return cmds
 	}
 	for _, line := range upto[from:] {
-		cmds = append(cmds, tea.Println(styleReasoning(line)))
+		// The watermark counts SOURCE lines, not printed ones, so wrapping one
+		// source line into several printed lines cannot desynchronise it.
+		for _, wrapped := range wrapReasoning(line, m.width) {
+			cmds = append(cmds, tea.Println(styleReasoning(wrapped)))
+		}
 	}
 	m.reasonedLines[msg.ID] = len(upto)
 	return cmds

@@ -280,8 +280,18 @@ func renderAssistantMessage(
 		})
 		position += messages[0].height
 		position++ // for the space
-	} else if thinking && thinkingContent != "" {
-		// Render the thinking content
+	} else if thinking && thinkingContent != "" && !skipReasoning {
+		// GORILLA FIX: this branch was NOT gated by skipReasoning, unlike the one
+		// above, so a message that was still thinking and had no answer text yet
+		// had its reasoning pushed through renderMessage -> toMarkdown -> glamour.
+		// Two things went wrong with that in scrollback mode:
+		//   1. glamour turns a literal "---" in the model's reasoning into a
+		//      horizontal rule (styles/markdown.go HorizontalRule), so rules
+		//      appeared inside the printed thinking.
+		//   2. it re-wrapped and re-flowed text that had already been printed
+		//      verbatim, line by line, by the printer.
+		// The reasoning is already in the terminal by this point. Rendering it
+		// again here can only disagree with what was printed.
 		content = renderMessage(thinkingContent, false, msg.ID == focusedUIMessageId, width)
 	}
 

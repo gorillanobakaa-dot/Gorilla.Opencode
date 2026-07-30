@@ -439,11 +439,11 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 	for event := range eventChan {
 		if processErr := a.processEvent(ctx, sessionID, &assistantMsg, event); processErr != nil {
 			a.finishMessage(ctx, &assistantMsg, message.FinishReasonCanceled)
-			return assistantMsg, nil, processErr
+			return assistantMsg, a.cancelPendingToolCalls(&assistantMsg), processErr
 		}
 		if ctx.Err() != nil {
 			a.finishMessage(context.Background(), &assistantMsg, message.FinishReasonCanceled)
-			return assistantMsg, nil, ctx.Err()
+			return assistantMsg, a.cancelPendingToolCalls(&assistantMsg), ctx.Err()
 		}
 	}
 
@@ -535,6 +535,52 @@ out:
 	}
 
 	return assistantMsg, &msg, err
+}
+
+// cancelPendingToolCalls writes a "canceled" result for every tool call the
+// assistant announced but never got to run. Returns nil when there are none.
+//
+// GORILLA FIX: pressing Esc while the model was still STREAMING left the UI
+// stuck on "Waiting for response..." forever, with no way out short of killing
+// the program. The status bar said "request cancelled by user" and the context
+// really was cancelled — but the two early returns in the streaming loop above
+// returned before ever reaching the tool loop, which is the only place that
+// wrote "Tool execution canceled by user" results. So the assistant message kept
+// tool calls with no matching result, and message.go renders exactly that as
+// "Waiting for response...".
+//
+// The tool loop's own cancellation branch only covers a cancel that arrives
+// AFTER streaming finished, which is the rarer case: by then there is usually
+// nothing left to wait for. Cancelling mid-think is the normal case and it was
+// the one not handled.
+//
+// context.Background() throughout, deliberately: the request context is already
+// cancelled, and writing these results is exactly what must still happen. Using
+// the dead context would make the write fail and leave the UI stuck again.
+func (a *agent) cancelPendingToolCalls(assistantMsg *message.Message) *message.Message {
+	toolCalls := assistantMsg.ToolCalls()
+	if len(toolCalls) == 0 {
+		return nil
+	}
+	parts := make([]message.ContentPart, 0, len(toolCalls))
+	for _, tc := range toolCalls {
+		parts = append(parts, message.ToolResult{
+			ToolCallID: tc.ID,
+			Content:    "Tool execution canceled by user",
+			IsError:    true,
+		})
+	}
+	msg, err := a.messages.Create(context.Background(), assistantMsg.SessionID,
+		message.CreateMessageParams{Role: message.Tool, Parts: parts})
+	if err != nil {
+		// Log and carry on. Failing to record the cancellation must not also
+		// take down the cancellation itself — the user asked for this to stop.
+		logging.ErrorPersist(fmt.Sprintf(
+			"failed to record cancelled tool calls for session %s: %v",
+			assistantMsg.SessionID, err))
+		return nil
+	}
+	return &msg
 }
 
 func (a *agent) finishMessage(ctx context.Context, msg *message.Message, finishReson message.FinishReason) {
