@@ -72,3 +72,8 @@ system-prompts/reference/
 # committed by the release pipeline's `git add -A` because nothing ignored it.
 *.sha256
 checksums.txt
+
+# Session handoff / working state — deliberately local.
+# Describes in-flight work and past mistakes in detail; useful to the next
+# session on this machine, nobody else's business.
+HANDOFF.md
