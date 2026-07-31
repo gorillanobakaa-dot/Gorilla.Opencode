@@ -1,7 +1,7 @@
 {
-  "project": "Gorilla OpenCode",
-  "version": "v0.1.42",
-  "previous": "v0.1.41",
+  "project": "gorilla-opencode",
+  "version": "v0.1.64",
+  "previous": "v0.1.48",
   "target": null,
-  "date": "2026-07-28"
+  "date": "2026-07-31"
 }
