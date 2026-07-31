@@ -1,3 +1,86 @@
+## v0.1.48 → v0.1.64 — 2026-07-31 — The conversation no longer stops dead at the first tool call
+
+Sixteen builds made between 28 and 31 July 2026, none of which were ever
+published. This entry covers all of them. Full documents:
+[layman](v0.1.48-v0.1.64-LAYMAN.md) · [developer](v0.1.48-v0.1.64-DEVELOPER.md).
+
+**Plain-language version:** for three days this program had a bug that made it
+close to unusable, and it hid itself well. When the AI used a tool — searching
+your files, running a command — the answer arrived, was saved, and was never
+shown to you. The screen sat on "Waiting for response…". On 30 July a command
+finished in two seconds, the AI wrote its full answer, and the screen showed
+nothing for fifteen minutes; that is indistinguishable from a stuck connection,
+so you wait, then restart, then blame your provider. Every conversation that
+used a tool was cut off at its first tool call. Alongside it, one search could
+return 2.4 megabytes in a single result and quietly wreck your token budget, the
+context meter read about two hundred times too high, Escape did not stop the AI,
+and the bar at the bottom of the screen crawled down the window and jumped back
+up. All fixed. Every one was found by measuring, not by reasoning about the code.
+
+### Fixed
+
+- **The transcript no longer halts at the first tool result** (v0.1.63). The
+  biggest fix here. `ScrollbackReady` returned false for tool messages to stop
+  double-printing, but `printPending` breaks on the first not-ready message — so
+  every later message, including the model's finished answer, was generated,
+  persisted, and never displayed. **"Ready" means "will not change again", not
+  "has something to show".** Duplicate suppression moved to
+  `RenderForScrollback` returning `""` for that role.
+- **Every tool result is bounded by SIZE at one choke point** (v0.1.62). grep
+  capped matches at 100 and returned **2,438,026 bytes**, because it matched
+  inside files where a whole source file is one escaped string — 80 lines over
+  10 KB, longest 66,438. That one result took a conversation from 15.9K to 675K
+  tokens in a single turn, and tool results are re-sent every turn afterwards.
+  Now 400 KB in `NewTextResponse`. **A limit must be expressed in the unit of
+  the resource it protects.**
+- **No frame line may exceed the terminal width** (v0.1.57) — the real cause of
+  the marching footer. The inline renderer erases by *logical* line count, so an
+  over-wide line occupies two physical rows, counts as one, and under-erases by
+  a row per render. Enforced centrally by `clampToWidth`.
+- **The context meter was inflated ~200×** (v0.1.55); it displayed 387%. Failed
+  turns now say why they failed instead of printing nothing.
+- **Escape actually stops the model** (v0.1.54), and streamed reasoning wraps at
+  word boundaries.
+- **It says why there is no thinking** when you asked to see thinking (v0.1.60).
+
+### Added
+
+- Up and Down recall previous messages (v0.1.64).
+- Reasoning streams into scrollback; the preview pane is gone (v0.1.58–v0.1.61).
+
+### Changed
+
+- All four system prompts rewritten (2026-07-29) against Anthropic's published
+  Claude Fable 5 guidance, with the research cited in
+  [`system-prompts/RESEARCH-SOURCES.md`](../system-prompts/RESEARCH-SOURCES.md).
+  Coder prompt 1,855 → 4,233 bytes (~464 → ~1,058 tokens/turn). Every section is
+  switchable in `/context` with its cost and what you lose; two are marked
+  critical because disabling them increases unverified success claims.
+
+### Known issues
+
+- **The footer is still reported to jump.** Two hypotheses are dead, both with
+  permanent tests: height oscillation, and the 20-row editor collapse. Diagnose
+  with a real byte capture replayed through `internal/tui/inline/terminal_test.go`
+  — not from a screenshot.
+- **The v0.1.57 width fix is verified headlessly only**, not across a long
+  interactive session. It bites hardest near 80 columns.
+
+### Corrections to the record
+
+- **v0.1.56 was shipped on a wrong diagnosis.** Frame-height oscillation was
+  blamed for the marching footer; a headless test shows 3↔4 rows and a 20→1
+  collapse both render correctly. The change was kept (constant height is still
+  more predictable) but its commit message states a cause that is not real.
+  Three independent sources reached that same wrong answer.
+- **v0.1.59 shipped with a failing test.** A shell chain did not gate on the
+  exit code and printed "all green" while a test was red. A pipe returns the
+  last command's status, not the test's.
+- **The v0.2.0 / v0.1.49 version numbers were never real.** They were invented
+  in error, never approved, and the release carrying them had no downloadable
+  assets. Both have been removed. The documents written under them were good
+  work and are kept; only the numbers are gone.
+
 ## v0.1.46 — 2026-07-28 — Undoing a slowdown I caused, and giving the mouse back
 
 Three complaints, three real causes — but only one was what it looked like.
