@@ -166,8 +166,15 @@ var SectionTradeoff = map[string]string{
 	SectionID("scope"):            "the AI may start changing code when you only asked a question, and may run restarts or deletions on a hunch",
 	SectionID("delegation"):       "the AI stops handing independent work to helpers and does everything itself — slower on big jobs",
 	SectionID("memory"):           "the AI stops treating your CLAUDE.md / OpenCode.md as authoritative, and will not offer to write down what it learned",
-	SectionID("tools"):            "the AI runs tool calls one at a time instead of in parallel — slower, more requests",
+	// GORILLA OVERRIDE: this line used to say the AI "runs tool calls one at a
+	// time instead of in parallel", which implied that leaving the section ON
+	// bought parallelism. It never did — agent.go executes tool calls in a plain
+	// sequential loop and the agent tool blocks on its helper. The real saving
+	// from batching is round-trips to the model, not concurrency, so that is what
+	// it now says. Measured 2026-07-31.
+	SectionID("tools"):            "the AI stops batching independent tool calls into one turn — the same work, but more round-trips to the model, which is the slow part on a poor connection",
 	SectionID("honesty"):          "the AI becomes MORE LIKELY to claim success it did not observe, and to invent file paths and flags",
+	SectionID("change-reporting"): "the AI stops telling you what a change costs you before it makes it — no list of what stops working, and no note of which claims it did not verify",
 	SectionID("output"):           "replies get longer and more padded, and the AI may add explanatory comments to your code",
 	SectionID("conduct"):          "the AI may stop halfway to ask what to do next, and may take destructive actions without confirming",
 }
