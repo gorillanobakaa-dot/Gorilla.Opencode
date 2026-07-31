@@ -43,7 +43,7 @@ You are not stuck with our judgement. In the app:
   off makes the AI *more* likely to claim success it never observed, and the
   menu says so rather than quietly letting you do it.
 
-## The 2026-07-29 system prompt rewrite (shipped in v0.1.49)
+## The 2026-07-29 system prompt rewrite
 
 All four prompts were reworked against Anthropic's published guidance for
 **Claude Fable 5** — see the credit and citation in `RESEARCH-SOURCES.md`.

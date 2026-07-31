@@ -1,6 +1,6 @@
 # Comprehensive Dual-Track Forensic Audit & Research Analysis
 
-**Target Release:** `Gorilla.Opencode` (`v0.1.49` — System Prompt Research Update)  
+**Target Release:** `Gorilla.Opencode` (the 2026-07-29 System Prompt Research Update)  
 **Methodology:** Gorilla Dual-Track Standard (Layman Track + Developer Track)  
 **Audit Scope:** Research Foundations, System Prompts, Go Engine Mechanics, Operational Trade-offs, & Omissions Analysis
 
@@ -19,7 +19,7 @@ When you type a question to an AI coding assistant, it does not start from scrat
 
 If that handbook is badly written, the AI will lie to you. It will tell you a build succeeded when it never checked. It will promise to run a test and then end its turn without running it. It will spawn dozens of helper processes that drain your money and crash your connection. These are not hypothetical failures — they are documented, researched, and published problems.
 
-In version `v0.1.49` of `Gorilla.Opencode`, every system prompt was completely rewritten based on five specific research papers published between 2024 and 2026. What follows is an honest, paper-by-paper explanation of what each piece of research found, what we did about it in the code, and what that means for you as a user.
+In the 2026-07-29 System Prompt Research Update to `Gorilla.Opencode`, every system prompt was completely rewritten based on five specific research papers published between 2024 and 2026. What follows is an honest, paper-by-paper explanation of what each piece of research found, what we did about it in the code, and what that means for you as a user.
 
 ---
 
@@ -63,7 +63,7 @@ We wrote three specific rules into the system prompt that directly address this:
 
 ### What this means for you
 
-When `Gorilla.Opencode v0.1.49` tells you something worked, it actually checked. When it did not check, it will tell you it did not check. You no longer have to guess whether the AI is reporting facts or generating plausible fiction.
+When `Gorilla.Opencode` (2026-07-29 onward) tells you something worked, it actually checked. When it did not check, it will tell you it did not check. You no longer have to guess whether the AI is reporting facts or generating plausible fiction.
 
 ---
 
@@ -191,7 +191,7 @@ The old system prompt used `IMPORTANT` seven times, along with extensive all-cap
 
 ## 1. Absolute File Paths & System Architecture Overview
 
-The system prompt engine in `Gorilla.Opencode` (`v0.1.49` — System Prompt Research Update) is structured across four primary code & prompt paths:
+The system prompt engine in `Gorilla.Opencode` (the 2026-07-29 System Prompt Research Update) is structured across four primary code & prompt paths:
 
 1. **System Prompt Source Specs (Embedded Factory Defaults & Text Copies):**
    - Main Coder Prompt: [`system-prompts/current/coder-modern.md`](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/main/system-prompts/current/coder-modern.md)
@@ -320,6 +320,6 @@ The system prompt engine in `Gorilla.Opencode` (`v0.1.49` — System Prompt Rese
 
 ## Verification Certification
 
-The `v0.1.49` release of `Gorilla.Opencode` demonstrates **direct code-level and prompt-level traceability** to the cited research. The prompt instructions are not generic boilerplate; they map line-for-line to Go control structures in `internal/llm/prompt/` and `internal/llm/agent/` that actively enforce process compliance, subagent leashing, dynamic sectioning, and context optimization.
+The 2026-07-29 System Prompt Research Update to `Gorilla.Opencode` demonstrates **direct code-level and prompt-level traceability** to the cited research. The prompt instructions are not generic boilerplate; they map line-for-line to Go control structures in `internal/llm/prompt/` and `internal/llm/agent/` that actively enforce process compliance, subagent leashing, dynamic sectioning, and context optimization.
 
 **Install:** `sudo dpkg -i gorilla-opencode_0.1.49_amd64.deb`
