@@ -25,7 +25,7 @@ import (
 // specialised for building large systems (Firefox/mach, Linux kernel,
 // Windows internals).
 //
-// v0.2.0 (2026-07-29): reworked against Anthropic's Claude Fable 5
+// 2026-07-29: reworked against Anthropic's Claude Fable 5
 // prompting guidance, which is written for exactly this shape of
 // workload — long-horizon autonomous runs where nobody is watching.
 // Three sections are new (scope, delegation, memory) and honesty,

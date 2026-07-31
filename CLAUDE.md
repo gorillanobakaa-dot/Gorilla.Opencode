@@ -53,7 +53,7 @@ If you add tooling, put it here.
 All four now verify what they assume. The lesson generalises: **an artefact's name is
 not its contents, and a side-effect is not a state.**
 
-**A fifth bug, found during v0.2.0 (2026-07-29) and NOT yet fixed.** The upload
+**A fifth bug, found during the 2026-07-29 release and NOT yet fixed.** The upload
 phase's own verification step crashes after a *successful* upload:
 
 ```
@@ -69,10 +69,10 @@ the install phase, so `--action install-purge` silently never runs and the scrip
 exits non-zero on a release that actually succeeded. **Do not read that failure as
 "the release is broken" and re-run it**; check `gh release view` first. Everything
 after the upload phase (deb inspection, checksum round-trip, `dpkg -i`, confirming
-`main` is at the tag) had to be done by hand for v0.2.0.
+`main` is at the tag) had to be done by hand for that release.
 
 **A sixth, now FIXED: it published the wrong document as the release body.** On
-v0.2.0 the GitHub release body came out as `Changelogs/DOCUMENTATION.dual-track.md`
+that release the GitHub release body came out as `Changelogs/DOCUMENTATION.dual-track.md`
 — the project-wide 20 KB July-23 overview — instead of anything about the release.
 Nobody noticed until the body was read on the release page; the assets, tag and
 draft status had all been verified and were all fine. **Verifying the artefacts is
@@ -84,7 +84,7 @@ The cause was a silent fallback chain, not the flag it looked like:
   nothing to do with the release body. Passing it changes nothing here.
 - The body comes from the profile's `release_notes_template`, which for `go_gorilla`
   is `GITHUB-RELEASE-NOTES-{version}.md` at the repo root. **That file has never
-  existed** — every release before v0.2.0 had its body written by hand afterwards,
+  existed** — every release up to that point had its body written by hand afterwards,
   which is why the bug stayed hidden.
 - When the template is missing the script fell back to
   `doc_output_dir/doc_output_base`, and `doc_output_base` is
