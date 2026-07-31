@@ -41,7 +41,7 @@ func TestParseSectionsShapeOfTheShippedPrompt(t *testing.T) {
 		t.Errorf("preamble should have no header, got %q", secs[0].Header)
 	}
 
-	want := []string{"method", "build discipline", "verification", "honesty", "scope", "delegation", "memory", "tools", "output", "conduct"}
+	want := []string{"method", "build discipline", "verification", "honesty", "change reporting", "scope", "delegation", "memory", "tools", "output", "conduct"}
 	var got []string
 	for _, s := range secs[1:] {
 		got = append(got, s.Header)
