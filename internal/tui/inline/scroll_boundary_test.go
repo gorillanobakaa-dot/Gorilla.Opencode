@@ -349,3 +349,97 @@ func TestAnOverWideFooterLineStrandsDebris(t *testing.T) {
 	}
 	t.Logf("confirmed: %d orphaned footer fragment(s) from one over-wide line", debris)
 }
+
+// THE BIG COLLAPSE.
+//
+// The earlier oscillation test moved the footer between 3 and 4 rows and found
+// nothing wrong, which is what made me conclude height changes were harmless.
+// That conclusion was drawn from too small a change.
+//
+// The real editor grows to maxEditorHeight (20 rows) while a long prompt is
+// typed and collapses to 1 row the moment it is sent. That is a 19-row swing,
+// and it happens exactly when a reply starts printing — i.e. at the scroll
+// boundary. Reported 2026-07-30 after pasting a 30-line list.
+type collapser struct {
+	scroller
+	tall bool
+}
+
+func (m collapser) Init() tea.Cmd { return m.scroller.Init() }
+
+func (m collapser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	inner, cmd := m.scroller.Update(msg)
+	m.scroller = inner.(scroller)
+	// Tall while nothing has been sent; collapses once output starts flowing,
+	// which is the real sequence: type a long prompt, press enter, replies print.
+	m.tall = m.sent < m.batch
+	return m, cmd
+}
+
+func (m collapser) View() string {
+	rows := []string{}
+	if m.tall {
+		for i := 0; i < 20; i++ {
+			rows = append(rows, fmt.Sprintf("EDITOR-LINE-%02d", i))
+		}
+	}
+	rows = append(rows, "FOOTER-PROMPT>")
+	return strings.Join(rows, "\n")
+}
+
+func TestATallEditorCollapsingDoesNotCorruptTheScreen(t *testing.T) {
+	const cols, rows = 80, 24
+	const total = 80
+
+	out := &safeBuf{}
+	in, _ := io.Pipe()
+	p := tea.NewProgram(collapser{scroller: scroller{footerRows: 1, total: total, batch: 6}},
+		tea.WithInput(in), tea.WithOutput(out), tea.WithoutSignalHandler())
+	go func() {
+		time.Sleep(2 * time.Millisecond)
+		p.Send(tea.WindowSizeMsg{Width: cols, Height: rows})
+	}()
+	done := make(chan error, 1)
+	go func() { _, err := p.Run(); done <- err }()
+
+	deadline := time.Now().Add(15 * time.Second)
+	var snap string
+	for time.Now().Before(deadline) {
+		if strings.Contains(out.String(), fmt.Sprintf("LINE-%03d", total-1)) {
+			time.Sleep(80 * time.Millisecond)
+			snap = out.String()
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	p.Kill()
+	<-done
+
+	tm := newTerm(cols, rows)
+	tm.Write(snap)
+
+	// 1. Exactly one prompt on screen.
+	if n := tm.CountOnScreen("FOOTER-PROMPT>"); n != 1 {
+		dump(t, tm)
+		t.Errorf("prompt appears %d times after a 20-row footer collapsed; want 1", n)
+	}
+	// 2. No editor rows stranded in the transcript.
+	strays := 0
+	for _, r := range tm.Screen() {
+		if strings.Contains(r, "EDITOR-LINE-") {
+			strays++
+		}
+	}
+	if strays > 0 {
+		dump(t, tm)
+		t.Errorf("%d stranded EDITOR row(s) left behind by the collapse", strays)
+	}
+	// 3. Not one printed line lost or duplicated.
+	for i := 0; i < total; i++ {
+		want := fmt.Sprintf("LINE-%03d", i)
+		if n := tm.CountEverywhere(want); n != 1 {
+			dump(t, tm)
+			t.Fatalf("%s appears %d times; want exactly 1", want, n)
+		}
+	}
+}
