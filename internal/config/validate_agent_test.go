@@ -81,6 +81,51 @@ func TestValidateAgentFallbackMaxTokensMatchesFallbackModel(t *testing.T) {
 	}
 }
 
+// GORILLA OVERRIDE: an OAuth provider (Antigravity, Gemini Code Assist) counts as
+// "configured" only once it appears in cfg.Providers. The provider portal signs
+// in AFTER config.Load, so within that session the entry must be added
+// explicitly — UpsertProviderKey with the oauth-login placeholder — BEFORE the
+// agent model is set. Skip it and validateAgent silently reverts every agent
+// onto Gemini (revertAgentToDefault returns nil), so the freshly-chosen Claude
+// model never takes effect. That is exactly what v0.1.65 shipped: sign in to
+// Antigravity, and every agent fell back to gemini-flash-latest.
+func TestOAuthProviderKeepsAgentModelWhenRegistered(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := Load(dir, false); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	c := Get()
+	want := models.AGClaudeSonnet46
+	if _, ok := models.SupportedModels[want]; !ok {
+		t.Fatalf("%s not registered", want)
+	}
+	// A reachable fallback, so an (expected) revert does not hard-error.
+	t.Setenv("GEMINI_API_KEY", "test-key")
+
+	// NEGATIVE — reproduces the bug: with no provider entry, the model reverts.
+	// If this ever stops reverting, the positive assertion below proves nothing.
+	delete(c.Providers, models.ProviderAntigravity)
+	c.Agents[AgentCoder] = Agent{Model: want, MaxTokens: 5000}
+	if err := validateAgent(c, AgentCoder, c.Agents[AgentCoder]); err != nil {
+		t.Fatalf("validateAgent (unregistered): %v", err)
+	}
+	if c.Agents[AgentCoder].Model == want {
+		t.Fatal("unregistered provider unexpectedly kept the model — bug not reproduced; the fix assertion would be vacuous")
+	}
+
+	// POSITIVE — the fix: register the provider, then the chosen model sticks.
+	if err := UpsertProviderKey(models.ProviderAntigravity, "oauth-login"); err != nil {
+		t.Fatalf("UpsertProviderKey: %v", err)
+	}
+	c.Agents[AgentCoder] = Agent{Model: want, MaxTokens: 5000}
+	if err := validateAgent(c, AgentCoder, c.Agents[AgentCoder]); err != nil {
+		t.Fatalf("validateAgent (registered): %v", err)
+	}
+	if got := c.Agents[AgentCoder].Model; got != want {
+		t.Fatalf("registered provider still reverted the model: got %s, want %s", got, want)
+	}
+}
+
 // A retired model id must be migrated forward, not treated as unknown and
 // dropped onto an unrelated default.
 func TestValidateAgentMigratesLegacyModelIDs(t *testing.T) {

@@ -54,11 +54,20 @@ type caPart struct {
 }
 
 type caFunctionCall struct {
+	// ID correlates a call with its response. GORILLA OVERRIDE: the Antigravity
+	// backend translates the envelope to the native Anthropic/OpenAI shape, which
+	// REQUIRE a tool-call id (Claude 400s with "tool_use.id: Field required"
+	// without it). Gemini Code Assist matches by name and never sends one, so it
+	// stays omitempty and the Gemini path leaves it empty. Measured 2026-08-03.
+	ID   string         `json:"id,omitempty"`
 	Name string         `json:"name"`
 	Args map[string]any `json:"args,omitempty"`
 }
 
 type caFunctionResp struct {
+	// ID must equal the matching caFunctionCall.ID for non-Gemini models. See
+	// caFunctionCall.ID.
+	ID       string         `json:"id,omitempty"`
 	Name     string         `json:"name"`
 	Response map[string]any `json:"response"`
 }
@@ -124,7 +133,12 @@ type caResponse struct {
 
 // caConvertMessages is a free function (no client state) so both the Gemini
 // Code Assist client and the Antigravity client share one conversion.
-func caConvertMessages(messages []message.Message) []caContent {
+//
+// withToolIDs stamps each tool call and response with its correlation id. The
+// Antigravity backend requires it (it translates to native Anthropic/OpenAI,
+// which mandate tool-call ids); Gemini Code Assist matches by name and must NOT
+// receive one, so it passes false. See caFunctionCall.ID.
+func caConvertMessages(messages []message.Message, withToolIDs bool) []caContent {
 	var out []caContent
 	for _, msg := range messages {
 		switch msg.Role {
@@ -145,8 +159,12 @@ func caConvertMessages(messages []message.Message) []caContent {
 			}
 			for _, call := range msg.ToolCalls() {
 				args, _ := parseJsonToMap(call.Input)
+				fc := &caFunctionCall{Name: call.Name, Args: args}
+				if withToolIDs {
+					fc.ID = call.ID
+				}
 				parts = append(parts, caPart{
-					FunctionCall:     &caFunctionCall{Name: call.Name, Args: args},
+					FunctionCall:     fc,
 					ThoughtSignature: call.ThoughtSignature,
 				})
 			}
@@ -170,9 +188,13 @@ func caConvertMessages(messages []message.Message) []caContent {
 						}
 					}
 				}
+				fr := &caFunctionResp{Name: name, Response: resp}
+				if withToolIDs {
+					fr.ID = result.ToolCallID
+				}
 				// The 2025 API takes functionResponse in a "user" turn.
 				out = append(out, caContent{Role: "user", Parts: []caPart{{
-					FunctionResponse: &caFunctionResp{Name: name, Response: resp},
+					FunctionResponse: fr,
 				}}})
 			}
 		}
@@ -202,7 +224,7 @@ func convertToolsCA(ts []tools.BaseTool) []caTool {
 
 func (c *codeAssistClient) buildEnvelope(messages []message.Message, ts []tools.BaseTool) caEnvelope {
 	req := caInnerRequest{
-		Contents: caConvertMessages(messages),
+		Contents: caConvertMessages(messages, false), // Gemini matches tools by name; no ids
 		Tools:    convertToolsCA(ts),
 		GenerationConfig: map[string]any{
 			"maxOutputTokens": c.providerOptions.maxTokens,
@@ -284,8 +306,16 @@ func collectParts(parts []caPart) (string, []message.ToolCall) {
 		}
 		if p.FunctionCall != nil {
 			input, _ := json.Marshal(p.FunctionCall.Args)
+			// GORILLA OVERRIDE: preserve the backend's own tool-call id when it
+			// sends one (Antigravity/Claude does — "toolu_vrtx_…"), so replaying
+			// it in history satisfies the native format. Gemini sends none, so
+			// this falls back to a generated id exactly as before.
+			id := p.FunctionCall.ID
+			if id == "" {
+				id = newCallID()
+			}
 			calls = append(calls, message.ToolCall{
-				ID:               newCallID(),
+				ID:               id,
 				Name:             p.FunctionCall.Name,
 				Input:            string(input),
 				Type:             "function",

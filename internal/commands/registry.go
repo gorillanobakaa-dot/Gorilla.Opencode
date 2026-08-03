@@ -146,6 +146,15 @@ var All = []Command{
 		Summary: "Sign out of your Google account.",
 		Detail:  "Removes the stored sign-in. Any API keys you typed are untouched.",
 	},
+	{
+		Name:    "usage",
+		Group:   GroupModels,
+		Summary: "Show your Antigravity free weekly quota.",
+		Detail: "If you signed in with the Antigravity free tier, this shows how much " +
+			"of your weekly allowance is left — Gemini has a separate pool from " +
+			"Claude and GPT-OSS — and when each resets. It also appears on its own " +
+			"at the start of each session. Nothing to see if you use another provider.",
+	},
 
 	// ─── Cost, speed and behaviour ───────────────────────────────────
 	{
