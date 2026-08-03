@@ -45,7 +45,7 @@ func newAntigravityClient(opts providerClientOptions) AntigravityClient {
 
 func (c *antigravityClient) buildEnvelope(messages []message.Message, ts []tools.BaseTool) caEnvelope {
 	req := caInnerRequest{
-		Contents: caConvertMessages(messages),
+		Contents: caConvertMessages(messages, true), // Antigravity's native format REQUIRES tool-call ids
 		Tools:    convertToolsCA(ts),
 		GenerationConfig: map[string]any{
 			"maxOutputTokens": c.providerOptions.maxTokens,

@@ -1,3 +1,42 @@
+## v0.1.66 — 2026-08-04 — the free Claude/GPT tier now actually works when you use it
+
+Full dual-track document: [v0.1.66-release-notes.md](v0.1.66-release-notes.md).
+
+**Plain-language version:** v0.1.65 shipped free Claude/GPT-OSS/Gemini and then three
+bugs made it fall over the moment you actually used it. First, signing in to
+Antigravity *looked* like it worked but silently ran Gemini instead of the model you
+picked — the app forgot to record the sign-in until the next restart, so it decided
+the provider "wasn't configured" and fell back (`agent "coder" model
+"antigravity.claude-sonnet-4-6" is unusable ... falling back to
+"gemini-flash-latest"`). Second, typing `/usage` said "Unknown command". Third — the
+big one — Claude and GPT-OSS crashed the instant they used a tool
+(`invalid_request_error: ...tool_use.id: Field required`), which for a coding
+assistant means they could chat but couldn't actually help. All three are fixed and
+each has a test that fails without the fix. Gemini was fine throughout and is left
+untouched.
+
+### Fixed
+
+- **Signing in to Antigravity now uses the model you chose, first session included.**
+  The provider is registered in-session the instant login succeeds
+  (`UpsertProviderKey` with the `oauth-login` sentinel), before agent models are set —
+  so `validateAgent` no longer silently reverts every agent to Gemini. Same fix
+  applied to the Google-only and GCP login paths.
+- **Claude and GPT-OSS can use tools again.** Their native (Anthropic/OpenAI) format
+  requires a tool-call `id`; we were sending the Gemini shape, which has none, so any
+  conversation containing a tool call 400'd. Tool-call ids are now emitted on the
+  Antigravity path only (Gemini matches by name and is unchanged), and the backend's
+  own id is preserved from responses. This is what made Claude/GPT usable for real
+  coding rather than chat-only.
+- **`/usage` works when typed**, not just from the command palette, and now appears in
+  `/help`.
+
+### Note (not a bug)
+
+- Hot-swapping models mid-conversation can make the assistant misidentify itself
+  (claim to be Claude, then admit it's Gemini). That's each model reading the shared
+  history; the one actually on Gemini corrected itself. Nothing changed here.
+
 ## v0.1.65 — 2026-08-03 — Claude, GPT-OSS and Gemini for free, through your own Google account
 
 Full dual-track document: [v0.1.65-release-notes.md](v0.1.65-release-notes.md).

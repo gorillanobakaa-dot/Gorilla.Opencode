@@ -24,6 +24,12 @@ const (
 	nimBaseURL         = "https://integrate.api.nvidia.com/v1"
 	ollamaEndpointName = "Ollama"
 	ollamaBaseURL      = "http://localhost:11434/v1"
+
+	// oauthLoginPlaceholder is the sentinel API key that marks an OAuth-based
+	// provider (Antigravity, Gemini Code Assist) as configured. The real auth is
+	// the stored token; this only clears config's "apiKey == '' means disabled"
+	// gate. Matches the value tui.go uses for the Gemini-OAuth provider.
+	oauthLoginPlaceholder = "oauth-login"
 )
 
 // portalProvider maps row IDs to the typed provider constants that
@@ -265,6 +271,16 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 		if err := runAntigravityLogin(ctx); err != nil {
 			return err
 		}
+		// GORILLA OVERRIDE: register the provider in-memory BEFORE setting agent
+		// models. config.Load enables it from the creds file, but that ran before
+		// this login, so within THIS session cfg.Providers has no antigravity
+		// entry — and validateAgent then silently reverts every agent to Gemini
+		// (revertAgentToDefault returns nil, so the reverts are invisible to
+		// UpdateAgentModel). The "oauth-login" placeholder clears the "apiKey==''
+		// means disabled" gate; the real auth is the stored token.
+		if err := config.UpsertProviderKey(models.ProviderAntigravity, oauthLoginPlaceholder); err != nil {
+			return err
+		}
 		// Coder on Claude Sonnet; the background agents (summarizer/task/title)
 		// on Gemini Flash, which draws the SEPARATE Gemini weekly pool and so
 		// leaves the Claude/GPT quota for the work the user actually watches.
@@ -282,10 +298,17 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 		if err := runGoogleLogin(ctx, ""); err != nil {
 			return err
 		}
+		// Same in-session registration as antigravity above.
+		if err := config.UpsertProviderKey(models.ProviderGeminiCA, oauthLoginPlaceholder); err != nil {
+			return err
+		}
 		return applyAgentModels(models.GeminiCAFlash, models.GeminiCA31FlashLite)
 
 	case "gcp-custom":
 		if err := runGoogleLogin(ctx, c.Input); err != nil {
+			return err
+		}
+		if err := config.UpsertProviderKey(models.ProviderGeminiCA, oauthLoginPlaceholder); err != nil {
 			return err
 		}
 		return applyAgentModels(models.GeminiCAFlash, models.GeminiCA31FlashLite)

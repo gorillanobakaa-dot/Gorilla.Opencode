@@ -60,6 +60,45 @@ func TestAntigravityEnvelopeShape(t *testing.T) {
 	}
 }
 
+// Tool calls must carry a correlation id for the Antigravity path (its native
+// Anthropic/OpenAI translation 400s without one — "tool_use.id: Field required")
+// and must NOT carry one for Gemini Code Assist (which matches by name). This is
+// the pure, offline guard for the live toolCallHistory reproduction.
+func TestToolCallIDsPresentOnlyForAntigravity(t *testing.T) {
+	am := message.Message{Role: message.Assistant}
+	am.SetToolCalls([]message.ToolCall{{ID: "call_xyz", Name: "list_files", Input: `{"path":"."}`, Type: "function", Finished: true}})
+	tm := message.Message{Role: message.Tool}
+	tm.AddToolResult(message.ToolResult{ToolCallID: "call_xyz", Name: "list_files", Content: "x.txt"})
+	msgs := []message.Message{
+		{Role: message.User, Parts: []message.ContentPart{message.TextContent{Text: "go"}}},
+		am, tm,
+	}
+
+	findIDs := func(contents []caContent) (callID, respID string) {
+		for _, c := range contents {
+			for _, p := range c.Parts {
+				if p.FunctionCall != nil {
+					callID = p.FunctionCall.ID
+				}
+				if p.FunctionResponse != nil {
+					respID = p.FunctionResponse.ID
+				}
+			}
+		}
+		return
+	}
+
+	callID, respID := findIDs(caConvertMessages(msgs, true))
+	if callID != "call_xyz" || respID != "call_xyz" {
+		t.Fatalf("Antigravity path must carry matching ids; got call=%q resp=%q", callID, respID)
+	}
+
+	callID, respID = findIDs(caConvertMessages(msgs, false))
+	if callID != "" || respID != "" {
+		t.Fatalf("Gemini path must NOT carry ids; got call=%q resp=%q", callID, respID)
+	}
+}
+
 // TestAntigravityLive drives the REAL transport (buildEnvelope → post → SSE
 // parse) against daily-cloudcode-pa, proving the whole gorilla path — not just
 // curl — produces a Claude response. Guarded: it needs a live token and never

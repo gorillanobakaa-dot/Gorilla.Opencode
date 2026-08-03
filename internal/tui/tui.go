@@ -242,19 +242,35 @@ func (a appModel) Init() tea.Cmd {
 	// /usage shows, automatically. SILENT (nil msg) when not signed in, so
 	// non-Antigravity users never see a thing. Runs in the Cmd goroutine, so a
 	// slow fetch on a high-latency link never blocks startup.
-	cmds = append(cmds, func() tea.Msg {
+	cmds = append(cmds, antigravityUsageCmd(true))
+
+	return tea.Batch(cmds...)
+}
+
+// antigravityUsageCmd fetches the Antigravity weekly quota and returns it as an
+// InfoMsg for the status bar. It runs in the returned Cmd's goroutine, so the
+// network call never blocks the UI, and the result is a tea.Msg — never printed
+// onto the screen Bubble Tea owns. quiet=true returns nil when not signed in or
+// on a transient error (used at session start, so non-Antigravity users see
+// nothing); quiet=false reports the reason (used by /usage on demand).
+func antigravityUsageCmd(quiet bool) tea.Cmd {
+	return func() tea.Msg {
 		creds, _ := auth.LoadAntigravityCreds()
 		if creds == nil || creds.AccessToken == "" {
-			return nil
+			if quiet {
+				return nil
+			}
+			return util.InfoMsg{Type: util.InfoTypeWarn, Msg: "Not signed in to Antigravity — pick it in the provider portal to sign in."}
 		}
 		line, err := creds.QuotaSummaryLine(context.Background())
 		if err != nil {
-			return nil // startup is not the place to nag about a transient error
+			if quiet {
+				return nil
+			}
+			return util.InfoMsg{Type: util.InfoTypeError, Msg: "Antigravity usage: " + err.Error()}
 		}
 		return util.InfoMsg{Type: util.InfoTypeInfo, Msg: line}
-	})
-
-	return tea.Batch(cmds...)
+	}
 }
 
 // Update wraps the real update so the terminal buffer can follow the dialogs.
@@ -761,6 +777,11 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.commandHelp.SetSize(a.width, a.height)
 			a.showCommandHelp = true
 			return a, nil
+		case "usage":
+			// GORILLA OVERRIDE: /usage — Antigravity weekly quota. Typed commands
+			// dispatch through this switch, NOT the command palette, so a palette
+			// RegisterCommand alone left `/usage` reported as "Unknown command".
+			return a, antigravityUsageCmd(false)
 		case "login":
 			// GORILLA OVERRIDE: /login — run the browser OAuth flow
 			// to sign in with Google (Code Assist free tier).
@@ -1780,17 +1801,7 @@ If there are Cursor rules (in .cursor/rules/ or .cursorrules) or Copilot rules (
 		Title:       "Antigravity Usage",
 		Description: "Show your Antigravity free-tier weekly quota (Claude/GPT/Gemini)",
 		Handler: func(cmd dialog.Command) tea.Cmd {
-			return func() tea.Msg {
-				creds, _ := auth.LoadAntigravityCreds()
-				if creds == nil || creds.AccessToken == "" {
-					return util.InfoMsg{Type: util.InfoTypeWarn, Msg: "Not signed in to Antigravity — pick it in the provider portal to sign in."}
-				}
-				line, err := creds.QuotaSummaryLine(context.Background())
-				if err != nil {
-					return util.InfoMsg{Type: util.InfoTypeError, Msg: "Antigravity usage: " + err.Error()}
-				}
-				return util.InfoMsg{Type: util.InfoTypeInfo, Msg: line}
-			}
+			return antigravityUsageCmd(false)
 		},
 	})
 
