@@ -1,3 +1,59 @@
+## v0.1.65 — 2026-08-03 — Claude, GPT-OSS and Gemini for free, through your own Google account
+
+Full dual-track document: [v0.1.65-release-notes.md](v0.1.65-release-notes.md).
+
+**Plain-language version:** two things. First, the free Gemini sign-in had stopped
+working — Google quietly closed the free "Code Assist" tier to every program except
+their own new app, Antigravity, and answered our requests with "migrate to
+Antigravity". Having the program introduce itself the way Google now expects (a
+one-word change to how it identifies itself, on the sign-in step only) opens that
+door again. Second — and this is the treat — every Gmail account already has a
+generous **free** Antigravity allowance that includes **Claude (Sonnet and Opus
+4.6), GPT-OSS, and Gemini**, and until now the only way to spend it was Google's own
+tool. This release adds an **"Antigravity free tier"** sign-in that unlocks all of
+them at no cost, using the allowance already attached to your own Google account.
+On top of that, a **provider menu now appears on every launch** (one press of Enter
+keeps what you had), and **`/usage`** shows how much of your weekly free allowance is
+left — it also appears on its own at the start of each session. The Antigravity route
+is unofficial: it works by speaking to Google the way Google's Antigravity tool does,
+so Google could change something and break it — that is stated plainly and kept
+isolated so nothing else depends on it. The Gemini fix uses Google's supported login
+and carries no such risk.
+
+### Added
+
+- **"Antigravity free tier" provider** — sign in with Google and use your own free
+  Antigravity allowance: Claude Sonnet 4.6, Claude Opus 4.6 (Thinking), GPT-OSS 120B,
+  and Gemini, at cost 0. New OAuth identity (`internal/auth/antigravity_oauth.go`) and
+  transport (`internal/llm/provider/antigravity.go`), reusing ~90% of the existing
+  Code Assist client. Protocol captured from the installed Antigravity CLI, not
+  guessed; transport proven end-to-end through the program's own code (Claude replied).
+  **Unofficial and brittle** — Google can change it; the risk is isolated to this
+  provider.
+- **Every-launch provider portal** — a startup menu listing every way to connect, with
+  the cursor on your current provider so Enter continues in one keystroke. Reachable
+  from the desktop icon, not just a typed flag. Replaces the old "edit the env file and
+  relaunch" first-run dead-end. Keys are entered masked.
+- **`/usage`** — shows your Antigravity weekly quota as one line, on demand and
+  automatically at session start (silent for non-Antigravity users). Wire shape
+  unit-tested against the captured response so a Google-side change fails a test
+  rather than blanking the view.
+
+### Fixed
+
+- **The free Gemini "Login with Google" tier works again.** Google discontinued the
+  free Code Assist tier for non-Antigravity clients (`UNSUPPORTED_CLIENT`). Sending an
+  `antigravity` product token in the `User-Agent` on the onboarding calls restores
+  free-tier eligibility and project provisioning. Root-caused live; the header is sent
+  on onboarding only — generation rejects it with 403. The earlier HTTP 500 was a blank
+  project, not the generation call.
+
+### Also included (pre-existing)
+
+- A **DeepSeek** provider added in an earlier development session
+  (`internal/llm/models/deepseek.go` and related edits) ships in this tag by the
+  maintainer's decision. Not part of this release's work; noted for completeness.
+
 ## v0.1.48 → v0.1.64 — 2026-07-31 — The conversation no longer stops dead at the first tool call
 
 Sixteen builds made between 28 and 31 July 2026, none of which were ever

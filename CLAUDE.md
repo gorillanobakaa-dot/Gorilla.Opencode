@@ -1,5 +1,18 @@
 # Working on gorilla-opencode
 
+
+## ⚠ BUILDING FROM SOURCE — the two universal build traps (added 2026-08-02)
+
+1. **A piped exit code lies.** `make ... | tee log` (or `go build | tee`) makes `$?` = **tee's** exit,
+   not the compiler's. A FAILED build reports success. Always capture the real exit with `${PIPESTATUS[0]}`.
+2. **Verify the artifact, never the exit code.** After any build, confirm the output binary/module mtime
+   actually updated and has the expected contents. A build can print "success" and leave a stale/wrong
+   artifact. (Firefox-specific extra: mach silences output when `CLAUDECODE`/`CODEX_SANDBOX`/`GEMINI_CLI`/
+   `OPENCODE` is set — unset them for the build. See the firefox-main AGENTS.md.)
+Full lesson: brain atom `Mach_Build_Output_Limited_Under_AI_Agent` (Firefox.154.Lessons/07.TOOLKIT).
+
+opencode build: `go build ... 2>&1 | tee build.log; exit=${PIPESTATUS[0]}`; verify the binary after.
+
 A Go fork of OpenCode: a Bubble Tea TUI coding agent. Target machine is a Sony VAIO
 SVE (i7-3632QM, 16 GB, Intel HD 4000, Debian 13) — assume modest hardware and a
 possibly high-latency link.

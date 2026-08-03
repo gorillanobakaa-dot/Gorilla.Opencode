@@ -3,26 +3,28 @@ package models
 const (
 	ProviderOpenRouter ModelProvider = "openrouter"
 
-	OpenRouterGPT41          ModelID = "openrouter.gpt-4.1"
-	OpenRouterGPT41Mini      ModelID = "openrouter.gpt-4.1-mini"
-	OpenRouterGPT41Nano      ModelID = "openrouter.gpt-4.1-nano"
-	OpenRouterGPT45Preview   ModelID = "openrouter.gpt-4.5-preview"
-	OpenRouterGPT4o          ModelID = "openrouter.gpt-4o"
-	OpenRouterGPT4oMini      ModelID = "openrouter.gpt-4o-mini"
-	OpenRouterO1             ModelID = "openrouter.o1"
-	OpenRouterO1Pro          ModelID = "openrouter.o1-pro"
-	OpenRouterO1Mini         ModelID = "openrouter.o1-mini"
-	OpenRouterO3             ModelID = "openrouter.o3"
-	OpenRouterO3Mini         ModelID = "openrouter.o3-mini"
-	OpenRouterO4Mini         ModelID = "openrouter.o4-mini"
-	OpenRouterGemini25Flash  ModelID = "openrouter.gemini-2.5-flash"
-	OpenRouterGemini25       ModelID = "openrouter.gemini-2.5"
-	OpenRouterClaude35Sonnet ModelID = "openrouter.claude-3.5-sonnet"
-	OpenRouterClaude3Haiku   ModelID = "openrouter.claude-3-haiku"
-	OpenRouterClaude37Sonnet ModelID = "openrouter.claude-3.7-sonnet"
-	OpenRouterClaude35Haiku  ModelID = "openrouter.claude-3.5-haiku"
-	OpenRouterClaude3Opus    ModelID = "openrouter.claude-3-opus"
-	OpenRouterDeepSeekR1Free ModelID = "openrouter.deepseek-r1-free"
+	OpenRouterGPT41           ModelID = "openrouter.gpt-4.1"
+	OpenRouterGPT41Mini       ModelID = "openrouter.gpt-4.1-mini"
+	OpenRouterGPT41Nano       ModelID = "openrouter.gpt-4.1-nano"
+	OpenRouterGPT45Preview    ModelID = "openrouter.gpt-4.5-preview"
+	OpenRouterGPT4o           ModelID = "openrouter.gpt-4o"
+	OpenRouterGPT4oMini       ModelID = "openrouter.gpt-4o-mini"
+	OpenRouterO1              ModelID = "openrouter.o1"
+	OpenRouterO1Pro           ModelID = "openrouter.o1-pro"
+	OpenRouterO1Mini          ModelID = "openrouter.o1-mini"
+	OpenRouterO3              ModelID = "openrouter.o3"
+	OpenRouterO3Mini          ModelID = "openrouter.o3-mini"
+	OpenRouterO4Mini          ModelID = "openrouter.o4-mini"
+	OpenRouterGemini25Flash   ModelID = "openrouter.gemini-2.5-flash"
+	OpenRouterGemini25        ModelID = "openrouter.gemini-2.5"
+	OpenRouterClaude35Sonnet  ModelID = "openrouter.claude-3.5-sonnet"
+	OpenRouterClaude3Haiku    ModelID = "openrouter.claude-3-haiku"
+	OpenRouterClaude37Sonnet  ModelID = "openrouter.claude-3.7-sonnet"
+	OpenRouterClaude35Haiku   ModelID = "openrouter.claude-3.5-haiku"
+	OpenRouterClaude3Opus     ModelID = "openrouter.claude-3-opus"
+	OpenRouterDeepSeekR1Free  ModelID = "openrouter.deepseek-r1-free"
+	OpenRouterDeepSeekV4Flash ModelID = "openrouter.deepseek-v4-flash"
+	OpenRouterDeepSeekV4Pro   ModelID = "openrouter.deepseek-v4-pro"
 )
 
 var OpenRouterModels = map[ModelID]Model{
@@ -272,5 +274,30 @@ var OpenRouterModels = map[ModelID]Model{
 		CostPer1MOutCached: 0,
 		ContextWindow:      163_840,
 		DefaultMaxTokens:   10000,
+	},
+
+	OpenRouterDeepSeekV4Flash: {
+		ID:                 OpenRouterDeepSeekV4Flash,
+		Name:               "OpenRouter – DeepSeek V4 Flash",
+		Provider:           ProviderOpenRouter,
+		APIModel:           "deepseek/deepseek-v4-flash",
+		CostPer1MIn:        DeepSeekModels[DeepSeekV4Flash].CostPer1MIn,
+		CostPer1MInCached:  DeepSeekModels[DeepSeekV4Flash].CostPer1MInCached,
+		CostPer1MOut:       DeepSeekModels[DeepSeekV4Flash].CostPer1MOut,
+		CostPer1MOutCached: DeepSeekModels[DeepSeekV4Flash].CostPer1MOutCached,
+		ContextWindow:      DeepSeekModels[DeepSeekV4Flash].ContextWindow,
+		DefaultMaxTokens:   DeepSeekModels[DeepSeekV4Flash].DefaultMaxTokens,
+	},
+	OpenRouterDeepSeekV4Pro: {
+		ID:                 OpenRouterDeepSeekV4Pro,
+		Name:               "OpenRouter – DeepSeek V4 Pro",
+		Provider:           ProviderOpenRouter,
+		APIModel:           "deepseek/deepseek-v4-pro",
+		CostPer1MIn:        DeepSeekModels[DeepSeekV4Pro].CostPer1MIn,
+		CostPer1MInCached:  DeepSeekModels[DeepSeekV4Pro].CostPer1MInCached,
+		CostPer1MOut:       DeepSeekModels[DeepSeekV4Pro].CostPer1MOut,
+		CostPer1MOutCached: DeepSeekModels[DeepSeekV4Pro].CostPer1MOutCached,
+		ContextWindow:      DeepSeekModels[DeepSeekV4Pro].ContextWindow,
+		DefaultMaxTokens:   DeepSeekModels[DeepSeekV4Pro].DefaultMaxTokens,
 	},
 }

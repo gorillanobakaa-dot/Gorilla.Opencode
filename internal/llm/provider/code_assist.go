@@ -94,6 +94,12 @@ type caEnvelope struct {
 	Model   string         `json:"model"`
 	Project string         `json:"project,omitempty"`
 	Request caInnerRequest `json:"request"`
+	// GORILLA OVERRIDE: the Antigravity backend (daily-cloudcode-pa) requires
+	// three more top-level fields; the Gemini path leaves them empty (omitempty)
+	// so this one struct serves both. Measured from a live agy capture.
+	RequestID   string `json:"requestId,omitempty"`
+	UserAgent   string `json:"userAgent,omitempty"`
+	RequestType string `json:"requestType,omitempty"`
 }
 
 // caResponse is one chunk (SSE) or the whole non-streaming reply; the real
@@ -116,7 +122,9 @@ type caResponse struct {
 
 // ---- conversion (mirrors gemini.go convertMessages/convertTools) -----------
 
-func (c *codeAssistClient) convertMessages(messages []message.Message) []caContent {
+// caConvertMessages is a free function (no client state) so both the Gemini
+// Code Assist client and the Antigravity client share one conversion.
+func caConvertMessages(messages []message.Message) []caContent {
 	var out []caContent
 	for _, msg := range messages {
 		switch msg.Role {
@@ -194,7 +202,7 @@ func convertToolsCA(ts []tools.BaseTool) []caTool {
 
 func (c *codeAssistClient) buildEnvelope(messages []message.Message, ts []tools.BaseTool) caEnvelope {
 	req := caInnerRequest{
-		Contents: c.convertMessages(messages),
+		Contents: caConvertMessages(messages),
 		Tools:    convertToolsCA(ts),
 		GenerationConfig: map[string]any{
 			"maxOutputTokens": c.providerOptions.maxTokens,
@@ -238,6 +246,11 @@ func (c *codeAssistClient) post(ctx context.Context, method string, env caEnvelo
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
+	// GORILLA OVERRIDE: do NOT send the Antigravity User-Agent here. Measured
+	// 2026-08-03: cloudcode-pa REJECTS generateContent with a 403 when the UA
+	// identifies as Antigravity (that identity is only honoured for onboarding,
+	// see auth.CodeAssistUserAgent), and serves it normally with the default
+	// UA once a project exists. The earlier 500 was a blank project, not the UA.
 	return http.DefaultClient.Do(req)
 }
 

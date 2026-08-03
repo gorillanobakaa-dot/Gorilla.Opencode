@@ -77,3 +77,7 @@ checksums.txt
 # Describes in-flight work and past mistakes in detail; useful to the next
 # session on this machine, nobody else's business.
 HANDOFF.md
+
+# backup binaries (local safety copies)
+gorilla-opencode.backup
+*.backup

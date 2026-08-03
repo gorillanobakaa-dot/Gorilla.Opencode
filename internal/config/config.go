@@ -385,6 +385,13 @@ func setProviderDefaults() {
 	if creds, _ := auth.LoadGeminiCreds(); creds != nil && creds.AccessToken != "" {
 		viper.SetDefault("providers.gemini-oauth.apiKey", "oauth-login")
 	}
+	// GORILLA OVERRIDE: same for the Antigravity free tier (Claude/GPT-OSS/
+	// Gemini) — enable the provider when its OAuth credentials exist on disk.
+	// The placeholder just clears the "apiKey == '' means disabled" gate; the
+	// real auth is the stored token. See internal/auth/antigravity_oauth.go.
+	if creds, _ := auth.LoadAntigravityCreds(); creds != nil && creds.AccessToken != "" {
+		viper.SetDefault("providers.antigravity.apiKey", "oauth-login")
+	}
 	if apiKey := os.Getenv("OPENROUTER_API_KEY"); apiKey != "" {
 		viper.SetDefault("providers.openrouter.apiKey", apiKey)
 	}
