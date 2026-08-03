@@ -559,6 +559,8 @@ func providerDisplayName(p models.ModelProvider) string {
 	switch p {
 	case models.ProviderGeminiCA:
 		return "Gemini (Google login)"
+	case models.ProviderAntigravity:
+		return "Antigravity (Google login — Claude/GPT/Gemini)"
 	}
 	s := string(p)
 	if s == "" {

@@ -137,6 +137,13 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 			options: clientOptions,
 			client:  newCodeAssistClient(clientOptions),
 		}, nil
+	// GORILLA OVERRIDE: Antigravity free tier (Claude/GPT-OSS/Gemini). See
+	// internal/llm/provider/antigravity.go.
+	case models.ProviderAntigravity:
+		return &baseProvider[AntigravityClient]{
+			options: clientOptions,
+			client:  newAntigravityClient(clientOptions),
+		}, nil
 	case models.ProviderAzure:
 		return &baseProvider[AzureClient]{
 			options: clientOptions,
@@ -162,6 +169,15 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 	case models.ProviderXAI:
 		clientOptions.openaiOptions = append(clientOptions.openaiOptions,
 			WithOpenAIBaseURL("https://api.x.ai/v1"),
+		)
+		return &baseProvider[OpenAIClient]{
+			options: clientOptions,
+			client:  newOpenAIClient(clientOptions),
+		}, nil
+	// GORILLA OVERRIDE: DeepSeek (OpenAI-compatible at api.deepseek.com).
+	case models.ProviderDeepSeek:
+		clientOptions.openaiOptions = append(clientOptions.openaiOptions,
+			WithOpenAIBaseURL("https://api.deepseek.com/v1"),
 		)
 		return &baseProvider[OpenAIClient]{
 			options: clientOptions,

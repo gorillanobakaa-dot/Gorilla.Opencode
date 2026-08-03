@@ -91,18 +91,14 @@ var launchCmd = &cobra.Command{
 	// args arrives verbatim and is handed to the exec'd binary below.
 	DisableFlagParsing: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// First desktop launch after a .deb install: create the key
-		// file and tell the user where it is, instead of flash-dying.
-		if ensureEnvTemplate() {
-			fmt.Printf("Welcome to Gorilla OpenCode.\n\nNo API keys are set yet. Put them in:\n  %s\n\n", envFilePath())
-			fmt.Println("  NVIDIA NIM:  LOCAL_ENDPOINT=https://integrate.api.nvidia.com/v1")
-			fmt.Println("               LOCAL_ENDPOINT_API_KEY=nvapi-...")
-			fmt.Println("  Google:      GEMINI_API_KEY=...")
-			fmt.Println("  Ollama:      LOCAL_ENDPOINT=http://localhost:11434/v1")
-			fmt.Print("\nThen launch again. Press Enter to close... ")
-			_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
-			return nil
-		}
+		// GORILLA OVERRIDE: create the key-file template on first run, then
+		// continue straight into the app. The provider portal (shown on every
+		// interactive launch, see cmd/provider_portal.go) is the onboarding now;
+		// the old behaviour here — print the env-file path, hold the window, and
+		// exit without starting anything — predates having an interactive screen
+		// to fall into. The env file it created is still read by config.Load, so
+		// that route to supplying keys is unchanged.
+		_ = ensureEnvTemplate()
 
 		self, err := os.Executable()
 		if err != nil {

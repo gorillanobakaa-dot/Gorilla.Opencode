@@ -46,6 +46,27 @@ const (
 	// Google Code Assist backend (the "free tier via login" endpoint).
 	CodeAssistEndpoint = "https://cloudcode-pa.googleapis.com"
 	CodeAssistVersion  = "v1internal"
+
+	// CodeAssistUserAgent identifies the ONBOARDING calls (loadCodeAssist,
+	// onboardUser) as the Antigravity CLI, which is what makes the FREE tier
+	// available and provisions a managed project.
+	//
+	// GORILLA OVERRIDE (2026-08-03): all measured against the live cloudcode-pa
+	// endpoint with a real logged-in token.
+	//   - loadCodeAssist: Google returns free-tier as ineligible
+	//     ("UNSUPPORTED_CLIENT — migrate to the Antigravity suite") for any
+	//     other client, leaving only a paid standard-tier that needs a
+	//     user-supplied GCP project. A User-Agent whose product token is
+	//     "antigravity" (case-insensitive) restores free-tier and yields a
+	//     managed project. The x-goog-api-client "gd/" token an earlier draft
+	//     proposed does nothing and is omitted.
+	//   - generateContent: the OPPOSITE — this same UA is REJECTED with 403,
+	//     and generation works with the default UA once a project exists. So
+	//     this header goes on onboarding ONLY, never on generation (see the
+	//     comment in internal/llm/provider/code_assist.go). The original 500
+	//     was a blank project, not the UA.
+	// Version tracks the installed agy (1.1.10).
+	CodeAssistUserAgent = "Antigravity/1.1.10 (linux; amd64)"
 )
 
 // geminiOAuthScopes are copied verbatim from the Gemini CLI.
@@ -404,6 +425,9 @@ func (c *GeminiCreds) callCodeAssist(ctx context.Context, token, method string, 
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
+	// GORILLA OVERRIDE: identify as Antigravity so loadCodeAssist/onboardUser
+	// return the free tier and provision a managed project. See CodeAssistUserAgent.
+	req.Header.Set("User-Agent", CodeAssistUserAgent)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err

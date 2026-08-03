@@ -242,6 +242,29 @@ understanding code directly from the terminal.`,
 			}
 		}
 
+		// GORILLA OVERRIDE: the every-launch provider portal. The desktop entry
+		// passes no arguments and most people start the program by clicking it,
+		// so switching provider must not require a flag or a config edit. The
+		// cursor starts on the active provider and Enter continues, so the
+		// launch that changes nothing costs one keystroke. -p runs never see it.
+		//
+		// After config.Load because UpsertProviderKey/UpsertLocalEndpoint need a
+		// loaded config, and before the "no provider" fatal check below so that
+		// selecting a provider here is what satisfies it. context.Background()
+		// rather than the app context (created later): the OAuth path is a
+		// blocking browser round-trip, exactly as `gorilla-opencode login` runs.
+		if prompt == "" && interactiveTerminal() {
+			quitApp, err := runProviderPortal(context.Background())
+			if err != nil {
+				return err
+			}
+			if quitApp {
+				// Same contract as quitting the workspace picker: nothing has
+				// started yet, leave silently.
+				return nil
+			}
+		}
+
 		// GORILLA OVERRIDE: fill the /settings theme row's options from the theme
 		// registry. theme imports config, so config cannot import it back — the
 		// list is pushed in here, the same inversion used for prompt sections and

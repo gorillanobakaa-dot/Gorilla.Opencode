@@ -237,6 +237,23 @@ func (a appModel) Init() tea.Cmd {
 		return dialog.ShowInitDialogMsg{Show: shouldShow}
 	})
 
+	// GORILLA OVERRIDE: on session start, if signed in to Antigravity, fetch the
+	// weekly quota once and surface it in the status bar — the same one-line view
+	// /usage shows, automatically. SILENT (nil msg) when not signed in, so
+	// non-Antigravity users never see a thing. Runs in the Cmd goroutine, so a
+	// slow fetch on a high-latency link never blocks startup.
+	cmds = append(cmds, func() tea.Msg {
+		creds, _ := auth.LoadAntigravityCreds()
+		if creds == nil || creds.AccessToken == "" {
+			return nil
+		}
+		line, err := creds.QuotaSummaryLine(context.Background())
+		if err != nil {
+			return nil // startup is not the place to nag about a transient error
+		}
+		return util.InfoMsg{Type: util.InfoTypeInfo, Msg: line}
+	})
+
 	return tea.Batch(cmds...)
 }
 
@@ -1753,6 +1770,30 @@ If there are Cursor rules (in .cursor/rules/ or .cursorrules) or Copilot rules (
 			}
 		},
 	})
+	// GORILLA OVERRIDE: /usage shows the Antigravity free-tier weekly quota
+	// (agy's /usage screen, condensed to one status line). The fetch runs inside
+	// the returned tea.Cmd's goroutine, so the network call never blocks the UI,
+	// and the result comes back as an InfoMsg — never printed onto the screen
+	// Bubble Tea owns.
+	model.RegisterCommand(dialog.Command{
+		ID:          "usage",
+		Title:       "Antigravity Usage",
+		Description: "Show your Antigravity free-tier weekly quota (Claude/GPT/Gemini)",
+		Handler: func(cmd dialog.Command) tea.Cmd {
+			return func() tea.Msg {
+				creds, _ := auth.LoadAntigravityCreds()
+				if creds == nil || creds.AccessToken == "" {
+					return util.InfoMsg{Type: util.InfoTypeWarn, Msg: "Not signed in to Antigravity — pick it in the provider portal to sign in."}
+				}
+				line, err := creds.QuotaSummaryLine(context.Background())
+				if err != nil {
+					return util.InfoMsg{Type: util.InfoTypeError, Msg: "Antigravity usage: " + err.Error()}
+				}
+				return util.InfoMsg{Type: util.InfoTypeInfo, Msg: line}
+			}
+		},
+	})
+
 	// Load custom commands
 	customCommands, err := dialog.LoadCustomCommands()
 	if err != nil {

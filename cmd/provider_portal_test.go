@@ -1,0 +1,184 @@
+package cmd
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"testing"
+
+	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/config/configtest"
+	"github.com/opencode-ai/opencode/internal/llm/models"
+	"github.com/opencode-ai/opencode/internal/tui/startup"
+)
+
+// TestMain isolates config: applyPortalChoice writes real credentials through
+// updateCfgFile, which without this lands in the developer's live config.json
+// (that has happened three times — see internal/config/configtest).
+func TestMain(m *testing.M) { os.Exit(configtest.Isolate(m)) }
+
+// loadCfg loads the isolated config once. config.Load caches globally, so the
+// first call in the process wins and later calls return the same object; every
+// test in this file therefore shares one isolated config, and assertions read
+// the file back rather than trusting in-memory state.
+func loadCfg(t *testing.T) {
+	t.Helper()
+	if config.Get() != nil {
+		return
+	}
+	cwd, _ := os.Getwd()
+	if _, err := config.Load(cwd, false); err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+}
+
+func readCfgFile(t *testing.T) config.Config {
+	t.Helper()
+	b, err := os.ReadFile(config.GorillaConfigFile())
+	if err != nil {
+		t.Fatalf("reading config file: %v", err)
+	}
+	var c config.Config
+	if err := json.Unmarshal(b, &c); err != nil {
+		t.Fatalf("unmarshalling config file: %v", err)
+	}
+	return c
+}
+
+// An API-key selection saves the key and moves every agent onto that provider,
+// persisted to disk — not just held in memory.
+func TestApplyAPIKeyChoicePersists(t *testing.T) {
+	loadCfg(t)
+	const key = "sk-ant-testonly-000"
+	err := applyPortalChoice(context.Background(), startup.ProviderChoice{ID: "anthropic", Input: key})
+	if err != nil {
+		t.Fatalf("applyPortalChoice: %v", err)
+	}
+	c := readCfgFile(t)
+	if got := c.Providers[models.ProviderAnthropic].APIKey; got != key {
+		t.Fatalf("anthropic key not persisted: got %q", got)
+	}
+	if got := c.Agents[config.AgentCoder].Model; got != models.Claude37Sonnet {
+		t.Fatalf("coder not moved to anthropic model: got %q", got)
+	}
+	if got := c.Agents[config.AgentTitle].Model; got != models.Claude37Sonnet {
+		t.Fatalf("title not moved: got %q", got)
+	}
+}
+
+// A local endpoint that lists no models is a failure, surfaced as an error so
+// the portal loop re-opens rather than silently leaving a dead endpoint.
+func TestApplyLocalEndpointNoModelsErrors(t *testing.T) {
+	loadCfg(t)
+	orig := registerLocalEndpoint
+	defer func() { registerLocalEndpoint = orig }()
+	registerLocalEndpoint = func(name, base, key string) (int, models.ModelID) { return 0, "" }
+
+	err := applyLocalEndpoint(nimEndpointName, nimBaseURL, "nvapi-xxx")
+	if err == nil {
+		t.Fatal("expected an error when no models are found")
+	}
+}
+
+// A successful local endpoint saves the endpoint (with its key) and points the
+// agents at the first discovered model.
+func TestApplyLocalEndpointSuccess(t *testing.T) {
+	loadCfg(t)
+
+	fakeID := models.ModelID("local.faketest-model")
+	models.SupportedModels[fakeID] = models.Model{
+		ID: fakeID, Provider: models.ProviderLocal, ContextWindow: 8192, DefaultMaxTokens: 4096,
+	}
+	models.RegisterLocalRouteForTestNamed(fakeID, nimBaseURL, "nvapi-xxx", nimEndpointName)
+	defer func() {
+		delete(models.SupportedModels, fakeID)
+		models.ClearLocalRouteForTest(fakeID)
+	}()
+
+	orig := registerLocalEndpoint
+	defer func() { registerLocalEndpoint = orig }()
+	registerLocalEndpoint = func(name, base, key string) (int, models.ModelID) { return 1, fakeID }
+
+	if err := applyLocalEndpoint(nimEndpointName, nimBaseURL, "nvapi-xxx"); err != nil {
+		t.Fatalf("applyLocalEndpoint: %v", err)
+	}
+	c := readCfgFile(t)
+	var found *config.LocalEndpoint
+	for i := range c.LocalEndpoints {
+		if c.LocalEndpoints[i].Name == nimEndpointName {
+			found = &c.LocalEndpoints[i]
+		}
+	}
+	if found == nil {
+		t.Fatal("NIM endpoint not persisted")
+	}
+	if found.APIKey != "nvapi-xxx" {
+		t.Fatalf("endpoint key not persisted: got %q", found.APIKey)
+	}
+	if got := c.Agents[config.AgentCoder].Model; got != fakeID {
+		t.Fatalf("coder not pointed at discovered model: got %q", got)
+	}
+}
+
+// An empty key on a re-selection must reuse the stored key, not blank it — this
+// is what Enter-on-a-ready-row means.
+func TestApplyLocalEndpointEmptyKeyReusesStored(t *testing.T) {
+	loadCfg(t)
+	// Seed a stored key.
+	if err := config.UpsertLocalEndpoint(config.LocalEndpoint{
+		Name: ollamaEndpointName, BaseURL: ollamaBaseURL, APIKey: "seeded-key",
+	}); err != nil {
+		t.Fatalf("seeding endpoint: %v", err)
+	}
+
+	fakeID := models.ModelID("local.faketest-ollama")
+	models.SupportedModels[fakeID] = models.Model{
+		ID: fakeID, Provider: models.ProviderLocal, ContextWindow: 8192, DefaultMaxTokens: 4096,
+	}
+	models.RegisterLocalRouteForTestNamed(fakeID, ollamaBaseURL, "seeded-key", ollamaEndpointName)
+	defer func() {
+		delete(models.SupportedModels, fakeID)
+		models.ClearLocalRouteForTest(fakeID)
+	}()
+
+	var gotKey string
+	orig := registerLocalEndpoint
+	defer func() { registerLocalEndpoint = orig }()
+	registerLocalEndpoint = func(name, base, key string) (int, models.ModelID) {
+		gotKey = key
+		return 1, fakeID
+	}
+
+	if err := applyLocalEndpoint(ollamaEndpointName, ollamaBaseURL, ""); err != nil {
+		t.Fatalf("applyLocalEndpoint: %v", err)
+	}
+	if gotKey != "seeded-key" {
+		t.Fatalf("empty key should have reused the stored key, got %q", gotKey)
+	}
+}
+
+// Every row the portal presents must be handled by applyPortalChoice's switch —
+// the guard that stops a future new row from silently doing nothing. Checked
+// structurally so no OAuth/network side effect runs.
+func TestEveryPortalRowIsHandled(t *testing.T) {
+	loadCfg(t)
+	handled := map[string]bool{
+		"antigravity":  true,
+		"google-oauth": true,
+		"gcp-custom":   true,
+		"nvidia-nim":   true,
+		"ollama":       true,
+	}
+	for id := range portalProvider {
+		handled[id] = true
+	}
+	rows, _ := providerPortalRows()
+	if len(rows) == 0 {
+		t.Fatal("no rows produced")
+	}
+	for _, r := range rows {
+		if !handled[r.ID] {
+			t.Fatalf("row %q is presented but not handled by applyPortalChoice", r.ID)
+		}
+	}
+}
