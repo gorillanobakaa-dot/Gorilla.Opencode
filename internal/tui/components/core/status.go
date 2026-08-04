@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/llm/models"
@@ -35,6 +36,28 @@ type statusCmp struct {
 }
 
 // clearMessageCmd is a command that clears status messages after a timeout
+// truncateStatusMsg fits a status/error message into width terminal COLUMNS.
+//
+// GORILLA FIX: this was inline as `msg[:infoWidth]` — a BYTE offset applied
+// against a COLUMN budget. The two agree only for pure ASCII, so any multi-byte
+// rune straddling the cut was sawn in half and emitted as invalid UTF-8. The
+// provider errors that land here now routinely carry "—" and "⟨⟩" (3 bytes
+// each), which took the odds of cutting mid-rune from remote to routine. len()
+// was wrong in the same direction: it overstated the length of any non-ASCII
+// message and truncated ones that would have fitted.
+//
+// ansi.Truncate measures display width and never splits a rune — the same tool
+// clampToWidth in tui.go already uses for this exact job.
+//
+// Extracted from View() so the behaviour can actually be tested: asserting that
+// ansi.Truncate is rune-safe proves nothing about whether this file calls it.
+func truncateStatusMsg(msg string, width int) string {
+	if width <= 0 {
+		return msg
+	}
+	return ansi.Truncate(msg, width, "...")
+}
+
 func (m statusCmp) clearMessageCmd(ttl time.Duration) tea.Cmd {
 	return tea.Tick(ttl, func(time.Time) tea.Msg {
 		return util.ClearStatusMsg{}
@@ -195,11 +218,7 @@ func (m statusCmp) View() string {
 		}
 
 		infoWidth := availableWidht - 10
-		// Truncate message if it's longer than available width
-		msg := m.info.Msg
-		if len(msg) > infoWidth && infoWidth > 0 {
-			msg = msg[:infoWidth] + "..."
-		}
+		msg := truncateStatusMsg(m.info.Msg, infoWidth)
 		status += infoStyle.Render(msg)
 	} else {
 		status += styles.Padded().

@@ -108,6 +108,15 @@ func (ToolResult) isPart() {}
 type Finish struct {
 	Reason FinishReason `json:"reason"`
 	Time   int64        `json:"time"`
+	// Details carries the provider's own words for a turn that ended badly.
+	//
+	// GORILLA OVERRIDE: a failed turn used to leave NOTHING in the transcript —
+	// the error went to the one-line status bar, which truncates at ~100 columns
+	// and is overwritten by the next message. The evidence was gone before you
+	// could read it. Storing it on the finish part puts the full error in the
+	// conversation, where it can be scrolled, selected and copied like any other
+	// output. omitempty, so existing rows on disk decode unchanged.
+	Details string `json:"details,omitempty"`
 }
 
 func (Finish) isPart() {}
@@ -311,7 +320,10 @@ func (m *Message) SetToolResults(tr []ToolResult) {
 	}
 }
 
-func (m *Message) AddFinish(reason FinishReason) {
+// AddFinish records why a turn ended. details is optional and carries the
+// provider's raw message when the reason is a failure; it is variadic so every
+// existing caller keeps working unchanged.
+func (m *Message) AddFinish(reason FinishReason, details ...string) {
 	// remove any existing finish part
 	for i, part := range m.Parts {
 		if _, ok := part.(Finish); ok {
@@ -319,7 +331,11 @@ func (m *Message) AddFinish(reason FinishReason) {
 			break
 		}
 	}
-	m.Parts = append(m.Parts, Finish{Reason: reason, Time: time.Now().Unix()})
+	var detail string
+	if len(details) > 0 {
+		detail = details[0]
+	}
+	m.Parts = append(m.Parts, Finish{Reason: reason, Time: time.Now().Unix(), Details: detail})
 }
 
 func (m *Message) AddImageURL(url, detail string) {

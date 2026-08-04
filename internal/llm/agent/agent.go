@@ -388,7 +388,13 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 				a.messages.Update(context.Background(), agentMessage)
 				return a.err(ErrRequestCancelled)
 			}
-			return a.err(fmt.Errorf("failed to process events: %w", err))
+			// GORILLA FIX: no "failed to process events:" prefix. It is internal
+			// jargon that told the user nothing and buried the one sentence that
+			// did — the provider errors below are already written as plain
+			// sentences ("… is not available to your account", "still failing
+			// after N retries — the provider is busy"), so a prefix about event
+			// processing only made a clear message look like a crash.
+			return a.err(err)
 		}
 		if cfg.Debug {
 			seqId := (len(msgHistory) + 1) / 2
@@ -623,7 +629,19 @@ func (a *agent) processEvent(ctx context.Context, sessionID string, assistantMsg
 			logging.InfoPersist(fmt.Sprintf("Event processing canceled for session: %s", sessionID))
 			return context.Canceled
 		}
+		// GORILLA FIX: put the failure in the TRANSCRIPT, not only in the status
+		// bar. The status line truncates at roughly 100 columns and the next
+		// message overwrites it, so the one thing needed to diagnose a failed
+		// turn was the one thing that could not be read or copied. Recording it
+		// on the assistant message keeps the provider's exact words in the
+		// conversation — scrollable, selectable, and still there tomorrow.
+		//
+		// The status bar keeps its short flash; this is the durable copy.
 		logging.ErrorPersist(event.Error.Error())
+		assistantMsg.AddFinish(message.FinishReasonError, event.Error.Error())
+		if err := a.messages.Update(ctx, *assistantMsg); err != nil {
+			logging.Error("could not record the failure on the message", "err", err)
+		}
 		return event.Error
 	case provider.EventComplete:
 		assistantMsg.SetToolCalls(event.Response.ToolCalls)

@@ -270,12 +270,29 @@ func renderAssistantMessage(
 				content = "*The model returned an error and produced no answer. " +
 					"If the context percentage in the footer is over 100%, the request " +
 					"was almost certainly rejected for being too large.*"
+				// GORILLA FIX: show the provider's own words underneath the
+				// explanation, not instead of it. The status bar gets ~100
+				// columns and then truncates; this is the copy you can actually
+				// read, scroll back to and paste into a bug report. Fenced so a
+				// URL or JSON fragment is not mangled by markdown, and so it is
+				// visibly the machine's words rather than ours.
+				if d := strings.TrimSpace(finishData.Details); d != "" {
+					content += "\n\n```\n" + d + "\n```"
+				}
 			case message.FinishReasonMaxTokens:
 				content = "*Stopped at the model's output limit before finishing the answer.*"
 			case message.FinishReasonCanceled:
 				content = "*Canceled — no answer was produced.*"
 			case message.FinishReasonPermissionDenied:
 				content = "*Permission denied, so nothing was run and no answer was produced.*"
+			case message.FinishReasonToolUse:
+				// GORILLA FIX: this is the COMMON case, and it was falling through
+				// to "Finished without output" — which reads like a failure for
+				// what is actually the model working normally. A turn that ends in
+				// tool_use with no prose means the model said nothing and went
+				// straight to running something; the tool call and its result are
+				// rendered directly below, so the turn is not empty at all.
+				content = "*No message — the model went straight to running a tool (below).*"
 			default:
 				content = "*Finished without output*"
 			}

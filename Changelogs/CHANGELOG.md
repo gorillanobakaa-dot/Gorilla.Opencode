@@ -1,3 +1,44 @@
+## v0.1.68 — 2026-08-04 — when something fails, you can finally read why
+
+Full dual-track document: [v0.1.68-release-notes.md](v0.1.68-release-notes.md).
+
+**Plain-language version:** an error used to read `failed to process events: POST
+"https://…/v1/chat/completions": 404 Not Found`, which looks like the app or the
+network is broken. It was neither — the key was fine and the provider was simply
+refusing to run that one model for that account, and working that out took an
+evening. Errors are now written in English (*"Llama 3.3 70B isn't enabled for your
+account (HTTP 404 — your key is fine). Pick another with /models."*) with the raw
+machine error kept alongside, never instead — a translation that throws away the
+evidence is worse than none when the translation is wrong. 401 and 404 give
+deliberately different advice, because sending you to regenerate a perfectly good
+key is its own waste. Failures now also land in the transcript, where they can be
+scrolled, selected and copied, instead of flashing past in a status bar that cuts
+off at ~100 characters and is wiped by the next message. The jargon prefix
+"failed to process events" is gone. A turn where the model runs a command instead
+of talking is no longer labelled "Finished without output" as though it had
+crashed. And a text-mangling bug was found while fixing the above: the status bar
+shortened messages by counting bytes rather than characters, so any dash or
+accented letter on the cut point was sliced in half — harmless for plain English,
+but the new error messages contain "—" and "⟨⟩", so the fix above would have
+started triggering it. Provider error text is now stored locally in your session
+database; inspected errors carry only method, URL and status, though this has not
+been audited across every provider.
+
+## v0.1.67 — 2026-08-04 — the provider picker stops cutting names in half
+
+Full dual-track document: [v0.1.67-release-notes.md](v0.1.67-release-notes.md).
+
+**Plain-language version:** the every-launch provider menu and the extras screen
+squeezed themselves into 76 characters regardless of terminal size, so provider
+names and descriptions were chopped off mid-word on a wide window. The 76 was a
+legitimate *fallback* for before the terminal reports its size, but it was also
+being used as a *ceiling*, so the real width was ignored once known. It now
+applies only when the width is genuinely unknown. Display-only; no settings, keys
+or sessions touched. **These notes were written after the fact, during the
+v0.1.68 release — v0.1.67 shipped with no changelog entry and no notes inside its
+package. That was an oversight, and this entry exists so the release is not a hole
+in the record.**
+
 ## v0.1.66 — 2026-08-04 — the free Claude/GPT tier now actually works when you use it
 
 Full dual-track document: [v0.1.66-release-notes.md](v0.1.66-release-notes.md).
