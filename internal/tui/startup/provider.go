@@ -170,7 +170,10 @@ func (m *providerModel) contentWidth() int {
 	if m.width <= 0 {
 		return fallback
 	}
-	return max(minimum, min(fallback, m.width-chrome))
+	// GORILLA OVERRIDE: removed min(fallback, ...) — the fallback is only for
+	// the no-width-yet case above. Capping at 76 on a wide terminal clips long
+	// provider names mid-word; use the full terminal width instead.
+	return max(minimum, m.width-chrome)
 }
 
 func (m *providerModel) View() string {

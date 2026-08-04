@@ -102,7 +102,10 @@ func (m *extrasModel) contentWidth() int {
 	if m.width <= 0 {
 		return fallback
 	}
-	return max(minimum, min(fallback, m.width-chrome))
+	// GORILLA OVERRIDE: removed min(fallback, ...) — fallback is only for the
+	// no-width-yet case above. Capping at 76 on a wide terminal clips item
+	// names and descriptions; use the full terminal width instead.
+	return max(minimum, m.width-chrome)
 }
 
 func (m *extrasModel) View() string {
