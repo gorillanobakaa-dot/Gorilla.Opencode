@@ -16,9 +16,12 @@ import (
 	"github.com/opencode-ai/opencode/internal/tui/startup"
 )
 
-// Endpoint names are FIXED so a re-selection updates the same entry instead of
-// accumulating duplicates — UpsertLocalEndpoint matches by Name, and one user
-// config once held four entries for the same NVIDIA URL.
+// Default endpoint names, used only when the user has no entry for that baseURL
+// yet. An endpoint is identified by WHERE IT POINTS, not by what it is called:
+// both the "is this configured?" check and the upsert resolve by baseURL and
+// adopt the user's own name. Keying off the name instead is what let one config
+// accumulate four entries for the same NVIDIA URL, and later made a keyed
+// "Gorilla.FREE.NVIDIA.NIM" invisible to the portal.
 const (
 	nimEndpointName    = "NVIDIA NIM"
 	nimBaseURL         = "https://integrate.api.nvidia.com/v1"
@@ -77,23 +80,54 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 		pr, ok := cfg.Providers[p]
 		return ok && pr.APIKey != "" && !pr.Disabled
 	}
-	endpoint := func(name string) (config.LocalEndpoint, bool) {
+	// GORILLA FIX: find a local endpoint by its baseURL, NOT by the name we
+	// happen to give it.
+	//
+	// This used to match on e.Name == "NVIDIA NIM". An endpoint is identified by
+	// where it points, and users name theirs whatever they like — one here is
+	// called "Gorilla.FREE.NVIDIA.NIM". The portal therefore could not see a
+	// perfectly good, keyed NIM endpoint and asked for the key again on every
+	// launch, with the row showing as not configured.
+	//
+	// The same name assumption is what made the portal CREATE a second "NVIDIA
+	// NIM" entry beside the user's own, leaving two endpoints on one baseURL —
+	// the documented "last one wins" trap that takes the survivor's models down
+	// with it. Matching on URL fixes both halves.
+	//
+	// A keyed entry wins over an unkeyed one when several point at the same URL,
+	// so a stray blank duplicate cannot mask a working key.
+	endpointFor := func(baseURL string) (config.LocalEndpoint, bool) {
+		var found config.LocalEndpoint
+		var ok bool
 		for _, e := range cfg.LocalEndpoints {
-			if e.Name == name && !e.Disabled {
-				return e, true
+			if e.BaseURL != baseURL || e.Disabled {
+				continue
+			}
+			if !ok || (found.APIKey == "" && e.APIKey != "") {
+				found, ok = e, true
 			}
 		}
-		return config.LocalEndpoint{}, false
+		return found, ok
 	}
 
 	creds, _ := auth.LoadGeminiCreds()
 	oauthReady := creds != nil && creds.AccessToken != ""
 	agCreds, _ := auth.LoadAntigravityCreds()
 	agReady := agCreds != nil && agCreds.AccessToken != ""
-	nimEp, nimReady := endpoint(nimEndpointName)
-	_, ollamaReady := endpoint(ollamaEndpointName)
+	nimEp, nimReady := endpointFor(nimBaseURL)
+	ollamaEp, _ := endpointFor(ollamaBaseURL)
 	nimReady = nimReady && nimEp.APIKey != ""
-	_ = ollamaReady // reachability is decided on apply, not from stored state
+
+	// The user's own name for each endpoint, so "Active" compares like with like.
+	// Falls back to ours when they have no entry for that URL yet.
+	nimName := nimEndpointName
+	if nimEp.Name != "" {
+		nimName = nimEp.Name
+	}
+	ollamaName := ollamaEndpointName
+	if ollamaEp.Name != "" {
+		ollamaName = ollamaEp.Name
+	}
 
 	// Which row is the session currently on?
 	curModel := cfg.Agents[config.AgentCoder].Model
@@ -133,7 +167,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			InputPrompt: "Paste your NVIDIA NIM key (nvapi-...). It is stored in config.json (mode 0600).",
 			Secret:      true,
 			Configured:  nimReady,
-			Active:      curEndpoint == nimEndpointName,
+			Active:      curEndpoint == nimName,
 		},
 		{
 			ID:   "ollama",
@@ -141,7 +175,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			What: "Models running on this machine at localhost:11434. Free and private; " +
 				"speed depends on this machine. Ollama must already be running.",
 			Configured: true, // nothing to enter; reachability is checked on apply
-			Active:     curEndpoint == ollamaEndpointName,
+			Active:     curEndpoint == ollamaName,
 		},
 		{
 			ID:          "anthropic",
@@ -339,11 +373,28 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 // which is what Enter-on-a-ready-row means.
 func applyLocalEndpoint(name, baseURL, key string) error {
 	key = strings.TrimSpace(key)
-	if key == "" {
-		for _, e := range config.Get().LocalEndpoints {
-			if e.Name == name {
-				key = e.APIKey
-			}
+
+	// GORILLA FIX: adopt whatever the user already calls this endpoint.
+	//
+	// UpsertLocalEndpoint matches by Name, so writing our fixed name beside a
+	// user-named entry on the SAME baseURL created a second endpoint — and two
+	// endpoints on one URL steal each other's model routes, last one wins. A
+	// config here held "Gorilla.FREE.NVIDIA.NIM" and "NVIDIA NIM" side by side,
+	// both with zero registered models.
+	//
+	// Reusing their name means the upsert updates in place. Their existing key is
+	// also carried over when none was typed, so simply pressing Enter on the row
+	// never blanks a working credential.
+	for _, e := range config.Get().LocalEndpoints {
+		if e.BaseURL != baseURL {
+			continue
+		}
+		name = e.Name
+		if key == "" {
+			key = e.APIKey
+		}
+		if e.APIKey != "" {
+			break // a keyed entry wins over a blank duplicate
 		}
 	}
 	if err := config.UpsertLocalEndpoint(config.LocalEndpoint{

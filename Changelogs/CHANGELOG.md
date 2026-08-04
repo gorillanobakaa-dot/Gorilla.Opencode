@@ -1,3 +1,25 @@
+## v0.1.69 — 2026-08-04 — the provider menu finds your setup whatever you named it
+
+Full dual-track document: [v0.1.69-release-notes.md](v0.1.69-release-notes.md).
+
+**Plain-language version:** the startup menu asked for an NVIDIA NIM key that was
+already saved, and showed the NVIDIA row as not set up while Groq, Cerebras and
+xAI showed `(ready)`. Retyping the key would have looked like a fix and then it
+would have asked again on the next launch, forever. The key was never lost — the
+menu looked for your NVIDIA connection **by name**, searching for an entry called
+exactly `NVIDIA NIM`, so one named anything else (`Gorilla.FREE.NVIDIA.NIM`) was
+invisible. A connection is identified by where it points, not by what you called
+it. The same mistake had a quieter second symptom: choosing NVIDIA also wrote the
+app's fixed name back, creating a **second** entry beside yours on the same
+address — and two entries on one address fight over which serves the models,
+which is how a config ended up with two NVIDIA connections and zero usable models
+between them. Both halves now match by address; re-picking a provider updates
+your existing entry and carries your saved key across, so pressing Enter on the
+row can never wipe a working credential. Notably, model *registration* already
+resolved by address and was name-agnostic — so the endpoint worked fine for
+inference while the menu insisted it was missing. If this was already broken for
+you it repairs itself on the next launch; no action needed.
+
 ## v0.1.68 — 2026-08-04 — when something fails, you can finally read why
 
 Full dual-track document: [v0.1.68-release-notes.md](v0.1.68-release-notes.md).
