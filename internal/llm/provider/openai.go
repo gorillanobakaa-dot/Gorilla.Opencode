@@ -462,6 +462,54 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 	return eventChan
 }
 
+// explainAPIStatus turns a bare HTTP status into a sentence that says what
+// happened and what to do about it. Returns "" when the status has no better
+// explanation than the raw error already gives.
+//
+// GORILLA FIX: the status code has to carry the whole explanation, because the
+// provider's own words do not survive the SDK.
+//
+// Measured 2026-08-04 against NVIDIA NIM: asking for a model the account is not
+// entitled to returns
+//
+//	{"status":404,"title":"Not Found",
+//	 "detail":"Function '<uuid>': Not found for account '<id>'"}
+//
+// which does not match OpenAI's {"error":{...}} schema, so openai-go's
+// unmarshal populates nothing: RawJSON(), Code, Message and Type all come back
+// EMPTY and only StatusCode survives. The user was therefore shown
+// `failed to process events: POST "…": 404 Not Found` — technically true and
+// completely useless, since it looks like the app or the network is broken when
+// in fact the key is fine and only that one model is off-limits.
+//
+// Anything added here must be derivable from the status alone. Do not reach for
+// the response body: it is already gone by this point.
+func explainAPIStatus(status int, modelName string) string {
+	if modelName == "" {
+		modelName = "this model"
+	}
+	// Kept SHORT and with the status code inline, deliberately. This lands in the
+	// one-line status bar, which clampToWidth truncates at the terminal width, so
+	// every word spent here is a word of raw detail pushed off the right edge.
+	// Leading with the diagnosis and the number means the useful part survives on
+	// a narrow terminal and only the trailing URL is ever lost — and that is still
+	// in the log.
+	switch status {
+	case 404:
+		return fmt.Sprintf("%s isn't enabled for your account (HTTP 404 — your key is fine). "+
+			"Pick another with /models.", modelName)
+	case 410:
+		return fmt.Sprintf("%s has been retired by the provider (HTTP 410). "+
+			"Pick another with /models.", modelName)
+	case 401:
+		return "Your API key was rejected (HTTP 401). Add or replace it with /connect."
+	case 403:
+		return fmt.Sprintf("Your key isn't allowed to use %s (HTTP 403 — usually needs a paid tier). "+
+			"Pick another with /models.", modelName)
+	}
+	return ""
+}
+
 func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool) (bool, int64, error) {
 	var apierr *openai.Error
 	if !errors.As(err, &apierr) {
@@ -511,6 +559,20 @@ func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool)
 	// Retry on rate-limit (429) and server-side errors (500/503) and the
 	// "overloaded" 529 some providers use.
 	if apierr.StatusCode != 429 && apierr.StatusCode != 500 && apierr.StatusCode != 503 && apierr.StatusCode != 529 {
+		if plain := explainAPIStatus(apierr.StatusCode, o.providerOptions.model.Name); plain != "" {
+			logging.Error("provider rejected the request", "status", apierr.StatusCode, "err", err)
+			// GORILLA FIX: explain AND show, never explain INSTEAD of showing.
+			//
+			// The plain sentence goes FIRST because the status bar truncates the
+			// tail, so the part that says what to do is the part that always
+			// survives. The raw error is appended, not discarded — a translation
+			// that swallows the URL and status code hides exactly what you need
+			// when the translation itself turns out to be wrong.
+			//
+			// %w, not %s: the *openai.Error stays reachable through errors.As, so
+			// anything upstream that inspects the status still can.
+			return false, 0, fmt.Errorf("%s  ⟨%w⟩", plain, err)
+		}
 		return false, 0, err
 	}
 
