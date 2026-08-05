@@ -168,6 +168,7 @@ func TestEveryPortalRowIsHandled(t *testing.T) {
 		"gcp-custom":   true,
 		"nvidia-nim":   true,
 		"ollama":       true,
+		"cloudflare":   true,
 	}
 	for id := range portalProvider {
 		handled[id] = true

@@ -58,7 +58,7 @@ func RegisterLocalEndpoint(name, baseURL, apiKey string) (int, ModelID) {
 	// every provider the user has never touched. An endpoint someone added by
 	// hand is the one they are looking for.
 	ProviderPopularity[ProviderLocal] = 1
-	var first ModelID
+	registered := make([]ModelID, 0, len(raw))
 	n := 0
 	for _, m := range raw {
 		model := convertLocalModel(m)
@@ -71,12 +71,67 @@ func RegisterLocalEndpoint(name, baseURL, apiKey string) (int, ModelID) {
 		}
 		SupportedModels[model.ID] = model
 		localRoute[model.ID] = localRouteInfo{BaseURL: baseURL, APIKey: apiKey, Endpoint: name}
-		if first == "" {
-			first = model.ID
-		}
+		registered = append(registered, model.ID)
 		n++
 	}
-	return n, first
+	return n, preferredChatModel(registered)
+}
+
+// cannotChat matches ids that are not chat models at all — embedders,
+// rerankers, retrievers and safety classifiers. Selecting one as an agent
+// produces an immediate, baffling failure (the safety classifiers answer a chat
+// request with a bare HTTP 400).
+var cannotChat = []string{
+	"embed", "embedding", "rerank", "retriever", "bge-", "guard", "safety", "moderation",
+}
+
+// preferredChatModel picks the model to start on when a local endpoint is first
+// configured.
+//
+// GORILLA FIX: this used to be whatever the provider listed FIRST.
+//
+// NVIDIA returns its catalogue in id order, so position 0 is "01-ai/yi-large"
+// — it sorts first purely because it begins with "01". Every re-run of the
+// startup portal therefore pinned all four agents to that one model, which on
+// this account is not even entitled (HTTP 404). Positions 2 and 5 are a vision
+// model and an EMBEDDING model, so list order is not merely unlucky here; it
+// carries no information about whether the model can hold a conversation.
+//
+// Preference order, then anything that is not obviously a non-chat model, then
+// (only if everything looks unusable) the first id, because returning nothing
+// would leave the endpoint configured with no model at all.
+func preferredChatModel(ids []ModelID) ModelID {
+	if len(ids) == 0 {
+		return ""
+	}
+	have := make(map[ModelID]bool, len(ids))
+	for _, id := range ids {
+		have[id] = true
+	}
+	for _, want := range []string{
+		"local.meta/llama-3.3-70b-instruct",
+		"local.meta/llama-3.1-70b-instruct",
+		"local.qwen/qwen2.5-coder-32b-instruct",
+		"local.meta/llama-3.1-8b-instruct",
+	} {
+		if have[ModelID(want)] {
+			return ModelID(want)
+		}
+	}
+	for _, id := range ids {
+		low := strings.ToLower(string(id))
+		bad := false
+		for _, pat := range cannotChat {
+			if strings.Contains(low, pat) {
+				bad = true
+				break
+			}
+		}
+		if !bad {
+			return id
+		}
+	}
+	return ids[0]
 }
 
 // UnregisterLocalEndpoint drops every model routed to baseURL (used when a
@@ -126,6 +181,79 @@ func fetchLocalModels(baseURL, apiKey string) []localModel {
 	models := try(lmStudioBetaModelsPath)
 	if len(models) == 0 {
 		models = try(localModelsPath)
+	}
+	if len(models) == 0 {
+		// GORILLA OVERRIDE: a provider-specific fallback for endpoints that are
+		// OpenAI-compatible for CHAT but not for LISTING.
+		//
+		// Cloudflare Workers AI is the case that forced this: its
+		// /v1/chat/completions is a drop-in, but GET /v1/models answers
+		// "405 GET not supported for requested URI" (measured 2026-08-05). Without
+		// a fallback the endpoint looks completely broken — discovery finds zero
+		// models and the portal reports "no models found ... is the key valid?",
+		// which points the user at their key when the key is fine.
+		models = fetchCloudflareModels(base, apiKey)
+	}
+	return models
+}
+
+// cfModelSearch is Cloudflare's own model listing. Only the fields needed to
+// decide "can this hold a conversation?" are decoded.
+type cfModelSearch struct {
+	Success bool `json:"success"`
+	Result  []struct {
+		Name string `json:"name"`
+		Task struct {
+			Name string `json:"name"`
+		} `json:"task"`
+	} `json:"result"`
+}
+
+// fetchCloudflareModels lists Workers AI models via Cloudflare's native
+// endpoint and returns only the text-generation ones.
+//
+// The chat base URL is .../accounts/<id>/ai/v1; the listing lives one level up
+// at .../accounts/<id>/ai/models/search, so the path is derived rather than
+// requiring the user to supply a second URL.
+//
+// Of 61 models the account exposes, 26 are Text Generation — the rest are image,
+// speech, embedding and classification models that cannot act as an agent at
+// all. Filtering here means the picker never offers one.
+func fetchCloudflareModels(base *url.URL, apiKey string) []localModel {
+	if base == nil || !strings.Contains(base.Host, "api.cloudflare.com") {
+		return nil
+	}
+	u := *base
+	u.Path = strings.TrimSuffix(strings.TrimSuffix(u.Path, "/"), "/v1") + "/models/search"
+	u.RawQuery = "per_page=100"
+
+	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil
+	}
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		logging.Debug("Cloudflare model listing failed", "error", err)
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		logging.Debug("Cloudflare model listing rejected", "status", resp.StatusCode)
+		return nil
+	}
+	var out cfModelSearch
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil || !out.Success {
+		return nil
+	}
+	models := make([]localModel, 0, len(out.Result))
+	for _, m := range out.Result {
+		if m.Task.Name != "Text Generation" {
+			continue
+		}
+		models = append(models, localModel{ID: m.Name})
 	}
 	return models
 }

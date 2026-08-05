@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/auth"
@@ -27,6 +28,11 @@ const (
 	nimBaseURL         = "https://integrate.api.nvidia.com/v1"
 	ollamaEndpointName = "Ollama"
 	ollamaBaseURL      = "http://localhost:11434/v1"
+
+	// Cloudflare Workers AI. The base URL embeds the account id, so it is built
+	// per-user from what they paste rather than being a constant.
+	cloudflareEndpointName = "Cloudflare Workers AI"
+	cloudflareBaseFmt      = "https://api.cloudflare.com/client/v4/accounts/%s/ai/v1"
 
 	// oauthLoginPlaceholder is the sentinel API key that marks an OAuth-based
 	// provider (Antigravity, Gemini Code Assist) as configured. The real auth is
@@ -114,6 +120,18 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 	oauthReady := creds != nil && creds.AccessToken != ""
 	agCreds, _ := auth.LoadAntigravityCreds()
 	agReady := agCreds != nil && agCreds.AccessToken != ""
+	// Cloudflare's baseURL contains the account id, so it cannot be matched by a
+	// fixed constant the way NIM and Ollama are.
+	var cfEp config.LocalEndpoint
+	cfReady := false
+	for _, e := range cfg.LocalEndpoints {
+		if !e.Disabled && strings.Contains(e.BaseURL, "api.cloudflare.com") && e.APIKey != "" {
+			cfEp, cfReady = e, true
+			break
+		}
+	}
+	_ = cfEp
+
 	nimEp, nimReady := endpointFor(nimBaseURL)
 	ollamaEp, _ := endpointFor(ollamaBaseURL)
 	nimReady = nimReady && nimEp.APIKey != ""
@@ -176,6 +194,22 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 				"speed depends on this machine. Ollama must already be running.",
 			Configured: true, // nothing to enter; reachability is checked on apply
 			Active:     curEndpoint == ollamaName,
+		},
+		{
+			ID:   "cloudflare",
+			Name: "Cloudflare Workers AI - free tier, no card",
+			What: "22 free models including a dedicated coder (Qwen2.5-Coder 32B), " +
+				"GPT-OSS 120B/20B, Llama 3.3 70B and DeepSeek-R1. Needs a free " +
+				"Cloudflare account - no payment details.",
+			Warning: "A few models (Kimi, GLM-5.2) need a paid Workers plan and will " +
+				"say so. The free daily allowance is shared across all of them.",
+			NeedsInput: true,
+			InputPrompt: "Paste your Cloudflare Account ID and API token. Order does not " +
+				"matter and extra text is ignored - pasting the whole snippet from " +
+				"Cloudflare's \"Use REST API\" page works.",
+			Secret:     true,
+			Configured: cfReady,
+			Active:     curEndpoint == cloudflareEndpointName,
 		},
 		{
 			ID:          "anthropic",
@@ -352,6 +386,8 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 
 	case "ollama":
 		return applyLocalEndpoint(ollamaEndpointName, ollamaBaseURL, "")
+	case "cloudflare":
+		return applyCloudflare(c.Input)
 
 	default:
 		prov, ok := portalProvider[c.ID]
@@ -406,7 +442,75 @@ func applyLocalEndpoint(name, baseURL, key string) error {
 	if n == 0 {
 		return fmt.Errorf("no models found at %s - is it running, and is the key valid?", baseURL)
 	}
+
+	// GORILLA FIX: re-selecting an endpoint must not overwrite a model the user
+	// already chose on it.
+	//
+	// The portal runs on EVERY launch, so choosing NVIDIA NIM again re-applied
+	// the default to all four agents — silently undoing a /models choice made
+	// minutes earlier. Combined with the default being the provider's first
+	// listed id ("01-ai/yi-large", which this account cannot even run), the
+	// effect was landing on the same unusable model after every single login,
+	// no matter what had been picked in between.
+	//
+	// If the coder is already on a model served by THIS endpoint, and that model
+	// is still registered, the choice stands. Same principle as adopting the
+	// user's endpoint name above: confirm what is there rather than replace it.
+	if cur := config.Get().Agents[config.AgentCoder].Model; cur != "" {
+		if _, known := models.SupportedModels[cur]; known && models.LocalEndpointFor(cur) == name {
+			return nil
+		}
+	}
 	return applyAgentModels(first, first)
+}
+
+// cfAccountRe matches a Cloudflare account id: 32 lowercase hex characters.
+var cfAccountRe = regexp.MustCompile(`\b[0-9a-f]{32}\b`)
+
+// cfTokenRe matches a Cloudflare API token. The current template issues
+// "cfut_"-prefixed tokens; older ones are a bare 40-char blob.
+var cfTokenRe = regexp.MustCompile(`\b(?:cfut_[A-Za-z0-9_\-]{20,}|[A-Za-z0-9_\-]{40})\b`)
+
+// parseCloudflareInput pulls an account id and API token out of whatever the
+// user pasted.
+//
+// GORILLA OVERRIDE: deliberately forgiving. Cloudflare needs TWO values, and its
+// "Use REST API" page presents them in separate boxes surrounded by prose and a
+// sample curl command. Demanding a precise format would make the most
+// error-prone step of the whole setup a typing exercise — so the whole page can
+// be pasted and the two values are found by shape. Order does not matter.
+//
+// The account id is unambiguous (32 hex). The token is matched second and must
+// not be the account id itself, which is what the exclusion below prevents.
+func parseCloudflareInput(in string) (account, token string, err error) {
+	account = cfAccountRe.FindString(in)
+	for _, m := range cfTokenRe.FindAllString(in, -1) {
+		if m != account {
+			token = m
+			break
+		}
+	}
+	switch {
+	case account == "" && token == "":
+		return "", "", fmt.Errorf("could not find a Cloudflare account ID or API token in that - " +
+			"the account ID is 32 hex characters and the token usually starts with cfut_")
+	case account == "":
+		return "", "", fmt.Errorf("found an API token but no account ID - it is 32 hex " +
+			"characters, shown on the same page under \"Account ID\"")
+	case token == "":
+		return "", "", fmt.Errorf("found an account ID but no API token - it usually starts " +
+			"with cfut_ and is only shown once, when you create it")
+	}
+	return account, token, nil
+}
+
+// applyCloudflare configures Workers AI from a pasted account id + token.
+func applyCloudflare(input string) error {
+	account, token, err := parseCloudflareInput(input)
+	if err != nil {
+		return err
+	}
+	return applyLocalEndpoint(cloudflareEndpointName, fmt.Sprintf(cloudflareBaseFmt, account), token)
 }
 
 // runAntigravityLogin runs the Antigravity OAuth flow and provisions the
