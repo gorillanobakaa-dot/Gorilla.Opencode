@@ -642,12 +642,27 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dialog.ModelSelectedMsg:
 		a.showModelDialog = false
 
+		// Capture the outgoing coder model BEFORE the update, so the helper
+		// agents that were shadowing it can be identified afterwards.
+		prevCoder := config.Get().Agents[config.AgentCoder].Model
+
 		model, err := a.app.CoderAgent.Update(config.AgentCoder, msg.Model.ID)
 		if err != nil {
 			return a, util.ReportError(err)
 		}
 
-		return a, util.ReportInfo(fmt.Sprintf("Model changed to %s", model.Name))
+		// GORILLA FIX: bring the helper agents along. Changing the coder used to
+		// leave summarizer/task/title on the old model — invisible until a title
+		// failed, or worse, until summarisation was needed mid-session.
+		note := fmt.Sprintf("Model changed to %s", model.Name)
+		if moved, ferr := config.FollowCoderModel(prevCoder, msg.Model.ID); ferr != nil {
+			// Not fatal: the coder switch already succeeded and is what was asked
+			// for. Say so rather than failing the whole action silently.
+			note += fmt.Sprintf(" — but the helper agents could not be moved: %v", ferr)
+		} else if moved > 0 {
+			note += fmt.Sprintf(" (%d helper agent(s) moved with it)", moved)
+		}
+		return a, util.ReportInfo(note)
 
 	case dialog.ShowInitDialogMsg:
 		a.showInitDialog = msg.Show

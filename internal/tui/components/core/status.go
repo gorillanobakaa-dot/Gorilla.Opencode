@@ -35,7 +35,6 @@ type statusCmp struct {
 	costNoticeShown bool
 }
 
-// clearMessageCmd is a command that clears status messages after a timeout
 // truncateStatusMsg fits a status/error message into width terminal COLUMNS.
 //
 // GORILLA FIX: this was inline as `msg[:infoWidth]` — a BYTE offset applied
@@ -51,6 +50,14 @@ type statusCmp struct {
 //
 // Extracted from View() so the behaviour can actually be tested: asserting that
 // ansi.Truncate is rune-safe proves nothing about whether this file calls it.
+// errorMessageTTL is how long an error stays in the status bar.
+//
+// Deliberately longer than messageTTL (10s): errors carry a model name, an HTTP
+// status, an explanation and a command to run. Measured at ~150 characters for a
+// provider entitlement failure — reading that, deciding, and typing /models does
+// not fit in ten seconds.
+const errorMessageTTL = 40 * time.Second
+
 func truncateStatusMsg(msg string, width int) string {
 	if width <= 0 {
 		return msg
@@ -58,6 +65,7 @@ func truncateStatusMsg(msg string, width int) string {
 	return ansi.Truncate(msg, width, "...")
 }
 
+// clearMessageCmd clears the status message after ttl elapses.
 func (m statusCmp) clearMessageCmd(ttl time.Duration) tea.Cmd {
 	return tea.Tick(ttl, func(time.Time) tea.Msg {
 		return util.ClearStatusMsg{}
@@ -99,6 +107,18 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ttl := msg.TTL
 		if ttl == 0 {
 			ttl = m.messageTTL
+			// GORILLA FIX: an error is not a toast. It was sharing the 10s
+			// default with notices like "copied to clipboard", and a provider
+			// failure is a ~150-character diagnosis you have to read, parse and
+			// act on — reported 2026-08-05 as "flashes by so fast I barely had
+			// time to read it; took two tries to screenshot".
+			//
+			// The transcript now keeps the full text permanently (see
+			// FinishReasonError details), so this is only the notification. It
+			// still has to be readable at a glance rather than a reflex test.
+			if msg.Type == util.InfoTypeError {
+				ttl = errorMessageTTL
+			}
 		}
 		return m, m.clearMessageCmd(ttl)
 	case util.ClearStatusMsg:

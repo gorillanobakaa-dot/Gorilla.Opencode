@@ -444,7 +444,22 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 	// Process each event in the stream.
 	for event := range eventChan {
 		if processErr := a.processEvent(ctx, sessionID, &assistantMsg, event); processErr != nil {
-			a.finishMessage(ctx, &assistantMsg, message.FinishReasonCanceled)
+			// GORILLA FIX: do NOT relabel a provider failure as "canceled".
+			//
+			// processEvent's EventError branch has just recorded
+			// FinishReasonError together with the provider's own words. AddFinish
+			// REMOVES any existing finish part before appending, so calling it
+			// again here overwrote both the reason and the details — every
+			// provider error was reported as "Canceled — no answer was produced"
+			// with the explanation deleted one line after being stored.
+			//
+			// Observed 2026-08-05 on a live 404: the status bar showed the real
+			// message while the transcript said "canceled", and every recorded
+			// finish in the session database read reason=canceled details=<empty>.
+			// This defeated the whole point of storing the detail in v0.1.68.
+			if errors.Is(processErr, context.Canceled) {
+				a.finishMessage(ctx, &assistantMsg, message.FinishReasonCanceled)
+			}
 			return assistantMsg, a.cancelPendingToolCalls(&assistantMsg), processErr
 		}
 		if ctx.Err() != nil {

@@ -267,17 +267,28 @@ func renderAssistantMessage(
 		if content == "" {
 			switch finishData.Reason {
 			case message.FinishReasonError:
-				content = "*The model returned an error and produced no answer. " +
-					"If the context percentage in the footer is over 100%, the request " +
-					"was almost certainly rejected for being too large.*"
-				// GORILLA FIX: show the provider's own words underneath the
-				// explanation, not instead of it. The status bar gets ~100
-				// columns and then truncates; this is the copy you can actually
-				// read, scroll back to and paste into a bug report. Fenced so a
-				// URL or JSON fragment is not mangled by markdown, and so it is
-				// visibly the machine's words rather than ours.
+				// GORILLA FIX: show the provider's own words, and when we have
+				// them do NOT also guess at the cause.
+				//
+				// The "context might be over 100%" line was written when a failed
+				// turn left nothing behind — a guess beat silence. Now that the
+				// real error is stored, that guess sits directly above an answer
+				// that often contradicts it: observed 2026-08-05 with the footer
+				// reading "context 0 (0%)" while the text speculated about an
+				// oversized request, immediately above a 404 saying the model was
+				// not enabled for the account. A confident wrong explanation next
+				// to the right one is worse than no explanation.
+				//
+				// So: details when we have them, the guess only when we do not.
+				// Fenced, so a URL or JSON fragment is not mangled by markdown and
+				// is visibly the machine's words rather than ours.
 				if d := strings.TrimSpace(finishData.Details); d != "" {
-					content += "\n\n```\n" + d + "\n```"
+					content = "*The model returned an error and produced no answer:*" +
+						"\n\n```\n" + d + "\n```"
+				} else {
+					content = "*The model returned an error and produced no answer. " +
+						"If the context percentage in the footer is over 100%, the request " +
+						"was almost certainly rejected for being too large.*"
 				}
 			case message.FinishReasonMaxTokens:
 				content = "*Stopped at the model's output limit before finishing the answer.*"

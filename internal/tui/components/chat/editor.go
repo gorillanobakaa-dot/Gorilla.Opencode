@@ -36,6 +36,22 @@ type editorCmp struct {
 	// so we only emit EditorHeightMsg when it actually changes.
 	lastReportedHeight int
 
+	// heightCeiling is the most rows the field may occupy, set by whoever owns
+	// the frame. 0 means "not told yet" and imposes no limit.
+	//
+	// GORILLA FIX: without this the editor ignored its allotment entirely.
+	// Measured 2026-08-05: given 1, 2, 3 or 5 rows by the layout it rendered 16
+	// every time, because desiredHeight() consulted only its own content and
+	// maxEditorHeight. maxEditorHeight's comment claimed "the footer's own budget
+	// clamps this further on short windows" — that clamp did not exist.
+	//
+	// The consequence is the documented one: a frame taller than the window
+	// breaks bubbletea's inline erase (it counts logical lines and walks the
+	// cursor up), so on a short terminal a long prompt appeared pinned to one
+	// line, scrolling from the last word, while the same build wrapped correctly
+	// in a taller window. Reported 2026-08-05 with screenshots of both.
+	heightCeiling int
+
 	// GORILLA OVERRIDE: input history, recalled with Up/Down like any shell.
 	//
 	// history holds what you have SENT, oldest first. historyPos indexes it
@@ -133,6 +149,12 @@ const (
 // renderer guesses wrong shifts everything after it.
 const overflowArrow = "▲"
 
+// HeightCapped is implemented by a component that can be told the most rows it
+// may occupy. The frame owner knows the window size; the component does not.
+type HeightCapped interface {
+	SetHeightCeiling(rows int)
+}
+
 // EditorHeightMsg asks the layout to give the editor exactly Height rows.
 type EditorHeightMsg struct{ Height int }
 
@@ -158,7 +180,31 @@ func (m *editorCmp) desiredHeight() int {
 	if len(m.attachments) > 0 {
 		rows++ // the attachments line sits above the input
 	}
-	return max(minEditorHeight, min(maxEditorHeight, rows))
+	ceiling := maxEditorHeight
+	if m.heightCeiling > 0 && m.heightCeiling < ceiling {
+		ceiling = m.heightCeiling
+	}
+	// When the content will be clipped, overflowNotice adds a row ABOVE the
+	// field, so the textarea must surrender one to keep the whole view inside
+	// the ceiling. Measured: without this the view came out at ceiling+1 for
+	// every ceiling from 1 to 8 — still over budget, still breaking the erase.
+	// Below two rows there is no room for both; the prompt wins, because a
+	// program with no visible input line looks broken rather than cramped.
+	if rows > ceiling && ceiling > minEditorHeight {
+		return ceiling - 1
+	}
+	return max(minEditorHeight, min(ceiling, rows))
+}
+
+// SetHeightCeiling tells the field the most rows it may occupy. The frame owner
+// knows the window size; the field does not, and must never exceed it — see the
+// heightCeiling comment on editorCmp. Anything hidden by this cap is announced
+// by overflowNotice, so a clamped field says so rather than silently scrolling.
+func (m *editorCmp) SetHeightCeiling(rows int) {
+	if rows < minEditorHeight {
+		rows = minEditorHeight
+	}
+	m.heightCeiling = rows
 }
 
 type EditorKeyMaps struct {
@@ -461,8 +507,12 @@ func (m *editorCmp) View() string {
 
 	if len(m.attachments) == 0 {
 		field := lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"), m.textarea.View())
+		// The notice costs a row. Only show it if that row is within budget —
+		// at a one-row ceiling the input line itself has to win.
 		if notice := m.overflowNotice(); notice != "" {
-			return lipgloss.JoinVertical(lipgloss.Left, notice, field)
+			if m.heightCeiling <= 0 || m.textarea.Height()+1 <= m.heightCeiling {
+				return lipgloss.JoinVertical(lipgloss.Left, notice, field)
+			}
 		}
 		return field
 	}

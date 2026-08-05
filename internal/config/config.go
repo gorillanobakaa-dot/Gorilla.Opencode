@@ -1596,3 +1596,47 @@ func LoadGitHubToken() (string, error) {
 
 	return "", fmt.Errorf("GitHub token not found in standard locations")
 }
+
+// FollowCoderModel moves the helper agents (summarizer, task, title) onto
+// newModel, but ONLY those that were still sitting on prevCoder — i.e. the ones
+// that were following the coder rather than deliberately set to something else.
+// Returns how many were moved.
+//
+// GORILLA FIX: switching the coder model used to strand the helpers.
+//
+// The every-launch portal sets all four agents (applyAgentModels), but the
+// /models dialog set ONLY the coder. So picking a new model left summarizer,
+// task and title pointing at the old one — and if that old model had become
+// unusable, the sole visible symptom was a recurring "failed to generate title"
+// in the status bar, while summarisation and sub-agents were primed to fail
+// later, silently, at whatever moment the context finally filled.
+//
+// Observed 2026-08-05: coder on google/diffusiongemma-26b-a4b-it while all
+// three helpers were still on 01-ai/yi-large, a model the account cannot run
+// (HTTP 404). Config-level validation cannot catch this: yi-large is a
+// perfectly well-formed, registered model — it is only the PROVIDER that
+// refuses it, which nothing local can know.
+//
+// Deliberately conditional on prevCoder rather than overwriting all three: a
+// cheap fast model for titles is a legitimate, common choice and must survive
+// a coder switch. Only agents that were shadowing the coder keep shadowing it.
+func FollowCoderModel(prevCoder, newModel models.ModelID) (int, error) {
+	if cfg == nil {
+		panic("config not loaded")
+	}
+	if prevCoder == "" || prevCoder == newModel {
+		return 0, nil
+	}
+	moved := 0
+	for _, name := range []AgentName{AgentSummarizer, AgentTask, AgentTitle} {
+		agentCfg, ok := cfg.Agents[name]
+		if !ok || agentCfg.Model != prevCoder {
+			continue // absent, or deliberately set to something else — leave it
+		}
+		if err := UpdateAgentModel(name, newModel); err != nil {
+			return moved, err
+		}
+		moved++
+	}
+	return moved, nil
+}

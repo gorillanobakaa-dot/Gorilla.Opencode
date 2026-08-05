@@ -106,3 +106,44 @@ func TestAddFinishCarriesDetailsWhenGiven(t *testing.T) {
 	}
 	t.Fatal("AddFinish recorded no finish part at all")
 }
+
+// When the provider told us what went wrong, we must not ALSO guess at the
+// cause. Observed 2026-08-05: the footer read "context 0 (0%)" while the
+// transcript speculated the request had been "rejected for being too large",
+// directly above a 404 saying the model was not enabled for the account. A
+// confident wrong explanation beside the right one is worse than none.
+func TestNoContextSizeGuessWhenTheRealErrorIsKnown(t *testing.T) {
+	const at int64 = 1785228225
+	failed := message.Message{
+		ID: "a1", Role: message.Assistant, CreatedAt: at,
+		Parts: []message.ContentPart{
+			message.Finish{Reason: message.FinishReasonError, Details: providerFailure},
+		},
+	}
+	out := strings.Join(plainLines(printerFor(t, 120, failed).printPending()), "\n")
+
+	if strings.Contains(out, "too large") || strings.Contains(out, "context percentage") {
+		t.Errorf("the context-size guess is still shown even though the real cause "+
+			"is known, and it contradicts it:\n%s", out)
+	}
+	if !strings.Contains(out, "404") {
+		t.Errorf("the provider's own words are missing:\n%s", out)
+	}
+}
+
+// The guess must SURVIVE for failures with no detail, where it is the only help
+// available — removing it entirely would trade one gap for another.
+func TestContextSizeGuessRemainsWhenNothingElseIsKnown(t *testing.T) {
+	const at int64 = 1785228225
+	failed := message.Message{
+		ID: "a1", Role: message.Assistant, CreatedAt: at,
+		Parts: []message.ContentPart{
+			message.Finish{Reason: message.FinishReasonError},
+		},
+	}
+	out := strings.Join(plainLines(printerFor(t, 120, failed).printPending()), "\n")
+
+	if !strings.Contains(out, "too large") {
+		t.Errorf("a detail-less failure lost its only hint about the likely cause:\n%s", out)
+	}
+}

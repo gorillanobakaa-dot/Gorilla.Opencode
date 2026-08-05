@@ -1,6 +1,10 @@
 package chat
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // The input box must grow with its content: verify the row measurement that
 // drives it (bubbles' textarea exposes no total-visual-rows API, so we measure
@@ -43,7 +47,19 @@ func TestDesiredHeightClamps(t *testing.T) {
 		long += "line\n"
 	}
 	m.textarea.SetValue(long)
-	if got := m.desiredHeight(); got != maxEditorHeight {
-		t.Errorf("overlong: got %d, want cap %d", got, maxEditorHeight)
+	// UPDATED 2026-08-05: the textarea now yields one row to the overflow notice
+	// when content is clipped, so desiredHeight caps at maxEditorHeight-1 and the
+	// RENDERED field totals maxEditorHeight. The previous expectation of a flat
+	// maxEditorHeight encoded an off-by-one: notice + textarea came to 21 rows
+	// against a stated cap of 20, and a frame taller than its budget is what
+	// breaks bubbletea's inline erase. The invariant worth asserting is the
+	// rendered total, so that is asserted too.
+	if got := m.desiredHeight(); got != maxEditorHeight-1 {
+		t.Errorf("overlong: got %d, want %d (one row reserved for the overflow notice)",
+			got, maxEditorHeight-1)
+	}
+	if got := lipgloss.Height(m.View()); got != maxEditorHeight {
+		t.Errorf("overlong: rendered %d rows, want the field to total exactly %d",
+			got, maxEditorHeight)
 	}
 }
