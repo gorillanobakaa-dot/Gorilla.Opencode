@@ -158,6 +158,31 @@ func TestTypingDropsStraightIntoTheField(t *testing.T) {
 	}
 }
 
+// flattened collapses all whitespace in a rendered view so an assertion about a
+// PHRASE cannot be broken by where the renderer happened to wrap.
+//
+// GORILLA FIX (2026-08-05): TestBadPathIsRefusedWithAReason failed
+// intermittently with "the error is not rendered". It was not a timing flake and
+// not an app bug. The error line is 84 columns against a content width of 72,
+// and lipgloss Width() WRAPS rather than truncates (a documented trap in
+// CLAUDE.md), so the message is shown in full across two rows. Whether the
+// literal substring "does not exist" survives depends on which space the wrap
+// falls on — and the path contains t.TempDir()'s random digits, so its length,
+// and therefore the wrap point, changes between runs.
+func flattened(view string) string {
+	// Strip the panel border before collapsing whitespace: the wrapped remainder
+	// of a long line begins on the next row, and the border glyph would otherwise
+	// sit between the two halves of the phrase ("... does not │ │ exist ...").
+	cleaned := strings.Map(func(r rune) rune {
+		switch r {
+		case '│', '─', '╭', '╮', '╰', '╯':
+			return ' '
+		}
+		return r
+	}, view)
+	return strings.Join(strings.Fields(cleaned), " ")
+}
+
 // A path that does not exist must be refused in place, with the reason on
 // screen. Accepting it would put the session in a directory that is not there.
 func TestBadPathIsRefusedWithAReason(t *testing.T) {
@@ -174,8 +199,8 @@ func TestBadPathIsRefusedWithAReason(t *testing.T) {
 	if !strings.Contains(m.err, "does not exist") {
 		t.Errorf("error = %q, want it to say the path is missing", m.err)
 	}
-	if !strings.Contains(m.View(), "does not exist") {
-		t.Error("the error is not rendered, so the user sees a dead enter key")
+	if !strings.Contains(flattened(m.View()), "does not exist") {
+		t.Errorf("the error is not rendered, so the user sees a dead enter key:\n%s", m.View())
 	}
 }
 

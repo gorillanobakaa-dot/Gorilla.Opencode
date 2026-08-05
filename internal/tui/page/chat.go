@@ -24,6 +24,10 @@ type chatPage struct {
 	app      *app.App
 	editor   layout.Container
 	messages layout.Container
+	// GORILLA OVERRIDE: a typed handle on the editor so the frame owner can cap
+	// its height. layout.Container hides the component, and the editor must never
+	// render more rows than the window can show — see editorCmp.heightCeiling.
+	editorCap chat.HeightCapped
 	// GORILLA OVERRIDE: the transcript component, typed for FooterView. Used only
 	// when the alternate screen is off, where the conversation is printed into the
 	// terminal and the pane itself is never drawn.
@@ -57,6 +61,19 @@ func (p *chatPage) FooterView(maxRows int) string {
 	// first. Order matters and is deliberate: the session numbers are reference
 	// information you can also get from /context, whereas the live preview is the
 	// only sign that a reply is arriving at all.
+	// GORILLA FIX: cap the field BEFORE rendering it. maxRows is this frame's
+	// whole row budget, computed from the window; the editor cannot see the
+	// window and previously ignored its allotment entirely, rendering up to 20
+	// rows in a 1-row slot. A frame taller than the window breaks bubbletea's
+	// inline erase, which is what made a long prompt look pinned to one line on
+	// a short terminal.
+	//
+	// FooterReservedRows is the live-indicator row that reserveLiveRow always
+	// adds below; everything else in the frame (the session numbers) is shed by
+	// shedToFit when space is short, so the prompt may claim the rest.
+	if p.editorCap != nil && maxRows > 0 {
+		p.editorCap.SetHeightCeiling(maxRows - chat.FooterReservedRows)
+	}
 	prompt := p.editor.View()
 
 	var live, info string
@@ -404,8 +421,10 @@ func NewChatPage(app *app.App) tea.Model {
 		messagesModel,
 		layout.WithPadding(1, 1, 0, 1),
 	)
+	editorModel := chat.NewEditorCmp(app)
+	editorCap, _ := editorModel.(chat.HeightCapped)
 	editorContainer := layout.NewContainer(
-		chat.NewEditorCmp(app),
+		editorModel,
 		layout.WithBorder(true, false, false, false),
 	)
 	// GORILLA OVERRIDE: keep a typed handle on the transcript component so the
@@ -414,9 +433,10 @@ func NewChatPage(app *app.App) tea.Model {
 	// returns the same pointer it was called on.
 	footer, _ := messagesModel.(chat.ScrollbackFooter)
 	return &chatPage{
-		app:      app,
-		editor:   editorContainer,
-		messages: messagesContainer,
+		app:       app,
+		editor:    editorContainer,
+		editorCap: editorCap,
+		messages:  messagesContainer,
 		// GORILLA OVERRIDE: read once, as the appModel does. The buffer is chosen
 		// when the program starts, so this cannot change mid-session.
 		scrollback:       !config.AlternateScreenEnabled(),

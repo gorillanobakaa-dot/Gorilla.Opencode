@@ -1,3 +1,28 @@
+## v0.1.70 — 2026-08-05 — the error you needed to read was being deleted, and the input box ignored the window
+
+Full dual-track document: [v0.1.70-release-notes.md](v0.1.70-release-notes.md).
+
+**Plain-language version:** v0.1.68 promised that a failed turn would leave the
+full explanation in your conversation. It did not work, and this release is
+mostly about admitting that and fixing it properly — the reason was recorded
+correctly and then deleted a fraction of a second later by a different piece of
+code, so you saw "Canceled — no answer was produced" for a failure that had
+nothing to do with cancelling. Four more fixes ride along. Errors now stay on
+screen forty seconds instead of ten, because a provider failure is a sentence you
+must read and act on, not a "copied to clipboard" toast. The app no longer
+guesses that your request was "too large" when it already knows the real cause —
+that guess was appearing directly above a message contradicting it, with the
+context reading 0%. Switching model from `/models` no longer strands the three
+helper agents (session titles, summarising, sub-tasks) on the old model, where
+the only clue was a recurring "failed to generate title" and the real failures
+waited until later. And the input box no longer outgrows the window: it had been
+ignoring its row allotment entirely — handed 1, 2, 3 or 5 rows it drew 16 every
+time — so on a short terminal a long prompt appeared stuck on one line, scrolling
+"from the last word", while the same build wrapped perfectly in a taller window.
+It now respects the space available and says so (`▲ N more lines`) when holding
+text back. Two flaky tests were also repaired, one of which guards the
+footer-width invariant behind the old marching-footer bug.
+
 ## v0.1.69 — 2026-08-04 — the provider menu finds your setup whatever you named it
 
 Full dual-track document: [v0.1.69-release-notes.md](v0.1.69-release-notes.md).

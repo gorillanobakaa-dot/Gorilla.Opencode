@@ -81,3 +81,12 @@ HANDOFF.md
 # backup binaries (local safety copies)
 gorilla-opencode.backup
 *.backup
+
+# Scratch/working folder — deliberately NOT in the repo.
+#
+# It was purged from all history on 2026-08-05 (it had been tracked since before
+# the ignore files inside it existed, and a .gitignore cannot untrack something
+# already tracked). The rules INSIDE that folder only cover its contents, so the
+# directory itself would reappear the moment a new file landed there and the
+# release pipeline ran `git add -A`. Named here so it cannot come back.
+TO.DO.TO.FIX/

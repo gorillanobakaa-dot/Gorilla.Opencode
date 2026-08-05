@@ -57,7 +57,21 @@ func (m scroller) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sent++
 	}
 	m.tick++
-	cmds = append(cmds, tea.Tick(time.Millisecond, func(time.Time) tea.Msg { return tick{} }))
+	// GORILLA FIX (2026-08-05): pace the batches SLOWER than the renderer.
+	//
+	// This was 1ms. Bubbletea's renderer runs on its own ticker at roughly 16ms,
+	// so at 1ms the batches burst through with few or no frames drawn between
+	// them — and the behaviour under test (an over-wide line making the erase
+	// under-reach, stranding debris) needs an erase cycle BETWEEN prints. On an
+	// idle machine enough frames happened by luck; under a full-suite run on 8
+	// contended cores they often did not, and TestAnOverWideFooterLineStrandsDebris
+	// reported "stranded NO debris" — which reads as "the invariant is broken or
+	// this guard is vacuous", when neither was true.
+	//
+	// 20ms guarantees at least one render between batches regardless of load.
+	// 15 batches of 4 costs ~300ms per test; determinism is worth it for a guard
+	// protecting the footer-width invariant behind the marching-footer bug.
+	cmds = append(cmds, tea.Tick(20*time.Millisecond, func(time.Time) tea.Msg { return tick{} }))
 	return m, tea.Sequence(cmds...)
 }
 
@@ -116,21 +130,11 @@ func runScroller(t *testing.T, m scroller, cols, rows int) *term {
 	go func() { _, err := p.Run(); done <- err }()
 
 	// Wait until every line has been printed and the renderer has settled.
-	deadline := time.Now().Add(15 * time.Second)
-	var snapshot string
-	for {
-		if time.Now().After(deadline) {
-			p.Kill()
-			t.Fatal("program did not print everything in time")
-		}
-		s := out.String()
-		if strings.Contains(s, fmt.Sprintf("LINE-%03d", m.total-1)) {
-			// Let the renderer draw at least one more frame after the last print.
-			time.Sleep(60 * time.Millisecond)
-			snapshot = out.String()
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
+	marker := fmt.Sprintf("LINE-%03d", m.total-1)
+	snapshot := waitSettled(out, marker, 60*time.Millisecond, 15*time.Second)
+	if !strings.Contains(snapshot, marker) {
+		p.Kill()
+		t.Fatal("program did not print everything in time")
 	}
 	p.Kill()
 	<-done
@@ -297,6 +301,49 @@ func (m wideFooter) View() string {
 	return strings.Join(rows, "\n")
 }
 
+// waitSettled returns the program's output once it has STOPPED CHANGING, rather
+// than after a fixed nap.
+//
+// GORILLA FIX (2026-08-05): these tests waited for a marker to appear and then
+// slept a fixed 60-80ms for the frame to finish. On a loaded machine — the whole
+// suite running in parallel on 8 logical CPUs — the snapshot could be taken
+// mid-frame, and the assertions then described a half-drawn screen.
+// TestAnOverWideFooterLineStrandsDebris duly failed with "stranded NO debris",
+// which reads as "the invariant is broken or the test is vacuous" when in fact
+// neither was true. A vacuity guard that cries wolf gets ignored, and this one
+// protects the footer-width invariant behind the marching-footer bug.
+//
+// Stability is the real condition: once the byte count has held steady across
+// two consecutive polls, the renderer has finished. Same wall-clock cost when
+// idle, correct under load.
+func waitSettled(out *safeBuf, marker string, quiet time.Duration, overall time.Duration) string {
+	deadline := time.Now().Add(overall)
+	// Phase 1: wait for the marker to appear at all.
+	for time.Now().Before(deadline) {
+		if strings.Contains(out.String(), marker) {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	// Phase 2: wait for output to stop growing.
+	last := -1
+	stableSince := time.Time{}
+	for time.Now().Before(deadline) {
+		cur := len(out.String())
+		if cur == last {
+			if stableSince.IsZero() {
+				stableSince = time.Now()
+			} else if time.Since(stableSince) >= quiet {
+				break
+			}
+		} else {
+			last, stableSince = cur, time.Time{}
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return out.String()
+}
+
 func TestAnOverWideFooterLineStrandsDebris(t *testing.T) {
 	const cols, rows = 80, 20
 	const total = 60
@@ -312,34 +359,55 @@ func TestAnOverWideFooterLineStrandsDebris(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { _, err := p.Run(); done <- err }()
 
+	// GORILLA FIX (2026-08-05, second attempt): poll for the CONDITION, not for
+	// output to settle.
+	//
+	// The first repair waited until the byte count stopped growing. That was
+	// still wrong, and it still failed intermittently under a full-suite run.
+	// Debris accumulates once per ERASE CYCLE, and bubbletea renders on a ticker
+	// — under CPU contention it simply draws fewer frames, so a settled buffer
+	// can legitimately contain no debris yet. Waiting for quiet cannot fix a
+	// condition that needs more frames.
+	//
+	// So: reconstruct the screen repeatedly and stop as soon as debris appears,
+	// with a generous deadline. When the mechanism works this returns almost at
+	// once; when it is genuinely broken the test takes the full deadline and then
+	// fails, which is the correct trade for a guard this expensive to lose.
+	marker := fmt.Sprintf("LINE-%03d", total-1)
 	deadline := time.Now().Add(15 * time.Second)
-	var snap string
+	var tm *term
+	debris := 0
 	for time.Now().Before(deadline) {
-		if strings.Contains(out.String(), fmt.Sprintf("LINE-%03d", total-1)) {
-			time.Sleep(60 * time.Millisecond)
-			snap = out.String()
+		snap := out.String()
+		if !strings.Contains(snap, marker) {
+			time.Sleep(5 * time.Millisecond)
+			continue
+		}
+		tm = newTerm(cols, rows)
+		tm.Write(snap)
+		screen := tm.Screen()
+		footerTop := -1
+		for i, r := range screen {
+			if strings.Contains(r, "FOOTER-PROMPT>") {
+				footerTop = i
+			}
+		}
+		debris = 0
+		for i := 0; i < footerTop-3 && i < len(screen); i++ {
+			if strings.Contains(screen[i], "FOOTER-") {
+				debris++
+			}
+		}
+		if debris > 0 {
 			break
 		}
-		time.Sleep(5 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 	p.Kill()
 	<-done
 
-	tm := newTerm(cols, rows)
-	tm.Write(snap)
-
-	screen := tm.Screen()
-	footerTop := -1
-	for i, r := range screen {
-		if strings.Contains(r, "FOOTER-PROMPT>") {
-			footerTop = i
-		}
-	}
-	debris := 0
-	for i := 0; i < footerTop-3 && i < len(screen); i++ {
-		if strings.Contains(screen[i], "FOOTER-") {
-			debris++
-		}
+	if tm == nil {
+		t.Fatal("the program never printed its last line; nothing could be asserted")
 	}
 	if debris == 0 {
 		dump(t, tm)
@@ -402,16 +470,7 @@ func TestATallEditorCollapsingDoesNotCorruptTheScreen(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { _, err := p.Run(); done <- err }()
 
-	deadline := time.Now().Add(15 * time.Second)
-	var snap string
-	for time.Now().Before(deadline) {
-		if strings.Contains(out.String(), fmt.Sprintf("LINE-%03d", total-1)) {
-			time.Sleep(80 * time.Millisecond)
-			snap = out.String()
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+	snap := waitSettled(out, fmt.Sprintf("LINE-%03d", total-1), 80*time.Millisecond, 15*time.Second)
 	p.Kill()
 	<-done
 
