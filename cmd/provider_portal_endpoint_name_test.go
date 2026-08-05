@@ -134,3 +134,109 @@ func TestApplyingReusesTheUsersEndpointInsteadOfCreatingATwin(t *testing.T) {
 			nimBaseURL, userName, atURL)
 	}
 }
+
+// THE BUG: the portal runs on EVERY launch, and re-selecting an endpoint
+// re-applied its default to all four agents — silently undoing a /models choice
+// made minutes earlier. Combined with that default being the provider's first
+// listed id, every login landed back on the same unusable model.
+//
+// Observed 2026-08-05: the user switched away from 01-ai/yi-large repeatedly and
+// was returned to it after each re-login.
+func TestReselectingAnEndpointKeepsTheModelAlreadyChosen(t *testing.T) {
+	loadCfg(t)
+	const userName = "Gorilla.FREE.NVIDIA.NIM"
+	if err := config.UpsertLocalEndpoint(config.LocalEndpoint{
+		Name: userName, BaseURL: nimBaseURL, APIKey: "nvapi-x",
+	}); err != nil {
+		t.Fatalf("seeding endpoint: %v", err)
+	}
+	defer config.RemoveLocalEndpoint(userName)
+
+	chosen := models.ModelID("local.deliberate/choice")
+	models.SupportedModels[chosen] = models.Model{
+		ID: chosen, Provider: models.ProviderLocal, ContextWindow: 8192, DefaultMaxTokens: 4096,
+	}
+	models.RegisterLocalRouteForTestNamed(chosen, nimBaseURL, "nvapi-x", userName)
+	defer func() {
+		delete(models.SupportedModels, chosen)
+		models.ClearLocalRouteForTest(chosen)
+	}()
+	if err := config.UpdateAgentModel(config.AgentCoder, chosen); err != nil {
+		t.Fatalf("setting the deliberate choice: %v", err)
+	}
+
+	// Registration returns a DIFFERENT default, as it would on a real re-login.
+	other := models.ModelID("local.some/default")
+	models.SupportedModels[other] = models.Model{
+		ID: other, Provider: models.ProviderLocal, ContextWindow: 8192, DefaultMaxTokens: 4096,
+	}
+	models.RegisterLocalRouteForTestNamed(other, nimBaseURL, "nvapi-x", userName)
+	defer func() {
+		delete(models.SupportedModels, other)
+		models.ClearLocalRouteForTest(other)
+	}()
+
+	orig := registerLocalEndpoint
+	defer func() { registerLocalEndpoint = orig }()
+	registerLocalEndpoint = func(name, base, key string) (int, models.ModelID) { return 2, other }
+
+	if err := applyLocalEndpoint(nimEndpointName, nimBaseURL, ""); err != nil {
+		t.Fatalf("applyLocalEndpoint: %v", err)
+	}
+	if got := config.Get().Agents[config.AgentCoder].Model; got != chosen {
+		t.Errorf("coder became %q; re-selecting the endpoint discarded the model the "+
+			"user had deliberately chosen on it (wanted %q)", got, chosen)
+	}
+}
+
+// But an agent pointing at a model that is NOT from this endpoint must still be
+// moved onto it — otherwise choosing a provider would do nothing at all.
+func TestSelectingAnEndpointStillAppliesWhenTheModelIsElsewhere(t *testing.T) {
+	loadCfg(t)
+	const userName = "Gorilla.FREE.NVIDIA.NIM"
+	if err := config.UpsertLocalEndpoint(config.LocalEndpoint{
+		Name: userName, BaseURL: nimBaseURL, APIKey: "nvapi-x",
+	}); err != nil {
+		t.Fatalf("seeding endpoint: %v", err)
+	}
+	defer config.RemoveLocalEndpoint(userName)
+
+	// A model on a DIFFERENT endpoint — still local, so it can be set without a
+	// configured cloud provider, but not served by the endpoint being selected.
+	// (The first attempt used a Claude model and simply SKIPPED, which verifies
+	// nothing.)
+	elsewhere := models.ModelID("local.other-endpoint/model")
+	models.SupportedModels[elsewhere] = models.Model{
+		ID: elsewhere, Provider: models.ProviderLocal, ContextWindow: 8192, DefaultMaxTokens: 4096,
+	}
+	models.RegisterLocalRouteForTestNamed(elsewhere, ollamaBaseURL, "", "some-other-endpoint")
+	defer func() {
+		delete(models.SupportedModels, elsewhere)
+		models.ClearLocalRouteForTest(elsewhere)
+	}()
+	if err := config.UpdateAgentModel(config.AgentCoder, elsewhere); err != nil {
+		t.Fatalf("setting a model on another endpoint: %v", err)
+	}
+
+	fresh := models.ModelID("local.fresh/model")
+	models.SupportedModels[fresh] = models.Model{
+		ID: fresh, Provider: models.ProviderLocal, ContextWindow: 8192, DefaultMaxTokens: 4096,
+	}
+	models.RegisterLocalRouteForTestNamed(fresh, nimBaseURL, "nvapi-x", userName)
+	defer func() {
+		delete(models.SupportedModels, fresh)
+		models.ClearLocalRouteForTest(fresh)
+	}()
+
+	orig := registerLocalEndpoint
+	defer func() { registerLocalEndpoint = orig }()
+	registerLocalEndpoint = func(name, base, key string) (int, models.ModelID) { return 1, fresh }
+
+	if err := applyLocalEndpoint(nimEndpointName, nimBaseURL, ""); err != nil {
+		t.Fatalf("applyLocalEndpoint: %v", err)
+	}
+	if got := config.Get().Agents[config.AgentCoder].Model; got != fresh {
+		t.Errorf("coder is %q; picking an endpoint whose models were not in use must "+
+			"actually switch to it (wanted %q)", got, fresh)
+	}
+}
