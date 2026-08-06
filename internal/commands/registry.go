@@ -124,7 +124,7 @@ var All = []Command{
 	},
 	{
 		Name:    "connect",
-		Aliases: []string{"connections", "providers", "provider", "switch"},
+		Aliases: []string{"connections"},
 		Group:   GroupModels,
 		Summary: "Add or manage your AI accounts and keys.",
 		Detail: "Where you paste an API key, add a local server such as Ollama or " +
@@ -132,6 +132,16 @@ var All = []Command{
 			"connection makes its models appear in /model. The list shows the " +
 			"servers you have added as well as the ones on offer; press d to " +
 			"remove one of yours for good, or space to just switch it off.",
+	},
+	{
+		Name:    "providers",
+		Aliases: []string{"provider", "switch"},
+		Group:   GroupModels,
+		Summary: "Switch to a different AI provider.",
+		Detail: "Reopens the same picker you saw when the app started, with the " +
+			"free options marked. Use it when the provider you chose does not " +
+			"work — a key refused, a model not included in your plan — instead " +
+			"of quitting and starting again. Esc leaves everything as it is.",
 	},
 	{
 		Name:    "login",

@@ -35,6 +35,23 @@ type ProviderRow struct {
 	NeedsInput  bool
 	InputPrompt string
 	Secret      bool
+	// InputPrompt2, when set, asks for a SECOND value after the first.
+	//
+	// GORILLA OVERRIDE: Cloudflare needs an account id AND an API token.
+	// Collecting both from one field meant parsing two values out of an
+	// arbitrary paste, and a paste containing a newline submits the field early
+	// — the terminal sends that newline as Enter — so everything after the first
+	// line was silently discarded. One field per value removes the ambiguity
+	// entirely: a stray newline now just advances to the next field.
+	InputPrompt2 string
+	// Secret2 masks the second field independently: an account id is not a
+	// secret and hiding it only makes it harder to check for a typo.
+	Secret2 bool
+	// Free marks a provider that costs nothing to use. Rendered as a distinct
+	// tag because a row that costs money and a row that does not otherwise look
+	// identical, and the people this is built for cannot afford to find out by
+	// being billed.
+	Free bool
 	// Configured means a usable credential is already saved, so Enter selects
 	// without asking for anything. `r` replaces the stored credential.
 	Configured bool
@@ -45,10 +62,11 @@ type ProviderRow struct {
 
 // ProviderChoice is what the user decided.
 type ProviderChoice struct {
-	ID    string // selected row; empty when Keep or Quit
-	Input string // typed credential, empty when none was asked for
-	Keep  bool   // esc: continue with the current setup, change nothing
-	Quit  bool   // ctrl+c (or esc with nothing configured): abort the launch
+	ID     string // selected row; empty when Keep or Quit
+	Input  string // typed credential, empty when none was asked for
+	Input2 string // second value, when the row asked for one
+	Keep   bool   // esc: continue with the current setup, change nothing
+	Quit   bool   // ctrl+c (or esc with nothing configured): abort the launch
 }
 
 type providerModel struct {
@@ -59,9 +77,12 @@ type providerModel struct {
 	// key-entry state
 	entering bool
 	input    []rune
-	hint     string
-	choice   ProviderChoice
-	done     bool
+	// input2 holds the second value, and stage tracks which field is active.
+	input2 []rune
+	stage  int // 0 = first field, 1 = second
+	hint   string
+	choice ProviderChoice
+	done   bool
 }
 
 func (m *providerModel) Init() tea.Cmd { return nil }
@@ -103,14 +124,14 @@ func (m *providerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Deliberate re-entry of a credential that is already saved.
 			if r := m.rows[m.sel]; r.Configured && r.NeedsInput {
 				m.entering = true
-				m.input = nil
+				m.input, m.input2, m.stage = nil, nil, 0
 				m.hint = ""
 			}
 		case "enter":
 			r := m.rows[m.sel]
 			if r.NeedsInput && !r.Configured {
 				m.entering = true
-				m.input = nil
+				m.input, m.input2, m.stage = nil, nil, 0
 				m.hint = ""
 				return m, nil
 			}
@@ -129,23 +150,46 @@ func (m *providerModel) updateEntering(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.done = true
 		return m, tea.Quit
 	case "esc":
+		// Back a step, not straight out: having typed a long token, being thrown
+		// all the way back to the list by one Esc is its own small disaster.
+		if m.stage == 1 {
+			m.stage = 0
+			m.hint = ""
+			return m, nil
+		}
 		m.entering = false
-		m.input = nil
+		m.input, m.input2 = nil, nil
 		m.hint = ""
 		return m, nil
 	case "enter":
-		if len(m.input) == 0 {
+		row := m.rows[m.sel]
+		if m.stage == 0 {
+			if len(m.input) == 0 {
+				m.hint = "Nothing entered yet — paste the value, or Esc to go back."
+				return m, nil
+			}
+			if row.InputPrompt2 != "" {
+				m.stage = 1
+				m.hint = ""
+				return m, nil
+			}
+		} else if len(m.input2) == 0 {
 			m.hint = "Nothing entered yet — paste the value, or Esc to go back."
 			return m, nil
 		}
 		m.choice = ProviderChoice{
-			ID:    m.rows[m.sel].ID,
-			Input: strings.TrimSpace(string(m.input)),
+			ID:     row.ID,
+			Input:  strings.TrimSpace(string(m.input)),
+			Input2: strings.TrimSpace(string(m.input2)),
 		}
 		m.done = true
 		return m, tea.Quit
 	case "backspace":
-		if len(m.input) > 0 {
+		if m.stage == 1 {
+			if len(m.input2) > 0 {
+				m.input2 = m.input2[:len(m.input2)-1]
+			}
+		} else if len(m.input) > 0 {
 			m.input = m.input[:len(m.input)-1]
 		}
 		return m, nil
@@ -153,7 +197,11 @@ func (m *providerModel) updateEntering(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Runes cover typing and paste alike; bubbletea delivers a paste as one
 	// KeyRunes message with every rune in it.
 	if msg.Type == tea.KeyRunes {
-		m.input = append(m.input, msg.Runes...)
+		if m.stage == 1 {
+			m.input2 = append(m.input2, msg.Runes...)
+		} else {
+			m.input = append(m.input, msg.Runes...)
+		}
 		m.hint = ""
 	}
 	return m, nil
@@ -201,11 +249,14 @@ func (m *providerModel) View() string {
 			cursor = "> "
 		}
 		tag := ""
+		if r.Free {
+			tag = "  free"
+		}
 		switch {
 		case r.Active:
-			tag = "  (current)"
+			tag += "  (current)"
 		case r.Configured:
-			tag = "  (ready)"
+			tag += "  (ready)"
 		}
 		label := clip(cursor+r.Name, w-len([]rune(tag)))
 		st := lipgloss.NewStyle()
@@ -231,9 +282,27 @@ func (m *providerModel) View() string {
 
 	if m.entering {
 		b.WriteString("\n")
-		writeWrapped(lipgloss.NewStyle(), cur.InputPrompt)
-		b.WriteString(m.inputLine(w) + "\n")
-		writeWrapped(dim, "Enter to save · Esc to go back")
+		// With two fields, show the completed one above so the value just typed
+		// is visibly banked rather than seeming to have vanished.
+		if cur.InputPrompt2 != "" && m.stage == 1 {
+			writeWrapped(dim, "1. "+cur.InputPrompt)
+			b.WriteString(dim.Render(m.echo(m.input, cur.Secret, w)) + "\n\n")
+			writeWrapped(lipgloss.NewStyle(), "2. "+cur.InputPrompt2)
+			b.WriteString(m.echo(m.input2, cur.Secret2, w) + "\n")
+			writeWrapped(dim, "Enter to save · Esc to go back to the first value")
+		} else {
+			prompt := cur.InputPrompt
+			if cur.InputPrompt2 != "" {
+				prompt = "1. " + prompt
+			}
+			writeWrapped(lipgloss.NewStyle(), prompt)
+			b.WriteString(m.echo(m.input, cur.Secret, w) + "\n")
+			next := "Enter to save · Esc to go back"
+			if cur.InputPrompt2 != "" {
+				next = "Enter for the next value · Esc to go back"
+			}
+			writeWrapped(dim, next)
+		}
 	}
 	if m.hint != "" {
 		writeWrapped(warn, m.hint)
@@ -254,18 +323,23 @@ func (m *providerModel) View() string {
 // inputLine renders the typed value. Secrets render as bullets with a length
 // counter — a pasted key must NEVER appear on screen (it would sit in the
 // terminal transcript; that has happened once already and is a standing rule).
-func (m *providerModel) inputLine(w int) string {
-	n := len(m.input)
+// echo renders one field's value. Secrets render as bullets with a length
+// counter — a pasted key must NEVER appear on screen (it would sit in the
+// terminal transcript; that has happened once already and is a standing rule).
+// Non-secret values ARE shown, because an account id is not a credential and
+// hiding it only makes a typo impossible to spot.
+func (m *providerModel) echo(val []rune, secret bool, w int) string {
+	n := len(val)
 	suffix := fmt.Sprintf(" (%d chars)", n)
 	room := w - len([]rune(suffix))
 	if room < 1 {
 		room = 1
 	}
 	var shown string
-	if m.rows[m.sel].Secret {
+	if secret {
 		shown = clip(strings.Repeat("•", n), room)
 	} else {
-		shown = clip(string(m.input), room)
+		shown = clip(string(val), room)
 	}
 	if shown == "" {
 		shown = "_" // an empty field still needs a visible cursor cell

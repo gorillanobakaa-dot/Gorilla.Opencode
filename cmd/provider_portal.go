@@ -155,6 +155,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 	rows := []startup.ProviderRow{
 		{
 			ID:   "antigravity",
+			Free: true,
 			Name: "Antigravity free tier - Claude + GPT-OSS + Gemini (Gmail sign-in)",
 			What: "Signs in with your Google account and uses your free Google " +
 				"Antigravity tier: Claude Sonnet/Opus 4.6, GPT-OSS 120B, and Gemini. " +
@@ -167,6 +168,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 		},
 		{
 			ID:   "google-oauth",
+			Free: true,
 			Name: "Google - Code Assist free tier (Gemini only, Gmail sign-in, no key)",
 			What: "Signs in with your Google account and uses the free Code Assist " +
 				"tier. Gemini models only. No API key, no cost.",
@@ -177,6 +179,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 		},
 		{
 			ID:   "nvidia-nim",
+			Free: true,
 			Name: "NVIDIA NIM (free API key)",
 			What: "NVIDIA's hosted models via an nvapi-... key. Note: the key is only " +
 				"proven at the first generation - NVIDIA lists models without " +
@@ -189,6 +192,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 		},
 		{
 			ID:   "ollama",
+			Free: true,
 			Name: "Local Ollama (no key)",
 			What: "Models running on this machine at localhost:11434. Free and private; " +
 				"speed depends on this machine. Ollama must already be running.",
@@ -197,6 +201,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 		},
 		{
 			ID:   "cloudflare",
+			Free: true,
 			Name: "Cloudflare Workers AI - free tier, no card",
 			What: "22 free models including a dedicated coder (Qwen2.5-Coder 32B), " +
 				"GPT-OSS 120B/20B, Llama 3.3 70B and DeepSeek-R1. Needs a free " +
@@ -204,12 +209,16 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			Warning: "A few models (Kimi, GLM-5.2) need a paid Workers plan and will " +
 				"say so. The free daily allowance is shared across all of them.",
 			NeedsInput: true,
-			InputPrompt: "Paste your Cloudflare Account ID and API token. Order does not " +
-				"matter and extra text is ignored - pasting the whole snippet from " +
-				"Cloudflare's \"Use REST API\" page works.",
-			Secret:     true,
-			Configured: cfReady,
-			Active:     curEndpoint == cloudflareEndpointName,
+			// Two fields, one value each. Cloudflare shows the account ID and the
+			// token in separate boxes, and asking for both in one field meant a
+			// paste containing a newline submitted early and silently lost the
+			// rest.
+			InputPrompt:  "Cloudflare Account ID (32 hex characters, shown under \"Account ID\")",
+			InputPrompt2: "Cloudflare API token (starts with cfut_, shown once when you create it)",
+			Secret:       false, // an account id is not a credential; showing it lets a typo be spotted
+			Secret2:      true,
+			Configured:   cfReady,
+			Active:       curEndpoint == cloudflareEndpointName,
 		},
 		{
 			ID:          "anthropic",
@@ -247,6 +256,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 		},
 		{
 			ID:   "groq",
+			Free: true,
 			Name: "Groq - API key (free tier available)",
 			What: "Very fast inference. Free tier caps around 12k tokens/minute - trim " +
 				"the /context loadout if you hit it.",
@@ -258,6 +268,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 		},
 		{
 			ID:   "cerebras",
+			Free: true,
 			Name: "Cerebras - API key",
 			What: "Very fast inference. A free key lists models, but inference may " +
 				"require credits.",
@@ -332,6 +343,35 @@ func runProviderPortal(ctx context.Context) (quit bool, err error) {
 	}
 }
 
+// reopenProviderPortal is the mid-session escape hatch, wired into the TUI as
+// tui.ReopenProviderPortal.
+//
+// GORILLA OVERRIDE: same picker, same rows, same readiness markers as launch.
+// It differs from the startup path in two ways that matter:
+//
+//   - a failure RETURNS instead of looping back to the menu. At startup the
+//     TUI has not begun and looping is free; here the terminal is on loan from
+//     bubbletea via tea.Exec, and staying inside it means the caller cannot
+//     report anything. The error surfaces in the status bar instead.
+//   - Quit does not quit the program. The user asked to change provider, not to
+//     end the session; treating ctrl+c as "abandon the switch" is the reading
+//     that cannot lose their work.
+func reopenProviderPortal() error {
+	rows, canKeep := providerPortalRows()
+	choice, err := startup.AskProviders(rows, true) // something already works: we are mid-session
+	_ = canKeep
+	if err != nil {
+		return fmt.Errorf("could not show the provider picker: %w", err)
+	}
+	if choice.Keep || choice.Quit || choice.ID == "" {
+		return nil
+	}
+	if err := applyPortalChoice(context.Background(), choice); err != nil {
+		return fmt.Errorf("could not set up %s: %w", choice.ID, err)
+	}
+	return nil
+}
+
 // applyPortalChoice turns a selection into saved credentials and agent models.
 func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 	switch c.ID {
@@ -387,7 +427,7 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 	case "ollama":
 		return applyLocalEndpoint(ollamaEndpointName, ollamaBaseURL, "")
 	case "cloudflare":
-		return applyCloudflare(c.Input)
+		return applyCloudflare(c.Input, c.Input2)
 
 	default:
 		prov, ok := portalProvider[c.ID]
@@ -504,13 +544,46 @@ func parseCloudflareInput(in string) (account, token string, err error) {
 	return account, token, nil
 }
 
-// applyCloudflare configures Workers AI from a pasted account id + token.
-func applyCloudflare(input string) error {
-	account, token, err := parseCloudflareInput(input)
-	if err != nil {
-		return err
+// applyCloudflare configures Workers AI from the account id and API token.
+//
+// Both are still run through the shape-matchers rather than trusted verbatim:
+// people paste surrounding whitespace, quotes, "Bearer " prefixes and the odd
+// stray line, and rejecting that would be pedantry. The fields only decide
+// WHICH value goes where; the matchers decide what each one actually is.
+func applyCloudflare(account, token string) error {
+	// GORILLA FIX: selecting an ALREADY-CONFIGURED row supplies no values.
+	//
+	// The portal only asks for input when a row is not yet configured, so
+	// pressing Enter on a "(ready)" Cloudflare row arrives here with both
+	// arguments empty and this function rejected it — "that does not look like a
+	// Cloudflare account ID" — for credentials that were saved and working.
+	// Reported 2026-08-05, three times in a row, with the cursor bouncing back
+	// to the previous provider each time.
+	//
+	// NVIDIA never hit this because its base URL is a constant and
+	// applyLocalEndpoint already falls back to the stored key. Cloudflare's base
+	// URL embeds the account id, so the whole stored endpoint has to be reused.
+	// `r` on the row is still how you REPLACE the credentials deliberately.
+	if strings.TrimSpace(account) == "" && strings.TrimSpace(token) == "" {
+		for _, e := range config.Get().LocalEndpoints {
+			if !e.Disabled && strings.Contains(e.BaseURL, "api.cloudflare.com") && e.APIKey != "" {
+				return applyLocalEndpoint(e.Name, e.BaseURL, e.APIKey)
+			}
+		}
+		return fmt.Errorf("no saved Cloudflare credentials to use - press r on this row to enter them")
 	}
-	return applyLocalEndpoint(cloudflareEndpointName, fmt.Sprintf(cloudflareBaseFmt, account), token)
+
+	acc := cfAccountRe.FindString(account)
+	if acc == "" {
+		return fmt.Errorf("that does not look like a Cloudflare account ID - it is 32 " +
+			"hex characters, shown on the Workers AI page under \"Account ID\"")
+	}
+	tok := cfTokenRe.FindString(token)
+	if tok == "" {
+		return fmt.Errorf("that does not look like a Cloudflare API token - it usually " +
+			"starts with cfut_ and is only shown once, when you create it")
+	}
+	return applyLocalEndpoint(cloudflareEndpointName, fmt.Sprintf(cloudflareBaseFmt, acc), tok)
 }
 
 // runAntigravityLogin runs the Antigravity OAuth flow and provisions the

@@ -326,6 +326,11 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 
 		// Interactive mode
 		// Set up the TUI
+		//
+		// GORILLA OVERRIDE: hand the TUI a way back to the provider picker.
+		// internal/tui cannot import cmd (cmd imports it), so the escape hatch is
+		// injected here rather than called directly.
+		tui.ReopenProviderPortal = reopenProviderPortal
 		zone.NewGlobal()
 		program := tea.NewProgram(
 			tui.New(app),
