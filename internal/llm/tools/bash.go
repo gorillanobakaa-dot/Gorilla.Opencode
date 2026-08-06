@@ -242,7 +242,13 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 // filtered tool output is the single biggest lever for build agents.
 var (
 	buildSignalRe = regexp.MustCompile(`(?i)(\berror\b:|fatal error:|undefined reference|undefined symbol|multiple definition|recipe for target .* failed|make(\[\d+\])?: \*\*\*|ld: |ld\.lld: |collect2:|linker command failed|cannot find|no such file|: warning:|warning generated|note: |panic:|Segmentation fault|failed with exit|Error \d)`)
-	buildNoiseRe  = regexp.MustCompile(`(?i)^\s*(cc|cxx|ar|ld|as|ranlib|cpp|gen|host cc|host cxx|copy|install|strip|objcopy|compiling|building|checking|make(\[\d+\])?:\s+(entering|leaving|nothing to be done)|\[\s*\d+%\]|\d+/\d+\s)`)
+	// GORILLA OVERRIDE: every tool name here MUST be followed by
+	// whitespace. Without that the alternation matched as a bare prefix,
+	// so `ld:`, `cc1plus:`, `arch/x86/...` and `assertion` were all
+	// classified as progress noise — i.e. the filter deleted the first
+	// line of failure on exactly the kernel and Gecko builds it was
+	// written for. Guarded by bash_logfilter_test.go.
+	buildNoiseRe  = regexp.MustCompile(`(?i)^\s*((cc|cxx|ar|ld|as|ranlib|cpp|gen|copy|install|strip|objcopy|host cc|host cxx)\s|(compiling|building|checking)\b|make(\[\d+\])?:\s+(entering|leaving|nothing to be done)|\[\s*\d+%\]|\d+/\d+\s)`)
 	buildMarkerRe = regexp.MustCompile(`(?i)(\bgcc\b|\bclang\b|\bmake\b|\bmach\b|\bcargo\b|\bcmake\b|\bninja\b|\bmozconfig\b|CC\s|CXX\s|\.o\b|\.rlib\b)`)
 	fileLineRe    = regexp.MustCompile(`^[^\s:][^:]*:\d+(:\d+)?:`)
 )
@@ -273,12 +279,21 @@ func filterBuildLog(content string) string {
 	keptIdx := map[int]bool{}
 	for i, l := range lines {
 		if buildSignalRe.MatchString(l) || fileLineRe.MatchString(l) {
-			// include one line of context on each side
+			// GORILLA OVERRIDE: signal beats noise. The noise test used
+			// to be applied to the matched line itself as well as to its
+			// context, so a line that was both — `ld: cannot find -lssl`
+			// is the canonical case — was discarded despite being the
+			// whole reason to keep anything. Context lines are still
+			// noise-filtered; the signal line never is.
 			for j := i - 1; j <= i+1; j++ {
-				if j >= 0 && j < len(lines) && !keptIdx[j] && !buildNoiseRe.MatchString(lines[j]) {
-					keptIdx[j] = true
-					kept = append(kept, lines[j])
+				if j < 0 || j >= len(lines) || keptIdx[j] {
+					continue
 				}
+				if j != i && buildNoiseRe.MatchString(lines[j]) {
+					continue
+				}
+				keptIdx[j] = true
+				kept = append(kept, lines[j])
 			}
 		}
 	}
