@@ -98,10 +98,25 @@ func (o *openaiClient) convertMessages(messages []message.Message) (openaiMessag
 				Role: "assistant",
 			}
 
-			if msg.Content().String() != "" {
-				assistantMsg.Content = openai.ChatCompletionAssistantMessageParamContentUnion{
-					OfString: openai.String(msg.Content().String()),
-				}
+			// GORILLA FIX: always send a STRING content, never null.
+			//
+			// An assistant turn that only calls a tool has no text, and leaving
+			// Content unset serialises as `"content": null`. OpenAI's schema allows
+			// that; Cloudflare Workers AI validates against a stricter one and
+			// rejects the whole request:
+			//
+			//   400  Type mismatch of '/messages/1/content', 'string' not in 'null'
+			//        required properties at '/messages/1' are 'role,content'
+			//
+			// The effect is that any conversation survives exactly until its first
+			// tool call and then fails on every following turn, because the
+			// offending message stays in the history forever. Measured 2026-08-05:
+			// identical request with "" instead of null returns 200.
+			//
+			// An empty string is faithful — the turn genuinely produced no text —
+			// and is accepted everywhere, so this is not a Cloudflare special case.
+			assistantMsg.Content = openai.ChatCompletionAssistantMessageParamContentUnion{
+				OfString: openai.String(msg.Content().String()),
 			}
 
 			if len(msg.ToolCalls()) > 0 {
@@ -172,7 +187,24 @@ func (o *openaiClient) preparedParams(messages []openai.ChatCompletionMessagePar
 	params := openai.ChatCompletionNewParams{
 		Model:    openai.ChatModel(o.providerOptions.model.APIModel),
 		Messages: messages,
-		Tools:    tools,
+	}
+
+	// GORILLA FIX: OMIT `tools` when there are none. Never send `"tools": []`.
+	//
+	// An empty array is meaningless everywhere — it says "here are the tools you
+	// may call: none" — but most providers tolerate it, so it went unnoticed.
+	// Cloudflare Workers AI validates it and rejects the whole request:
+	//
+	//   400  Value error, `tools` must not be an empty array.
+	//        Either provide at least one tool or omit the field
+	//
+	// This is why session titles failed against Cloudflare while ordinary turns
+	// worked: generateTitle calls SendMessages with make([]tools.BaseTool, 0),
+	// and the summarizer does the same, so long conversations would have started
+	// failing the moment they needed compacting. Measured 2026-08-05: identical
+	// request with the field omitted returns 200, with `"tools": []` returns 400.
+	if len(tools) > 0 {
+		params.Tools = tools
 	}
 
 	if o.providerOptions.model.CanReason == true {
