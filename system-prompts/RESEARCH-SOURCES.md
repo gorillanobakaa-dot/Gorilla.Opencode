@@ -82,13 +82,61 @@ arXiv ID was fetched and its title confirmed against arXiv on
   poorly. The reason we resisted simply appending every good idea to the
   prompt.*
 
-## Prompt hygiene — the case against shouting
+## Prompt hygiene — letter case and typographic emphasis
+
+*Section renamed 2026-08-06. It was previously headed "the case against
+shouting" and carried exactly one citation, about agent documentation
+practices, which argued nothing of the sort. The header asserted a position
+with no source under it. The correction is below and it partly goes against
+us.*
+
+- **Attention is Case-Sensitive** — Dillitzer, Sohn, Corso & Auerbach
+  (2026-08-04). arXiv:2608.03711 — https://arxiv.org/abs/2608.03711
+  *The direct measurement of the thing this project asserted without one.
+  Holds semantics and word order fixed and varies only letter case, across
+  15 schemes, 13 models and 3 tokenizer families (BPE, SentencePiece,
+  byte-level BPE), measuring attention mass and downstream accuracy as
+  separate quantities. Four results that bear on our prompt:*
+  - *Uppercase target spans against lowercase context (their TE1) are the
+    only reliably **productive** intervention: +1.85 pp accuracy on the
+    discovery model, up to +8.95 pp across the set.*
+  - *`aLtErNaTiNg` case pulls the **most** attention (+2.77 pp) and **loses**
+    accuracy (−2.88 pp mean, −13.96 pp on LLaMA-3.1-8B). Attention
+    concentration and task performance are not the same axis — the paper's
+    central point, and a trap for anyone optimising a prompt by eye.*
+  - *Global uniform casing — all-caps or all-lowercase throughout — does
+    close to nothing (≤1.16 pp). Emphasis is a contrast effect. Applied
+    everywhere it is applied nowhere.*
+  - *Reasoning models show <±0.5 pp sensitivity; the deliberation phase
+    filters typographic salience. The effect is universal in the nine
+    non-reasoning models. **This fork mostly drives local and open-weight
+    models, so the effect applies to us more than it applies to
+    Claude-backed tooling.***
+
+  *What it does NOT license: reintroducing seventeen `IMPORTANT`s. The
+  productive regime is sparse caps in a lowercase field, which is what
+  `current/coder-modern.md` already has (2 spans / 816 words). Their
+  finding explains why that shape works; it does not argue for more.*
+  *Caveat: Latin-script only, no causal mediation analysis, and no
+  pre-registration behind a 15 × 13 × 6 sweep.*
+
+- **Large Language Models Understand and Can be Enhanced by Emotional
+  Stimuli** ("EmotionPrompt") — Cheng Li et al. (2023). arXiv:2307.11760
+  — https://arxiv.org/abs/2307.11760
+  *Listed again here, under the section it was actually used to support,
+  because that use was wrong. This paper is about emotional and
+  motivational phrasing ("this is very important to my career"). We
+  extended it to letter case, which it never studied, and stated the
+  extension as a research finding in `REPORT.md` and `README.md`. Both are
+  corrected as of 2026-08-06. The token-fragmentation argument for cutting
+  caps was always separate and still stands.*
 
 - **The 2025 AI Agent Index: Documenting Technical and Safety Features of
   Deployed Agentic AI Systems** — (2026-02-19). arXiv:2602.17753 —
   https://arxiv.org/abs/2602.17753
   *Survey of 30 deployed agents and how inconsistently they document what
-  they actually do. Part of why this directory exists.*
+  they actually do. Part of why this directory exists — and this section is
+  a worked example of the failure it describes.*
 
 
 ## Agents for repository-scale code & system compilation
