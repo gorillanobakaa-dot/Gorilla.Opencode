@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"sync/atomic"
 
@@ -43,6 +44,31 @@ type keyMap struct {
 	SwitchTheme     key.Binding
 	ToggleSelection key.Binding
 }
+
+// ReopenProviderPortal reopens the every-launch provider picker from inside a
+// session. Set by cmd at startup; nil in tests and in any build that does not
+// wire it.
+//
+// GORILLA OVERRIDE: the escape hatch. The portal only ran at launch, so a
+// provider that turned out not to work left the user stuck unless they knew to
+// quit and relaunch — and the people this is built for are exactly the ones who
+// do not know that. /connect, /login and /model between them can do the same
+// job, but they are three commands and none of them is the screen the user was
+// just shown.
+//
+// It is a hook rather than a direct call because internal/tui cannot import
+// cmd: cmd imports this package.
+var ReopenProviderPortal func() error
+
+// portalExec runs the provider portal while bubbletea has released the
+// terminal. The portal is its own tea.Program and needs the screen to itself;
+// tea.Exec is the same mechanism the editor already uses for $EDITOR.
+type portalExec struct{ run func() error }
+
+func (p portalExec) Run() error        { return p.run() }
+func (portalExec) SetStdin(io.Reader)  {}
+func (portalExec) SetStdout(io.Writer) {}
+func (portalExec) SetStderr(io.Writer) {}
 
 type startCompactSessionMsg struct{}
 
@@ -697,10 +723,12 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.showModelDialog = true
 			return a, nil
 		// GORILLA OVERRIDE: /provider and /switch are natural aliases —
-		// "I want to switch provider" maps intuitively to /connect, and
-		// /provider mirrors the /model → /provider parallel in
-		// Claude / Codex CLIs.
-		case "connect", "connections", "providers", "provider", "switch":
+		// UPDATED 2026-08-05: /providers, /provider and /switch now open the
+		// launch-time PICKER instead of this dialog (see the "providers" case
+		// below). This dialog remains the detailed manager — add a local server,
+		// toggle a connection off, remove one for good — which is a different job
+		// from "the provider I picked does not work, show me the others".
+		case "connect", "connections":
 			a.connectDialog.Init()
 			a.showConnectDialog = true
 			return a, nil
@@ -792,6 +820,34 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.commandHelp.SetSize(a.width, a.height)
 			a.showCommandHelp = true
 			return a, nil
+		case "providers", "provider", "switch":
+			// GORILLA OVERRIDE: the escape hatch, as a COMMAND rather than a key.
+			//
+			// A key binding was tried first and abandoned: ctrl+p is Print in most
+			// GUI contexts and "previous line" in readline; ctrl+c is SIGINT (and
+			// copy, for anyone who has rebound it); esc already cancels a running
+			// turn here, so taking it would mean esc sometimes stops your request
+			// and sometimes opens a menu. Nearly every remaining control key is
+			// either bound in this app or reserved by the terminal (ctrl+z
+			// suspend, ctrl+d EOF, ctrl+q/s flow control, ctrl+b tmux prefix).
+			//
+			// A slash command collides with nothing, appears in /help, and is the
+			// idiom this app already teaches.
+			if ReopenProviderPortal == nil {
+				return a, util.ReportWarn("switching providers is not available in this build")
+			}
+			if a.app.CoderAgent != nil && a.app.CoderAgent.IsBusy() {
+				return a, util.ReportWarn("finish or cancel the current turn before switching provider")
+			}
+			return a, tea.Exec(portalExec{run: ReopenProviderPortal}, func(err error) tea.Msg {
+				if err != nil {
+					return util.InfoMsg{Type: util.InfoTypeError, Msg: err.Error()}
+				}
+				return util.InfoMsg{
+					Type: util.InfoTypeInfo,
+					Msg:  "Provider updated — use /models if you want a different model from it.",
+				}
+			})
 		case "usage":
 			// GORILLA OVERRIDE: /usage — Antigravity weekly quota. Typed commands
 			// dispatch through this switch, NOT the command palette, so a palette
@@ -1086,6 +1142,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, keys.Logs):
 			return a, a.moveToPage(page.LogsPage)
+
 		case key.Matches(msg, keys.Help):
 			if a.showQuit {
 				return a, nil

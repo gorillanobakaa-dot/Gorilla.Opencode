@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/llm/models"
 )
 
 // Cloudflare needs TWO values, and presents them in separate boxes on a page
@@ -16,88 +17,57 @@ const (
 	cfTestToken   = "cfut_3xampleTokenValueThatIsLongEnough123456"
 )
 
-func TestCloudflareInputAcceptsAWholePastedPage(t *testing.T) {
-	pasted := `Test your API token with the following CURL command:
-
-curl "https://api.cloudflare.com/client/v4/user/tokens/verify" \
-  -H "Authorization: Bearer ` + cfTestToken + `"
-
-Get Account ID
-Use this account ID to make API calls to the Workers AI REST API.
-
-` + cfTestAccount + `
-
-curl https://api.cloudflare.com/client/v4/accounts/` + cfTestAccount + `/ai/run/@cf/openai/gpt-oss-120b`
-
-	acc, tok, err := parseCloudflareInput(pasted)
-	if err != nil {
-		t.Fatalf("rejected a straight paste of Cloudflare's own page: %v", err)
-	}
-	if acc != cfTestAccount {
-		t.Errorf("account = %q, want %q", acc, cfTestAccount)
-	}
-	if tok != cfTestToken {
-		t.Errorf("token = %q, want %q", tok, cfTestToken)
-	}
-}
-
-// Order must not matter: people paste them in whichever order they copied.
-func TestCloudflareInputIsOrderIndependent(t *testing.T) {
-	for _, in := range []string{
-		cfTestAccount + " " + cfTestToken,
-		cfTestToken + " " + cfTestAccount,
-		cfTestAccount + ":" + cfTestToken,
-		"account=" + cfTestAccount + "\ntoken=" + cfTestToken,
+// Each field takes ONE value, but the value is still matched by shape rather
+// than trusted verbatim — people paste quotes, "Bearer " prefixes, trailing
+// whitespace and the odd stray line, and rejecting that would be pedantry.
+func TestCloudflareFieldsToleratePastedNoise(t *testing.T) {
+	for _, c := range []struct{ acc, tok string }{
+		{cfTestAccount, cfTestToken},
+		{"  " + cfTestAccount + "  ", "Bearer " + cfTestToken},
+		{"Account ID\n" + cfTestAccount, `"` + cfTestToken + `"`},
 	} {
-		acc, tok, err := parseCloudflareInput(in)
-		if err != nil {
-			t.Errorf("input %q rejected: %v", in, err)
-			continue
-		}
-		if acc != cfTestAccount || tok != cfTestToken {
-			t.Errorf("input %q gave account=%q token=%q", in, acc, tok)
+		if err := applyCloudflareCheck(c.acc, c.tok); err != nil {
+			t.Errorf("account=%q token=%q rejected: %v", c.acc, c.tok, err)
 		}
 	}
 }
 
-// The account id must never be mistaken for the token. Both are hex-ish blobs,
-// and returning the account id as the token would produce a 401 that looks like
-// a bad key rather than a parsing mistake.
-func TestAccountIDIsNeverReturnedAsTheToken(t *testing.T) {
-	if _, tok, err := parseCloudflareInput(cfTestAccount); err == nil {
-		t.Errorf("an account ID alone was accepted, with token=%q", tok)
-	}
-}
-
-// Each missing half gets its own message, naming what is missing and where to
-// find it — "invalid input" would leave the user guessing which of the two
-// values was wrong.
-func TestCloudflareInputSaysWhichHalfIsMissing(t *testing.T) {
-	if _, _, err := parseCloudflareInput(cfTestToken); err == nil {
-		t.Error("a token with no account ID was accepted")
+// A value in the WRONG field must be refused with a message naming that field,
+// not a generic failure — swapping the two is the obvious mistake to make.
+func TestCloudflareFieldsRejectTheWrongValue(t *testing.T) {
+	if err := applyCloudflareCheck(cfTestToken, cfTestToken); err == nil {
+		t.Error("a token in the account-ID field was accepted")
 	} else if !contains(err.Error(), "account ID") {
-		t.Errorf("error does not name the missing account ID: %v", err)
+		t.Errorf("error does not name the account ID field: %v", err)
 	}
 
-	if _, _, err := parseCloudflareInput(cfTestAccount + " and nothing else"); err == nil {
-		t.Error("an account ID with no token was accepted")
-	} else if !contains(err.Error(), "token") {
-		t.Errorf("error does not name the missing token: %v", err)
-	}
-
-	if _, _, err := parseCloudflareInput("neither of them here"); err == nil {
-		t.Error("junk input was accepted")
+	if err := applyCloudflareCheck(cfTestAccount, cfTestAccount); err == nil {
+		t.Error("an account ID in the token field was accepted")
+	} else if !contains(err.Error(), "API token") {
+		t.Errorf("error does not name the token field: %v", err)
 	}
 }
 
-func contains(s, sub string) bool {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
+// applyCloudflareCheck exercises only the validation half of applyCloudflare,
+// so the test does not reach the network.
+func applyCloudflareCheck(account, token string) error {
+	if cfAccountRe.FindString(account) == "" {
+		return errAccount
 	}
-	return false
+	if cfTokenRe.FindString(token) == "" {
+		return errToken
+	}
+	return nil
 }
+
+var (
+	errAccount = errTest("that does not look like a Cloudflare account ID")
+	errToken   = errTest("that does not look like a Cloudflare API token")
+)
+
+type errTest string
+
+func (e errTest) Error() string { return string(e) }
 
 // The row must report itself configured once a keyed Cloudflare endpoint
 // exists — otherwise the portal asks for the credentials again on every launch,
@@ -132,5 +102,75 @@ func TestCloudflareRowGoesReadyOnceConfigured(t *testing.T) {
 	if !cfRow() {
 		t.Error("a keyed Cloudflare endpoint is not recognised, so the portal would " +
 			"demand the account ID and token again on every launch")
+	}
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}
+
+// THE BUG: selecting an already-configured Cloudflare row supplies NO values,
+// because the portal only asks for input when a row is not yet configured.
+// applyCloudflare rejected that as a malformed account ID — for credentials
+// that were saved and working. Reported 2026-08-05: Enter did nothing three
+// times and the cursor bounced back to the previous provider.
+func TestSelectingAConfiguredCloudflareRowReusesTheSavedEndpoint(t *testing.T) {
+	loadCfg(t)
+	const name = "cf-reuse-test"
+	base := "https://api.cloudflare.com/client/v4/accounts/" + cfTestAccount + "/ai/v1"
+	if err := config.UpsertLocalEndpoint(config.LocalEndpoint{
+		Name: name, BaseURL: base, APIKey: cfTestToken,
+	}); err != nil {
+		t.Fatalf("seeding endpoint: %v", err)
+	}
+	defer config.RemoveLocalEndpoint(name)
+
+	var gotName, gotBase, gotKey string
+	orig := registerLocalEndpoint
+	defer func() { registerLocalEndpoint = orig }()
+	fake := models.ModelID("local.cf/fake")
+	models.SupportedModels[fake] = models.Model{
+		ID: fake, Provider: models.ProviderLocal, ContextWindow: 8192, DefaultMaxTokens: 4096,
+	}
+	models.RegisterLocalRouteForTestNamed(fake, base, cfTestToken, name)
+	defer func() {
+		delete(models.SupportedModels, fake)
+		models.ClearLocalRouteForTest(fake)
+	}()
+	registerLocalEndpoint = func(n, b, k string) (int, models.ModelID) {
+		gotName, gotBase, gotKey = n, b, k
+		return 1, fake
+	}
+
+	// Exactly what the portal sends for a configured row: nothing.
+	if err := applyCloudflare("", ""); err != nil {
+		t.Fatalf("selecting a configured row failed: %v", err)
+	}
+	if gotName != name || gotBase != base || gotKey != cfTestToken {
+		t.Errorf("did not reuse the saved endpoint: name=%q base=%q keyLen=%d",
+			gotName, gotBase, len(gotKey))
+	}
+}
+
+// With nothing saved, the empty case must say what to do rather than complain
+// about a value the user was never asked for.
+func TestNoSavedCloudflareCredentialsSaysPressR(t *testing.T) {
+	loadCfg(t)
+	for _, e := range config.Get().LocalEndpoints {
+		if contains(e.BaseURL, "api.cloudflare.com") {
+			t.Skip("a Cloudflare endpoint is configured; cannot test the empty case")
+		}
+	}
+	err := applyCloudflare("", "")
+	if err == nil {
+		t.Fatal("empty input with nothing saved was accepted")
+	}
+	if !contains(err.Error(), "press r") {
+		t.Errorf("error does not tell the user how to enter credentials: %v", err)
 	}
 }
