@@ -61,7 +61,10 @@ func resilientHTTPClient() *http.Client {
 	}
 
 	return &http.Client{
-		Transport: transport,
+		// GORILLA OVERRIDE: gzip outgoing request bodies. Go compresses
+		// responses for free but never requests, and the uploaded
+		// conversation is the largest thing we send. See gzip_request.go.
+		Transport: newGzipRequestTransport(transport),
 		// Deliberately NO Timeout — see the file comment.
 	}
 }
