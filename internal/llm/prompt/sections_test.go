@@ -41,7 +41,10 @@ func TestParseSectionsShapeOfTheShippedPrompt(t *testing.T) {
 		t.Errorf("preamble should have no header, got %q", secs[0].Header)
 	}
 
-	want := []string{"method", "build discipline", "verification", "honesty", "change reporting", "scope", "delegation", "memory", "tools", "output", "conduct"}
+	// "precedence" added 2026-08-06 and deliberately FIRST: it governs how every
+	// section below it is read, so it is placed directly after the preamble.
+	// Order matters to this assertion, not just membership.
+	want := []string{"precedence", "method", "build discipline", "verification", "honesty", "change reporting", "scope", "delegation", "memory", "tools", "output", "conduct"}
 	var got []string
 	for _, s := range secs[1:] {
 		got = append(got, s.Header)

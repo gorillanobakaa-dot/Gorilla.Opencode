@@ -159,7 +159,13 @@ func assembleCoderPrompt() string {
 // Written per section rather than generated, because "you lose the honesty
 // rules" needs to say what that actually means.
 var SectionTradeoff = map[string]string{
-	SectionID(preambleSlug):       "the AI is not told what it is or what it specialises in — expect generic answers",
+	SectionID(preambleSlug): "the AI is not told what it is or what it specialises in — expect generic answers",
+	// GORILLA OVERRIDE: added 2026-08-06. This section does not add a rule; it
+	// says which existing rule wins when two of them disagree. Switching it off
+	// does not remove any instruction, so the honest tradeoff is about wasted
+	// work rather than lost capability — measured once at ~10 re-derivations and
+	// 33K input tokens in a single turn before the ordering existed.
+	SectionID("precedence"):       "the AI loses the tie-breaker it uses when two of your rules disagree — it still follows them, but can spend a lot of a turn arguing with itself about which one applies",
 	SectionID("method"):           "the AI may rewrite working code instead of making the smallest fix, and may not read files before editing them",
 	SectionID("build-discipline"): "the AI may retry the same failed build repeatedly instead of stopping and telling you what is blocked",
 	SectionID("verification"):     "the AI may report a job done without building or testing it first",

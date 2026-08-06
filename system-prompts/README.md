@@ -67,21 +67,25 @@ What changed, and why:
 **The honest cost:** the coder prompt grew from ~464 to ~1058 estimated
 tokens per turn (1,855 → 4,233 bytes, measured, not guessed). That is a real
 increase in fixed overhead on every request.
-**Re-measured 2026-08-06: it is now 5,189 bytes / 832 words / ~1,297 est.
-tokens.** It gained ~845 bytes after the first figure was written and nobody
-re-measured, so this file understated the standing per-turn cost by about 20%
-for a week. Word count barely moved, so the growth is structure rather than
-new rules. On a single-digit-KB/s link that difference is real; re-measure
-this figure whenever the prompt is touched rather than trusting the prose. It is still roughly half the
-~2,003-token 2023-era prompt it replaced, and every new section can be
-switched off individually in `/context`.
+**Re-measured 2026-08-06, after the precedence work: 5,908 bytes / 961 words /
+~1,477 est. tokens.** The `# precedence` section is 160 of those tokens and is
+individually switchable in `/context` like every other section.
 
-**And it went stale again the same day.** The re-measurement above was first
+That is no longer "roughly half" the ~2,003-token 2023-era prompt it replaced —
+it is about **three quarters** of it, and the sentence claiming half stood here
+until this line was written. The gap has closed mostly through structure rather
+than new rules, but not entirely: `# precedence` is real added text, bought to
+stop the model spending a turn arbitrating its own instructions. On a
+single-digit-KB/s link that difference is real, and every section remains
+individually switchable.
+
+**And it went stale twice in one day.** The re-measurement above was first
 written as *5,078 bytes / 812 words* — taken before the `# delegation` fix in
 correction 1 landed, in the same commit as that fix, which its own paragraph
-says costs 32 bytes. 5,078 + 32 = 5,110. Then +79 for the scope/conduct
-precedence clause (correction 5) brought it to 5,189. Twice now, in a document
-whose argument is that you should measure rather than assert.
+says costs 32 bytes. 5,078 + 32 = 5,110. It was then corrected to 5,189 for the
+scope/conduct clause of correction 5, and that clause was **deleted hours later**
+when correction 6 replaced it with a general mechanism. Three figures in one
+day, in a document whose argument is that you should measure rather than assert.
 
 The guard that actually holds this honest is not this paragraph: it is the
 size assertion in `internal/llm/prompt/storage_unified_test.go`, which fails
@@ -98,7 +102,7 @@ cult. The effort-level and `refusal`-fallback guidance is likewise
 Claude-API-specific and does not generalise to the local and open-weight
 models this fork is mostly pointed at.
 
-## The 2026-08-06 corrections — five things we had wrong
+## The 2026-08-06 corrections — six things we had wrong
 
 Everything in this section is a correction to something this directory
 previously stated with confidence. It is written down because a research
@@ -194,6 +198,50 @@ Behaviour is **not** verified: a byte count cannot measure it. The probe is
 registered as amendment 1 in `EXPERIMENT-PREREG-2026-08-04.md`, with the
 observation above recorded as the pre-fix baseline and explicitly marked as a
 bug report rather than a data point.
+
+### 6. Correction 5 fixed one instance of a defect, not the defect.
+
+The clause added in correction 5 settled `# scope` against `# conduct`. A
+pairwise review of all four prompts afterwards — comparing rules by *what each
+one reads to decide*, rather than reading them one at a time — found the same
+structure twice more:
+
+- `# change reporting — blast radius sets depth` decides from **the change you
+  made**. `# conduct — match answer` and `# output — keep replies short` decide
+  from **the user's message**. Change a config default, get asked "did that
+  work?", and full-report and one-sentence both fire. This one is likelier to
+  trigger than the observed bug, because every config change ends with someone
+  asking something short.
+- `# method — act when ready` decides from **your information state** and
+  collides with `# scope` exactly as `# conduct` did. Correction 5's clause
+  lived in `# conduct` and never reached it.
+
+So the clause was **deleted** and replaced with a `# precedence` section that
+states one order — honesty > scope > blast radius > brevity — and names the
+three seams it settles. It is placed directly after the preamble because it
+governs how everything below is read. +719 bytes net, 160 tokens, switchable in
+`/context` like any other section.
+
+Two ambiguities went with it: `2 attempts max` never said *per what* (per error,
+per build and per session differ enormously on a kernel build — now per distinct
+error), and `log filter` read as an instruction to do work the harness already
+does unconditionally at `bash.go:196` (now descriptive). `summarizer.md`
+contradicted itself in 536 bytes — "next steps: what needs completion" requires
+inference, "factual only: no interpretation" forbids it — and `task.md` forbade
+narrating process while explaining two lines later why the parent needs
+grounding.
+
+**None of these were observed.** They were found by structural review, which is
+a weaker evidence class than the one live trace behind correction 5, and this
+file should not pretend otherwise. Probes P6–P8 are registered in
+`EXPERIMENT-PREREG-2026-08-04.md`, amendment 2.
+
+The general-mechanism-versus-per-seam-clause choice is also a **reasoned bet,
+not a measured one**. An ordering is abstract, and sorting a rule into one of
+four buckets is itself an inference that could thrash — which is why the three
+concrete seams are named underneath it rather than left to be derived. If a
+model starts over-reporting on trivial changes, suspect `blast radius outranks
+brevity` first.
 
 **The pattern in the first four:** every one was a claim nothing could falsify.
 The prompt line had no test, the filter had no test, the research claim had no

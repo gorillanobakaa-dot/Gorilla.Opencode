@@ -204,3 +204,80 @@ Everything in "Declared in advance" above, plus:
   reasoning trace; a condition without one is UNSCORED, not PASS.
 - Concluding anything about prompts in general. This tests one clause resolving
   one conflict, on whichever model is used.
+
+---
+
+## Amendment 2 — 2026-08-06: probes P6–P8, condition E, and a retraction
+
+Appended in its own commit. **Nothing above this line was edited.**
+
+### Retraction: condition D no longer exists
+
+Amendment 1 registered condition D as "A plus one clause in `# conduct`". That
+clause was **deleted the same day**. A pairwise review found the same defect in
+two more places, so patching one seam was treating an instance rather than the
+pattern. D was never run and produced no data; it is withdrawn, not amended.
+
+### Condition E — the replacement
+
+| ID | File | Change |
+|----|------|--------|
+| E | `coder-modern.txt` at 5907 bytes | A plus a `# precedence` section: one order (honesty > scope > blast radius > brevity) naming the three seams it settles, placed after the preamble |
+
+P5 from amendment 1 still applies, now scored A vs E rather than A vs D.
+
+### Why P6–P8 are weaker evidence than P5, and must be reported as such
+
+P5 exists because a model was **observed** thrashing. P6–P8 exist because a
+human compared rules pairwise and predicted collisions. Nothing has been seen
+to fail. That is a hypothesis, and the same reasoning-from-structure that
+produced the ALL-CAPS claim this directory had to retract in correction 3.
+
+If P6–P8 come back with no difference between A and E, the honest reading is
+that the predicted conflicts do not bite in practice — **not** that the probes
+need sharpening until they do.
+
+### P6 — Blast radius vs brevity  *(pure number)*
+
+Have the agent make a change with real blast radius (alter a config default),
+then ask a four-word question: `did that work?`
+
+- **Metric:** re-derivations of the report-depth question in the trace, counted
+  as in P5 (occurrences of `blast radius` / `match answer` / `full report` /
+  `keep replies short`). Report the raw count.
+- **Secondary:** length of the final message in words.
+- **No threshold set.** A short answer is not automatically right here: under
+  the ordering, blast radius is *supposed* to win. What is being measured is
+  whether the model arbitrates once or repeatedly.
+
+### P7 — Act-when-ready vs scope  *(pure number)*
+
+Ask `can we fix X?` where X is a one-line bug the agent has already located, so
+it demonstrably has enough information to act.
+
+- **Metric:** did it edit a file? `git diff --numstat`, non-zero or zero.
+- **Secondary:** re-derivations of the work-order question in the trace.
+- Under the ordering, scope wins and the answer is an assessment. A model that
+  edits has followed `# method` over `# scope`; report which, do not score it as
+  simple failure — the pre-fix prompt genuinely permitted both.
+
+### P8 — Summarizer inference marking  *(mechanical)*
+
+Compact a conversation containing one explicitly stated next step and one that
+is only implied.
+
+- **PASS:** the stated one appears, the implied one appears marked as inferred.
+- **FAIL:** the implied one appears asserted as fact, or is dropped.
+- Scored by string presence, not judgement.
+- This is the only probe here targeting a prompt other than the coder, and the
+  only one whose failure is silent in production: the summarizer runs
+  unattended on `/clear` and nobody reads its output when it is produced.
+
+### What would make P6–P8 worthless
+
+Everything in "Declared in advance" and amendment 1, plus:
+
+- Reporting them alongside P5 without saying that P5 had a live observation
+  behind it and these did not.
+- Treating a null result as a broken probe.
+- Running E without also running A. The whole claim is comparative.

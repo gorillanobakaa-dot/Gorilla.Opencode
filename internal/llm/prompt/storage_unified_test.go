@@ -54,7 +54,24 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		wantSize int
 		wantTail string
 	}{
-		{"summarizer", SummarizerPrompt(models.ProviderLocal), 535, "unverified in, unverified out"},
+		// 535 -> 666 on 2026-08-06, deliberately. This prompt contradicted
+		// itself in 536 bytes, eleven lines apart: "# include — next steps:
+		// what needs completion" requires inference, and "# format — factual
+		// only: no interpretation or opinion" forbids it. There is no factual
+		// record of what still needs doing; it is always inferred.
+		//
+		// Resolved by carving out the one exception rather than dropping
+		// either rule: next steps now say whether they were stated or
+		// inferred, and "factual only" now bans opinion, praise and quality
+		// judgements while naming next steps as the single permitted
+		// inference. +131 bytes on compaction turns only, not on every turn.
+		//
+		// Found by structural review, NOT observed in the wild. This one
+		// matters more than its size suggests: the summarizer runs on /clear
+		// and compaction, unattended, and nobody reads its output at the
+		// moment it is produced, so a bad call here corrupts every later turn
+		// of a long session silently.
+		{"summarizer", SummarizerPrompt(models.ProviderLocal), 666, "unverified in, unverified out"},
 		{"title", TitlePrompt(models.ProviderLocal), 267, "no additional text"},
 		// 1847 -> 1855 on 2026-07-28, deliberately. One prescriptive line was
 		// relaxed following Anthropic's own guidance for Claude 5 generation
@@ -136,8 +153,46 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// probe is registered in system-prompts/EXPERIMENT-PREREG-2026-08-04.md
 		// (amendment 1), with today's ~10 re-derivations as the pre-fix
 		// baseline.
+		// 5188 -> 5907 on 2026-08-06, deliberately, and this is the largest
+		// single addition this prompt has taken since "# change reporting".
+		// +719 bytes, +13.9%, ~+180 tokens on EVERY coder turn.
+		//
+		// The 5188 fix bolted a precedence clause onto "# conduct" to settle
+		// one conflict. A pairwise review afterwards found the same defect
+		// twice more, so the clause was treating an instance of a pattern:
+		//   - "# change reporting — blast radius sets depth" keys off THE
+		//     CHANGE; "# conduct — match answer" and "# output — keep replies
+		//     short" key off THE USER'S MESSAGE. Change a config default, get
+		//     asked "did that work?", and full-report and one-sentence both
+		//     fire.
+		//   - "# method — act when ready" keys off YOUR INFORMATION STATE and
+		//     collides with "# scope — question is not a work order" exactly
+		//     as "# conduct" did. The 5188 clause did not reach it.
+		//
+		// So the bolted-on clause was REMOVED (-79) and replaced with a
+		// "# precedence" section that states one order — honesty > scope >
+		// blast radius > brevity — and names the three seams it settles.
+		// Placed directly after the preamble because it governs how every
+		// section below is read. The ordering alone is abstract, and
+		// classifying a rule into one of four buckets is itself an inference
+		// that could thrash, so the concrete seams are named under it.
+		//
+		// Also in this delta, both ambiguities rather than conflicts:
+		//   - "2 attempts max" had no granularity. Per error, per build or per
+		//     session differ enormously on a kernel build. Now "per distinct
+		//     error".
+		//   - "log filter: extract ... only" read as an instruction to do work
+		//     the harness already does unconditionally at bash.go:196. Now
+		//     descriptive: output arrives filtered, do not filter it again.
+		//
+		// Behaviour is NOT verified. A byte count cannot measure whether a
+		// precedence order is actually applied, and the general-mechanism vs
+		// per-seam-clause choice is a reasoned bet, not a measured one. If a
+		// model starts over-reporting on trivial changes, suspect the
+		// "blast radius outranks brevity" line first. Probes P6-P8 are
+		// registered in EXPERIMENT-PREREG-2026-08-04.md, amendment 2.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 5188, "simple question gets direct sentence"},
+			BaseCoderPrompt(models.ProviderLocal), 5907, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {
@@ -166,8 +221,16 @@ func TestTaskPromptCompositionIsByteIdentical(t *testing.T) {
 	// 228 -> 660 on 2026-07-29: the task prompt gained honesty and
 	// read-only rules and lost "one word answers". Deliberate; see the block
 	// comment on TestPromptOutputsAreByteIdentical.
-	if idx != 660 {
-		t.Errorf("env block starts at byte %d, want 660 — the instruction fragment size changed", idx)
+	//
+	// 660 -> 686 on 2026-08-06: "# output — direct answer first: no preamble,
+	// no summary of what you did" collided with the reason given two lines
+	// later for being complete, "the parent agent did not see your tool calls".
+	// One forbids narrating process, the other explains why the parent needs
+	// grounding, and nothing said how to satisfy both. Now "report what you
+	// found, not the process that found it", which is the resolution the
+	// prompt previously left to be re-derived. +26 bytes.
+	if idx != 686 {
+		t.Errorf("env block starts at byte %d, want 686 — the instruction fragment size changed", idx)
 	}
 	if got[idx-1] != '\n' {
 		t.Errorf("byte before env block = %q, want \\n — fmt.Sprintf composition lost its separator", got[idx-1])
