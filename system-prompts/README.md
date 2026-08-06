@@ -67,14 +67,27 @@ What changed, and why:
 **The honest cost:** the coder prompt grew from ~464 to ~1058 estimated
 tokens per turn (1,855 → 4,233 bytes, measured, not guessed). That is a real
 increase in fixed overhead on every request.
-**Re-measured 2026-08-06: it is now 5,078 bytes / 812 words / ~1,270 est.
-tokens.** It gained ~845 bytes after the line above was written and nobody
+**Re-measured 2026-08-06: it is now 5,189 bytes / 832 words / ~1,297 est.
+tokens.** It gained ~845 bytes after the first figure was written and nobody
 re-measured, so this file understated the standing per-turn cost by about 20%
 for a week. Word count barely moved, so the growth is structure rather than
 new rules. On a single-digit-KB/s link that difference is real; re-measure
 this figure whenever the prompt is touched rather than trusting the prose. It is still roughly half the
 ~2,003-token 2023-era prompt it replaced, and every new section can be
 switched off individually in `/context`.
+
+**And it went stale again the same day.** The re-measurement above was first
+written as *5,078 bytes / 812 words* — taken before the `# delegation` fix in
+correction 1 landed, in the same commit as that fix, which its own paragraph
+says costs 32 bytes. 5,078 + 32 = 5,110. Then +79 for the scope/conduct
+precedence clause (correction 5) brought it to 5,189. Twice now, in a document
+whose argument is that you should measure rather than assert.
+
+The guard that actually holds this honest is not this paragraph: it is the
+size assertion in `internal/llm/prompt/storage_unified_test.go`, which fails
+the build on any change to the prompt and demands a written reason for the new
+number. That test has never been wrong. Every stale figure has been in prose.
+Read the test, not this line.
 
 **What we deliberately did not adopt:** Anthropic's guide recommends a
 `send_to_user` tool so an asynchronous agent can push content to a user
@@ -85,7 +98,7 @@ cult. The effort-level and `refusal`-fallback guidance is likewise
 Claude-API-specific and does not generalise to the local and open-weight
 models this fork is mostly pointed at.
 
-## The 2026-08-06 corrections — four things we had wrong
+## The 2026-08-06 corrections — five things we had wrong
 
 Everything in this section is a correction to something this directory
 previously stated with confidence. It is written down because a research
@@ -151,12 +164,50 @@ checkbox for the build-log filter — which had stayed unticked for so long
 that a later session read it as outstanding and began writing a second
 implementation — is now ticked.
 
-**The pattern in all four:** every one was a claim nothing could falsify. The
-prompt line had no test, the filter had no test, the research claim had no
+### 5. Two sections contradicted each other, and nothing said which won.
+
+`# scope` says a question is not a work order — report and stop. `# conduct`
+says if your last paragraph is a plan, do that work now. They discriminate on
+**different axes**: `# scope` reads the user's message, `# conduct` reads your
+own output. So a question whose honest answer *is* a plan satisfies both, and
+the prompt never said which wins.
+
+Observed 2026-08-06 on Gemini 3.6 Flash via Antigravity, in this repo. Asked
+*"what are you gonna do about it?"* after giving an assessment, the model
+re-derived the conflict about ten times in one turn — quoting both rules back
+at itself, "Wait!" each time — before settling on report-and-stop. 33.0K tokens
+in, 1.7K out, no files changed. The conclusion was defensible; the cost of
+reaching it was the defect. On a satellite uplink that thrash is the expensive
+part.
+
+Fixed by declaring a winner rather than adding a rule: `# conduct` now ends
+*"unless the deliverable is the assessment itself, where the report is the
+work"*. +79 bytes.
+
+This one is different from the four above in a way worth naming. Those were
+claims that were false. This was two claims that were each true and could not
+both be followed. Nothing in a review process that checks statements
+individually would find it — it is only visible in the seam between them, and
+it was found by watching a model struggle rather than by reading the prompt.
+
+Behaviour is **not** verified: a byte count cannot measure it. The probe is
+registered as amendment 1 in `EXPERIMENT-PREREG-2026-08-04.md`, with the
+observation above recorded as the pre-fix baseline and explicitly marked as a
+bug report rather than a data point.
+
+**The pattern in the first four:** every one was a claim nothing could falsify.
+The prompt line had no test, the filter had no test, the research claim had no
 citation, and the byte count had no re-measurement. The fixes that stuck are
 the ones that came with a guard attached. Prose in a README is not a guard;
 it is a promise, and this directory now contains a documented instance of
 every kind of promise it makes being broken.
+
+**The fifth does not fit that pattern, which is why it is worth keeping
+separate.** Both of its statements were true, individually testable, and would
+have passed any review that checked them one at a time. The defect lived in the
+seam between them. A guard attached to either line would have found nothing —
+so "every claim needs a falsifier" is necessary and not sufficient, and the
+thing that actually surfaced it was watching a model try to obey.
 
 ## 2026-08-06 — gzipped request bodies
 
