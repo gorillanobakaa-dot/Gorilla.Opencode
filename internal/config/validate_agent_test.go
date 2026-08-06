@@ -28,8 +28,15 @@ func TestValidateAgentFallbackMaxTokensMatchesFallbackModel(t *testing.T) {
 		rejected  models.ModelID
 		maxTokens int64
 	}{
-		{"modest max-tokens", models.Gemini36Flash, 5_000},
-		{"the user's configured 50k", models.Gemini36Flash, 50_000},
+		// UPDATED 2026-08-05: these two rejected a GEMINI model while setting
+		// GEMINI_API_KEY so the GEMINI fallback would work — the same provider
+		// disabled and available at once. That only passed because validateAgent
+		// ignored the environment when a config entry existed, which was itself
+		// the bug (a provider shown "(ready)" by the portal was reverted by the
+		// validator). With the environment now honoured, the fixture has to pick
+		// a rejected provider that is genuinely unusable.
+		{"modest max-tokens", models.GPT41, 5_000},
+		{"the user's configured 50k", models.GPT41, 50_000},
 		{"wider rejected window, max-tokens above the fallback's half", models.GPT41, 600_000},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -55,6 +62,10 @@ func TestValidateAgentFallbackMaxTokensMatchesFallbackModel(t *testing.T) {
 			// Make the configured model's provider unusable, and ensure a
 			// fallback is reachable.
 			c.Providers[rm.Provider] = Provider{APIKey: "", Disabled: true}
+			// Genuinely unusable: no config key AND no environment key. Without
+			// this the environment would rescue it, which is now correct
+			// behaviour and would leave nothing to fall back FROM.
+			t.Setenv("OPENAI_API_KEY", "")
 			t.Setenv("GEMINI_API_KEY", "test-key")
 			c.Agents[AgentCoder] = Agent{Model: rejected, MaxTokens: tc.maxTokens}
 
