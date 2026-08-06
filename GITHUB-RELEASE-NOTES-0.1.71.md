@@ -42,8 +42,9 @@ back except quitting.
 
 ### Not verified
 
-- No interactive TUI run. Build, vet and the full test suite pass; the
-  `/providers` flow wants one human confirmation.
+- ~~No interactive TUI run.~~ **Confirmed working by a human on 2026-08-07**:
+  `/providers` reopens the launch picker as intended. Build, vet and the full
+  test suite also pass.
 - The Cloudflare fixes were measured against the live API on 2026-08-05 and not
   re-measured for this release — the free tier's daily allocation was exhausted.
 - The prompt precedence work has a pre-registered experiment
