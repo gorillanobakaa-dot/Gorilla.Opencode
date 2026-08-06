@@ -1,3 +1,34 @@
+## v0.1.71 — 2026-08-07 — providers that said "ready" and then refused, and a log filter that ate the error
+
+Full dual-track document: [v0.1.71-release-notes.md](v0.1.71-release-notes.md).
+
+**Plain-language version:** Four things were quietly broken, and each one made the
+app misreport its own state. It showed a provider as "ready" and then refused to
+use it, because the startup picker and the thing that validates your choice had
+two different ideas of what "configured" means — providers you had never opened
+worked, ones you had worked on did not. Conversations with Cloudflare stopped
+dead at the first tool the assistant used and never recovered, because a bad
+message stays in the history forever; session titles failed for a separate reason
+in the same family. The filter that trims noisy build output was throwing away
+the error line itself, on exactly the big kernel and browser builds it exists
+for. And if the provider you picked at startup turned out not to work, there was
+no way back to that screen — now `/providers` reopens it. Two models in the list
+also gained a note saying they held their ground when a user insisted they were
+wrong, with the number of times we checked printed next to it, because two checks
+is not many.
+
+Fixes: environment-variable provider keys no longer hidden by a stale
+`disabled:true`; `"content": null` and `"tools": []` no longer sent, which
+unblocks Cloudflare Workers AI for tool use, session titles and compaction;
+`filterBuildLog` no longer discards the signal line it matched on; `/providers`
+reopens the launch picker mid-session; `openai/gpt-oss-20b` added to the NIM
+catalogue; coder prompt gains a `# precedence` section (~160 tokens, switchable
+in `/context`).
+
+Not verified: no interactive TUI run — the `/providers` flow wants one human
+confirmation. The prompt precedence work has a pre-registered experiment that has
+not been run.
+
 ## v0.1.70 — 2026-08-05 — the error you needed to read was being deleted, and the input box ignored the window
 
 Full dual-track document: [v0.1.70-release-notes.md](v0.1.70-release-notes.md).
