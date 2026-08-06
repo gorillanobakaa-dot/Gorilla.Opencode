@@ -116,8 +116,28 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// context, not time. +32 bytes to stop the model spawning helpers as
 		// a latency hedge on a link where every round-trip is the expensive
 		// part.
+		// 5109 -> 5188 on 2026-08-06, deliberately. "# scope" and "# conduct"
+		// had no precedence between them and discriminate on DIFFERENT axes:
+		// "# scope" reads the user's message (is it a question? report and
+		// stop), "# conduct" reads your own output (does it end in a plan? do
+		// that work now). A question whose honest answer IS a plan satisfies
+		// both, and nothing said which wins.
+		//
+		// Observed live 2026-08-06 on Gemini 3.6 Flash via Antigravity: asked
+		// "what are you gonna do about it?" after an assessment, the model
+		// re-derived the scope-vs-conduct question about ten times in one
+		// turn, quoting both rules back at itself, before settling on report
+		// and stop. 33.0K tokens in / 1.7K out, no files changed. The answer
+		// was defensible; the cost of reaching it was not, and on a satellite
+		// uplink that thrash is the expensive part.
+		//
+		// +79 bytes to declare a winner rather than add a rule. Behaviour is
+		// NOT verified by this test — a byte count cannot measure it. The
+		// probe is registered in system-prompts/EXPERIMENT-PREREG-2026-08-04.md
+		// (amendment 1), with today's ~10 re-derivations as the pre-fix
+		// baseline.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 5109, "simple question gets direct sentence"},
+			BaseCoderPrompt(models.ProviderLocal), 5188, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {

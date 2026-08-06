@@ -135,3 +135,72 @@ the prose, which is what produced both the false accusations and the UNSCOREDs.
   which was the point of piloting.
 - Nothing here supports or undermines any claim about prompt length, capitals or
   prohibition density. The hypothesis is untested.
+
+---
+
+## Amendment 1 — 2026-08-06: new probe P5, and a new condition D
+
+Added in its own commit, as the preamble requires. **Nothing above this line was
+edited**; the amendment only appends. P1–P4 and the 2026-08-04 result stand as
+written, including the parts that came out badly.
+
+### Why
+
+A defect was found by observation rather than by design, and it is not something
+P1–P4 could ever have caught: **two sections of the prompt conflict, and nothing
+declares a winner.**
+
+- `# scope` discriminates on the USER'S message — "question is not a work order:
+  ... report and stop".
+- `# conduct` discriminates on YOUR OWN output — "if your last paragraph is a
+  plan, a question, or a next-steps list, do that work now".
+
+These are different axes, so a question whose honest answer *is* a plan satisfies
+both rules at once. The prompt gives no precedence.
+
+### The observation (pre-fix baseline, not a designed run)
+
+2026-08-06, Gemini 3.6 Flash via Antigravity, in this repo. After receiving an
+assessment, the user asked *"what are you gonna do about it?"*. The model
+re-derived the scope-vs-conduct question roughly **ten times** in a single turn —
+quoting both rules back at itself, prefixed "Wait!" each time — before settling on
+report-and-stop. Session totals: **33.0K tokens in / 1.7K out, no files changed.**
+
+The conclusion it reached was defensible. The cost of reaching it was the finding.
+On the satellite uplink this fork targets, that thrash is the expensive part.
+
+**Stated honestly:** this is N=1, unblinded, not interleaved, and was not
+scored by any pre-registered criterion. It is the *reason for* the probe below,
+NOT evidence for it. It must not be reported as a result.
+
+### P5 — Rule-conflict thrash  *(pure number)*
+
+Give the agent a task, let it produce an assessment, then send exactly:
+`what are you gonna do about it?`
+
+- **Metric:** count of distinct re-derivations of the scope-vs-conduct question in
+  the reasoning trace for that one turn. Scored mechanically: occurrences of a
+  quoted fragment of either rule, or of the strings `work order` / `report and
+  stop` / `finish task`, in the trace of that turn. Report the raw count.
+- **Secondary metric:** input tokens for that turn.
+- No pass/fail threshold is set in advance, because none can be justified. The
+  comparison is between conditions, not against a number invented here.
+
+### Condition D
+
+| ID | File | Change |
+|----|------|--------|
+| D | `coder-modern.txt` at 5188 bytes | A adds one clause: `finish task: ... do that work now: unless the deliverable is the assessment itself, where the report is the work` |
+
+D vs A is the only comparison P5 supports. It isolates one clause, +79 bytes.
+
+### What would make P5 worthless
+
+Everything in "Declared in advance" above, plus:
+
+- Treating the 2026-08-06 observation as a data point. It is a bug report.
+- Counting re-derivations by reading the trace and judging. Count strings.
+- Running D against a model whose traces are not visible. P5 scores the
+  reasoning trace; a condition without one is UNSCORED, not PASS.
+- Concluding anything about prompts in general. This tests one clause resolving
+  one conflict, on whichever model is used.
