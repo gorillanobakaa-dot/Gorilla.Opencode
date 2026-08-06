@@ -12,7 +12,7 @@
     "cost_out": 0.4,
     "description": "70B dense, Llama-3.1 coding fine-tune",
     "name": "Dracarys 70B",
-    "rank": 16
+    "rank": 17
   },
   "adept/fuyu-8b": {
     "cost_conf": "free",
@@ -216,7 +216,7 @@
     "cost_out": 0.4,
     "description": "70B dense, 128K ctx. Same tier as 3.3 above \u2014 prefer 3.3 if both are available.",
     "name": "Llama 3.1 70B",
-    "rank": 20
+    "rank": 21
   },
   "meta/llama-3.2-11b-vision-instruct": {
     "cost_conf": "market",
@@ -253,7 +253,7 @@
     "cost_out": 0.79,
     "description": "70B dense, 128K ctx. Solid generalist fallback, better than 3.1 for most tasks.",
     "name": "Llama 3.3 70B",
-    "rank": 19
+    "rank": 20
   },
   "meta/llama-4-maverick-17b-128e-instruct": {
     "context_window": 1000000,
@@ -262,7 +262,7 @@
     "cost_out": 0.6,
     "description": "~400B MoE, 1M ctx, efficient routing",
     "name": "Llama 4 Maverick",
-    "rank": 8
+    "rank": 9
   },
   "meta/llama-guard-4-12b": {
     "cost_conf": "free",
@@ -306,7 +306,7 @@
     "cost_out": 1.2,
     "description": "prior-gen MiniMax, 204K ctx",
     "name": "MiniMax M2.7",
-    "rank": 12
+    "rank": 13
   },
   "minimaxai/minimax-m3": {
     "context_window": 1000000,
@@ -331,7 +331,7 @@
     "cost_out": 0.1,
     "description": "14B dense. Small, fast, general-purpose \u2014 fine for quick chat-style Q&A, not heavy coding.",
     "name": "Ministral 14B",
-    "rank": 23
+    "rank": 24
   },
   "mistralai/mistral-7b-instruct-v0.3": {
     "context_window": 32768,
@@ -363,7 +363,7 @@
     "cost_out": 6.0,
     "description": "675B MoE, 128K ctx, multilingual",
     "name": "Mistral Large 3",
-    "rank": 7
+    "rank": 8
   },
   "mistralai/mistral-medium-3.5-128b": {
     "context_window": 131072,
@@ -372,7 +372,7 @@
     "cost_out": 2.0,
     "description": "128B-class dense, 128K ctx",
     "name": "Mistral Medium 3.5",
-    "rank": 22
+    "rank": 23
   },
   "mistralai/mistral-nemotron": {
     "cost_conf": "market",
@@ -380,7 +380,7 @@
     "cost_out": 0.15,
     "description": "NVIDIA/Mistral collaboration dense model",
     "name": "Mistral Nemotron",
-    "rank": 25
+    "rank": 26
   },
   "mistralai/mistral-small-4-119b-2603": {
     "cost_conf": "est",
@@ -388,7 +388,7 @@
     "cost_out": 0.9,
     "description": "Despite the name, ~119B dense",
     "name": "Mistral Small 4",
-    "rank": 24
+    "rank": 25
   },
   "mistralai/mixtral-8x22b-v0.1": {
     "context_window": 65536,
@@ -405,7 +405,7 @@
     "cost_out": 0.24,
     "description": "56B MoE (12B active), 32K ctx",
     "name": "Mixtral 8x7B",
-    "rank": 21
+    "rank": 22
   },
   "moonshotai/kimi-k2.6": {
     "context_window": 262144,
@@ -536,7 +536,7 @@
     "cost_out": 0.6,
     "description": "49B dense, 128K ctx, older tune",
     "name": "Nemotron Super 49B v1",
-    "rank": 14
+    "rank": 15
   },
   "nvidia/llama-3.3-nemotron-super-49b-v1.5": {
     "context_window": 131072,
@@ -545,7 +545,7 @@
     "cost_out": 0.6,
     "description": "49B dense, 128K ctx, fast structured output",
     "name": "Nemotron Super 49B v1.5",
-    "rank": 13
+    "rank": 14
   },
   "nvidia/llama-nemotron-embed-1b-v2": {
     "cost_conf": "free",
@@ -597,7 +597,7 @@
     "cost_out": 0.3,
     "description": "30B MoE (3B active), 128K ctx",
     "name": "Nemotron 3 Nano 30B",
-    "rank": 18
+    "rank": 19
   },
   "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning": {
     "context_window": 131072,
@@ -606,7 +606,7 @@
     "cost_out": 0.4,
     "description": "30B MoE (3B active), 128K ctx, reasoning-tuned",
     "name": "Nemotron 3 Nano Omni 30B",
-    "rank": 17
+    "rank": 18
   },
   "nvidia/nemotron-3-super-120b-a12b": {
     "context_window": 1000000,
@@ -615,14 +615,14 @@
     "cost_out": 0.9,
     "description": "120B MoE, 1M ctx, best speed/quality NVIDIA tier",
     "name": "Nemotron 3 Super 120B",
-    "rank": 9
+    "rank": 10
   },
   "nvidia/nemotron-3-ultra-550b-a55b": {
     "context_window": 1000000,
     "cost_conf": "est",
     "cost_in": 0.9,
     "cost_out": 2.7,
-    "description": "550B MoE, 1M ctx, hybrid Mamba-Transformer",
+    "description": "550B MoE, 1M ctx, hybrid Mamba-Transformer \u2014 won't lie about research: held tool-sourced facts under pressure, 2/2 runs",
     "name": "Nemotron 3 Ultra 550B",
     "rank": 5
   },
@@ -746,7 +746,16 @@
     "cost_out": 0.6,
     "description": "~120B MoE, 128K ctx",
     "name": "GPT-OSS 120B",
-    "rank": 15
+    "rank": 16
+  },
+  "openai/gpt-oss-20b": {
+    "context_window": 131072,
+    "cost_conf": "unknown",
+    "cost_in": 0.0,
+    "cost_out": 0.0,
+    "description": "20B MoE, 128K ctx \u2014 won't lie about research: held tool-sourced facts under pressure, 2/2 runs",
+    "name": "GPT-OSS 20B",
+    "rank": 6
   },
   "poolside/laguna-xs-2.1": {
     "cost_conf": "unknown",
@@ -754,7 +763,7 @@
     "cost_out": 0.0,
     "description": "'XS' = the small tier of Poolside's code-focused model family",
     "name": "Poolside Laguna XS 2.1",
-    "rank": 30
+    "rank": 31
   },
   "qwen/qwen3-next-80b-a3b-instruct": {
     "context_window": 262144,
@@ -763,7 +772,7 @@
     "cost_out": 0.4,
     "description": "80B MoE, 256K ctx, fast but shallow",
     "name": "Qwen3-Next 80B",
-    "rank": 11
+    "rank": 12
   },
   "qwen/qwen3.5-122b-a10b": {
     "context_window": 268288,
@@ -772,7 +781,7 @@
     "cost_out": 2.4,
     "description": "122B MoE, 262K ctx",
     "name": "Qwen 3.5 122B",
-    "rank": 10
+    "rank": 11
   },
   "qwen/qwen3.5-397b-a17b": {
     "context_window": 268288,
@@ -781,7 +790,7 @@
     "cost_out": 3.6,
     "description": "397B MoE, 262K ctx, 76.4% SWE-bench",
     "name": "Qwen 3.5 397B",
-    "rank": 6
+    "rank": 7
   },
   "sarvamai/sarvam-m": {
     "cost_conf": "market",
@@ -803,7 +812,7 @@
     "cost_out": 0.3,
     "description": "Fast general-purpose model from StepFun",
     "name": "Step 3.5 Flash",
-    "rank": 27
+    "rank": 28
   },
   "stepfun-ai/step-3.7-flash": {
     "cost_conf": "known",
@@ -811,7 +820,7 @@
     "cost_out": 1.15,
     "description": "Newer Step Flash generation",
     "name": "Step 3.7 Flash",
-    "rank": 28
+    "rank": 29
   },
   "thinkingmachines/inkling": {
     "cost_conf": "unknown",
@@ -819,7 +828,7 @@
     "cost_out": 0.0,
     "description": "Thinking Machines Lab's research model",
     "name": "Inkling",
-    "rank": 29
+    "rank": 30
   },
   "upstage/solar-10.7b-instruct": {
     "cost_conf": "market",
@@ -827,7 +836,7 @@
     "cost_out": 0.15,
     "description": "10.7B dense generalist",
     "name": "Solar 10.7B",
-    "rank": 26
+    "rank": 27
   },
   "writer/palmyra-creative-122b": {
     "cost_conf": "est",
