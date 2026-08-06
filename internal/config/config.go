@@ -694,6 +694,28 @@ func validateAgent(cfg *Config, name AgentName, agent Agent) error {
 			logging.Info("added provider from environment", "provider", provider)
 		}
 	} else if providerCfg.Disabled || providerCfg.APIKey == "" {
+		// GORILLA FIX: an entry in cfg.Providers must not hide an env key.
+		//
+		// The !providerExists branch above already rescues a provider whose key
+		// lives in the environment. This branch did not, so a provider that had
+		// EVER been written to config — typically with disabled:true from the
+		// "no API key" loop below — was reverted even when its *_API_KEY was
+		// present and working. Having an entry was what broke it; a provider the
+		// user had never touched worked fine.
+		//
+		// Observed 2026-08-05: GROQ_API_KEY, CEREBRAS_API_KEY and XAI_API_KEY all
+		// set, all three shown as "(ready)" in the startup portal (it consults
+		// AvailableViaEnv), and all four agents reverted to Gemini on selection
+		// with "provider cerebras is disabled". The portal and the validator had
+		// two different definitions of "configured".
+		if apiKey := getProviderAPIKey(provider); apiKey != "" {
+			providerCfg.APIKey = apiKey
+			providerCfg.Disabled = false
+			cfg.Providers[provider] = providerCfg
+			logging.Info("provider key found in environment; clearing stale disabled flag",
+				"provider", provider)
+			return validateAgentMaxTokens(cfg, name, agent, model)
+		}
 		reason := fmt.Sprintf("provider %s is disabled", provider)
 		if !providerCfg.Disabled {
 			reason = fmt.Sprintf("provider %s has no API key", provider)
@@ -828,6 +850,18 @@ func Validate() error {
 
 	// Validate providers
 	for provider, providerCfg := range cfg.Providers {
+		// GORILLA FIX: the key may be in the environment rather than in config.
+		// Disabling on an empty config field alone is what wrote the stale
+		// disabled:true that validateAgent then read as truth on the next launch.
+		// Adopt the env key instead, and clear any flag left by an earlier run.
+		if apiKey := getProviderAPIKey(provider); apiKey != "" {
+			if providerCfg.APIKey == "" || providerCfg.Disabled {
+				providerCfg.APIKey = apiKey
+				providerCfg.Disabled = false
+				cfg.Providers[provider] = providerCfg
+			}
+			continue
+		}
 		if providerCfg.APIKey == "" && !providerCfg.Disabled {
 			fmt.Fprintf(os.Stderr, "note: provider %s has no API key, marking as disabled\n", provider)
 			logging.Warn("provider has no API key, marking as disabled", "provider", provider)
