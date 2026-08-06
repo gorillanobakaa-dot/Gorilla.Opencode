@@ -98,8 +98,26 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// into one assistant message still costs ONE inference round-trip instead
 		// of N, and on a high-latency link that is the expensive part. So the line
 		// keeps the batching instruction and drops the concurrency claim.
+		// 5109 -> 5077 on 2026-08-06, deliberately. The standalone
+		// "# conduct — pronouns: they/them default: never infer from name"
+		// bullet was merged into the "# honesty" rule it always belonged to:
+		// "state unverified facts: do not invent paths symbols flags or a
+		// person's gender". Same guard against asserting an unverified fact
+		// about a person — a name in MAINTAINERS or git blame does not carry
+		// one — but filed as accuracy rather than as a standalone policy
+		// line, and 32 bytes cheaper on every turn.
+		// 5077 -> 5109 on 2026-08-06, deliberately. The "# delegation" line
+		// read "delegate independent subtasks: keep working while they run",
+		// which is false: agent-tool.go:94 is `result := <-done`, so the
+		// parent BLOCKS on every helper. This is the third place the same
+		// phantom concurrency had to be removed — the "# tools" line lost it
+		// on 2026-07-31 and the agent tool's own description lost it the same
+		// day; this section was missed both times. It now says helpers save
+		// context, not time. +32 bytes to stop the model spawning helpers as
+		// a latency hedge on a link where every round-trip is the expensive
+		// part.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 5109, "never infer from name"},
+			BaseCoderPrompt(models.ProviderLocal), 5109, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {

@@ -180,7 +180,13 @@ Anthropic recommended defining a custom tool that lets the AI send a structured 
 Some approaches force the AI to show its reasoning step-by-step inside the prompt response. While this can improve accuracy in some settings, it increases output token consumption by 300% to 500%. On a satellite connection measured in kilobytes per second, this is the difference between a response arriving in seconds and a response arriving in minutes. On a rate-limited API, this means fewer useful turns before you hit your limit. We omitted it.
 
 ### 3. Shouting in Capital Letters (EmotionPrompt, 2023)
-The old system prompt used `IMPORTANT` seven times, along with extensive all-caps emphasis. Research since 2024 shows that shouting in system prompts actually **hurts** performance: capital letters split into extra tokens (costing more money), and emphatic language increases AI anxiety, hedging, and false reports of success. We removed all shouting and wrote the prompt in calm, direct lowercase. The AI follows clear instructions more reliably than emphatic ones.
+The old system prompt used `IMPORTANT` seven times, along with extensive all-caps emphasis. We removed nearly all of it and wrote the prompt in calm, direct lowercase, on two grounds. One of them has since turned out to be wrong.
+
+**The cost argument holds.** Capital letters split into extra tokens — `IMPORTANT` is 2–3 tokens where `important` is 1 — and you pay that on every single request, forever. Seventeen of them is a standing bill for nothing.
+
+**The accuracy argument does not.** We also claimed that shouting *hurts* performance, generalising from the 2023 EmotionPrompt work on emotional stimuli. That was never a measurement of letter case, and when someone finally measured letter case directly the result went the other way: a small number of uppercase spans inside otherwise-lowercase text is the one formatting trick that reliably *helps* (see `RESEARCH-SOURCES.md`, arXiv:2608.03711). What genuinely damages accuracy is `aLtErNaTiNg` case, which this prompt never used.
+
+**Corrected 2026-08-06.** The prompt itself is unchanged and needs no change: two capitalised spans in 816 lowercase words is already the shape that measures well. But the reason we gave for the shape was half wrong, and this directory exists so you can check reasoning rather than take it on trust.
 
 ---
 
@@ -313,8 +319,9 @@ The system prompt engine in `Gorilla.Opencode` (the 2026-07-29 System Prompt Res
    - **Status:** DELIBERATELY OMITTED
    - **Rationale:** Demanding verbose CoT increases output token consumption by 300%–500%, stalling satellite connections and violating rate-limits on constrained API tiers.
 3. **EmotionPrompt / Capital Letter Shouting:**
-   - **Status:** DELIBERATELY OMITTED
-   - **Rationale:** `IMPORTANT` occurred seven times in the old prompt. Research shows capitals split into extra tokens (increased cost), and emphatic language increases AI hedging and false success reports.
+   - **Status:** REDUCED, NOT ELIMINATED — 17 capitalised spans → 2
+   - **Rationale (holds):** `IMPORTANT` occurred seven times in the old prompt. Capitals fragment under BPE (`IMPORTANT` = 2–3 tokens vs `important` = 1) and that cost recurs on every request.
+   - **Rationale withdrawn 2026-08-06:** this entry previously also claimed capitals raise hedging and false success reports, citing EmotionPrompt (arXiv:2307.11760) — a paper about emotional stimuli, not letter case. arXiv:2608.03711 measures case directly across 13 models and finds sparse uppercase targets against lowercase context are the only *productive* casing intervention (+1.85 pp on the discovery model, up to +8.95 pp), while alternating case is the destructive one (−2.88 pp mean, −13.96 pp worst). The surviving prompt's 2 spans sit in the productive regime by accident, not by design.
 
 ---
 
