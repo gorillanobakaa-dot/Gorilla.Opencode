@@ -76,8 +76,9 @@ source**. That fixes a real failure we observed and recorded.
 - No live fetch over a genuinely slow link; measurements are byte counts, not
   timings.
 - Hit rates for `Accept: text/markdown` and the `.md` companion are unmeasured.
-- TextRank is unit-tested and wired, not yet driven end-to-end on a real
-  full-text document.
+- ~~TextRank not driven end-to-end~~ **verified** on a 169,504-character document:
+  ~42,376 tokens to ~828 (2.0%), and it refused a short input as designed. Not yet
+  driven through a live agent turn.
 - Prompt-line effects are reasoning, not evidence; the pre-registered experiment
   remains unrun.
 - Token counts are byte/4 estimates, good to roughly ±15%. The 92% ratio is
