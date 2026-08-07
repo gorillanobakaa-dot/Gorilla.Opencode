@@ -42,8 +42,8 @@ var LoadoutComponents = []LoadoutComponent{
 	{"tool.grep", "Grep tool", "agent can't search file contents", 600, true, false},
 	{"tool.glob", "Glob tool", "agent can't find files by name pattern", 400, true, false},
 	{"tool.patch", "Patch tool", "agent loses multi-hunk patch edits (edit/write still work)", 900, true, false},
-	{"tool.fetch", "Fetch tool", "agent can't fetch URLs", 300, true, false},
-	{"tool.websearch", "Web search tool", "agent can't search for papers or sources", 300, true, false},
+	{"tool.fetch", "Fetch a web page", "agent can't open a link you give it", 300, true, false},
+	{"tool.websearch", "Find sources", "agent can't look anything up — only what you paste in", 300, true, false},
 	{"tool.diagnostics", "Diagnostics tool", "agent can't read LSP errors/warnings", 400, true, false},
 	{"tool.agent", "Sub-agent tool", "agent can't spawn read-only search sub-agents", 200, true, false},
 	// GORILLA OVERRIDE: default OFF. sparse is the kernel's own semantic checker

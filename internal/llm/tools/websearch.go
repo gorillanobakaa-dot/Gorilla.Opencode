@@ -55,43 +55,32 @@ const (
 	// contact ("the polite pool").
 	politeContact = "gorilla-opencode (+https://github.com/gorillanobakaa-dot/Gorilla.Opencode)"
 
-	webSearchDescription = `Search the literature and the web for sources, by keyword.
+	webSearchDescription = `Find papers, articles and references by keyword.
 
-USE THIS BEFORE GUESSING A URL. If you need papers, articles or references and
-do not already have an exact address, search here first. Do not hand-construct
-search URLs for publisher sites - most of them block automated access and you
-will get 403s.
+Search here before guessing a URL. Do not hand-build search URLs for publisher
+sites; most block automated access and return 403.
 
-SOURCES (pick with the "source" argument):
-- scholar (default) — OpenAlex. All disciplines, ~250M works, includes
-  preprints, conference papers and journal articles. Best general starting point.
-- medical — Europe PMC. Indexes MEDLINE/PubMed plus preprints. Use for
-  clinical, biomedical and life-sciences questions.
-- crossref — Crossref. DOI metadata across publishers; good for pinning down a
-  citation you already half-know, or finding the publisher of record.
-- openaccess — give it a DOI and Unpaywall says whether a LEGAL free full text
-  exists and where; give it keywords and DOAJ returns articles that are open
-  access by construction. Use this whenever a user hits a paywall.
-- books — Project Gutenberg (public domain, full text) and Open Library.
-- reference — Wikipedia. For general "what is X / how does Y work" questions.
-- all — queries scholar, medical and crossref, merged and de-duplicated by DOI.
+source:
+  scholar (default)  OpenAlex — all disciplines, ~250M works
+  medical            Europe PMC — indexes MEDLINE/PubMed
+  crossref           Crossref — DOI metadata across publishers
+  openaccess         a DOI goes to Unpaywall ("is there a legal free copy of
+                     THIS?"); keywords go to DOAJ. Use it at any paywall.
+  books              Project Gutenberg (full text), Open Library
+  reference          Wikipedia
+  all                scholar + medical + crossref, deduplicated by DOI
 
-Results marked FREE LEGAL FULL TEXT can be read at no cost. Prefer them, and
-tell the user when a paper is only available by purchase - do not leave someone
-assuming they must pay when an open copy exists.
+Results tagged FREE LEGAL FULL TEXT cost nothing to read. Prefer them, and say
+when a paper is purchase-only — never leave someone assuming they must pay while
+an open copy exists.
 
-There is NO general web search (Google/Bing/DuckDuckGo) available here. If a
-question needs the open web and you have no URL, say so and ask the user for
-one. Do not invent a source.
+There is NO general web search here (no Google/Bing/DuckDuckGo). If you need the
+open web and have no URL, ask the user for one. Do not invent a source.
 
-RETURNS: title, authors, year, venue, DOI and a URL for each result, plus an
-abstract where the source provides one.
+If a search fails or returns nothing, SAY SO. A plausible citation that turns
+out to be a different paper is worse than an empty result.
 
-IF A SEARCH RETURNS NOTHING, SAY SO. Do not fall back on remembered citations:
-a plausible-looking reference that turns out to be a different paper is worse
-than telling the user the search came up empty.
-
-For a specific page you already know the address of, use web_fetch.`
+To read a page you already have the address of, use web_fetch.`
 )
 
 type WebSearchParams struct {
