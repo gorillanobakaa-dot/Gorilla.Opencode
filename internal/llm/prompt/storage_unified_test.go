@@ -153,6 +153,17 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// probe is registered in system-prompts/EXPERIMENT-PREREG-2026-08-04.md
 		// (amendment 1), with today's ~10 re-derivations as the pre-fix
 		// baseline.
+		// 5907 -> 6019 on 2026-08-07, deliberately: one line under "# tools"
+		// stating that web access exists via web_fetch. +112 bytes, ~+28 tokens
+		// per coder turn.
+		//
+		// Bought because models were telling users "I don't have the tools to
+		// read a webpage" while an enabled, working fetch tool sat in their
+		// schema. The tool alone was not enough: models carry a strong trained
+		// prior that they cannot reach the internet, and a tool named "fetch"
+		// (now web_fetch) does not contradict it. This is the cheapest place to
+		// say so, and it is a capability claim rather than a rule.
+		//
 		// 5188 -> 5907 on 2026-08-06, deliberately, and this is the largest
 		// single addition this prompt has taken since "# change reporting".
 		// +719 bytes, +13.9%, ~+180 tokens on EVERY coder turn.
@@ -192,7 +203,7 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// "blast radius outranks brevity" line first. Probes P6-P8 are
 		// registered in EXPERIMENT-PREREG-2026-08-04.md, amendment 2.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 5907, "simple question gets direct sentence"},
+			BaseCoderPrompt(models.ProviderLocal), 6019, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {
