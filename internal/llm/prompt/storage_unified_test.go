@@ -153,6 +153,23 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// probe is registered in system-prompts/EXPERIMENT-PREREG-2026-08-04.md
 		// (amendment 1), with today's ~10 re-derivations as the pre-fix
 		// baseline.
+		// 6181 -> 6421 on 2026-08-07: "# honesty" gains a line saying that
+		// describing your own process is itself a progress claim. +240 bytes,
+		// ~+60 tokens per coder turn.
+		//
+		// Observed the same day. Asked "walk me through your procedure", a model
+		// described a date filter its tool does not have, "the JSON format
+		// supplied by the tool" (it returns plain text), "the top 25 hits" when
+		// it had requested 10, and link verification it never performed - then
+		// blamed an OpenAlex indexing lag for a paper that is the #1 hit for its
+		// own title and has been indexed for eleven months.
+		//
+		// Every structural claim was false, and the account was MORE convincing
+		// than the answer it explained, because it was organised and
+		// self-critical. The existing audit line covers claims about the work;
+		// this one covers claims about how the work was done, which is the same
+		// failure aimed at the post-mortem.
+		//
 		// 6019 -> 6181 on 2026-08-07: a second "# tools" line, for web_search.
 		// +162 bytes, ~+40 tokens per coder turn.
 		//
@@ -215,7 +232,7 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// "blast radius outranks brevity" line first. Probes P6-P8 are
 		// registered in EXPERIMENT-PREREG-2026-08-04.md, amendment 2.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 6181, "simple question gets direct sentence"},
+			BaseCoderPrompt(models.ProviderLocal), 6421, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {
