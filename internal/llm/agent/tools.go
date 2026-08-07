@@ -39,6 +39,10 @@ func CoderAgentTools(
 	add("tool.bash", tools.NewBashTool(permissions))
 	add("tool.edit", tools.NewEditTool(lspClients, permissions, history))
 	add("tool.fetch", tools.NewFetchTool(permissions))
+	// GORILLA OVERRIDE: without a search tool the agent hand-builds query
+	// URLs for publisher sites, gets 403s, and has been observed fabricating
+	// citations rather than reporting the failure.
+	add("tool.websearch", tools.NewWebSearchTool(permissions))
 	add("tool.glob", tools.NewGlobTool())
 	add("tool.grep", tools.NewGrepTool())
 	add("tool.ls", tools.NewLsTool())

@@ -143,6 +143,15 @@ func rewriteToSource(raw string) (string, string) {
 	}
 	host := strings.ToLower(u.Hostname())
 
+	// arxiv.org/abs/ID -> the export API: title, authors and abstract as clean
+	// XML instead of a page that is 83% navigation and tool sidebars.
+	if host == "arxiv.org" || host == "www.arxiv.org" {
+		if id := strings.TrimPrefix(strings.Trim(u.Path, "/"), "abs/"); id != "" && !strings.Contains(id, "/") {
+			return "https://export.arxiv.org/api/query?id_list=" + id,
+				"rewritten to the arXiv export API (metadata and abstract, no page furniture)"
+		}
+	}
+
 	// github.com/o/r/blob/ref/path -> raw.githubusercontent.com/o/r/ref/path
 	if host == "github.com" || host == "www.github.com" {
 		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
@@ -292,7 +301,7 @@ func (t *fetchTool) Info() ToolInfo {
 			"format": map[string]any{
 				"type":        "string",
 				"description": "Output format. Defaults to markdown.",
-				"enum":        []string{"text", "markdown", "html"},
+				"enum":        []string{"text", "markdown", "html", "json"},
 			},
 			"timeout": map[string]any{
 				"type":        "number",
@@ -380,8 +389,11 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	if format == "" {
 		format = "markdown"
 	}
-	if format != "text" && format != "markdown" && format != "html" {
-		return NewTextErrorResponse("format must be one of: text, markdown, html"), nil
+	// GORILLA OVERRIDE: json is a passthrough, not a conversion. A model
+	// calling a JSON API asked for format=json and was refused, which pushed it
+	// toward scraping HTML search pages instead of reading a clean API.
+	if format != "text" && format != "markdown" && format != "html" && format != "json" {
+		return NewTextErrorResponse("format must be one of: text, markdown, html, json"), nil
 	}
 	if !strings.HasPrefix(params.URL, "http://") && !strings.HasPrefix(params.URL, "https://") {
 		return NewTextErrorResponse("url must start with http:// or https://"), nil
@@ -464,7 +476,7 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 
 	var out string
 	switch {
-	case format == "html":
+	case format == "json", format == "html":
 		out = content
 	case isHTML && format == "markdown":
 		converted, err := convertHTMLToMarkdown(content)

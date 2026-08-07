@@ -53,6 +53,7 @@ func CalibrateLoadout(
 	set("tool.bash", tools.NewBashTool(permissions))
 	set("tool.edit", tools.NewEditTool(lspClients, permissions, history))
 	set("tool.fetch", tools.NewFetchTool(permissions))
+	set("tool.websearch", tools.NewWebSearchTool(permissions))
 	set("tool.glob", tools.NewGlobTool())
 	set("tool.grep", tools.NewGrepTool())
 	set("tool.ls", tools.NewLsTool())
