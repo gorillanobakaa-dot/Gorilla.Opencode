@@ -77,3 +77,87 @@ func TestLiveBackendsReturnParseableResults(t *testing.T) {
 		t.Logf("%s ok: %d hits, first = %.70s", name, len(hits), hits[0].Title)
 	}
 }
+
+func isTransientNetErr(err error) bool {
+	e := strings.ToLower(err.Error())
+	for _, s := range []string{"connection refused", "connection reset", "timeout",
+		"no such host", "i/o timeout", "eof", "http 429", "http 502", "http 503", "http 504"} {
+		if strings.Contains(e, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// Live check for the access-oriented backends. Same opt-in as above.
+func TestLiveAccessBackends(t *testing.T) {
+	if os.Getenv("GORILLA_LIVE_SEARCH") != "1" {
+		t.Skip("set GORILLA_LIVE_SEARCH=1 to run (needs network)")
+	}
+	tool := &webSearchTool{client: newSafeClient(30 * time.Second)}
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	cases := []struct {
+		name  string
+		query string
+		fn    func(context.Context, string, int) ([]searchHit, error)
+		// The whole point of these backends: a free legal copy must be surfaced.
+		wantFree bool
+	}{
+		{"Unpaywall", "10.1038/nature12373", tool.searchUnpaywall, true},
+		{"DOAJ", "hallucination language model", tool.searchDOAJ, false},
+		{"Gutenberg", "shakespeare", tool.searchGutendex, true},
+		{"OpenLibrary", "shakespeare", tool.searchOpenLibrary, false},
+		{"Wikipedia", "reverse proxy", tool.searchWikipedia, false},
+	}
+	for _, c := range cases {
+		hits, err := c.fn(ctx, c.query, 3)
+		if err != nil {
+			// A refused connection or a 429 is the internet having a bad day;
+			// a parse failure or an empty result set is our bug. Only the
+			// second kind should fail the suite, or this test becomes noise
+			// people learn to ignore.
+			if isTransientNetErr(err) {
+				t.Logf("%-12s SKIPPED (transient): %v", c.name, err)
+				continue
+			}
+			t.Errorf("%s: %v", c.name, err)
+			continue
+		}
+		if len(hits) == 0 {
+			t.Errorf("%s: zero results — parser likely broken", c.name)
+			continue
+		}
+		if strings.TrimSpace(hits[0].Title) == "" {
+			t.Errorf("%s: first result has no title", c.name)
+		}
+		if c.wantFree && hits[0].FreePDF == "" {
+			t.Errorf("%s: expected a free legal full-text link and got none", c.name)
+		}
+		t.Logf("%-12s %d hits | %.48s | free=%.52s", c.name, len(hits), hits[0].Title, hits[0].FreePDF)
+	}
+}
+
+func TestOpenAlexSurfacesOpenAccessLink(t *testing.T) {
+	if os.Getenv("GORILLA_LIVE_SEARCH") != "1" {
+		t.Skip("set GORILLA_LIVE_SEARCH=1 to run (needs network)")
+	}
+	tool := &webSearchTool{client: newSafeClient(30 * time.Second)}
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	hits, err := tool.searchOpenAlex(ctx, "LLM hallucination", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	free := 0
+	for _, h := range hits {
+		if h.FreePDF != "" {
+			free++
+		}
+	}
+	if free == 0 {
+		t.Error("no result carried a free-access link; the best_oa_location field is being discarded again")
+	}
+	t.Logf("%d of %d results have a free legal copy", free, len(hits))
+}
