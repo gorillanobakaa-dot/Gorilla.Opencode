@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -278,6 +279,21 @@ func (a appModel) Init() tea.Cmd {
 // network call never blocks the UI, and the result is a tea.Msg — never printed
 // onto the screen Bubble Tea owns. quiet=true returns nil when not signed in or
 // on a transient error (used at session start, so non-Antigravity users see
+// quotaLineMsg carries a fetched quota reading.
+//
+// GORILLA OVERRIDE: /usage used to render only as a footer toast, which is
+// ephemeral - to see the number again you had to type /usage again, and that
+// costs another request against the very quota you are trying to conserve.
+// A reading you can scroll back to is strictly better: "what was left twenty
+// minutes ago" is answerable for free.
+//
+// So the line is ALSO printed into the scrollback, timestamped, because a quota
+// figure without a time is not a measurement. The toast stays for immediacy.
+type quotaLineMsg struct {
+	line string
+	kind util.InfoType
+}
+
 // nothing); quiet=false reports the reason (used by /usage on demand).
 func antigravityUsageCmd(quiet bool) tea.Cmd {
 	return func() tea.Msg {
@@ -286,16 +302,16 @@ func antigravityUsageCmd(quiet bool) tea.Cmd {
 			if quiet {
 				return nil
 			}
-			return util.InfoMsg{Type: util.InfoTypeWarn, Msg: "Not signed in to Antigravity — pick it in the provider portal to sign in."}
+			return quotaLineMsg{line: "Not signed in to Antigravity — pick it in the provider portal to sign in.", kind: util.InfoTypeWarn}
 		}
 		line, err := creds.QuotaSummaryLine(context.Background())
 		if err != nil {
 			if quiet {
 				return nil
 			}
-			return util.InfoMsg{Type: util.InfoTypeError, Msg: "Antigravity usage: " + err.Error()}
+			return quotaLineMsg{line: "Antigravity usage: " + err.Error(), kind: util.InfoTypeError}
 		}
-		return util.InfoMsg{Type: util.InfoTypeInfo, Msg: line}
+		return quotaLineMsg{line: line, kind: util.InfoTypeInfo}
 	}
 }
 
@@ -432,6 +448,25 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return a, tea.Batch(cmds...)
+	// GORILLA OVERRIDE: a quota reading goes into the scrollback as well as the
+	// footer. The footer answers "what is it now"; the scrollback answers "what
+	// was it before", which the footer cannot do at any price - re-asking spends
+	// a request against the quota being measured.
+	//
+	// tea.Println is the only way to write above the inline frame. Printing to
+	// stdout directly is painted over by the next render with no record in the
+	// renderer, and no redraw can ever clear it (see the trap list in CLAUDE.md).
+	case quotaLineMsg:
+		if a.scrollback {
+			stamp := time.Now().Format("15:04:05")
+			cmds = append(cmds, tea.Println("  "+stamp+"  quota · "+msg.line))
+		}
+		info := util.InfoMsg{Type: msg.kind, Msg: msg.line}
+		st, cmd := a.status.Update(info)
+		a.status = st.(core.StatusCmp)
+		cmds = append(cmds, cmd)
+		return a, tea.Batch(cmds...)
+
 	// Status
 	case util.InfoMsg:
 		s, cmd := a.status.Update(msg)
