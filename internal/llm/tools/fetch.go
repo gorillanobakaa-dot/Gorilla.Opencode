@@ -248,12 +248,16 @@ type FetchParams struct {
 	URL     string `json:"url"`
 	Format  string `json:"format,omitempty"`
 	Timeout int    `json:"timeout,omitempty"`
+	// Summarise is opt-in and never automatic. Silently shortening a document
+	// the user asked to read is the truncation bug wearing a helpful hat.
+	Summarise bool `json:"summarise,omitempty"`
 }
 
 type FetchPermissionsParams struct {
-	URL     string `json:"url"`
-	Format  string `json:"format,omitempty"`
-	Timeout int    `json:"timeout,omitempty"`
+	URL       string `json:"url"`
+	Format    string `json:"format,omitempty"`
+	Timeout   int    `json:"timeout,omitempty"`
+	Summarise bool   `json:"summarise,omitempty"`
 }
 
 type fetchTool struct {
@@ -334,6 +338,13 @@ func (t *fetchTool) Info() ToolInfo {
 			"timeout": map[string]any{
 				"type":        "number",
 				"description": "Optional timeout in seconds (max 120).",
+			},
+			"summarise": map[string]any{
+				"type": "boolean",
+				"description": "Optional. Condense a LONG document locally (TextRank) " +
+					"before returning it, to save tokens. Ignored for anything under " +
+					"8000 characters. The result states how much was cut and that it " +
+					"is extractive - do not use it when exact wording matters.",
 			},
 		},
 		// GORILLA OVERRIDE: url only. format was required, so a model calling
@@ -536,6 +547,21 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	if res.truncated {
 		out += fmt.Sprintf("\n\n[TRUNCATED: the response exceeded the %d MB limit and was cut here. "+
 			"The remainder was NOT read.]", maxFetchBytes/(1024*1024))
+	}
+
+	// GORILLA OVERRIDE: local summarisation, opt-in. Runs on the user's own
+	// machine so the tokens are never sent, never billed. Summarise() refuses
+	// on short input and its Header() carries the compression ratio, so a model
+	// can never mistake an extract for the whole document.
+	if params.Summarise {
+		sum := Summarise(out, 12)
+		if sum.Summarised {
+			notes = append(notes, fmt.Sprintf("summarised locally: %d of %d sentences, %.0f%% of original",
+				sum.SentencesKept, sum.SentencesTotal, sum.CompressionRatio*100))
+			out = sum.Header() + "\n\n" + sum.Text
+		} else {
+			notes = append(notes, "summarise requested but skipped: document too short to shorten safely")
+		}
 	}
 
 	header := fmt.Sprintf("Fetched: %s", target)
