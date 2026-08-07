@@ -153,6 +153,18 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// probe is registered in system-prompts/EXPERIMENT-PREREG-2026-08-04.md
 		// (amendment 1), with today's ~10 re-derivations as the pre-fix
 		// baseline.
+		// 6019 -> 6181 on 2026-08-07: a second "# tools" line, for web_search.
+		// +162 bytes, ~+40 tokens per coder turn.
+		//
+		// The clause that earns its keep is the last one: "if a search fails or
+		// returns nothing, SAY SO: never fill the gap with remembered
+		// citations". Observed the same day: given no search tool, a model
+		// hand-built query URLs for IEEE/ACM/Springer/CORE, collected 403s and
+		// 404s, and then produced a citation table plus a "How I found them"
+		// narrative describing searches that had failed. Four of six links
+		// resolved to real pages holding entirely different papers - which
+		// survives a spot-check, and is therefore worse than a dead link.
+		//
 		// 5907 -> 6019 on 2026-08-07, deliberately: one line under "# tools"
 		// stating that web access exists via web_fetch. +112 bytes, ~+28 tokens
 		// per coder turn.
@@ -203,7 +215,7 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// "blast radius outranks brevity" line first. Probes P6-P8 are
 		// registered in EXPERIMENT-PREREG-2026-08-04.md, amendment 2.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 6019, "simple question gets direct sentence"},
+			BaseCoderPrompt(models.ProviderLocal), 6181, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {

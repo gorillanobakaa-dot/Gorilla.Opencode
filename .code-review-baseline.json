@@ -1,0 +1,64 @@
+{
+  "_about": [
+    "Findings this project has examined and accepted. Read by the local code",
+    "review toolkit (Scripts.For.Work/Code.review/code_review_toolkit).",
+    "Matching is file + rule_id, never line number, so edits above a line do",
+    "not silently un-suppress it. Every entry needs a 'reason'; 'doc' should",
+    "point at the project's own write-up rather than paraphrasing it here."
+  ],
+  "accepted": [
+    {
+      "file": "internal/auth/gemini_oauth.go",
+      "rule_id": "generic-api-key",
+      "doc": "docs/CLIENT-SECRETS-EXPLAINED.md",
+      "reason": "Public installed-app OAuth client secret, embedded on purpose. An installed/desktop app has no server to keep a secret on, so Google issues Desktop-app credentials whose secret is explicitly 'not treated as confidential'; the same value is published in Google's own Gemini CLI source. The sensitive artifact is the user's token, which lives at 0600 under ~/.config, outside the repo. Kept visible with an explanatory comment rather than obfuscated, and pushed via GitHub's unblock-secret acknowledgement so the decision is auditable.",
+      "accepted_by": "gorilla",
+      "date": "2026-08-06"
+    },
+    {
+      "file": "internal/auth/gemini_oauth.go",
+      "rule_id": "G101",
+      "doc": "docs/CLIENT-SECRETS-EXPLAINED.md",
+      "reason": "Same accepted value as the generic-api-key entry, reported by gosec instead of gitleaks. Both need an entry because matching is per rule_id.",
+      "accepted_by": "gorilla",
+      "date": "2026-08-06"
+    },
+    {
+      "file": "internal/auth/antigravity_oauth.go",
+      "rule_id": "generic-api-key",
+      "doc": "docs/CLIENT-SECRETS-EXPLAINED.md",
+      "reason": "Same installed-app OAuth client secret rationale as gemini_oauth.go: public by necessity, harmless without a stolen user token.",
+      "accepted_by": "gorilla",
+      "date": "2026-08-06"
+    },
+    {
+      "file": "internal/auth/antigravity_oauth.go",
+      "rule_id": "G101",
+      "doc": "docs/CLIENT-SECRETS-EXPLAINED.md",
+      "reason": "Same accepted value, reported by gosec instead of gitleaks.",
+      "accepted_by": "gorilla",
+      "date": "2026-08-06"
+    },
+    {
+      "file": "internal/config/endpoint_hygiene_test.go",
+      "rule_id": "generic-api-key",
+      "reason": "Test fixture. The key-shaped string exists so the endpoint-hygiene test can prove such values are handled correctly. Not a live credential.",
+      "accepted_by": "gorilla",
+      "date": "2026-08-06"
+    },
+    {
+      "file": "internal/tui/tui.go",
+      "rule_id": "G101",
+      "reason": "The flagged literal is the sentinel string \"oauth-login\" assigned to Provider.APIKey to mark 'this provider authenticates by OAuth, not by key'. A mode marker, not a credential.",
+      "accepted_by": "gorilla",
+      "date": "2026-08-06"
+    },
+    {
+      "file": "internal/config/config.go",
+      "rule_id": "G703",
+      "reason": "gosec taint analysis treats os.UserHomeDir()/os.UserConfigDir()/XDG_CONFIG_HOME as attacker-controlled. Here they are joined with constant literals to locate this app's own config. Anyone able to set XDG_CONFIG_HOME for this process already controls the account that config belongs to, so no privilege boundary is crossed.",
+      "accepted_by": "gorilla",
+      "date": "2026-08-06"
+    }
+  ]
+}
