@@ -152,6 +152,25 @@ func rewriteToSource(raw string) (string, string) {
 		}
 	}
 
+	// pubmed.ncbi.nlm.nih.gov/PMID -> the E-utilities XML record. The rendered
+	// PubMed page is mostly interface; efetch returns the abstract itself.
+	if host == "pubmed.ncbi.nlm.nih.gov" {
+		if id := strings.Trim(u.Path, "/"); id != "" && !strings.Contains(id, "/") && isAllDigits(id) {
+			return "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=" +
+					id + "&retmode=xml",
+				"rewritten to the NCBI E-utilities record (abstract, no page furniture)"
+		}
+	}
+
+	// en.wikipedia.org/wiki/Topic -> the REST summary. Measured 2026-08-07:
+	// the rendered article is ~25,595 tokens, the summary ~600.
+	if strings.HasSuffix(host, "wikipedia.org") {
+		if t := strings.TrimPrefix(strings.Trim(u.Path, "/"), "wiki/"); t != "" && !strings.Contains(t, "/") {
+			return "https://" + host + "/api/rest_v1/page/summary/" + t,
+				"rewritten to the Wikipedia REST summary (lead section; fetch the /wiki/ URL directly if you need the full article)"
+		}
+	}
+
 	// github.com/o/r/blob/ref/path -> raw.githubusercontent.com/o/r/ref/path
 	if host == "github.com" || host == "www.github.com" {
 		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
@@ -167,6 +186,15 @@ func rewriteToSource(raw string) (string, string) {
 // markdownSibling returns the ".md" companion of a documentation-style URL, or
 // "" when the guess would be nonsense. Tried only when the server answered with
 // HTML and markdown was asked for, so it costs at most one extra request.
+func isAllDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return s != ""
+}
+
 func markdownSibling(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.RawQuery != "" {

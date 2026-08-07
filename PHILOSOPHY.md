@@ -177,21 +177,38 @@ a card number.
 
 ### The measurement
 
-One arXiv abstract page, measured on 2026-08-07:
+Eight real pages, measured 2026-08-07 by
+`internal/llm/tools/fetch_tokencost_test.go`, which is a permanent regression
+test rather than a one-off:
 
-| what you send | bytes | ~tokens | vs raw |
+| page | raw tokens | sent tokens | cut |
 |---|---|---|---|
-| raw HTML, as URL-context tools send it | 42,979 | ~10,744 | 100% |
-| HTML converted and stripped locally | 7,177 | ~1,794 | 16.7% |
-| the arXiv export API, full XML | 2,936 | ~734 | 6.8% |
-| the abstract alone | 1,312 | ~328 | 3.1% |
+| GitHub blob page | 62,083 | 885 | 99% |
+| MDN documentation page | 44,219 | 1,568 | 96% |
+| Anna's Archive search | 34,759 | 3,931 | 89% |
+| Wikipedia article | 25,595 | 3,928 | 85% |
+| arXiv abstract page | 10,744 | 1,769 | 84% |
+| **TOTAL across all eight** | **179,100** | **13,781** | **92%** |
 
-**Thirty-two times less, for strictly more useful content.** The raw page is
-mostly furniture; the abstract is the part that answers the question.
+**Ninety-two percent, for strictly more useful content.** The removed portion is
+navigation, cookie banners and tracking scripts — billed once, and then re-billed
+on every later turn of the conversation.
 
-Note carefully *where* the saving comes from. Going from raw HTML to the API
-captures 93% of it. That matters, because it tells you which engineering is
-worth doing.
+The worst offender is not the heaviest-looking site. A **GitHub file page costs
+62,083 tokens** to display a README whose actual content is 363 tokens: a
+JavaScript application shell wrapped around a text file. Rewriting it to
+`raw.githubusercontent.com` is a **171x** reduction on the single most common URL
+a coding agent is handed.
+
+Note carefully *where* the saving comes from. The clean sources in that run —
+the arXiv API at 734 tokens, the Wikipedia REST summary at 600, raw
+githubusercontent at 363 — show "0% cut" because there was nothing left to
+strip. The saving had already happened when the source was chosen. **Choosing
+the right source beats cleaning the wrong one**, which is the shape of the whole
+ladder.
+
+At a nominal one-million-token daily free allowance, that is the difference
+between **16 GitHub pages a day and 2,754**.
 
 ### The source ladder
 

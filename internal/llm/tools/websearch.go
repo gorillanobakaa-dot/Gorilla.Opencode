@@ -45,6 +45,11 @@ const (
 	openAlexAPI  = "https://api.openalex.org/works"
 	crossrefAPI  = "https://api.crossref.org/works"
 	europePMCAPI = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+	unpaywallAPI = "https://api.unpaywall.org/v2/"
+	doajAPI      = "https://doaj.org/api/search/articles/"
+	gutendexAPI  = "https://gutendex.com/books"
+	openLibAPI   = "https://openlibrary.org/search.json"
+	wikipediaAPI = "https://en.wikipedia.org/w/api.php"
 
 	// OpenAlex and Crossref give better rate limits to requests that identify a
 	// contact ("the polite pool").
@@ -64,7 +69,20 @@ SOURCES (pick with the "source" argument):
   clinical, biomedical and life-sciences questions.
 - crossref — Crossref. DOI metadata across publishers; good for pinning down a
   citation you already half-know, or finding the publisher of record.
-- all — queries all three and merges, de-duplicated by DOI.
+- openaccess — give it a DOI and Unpaywall says whether a LEGAL free full text
+  exists and where; give it keywords and DOAJ returns articles that are open
+  access by construction. Use this whenever a user hits a paywall.
+- books — Project Gutenberg (public domain, full text) and Open Library.
+- reference — Wikipedia. For general "what is X / how does Y work" questions.
+- all — queries scholar, medical and crossref, merged and de-duplicated by DOI.
+
+Results marked FREE LEGAL FULL TEXT can be read at no cost. Prefer them, and
+tell the user when a paper is only available by purchase - do not leave someone
+assuming they must pay when an open copy exists.
+
+There is NO general web search (Google/Bing/DuckDuckGo) available here. If a
+question needs the open web and you have no URL, say so and ask the user for
+one. Do not invent a source.
 
 RETURNS: title, authors, year, venue, DOI and a URL for each result, plus an
 abstract where the source provides one.
@@ -73,9 +91,7 @@ IF A SEARCH RETURNS NOTHING, SAY SO. Do not fall back on remembered citations:
 a plausible-looking reference that turns out to be a different paper is worse
 than telling the user the search came up empty.
 
-Note: general web search (Google/Bing/DuckDuckGo style) is NOT available here.
-These three cover published literature. For a specific page you already know the
-address of, use web_fetch.`
+For a specific page you already know the address of, use web_fetch.`
 )
 
 type WebSearchParams struct {
@@ -93,6 +109,7 @@ type searchHit struct {
 	URL      string
 	Abstract string
 	Backend  string
+	FreePDF  string // a legal, open-access full text, when the index knows of one
 }
 
 type webSearchTool struct {
@@ -122,7 +139,7 @@ func (t *webSearchTool) Info() ToolInfo {
 			"source": map[string]any{
 				"type":        "string",
 				"description": "Which index to search. Defaults to scholar.",
-				"enum":        []string{"scholar", "medical", "crossref", "all"},
+				"enum":        []string{"scholar", "medical", "crossref", "openaccess", "books", "reference", "all"},
 			},
 			"max_results": map[string]any{
 				"type":        "number",
@@ -198,6 +215,10 @@ func (t *webSearchTool) searchOpenAlex(ctx context.Context, q string, n int) ([]
 					DisplayName string `json:"display_name"`
 				} `json:"source"`
 			} `json:"primary_location"`
+			BestOA struct {
+				PDFURL string `json:"pdf_url"`
+				URL    string `json:"landing_page_url"`
+			} `json:"best_oa_location"`
 		} `json:"results"`
 	}
 	if err := t.getJSON(ctx, u, &out); err != nil {
@@ -222,6 +243,10 @@ func (t *webSearchTool) searchOpenAlex(ctx context.Context, q string, n int) ([]
 			Year: fmt.Sprint(r.PublicationYear), Venue: r.PrimaryLocation.Source.DisplayName,
 			DOI: r.DOI, URL: link,
 			Abstract: openAlexAbstract(r.AbstractIdx), Backend: "OpenAlex",
+			// GORILLA OVERRIDE: OpenAlex already tells us where a legal free
+			// copy lives. Discarding it and letting the user hit a paywall was
+			// a waste of a field we had already paid to fetch.
+			FreePDF: firstNonEmpty(r.BestOA.PDFURL, r.BestOA.URL),
 		})
 	}
 	return hits, nil
@@ -321,6 +346,204 @@ func (t *webSearchTool) searchCrossref(ctx context.Context, q string, n int) ([]
 	return hits, nil
 }
 
+func firstNonEmpty(v ...string) string {
+	for _, x := range v {
+		if strings.TrimSpace(x) != "" {
+			return x
+		}
+	}
+	return ""
+}
+
+// searchUnpaywall answers the question a student actually has: "I found a paper
+// behind a paywall - is there a legal free copy?" Takes a DOI, not keywords.
+func (t *webSearchTool) searchUnpaywall(ctx context.Context, q string, _ int) ([]searchHit, error) {
+	doi := strings.TrimSpace(q)
+	for _, pre := range []string{"https://doi.org/", "http://doi.org/", "doi:"} {
+		doi = strings.TrimPrefix(doi, pre)
+	}
+	if !strings.HasPrefix(doi, "10.") {
+		return nil, fmt.Errorf("unpaywall needs a DOI (e.g. 10.1038/nature12373), got %q", q)
+	}
+	var out struct {
+		Title   string `json:"title"`
+		Year    int    `json:"year"`
+		Journal string `json:"journal_name"`
+		IsOA    bool   `json:"is_oa"`
+		BestOA  struct {
+			URLForPDF string `json:"url_for_pdf"`
+			URL       string `json:"url"`
+			License   string `json:"license"`
+			HostType  string `json:"host_type"`
+		} `json:"best_oa_location"`
+	}
+	u := unpaywallAPI + url.PathEscape(doi) + "?email=" + url.QueryEscape("gorillanobakaa@gmail.com")
+	if err := t.getJSON(ctx, u, &out); err != nil {
+		return nil, err
+	}
+	abs := "No open-access copy is known for this DOI. It may only be available by purchase or through a library."
+	if out.IsOA {
+		abs = fmt.Sprintf("OPEN ACCESS: a legal free full text exists (%s, licence %s).",
+			firstNonEmpty(out.BestOA.HostType, "unknown host"), firstNonEmpty(out.BestOA.License, "unspecified"))
+	}
+	return []searchHit{{
+		Title: out.Title, Year: fmt.Sprint(out.Year), Venue: out.Journal, DOI: doi,
+		URL:      firstNonEmpty(out.BestOA.URL, "https://doi.org/"+doi),
+		FreePDF:  firstNonEmpty(out.BestOA.URLForPDF, out.BestOA.URL),
+		Abstract: abs, Backend: "Unpaywall",
+	}}, nil
+}
+
+func (t *webSearchTool) searchDOAJ(ctx context.Context, q string, n int) ([]searchHit, error) {
+	var out struct {
+		Results []struct {
+			Bibjson struct {
+				Title    string `json:"title"`
+				Abstract string `json:"abstract"`
+				Year     string `json:"year"`
+				Journal  struct {
+					Title string `json:"title"`
+				} `json:"journal"`
+				Author []struct {
+					Name string `json:"name"`
+				} `json:"author"`
+				Link []struct {
+					URL  string `json:"url"`
+					Type string `json:"type"`
+				} `json:"link"`
+				Identifier []struct {
+					ID   string `json:"id"`
+					Type string `json:"type"`
+				} `json:"identifier"`
+			} `json:"bibjson"`
+		} `json:"results"`
+	}
+	u := fmt.Sprintf("%s%s?pageSize=%d", doajAPI, url.PathEscape(q), n)
+	if err := t.getJSON(ctx, u, &out); err != nil {
+		return nil, err
+	}
+	hits := make([]searchHit, 0, len(out.Results))
+	for _, r := range out.Results {
+		b := r.Bibjson
+		var names []string
+		for i, a := range b.Author {
+			if i == 4 {
+				names = append(names, "et al.")
+				break
+			}
+			names = append(names, a.Name)
+		}
+		link, doi := "", ""
+		for _, l := range b.Link {
+			if l.URL != "" {
+				link = l.URL
+				break
+			}
+		}
+		for _, id := range b.Identifier {
+			if strings.EqualFold(id.Type, "doi") {
+				doi = id.ID
+			}
+		}
+		hits = append(hits, searchHit{
+			Title: b.Title, Authors: strings.Join(names, ", "), Year: b.Year,
+			Venue: b.Journal.Title, DOI: doi, URL: link, FreePDF: link,
+			Abstract: b.Abstract, Backend: "DOAJ (all open access)",
+		})
+	}
+	return hits, nil
+}
+
+func (t *webSearchTool) searchGutendex(ctx context.Context, q string, n int) ([]searchHit, error) {
+	var out struct {
+		Results []struct {
+			Title   string            `json:"title"`
+			Formats map[string]string `json:"formats"`
+			Authors []struct {
+				Name string `json:"name"`
+			} `json:"authors"`
+		} `json:"results"`
+	}
+	if err := t.getJSON(ctx, gutendexAPI+"?search="+url.QueryEscape(q), &out); err != nil {
+		return nil, err
+	}
+	hits := make([]searchHit, 0)
+	for i, r := range out.Results {
+		if i >= n {
+			break
+		}
+		var names []string
+		for _, a := range r.Authors {
+			names = append(names, a.Name)
+		}
+		txt := firstNonEmpty(r.Formats["text/plain; charset=utf-8"],
+			r.Formats["text/plain"], r.Formats["text/html"])
+		hits = append(hits, searchHit{
+			Title: r.Title, Authors: strings.Join(names, ", "),
+			URL: txt, FreePDF: txt, Venue: "Project Gutenberg",
+			Abstract: "Public domain. Full text is free to read and download.",
+			Backend:  "Gutenberg",
+		})
+	}
+	return hits, nil
+}
+
+func (t *webSearchTool) searchOpenLibrary(ctx context.Context, q string, n int) ([]searchHit, error) {
+	var out struct {
+		Docs []struct {
+			Title     string   `json:"title"`
+			AuthorNam []string `json:"author_name"`
+			FirstYear int      `json:"first_publish_year"`
+			Key       string   `json:"key"`
+			IA        []string `json:"ia"`
+		} `json:"docs"`
+	}
+	u := fmt.Sprintf("%s?q=%s&limit=%d", openLibAPI, url.QueryEscape(q), n)
+	if err := t.getJSON(ctx, u, &out); err != nil {
+		return nil, err
+	}
+	hits := make([]searchHit, 0)
+	for _, d := range out.Docs {
+		free := ""
+		if len(d.IA) > 0 {
+			free = "https://archive.org/details/" + d.IA[0]
+		}
+		hits = append(hits, searchHit{
+			Title: d.Title, Authors: strings.Join(d.AuthorNam, ", "),
+			Year: fmt.Sprint(d.FirstYear), Venue: "Open Library",
+			URL: "https://openlibrary.org" + d.Key, FreePDF: free,
+			Backend: "Open Library",
+		})
+	}
+	return hits, nil
+}
+
+func (t *webSearchTool) searchWikipedia(ctx context.Context, q string, n int) ([]searchHit, error) {
+	var out struct {
+		Query struct {
+			Search []struct {
+				Title   string `json:"title"`
+				Snippet string `json:"snippet"`
+			} `json:"search"`
+		} `json:"query"`
+	}
+	u := fmt.Sprintf("%s?action=query&list=search&srsearch=%s&format=json&srlimit=%d",
+		wikipediaAPI, url.QueryEscape(q), n)
+	if err := t.getJSON(ctx, u, &out); err != nil {
+		return nil, err
+	}
+	hits := make([]searchHit, 0)
+	for _, r := range out.Query.Search {
+		hits = append(hits, searchHit{
+			Title: r.Title, Venue: "Wikipedia",
+			URL:      "https://en.wikipedia.org/wiki/" + strings.ReplaceAll(r.Title, " ", "_"),
+			Abstract: stripJATS(r.Snippet),
+			Backend:  "Wikipedia",
+		})
+	}
+	return hits, nil
+}
+
 // Crossref abstracts arrive as JATS XML fragments.
 func stripJATS(s string) string {
 	for {
@@ -387,10 +610,24 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		chosen = []backend{{"Europe PMC", t.searchEuropePMC}}
 	case "crossref":
 		chosen = []backend{{"Crossref", t.searchCrossref}}
+	case "openaccess":
+		// A DOI routes to Unpaywall ("is there a legal free copy of THIS?"),
+		// keywords to DOAJ ("find me things that are free by construction").
+		if strings.HasPrefix(strings.TrimSpace(params.Query), "10.") ||
+			strings.Contains(params.Query, "doi.org/") {
+			chosen = []backend{{"Unpaywall", t.searchUnpaywall}}
+		} else {
+			chosen = []backend{{"DOAJ", t.searchDOAJ}}
+		}
+	case "books":
+		chosen = []backend{{"Gutenberg", t.searchGutendex}, {"Open Library", t.searchOpenLibrary}}
+	case "reference":
+		chosen = []backend{{"Wikipedia", t.searchWikipedia}}
 	case "all":
 		chosen = []backend{{"OpenAlex", t.searchOpenAlex}, {"Europe PMC", t.searchEuropePMC}, {"Crossref", t.searchCrossref}}
 	default:
-		return NewTextErrorResponse("source must be one of: scholar, medical, crossref, all"), nil
+		return NewTextErrorResponse(
+			"source must be one of: scholar, medical, crossref, openaccess, books, reference, all"), nil
 	}
 
 	var hits []searchHit
@@ -455,6 +692,9 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		}
 		if h.DOI != "" {
 			fmt.Fprintf(&sb, "   doi: %s\n", h.DOI)
+		}
+		if h.FreePDF != "" {
+			fmt.Fprintf(&sb, "   FREE LEGAL FULL TEXT: %s\n", h.FreePDF)
 		}
 		if a := strings.TrimSpace(h.Abstract); a != "" {
 			if len(a) > 700 {
