@@ -1,3 +1,39 @@
+## v0.1.73 — 2026-08-07 — the token sieve: 92% less sent, and a way to find the free copy
+
+Full dual-track document: [v0.1.73-release-notes.md](v0.1.73-release-notes.md).
+
+**Plain-language version:** When you asked the assistant to read a web page, it
+used to send the entire page to the AI service — menus, advertising scripts,
+cookie banner, footer — and you were charged for every word, then charged again
+each time the conversation continued. We measured it across eight real pages:
+**ninety-two percent of what you were paying for was not the article.** One
+GitHub file page cost 62,083 tokens to display a README whose actual content was
+363. This release sends 92% less.
+
+That matters because of who this is for. A family living on a dollar a day cannot
+absorb two dollars a month, and there is no version of "it's only a few cents"
+that survives that arithmetic. Send small enough requests and you never pay at
+all — you stay inside the free allowances permanently. At a typical free daily
+allowance the difference we measured is between sixteen pages a day and 2,754.
+
+The assistant can also now **search** for papers and books instead of guessing
+web addresses, and — the part that matters most — when it finds a paper behind a
+paywall it checks whether a **legal free copy** exists elsewhere. Very often one
+does, posted by the authors or their university. Measured on one query, seven of
+ten results carried a free legal full text. Nobody should be told to pay $40 for
+a paper that is free on the next page.
+
+It now also says clearly when it *cannot* search, instead of inventing a source —
+a real failure we observed and fixed. Long documents are shortened on your own
+computer using mathematics rather than AI, and the summary always says how much
+it cut and warns that the dropped parts may include the paper's own caveats. And
+the download itself is 26% smaller, which is about forty minutes back on a slow
+connection.
+
+Not verified: no live test over a genuinely slow link; TextRank is unit-tested
+but not yet driven end-to-end on a real full-text document; token counts are
+byte/4 estimates; the prompt experiment remains pre-registered and unrun.
+
 ## v0.1.72 — 2026-08-07 — the model could always read the web, and kept telling you it couldn't
 
 Full dual-track document: [v0.1.72-release-notes.md](v0.1.72-release-notes.md).
