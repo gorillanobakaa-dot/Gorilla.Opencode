@@ -57,9 +57,11 @@ Caught mechanically by `procedure_confabulation` in
 
 ### Not verified
 
-- **Nobody has seen the `/usage` line in the history.** `tea.Println` cannot be
-  driven from an agent shell; the test covers the plumbing and severity, not the
-  rendering. One person needs to type `/usage` and look.
+- ~~Nobody has seen the `/usage` line in the history.~~ **Confirmed working**:
+  two readings nine seconds apart both stayed in the scrollback, timestamped,
+  the second not replacing the first. Automated tests still cover only the
+  plumbing, format and severity — `tea.Println` cannot be driven from an agent
+  shell.
 - The prompt line ships on reasoning, not measurement.
 - Token thresholds use bytes ÷ 4, good to ~±15%.
 - The pre-registered prompt experiment remains unrun.
