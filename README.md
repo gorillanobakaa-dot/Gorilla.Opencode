@@ -157,6 +157,34 @@ bias is the opposite one, stated plainly in its [Philosophy](PHILOSOPHY.md):
 **measure it, show the user, and give them the switch.** Your key, your machine,
 your call — every turn.
 
+### The token sieve: we don't send you the whole page
+
+The same bias decides how the web tools work. An API can only bill you for what
+you send it, so we send the least that answers the question. One arXiv abstract
+page, measured:
+
+| what gets sent | ~tokens | vs raw |
+|---|---|---|
+| raw HTML, as "URL context" features send it | ~10,744 | 100% |
+| converted and stripped locally | ~1,794 | 16.7% |
+| via the arXiv export API | ~734 | 6.8% |
+| the abstract alone | **~328** | **3.1%** |
+
+Thirty-two times less, for strictly more useful content — the rest was
+navigation, cookie banner and tracking scripts, billed to you and then re-billed
+on every later turn of the conversation.
+
+`web_fetch` therefore walks a ladder and reports which rung it used: a
+structured API first, then the source document (`Accept: text/markdown`, a
+`raw.githubusercontent.com` rewrite, a `.md` companion), then local HTML
+conversion, and it says plainly when it has handed you a reconstruction rather
+than a source.
+
+This matters most where it is least visible. On fibre with a corporate card it
+is a rounding error. On a single-digit-KB/s link, for a household that cannot
+absorb two dollars a month, it is the difference between a tool that works and
+one that doesn't. See [Philosophy, Part Seven](PHILOSOPHY.md#part-seven-the-token-sieve--why-we-refuse-to-send-the-whole-page).
+
 Every one of these knobs exists *somewhere* — but buried in a config file, an
 environment variable, or an external gateway, and set once at startup. What we
 haven't found anywhere else is having them **live and together**: token *and*
