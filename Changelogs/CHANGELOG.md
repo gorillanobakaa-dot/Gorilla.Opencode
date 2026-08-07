@@ -1,3 +1,36 @@
+## v0.1.72 — 2026-08-07 — the model could always read the web, and kept telling you it couldn't
+
+Full dual-track document: [v0.1.72-release-notes.md](v0.1.72-release-notes.md).
+
+**Plain-language version:** The assistant could always read web pages. It just did
+not know it could. The tool was called `fetch`, the word "web" appeared once in
+its whole description and never in its name, and the system prompt never
+mentioned the internet at all — so against a strong trained belief that "I am a
+language model, I cannot browse the web", the assistant kept refusing a perfectly
+ordinary request and giving a false reason for it. It is now called `web_fetch`,
+its description opens by saying the capability exists, and the prompt says so too.
+
+Two other faults in the same tool. It could have been redirected into your home
+network or a cloud server's internal admin address — the check looked at the
+address you typed and never at where the connection actually went; it now checks
+every hop, immediately before connecting. And it asked every website for the full
+rendered page when a clean text version was often available, downloading roughly
+fifty times more than it needed. That is invisible on fast broadband and it is
+minutes of waiting on a slow or satellite link — and because AI assistants charge
+by the word and re-read the whole conversation on every reply, the navigation
+menus and cookie banners were being billed to you again and again.
+
+Also fixed: a page cut off at the 5MB limit was silently handed over as if
+complete, so the assistant would confidently summarise a document it had only
+partly read; failed requests threw away the server's explanation; non-UTF-8 pages
+arrived as gibberish; PDFs came back as binary noise; and `format` was a required
+argument, so the obvious way to call the tool failed outright.
+
+Not verified: no live fetch over a genuinely slow link, no measured hit rate for
+the markdown negotiation, and no measurement of the prompt line's effect on
+behaviour — that last one has a pre-registered experiment that still has not
+been run.
+
 ## v0.1.71 — 2026-08-07 — providers that said "ready" and then refused, and a log filter that ate the error
 
 Full dual-track document: [v0.1.71-release-notes.md](v0.1.71-release-notes.md).
