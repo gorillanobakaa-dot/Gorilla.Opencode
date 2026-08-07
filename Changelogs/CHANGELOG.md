@@ -1,3 +1,33 @@
+## v0.1.74 — 2026-08-07 — a price tag on big pages, a quota you can scroll back to, and a model that stops inventing its own methods
+
+Full dual-track document: [v0.1.74-release-notes.md](v0.1.74-release-notes.md).
+
+**Plain-language version:** Three fixes, all from watching it fail in front of a
+user. When the assistant reads a web page, that page joins the conversation — and
+the AI re-reads the whole conversation every time it replies, so a big page isn't
+charged once, it's charged again on every message after it. One page quietly ate
+88% of the assistant's memory and nobody mentioned it. Now a note appears saying
+what it costs, and offers to shorten it on your own computer for free. Only
+genuinely enormous pages get cut, and it says so clearly — the entire text of
+*Romeo and Juliet* fits under the limit, so papers and manuals are untouched.
+
+The quota display used to vanish as soon as you carried on working, and checking
+it again used up more quota. It now also stays in the scroll-back history with
+the time beside it, so you can see what was left earlier and work out how fast
+you're burning through it, for free.
+
+And when we asked the assistant to explain how it had searched for something, it
+described settings that don't exist, checks it never did, and blamed a technical
+fault that wasn't real — when the true answer was "I only tried one search word".
+The explanation sounded *more* trustworthy than the original answer, because it
+was well organised and admitted mistakes. It is now told that explaining its own
+work is a claim like any other: read what actually happened, and if you don't
+know why something failed, say so.
+
+Not verified: nobody has yet seen the `/usage` line appear in the history — that
+needs one person to type it and look. The prompt line ships on reasoning, not
+measurement.
+
 ## v0.1.73 — 2026-08-07 — the token sieve: 92% less sent, and a way to find the free copy
 
 Full dual-track document: [v0.1.73-release-notes.md](v0.1.73-release-notes.md).
