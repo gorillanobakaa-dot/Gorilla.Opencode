@@ -278,6 +278,25 @@ const (
 
 	maxFetchBytes = 5 * 1024 * 1024
 
+	// GORILLA OVERRIDE: a budget, not a guillotine.
+	//
+	// The byte cap at NewTextResponse (400KB) protects memory. It does not
+	// protect the CONTEXT WINDOW, which is the resource that actually runs out:
+	// 400KB is ~100,000 tokens, and one researchsquare fetch on 2026-08-07 took
+	// a session to 88% of context in a single call. Same shape as the grep bug
+	// in CLAUDE.md - a limit expressed in the wrong unit.
+	//
+	// But a low cap is worse than no cap. Measured: a converted arXiv abstract
+	// page is ~10,700 tokens and a whole book ~42,400. Anything tight enough to
+	// guarantee cheapness hands the model half a paper, and reasoning over a
+	// fragment is the failure this project exists to prevent.
+	//
+	// So: warn early, truncate late, and always offer the way out. The original
+	// fault was not that 85,000 tokens arrived - it was that nobody was told
+	// what it cost or offered an alternative.
+	warnTokens = 15000 // ~60KB: above a full abstract page, below a book
+	maxTokens  = 40000 // ~160KB: fits an entire novel; refuses the pathological
+
 	fetchToolDescription = `Fetch a web page, document or API response from the internet.
 
 YOU DO HAVE INTERNET ACCESS through this tool. Use it whenever the user gives
@@ -540,6 +559,27 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 
 	if res.fromCache {
 		notes = append(notes, "unchanged since the last fetch (304); served from this session's cache")
+	}
+
+	// Token budget. Estimated at 4 bytes/token - good to roughly +/-15%, and
+	// the decision it informs is coarse enough that precision does not matter.
+	if est := len(out) / 4; est > maxTokens {
+		keep := maxTokens * 4
+		out = out[:keep] + fmt.Sprintf(
+			"\n\n[CUT AT THE TOKEN BUDGET: this document is ~%d tokens and only the "+
+				"first ~%d were kept. THE REST WAS NOT READ - do not summarise this as "+
+				"though it were complete. To read it properly, call web_fetch again with "+
+				"summarise:true (condensed locally, costs you nothing), or fetch a "+
+				"narrower source such as the paper's abstract or API record.]",
+			est, maxTokens)
+		notes = append(notes, fmt.Sprintf("CUT at the %d-token budget from ~%d", maxTokens, est))
+	} else if est > warnTokens {
+		out = fmt.Sprintf(
+			"[LARGE DOCUMENT: ~%d tokens. This is being added to the conversation and "+
+				"will be re-sent on every later turn, so it is a recurring cost, not a "+
+				"one-off. If you only need part of it, web_fetch with summarise:true "+
+				"condenses it locally for free, or fetch a narrower source.]\n\n", est) + out
+		notes = append(notes, fmt.Sprintf("large: ~%d tokens, recurring on every turn", est))
 	}
 
 	// GORILLA OVERRIDE: truncation must SAY so. A model handed a silent
