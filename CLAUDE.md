@@ -127,7 +127,10 @@ cost real confusion; they are not optional.
 1. **Tag first, then build**, so the version stamp is real:
    ```sh
    git tag -a vX.Y.Z -m "…"
-   go build -ldflags "-X github.com/opencode-ai/opencode/internal/version.Version=vX.Y.Z" -o gorilla-opencode .
+   go build -ldflags "-s -w -X github.com/opencode-ai/opencode/internal/version.Version=vX.Y.Z" -o gorilla-opencode .
+   # -s -w strips the symbol table and DWARF: 66.1 MB -> 48.6 MB, measured
+   # 2026-08-07. On a single-digit-KB/s link that is ~40 minutes of the user's
+   # time. Never drop it from a release build.
    ./gorilla-opencode --version    # must print vX.Y.Z
    ```
 2. **Dual-track docs** via `dual_track.py` (see "Local-only tooling" below):
