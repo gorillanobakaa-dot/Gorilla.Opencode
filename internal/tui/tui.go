@@ -279,6 +279,17 @@ func (a appModel) Init() tea.Cmd {
 // network call never blocks the UI, and the result is a tea.Msg — never printed
 // onto the screen Bubble Tea owns. quiet=true returns nil when not signed in or
 // on a transient error (used at session start, so non-Antigravity users see
+// formatQuotaScrollbackLine renders the history entry.
+//
+// Extracted from the switch so it can be tested: inline formatting inside a
+// tea.Msg case is unreachable from a test, and an untested string is one
+// refactor away from being silently emptied. The timestamp is mandatory - a
+// quota figure without a time is not a measurement, and two dated readings are
+// what give you a burn rate.
+func formatQuotaScrollbackLine(at time.Time, line string) string {
+	return "  " + at.Format("15:04:05") + "  quota · " + line
+}
+
 // quotaLineMsg carries a fetched quota reading.
 //
 // GORILLA OVERRIDE: /usage used to render only as a footer toast, which is
@@ -458,8 +469,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// renderer, and no redraw can ever clear it (see the trap list in CLAUDE.md).
 	case quotaLineMsg:
 		if a.scrollback {
-			stamp := time.Now().Format("15:04:05")
-			cmds = append(cmds, tea.Println("  "+stamp+"  quota · "+msg.line))
+			cmds = append(cmds, tea.Println(formatQuotaScrollbackLine(time.Now(), msg.line)))
 		}
 		info := util.InfoMsg{Type: msg.kind, Msg: msg.line}
 		st, cmd := a.status.Update(info)

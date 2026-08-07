@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/opencode-ai/opencode/internal/tui/util"
 )
@@ -37,5 +38,20 @@ func TestQuotaLineCarriesTextAndSeverity(t *testing.T) {
 		if info.Msg != c.msg.line || info.Type != c.msg.kind {
 			t.Errorf("%s: message content or severity lost in conversion", c.name)
 		}
+	}
+}
+
+func TestQuotaScrollbackLineFormat(t *testing.T) {
+	t.Parallel()
+	at := time.Date(2026, 8, 7, 16, 42, 7, 0, time.UTC)
+	got := formatQuotaScrollbackLine(at, "Gemini 16% · refreshes in 71h 9m")
+	if !strings.Contains(got, "16:42:07") {
+		t.Errorf("no timestamp: %q — a quota figure without a time is not a measurement", got)
+	}
+	if !strings.Contains(got, "quota") {
+		t.Errorf("line is not identifiable as a quota reading when scrolled past: %q", got)
+	}
+	if !strings.Contains(got, "Gemini 16%") {
+		t.Errorf("the reading itself was lost: %q", got)
 	}
 }
