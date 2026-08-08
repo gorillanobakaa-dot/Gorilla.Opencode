@@ -30,6 +30,71 @@ type Section struct {
 // sectionHeaderRe matches a markdown-ish section header at line start.
 var sectionHeaderRe = regexp.MustCompile(`(?m)^#\s+(.+)$`)
 
+// GORILLA OVERRIDE: per-line tool gating.
+//
+// A prompt line may end with [[needs tool.fetch]] (or several ids, space
+// separated). The line is kept only if every id is enabled in the loadout, and
+// the marker is always stripped before the prompt is sent.
+//
+// Why this exists: sections are gated by SECTION, tools by TOOL, and nothing
+// connected the two. Turning a tool off removed its schema and left the prompt
+// still describing it, so the model was told it had a capability it did not
+// have. The web_fetch line was the worst case - it says "never say you cannot
+// reach a page", which at that moment is an instruction to fabricate, in the
+// one codebase whose search tool exists because a cornered model fabricated
+// citations on 2026-08-07. Low-bandwidth mode is a single keypress in /context
+// and turns off tool.fetch, tool.websearch, tool.patch, tool.diagnostics and
+// tool.agent at once, so this was reachable by accident, not only by an expert
+// pruning the loadout deliberately.
+//
+// Line-level markers rather than more sections: /context lists one row per
+// section with a "what you lose" line, and splitting these out would add
+// one-line rows that duplicate the tool toggles already sitting in the same
+// menu. The marker keeps the dependency next to the sentence it governs, where
+// someone editing the prompt will see it.
+var needsMarkerRe = regexp.MustCompile(`\s*\[\[needs\s+([^\]]+)\]\]`)
+
+// applyToolGates drops the lines whose required loadout ids are off and strips
+// the markers from the lines it keeps. Text with no markers is returned as-is,
+// so a user's hand-edited prompt is unaffected.
+func applyToolGates(body string) string {
+	if !strings.Contains(body, "[[needs") {
+		return body
+	}
+	lines := strings.Split(body, "\n")
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		m := needsMarkerRe.FindStringSubmatch(line)
+		if m == nil {
+			kept = append(kept, line)
+			continue
+		}
+		enabled := true
+		for _, id := range strings.Fields(m[1]) {
+			if !config.LoadoutEnabled(id) {
+				enabled = false
+				break
+			}
+		}
+		if enabled {
+			kept = append(kept, needsMarkerRe.ReplaceAllString(line, ""))
+		}
+	}
+	return strings.TrimRight(strings.Join(kept, "\n"), "\n")
+}
+
+// bodyIsOnlyHeader reports whether gating emptied a section down to its "# foo"
+// line. A bare header is noise in the prompt and, worse, implies the section's
+// content was meant to be there, so the whole section is dropped instead.
+func bodyIsOnlyHeader(body string) bool {
+	for _, line := range strings.Split(strings.TrimSpace(body), "\n") {
+		if l := strings.TrimSpace(line); l != "" && !strings.HasPrefix(l, "#") {
+			return false
+		}
+	}
+	return true
+}
+
 const (
 	sectionIDPrefix = "prompt.section."
 	preambleSlug    = "preamble"
@@ -141,16 +206,23 @@ func CoderSections() []Section {
 func assembleCoderPrompt() string {
 	secs := CoderSections()
 	if len(secs) == 0 {
-		return Factory(PromptCoder)
+		return applyToolGates(Factory(PromptCoder))
 	}
 	var keep []string
 	for _, s := range secs {
-		if config.LoadoutEnabled(s.ID) {
-			keep = append(keep, s.Body)
+		if !config.LoadoutEnabled(s.ID) {
+			continue
 		}
+		// Gate individual lines on the tools they describe, then drop a section
+		// that gating reduced to a bare header.
+		body := applyToolGates(s.Body)
+		if body == "" || bodyIsOnlyHeader(body) {
+			continue
+		}
+		keep = append(keep, body)
 	}
 	if len(keep) == 0 {
-		return Factory(PromptCoder)
+		return applyToolGates(Factory(PromptCoder))
 	}
 	return strings.Join(keep, "\n\n")
 }

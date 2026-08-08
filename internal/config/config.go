@@ -138,7 +138,21 @@ type Config struct {
 	// nearly everyone starts this program, and a capability reachable only by
 	// typing --plain is a capability most users do not have. Same lesson as the
 	// working directory defaulting to $HOME on an icon launch.
-	Interface      string                            `json:"interface,omitempty"`
+	Interface string `json:"interface,omitempty"`
+	// GORILLA OVERRIDE: base URL of a self-hosted SearXNG, e.g.
+	// "http://localhost:8888". Empty means general web search is OFF and
+	// web_search says so rather than guessing — see internal/llm/tools/websearch.go.
+	//
+	// Self-hosting is not a preference here, it is the only remaining option:
+	// as of 2026-08 Google's Custom Search JSON API is closed to new customers
+	// (sunset 2027-01-01), Microsoft retired the Bing Search API, Brave requires
+	// a card even on its free credit, and Mojeek has no self-serve tier. SearXNG
+	// is what is left that needs no key and no account.
+	//
+	// The explicit mapstructure tag is not decoration: viper reads THESE, not
+	// json tags, and a field it cannot match becomes write-only. That is exactly
+	// how WorkingDir's `json:"wd"` silently never loaded back.
+	SearxNGURL     string                            `json:"searxngURL,omitempty" mapstructure:"searxngURL"`
 	MCPServers     map[string]MCPServer              `json:"mcpServers,omitempty"`
 	Providers      map[models.ModelProvider]Provider `json:"providers,omitempty"`
 	LocalEndpoints []LocalEndpoint                   `json:"localEndpoints,omitempty"`

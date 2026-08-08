@@ -156,9 +156,14 @@ func TestAllSectionsOffFallsBackToFactory(t *testing.T) {
 	if strings.TrimSpace(got) == "" {
 		t.Fatal("every section off produced an EMPTY system prompt — the agent would silently degrade with no error")
 	}
-	if got != Factory(PromptCoder) {
+	// Compared against the GATED factory text, not the raw file: prompt lines may
+	// carry a [[needs tool.x]] marker, and the marker is a build instruction that
+	// must never reach the model. With every tool enabled (this test only toggles
+	// sections) gating keeps every line and removes only the markers, so this
+	// still asserts what it always did — all-off hands the whole prompt back.
+	if want := applyToolGates(Factory(PromptCoder)); got != want {
 		t.Errorf("all-off should fall back to the full factory prompt; got %d bytes vs factory %d",
-			len(got), len(Factory(PromptCoder)))
+			len(got), len(want))
 	}
 }
 
