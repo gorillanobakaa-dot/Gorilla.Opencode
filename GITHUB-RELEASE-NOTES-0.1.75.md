@@ -3,7 +3,7 @@
 `web_search` gains `source: web`, backed by a **self-hosted SearXNG**. Set
 `searxngURL` in `config.json` or export `SEARXNG_URL`. No container needed —
 SearXNG runs from source; setup is in the
-[full release notes](Changelogs/v0.1.75-release-notes.md#setting-up-searxng).
+[full release notes](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.1.75/Changelogs/v0.1.75-release-notes.md#setting-up-searxng).
 
 SearXNG is not a preference, it is what is left. As of August 2026 Google's
 Custom Search JSON API is closed to new customers, Microsoft retired the Bing
