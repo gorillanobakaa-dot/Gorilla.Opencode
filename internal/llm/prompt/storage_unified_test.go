@@ -153,6 +153,29 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// probe is registered in system-prompts/EXPERIMENT-PREREG-2026-08-04.md
 		// (amendment 1), with today's ~10 re-derivations as the pre-fix
 		// baseline.
+		// 6862 -> 6845 on 2026-08-08: -17 bytes, " and web_fetch it" dropped from
+		// the "search off is an answer" line.
+		//
+		// Not cosmetic. Prompt lines now carry [[needs tool.x]] markers and are
+		// dropped when that tool is switched off; the markers themselves are
+		// stripped at assembly and never reach the model, which is why this
+		// number moved by 17 and not by the ~180 bytes the markers occupy in the
+		// source file. That line is gated on tool.websearch, but it named
+		// web_fetch, so with fetch off and search on it still advertised a tool
+		// that was gone. Cross-references between gated lines reintroduce exactly
+		// the bug the gating removes, so a line names only its own tool.
+		// 6421 -> 6862 on 2026-08-08: "# tools" replaces the single web_search
+		// line with three, because the tool gained general web search (source:
+		// web, backed by a self-hosted SearXNG) and the old line said it "finds
+		// papers by keyword" — which would have stopped the model ever trying
+		// the new source. +441 bytes, ~+110 tokens per coder turn.
+		//
+		// Two of the three lines are not capability, they are refusal discipline:
+		// "search off is an answer" and "PARTIAL means absence is unproven". The
+		// tool can now say "web search is not configured", and that sentence is
+		// read at exactly the moment the 2026-08-07 fabrication happened — a model
+		// asked for something it cannot get. Advertising a capability without also
+		// saying what to do when it is absent is how that incident started.
 		// 6181 -> 6421 on 2026-08-07: "# honesty" gains a line saying that
 		// describing your own process is itself a progress claim. +240 bytes,
 		// ~+60 tokens per coder turn.
@@ -232,7 +255,7 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// "blast radius outranks brevity" line first. Probes P6-P8 are
 		// registered in EXPERIMENT-PREREG-2026-08-04.md, amendment 2.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 6421, "simple question gets direct sentence"},
+			BaseCoderPrompt(models.ProviderLocal), 6845, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {

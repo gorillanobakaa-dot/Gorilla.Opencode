@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -38,6 +39,24 @@ import (
 // The three below were verified to return real, parseable content and need no
 // API key. If a general-web backend is added later it must be behind a key and
 // must fail loudly rather than return a block page.
+//
+// GORILLA OVERRIDE (2026-08-08): general web search now exists as source "web",
+// and it is SearXNG only. That is not a preference, it is what survived an audit
+// of every alternative:
+//
+//	Google Custom Search JSON API  discontinued for new customers, sunset 2027-01-01
+//	Bing Search API                retired by Microsoft
+//	Brave Search API               credit card required even for the free credit
+//	Mojeek                         no self-serve tier, sales-gated
+//	DuckDuckGo HTML                block pages, see above
+//
+// SearXNG is the only general-web backend left that needs no key, no account and
+// no card. It also satisfies the rule this file already lived by, better than any
+// paid API can: its JSON response carries `unresponsive_engines`, a per-query list
+// of which upstreams failed. A grounding API returns confident prose whether or not
+// the search worked; SearXNG hands over the failure list, so "every engine blocked
+// us" is distinguishable from "no such thing exists". We refuse in the first case
+// instead of summarising nothing.
 
 const (
 	WebSearchToolName = "web_search"
@@ -55,12 +74,63 @@ const (
 	// contact ("the polite pool").
 	politeContact = "gorilla-opencode (+https://github.com/gorillanobakaa-dot/Gorilla.Opencode)"
 
+	// searxngEnvVar is the fallback when nothing is in config.json, so a user can
+	// try this without editing a file.
+	searxngEnvVar = "SEARXNG_URL"
+
+	// searxngSetup is what the model is told when web search is switched off. It
+	// is the highest-leverage string in this file: it is read at exactly the
+	// moment the model has been asked for something it cannot get, which is the
+	// moment that produced the 2026-08-07 fabrication. It must close the door
+	// firmly and point at the human, not leave a gap that invites improvisation.
+	searxngSetup = `General web search is NOT configured, so nothing was searched.
+
+Do not answer from memory as though a search had happened, and do not guess URLs.
+Tell the user web search is off, and that they can turn it on by running their own
+SearXNG (no API key, no account, no card):
+
+From source, no container needed (verified on Debian 13, python 3.13):
+
+  git clone --depth 1 https://github.com/searxng/searxng.git
+  python3 -m venv searxvenv
+  ./searxvenv/bin/pip install pyyaml -r searxng/requirements.txt
+
+  cat > settings.yml <<'YML'
+  use_default_settings: true
+  server:
+    secret_key: "change-me"
+    limiter: false          # the bot limiter 429s local automation
+    bind_address: "127.0.0.1"
+    port: 8888
+  search:
+    formats: [html, json]   # json is OFF by default; without it you get 403
+  YML
+
+  SEARXNG_SETTINGS_PATH=$PWD/settings.yml PYTHONPATH=$PWD/searxng \
+    ./searxvenv/bin/python -m searx.webapp
+
+(Do NOT "pip install -e ." — its build needs msgspec and pyyaml present first.
+Running from source with PYTHONPATH skips that entirely. If you prefer a
+container, the official image is searxng/searxng with the same two settings.)
+
+and pointing this tool at it, either with
+
+  searxngURL in ~/.config/gorilla-opencode/config.json, or
+  the SEARXNG_URL environment variable.
+
+Until then: if the user needs something from the open web, ask them for the URL
+and read it with web_fetch. Scholarly sources (scholar, medical, crossref,
+openaccess, books, reference) do not need any of this and still work.`
+
 	webSearchDescription = `Find papers, articles and references by keyword.
 
 Search here before guessing a URL. Do not hand-build search URLs for publisher
 sites; most block automated access and return 403.
 
 source:
+  web                the open web, via a self-hosted SearXNG. Only available if
+                     one is configured; if it is not, this tool SAYS SO and you
+                     must ask the user rather than guess a URL.
   scholar (default)  OpenAlex — all disciplines, ~250M works
   medical            Europe PMC — indexes MEDLINE/PubMed
   crossref           Crossref — DOI metadata across publishers
@@ -74,8 +144,10 @@ Results tagged FREE LEGAL FULL TEXT cost nothing to read. Prefer them, and say
 when a paper is purchase-only — never leave someone assuming they must pay while
 an open copy exists.
 
-There is NO general web search here (no Google/Bing/DuckDuckGo). If you need the
-open web and have no URL, ask the user for one. Do not invent a source.
+General web search (source: web) works ONLY when the user runs their own SearXNG.
+There is no built-in Google/Bing/DuckDuckGo and there never will be. If source:
+web reports that it is not configured, that is the end of it — ask the user for a
+URL. Do not invent a source, and do not fall back to remembered links.
 
 If a search fails or returns nothing, SAY SO. A plausible citation that turns
 out to be a different paper is worse than an empty result.
@@ -104,6 +176,7 @@ type searchHit struct {
 type webSearchTool struct {
 	permissions permission.Service
 	client      *http.Client
+	searxClient *http.Client
 }
 
 func NewWebSearchTool(permissions permission.Service) BaseTool {
@@ -113,7 +186,38 @@ func NewWebSearchTool(permissions permission.Service) BaseTool {
 		// guard costs nothing and stops a future edit pointing this at a
 		// private address.
 		client: newSafeClient(30 * time.Second),
+		// GORILLA OVERRIDE: SearXNG deliberately does NOT use newSafeClient.
+		//
+		// It is meant to run on localhost or a LAN box, and blockedIP() refuses
+		// loopback and RFC1918 — correctly, because that guard exists to stop a
+		// MODEL-CHOSEN URL reaching the metadata service or an internal admin
+		// page. The distinction that makes this exception safe is provenance,
+		// not address: this host comes from the operator's config file or
+		// environment, and the model can only fill in the query string, which is
+		// URL-escaped. The model cannot move this address.
+		//
+		// Redirects are refused outright rather than followed, so a misconfigured
+		// or hostile instance cannot bounce a request somewhere else and inherit
+		// the exemption. That is the one hole this arrangement could have had.
+		searxClient: &http.Client{
+			Timeout: 30 * time.Second,
+			CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+				return fmt.Errorf("SearXNG endpoint redirected to %s; refusing to follow", req.URL)
+			},
+		},
 	}
+}
+
+// searxngEndpoint resolves the configured instance: config.json first, then the
+// environment. Empty means OFF, and OFF is reported as such — it is never quietly
+// substituted with a public instance. Public SearXNG instances were measured
+// returning 403 (json format disabled by the operator) and 429 (bot limiter) and
+// would put this tool straight back to summarising block pages.
+func searxngEndpoint() string {
+	if cfg := config.Get(); cfg != nil && strings.TrimSpace(cfg.SearxNGURL) != "" {
+		return strings.TrimRight(strings.TrimSpace(cfg.SearxNGURL), "/")
+	}
+	return strings.TrimRight(strings.TrimSpace(os.Getenv(searxngEnvVar)), "/")
 }
 
 func (t *webSearchTool) Info() ToolInfo {
@@ -127,8 +231,8 @@ func (t *webSearchTool) Info() ToolInfo {
 			},
 			"source": map[string]any{
 				"type":        "string",
-				"description": "Which index to search. Defaults to scholar.",
-				"enum":        []string{"scholar", "medical", "crossref", "openaccess", "books", "reference", "all"},
+				"description": "Which index to search. Defaults to scholar. 'web' needs a self-hosted SearXNG.",
+				"enum":        []string{"web", "scholar", "medical", "crossref", "openaccess", "books", "reference", "all"},
 			},
 			"max_results": map[string]any{
 				"type":        "number",
@@ -549,6 +653,147 @@ func stripJATS(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
+// ---------------------------------------------------------------------------
+// SearXNG - general web search
+// ---------------------------------------------------------------------------
+
+// Backends report degradation, not just failure. A backend that answered with
+// SOME of its upstreams dead has not failed - but the caller must still be told,
+// because "3 results" and "3 results out of 9 engines, 6 of which were blocked"
+// are different claims and only one of them is safe to summarise confidently.
+type searchWarnKey struct{}
+
+func withSearchWarnings(ctx context.Context) (context.Context, *[]string) {
+	w := new([]string)
+	return context.WithValue(ctx, searchWarnKey{}, w), w
+}
+
+func addSearchWarning(ctx context.Context, format string, a ...any) {
+	if w, ok := ctx.Value(searchWarnKey{}).(*[]string); ok && w != nil {
+		*w = append(*w, fmt.Sprintf(format, a...))
+	}
+}
+
+// searxngDeadEngines flattens SearXNG's unresponsive_engines, which is an array
+// of [name, reason] pairs. Decoded as []any rather than []string because the
+// reason field has not always been a string across versions, and a decode error
+// here would fail the whole search over a diagnostic field.
+func searxngDeadEngines(raw [][]any) []string {
+	var out []string
+	for _, pair := range raw {
+		switch len(pair) {
+		case 0:
+			continue
+		case 1:
+			out = append(out, fmt.Sprintf("%v", pair[0]))
+		default:
+			out = append(out, fmt.Sprintf("%v (%v)", pair[0], pair[1]))
+		}
+	}
+	return out
+}
+
+func (t *webSearchTool) searchSearxNG(ctx context.Context, q string, n int) ([]searchHit, error) {
+	endpoint := searxngEndpoint()
+	if endpoint == "" {
+		// Run() gates on this first; belt and braces so a future call site
+		// cannot reach the network with an empty host.
+		return nil, fmt.Errorf("no SearXNG endpoint configured")
+	}
+
+	raw := fmt.Sprintf("%s/search?q=%s&format=json", endpoint, url.QueryEscape(q))
+	req, err := http.NewRequestWithContext(ctx, "GET", raw, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", politeContact)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := t.searxClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("could not reach SearXNG at %s: %w", endpoint, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
+		hint := ""
+		switch resp.StatusCode {
+		case http.StatusForbidden, http.StatusNotFound:
+			hint = ` - the instance is probably refusing format=json. Add "json" under` +
+				` search.formats in settings.yml and restart it`
+		case http.StatusTooManyRequests:
+			hint = " - the instance's bot limiter is rejecting us. Disable the limiter" +
+				" for loopback, or lower the request rate"
+		}
+		return nil, fmt.Errorf("SearXNG returned HTTP %d%s: %s",
+			resp.StatusCode, hint, strings.TrimSpace(string(body)))
+	}
+
+	// A SearXNG serving HTML here means format=json is off. Without this check
+	// that arrives as a JSON syntax error, which reads like a bug in this tool
+	// rather than a setting on their instance - and per this file's whole reason
+	// for existing, a wrong-shaped 200 must never be parsed hopefully.
+	if ct := resp.Header.Get("Content-Type"); !strings.Contains(strings.ToLower(ct), "json") {
+		return nil, fmt.Errorf(
+			"SearXNG answered 200 with Content-Type %q, not JSON - format=json is not"+
+				` enabled on that instance. Add "json" under search.formats in settings.yml`, ct)
+	}
+
+	var out struct {
+		Results []struct {
+			URL           string `json:"url"`
+			Title         string `json:"title"`
+			Content       string `json:"content"`
+			Engine        string `json:"engine"`
+			PublishedDate string `json:"publishedDate"`
+		} `json:"results"`
+		UnresponsiveEngines [][]any `json:"unresponsive_engines"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4*1024*1024)).Decode(&out); err != nil {
+		return nil, fmt.Errorf("could not parse SearXNG response: %w", err)
+	}
+
+	dead := searxngDeadEngines(out.UnresponsiveEngines)
+
+	// The distinction this whole backend was chosen for: zero results with every
+	// engine dead is a FAILURE, not an absence. Reporting it as "no results"
+	// would tell the model the thing does not exist, which is the lie that starts
+	// a fabrication.
+	if len(out.Results) == 0 && len(dead) > 0 {
+		return nil, fmt.Errorf(
+			"every upstream engine failed, so nothing was searched (%s). This is NOT"+
+				" evidence that no results exist", strings.Join(dead, "; "))
+	}
+	if len(dead) > 0 {
+		addSearchWarning(ctx, "SearXNG: %d engine(s) did not answer, results are incomplete: %s",
+			len(dead), strings.Join(dead, "; "))
+	}
+
+	hits := make([]searchHit, 0, len(out.Results))
+	for i, r := range out.Results {
+		if i >= n {
+			break
+		}
+		year := ""
+		if len(r.PublishedDate) >= 4 {
+			year = r.PublishedDate[:4]
+		}
+		backend := "SearXNG"
+		if r.Engine != "" {
+			backend = "SearXNG/" + r.Engine
+		}
+		hits = append(hits, searchHit{
+			Title:    r.Title,
+			URL:      r.URL,
+			Abstract: r.Content,
+			Year:     year,
+			Backend:  backend,
+		})
+	}
+	return hits, nil
+}
+
 func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error) {
 	var params WebSearchParams
 	if err := json.Unmarshal([]byte(call.Input), &params); err != nil {
@@ -567,6 +812,14 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 	}
 	if n > 25 {
 		n = 25
+	}
+
+	// Refuse an unconfigured web search HERE, above the permission prompt, not in
+	// the switch below. Asking someone to approve a search that cannot happen
+	// trains them to approve without reading, and the answer would be the same
+	// whichever button they pressed. §3: prefer refusing over inventing state.
+	if source == "web" && searxngEndpoint() == "" {
+		return NewTextErrorResponse(searxngSetup), nil
 	}
 
 	sessionID, messageID := GetContextValues(ctx)
@@ -593,6 +846,9 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 	}
 	var chosen []backend
 	switch source {
+	case "web":
+		// The unconfigured case was already refused above the permission prompt.
+		chosen = []backend{{"SearXNG", t.searchSearxNG}}
 	case "scholar":
 		chosen = []backend{{"OpenAlex", t.searchOpenAlex}}
 	case "medical":
@@ -616,8 +872,12 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		chosen = []backend{{"OpenAlex", t.searchOpenAlex}, {"Europe PMC", t.searchEuropePMC}, {"Crossref", t.searchCrossref}}
 	default:
 		return NewTextErrorResponse(
-			"source must be one of: scholar, medical, crossref, openaccess, books, reference, all"), nil
+			"source must be one of: web, scholar, medical, crossref, openaccess, books, reference, all"), nil
 	}
+
+	// Degradation short of failure is collected here and surfaced as PARTIAL
+	// below, so a backend can say "I answered, but with half my upstreams down".
+	reqCtx, warnings := withSearchWarnings(reqCtx)
 
 	var hits []searchHit
 	var failures []string
@@ -644,6 +904,12 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 	// Silence and success must never look alike.
 	if len(hits) == 0 {
 		msg := fmt.Sprintf("No results for %q.", params.Query)
+		// "Nothing found" and "nothing found, but coverage was incomplete" must
+		// not read the same. The second is not evidence of absence.
+		if len(*warnings) > 0 {
+			msg += fmt.Sprintf("\n\nCOVERAGE WAS INCOMPLETE, so this is not evidence that"+
+				" nothing exists:\n  %s", strings.Join(*warnings, "\n  "))
+		}
 		if len(failures) > 0 {
 			msg = fmt.Sprintf("Search FAILED for %q - no backend answered:\n  %s\n\n"+
 				"Nothing was retrieved. Tell the user the search failed; do not "+
@@ -657,6 +923,9 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 	if len(failures) > 0 {
 		fmt.Fprintf(&sb, "PARTIAL: some backends failed, results below are incomplete:\n  %s\n",
 			strings.Join(failures, "\n  "))
+	}
+	if len(*warnings) > 0 {
+		fmt.Fprintf(&sb, "PARTIAL: %s\n", strings.Join(*warnings, "\n  "))
 	}
 	for i, h := range hits {
 		if i >= n && source != "all" {
