@@ -1,3 +1,49 @@
+## v0.1.75 — 2026-08-08 — the agent can search the open web, and stops claiming tools it no longer has
+
+Full dual-track document: [v0.1.75-release-notes.md](v0.1.75-release-notes.md).
+
+**Plain-language version:** Until now this program could look things up in
+academic and reference databases — papers, books, Wikipedia — but it had no way
+to search the ordinary web. Ask it about something on a normal website without
+giving it a link, and it had nothing to work with.
+
+It can now search the open web, but only if you run your own copy of a search
+engine called SearXNG on your own machine. That is a deliberate choice, not an
+apology: every commercial search API has either closed to new users, been
+retired, or now wants a credit card. Running your own costs nothing, needs no
+account, and nobody logs what you searched for. Setup instructions are in the
+full notes.
+
+If you have not set it up, the assistant is told plainly that web search is off
+and to ask you for a link rather than guess. That refusal matters more than it
+sounds: the worst thing this program has ever done was invent a table of
+academic citations when it could not search — real-looking links leading to
+completely different papers. A tool that says "I could not search" is safe; one
+that quietly returns nothing teaches the assistant that nothing exists. For the
+same reason, when the search runs but the engines behind it are blocked, that is
+now reported as a failure rather than as "no results found".
+
+The second fix is a quieter version of the same problem. You can switch
+individual tools off to save bandwidth, and one key switches off five at once.
+But the assistant's instructions were written as though every tool were always
+there — so in low-bandwidth mode it was still being told "you can open web pages,
+never say you cannot reach a page" at the exact moment it could not. That is an
+instruction to make something up. Those lines now disappear along with the tools
+they describe.
+
+**Technical:** `web_search` gains `source: web`, backed by a self-hosted SearXNG
+(`searxngURL` in config.json or `SEARXNG_URL`). Chosen because it is the only
+key-free general-web backend left — Google's Custom Search JSON API is closed to
+new customers, Bing's is retired, Brave needs a card, Mojeek is sales-gated —
+and because its `unresponsive_engines` field distinguishes "nothing matched"
+from "everything was blocked". Zero results with every engine dead is an error,
+not an empty result set. Its HTTP client deliberately skips the SSRF guard
+(SearXNG runs on loopback); the exemption rests on provenance — the host comes
+from config, the model controls only the query string — and redirects are
+refused so nothing can inherit it. Separately, prompt lines may now carry
+`[[needs tool.x]]` and are dropped when that component is off, with the marker
+stripped before send; a section gated down to a bare header is dropped entirely.
+
 ## v0.1.74 — 2026-08-07 — a price tag on big pages, a quota you can scroll back to, and a model that stops inventing its own methods
 
 Full dual-track document: [v0.1.74-release-notes.md](v0.1.74-release-notes.md).
