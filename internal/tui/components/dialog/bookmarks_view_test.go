@@ -151,3 +151,36 @@ func TestBookmarksDropInheritedRanks(t *testing.T) {
 		}
 	}
 }
+
+// The feature has to be findable. Reported from a live run: "there's no
+// indication that YOU HAVE THE OPTION to even select your models and bookmark
+// them" — the only label naming the shortlist appeared after you had already
+// used it, which is not discoverability, it is a reward for already knowing.
+func TestPickerTellsYouAboutBookmarking(t *testing.T) {
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Get()
+	cfg.Providers = map[models.ModelProvider]config.Provider{
+		models.ProviderAnthropic: {APIKey: "x"},
+	}
+	m := &modelDialogCmp{width: 200, height: 40}
+	m.availableProviders = getEnabledProviders(cfg)
+	m.setupModelsForProvider(models.ProviderAnthropic)
+
+	view := m.View()
+	if !strings.Contains(view, "space") {
+		t.Error("no mention of the space key anywhere in the picker")
+	}
+	if !strings.Contains(strings.ToLower(view), "bookmark") {
+		t.Error("the word 'bookmark' never appears, so nobody learns the feature exists")
+	}
+}
+
+// And the shortlist must say whose list it is, not just what it is called.
+func TestBookmarksTitleSaysItIsYours(t *testing.T) {
+	name := providerDisplayName(ProviderBookmarks)
+	if !strings.Contains(strings.ToUpper(name), "YOUR") {
+		t.Errorf("the title must make ownership obvious, got %q", name)
+	}
+}
