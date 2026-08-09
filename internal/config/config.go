@@ -152,18 +152,22 @@ type Config struct {
 	// The explicit mapstructure tag is not decoration: viper reads THESE, not
 	// json tags, and a field it cannot match becomes write-only. That is exactly
 	// how WorkingDir's `json:"wd"` silently never loaded back.
-	SearxNGURL     string                            `json:"searxngURL,omitempty" mapstructure:"searxngURL"`
-	MCPServers     map[string]MCPServer              `json:"mcpServers,omitempty"`
-	Providers      map[models.ModelProvider]Provider `json:"providers,omitempty"`
-	LocalEndpoints []LocalEndpoint                   `json:"localEndpoints,omitempty"`
-	LSP            map[string]LSPConfig              `json:"lsp,omitempty"`
-	Agents         map[AgentName]Agent               `json:"agents,omitempty"`
-	Debug          bool                              `json:"debug,omitempty"`
-	DebugLSP       bool                              `json:"debugLSP,omitempty"`
-	ContextPaths   []string                          `json:"contextPaths,omitempty"`
-	TUI            TUIConfig                         `json:"tui"`
-	Shell          ShellConfig                       `json:"shell,omitempty"`
-	AutoCompact    bool                              `json:"autoCompact,omitempty"`
+	SearxNGURL string `json:"searxngURL,omitempty" mapstructure:"searxngURL"`
+	// GORILLA OVERRIDE: the user's personal model shortlist, shown above every
+	// provider in the picker. Model IDs in the order they were added — see
+	// bookmarks.go for why IDs rather than names or list positions.
+	BookmarkedModels []string                          `json:"bookmarkedModels,omitempty" mapstructure:"bookmarkedModels"`
+	MCPServers       map[string]MCPServer              `json:"mcpServers,omitempty"`
+	Providers        map[models.ModelProvider]Provider `json:"providers,omitempty"`
+	LocalEndpoints   []LocalEndpoint                   `json:"localEndpoints,omitempty"`
+	LSP              map[string]LSPConfig              `json:"lsp,omitempty"`
+	Agents           map[AgentName]Agent               `json:"agents,omitempty"`
+	Debug            bool                              `json:"debug,omitempty"`
+	DebugLSP         bool                              `json:"debugLSP,omitempty"`
+	ContextPaths     []string                          `json:"contextPaths,omitempty"`
+	TUI              TUIConfig                         `json:"tui"`
+	Shell            ShellConfig                       `json:"shell,omitempty"`
+	AutoCompact      bool                              `json:"autoCompact,omitempty"`
 }
 
 // Application constants
