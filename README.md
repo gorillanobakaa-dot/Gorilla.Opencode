@@ -244,6 +244,10 @@ curl -fsSL https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode
 
 ```sh
 sudo apt install ./gorilla-opencode_*_amd64.deb
+
+# or, with no terminal at all: right-click the .deb → Open With → GDebi
+# (both resolve dependencies; `dpkg -i` does not, and will refuse until they
+#  are installed)
 ```
 
 **From source:**

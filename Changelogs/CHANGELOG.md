@@ -1,3 +1,23 @@
+## v0.1.79 — 2026-08-09 — lynx is now required, not suggested
+
+Full dual-track document: [v0.1.79-release-notes.md](v0.1.79-release-notes.md).
+
+**Plain-language version:** One fix, straight after v0.1.78. That release said
+the package *recommends* lynx — the small text browser that makes web search work
+with no setup. That sounded polite and was wrong. `apt` honours a recommendation;
+**gdebi does not** — the graphical installer you get by right-clicking a `.deb`,
+which is how most people who do not live in a terminal install software. Its
+source never mentions the field, and `dpkg -i` resolves nothing at all. So the
+two friendliest install routes would have skipped the package that makes the
+headline feature work, and web search would have looked broken to exactly the
+people it was built for. A promise that only holds when you install the expert
+way is not a promise. It is 641 KB and now arrives on every path.
+
+**Technical:** `Recommends: lynx` → `Depends: lynx`. Verified by reading gdebi's
+source (no occurrence of "Recommends"). apt's default is
+`APT::Install-Recommends "true"`, which is why the gap was invisible when tested
+with apt alone — the one tool that honours the weaker field.
+
 ## v0.1.78 — 2026-08-09 — web search with no setup, and a model list that tells the truth
 
 Full dual-track document: [v0.1.78-release-notes.md](v0.1.78-release-notes.md).
