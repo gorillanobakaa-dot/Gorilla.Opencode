@@ -168,6 +168,11 @@ func RefreshOpenRouter(configDir string) (*RefreshResult, error) {
 		if !hasTools {
 			continue
 		}
+		// Batch endpoints are asynchronous: an interactive agent pointed at one
+		// waits indefinitely for a reply.
+		if IsBatchVariant(m.ID) {
+			continue
+		}
 		attach := false
 		for _, mod := range m.Architecture.InputModalities {
 			if mod == "image" {
@@ -183,7 +188,7 @@ func RefreshOpenRouter(configDir string) (*RefreshResult, error) {
 		fresh[id] = Model{
 			ID:                  id,
 			Name:                m.Name,
-			Description:         shortDesc(m.Description, m.ContextLength, free),
+			Description:         CleanCatalogueDescription(m.Description, m.ContextLength, free),
 			Provider:            ProviderOpenRouter,
 			APIModel:            m.ID,
 			CostPer1MIn:         perMillionPrice(m.Pricing.Prompt),
@@ -284,25 +289,6 @@ func perMillionPrice(s string) float64 {
 		return 0
 	}
 	return f * 1_000_000
-}
-
-func shortDesc(s string, ctx int64, free bool) string {
-	s = strings.ReplaceAll(s, "\n", " ")
-	if i := strings.IndexAny(s, ".!"); i > 30 {
-		s = s[:i]
-	}
-	s = strings.Join(strings.Fields(s), " ")
-	if len(s) > 90 {
-		s = strings.TrimSpace(s[:90]) + "…"
-	}
-	prefix := ""
-	if free {
-		prefix = "FREE — "
-	}
-	if ctx > 0 {
-		return fmt.Sprintf("%s%s (%dK ctx)", prefix, s, ctx/1000)
-	}
-	return prefix + s
 }
 
 // CatalogueAge reports when the model list was last refreshed. ok is false if it

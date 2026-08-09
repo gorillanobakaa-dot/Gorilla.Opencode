@@ -30,6 +30,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/opencode-ai/opencode/internal/llm/models"
 	"io"
 	"net/http"
 	"os"
@@ -110,38 +111,19 @@ func goIdent(id string) string {
 	return b.String()
 }
 
-// shortDescription trims OpenRouter's prose to one clause. The picker shows this
-// on one line next to the name; the full paragraph would wrap and push the list
-// off a 1600x900 screen.
-func shortDescription(s string, ctx int64, free bool) string {
-	s = strings.ReplaceAll(s, "\n", " ")
-	if i := strings.IndexAny(s, ".!"); i > 30 {
-		s = s[:i]
-	}
-	s = strings.Join(strings.Fields(s), " ")
-	if len(s) > 90 {
-		s = strings.TrimSpace(s[:90]) + "…"
-	}
-	prefix := ""
-	if free {
-		prefix = "FREE — "
-	}
-	if ctx > 0 {
-		return fmt.Sprintf("%s%s (%dK ctx)", prefix, s, ctx/1000)
-	}
-	return prefix + s
-}
-
 func main() {
-	models, err := fetch()
+	catalogue, err := fetch()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "openrouter-models:", err)
 		os.Exit(1)
 	}
 
 	var usable []orModel
-	for _, m := range models {
-		if m.supports("tools") {
+	for _, m := range catalogue {
+		// Batch endpoints are asynchronous bulk jobs - an interactive agent
+		// pointed at one waits indefinitely. Same judgement as the tools filter:
+		// removing entries that cannot do this job, not curating taste.
+		if m.supports("tools") && !models.IsBatchVariant(m.ID) {
 			usable = append(usable, m)
 		}
 	}
@@ -175,7 +157,7 @@ func main() {
 	}
 
 	sort.Slice(usable, func(i, j int) bool { return usable[i].ID < usable[j].ID })
-	emit(usable, rank, len(models), len(free))
+	emit(usable, rank, len(catalogue), len(free))
 }
 
 func fetch() ([]orModel, error) {
@@ -241,7 +223,7 @@ const (
 		fmt.Fprintf(w, "\t%s: {\n", goIdent(m.ID))
 		fmt.Fprintf(w, "\t\tID:                  %s,\n", goIdent(m.ID))
 		fmt.Fprintf(w, "\t\tName:                %q,\n", m.Name)
-		fmt.Fprintf(w, "\t\tDescription:         %q,\n", shortDescription(m.Description, m.ContextLength, m.isFree()))
+		fmt.Fprintf(w, "\t\tDescription:         %q,\n", models.CleanCatalogueDescription(m.Description, m.ContextLength, m.isFree()))
 		if r := rank[m.ID]; r > 0 {
 			fmt.Fprintf(w, "\t\tRank:                %d,\n", r)
 		}
