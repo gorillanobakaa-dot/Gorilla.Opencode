@@ -1,3 +1,49 @@
+## v0.1.76 — 2026-08-09 — the assistant offers to set up web search, instead of explaining how
+
+Full dual-track document: [v0.1.76-release-notes.md](v0.1.76-release-notes.md).
+
+**Plain-language version:** Last release added web search, but only if you ran
+your own copy of a search engine called SearXNG — which meant, realistically,
+almost nobody had it.
+
+Now the assistant offers. Ask it something it needs the web for and instead of
+"web search is not configured, here are some instructions", it says it can set it
+up for you: no account, no API key, no card, all on your own machine, a couple of
+minutes. Say yes and it runs one installer. Say no and it asks you for a link, as
+before.
+
+The installer is a script we ship, not something the assistant improvises. That
+matters more than it sounds. When we handed an earlier version of those setup
+instructions to a model as plain text and asked it to pass them on, it quietly
+dropped one word — `pyyaml` — from one line, and that single omission makes the
+install fail with a confusing error. A model doing the installation itself would
+make the same class of mistake and then tell you it had worked. So the
+assistant's job is to ask you and run one command; every decision that could go
+wrong is made once, in a script that does not improvise. The script also checks
+its own work: it runs a real search and requires real results back before
+reporting success.
+
+**Technical:** `packaging/setup-searxng.sh` ships at
+`/usr/share/gorilla-opencode/setup-searxng.sh`. It encodes both traps (`pip
+install -e .` fails before msgspec/pyyaml exist; `json` is absent from
+`search.formats` by default, which is why public instances 403), installs a
+systemd user service, needs no root, writes `searxngURL` preserving every other
+config key, and verifies with a live query — exiting non-zero naming the failed
+step rather than reporting "probably fine".
+
+Also fixes a test-isolation bug this exposed: `internal/llm/tools`' `TestMain`
+called `config.Load` without redirecting `XDG_CONFIG_HOME`, so `config.Get()` had
+been returning the developer's real config all along. Invisible until a config
+value changed behaviour — when the installer wrote `searxngURL`, four stubbed
+tests silently began querying the live instance and failed with "want 2 hits, got
+8". Had it returned two, the suite would have stayed green while testing nothing.
+`configtest` gains `IsolateWith(m, setup)` so the redirect precedes the load.
+
+Adds an opt-in probe recording a negative result: Antigravity does **not** support
+Google Search grounding (flash returns 200 with no `groundingMetadata`, pro
+returns 400), and the envelope is not the cause — gemini-cli places `tools`
+identically.
+
 ## v0.1.75 — 2026-08-08 — the agent can search the open web, and stops claiming tools it no longer has
 
 Full dual-track document: [v0.1.75-release-notes.md](v0.1.75-release-notes.md).
