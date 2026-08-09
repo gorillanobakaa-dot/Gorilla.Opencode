@@ -239,3 +239,58 @@ func TestJumpToBookmarksWithNoneSaysWhatToDo(t *testing.T) {
 		t.Error("pressing b with no bookmarks must report something, not do nothing")
 	}
 }
+
+// The shortlist is the one list that mixes providers, so the same model can
+// appear twice by different routes — "Gemini 3.6 Flash" via Antigravity and via
+// a Gemini key. With nothing to tell them apart they read as duplicates, and
+// the reported instinct was to delete one: silently removing a different route,
+// on a different quota.
+func TestBookmarksNameTheirProvider(t *testing.T) {
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatal(err)
+	}
+	var pick models.ModelID
+	for id, m := range models.SupportedModels {
+		if m.Provider != "" && m.Provider != models.ProviderLocal {
+			pick = id
+			break
+		}
+	}
+	if pick == "" {
+		t.Skip("no non-local model available")
+	}
+	if _, err := config.ToggleBookmark(string(pick)); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = config.ToggleBookmark(string(pick)) })
+
+	m := &modelDialogCmp{width: 240, height: 40}
+	m.availableProviders = getEnabledProviders(config.Get())
+	m.setupModelsForProvider(ProviderBookmarks)
+	view := m.View()
+
+	home := string(models.SupportedModels[pick].Provider)
+	if !strings.Contains(view, "["+home+"]") {
+		t.Errorf("the shortlist must name each model's provider; %q missing from the view", home)
+	}
+}
+
+// The list has to grow into the window. A fixed fourteen rows hid most of a
+// thirty-entry shortlist behind a scroll — the wall this list exists to remove.
+func TestVisibleRowsGrowsWithTheWindow(t *testing.T) {
+	small := &modelDialogCmp{height: 24}
+	large := &modelDialogCmp{height: 50}
+	if large.visibleRows() <= small.visibleRows() {
+		t.Errorf("a taller window must show more rows: %d vs %d",
+			large.visibleRows(), small.visibleRows())
+	}
+	// Never taller than the window, or the frame overflows and the footer
+	// marches down the screen.
+	if r := large.visibleRows(); r >= large.height {
+		t.Errorf("%d rows in a %d-row window overflows the frame", r, large.height)
+	}
+	// And an unsized dialog must not compute a negative or silly count.
+	if (&modelDialogCmp{}).visibleRows() != numVisibleModels {
+		t.Error("an unsized dialog should fall back to the floor")
+	}
+}
