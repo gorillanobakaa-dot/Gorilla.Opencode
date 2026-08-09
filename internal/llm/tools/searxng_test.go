@@ -260,13 +260,22 @@ func TestSearxNGEndpointPrefersConfigThenEnv(t *testing.T) {
 	}
 }
 
-// Unconfigured web search must refuse with instructions BEFORE the permission
-// prompt - asking someone to approve a search that cannot happen trains them to
-// approve without reading, and no answer they give changes the outcome. The nil
-// permission service here is the assertion: if Run reached the prompt it would
-// panic, so passing proves the refusal came first.
+// With NO route to the web at all - no SearXNG and no lynx - web search must
+// refuse with instructions BEFORE the permission prompt. Asking someone to
+// approve a search that cannot happen trains them to approve without reading,
+// and no answer they give changes the outcome. The nil permission service here
+// is the assertion: if Run reached the prompt it would panic, so passing proves
+// the refusal came first.
 func TestWebSearchRefusesUnconfiguredWebBeforeAskingPermission(t *testing.T) {
 	t.Setenv(searxngEnvVar, "")
+	// Web search now has two routes, so refusing requires BOTH to be gone.
+	// Emptying PATH makes exec.LookPath("lynx") fail deterministically, which
+	// is the state of a machine where the Recommends was declined - and it is
+	// the only state in which this refusal should ever be seen.
+	t.Setenv("PATH", "")
+	if lynxPath() != "" {
+		t.Fatal("lynx still resolvable with an empty PATH; this test proves nothing")
+	}
 
 	in, err := json.Marshal(WebSearchParams{Query: "anything", Source: "web"})
 	if err != nil {
