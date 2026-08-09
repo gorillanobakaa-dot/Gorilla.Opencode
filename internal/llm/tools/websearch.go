@@ -808,7 +808,11 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 	// the switch below. Asking someone to approve a search that cannot happen
 	// trains them to approve without reading, and the answer would be the same
 	// whichever button they pressed. §3: prefer refusing over inventing state.
-	if source == "web" && searxngEndpoint() == "" {
+	//
+	// Only refuse when BOTH routes are gone: a configured SearXNG, or lynx on
+	// PATH. lynx is a Recommends of the package, so in practice this fires only
+	// for someone who removed it.
+	if source == "web" && searxngEndpoint() == "" && lynxPath() == "" {
 		return NewTextErrorResponse(searxngSetup), nil
 	}
 
@@ -837,8 +841,15 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 	var chosen []backend
 	switch source {
 	case "web":
-		// The unconfigured case was already refused above the permission prompt.
-		chosen = []backend{{"SearXNG", t.searchSearxNG}}
+		// The no-route-at-all case was already refused above the permission
+		// prompt. SearXNG first when configured: it queries the same upstreams
+		// but with real per-engine parsers and reports which of them failed,
+		// where lynx can only tell that a page yielded nothing.
+		if searxngEndpoint() != "" {
+			chosen = []backend{{"SearXNG", t.searchSearxNG}}
+		} else {
+			chosen = []backend{{"lynx", t.searchLynx}}
+		}
 	case "scholar":
 		chosen = []backend{{"OpenAlex", t.searchOpenAlex}}
 	case "medical":
