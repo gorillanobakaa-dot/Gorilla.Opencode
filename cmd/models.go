@@ -209,8 +209,12 @@ and if the download fails the list you already have keeps working.`,
 
 		fmt.Printf("  Downloaded %d models (%.0f KB).\n", res.Fetched, float64(res.Bytes)/1024)
 		fmt.Printf("  %d can be used by an agent; %d of those are FREE.\n", res.Usable, res.Free)
-		fmt.Printf("  %d were skipped — they cannot call tools, so they cannot edit files.\n",
-			res.Fetched-res.Usable)
+		if res.NoTools > 0 {
+			fmt.Printf("  %d skipped: cannot call tools, so they cannot edit files.\n", res.NoTools)
+		}
+		if res.Batch > 0 {
+			fmt.Printf("  %d skipped: batch endpoints — replies arrive hours later, not in a chat.\n", res.Batch)
+		}
 		fmt.Println()
 
 		report := func(label string, items []string, limit int) {
