@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -173,21 +174,41 @@ func listTopLevelBrief(dir string, limit int) string {
 	if err != nil {
 		return fmt.Sprintf("(could not list directory: %v)", err)
 	}
-	names := make([]string, 0, len(entries))
+	var dirs, files []string
 	for _, e := range entries {
 		name := e.Name()
 		if strings.HasPrefix(name, ".") {
 			continue
 		}
 		if e.IsDir() {
-			name += "/"
+			dirs = append(dirs, name+"/")
+		} else {
+			files = append(files, name)
 		}
-		names = append(names, name)
 	}
-	sort.Strings(names)
-	if len(names) == 0 {
+	if len(dirs)+len(files) == 0 {
 		return "(empty or only hidden entries)"
 	}
+	sort.Strings(dirs)
+	files = collapseVersionFamilies(files)
+	sort.Strings(files)
+
+	// GORILLA OVERRIDE (2026-08-09): directories first, then files.
+	//
+	// This was a plain sort.Strings over everything, which is ASCII, which puts
+	// CAPITALS first. In this very repo that meant the 25 slots were consumed by
+	// GITHUB-RELEASE-NOTES-0.1.65 … 0.1.77 and SHA256SUMS-*, and NOT ONE source
+	// entry reached the model - no cmd/, no internal/, no go.mod. The block whose
+	// entire job is "where am I" was describing a pile of old builds.
+	//
+	// It is not a naming problem: lowercasing every filename puts internal/ at
+	// position 78, because 47 .deb artifacts sort before it either way. The root
+	// simply had 96 entries and a 25-entry budget.
+	//
+	// Directories are the orientation signal; loose files in a repo root are
+	// mostly output. Listing dirs first means the answer to "what is this
+	// project" survives any amount of accumulated detritus.
+	names := append(dirs, files...)
 	shown := names
 	extra := 0
 	if len(shown) > limit {
@@ -197,6 +218,79 @@ func listTopLevelBrief(dir string, limit int) string {
 	out := strings.Join(shown, "\n")
 	if extra > 0 {
 		out += fmt.Sprintf("\n… +%d more (not listed)", extra)
+	}
+	return out
+}
+
+// versionRunRe matches a run of digits and dots - the part that varies across
+// release artifacts (0.1.65, 1.2.3, 20260809).
+var versionRunRe = regexp.MustCompile(`[0-9][0-9.]*`)
+
+// collapseVersionFamilies folds files that differ only by a version number into
+// a single line: 47 copies of gorilla-opencode_0.1.NN_amd64.deb become
+// "gorilla-opencode_*_amd64.deb (47 files)".
+//
+// GORILLA OVERRIDE (2026-08-09): this is the honest fix for a truncated
+// listing. The alternative - raising the cap - re-introduces the 10k-30k
+// tokens/turn this block was written to eliminate. Collapsing instead makes the
+// listing SMALLER while showing MORE: the fact that 47 .deb files exist is one
+// line of information, not 47, and the 46 slots freed go to entries that
+// actually distinguish this project from any other.
+//
+// It also removes an accidental prompt injection. Thirteen consecutive
+// GITHUB-RELEASE-NOTES-0.1.65…0.1.77 lines read as a sequence, and on 2026-08-09
+// a model given the input "oi" and nothing else continued that sequence: it ran
+// `git tag -a v0.1.78`, and the tag was really created. Nothing was
+// hallucinated - the context contained a monotonic counter and an idle agent.
+// One collapsed line carries the same fact and invites nothing.
+func collapseVersionFamilies(files []string) []string {
+	const minFamily = 3
+
+	type fam struct {
+		pattern string
+		count   int
+		first   int
+	}
+	order := []string{}
+	byKey := map[string]*fam{}
+
+	for i, f := range files {
+		loc := versionRunRe.FindStringIndex(f)
+		if loc == nil {
+			continue
+		}
+		key := f[:loc[0]] + "\x00" + f[loc[1]:]
+		if fm, ok := byKey[key]; ok {
+			fm.count++
+		} else {
+			byKey[key] = &fam{pattern: f[:loc[0]] + "*" + f[loc[1]:], count: 1, first: i}
+			order = append(order, key)
+		}
+	}
+
+	collapsed := map[string]bool{}
+	out := make([]string, 0, len(files))
+	for _, key := range order {
+		if byKey[key].count >= minFamily {
+			collapsed[key] = true
+		}
+	}
+	seen := map[string]bool{}
+	for _, f := range files {
+		loc := versionRunRe.FindStringIndex(f)
+		key := ""
+		if loc != nil {
+			key = f[:loc[0]] + "\x00" + f[loc[1]:]
+		}
+		if key != "" && collapsed[key] {
+			if !seen[key] {
+				seen[key] = true
+				fm := byKey[key]
+				out = append(out, fmt.Sprintf("%s (%d files)", fm.pattern, fm.count))
+			}
+			continue
+		}
+		out = append(out, f)
 	}
 	return out
 }
