@@ -45,10 +45,26 @@ const openRouterCatalogueURL = "https://openrouter.ai/api/v1/models"
 // cacheFileName lives beside config.json. Named for what it holds.
 const cacheFileName = "openrouter-models.json"
 
+// catalogueSchema is the version of the RULES used to build a cache — which
+// models are excluded, how descriptions are cleaned. Bump it whenever those
+// change.
+//
+// GORILLA OVERRIDE (2026-08-09): added after a stale cache silently undid a
+// fix. Batch endpoints were removed from the catalogue and descriptions stopped
+// being cut mid-sentence, both verified in the generated file — and the running
+// program still showed 333 models with 59 batch entries and truncated text,
+// because a cache written an hour earlier was merged over the corrected list at
+// startup. The improvement was real and invisible.
+//
+// A cache built under different rules is now discarded rather than trusted. It
+// costs one refresh; trusting it costs a fix nobody can see.
+const catalogueSchema = 2
+
 // cachedCatalogue is what gets written to disk. The Model values are stored
 // whole rather than re-derived, so a future change to the conversion cannot
 // silently reinterpret an old cache.
 type cachedCatalogue struct {
+	Schema    int               `json:"schema"`
 	Refreshed time.Time         `json:"refreshed"`
 	Source    string            `json:"source"`
 	Models    map[ModelID]Model `json:"models"`
@@ -56,9 +72,14 @@ type cachedCatalogue struct {
 
 // RefreshResult describes what a refresh did, for reporting to the user.
 type RefreshResult struct {
-	Fetched      int
-	Usable       int
-	Free         int
+	Fetched int
+	Usable  int
+	Free    int
+	// Skipped, split by REASON. Reporting one number for both would tell
+	// someone that 126 models "cannot call tools" when 59 of them can — they
+	// are simply asynchronous batch endpoints.
+	NoTools      int
+	Batch        int
 	Added        []string
 	Removed      []string
 	PriceChanged []string
@@ -90,6 +111,14 @@ func LoadRefreshedCatalogue(configDir string) (int, error) {
 	}
 	if len(c.Models) == 0 {
 		return 0, fmt.Errorf("refreshed model list is empty, using the built-in one")
+	}
+	if c.Schema != catalogueSchema {
+		// Built under older rules — it may contain models since excluded, or
+		// text cleaned the old way. Ignoring it costs one refresh; trusting it
+		// silently reverts whatever those rules were changed to fix.
+		return 0, fmt.Errorf(
+			"saved model list was built by an older version (schema %d, now %d) — using the built-in list; run `gorilla-opencode models refresh` to rebuild it",
+			c.Schema, catalogueSchema)
 	}
 	n := 0
 	for id, m := range c.Models {
@@ -166,11 +195,13 @@ func RefreshOpenRouter(configDir string) (*RefreshResult, error) {
 		// A model that cannot call tools cannot do this job: the agent would
 		// describe edits it is unable to make. Dropping them is not curation.
 		if !hasTools {
+			res.NoTools++
 			continue
 		}
 		// Batch endpoints are asynchronous: an interactive agent pointed at one
 		// waits indefinitely for a reply.
 		if IsBatchVariant(m.ID) {
+			res.Batch++
 			continue
 		}
 		attach := false
@@ -260,7 +291,7 @@ func RefreshOpenRouter(configDir string) (*RefreshResult, error) {
 	// Write atomically: a half-written cache read at next launch is exactly the
 	// "corrupt file leaves you with no models" case the loader guards against,
 	// and it is cheaper to not create it than to recover from it.
-	out := cachedCatalogue{Refreshed: time.Now().UTC(), Source: openRouterCatalogueURL, Models: fresh}
+	out := cachedCatalogue{Schema: catalogueSchema, Refreshed: time.Now().UTC(), Source: openRouterCatalogueURL, Models: fresh}
 	blob, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
 		return nil, err
