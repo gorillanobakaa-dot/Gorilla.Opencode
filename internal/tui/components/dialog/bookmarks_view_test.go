@@ -69,3 +69,34 @@ func TestSelectingRetiredBookmarkIsRefused(t *testing.T) {
 		t.Fatal("fixture is wrong — this id should not resolve")
 	}
 }
+
+// The shortlist must be the FIRST column, not merely present.
+//
+// Prepending it was not enough: getEnabledProviders sorts by
+// ProviderPopularity afterwards, the shortlist is not a real provider so it has
+// no entry, and unranked providers default to 999 = show last. It ended up at
+// the far right of the carousel — several presses away and, to the user,
+// indistinguishable from not having been created at all.
+func TestBookmarksColumnComesFirst(t *testing.T) {
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Get()
+	// Two real providers, so the sort has something to reorder.
+	cfg.Providers = map[models.ModelProvider]config.Provider{
+		models.ProviderOpenAI:    {APIKey: "x"},
+		models.ProviderAnthropic: {APIKey: "x"},
+	}
+	if _, err := config.ToggleBookmark("openrouter.vendor/anything"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = config.ToggleBookmark("openrouter.vendor/anything") })
+
+	got := getEnabledProviders(cfg)
+	if len(got) == 0 {
+		t.Fatal("no providers at all")
+	}
+	if got[0] != ProviderBookmarks {
+		t.Fatalf("the shortlist must lead the carousel, got order: %v", got)
+	}
+}

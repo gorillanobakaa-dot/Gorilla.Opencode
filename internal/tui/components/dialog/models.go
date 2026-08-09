@@ -505,6 +505,20 @@ func getEnabledProviders(cfg *config.Config) []models.ModelProvider {
 
 	// Sort by provider popularity
 	slices.SortFunc(providers, func(a, b models.ModelProvider) int {
+		// GORILLA FIX (2026-08-09): the shortlist column must lead, and this
+		// sort was quietly sending it to the back. It is not a real provider so
+		// it has no ProviderPopularity entry, and unranked providers default to
+		// 999 = "show last" — so bookmarks landed at the far right of the
+		// carousel, several presses away, and looked like it had not been
+		// created at all. Prepending it above was not enough; the sort runs
+		// afterwards and does not care where a thing started.
+		if a == ProviderBookmarks && b != ProviderBookmarks {
+			return -1
+		}
+		if b == ProviderBookmarks && a != ProviderBookmarks {
+			return 1
+		}
+
 		rA := models.ProviderPopularity[a]
 		rB := models.ProviderPopularity[b]
 
