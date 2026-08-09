@@ -178,8 +178,22 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case key.Matches(msg, modelKeys.Enter):
-			util.ReportInfo(fmt.Sprintf("selected model: %s", m.models[m.selectedIdx].Name))
-			return m, util.CmdHandler(ModelSelectedMsg{Model: m.models[m.selectedIdx]})
+			if len(m.models) == 0 {
+				break
+			}
+			chosen := m.models[m.selectedIdx]
+			// GORILLA OVERRIDE: refuse a bookmark whose model no longer exists.
+			// Without this the unresolvable id reaches the agent and comes back
+			// as a generic failure, which reads as "this program is broken"
+			// rather than "that model was retired". Say which, and say what to
+			// press.
+			if _, ok := models.SupportedModels[chosen.ID]; !ok {
+				return m, util.ReportWarn(fmt.Sprintf(
+					"%s is no longer offered by its provider — press space to remove it from your bookmarks",
+					chosen.ID))
+			}
+			util.ReportInfo(fmt.Sprintf("selected model: %s", chosen.Name))
+			return m, util.CmdHandler(ModelSelectedMsg{Model: chosen})
 		case key.Matches(msg, modelKeys.Escape):
 			return m, util.CmdHandler(CloseModelDialogMsg{})
 		}
