@@ -1,6 +1,7 @@
 package dialog
 
 import (
+	tea "github.com/charmbracelet/bubbletea"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -182,5 +183,59 @@ func TestBookmarksTitleSaysItIsYours(t *testing.T) {
 	name := providerDisplayName(ProviderBookmarks)
 	if !strings.Contains(strings.ToUpper(name), "YOUR") {
 		t.Errorf("the title must make ownership obvious, got %q", name)
+	}
+}
+
+// The reported dead end: after browsing several providers to bookmark things,
+// you are several columns from the shortlist, ←/→ moves one at a time, and the
+// only way anyone found to see the list was to close the dialog and reopen it.
+// "b" must reach it from anywhere, in one press.
+func TestJumpToBookmarksFromAnyColumn(t *testing.T) {
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Get()
+	cfg.Providers = map[models.ModelProvider]config.Provider{
+		models.ProviderAnthropic: {APIKey: "x"},
+		models.ProviderOpenAI:    {APIKey: "x"},
+		models.ProviderGemini:    {APIKey: "x"},
+	}
+	if _, err := config.ToggleBookmark("openrouter.vendor/anything"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = config.ToggleBookmark("openrouter.vendor/anything") })
+
+	m := &modelDialogCmp{}
+	m.availableProviders = getEnabledProviders(cfg)
+	m.hScrollPossible = true
+	// Stand at the far end, as someone does after browsing to bookmark.
+	last := len(m.availableProviders) - 1
+	if last < 2 {
+		t.Skip("need several providers to make the jump meaningful")
+	}
+	m.hScrollOffset = last
+	m.setupModelsForProvider(m.availableProviders[last])
+	if m.provider == ProviderBookmarks {
+		t.Skip("already on the shortlist")
+	}
+
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
+	if m.provider != ProviderBookmarks {
+		t.Fatalf("b must reach the shortlist from column %d, landed on %q", last, m.provider)
+	}
+}
+
+// With nothing bookmarked, b must explain rather than appear broken.
+func TestJumpToBookmarksWithNoneSaysWhatToDo(t *testing.T) {
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatal(err)
+	}
+	m := &modelDialogCmp{}
+	m.availableProviders = getEnabledProviders(config.Get())
+	if findProviderIndex(m.availableProviders, ProviderBookmarks) >= 0 {
+		t.Skip("bookmarks exist in this environment")
+	}
+	if _, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}}); cmd == nil {
+		t.Error("pressing b with no bookmarks must report something, not do nothing")
 	}
 }
