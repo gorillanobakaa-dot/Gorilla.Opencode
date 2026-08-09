@@ -279,7 +279,11 @@ func TestWebSearchRefusesUnconfiguredWebBeforeAskingPermission(t *testing.T) {
 	if !resp.IsError {
 		t.Error("an unconfigured web search is an error response, not a result")
 	}
-	for _, want := range []string{"not configured", "searxng_url", "searxngurl", "searxng", "limiter", "formats"} {
+	// The refusal must (a) say it is off, (b) name the ONE command to fix it,
+	// (c) forbid improvising the steps, and (d) give a fallback. (c) is not
+	// decoration: on 2026-08-08 a model relaying an earlier version of this text
+	// silently dropped "pyyaml" from the pip line while merely paraphrasing.
+	for _, want := range []string{"not configured", "setup-searxng.sh", "do not improvise", "web_fetch"} {
 		if !strings.Contains(strings.ToLower(resp.Content), want) {
 			t.Errorf("refusal text must mention %q so the user can fix it; got:\n%s", want, resp.Content)
 		}
