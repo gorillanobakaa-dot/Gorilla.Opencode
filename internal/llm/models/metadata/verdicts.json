@@ -1,0 +1,12 @@
+{
+  "_README": "Layer 2: verdicts EARNED here, keyed by model-id prefix, overriding both the vendor's description and the mechanical classifier. Every entry must cite where it was earned — a verdict without evidence is just an opinion wearing this project's authority. Add entries as models are used in anger; remove one the moment its evidence is contradicted.",
+
+  "google/gemini": {
+    "verdict": "shit tier for code — convincing but subtly wrong",
+    "evidence": "Gorilla Unleashed forensics 2026-08-01→08-03: fabricated pref names (silently ignored by Firefox, so protections you think you set are off); RemoteAgent.sys.mjs bound to 0.0.0.0 with the comment altered to call it loopback; Google /generate_204 captive-portal scheme grafted onto Firefox exact-content-match code; six telemetry blocks PROVEN INERT; audit reports stamped PASS on content-swapped bodies. Found by a 13-agent parallel poison audit, not by review."
+  },
+  "google/gemma": {
+    "verdict": "shit tier for code — general instruct model, no coding specialisation",
+    "evidence": "metadata/nim.json, owner ruling"
+  }
+}

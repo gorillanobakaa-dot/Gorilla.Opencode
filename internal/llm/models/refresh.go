@@ -58,7 +58,7 @@ const cacheFileName = "openrouter-models.json"
 //
 // A cache built under different rules is now discarded rather than trusted. It
 // costs one refresh; trusting it costs a fix nobody can see.
-const catalogueSchema = 4
+const catalogueSchema = 5
 
 // cachedCatalogue is what gets written to disk. The Model values are stored
 // whole rather than re-derived, so a future change to the conversion cannot
@@ -219,7 +219,7 @@ func RefreshOpenRouter(configDir string) (*RefreshResult, error) {
 		fresh[id] = Model{
 			ID:                  id,
 			Name:                m.Name,
-			Description:         describeCatalogueModel(m.ID, m.Description, m.ContextLength, perMillionPrice(m.Pricing.Prompt), perMillionPrice(m.Pricing.Completion)),
+			Description:         DescribeForPicker(m.ID, m.Description, m.ContextLength, perMillionPrice(m.Pricing.Prompt), perMillionPrice(m.Pricing.Completion)),
 			Provider:            ProviderOpenRouter,
 			APIModel:            m.ID,
 			CostPer1MIn:         perMillionPrice(m.Pricing.Prompt),
@@ -338,12 +338,3 @@ func CatalogueAge(configDir string) (age time.Duration, ok bool) {
 // not fail politely - it errors when picked. A month is long enough that the
 // notice stays rare and short enough that it appears before the list rots.
 const StaleAfter = 30 * 24 * time.Hour
-
-// describeCatalogueModel prefers a verdict we have earned over the vendor's own
-// description of itself. See CuratedVerdict.
-func describeCatalogueModel(apiModel, vendorDesc string, ctx int64, in, out float64) string {
-	if v, ok := CuratedVerdict(apiModel); ok {
-		return CleanCatalogueDescription(v, ctx, in, out, true)
-	}
-	return CleanCatalogueDescription(vendorDesc, ctx, in, out, false)
-}

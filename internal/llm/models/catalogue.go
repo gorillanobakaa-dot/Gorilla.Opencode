@@ -34,7 +34,7 @@ func IsBatchVariant(id string) bool {
 // [Poolside](<https://poolside.ai/>)" renders as exactly that in a terminal,
 // spending characters on a URL nobody can click. The link text is kept and the
 // address dropped.
-func CleanCatalogueDescription(desc string, ctx int64, inPer1M, outPer1M float64, curated bool) string {
+func CleanCatalogueDescription(desc string, ctx int64, inPer1M, outPer1M float64) string {
 	s := markdownLink.ReplaceAllString(desc, "$1")
 	s = strings.ReplaceAll(s, "\n", " ")
 	if i := strings.IndexAny(s, ".!"); i > 30 {
@@ -53,12 +53,7 @@ func CleanCatalogueDescription(desc string, ctx int64, inPer1M, outPer1M float64
 	if len(s) > 220 {
 		s = strings.TrimSpace(s[:220]) + "…"
 	}
-	if !curated {
-		// Vendor marketing, not our verdict. Saying so is the difference
-		// between a description someone can rely on and one that merely sounds
-		// authoritative.
-		s = "[unverified] " + s
-	}
+
 	// GORILLA OVERRIDE (2026-08-09): price goes FIRST, on every entry.
 	//
 	// Free models were marked and paid ones were not, so telling them apart
@@ -127,4 +122,33 @@ func normaliseModelKey(id string) string {
 		}
 	}
 	return b.String()
+}
+
+// DescribeForPicker builds the line shown in the model picker, in the order
+// this project trusts things: what we found ourselves, then a judgement already
+// written for the same model, then the vendor's own claim with the word that
+// triggered its label, then an admission that nobody has any idea.
+//
+// The label leads because it is the decision. Someone learning to code should
+// not have to read a paragraph of marketing to discover that a model is a
+// roleplay bot.
+func DescribeForPicker(apiModel, vendorDesc string, ctx int64, in, out float64) string {
+	// 1. Earned here, with evidence on file.
+	if v, ok := EarnedVerdict(apiModel); ok {
+		return CleanCatalogueDescription(v.Verdict, ctx, in, out)
+	}
+	// 2. Already judged for the same underlying model.
+	if v, ok := CuratedVerdict(apiModel); ok {
+		return CleanCatalogueDescription(v, ctx, in, out)
+	}
+	// 3. The vendor's own claim, labelled and quotable.
+	label, trigger := ClassifyForCoding(vendorDesc)
+	body := label
+	if trigger != "" {
+		body += ` (vendor: "` + trigger + `")`
+	}
+	if d := strings.TrimSpace(vendorDesc); d != "" && trigger != "" {
+		body += " — " + d
+	}
+	return CleanCatalogueDescription(body, ctx, in, out)
 }
