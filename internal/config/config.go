@@ -1363,6 +1363,17 @@ func registerLocalEndpoints() {
 			"kept", seenURL[ep.BaseURL].Name, "ignored", ep.Name, "baseURL", ep.BaseURL)
 	}
 
+	// GORILLA OVERRIDE: apply a previously refreshed model catalogue over the
+	// built-in one. Reads a local file only - never the network - so a slow or
+	// absent connection cannot delay startup. Any problem with the file is
+	// logged and the built-in list stands, because a corrupt cache must not
+	// leave someone with no models at all.
+	if n, err := models.LoadRefreshedCatalogue(ConfigBase()); err != nil {
+		logging.Warn("Could not apply refreshed model list", "error", err)
+	} else if n > 0 {
+		logging.Debug("Applied refreshed model list", "models", n)
+	}
+
 	var first models.ModelID
 	for _, url := range order {
 		ep := seenURL[url]
