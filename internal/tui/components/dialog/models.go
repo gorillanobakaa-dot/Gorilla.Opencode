@@ -76,6 +76,12 @@ type modelKeyMap struct {
 	// judgement as "this one is good", and a list you can only add to becomes
 	// another wall.
 	Bookmark key.Binding
+	// GORILLA OVERRIDE: jump straight to the shortlist from any column.
+	// ←/→ move ONE provider at a time, and after browsing to bookmark things
+	// you are typically several columns away from it — so the list you just
+	// built was reachable only by pressing left repeatedly, or by closing the
+	// dialog and reopening it. Neither is discoverable.
+	ShowBookmarks key.Binding
 }
 
 var modelKeys = modelKeyMap{
@@ -123,6 +129,10 @@ var modelKeys = modelKeyMap{
 		key.WithKeys(" "),
 		key.WithHelp("space", "bookmark / unbookmark"),
 	),
+	ShowBookmarks: key.NewBinding(
+		key.WithKeys("b"),
+		key.WithHelp("b", "jump to your bookmarks"),
+	),
 }
 
 func (m *modelDialogCmp) Init() tea.Cmd {
@@ -146,6 +156,16 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.hScrollPossible {
 				m.switchProvider(1)
 			}
+		case key.Matches(msg, modelKeys.ShowBookmarks):
+			idx := findProviderIndex(m.availableProviders, ProviderBookmarks)
+			if idx < 0 {
+				// Say what to do instead of silently doing nothing — a key that
+				// appears to be broken is worse than one that explains itself.
+				return m, util.ReportWarn("you have not bookmarked anything yet — press space on a model to add it")
+			}
+			m.hScrollOffset = idx
+			m.setupModelsForProvider(ProviderBookmarks)
+			return m, nil
 		case key.Matches(msg, modelKeys.Bookmark):
 			if len(m.models) == 0 {
 				break
@@ -173,7 +193,7 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectedIdx = sel
 			}
 			if on {
-				util.ReportInfo("bookmarked — it will appear in ★ bookmarks")
+				util.ReportInfo("bookmarked — press b to see your list")
 			} else {
 				util.ReportInfo("removed from bookmarks")
 			}
@@ -373,7 +393,7 @@ func (m *modelDialogCmp) View() string {
 	// your models and bookmark them".
 	//
 	// One line, on every column, in the frame the user is already reading.
-	hint := "space ★ bookmark"
+	hint := "space ★ bookmark   b YOUR LIST"
 	if m.provider == ProviderBookmarks {
 		hint = "space remove from bookmarks"
 	}
