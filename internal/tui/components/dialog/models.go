@@ -150,14 +150,22 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// moveSelectionUp moves the selection up or wraps to bottom
+// moveSelectionUp moves the selection up and STOPS at the top.
+//
+// GORILLA OVERRIDE (2026-08-09): this used to wrap around - top jumped to
+// bottom, bottom jumped to top. With a handful of models that is a convenience.
+// NVIDIA NIM alone exposes 128, and at that length wrapping means there is no
+// way to tell "I have reached the beginning" from "I am somewhere in the
+// middle": you scroll past the end without noticing and lose your place
+// entirely. A list with no ends is a list you cannot navigate, only wander.
+//
+// Both ends are hard now. Holding a key at the boundary does nothing, which is
+// exactly the feedback that tells you where you are.
 func (m *modelDialogCmp) moveSelectionUp() {
-	if m.selectedIdx > 0 {
-		m.selectedIdx--
-	} else {
-		m.selectedIdx = len(m.models) - 1
-		m.scrollOffset = max(0, len(m.models)-numVisibleModels)
+	if m.selectedIdx == 0 {
+		return // hard stop at the top
 	}
+	m.selectedIdx--
 
 	// Keep selection visible
 	if m.selectedIdx < m.scrollOffset {
@@ -165,14 +173,13 @@ func (m *modelDialogCmp) moveSelectionUp() {
 	}
 }
 
-// moveSelectionDown moves the selection down or wraps to top
+// moveSelectionDown moves the selection down and STOPS at the bottom.
+// See moveSelectionUp for why neither end wraps.
 func (m *modelDialogCmp) moveSelectionDown() {
-	if m.selectedIdx < len(m.models)-1 {
-		m.selectedIdx++
-	} else {
-		m.selectedIdx = 0
-		m.scrollOffset = 0
+	if m.selectedIdx >= len(m.models)-1 {
+		return // hard stop at the bottom
 	}
+	m.selectedIdx++
 
 	// Keep selection visible
 	if m.selectedIdx >= m.scrollOffset+numVisibleModels {
