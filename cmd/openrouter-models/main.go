@@ -223,7 +223,7 @@ const (
 		fmt.Fprintf(w, "\t%s: {\n", goIdent(m.ID))
 		fmt.Fprintf(w, "\t\tID:                  %s,\n", goIdent(m.ID))
 		fmt.Fprintf(w, "\t\tName:                %q,\n", m.Name)
-		fmt.Fprintf(w, "\t\tDescription:         %q,\n", models.CleanCatalogueDescription(m.Description, m.ContextLength, perMillion(m.Pricing.Prompt), perMillion(m.Pricing.Completion)))
+		fmt.Fprintf(w, "\t\tDescription:         %q,\n", describeModel(m))
 		if r := rank[m.ID]; r > 0 {
 			fmt.Fprintf(w, "\t\tRank:                %d,\n", r)
 		}
@@ -239,4 +239,16 @@ const (
 		fmt.Fprintf(w, "\t},\n")
 	}
 	fmt.Fprintf(w, "}\n")
+}
+
+// describeModel prefers a verdict already earned in metadata/nim.json over the
+// vendor's own marketing. Twenty-three of OpenRouter's models are the same
+// underlying model as one already judged there; the rest are marked unverified,
+// because none of them has ever been tested here.
+func describeModel(m orModel) string {
+	in, out := perMillion(m.Pricing.Prompt), perMillion(m.Pricing.Completion)
+	if v, ok := models.CuratedVerdict(m.ID); ok {
+		return models.CleanCatalogueDescription(v, m.ContextLength, in, out, true)
+	}
+	return models.CleanCatalogueDescription(m.Description, m.ContextLength, in, out, false)
 }

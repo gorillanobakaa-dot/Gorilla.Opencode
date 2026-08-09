@@ -34,7 +34,7 @@ func IsBatchVariant(id string) bool {
 // [Poolside](<https://poolside.ai/>)" renders as exactly that in a terminal,
 // spending characters on a URL nobody can click. The link text is kept and the
 // address dropped.
-func CleanCatalogueDescription(desc string, ctx int64, inPer1M, outPer1M float64) string {
+func CleanCatalogueDescription(desc string, ctx int64, inPer1M, outPer1M float64, curated bool) string {
 	s := markdownLink.ReplaceAllString(desc, "$1")
 	s = strings.ReplaceAll(s, "\n", " ")
 	if i := strings.IndexAny(s, ".!"); i > 30 {
@@ -52,6 +52,12 @@ func CleanCatalogueDescription(desc string, ctx int64, inPer1M, outPer1M float64
 	// thing; narrow ones cut to fit, which is the only place cutting belongs.
 	if len(s) > 220 {
 		s = strings.TrimSpace(s[:220]) + "…"
+	}
+	if !curated {
+		// Vendor marketing, not our verdict. Saying so is the difference
+		// between a description someone can rely on and one that merely sounds
+		// authoritative.
+		s = "[unverified] " + s
 	}
 	// GORILLA OVERRIDE (2026-08-09): price goes FIRST, on every entry.
 	//
@@ -77,4 +83,48 @@ func CleanCatalogueDescription(desc string, ctx int64, inPer1M, outPer1M float64
 		return fmt.Sprintf("%s%s (%dK ctx)", prefix, s, ctx/1000)
 	}
 	return prefix + s
+}
+
+// CuratedVerdict returns our own judgement of a model, if we have earned one.
+//
+// GORILLA OVERRIDE (2026-08-09): OpenRouter lists 274 usable models and we have
+// tested NONE of them — every one of the 77 eval runs in
+// Scripts.For.Work/model-eval was against NVIDIA NIM. Twenty-three of the 274
+// are nonetheless the SAME underlying model as an entry already curated in
+// metadata/nim.json, so the verdict already written for it applies: DeepSeek V4
+// Pro is 1.6T MoE at 80.6% SWE-bench whichever door you reach it through.
+//
+// Matching is on the model name with the vendor prefix and punctuation removed,
+// because the same model is published as "deepseek-ai/deepseek-v4-pro" on NIM
+// and "deepseek/deepseek-v4-pro" on OpenRouter.
+//
+// Everything else gets the vendor's own description, MARKED as such. That
+// distinction is the whole point: a curated line is a judgement someone earned
+// and can defend, a vendor line is marketing copy nobody here has checked, and
+// presenting the second as the first is how a picker starts lying quietly.
+func CuratedVerdict(apiModel string) (string, bool) {
+	key := normaliseModelKey(apiModel)
+	for id, meta := range modelMetaByID {
+		if normaliseModelKey(id) == key && strings.TrimSpace(meta.Description) != "" {
+			return meta.Description, true
+		}
+	}
+	return "", false
+}
+
+// normaliseModelKey strips the vendor prefix and every non-alphanumeric
+// character, so "deepseek-ai/deepseek-v4-pro" and "deepseek/deepseek-v4-pro"
+// compare equal.
+func normaliseModelKey(id string) string {
+	s := strings.ToLower(id)
+	if i := strings.LastIndex(s, "/"); i >= 0 {
+		s = s[i+1:]
+	}
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

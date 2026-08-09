@@ -293,7 +293,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAi21JambaLarge17: {
 		ID:                  OpenRouterAi21JambaLarge17,
 		Name:                "AI21: Jamba Large 1.7",
-		Description:         "$2.0/$8.0 per 1M — Jamba Large 1.7 is the latest model in the Jamba open family, offering improvements in grounding, instruction-following, and overall efficiency. Built on a hybrid SSM-Transformer architecture with a 256K context... (256K ctx)",
+		Description:         "$2.0/$8.0 per 1M — [unverified] Jamba Large 1.7 is the latest model in the Jamba open family, offering improvements in grounding, instruction-following, and overall efficiency. Built on a hybrid SSM-Transformer architecture with a 256K context... (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "ai21/jamba-large-1.7",
 		CostPer1MIn:         2,
@@ -307,7 +307,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAionLabsAion20: {
 		ID:                  OpenRouterAionLabsAion20,
 		Name:                "AionLabs: Aion-2.0",
-		Description:         "$0.8/$1.6 per 1M — Aion-2.0 is a variant of DeepSeek V3.2 optimized for immersive roleplaying and storytelling. It is particularly strong at introducing tension, crises, and conflict into stories, making narratives feel more engaging.... (131K ctx)",
+		Description:         "$0.8/$1.6 per 1M — [unverified] Aion-2.0 is a variant of DeepSeek V3.2 optimized for immersive roleplaying and storytelling. It is particularly strong at introducing tension, crises, and conflict into stories, making narratives feel more engaging.... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "aion-labs/aion-2.0",
 		CostPer1MIn:         0.7999999999999999,
@@ -321,7 +321,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAionLabsAion30: {
 		ID:                  OpenRouterAionLabsAion30,
 		Name:                "AionLabs: Aion-3.0",
-		Description:         "$3.0/$6.0 per 1M — Aion-3.0 is a multi-model roleplaying and storytelling system from AionLabs, built on the GLM family of models. It uses a collaborative generation process in which multiple specialized models each contribute... (131K ctx)",
+		Description:         "$3.0/$6.0 per 1M — [unverified] Aion-3.0 is a multi-model roleplaying and storytelling system from AionLabs, built on the GLM family of models. It uses a collaborative generation process in which multiple specialized models each contribute... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "aion-labs/aion-3.0",
 		CostPer1MIn:         3,
@@ -335,7 +335,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAionLabsAion30Mini: {
 		ID:                  OpenRouterAionLabsAion30Mini,
 		Name:                "AionLabs: Aion-3.0-Mini",
-		Description:         "$0.7/$1.4 per 1M — Aion-3.0 Mini is a multi-model roleplaying and storytelling system from AionLabs, built on the DeepSeek family of models. It uses a collaborative generation process in which multiple specialized models each... (131K ctx)",
+		Description:         "$0.7/$1.4 per 1M — [unverified] Aion-3.0 Mini is a multi-model roleplaying and storytelling system from AionLabs, built on the DeepSeek family of models. It uses a collaborative generation process in which multiple specialized models each... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "aion-labs/aion-3.0-mini",
 		CostPer1MIn:         0.7,
@@ -349,7 +349,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAmazonNova2LiteV1: {
 		ID:                  OpenRouterAmazonNova2LiteV1,
 		Name:                "Amazon: Nova 2 Lite",
-		Description:         "$0.3/$2.5 per 1M — Nova 2 Lite is a fast, cost-effective reasoning model for everyday workloads that can process text, images, and videos to generate text (1000K ctx)",
+		Description:         "$0.3/$2.5 per 1M — [unverified] Nova 2 Lite is a fast, cost-effective reasoning model for everyday workloads that can process text, images, and videos to generate text (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "amazon/nova-2-lite-v1",
 		CostPer1MIn:         0.3,
@@ -363,7 +363,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAmazonNovaLiteV1: {
 		ID:                  OpenRouterAmazonNovaLiteV1,
 		Name:                "Amazon: Nova Lite 1.0",
-		Description:         "$0.06/$0.24 per 1M — Amazon Nova Lite 1.0 is a very low-cost multimodal model from Amazon that focused on fast processing of image, video, and text inputs to generate text output. Amazon Nova Lite... (300K ctx)",
+		Description:         "$0.06/$0.24 per 1M — [unverified] Amazon Nova Lite 1.0 is a very low-cost multimodal model from Amazon that focused on fast processing of image, video, and text inputs to generate text output. Amazon Nova Lite... (300K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "amazon/nova-lite-v1",
 		CostPer1MIn:         0.06,
@@ -377,7 +377,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAmazonNovaMicroV1: {
 		ID:                  OpenRouterAmazonNovaMicroV1,
 		Name:                "Amazon: Nova Micro 1.0",
-		Description:         "$0.04/$0.14 per 1M — Amazon Nova Micro 1.0 is a text-only model that delivers the lowest latency responses in the Amazon Nova family of models at a very low cost. With a context length... (128K ctx)",
+		Description:         "$0.04/$0.14 per 1M — [unverified] Amazon Nova Micro 1.0 is a text-only model that delivers the lowest latency responses in the Amazon Nova family of models at a very low cost. With a context length... (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "amazon/nova-micro-v1",
 		CostPer1MIn:         0.035,
@@ -391,7 +391,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAmazonNovaPremierV1: {
 		ID:                  OpenRouterAmazonNovaPremierV1,
 		Name:                "Amazon: Nova Premier 1.0",
-		Description:         "$2.5/$12.5 per 1M — Amazon Nova Premier is the most capable of Amazon’s multimodal models for complex reasoning tasks and for use as the best teacher for distilling custom models (1000K ctx)",
+		Description:         "$2.5/$12.5 per 1M — [unverified] Amazon Nova Premier is the most capable of Amazon’s multimodal models for complex reasoning tasks and for use as the best teacher for distilling custom models (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "amazon/nova-premier-v1",
 		CostPer1MIn:         2.5,
@@ -405,7 +405,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAmazonNovaProV1: {
 		ID:                  OpenRouterAmazonNovaProV1,
 		Name:                "Amazon: Nova Pro 1.0",
-		Description:         "$0.8/$3.2 per 1M — Amazon Nova Pro 1.0 is a capable multimodal model from Amazon focused on providing a combination of accuracy, speed, and cost for a wide range of tasks. As of December... (300K ctx)",
+		Description:         "$0.8/$3.2 per 1M — [unverified] Amazon Nova Pro 1.0 is a capable multimodal model from Amazon focused on providing a combination of accuracy, speed, and cost for a wide range of tasks. As of December... (300K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "amazon/nova-pro-v1",
 		CostPer1MIn:         0.7999999999999999,
@@ -419,7 +419,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaude3Haiku: {
 		ID:                  OpenRouterAnthropicClaude3Haiku,
 		Name:                "Anthropic: Claude 3 Haiku",
-		Description:         "$0.2/$1.2 per 1M — Claude 3 Haiku is Anthropic's fastest and most compact model for near-instant responsiveness (200K ctx)",
+		Description:         "$0.2/$1.2 per 1M — [unverified] Claude 3 Haiku is Anthropic's fastest and most compact model for near-instant responsiveness (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-3-haiku",
 		CostPer1MIn:         0.25,
@@ -433,7 +433,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeFable5: {
 		ID:                  OpenRouterAnthropicClaudeFable5,
 		Name:                "Anthropic: Claude Fable 5",
-		Description:         "$10.0/$50.0 per 1M — Claude Fable 5 is a Mythos-class model from Anthropic, built for autonomous knowledge work and coding (1000K ctx)",
+		Description:         "$10.0/$50.0 per 1M — [unverified] Claude Fable 5 is a Mythos-class model from Anthropic, built for autonomous knowledge work and coding (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-fable-5",
 		CostPer1MIn:         10,
@@ -447,7 +447,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeHaiku45: {
 		ID:                  OpenRouterAnthropicClaudeHaiku45,
 		Name:                "Anthropic: Claude Haiku 4.5",
-		Description:         "$1.0/$5.0 per 1M — Claude Haiku 4.5 is Anthropic’s fastest and most efficient model, delivering near-frontier intelligence at a fraction of the cost and latency of larger Claude models. Matching Claude Sonnet 4’s performance... (200K ctx)",
+		Description:         "$1.0/$5.0 per 1M — [unverified] Claude Haiku 4.5 is Anthropic’s fastest and most efficient model, delivering near-frontier intelligence at a fraction of the cost and latency of larger Claude models. Matching Claude Sonnet 4’s performance... (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-haiku-4.5",
 		CostPer1MIn:         1,
@@ -461,7 +461,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus4: {
 		ID:                  OpenRouterAnthropicClaudeOpus4,
 		Name:                "Anthropic: Claude Opus 4",
-		Description:         "$15.0/$75.0 per 1M — Claude Opus 4 is benchmarked as the world’s best coding model, at time of release, bringing sustained performance on complex, long-running tasks and agent workflows (200K ctx)",
+		Description:         "$15.0/$75.0 per 1M — [unverified] Claude Opus 4 is benchmarked as the world’s best coding model, at time of release, bringing sustained performance on complex, long-running tasks and agent workflows (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4",
 		CostPer1MIn:         15,
@@ -475,7 +475,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus41: {
 		ID:                  OpenRouterAnthropicClaudeOpus41,
 		Name:                "Anthropic: Claude Opus 4.1",
-		Description:         "$15.0/$75.0 per 1M — Claude Opus 4.1 is an updated version of Anthropic’s flagship model, offering improved performance in coding, reasoning, and agentic tasks. It achieves 74.5% on SWE-bench Verified and shows notable gains... (200K ctx)",
+		Description:         "$15.0/$75.0 per 1M — [unverified] Claude Opus 4.1 is an updated version of Anthropic’s flagship model, offering improved performance in coding, reasoning, and agentic tasks. It achieves 74.5% on SWE-bench Verified and shows notable gains... (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.1",
 		CostPer1MIn:         15,
@@ -489,7 +489,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus45: {
 		ID:                  OpenRouterAnthropicClaudeOpus45,
 		Name:                "Anthropic: Claude Opus 4.5",
-		Description:         "$5.0/$25.0 per 1M — Claude Opus 4.5 is Anthropic’s frontier reasoning model optimized for complex software engineering, agentic workflows, and long-horizon computer use. It offers strong multimodal capabilities, competitive performance ac… (200K ctx)",
+		Description:         "$5.0/$25.0 per 1M — [unverified] Claude Opus 4.5 is Anthropic’s frontier reasoning model optimized for complex software engineering, agentic workflows, and long-horizon computer use. It offers strong multimodal capabilities, competitive performance ac… (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.5",
 		CostPer1MIn:         5,
@@ -503,7 +503,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus46: {
 		ID:                  OpenRouterAnthropicClaudeOpus46,
 		Name:                "Anthropic: Claude Opus 4.6",
-		Description:         "$5.0/$25.0 per 1M — Opus 4.6 is Anthropic’s strongest model for coding and long-running professional tasks. It is built for agents that operate across entire workflows rather than single prompts, making it especially effective... (1000K ctx)",
+		Description:         "$5.0/$25.0 per 1M — [unverified] Opus 4.6 is Anthropic’s strongest model for coding and long-running professional tasks. It is built for agents that operate across entire workflows rather than single prompts, making it especially effective... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.6",
 		CostPer1MIn:         5,
@@ -517,7 +517,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus47: {
 		ID:                  OpenRouterAnthropicClaudeOpus47,
 		Name:                "Anthropic: Claude Opus 4.7",
-		Description:         "$5.0/$25.0 per 1M — Opus 4.7 is the next generation of Anthropic's Opus family, built for long-running, asynchronous agents. Building on the coding and agentic strengths of Opus 4.6, it delivers stronger performance on... (1000K ctx)",
+		Description:         "$5.0/$25.0 per 1M — [unverified] Opus 4.7 is the next generation of Anthropic's Opus family, built for long-running, asynchronous agents. Building on the coding and agentic strengths of Opus 4.6, it delivers stronger performance on... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.7",
 		CostPer1MIn:         5,
@@ -531,7 +531,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus47Fast: {
 		ID:                  OpenRouterAnthropicClaudeOpus47Fast,
 		Name:                "Anthropic: Claude Opus 4.7 (Fast)",
-		Description:         "$30.0/$150.0 per 1M — Fast-mode variant of Opus 4.7 - identical capabilities with higher output speed at premium 6x pricing. Learn more in Anthropic's docs: https://platform.claude.com/docs/en/build-with-claude/fast-mode (1000K ctx)",
+		Description:         "$30.0/$150.0 per 1M — [unverified] Fast-mode variant of Opus 4.7 - identical capabilities with higher output speed at premium 6x pricing. Learn more in Anthropic's docs: https://platform.claude.com/docs/en/build-with-claude/fast-mode (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.7-fast",
 		CostPer1MIn:         30,
@@ -545,7 +545,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus48: {
 		ID:                  OpenRouterAnthropicClaudeOpus48,
 		Name:                "Anthropic: Claude Opus 4.8",
-		Description:         "$5.0/$25.0 per 1M — Claude Opus 4.8 is Anthropic's most capable generally available model in the Opus family. It supports text, image, and file inputs with text output, with reasoning support and a 1M-token... (1000K ctx)",
+		Description:         "$5.0/$25.0 per 1M — [unverified] Claude Opus 4.8 is Anthropic's most capable generally available model in the Opus family. It supports text, image, and file inputs with text output, with reasoning support and a 1M-token... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.8",
 		CostPer1MIn:         5,
@@ -559,7 +559,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus48Fast: {
 		ID:                  OpenRouterAnthropicClaudeOpus48Fast,
 		Name:                "Anthropic: Claude Opus 4.8 (Fast)",
-		Description:         "$10.0/$50.0 per 1M — Fast-mode variant of Opus 4.8 - identical capabilities with higher output speed at 2x pricing relative to regular Opus 4.8. Learn more in Anthropic's docs: https://platform.claude.com/docs/en/build-with-claude/fast-mode (1000K ctx)",
+		Description:         "$10.0/$50.0 per 1M — [unverified] Fast-mode variant of Opus 4.8 - identical capabilities with higher output speed at 2x pricing relative to regular Opus 4.8. Learn more in Anthropic's docs: https://platform.claude.com/docs/en/build-with-claude/fast-mode (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.8-fast",
 		CostPer1MIn:         10,
@@ -573,7 +573,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus5: {
 		ID:                  OpenRouterAnthropicClaudeOpus5,
 		Name:                "Claude Opus 5",
-		Description:         "$5.0/$25.0 per 1M — Claude Opus 5 is Anthropic’s flagship model for demanding reasoning, coding, and long-horizon agentic work (1000K ctx)",
+		Description:         "$5.0/$25.0 per 1M — [unverified] Claude Opus 5 is Anthropic’s flagship model for demanding reasoning, coding, and long-horizon agentic work (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-5",
 		CostPer1MIn:         5,
@@ -587,7 +587,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus5Fast: {
 		ID:                  OpenRouterAnthropicClaudeOpus5Fast,
 		Name:                "Claude Opus 5 (Fast)",
-		Description:         "$10.0/$50.0 per 1M — Fast-mode variant of Opus 5 - identical capabilities with higher output speed at 2x pricing relative to regular Opus 5 (1000K ctx)",
+		Description:         "$10.0/$50.0 per 1M — [unverified] Fast-mode variant of Opus 5 - identical capabilities with higher output speed at 2x pricing relative to regular Opus 5 (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-5-fast",
 		CostPer1MIn:         10,
@@ -601,7 +601,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeSonnet4: {
 		ID:                  OpenRouterAnthropicClaudeSonnet4,
 		Name:                "Anthropic: Claude Sonnet 4",
-		Description:         "$3.0/$15.0 per 1M — Claude Sonnet 4 significantly enhances the capabilities of its predecessor, Sonnet 3 (1000K ctx)",
+		Description:         "$3.0/$15.0 per 1M — [unverified] Claude Sonnet 4 significantly enhances the capabilities of its predecessor, Sonnet 3 (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-sonnet-4",
 		CostPer1MIn:         3,
@@ -615,7 +615,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeSonnet45: {
 		ID:                  OpenRouterAnthropicClaudeSonnet45,
 		Name:                "Anthropic: Claude Sonnet 4.5",
-		Description:         "$3.0/$15.0 per 1M — Claude Sonnet 4.5 is Anthropic’s most advanced Sonnet model to date, optimized for real-world agents and coding workflows. It delivers state-of-the-art performance on coding benchmarks such as SWE-bench Verified, with.… (1000K ctx)",
+		Description:         "$3.0/$15.0 per 1M — [unverified] Claude Sonnet 4.5 is Anthropic’s most advanced Sonnet model to date, optimized for real-world agents and coding workflows. It delivers state-of-the-art performance on coding benchmarks such as SWE-bench Verified, with.… (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-sonnet-4.5",
 		CostPer1MIn:         3,
@@ -629,7 +629,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeSonnet46: {
 		ID:                  OpenRouterAnthropicClaudeSonnet46,
 		Name:                "Anthropic: Claude Sonnet 4.6",
-		Description:         "$3.0/$15.0 per 1M — Sonnet 4.6 is Anthropic's most capable Sonnet-class model yet, with frontier performance across coding, agents, and professional work. It excels at iterative development, complex codebase navigation, end-to-end project m… (1000K ctx)",
+		Description:         "$3.0/$15.0 per 1M — [unverified] Sonnet 4.6 is Anthropic's most capable Sonnet-class model yet, with frontier performance across coding, agents, and professional work. It excels at iterative development, complex codebase navigation, end-to-end project m… (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-sonnet-4.6",
 		CostPer1MIn:         3,
@@ -643,7 +643,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeSonnet5: {
 		ID:                  OpenRouterAnthropicClaudeSonnet5,
 		Name:                "Anthropic: Claude Sonnet 5",
-		Description:         "$2.0/$10.0 per 1M — Sonnet 5 is Anthropic's most capable Sonnet-class model, with frontier performance across coding, agents, and professional work (1000K ctx)",
+		Description:         "$2.0/$10.0 per 1M — [unverified] Sonnet 5 is Anthropic's most capable Sonnet-class model, with frontier performance across coding, agents, and professional work (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-sonnet-5",
 		CostPer1MIn:         2,
@@ -657,7 +657,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterArceeAiTrinityLargeThinking: {
 		ID:                  OpenRouterArceeAiTrinityLargeThinking,
 		Name:                "Arcee AI: Trinity Large Thinking",
-		Description:         "$0.22/$0.85 per 1M — Trinity Large Thinking is a powerful open source reasoning model from the team at Arcee AI (262K ctx)",
+		Description:         "$0.22/$0.85 per 1M — [unverified] Trinity Large Thinking is a powerful open source reasoning model from the team at Arcee AI (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "arcee-ai/trinity-large-thinking",
 		CostPer1MIn:         0.22,
@@ -671,7 +671,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterArceeAiVirtuosoLarge: {
 		ID:                  OpenRouterArceeAiVirtuosoLarge,
 		Name:                "Arcee AI: Virtuoso Large",
-		Description:         "$0.8/$1.2 per 1M — Virtuoso‑Large is Arcee's top‑tier general‑purpose LLM at 72 B parameters, tuned to tackle cross‑domain reasoning, creative writing and enterprise QA (131K ctx)",
+		Description:         "$0.8/$1.2 per 1M — [unverified] Virtuoso‑Large is Arcee's top‑tier general‑purpose LLM at 72 B parameters, tuned to tackle cross‑domain reasoning, creative writing and enterprise QA (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "arcee-ai/virtuoso-large",
 		CostPer1MIn:         0.75,
@@ -685,7 +685,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterBytedanceSeedSeed16: {
 		ID:                  OpenRouterBytedanceSeedSeed16,
 		Name:                "ByteDance Seed: Seed 1.6",
-		Description:         "$0.2/$2.0 per 1M — Seed 1.6 is a general-purpose model released by the ByteDance Seed team. It incorporates multimodal capabilities and adaptive deep thinking with a 256K context window. (262K ctx)",
+		Description:         "$0.2/$2.0 per 1M — [unverified] Seed 1.6 is a general-purpose model released by the ByteDance Seed team. It incorporates multimodal capabilities and adaptive deep thinking with a 256K context window. (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "bytedance-seed/seed-1.6",
 		CostPer1MIn:         0.25,
@@ -699,7 +699,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterBytedanceSeedSeed16Flash: {
 		ID:                  OpenRouterBytedanceSeedSeed16Flash,
 		Name:                "ByteDance Seed: Seed 1.6 Flash",
-		Description:         "$0.07/$0.30 per 1M — Seed 1.6 Flash is an ultra-fast multimodal deep thinking model by ByteDance Seed, supporting both text and visual understanding. It features a 256k context window and can generate outputs of... (262K ctx)",
+		Description:         "$0.07/$0.30 per 1M — [unverified] Seed 1.6 Flash is an ultra-fast multimodal deep thinking model by ByteDance Seed, supporting both text and visual understanding. It features a 256k context window and can generate outputs of... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "bytedance-seed/seed-1.6-flash",
 		CostPer1MIn:         0.075,
@@ -713,7 +713,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterBytedanceSeedSeed20Lite: {
 		ID:                  OpenRouterBytedanceSeedSeed20Lite,
 		Name:                "ByteDance Seed: Seed-2.0-Lite",
-		Description:         "$0.2/$2.0 per 1M — Seed-2.0-Lite is a versatile, cost‑efficient enterprise workhorse that delivers strong multimodal and agent capabilities while offering noticeably lower latency, making it a practical default choice for most production… (262K ctx)",
+		Description:         "$0.2/$2.0 per 1M — [unverified] Seed-2.0-Lite is a versatile, cost‑efficient enterprise workhorse that delivers strong multimodal and agent capabilities while offering noticeably lower latency, making it a practical default choice for most production… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "bytedance-seed/seed-2.0-lite",
 		CostPer1MIn:         0.25,
@@ -727,7 +727,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterBytedanceSeedSeed20Mini: {
 		ID:                  OpenRouterBytedanceSeedSeed20Mini,
 		Name:                "ByteDance Seed: Seed-2.0-Mini",
-		Description:         "$0.10/$0.40 per 1M — Seed-2.0-mini targets latency-sensitive, high-concurrency, and cost-sensitive scenarios, emphasizing fast response and flexible inference deployment. It delivers performance comparable to ByteDance-Seed-1.6, supports 256… (262K ctx)",
+		Description:         "$0.10/$0.40 per 1M — [unverified] Seed-2.0-mini targets latency-sensitive, high-concurrency, and cost-sensitive scenarios, emphasizing fast response and flexible inference deployment. It delivers performance comparable to ByteDance-Seed-1.6, supports 256… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "bytedance-seed/seed-2.0-mini",
 		CostPer1MIn:         0.09999999999999999,
@@ -741,7 +741,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterCohereCommandR082024: {
 		ID:                  OpenRouterCohereCommandR082024,
 		Name:                "Cohere: Command R (08-2024)",
-		Description:         "$0.15/$0.60 per 1M — command-r-08-2024 is an update of the Command R with improved performance for multilingual retrieval-augmented generation (RAG) and tool use (128K ctx)",
+		Description:         "$0.15/$0.60 per 1M — [unverified] command-r-08-2024 is an update of the Command R with improved performance for multilingual retrieval-augmented generation (RAG) and tool use (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "cohere/command-r-08-2024",
 		CostPer1MIn:         0.15,
@@ -755,7 +755,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterCohereCommandRPlus082024: {
 		ID:                  OpenRouterCohereCommandRPlus082024,
 		Name:                "Cohere: Command R+ (08-2024)",
-		Description:         "$2.5/$10.0 per 1M — command-r-plus-08-2024 is an update of the Command R+ with roughly 50% higher throughput and 25% lower latencies as compared to the previous Command R+ version, while keeping the hardware footprint (128K ctx)",
+		Description:         "$2.5/$10.0 per 1M — [unverified] command-r-plus-08-2024 is an update of the Command R+ with roughly 50% higher throughput and 25% lower latencies as compared to the previous Command R+ version, while keeping the hardware footprint (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "cohere/command-r-plus-08-2024",
 		CostPer1MIn:         2.5,
@@ -769,7 +769,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterCohereNorthMiniCodeFree: {
 		ID:                  OpenRouterCohereNorthMiniCodeFree,
 		Name:                "Cohere: North Mini Code (free)",
-		Description:         "FREE — North Mini Code is Cohere's first agentic coding model and the debut of its North family (256K ctx)",
+		Description:         "FREE — [unverified] North Mini Code is Cohere's first agentic coding model and the debut of its North family (256K ctx)",
 		Rank:                8,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "cohere/north-mini-code:free",
@@ -784,7 +784,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekChat: {
 		ID:                  OpenRouterDeepseekDeepseekChat,
 		Name:                "DeepSeek: DeepSeek V3",
-		Description:         "$0.3/$1.0 per 1M — DeepSeek-V3 is the latest model from the DeepSeek team, building upon the instruction following and coding abilities of the previous versions (163K ctx)",
+		Description:         "$0.3/$1.0 per 1M — [unverified] DeepSeek-V3 is the latest model from the DeepSeek team, building upon the instruction following and coding abilities of the previous versions (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-chat",
 		CostPer1MIn:         0.2574,
@@ -798,7 +798,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekChatV30324: {
 		ID:                  OpenRouterDeepseekDeepseekChatV30324,
 		Name:                "DeepSeek: DeepSeek V3 0324",
-		Description:         "$0.3/$1.1 per 1M — DeepSeek V3, a 685B-parameter, mixture-of-experts model, is the latest iteration of the flagship chat model family from the DeepSeek team (163K ctx)",
+		Description:         "$0.3/$1.1 per 1M — [unverified] DeepSeek V3, a 685B-parameter, mixture-of-experts model, is the latest iteration of the flagship chat model family from the DeepSeek team (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-chat-v3-0324",
 		CostPer1MIn:         0.27,
@@ -812,7 +812,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekChatV31: {
 		ID:                  OpenRouterDeepseekDeepseekChatV31,
 		Name:                "DeepSeek: DeepSeek V3.1",
-		Description:         "$0.25/$0.95 per 1M — DeepSeek-V3.1 is a large hybrid reasoning model (671B parameters, 37B active) that supports both thinking and non-thinking modes via prompt templates. It extends the DeepSeek-V3 base with a two-phase long-context... (163K ctx)",
+		Description:         "$0.25/$0.95 per 1M — [unverified] DeepSeek-V3.1 is a large hybrid reasoning model (671B parameters, 37B active) that supports both thinking and non-thinking modes via prompt templates. It extends the DeepSeek-V3 base with a two-phase long-context... (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-chat-v3.1",
 		CostPer1MIn:         0.25,
@@ -826,7 +826,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekR1: {
 		ID:                  OpenRouterDeepseekDeepseekR1,
 		Name:                "DeepSeek: R1",
-		Description:         "$0.7/$2.5 per 1M — DeepSeek R1 is here: Performance on par with OpenAI o1, but open-sourced and with fully open reasoning tokens (163K ctx)",
+		Description:         "$0.7/$2.5 per 1M — [unverified] DeepSeek R1 is here: Performance on par with OpenAI o1, but open-sourced and with fully open reasoning tokens (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-r1",
 		CostPer1MIn:         0.7,
@@ -840,7 +840,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekR10528: {
 		ID:                  OpenRouterDeepseekDeepseekR10528,
 		Name:                "DeepSeek: R1 0528",
-		Description:         "$0.5/$2.2 per 1M — May 28th update to the original DeepSeek R1 Performance on par with OpenAI o1, but open-sourced and with fully open reasoning tokens (163K ctx)",
+		Description:         "$0.5/$2.2 per 1M — [unverified] May 28th update to the original DeepSeek R1 Performance on par with OpenAI o1, but open-sourced and with fully open reasoning tokens (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-r1-0528",
 		CostPer1MIn:         0.5,
@@ -854,7 +854,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekV31Terminus: {
 		ID:                  OpenRouterDeepseekDeepseekV31Terminus,
 		Name:                "DeepSeek: DeepSeek V3.1 Terminus",
-		Description:         "$0.3/$1.0 per 1M — DeepSeek-V3.1 Terminus is an update to DeepSeek V3.1 that maintains the model's original capabilities while addressing issues reported by users, including language consistency and agent capabilities, further optimizing t… (163K ctx)",
+		Description:         "$0.3/$1.0 per 1M — [unverified] DeepSeek-V3.1 Terminus is an update to DeepSeek V3.1 that maintains the model's original capabilities while addressing issues reported by users, including language consistency and agent capabilities, further optimizing t… (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-v3.1-terminus",
 		CostPer1MIn:         0.27,
@@ -868,7 +868,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekV32: {
 		ID:                  OpenRouterDeepseekDeepseekV32,
 		Name:                "DeepSeek: DeepSeek V3.2",
-		Description:         "$0.27/$0.40 per 1M — DeepSeek-V3.2 is a large language model designed to harmonize high computational efficiency with strong reasoning and agentic tool-use performance. It introduces DeepSeek Sparse Attention (DSA), a fine-grained sparse att… (163K ctx)",
+		Description:         "$0.27/$0.40 per 1M — [unverified] DeepSeek-V3.2 is a large language model designed to harmonize high computational efficiency with strong reasoning and agentic tool-use performance. It introduces DeepSeek Sparse Attention (DSA), a fine-grained sparse att… (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-v3.2",
 		CostPer1MIn:         0.26899999999999996,
@@ -882,7 +882,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekV32Exp: {
 		ID:                  OpenRouterDeepseekDeepseekV32Exp,
 		Name:                "DeepSeek: DeepSeek V3.2 Exp",
-		Description:         "$0.27/$0.41 per 1M — DeepSeek-V3.2-Exp is an experimental large language model released by DeepSeek as an intermediate step between V3.1 and future architectures. It introduces DeepSeek Sparse Attention (DSA), a fine-grained sparse attention… (163K ctx)",
+		Description:         "$0.27/$0.41 per 1M — [unverified] DeepSeek-V3.2-Exp is an experimental large language model released by DeepSeek as an intermediate step between V3.1 and future architectures. It introduces DeepSeek Sparse Attention (DSA), a fine-grained sparse attention… (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-v3.2-exp",
 		CostPer1MIn:         0.27,
@@ -896,7 +896,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekV4Flash: {
 		ID:                  OpenRouterDeepseekDeepseekV4Flash,
 		Name:                "DeepSeek: DeepSeek V4 Flash 0423",
-		Description:         "$0.14/$0.28 per 1M — DeepSeek V4 Flash is an efficiency-optimized Mixture-of-Experts model from DeepSeek with 284B total parameters and 13B activated parameters, supporting a 1M-token context window (1048K ctx)",
+		Description:         "$0.14/$0.28 per 1M — 284B MoE, 1M ctx, 79% SWE-bench, fast (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-v4-flash",
 		CostPer1MIn:         0.14,
@@ -910,7 +910,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekV4Flash0731: {
 		ID:                  OpenRouterDeepseekDeepseekV4Flash0731,
 		Name:                "DeepSeek: DeepSeek V4 Flash 0731",
-		Description:         "$0.09/$0.18 per 1M — DeepSeek V4 Flash 0731 is a sparse mixture-of-experts model from DeepSeek, with 13B active parameters out of 284B total (1048K ctx)",
+		Description:         "$0.09/$0.18 per 1M — [unverified] DeepSeek V4 Flash 0731 is a sparse mixture-of-experts model from DeepSeek, with 13B active parameters out of 284B total (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-v4-flash-0731",
 		CostPer1MIn:         0.09,
@@ -924,7 +924,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekV4Pro: {
 		ID:                  OpenRouterDeepseekDeepseekV4Pro,
 		Name:                "DeepSeek: DeepSeek V4 Pro",
-		Description:         "$0.43/$0.87 per 1M — DeepSeek V4 Pro is a large-scale Mixture-of-Experts model from DeepSeek with 1 (1048K ctx)",
+		Description:         "$0.43/$0.87 per 1M — 1.6T MoE, 1M ctx, 80.6% SWE-bench (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-v4-pro",
 		CostPer1MIn:         0.435,
@@ -938,7 +938,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini25Flash: {
 		ID:                  OpenRouterGoogleGemini25Flash,
 		Name:                "Google: Gemini 2.5 Flash",
-		Description:         "$0.3/$2.5 per 1M — Gemini 2.5 Flash is Google's state-of-the-art workhorse model, specifically designed for advanced reasoning, coding, mathematics, and scientific tasks. It includes built-in \"thinking\" capabilities, enabling it to provide… (1048K ctx)",
+		Description:         "$0.3/$2.5 per 1M — [unverified] Gemini 2.5 Flash is Google's state-of-the-art workhorse model, specifically designed for advanced reasoning, coding, mathematics, and scientific tasks. It includes built-in \"thinking\" capabilities, enabling it to provide… (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-2.5-flash",
 		CostPer1MIn:         0.3,
@@ -952,7 +952,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini25FlashLite: {
 		ID:                  OpenRouterGoogleGemini25FlashLite,
 		Name:                "Google: Gemini 2.5 Flash Lite",
-		Description:         "$0.10/$0.40 per 1M — Gemini 2.5 Flash-Lite is a lightweight reasoning model in the Gemini 2.5 family, optimized for ultra-low latency and cost efficiency. It offers improved throughput, faster token generation, and better performance... (1048K ctx)",
+		Description:         "$0.10/$0.40 per 1M — [unverified] Gemini 2.5 Flash-Lite is a lightweight reasoning model in the Gemini 2.5 family, optimized for ultra-low latency and cost efficiency. It offers improved throughput, faster token generation, and better performance... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-2.5-flash-lite",
 		CostPer1MIn:         0.09999999999999999,
@@ -966,7 +966,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini25Pro: {
 		ID:                  OpenRouterGoogleGemini25Pro,
 		Name:                "Google: Gemini 2.5 Pro",
-		Description:         "$1.2/$10.0 per 1M — Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, coding, mathematics, and scientific tasks. It employs “thinking” capabilities, enabling it to reason through responses with enha… (1048K ctx)",
+		Description:         "$1.2/$10.0 per 1M — [unverified] Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, coding, mathematics, and scientific tasks. It employs “thinking” capabilities, enabling it to reason through responses with enha… (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-2.5-pro",
 		CostPer1MIn:         1.25,
@@ -980,7 +980,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini25ProPreview: {
 		ID:                  OpenRouterGoogleGemini25ProPreview,
 		Name:                "Google: Gemini 2.5 Pro Preview 06-05",
-		Description:         "$1.2/$10.0 per 1M — Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, coding, mathematics, and scientific tasks. It employs “thinking” capabilities, enabling it to reason through responses with enha… (1048K ctx)",
+		Description:         "$1.2/$10.0 per 1M — [unverified] Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, coding, mathematics, and scientific tasks. It employs “thinking” capabilities, enabling it to reason through responses with enha… (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-2.5-pro-preview",
 		CostPer1MIn:         1.25,
@@ -994,7 +994,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini25ProPreview0506: {
 		ID:                  OpenRouterGoogleGemini25ProPreview0506,
 		Name:                "Google: Gemini 2.5 Pro Preview 05-06",
-		Description:         "$1.2/$10.0 per 1M — Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, coding, mathematics, and scientific tasks. It employs “thinking” capabilities, enabling it to reason through responses with enha… (1048K ctx)",
+		Description:         "$1.2/$10.0 per 1M — [unverified] Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, coding, mathematics, and scientific tasks. It employs “thinking” capabilities, enabling it to reason through responses with enha… (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-2.5-pro-preview-05-06",
 		CostPer1MIn:         1.25,
@@ -1008,7 +1008,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini3FlashPreview: {
 		ID:                  OpenRouterGoogleGemini3FlashPreview,
 		Name:                "Google: Gemini 3 Flash Preview",
-		Description:         "$0.5/$3.0 per 1M — Gemini 3 Flash Preview is a high speed, high value thinking model designed for agentic workflows, multi turn chat, and coding assistance (1048K ctx)",
+		Description:         "$0.5/$3.0 per 1M — [unverified] Gemini 3 Flash Preview is a high speed, high value thinking model designed for agentic workflows, multi turn chat, and coding assistance (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3-flash-preview",
 		CostPer1MIn:         0.5,
@@ -1022,7 +1022,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini3ProImage: {
 		ID:                  OpenRouterGoogleGemini3ProImage,
 		Name:                "Google: Nano Banana Pro (Gemini 3 Pro Image)",
-		Description:         "$2.0/$12.0 per 1M — Nano Banana Pro is Google’s most advanced image-generation and editing model, built on Gemini 3 Pro (131K ctx)",
+		Description:         "$2.0/$12.0 per 1M — [unverified] Nano Banana Pro is Google’s most advanced image-generation and editing model, built on Gemini 3 Pro (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3-pro-image",
 		CostPer1MIn:         2,
@@ -1036,7 +1036,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini31FlashLite: {
 		ID:                  OpenRouterGoogleGemini31FlashLite,
 		Name:                "Google: Gemini 3.1 Flash Lite",
-		Description:         "$0.2/$1.5 per 1M — Gemini 3.1 Flash Lite is Google’s GA high-efficiency multimodal model optimized for low-latency, high-volume workloads. It supports text, image, video, audio, and PDF inputs, and is designed for lightweight agentic... (1048K ctx)",
+		Description:         "$0.2/$1.5 per 1M — [unverified] Gemini 3.1 Flash Lite is Google’s GA high-efficiency multimodal model optimized for low-latency, high-volume workloads. It supports text, image, video, audio, and PDF inputs, and is designed for lightweight agentic... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.1-flash-lite",
 		CostPer1MIn:         0.25,
@@ -1050,7 +1050,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini31FlashLitePreview: {
 		ID:                  OpenRouterGoogleGemini31FlashLitePreview,
 		Name:                "Google: Gemini 3.1 Flash Lite Preview",
-		Description:         "$0.2/$1.5 per 1M — Gemini 3.1 Flash Lite Preview is Google's high-efficiency model optimized for high-volume use cases. It outperforms Gemini 2.5 Flash Lite on overall quality and approaches Gemini 2.5 Flash performance across... (1048K ctx)",
+		Description:         "$0.2/$1.5 per 1M — [unverified] Gemini 3.1 Flash Lite Preview is Google's high-efficiency model optimized for high-volume use cases. It outperforms Gemini 2.5 Flash Lite on overall quality and approaches Gemini 2.5 Flash performance across... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.1-flash-lite-preview",
 		CostPer1MIn:         0.25,
@@ -1064,7 +1064,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini31ProPreview: {
 		ID:                  OpenRouterGoogleGemini31ProPreview,
 		Name:                "Google: Gemini 3.1 Pro Preview",
-		Description:         "$2.0/$12.0 per 1M — Gemini 3.1 Pro Preview is Google’s frontier reasoning model, delivering enhanced software engineering performance, improved agentic reliability, and more efficient token usage across complex workflows. Building on the… (1048K ctx)",
+		Description:         "$2.0/$12.0 per 1M — [unverified] Gemini 3.1 Pro Preview is Google’s frontier reasoning model, delivering enhanced software engineering performance, improved agentic reliability, and more efficient token usage across complex workflows. Building on the… (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.1-pro-preview",
 		CostPer1MIn:         2,
@@ -1078,7 +1078,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini31ProPreviewCustomtools: {
 		ID:                  OpenRouterGoogleGemini31ProPreviewCustomtools,
 		Name:                "Google: Gemini 3.1 Pro Preview Custom Tools",
-		Description:         "$2.0/$12.0 per 1M — Gemini 3.1 Pro Preview Custom Tools is a variant of Gemini 3.1 Pro that improves tool selection behavior by preventing overuse of a general bash tool when more efficient third-party... (1048K ctx)",
+		Description:         "$2.0/$12.0 per 1M — [unverified] Gemini 3.1 Pro Preview Custom Tools is a variant of Gemini 3.1 Pro that improves tool selection behavior by preventing overuse of a general bash tool when more efficient third-party... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.1-pro-preview-customtools",
 		CostPer1MIn:         2,
@@ -1092,7 +1092,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini35Flash: {
 		ID:                  OpenRouterGoogleGemini35Flash,
 		Name:                "Google: Gemini 3.5 Flash",
-		Description:         "$1.5/$9.0 per 1M — Gemini 3.5 Flash is Google's high-efficiency multimodal model, bringing near-Pro level coding and reasoning at Flash-tier cost and speed. It is highly optimized for coding proficiency and parallel agentic execution... (1048K ctx)",
+		Description:         "$1.5/$9.0 per 1M — [unverified] Gemini 3.5 Flash is Google's high-efficiency multimodal model, bringing near-Pro level coding and reasoning at Flash-tier cost and speed. It is highly optimized for coding proficiency and parallel agentic execution... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.5-flash",
 		CostPer1MIn:         1.5,
@@ -1106,7 +1106,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini35FlashLite: {
 		ID:                  OpenRouterGoogleGemini35FlashLite,
 		Name:                "Google: Gemini 3.5 Flash Lite",
-		Description:         "$0.3/$2.5 per 1M — Gemini 3.5 Flash Lite is a high-efficiency model from Google with upgraded agentic capabilities. It is suited for subagents that execute focused tasks within complex, multi-agent workflows. (1048K ctx)",
+		Description:         "$0.3/$2.5 per 1M — [unverified] Gemini 3.5 Flash Lite is a high-efficiency model from Google with upgraded agentic capabilities. It is suited for subagents that execute focused tasks within complex, multi-agent workflows. (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.5-flash-lite",
 		CostPer1MIn:         0.3,
@@ -1120,7 +1120,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini36Flash: {
 		ID:                  OpenRouterGoogleGemini36Flash,
 		Name:                "Google: Gemini 3.6 Flash",
-		Description:         "$1.5/$7.5 per 1M — Gemini 3.6 Flash is a high-efficiency model from Google for coding, agentic workflows, and web and app development. It is designed to produce polished outputs with fewer unnecessary edits and... (1048K ctx)",
+		Description:         "$1.5/$7.5 per 1M — [unverified] Gemini 3.6 Flash is a high-efficiency model from Google for coding, agentic workflows, and web and app development. It is designed to produce polished outputs with fewer unnecessary edits and... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.6-flash",
 		CostPer1MIn:         1.5,
@@ -1134,7 +1134,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemma312bIt: {
 		ID:                  OpenRouterGoogleGemma312bIt,
 		Name:                "Google: Gemma 3 12B",
-		Description:         "$0.05/$0.15 per 1M — Gemma 3 introduces multimodality, supporting vision-language input and text outputs (131K ctx)",
+		Description:         "$0.05/$0.15 per 1M — shit tier — , borderline (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemma-3-12b-it",
 		CostPer1MIn:         0.049999999999999996,
@@ -1148,7 +1148,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemma327bIt: {
 		ID:                  OpenRouterGoogleGemma327bIt,
 		Name:                "Google: Gemma 3 27B",
-		Description:         "$0.08/$0.45 per 1M — Gemma 3 introduces multimodality, supporting vision-language input and text outputs (262K ctx)",
+		Description:         "$0.08/$0.45 per 1M — [unverified] Gemma 3 introduces multimodality, supporting vision-language input and text outputs (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemma-3-27b-it",
 		CostPer1MIn:         0.08,
@@ -1162,7 +1162,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemma426bA4bIt: {
 		ID:                  OpenRouterGoogleGemma426bA4bIt,
 		Name:                "Google: Gemma 4 26B A4B ",
-		Description:         "$0.07/$0.34 per 1M — Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind (262K ctx)",
+		Description:         "$0.07/$0.34 per 1M — [unverified] Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemma-4-26b-a4b-it",
 		CostPer1MIn:         0.07,
@@ -1176,7 +1176,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemma426bA4bItFree: {
 		ID:                  OpenRouterGoogleGemma426bA4bItFree,
 		Name:                "Google: Gemma 4 26B A4B  (free)",
-		Description:         "FREE — Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind (262K ctx)",
+		Description:         "FREE — [unverified] Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind (262K ctx)",
 		Rank:                2,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemma-4-26b-a4b-it:free",
@@ -1191,7 +1191,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemma431bIt: {
 		ID:                  OpenRouterGoogleGemma431bIt,
 		Name:                "Google: Gemma 4 31B",
-		Description:         "$0.10/$0.34 per 1M — Gemma 4 31B Instruct is Google DeepMind's 30 (262K ctx)",
+		Description:         "$0.10/$0.34 per 1M — shit tier — . 31B general instruct model, no coding specialization — skip it for code. (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemma-4-31b-it",
 		CostPer1MIn:         0.09999999999999999,
@@ -1205,7 +1205,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemma431bItFree: {
 		ID:                  OpenRouterGoogleGemma431bItFree,
 		Name:                "Google: Gemma 4 31B (free)",
-		Description:         "FREE — Gemma 4 31B Instruct is Google DeepMind's 30 (262K ctx)",
+		Description:         "FREE — [unverified] Gemma 4 31B Instruct is Google DeepMind's 30 (262K ctx)",
 		Rank:                3,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemma-4-31b-it:free",
@@ -1220,7 +1220,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterIbmGraniteGranite418b: {
 		ID:                  OpenRouterIbmGraniteGranite418b,
 		Name:                "IBM: Granite 4.1 8B",
-		Description:         "$0.05/$0.10 per 1M — Granite 4.1 8B is a dense, decoder-only 8-billion-parameter language model from IBM, part of the Granite 4.1 family. It supports a 131K-token context window and is designed for enterprise tasks... (131K ctx)",
+		Description:         "$0.05/$0.10 per 1M — [unverified] Granite 4.1 8B is a dense, decoder-only 8-billion-parameter language model from IBM, part of the Granite 4.1 family. It supports a 131K-token context window and is designed for enterprise tasks... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "ibm-granite/granite-4.1-8b",
 		CostPer1MIn:         0.049999999999999996,
@@ -1234,7 +1234,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterInceptionMercury2: {
 		ID:                  OpenRouterInceptionMercury2,
 		Name:                "Inception: Mercury 2",
-		Description:         "$0.25/$0.75 per 1M — Mercury 2 is an extremely fast reasoning LLM, and the first reasoning diffusion LLM (dLLM) (128K ctx)",
+		Description:         "$0.25/$0.75 per 1M — [unverified] Mercury 2 is an extremely fast reasoning LLM, and the first reasoning diffusion LLM (dLLM) (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "inception/mercury-2",
 		CostPer1MIn:         0.25,
@@ -1248,7 +1248,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterInclusionaiLing261t: {
 		ID:                  OpenRouterInclusionaiLing261t,
 		Name:                "inclusionAI: Ling-2.6-1T",
-		Description:         "$0.07/$0.62 per 1M — Ling-2.6-1T is an instant (instruct) model from inclusionAI and the company’s trillion-parameter flagship, designed for real-world agents that require fast execution and high efficiency at scale. It uses a “fast... (262K ctx)",
+		Description:         "$0.07/$0.62 per 1M — [unverified] Ling-2.6-1T is an instant (instruct) model from inclusionAI and the company’s trillion-parameter flagship, designed for real-world agents that require fast execution and high efficiency at scale. It uses a “fast... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "inclusionai/ling-2.6-1t",
 		CostPer1MIn:         0.075,
@@ -1262,7 +1262,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterInclusionaiLing26Flash: {
 		ID:                  OpenRouterInclusionaiLing26Flash,
 		Name:                "inclusionAI: Ling-2.6-flash",
-		Description:         "$0.01/$0.03 per 1M — Ling-2.6-flash is an instant (instruct) model from inclusionAI with 104B total parameters and 7.4B active parameters, designed for real-world agents that require fast responses, strong execution, and high token efficienc… (262K ctx)",
+		Description:         "$0.01/$0.03 per 1M — [unverified] Ling-2.6-flash is an instant (instruct) model from inclusionAI with 104B total parameters and 7.4B active parameters, designed for real-world agents that require fast responses, strong execution, and high token efficienc… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "inclusionai/ling-2.6-flash",
 		CostPer1MIn:         0.01,
@@ -1276,7 +1276,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterInclusionaiLing30Flash: {
 		ID:                  OpenRouterInclusionaiLing30Flash,
 		Name:                "Ling-3.0-flash",
-		Description:         "$0.02/$0.06 per 1M — *Ling-3.0-flash* is a *124B-parameter Mixture-of-Experts (MoE) model*, with approximately *5.1B parameters activated per token*. The model is designed with *token efficiency and production-scale agentic inference* as key… (262K ctx)",
+		Description:         "$0.02/$0.06 per 1M — [unverified] *Ling-3.0-flash* is a *124B-parameter Mixture-of-Experts (MoE) model*, with approximately *5.1B parameters activated per token*. The model is designed with *token efficiency and production-scale agentic inference* as key… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "inclusionai/ling-3.0-flash",
 		CostPer1MIn:         0.020999999999999998,
@@ -1290,7 +1290,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterInclusionaiLing30TinyFree: {
 		ID:                  OpenRouterInclusionaiLing30TinyFree,
 		Name:                "inclusionAI: Ling 3.0 Tiny (free)",
-		Description:         "FREE — Ling 3.0 Tiny is a mixture-of-experts model from InclusionAI, with 1.3B active parameters out of 7.9B total. It is designed for responsive agents, instruction following, and multi-turn conversations, with switchable... (262K ctx)",
+		Description:         "FREE — [unverified] Ling 3.0 Tiny is a mixture-of-experts model from InclusionAI, with 1.3B active parameters out of 7.9B total. It is designed for responsive agents, instruction following, and multi-turn conversations, with switchable... (262K ctx)",
 		Rank:                4,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "inclusionai/ling-3.0-tiny:free",
@@ -1305,7 +1305,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterInclusionaiRing261t: {
 		ID:                  OpenRouterInclusionaiRing261t,
 		Name:                "inclusionAI: Ring-2.6-1T",
-		Description:         "$0.07/$0.62 per 1M — Ring-2.6-1T is a 1T-parameter-scale thinking model with 63B active parameters, built for real-world agent workflows that require both strong capability and operational efficiency. It is optimized for coding agents, tool.… (262K ctx)",
+		Description:         "$0.07/$0.62 per 1M — [unverified] Ring-2.6-1T is a 1T-parameter-scale thinking model with 63B active parameters, built for real-world agent workflows that require both strong capability and operational efficiency. It is optimized for coding agents, tool.… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "inclusionai/ring-2.6-1t",
 		CostPer1MIn:         0.075,
@@ -1319,7 +1319,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterKwaipilotKatCoderAirV25: {
 		ID:                  OpenRouterKwaipilotKatCoderAirV25,
 		Name:                "Kwaipilot: KAT-Coder-Air V2.5",
-		Description:         "$0.15/$0.60 per 1M — KAT-Coder-Air V2.5 is a flagship-level Agentic Coding model that can directly hand over an entire issue or an entire business workflow to it, allowing it to autonomously locate and make... (256K ctx)",
+		Description:         "$0.15/$0.60 per 1M — [unverified] KAT-Coder-Air V2.5 is a flagship-level Agentic Coding model that can directly hand over an entire issue or an entire business workflow to it, allowing it to autonomously locate and make... (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "kwaipilot/kat-coder-air-v2.5",
 		CostPer1MIn:         0.15,
@@ -1333,7 +1333,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterKwaipilotKatCoderProV2: {
 		ID:                  OpenRouterKwaipilotKatCoderProV2,
 		Name:                "Kwaipilot: KAT-Coder-Pro V2",
-		Description:         "$0.3/$1.2 per 1M — KAT-Coder-Pro V2 is the latest high-performance model in KwaiKAT’s KAT-Coder series, designed for complex enterprise-grade software engineering and SaaS integration (262K ctx)",
+		Description:         "$0.3/$1.2 per 1M — [unverified] KAT-Coder-Pro V2 is the latest high-performance model in KwaiKAT’s KAT-Coder series, designed for complex enterprise-grade software engineering and SaaS integration (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "kwaipilot/kat-coder-pro-v2",
 		CostPer1MIn:         0.3,
@@ -1347,7 +1347,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterKwaipilotKatCoderProV25: {
 		ID:                  OpenRouterKwaipilotKatCoderProV25,
 		Name:                "Kwaipilot: KAT-Coder-Pro V2.5",
-		Description:         "$0.7/$3.0 per 1M — KAT-Coder-Pro V2.5 is a flagship-level Agentic Coding model that can directly hand over an entire issue or an entire business workflow to it, allowing it to autonomously locate and make... (256K ctx)",
+		Description:         "$0.7/$3.0 per 1M — [unverified] KAT-Coder-Pro V2.5 is a flagship-level Agentic Coding model that can directly hand over an entire issue or an entire business workflow to it, allowing it to autonomously locate and make... (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "kwaipilot/kat-coder-pro-v2.5",
 		CostPer1MIn:         0.74,
@@ -1361,7 +1361,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMeituanLongcat20: {
 		ID:                  OpenRouterMeituanLongcat20,
 		Name:                "Meituan: LongCat 2.0",
-		Description:         "$0.3/$1.2 per 1M — LongCat 2.0 is a sparse mixture-of-experts language model from Meituan, with 48B active parameters out of 1.6T total. It is suited for coding, repository-level changes, long-horizon problem solving, and agentic... (1048K ctx)",
+		Description:         "$0.3/$1.2 per 1M — [unverified] LongCat 2.0 is a sparse mixture-of-experts language model from Meituan, with 48B active parameters out of 1.6T total. It is suited for coding, repository-level changes, long-horizon problem solving, and agentic... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meituan/longcat-2.0",
 		CostPer1MIn:         0.3,
@@ -1375,7 +1375,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaLlamaLlama3170bInstruct: {
 		ID:                  OpenRouterMetaLlamaLlama3170bInstruct,
 		Name:                "Meta: Llama 3.1 70B Instruct",
-		Description:         "$0.40/$0.40 per 1M — Meta's latest class of model (Llama 3 (131K ctx)",
+		Description:         "$0.40/$0.40 per 1M — 70B dense, 128K ctx. Same tier as 3.3 above — prefer 3.3 if both are available. (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta-llama/llama-3.1-70b-instruct",
 		CostPer1MIn:         0.39999999999999997,
@@ -1389,7 +1389,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaLlamaLlama318bInstruct: {
 		ID:                  OpenRouterMetaLlamaLlama318bInstruct,
 		Name:                "Meta: Llama 3.1 8B Instruct",
-		Description:         "$0.05/$0.08 per 1M — Meta's latest class of model (Llama 3 (131K ctx)",
+		Description:         "$0.05/$0.08 per 1M — [unverified] Meta's latest class of model (Llama 3 (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta-llama/llama-3.1-8b-instruct",
 		CostPer1MIn:         0.049999999999999996,
@@ -1403,7 +1403,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaLlamaLlama3370bInstruct: {
 		ID:                  OpenRouterMetaLlamaLlama3370bInstruct,
 		Name:                "Meta: Llama 3.3 70B Instruct",
-		Description:         "$0.10/$0.32 per 1M — The Meta Llama 3.3 multilingual large language model (LLM) is a pretrained and instruction tuned generative model in 70B (text in/text out). The Llama 3.3 instruction tuned text only model... (131K ctx)",
+		Description:         "$0.10/$0.32 per 1M — 70B dense, 128K ctx. Solid generalist fallback, better than 3.1 for most tasks. (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta-llama/llama-3.3-70b-instruct",
 		CostPer1MIn:         0.09999999999999999,
@@ -1417,7 +1417,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaLlamaLlama4Maverick: {
 		ID:                  OpenRouterMetaLlamaLlama4Maverick,
 		Name:                "Meta: Llama 4 Maverick",
-		Description:         "$0.20/$0.80 per 1M — Llama 4 Maverick 17B Instruct (128E) is a high-capacity multimodal language model from Meta, built on a mixture-of-experts (MoE) architecture with 128 experts and 17 billion active parameters per forward (1048K ctx)",
+		Description:         "$0.20/$0.80 per 1M — [unverified] Llama 4 Maverick 17B Instruct (128E) is a high-capacity multimodal language model from Meta, built on a mixture-of-experts (MoE) architecture with 128 experts and 17 billion active parameters per forward (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta-llama/llama-4-maverick",
 		CostPer1MIn:         0.19999999999999998,
@@ -1431,7 +1431,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaLlamaLlama4Scout: {
 		ID:                  OpenRouterMetaLlamaLlama4Scout,
 		Name:                "Meta: Llama 4 Scout",
-		Description:         "$0.10/$0.30 per 1M — Llama 4 Scout 17B Instruct (16E) is a mixture-of-experts (MoE) language model developed by Meta, activating 17 billion parameters out of a total of 109B (1310K ctx)",
+		Description:         "$0.10/$0.30 per 1M — [unverified] Llama 4 Scout 17B Instruct (16E) is a mixture-of-experts (MoE) language model developed by Meta, activating 17 billion parameters out of a total of 109B (1310K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta-llama/llama-4-scout",
 		CostPer1MIn:         0.09999999999999999,
@@ -1445,7 +1445,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaMuseSpark11: {
 		ID:                  OpenRouterMetaMuseSpark11,
 		Name:                "Meta: Muse Spark 1.1",
-		Description:         "$1.2/$4.2 per 1M — Muse Spark 1.1 is a multimodal reasoning model from Meta, built for agentic tasks. It accepts text, images, video, audio, and PDF documents and returns text, with a 1M-token context... (1048K ctx)",
+		Description:         "$1.2/$4.2 per 1M — [unverified] Muse Spark 1.1 is a multimodal reasoning model from Meta, built for agentic tasks. It accepts text, images, video, audio, and PDF documents and returns text, with a 1M-token context... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta/muse-spark-1.1",
 		CostPer1MIn:         1.25,
@@ -1459,7 +1459,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaMuseSpark12: {
 		ID:                  OpenRouterMetaMuseSpark12,
 		Name:                "Meta: Muse Spark 1.2",
-		Description:         "$1.2/$4.2 per 1M — Muse Spark 1.2 is a reasoning model from Meta, designed for complex agentic tasks. It accepts text, images, video, audio, and PDF documents, returns text, and offers a 1M-token context... (1048K ctx)",
+		Description:         "$1.2/$4.2 per 1M — [unverified] Muse Spark 1.2 is a reasoning model from Meta, designed for complex agentic tasks. It accepts text, images, video, audio, and PDF documents, returns text, and offers a 1M-token context... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta/muse-spark-1.2",
 		CostPer1MIn:         1.25,
@@ -1473,7 +1473,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMinimaxMinimaxM1: {
 		ID:                  OpenRouterMinimaxMinimaxM1,
 		Name:                "MiniMax: MiniMax M1",
-		Description:         "$0.6/$2.2 per 1M — MiniMax-M1 is a large-scale, open-weight reasoning model designed for extended context and high-efficiency inference (1000K ctx)",
+		Description:         "$0.6/$2.2 per 1M — [unverified] MiniMax-M1 is a large-scale, open-weight reasoning model designed for extended context and high-efficiency inference (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "minimax/minimax-m1",
 		CostPer1MIn:         0.55,
@@ -1487,7 +1487,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMinimaxMinimaxM2: {
 		ID:                  OpenRouterMinimaxMinimaxM2,
 		Name:                "MiniMax: MiniMax M2",
-		Description:         "$0.3/$1.0 per 1M — MiniMax-M2 is a compact, high-efficiency large language model optimized for end-to-end coding and agentic workflows (204K ctx)",
+		Description:         "$0.3/$1.0 per 1M — [unverified] MiniMax-M2 is a compact, high-efficiency large language model optimized for end-to-end coding and agentic workflows (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "minimax/minimax-m2",
 		CostPer1MIn:         0.255,
@@ -1501,7 +1501,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMinimaxMinimaxM21: {
 		ID:                  OpenRouterMinimaxMinimaxM21,
 		Name:                "MiniMax: MiniMax M2.1",
-		Description:         "$0.3/$1.2 per 1M — MiniMax-M2.1 is a lightweight, state-of-the-art large language model optimized for coding, agentic workflows, and modern application development. With only 10 billion activated parameters, it delivers a major jump in rea… (204K ctx)",
+		Description:         "$0.3/$1.2 per 1M — [unverified] MiniMax-M2.1 is a lightweight, state-of-the-art large language model optimized for coding, agentic workflows, and modern application development. With only 10 billion activated parameters, it delivers a major jump in rea… (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "minimax/minimax-m2.1",
 		CostPer1MIn:         0.3,
@@ -1515,7 +1515,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMinimaxMinimaxM25: {
 		ID:                  OpenRouterMinimaxMinimaxM25,
 		Name:                "MiniMax: MiniMax M2.5",
-		Description:         "$0.22/$0.90 per 1M — MiniMax-M2.5 is a SOTA large language model designed for real-world productivity. Trained in a diverse range of complex real-world digital working environments, M2.5 builds upon the coding expertise of M2.1... (204K ctx)",
+		Description:         "$0.22/$0.90 per 1M — [unverified] MiniMax-M2.5 is a SOTA large language model designed for real-world productivity. Trained in a diverse range of complex real-world digital working environments, M2.5 builds upon the coding expertise of M2.1... (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "minimax/minimax-m2.5",
 		CostPer1MIn:         0.22,
@@ -1529,7 +1529,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMinimaxMinimaxM27: {
 		ID:                  OpenRouterMinimaxMinimaxM27,
 		Name:                "MiniMax: MiniMax M2.7",
-		Description:         "$0.3/$1.2 per 1M — MiniMax-M2.7 is a next-generation large language model designed for autonomous, real-world productivity and continuous improvement. Built to actively participate in its own evolution, M2.7 integrates advanced agentic cap… (204K ctx)",
+		Description:         "$0.3/$1.2 per 1M — prior-gen MiniMax, 204K ctx (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "minimax/minimax-m2.7",
 		CostPer1MIn:         0.3,
@@ -1543,7 +1543,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMinimaxMinimaxM3: {
 		ID:                  OpenRouterMinimaxMinimaxM3,
 		Name:                "MiniMax: MiniMax M3",
-		Description:         "$0.3/$1.2 per 1M — MiniMax-M3 is a multimodal foundation model from MiniMax (1048K ctx)",
+		Description:         "$0.3/$1.2 per 1M — MoE, 1M ctx, proven long autonomous debug runs (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "minimax/minimax-m3",
 		CostPer1MIn:         0.3,
@@ -1557,7 +1557,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiCodestral2508: {
 		ID:                  OpenRouterMistralaiCodestral2508,
 		Name:                "Mistral: Codestral 2508",
-		Description:         "$0.30/$0.90 per 1M — Mistral's cutting-edge language model for coding released end of July 2025 (256K ctx)",
+		Description:         "$0.30/$0.90 per 1M — [unverified] Mistral's cutting-edge language model for coding released end of July 2025 (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/codestral-2508",
 		CostPer1MIn:         0.3,
@@ -1571,7 +1571,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMinistral14b2512: {
 		ID:                  OpenRouterMistralaiMinistral14b2512,
 		Name:                "Mistral: Ministral 3 14B 2512",
-		Description:         "$0.20/$0.20 per 1M — The largest model in the Ministral 3 family, Ministral 3 14B offers frontier capabilities and performance comparable to its larger Mistral Small 3 (262K ctx)",
+		Description:         "$0.20/$0.20 per 1M — [unverified] The largest model in the Ministral 3 family, Ministral 3 14B offers frontier capabilities and performance comparable to its larger Mistral Small 3 (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/ministral-14b-2512",
 		CostPer1MIn:         0.19999999999999998,
@@ -1585,7 +1585,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMinistral3b2512: {
 		ID:                  OpenRouterMistralaiMinistral3b2512,
 		Name:                "Mistral: Ministral 3 3B 2512",
-		Description:         "$0.10/$0.10 per 1M — The smallest model in the Ministral 3 family, Ministral 3 3B is a powerful, efficient tiny language model with vision capabilities (131K ctx)",
+		Description:         "$0.10/$0.10 per 1M — [unverified] The smallest model in the Ministral 3 family, Ministral 3 3B is a powerful, efficient tiny language model with vision capabilities (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/ministral-3b-2512",
 		CostPer1MIn:         0.09999999999999999,
@@ -1599,7 +1599,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMinistral8b2512: {
 		ID:                  OpenRouterMistralaiMinistral8b2512,
 		Name:                "Mistral: Ministral 3 8B 2512",
-		Description:         "$0.15/$0.15 per 1M — A balanced model in the Ministral 3 family, Ministral 3 8B is a powerful, efficient tiny language model with vision capabilities (262K ctx)",
+		Description:         "$0.15/$0.15 per 1M — [unverified] A balanced model in the Ministral 3 family, Ministral 3 8B is a powerful, efficient tiny language model with vision capabilities (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/ministral-8b-2512",
 		CostPer1MIn:         0.15,
@@ -1613,7 +1613,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralLarge: {
 		ID:                  OpenRouterMistralaiMistralLarge,
 		Name:                "Mistral Large",
-		Description:         "$2.0/$6.0 per 1M — This is Mistral AI's flagship model, Mistral Large 2 (version `mistral-large-2407`) (128K ctx)",
+		Description:         "$2.0/$6.0 per 1M — Original Mistral Large (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-large",
 		CostPer1MIn:         2,
@@ -1627,7 +1627,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralLarge2407: {
 		ID:                  OpenRouterMistralaiMistralLarge2407,
 		Name:                "Mistral Large 2407",
-		Description:         "$2.0/$6.0 per 1M — This is Mistral AI's flagship model, Mistral Large 2 (version mistral-large-2407) (131K ctx)",
+		Description:         "$2.0/$6.0 per 1M — [unverified] This is Mistral AI's flagship model, Mistral Large 2 (version mistral-large-2407) (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-large-2407",
 		CostPer1MIn:         2,
@@ -1641,7 +1641,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralLarge2512: {
 		ID:                  OpenRouterMistralaiMistralLarge2512,
 		Name:                "Mistral: Mistral Large 3 2512",
-		Description:         "$0.5/$1.5 per 1M — Mistral Large 3 2512 is Mistral’s most capable model to date, featuring a sparse mixture-of-experts architecture with 41B active parameters (675B total), and released under the Apache 2 (262K ctx)",
+		Description:         "$0.5/$1.5 per 1M — [unverified] Mistral Large 3 2512 is Mistral’s most capable model to date, featuring a sparse mixture-of-experts architecture with 41B active parameters (675B total), and released under the Apache 2 (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-large-2512",
 		CostPer1MIn:         0.5,
@@ -1655,7 +1655,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralMedium3: {
 		ID:                  OpenRouterMistralaiMistralMedium3,
 		Name:                "Mistral: Mistral Medium 3",
-		Description:         "$0.4/$2.0 per 1M — Mistral Medium 3 is a high-performance enterprise-grade language model designed to deliver frontier-level capabilities at significantly reduced operational cost (131K ctx)",
+		Description:         "$0.4/$2.0 per 1M — [unverified] Mistral Medium 3 is a high-performance enterprise-grade language model designed to deliver frontier-level capabilities at significantly reduced operational cost (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-medium-3",
 		CostPer1MIn:         0.39999999999999997,
@@ -1669,7 +1669,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralMedium35: {
 		ID:                  OpenRouterMistralaiMistralMedium35,
 		Name:                "Mistral: Mistral Medium 3.5",
-		Description:         "$1.5/$7.5 per 1M — Mistral Medium 3.5 is a dense 128B instruction-following model from Mistral AI. It supports text and image inputs with text output, and is designed for agentic workflows, coding, and complex... (262K ctx)",
+		Description:         "$1.5/$7.5 per 1M — [unverified] Mistral Medium 3.5 is a dense 128B instruction-following model from Mistral AI. It supports text and image inputs with text output, and is designed for agentic workflows, coding, and complex... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-medium-3-5",
 		CostPer1MIn:         1.5,
@@ -1683,7 +1683,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralMedium31: {
 		ID:                  OpenRouterMistralaiMistralMedium31,
 		Name:                "Mistral: Mistral Medium 3.1",
-		Description:         "$0.4/$2.0 per 1M — Mistral Medium 3.1 is an updated version of Mistral Medium 3, which is a high-performance enterprise-grade language model designed to deliver frontier-level capabilities at significantly reduced operational cost. It bala… (131K ctx)",
+		Description:         "$0.4/$2.0 per 1M — [unverified] Mistral Medium 3.1 is an updated version of Mistral Medium 3, which is a high-performance enterprise-grade language model designed to deliver frontier-level capabilities at significantly reduced operational cost. It bala… (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-medium-3.1",
 		CostPer1MIn:         0.39999999999999997,
@@ -1697,7 +1697,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralNemo: {
 		ID:                  OpenRouterMistralaiMistralNemo,
 		Name:                "Mistral: Mistral Nemo",
-		Description:         "$0.02/$0.03 per 1M — A 12B parameter model with a 128k token context length built by Mistral in collaboration with NVIDIA (131K ctx)",
+		Description:         "$0.02/$0.03 per 1M — [unverified] A 12B parameter model with a 128k token context length built by Mistral in collaboration with NVIDIA (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-nemo",
 		CostPer1MIn:         0.019000000000000003,
@@ -1711,7 +1711,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralSaba: {
 		ID:                  OpenRouterMistralaiMistralSaba,
 		Name:                "Mistral: Saba",
-		Description:         "$0.20/$0.60 per 1M — Mistral Saba is a 24B-parameter language model specifically designed for the Middle East and South Asia, delivering accurate and contextually relevant responses while maintaining efficient performance (32K ctx)",
+		Description:         "$0.20/$0.60 per 1M — [unverified] Mistral Saba is a 24B-parameter language model specifically designed for the Middle East and South Asia, delivering accurate and contextually relevant responses while maintaining efficient performance (32K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-saba",
 		CostPer1MIn:         0.19999999999999998,
@@ -1725,7 +1725,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralSmall2603: {
 		ID:                  OpenRouterMistralaiMistralSmall2603,
 		Name:                "Mistral: Mistral Small 4",
-		Description:         "$0.15/$0.60 per 1M — Mistral Small 4 is the next major release in the Mistral Small family, unifying the capabilities of several flagship Mistral models into a single system (262K ctx)",
+		Description:         "$0.15/$0.60 per 1M — [unverified] Mistral Small 4 is the next major release in the Mistral Small family, unifying the capabilities of several flagship Mistral models into a single system (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-small-2603",
 		CostPer1MIn:         0.15,
@@ -1739,7 +1739,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralSmall3224bInstruct: {
 		ID:                  OpenRouterMistralaiMistralSmall3224bInstruct,
 		Name:                "Mistral: Mistral Small 3.2 24B",
-		Description:         "$0.09/$0.25 per 1M — Mistral-Small-3.2-24B-Instruct-2506 is an updated 24B parameter model from Mistral optimized for instruction following, repetition reduction, and improved function calling. Compared to the 3.1 release, version 3.2 signif… (256K ctx)",
+		Description:         "$0.09/$0.25 per 1M — [unverified] Mistral-Small-3.2-24B-Instruct-2506 is an updated 24B parameter model from Mistral optimized for instruction following, repetition reduction, and improved function calling. Compared to the 3.1 release, version 3.2 signif… (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-small-3.2-24b-instruct",
 		CostPer1MIn:         0.09375,
@@ -1753,7 +1753,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMixtral8x22bInstruct: {
 		ID:                  OpenRouterMistralaiMixtral8x22bInstruct,
 		Name:                "Mistral: Mixtral 8x22B Instruct",
-		Description:         "$2.0/$6.0 per 1M — Mistral's official instruct fine-tuned version of Mixtral 8x22B (65K ctx)",
+		Description:         "$2.0/$6.0 per 1M — [unverified] Mistral's official instruct fine-tuned version of Mixtral 8x22B (65K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mixtral-8x22b-instruct",
 		CostPer1MIn:         2,
@@ -1767,7 +1767,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiVoxtralSmall24b2507: {
 		ID:                  OpenRouterMistralaiVoxtralSmall24b2507,
 		Name:                "Mistral: Voxtral Small 24B 2507",
-		Description:         "$0.10/$0.30 per 1M — Voxtral Small is an enhancement of Mistral Small 3, incorporating state-of-the-art audio input capabilities while retaining best-in-class text performance (32K ctx)",
+		Description:         "$0.10/$0.30 per 1M — [unverified] Voxtral Small is an enhancement of Mistral Small 3, incorporating state-of-the-art audio input capabilities while retaining best-in-class text performance (32K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/voxtral-small-24b-2507",
 		CostPer1MIn:         0.09999999999999999,
@@ -1781,7 +1781,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK2: {
 		ID:                  OpenRouterMoonshotaiKimiK2,
 		Name:                "MoonshotAI: Kimi K2 0711",
-		Description:         "$0.6/$2.3 per 1M — Kimi K2 Instruct is a large-scale Mixture-of-Experts (MoE) language model developed by Moonshot AI, featuring 1 trillion total parameters with 32 billion active per forward pass (131K ctx)",
+		Description:         "$0.6/$2.3 per 1M — [unverified] Kimi K2 Instruct is a large-scale Mixture-of-Experts (MoE) language model developed by Moonshot AI, featuring 1 trillion total parameters with 32 billion active per forward pass (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k2",
 		CostPer1MIn:         0.5700000000000001,
@@ -1795,7 +1795,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK20905: {
 		ID:                  OpenRouterMoonshotaiKimiK20905,
 		Name:                "MoonshotAI: Kimi K2 0905",
-		Description:         "$0.6/$2.5 per 1M — Kimi K2 0905 is the September update of Kimi K2 0711 (262K ctx)",
+		Description:         "$0.6/$2.5 per 1M — [unverified] Kimi K2 0905 is the September update of Kimi K2 0711 (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k2-0905",
 		CostPer1MIn:         0.6,
@@ -1809,7 +1809,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK2Thinking: {
 		ID:                  OpenRouterMoonshotaiKimiK2Thinking,
 		Name:                "MoonshotAI: Kimi K2 Thinking",
-		Description:         "$0.6/$2.5 per 1M — Kimi K2 Thinking is Moonshot AI’s most advanced open reasoning model to date, extending the K2 series into agentic, long-horizon reasoning (262K ctx)",
+		Description:         "$0.6/$2.5 per 1M — [unverified] Kimi K2 Thinking is Moonshot AI’s most advanced open reasoning model to date, extending the K2 series into agentic, long-horizon reasoning (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k2-thinking",
 		CostPer1MIn:         0.6,
@@ -1823,7 +1823,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK25: {
 		ID:                  OpenRouterMoonshotaiKimiK25,
 		Name:                "MoonshotAI: Kimi K2.5",
-		Description:         "$0.6/$2.8 per 1M — Kimi K2.5 is Moonshot AI's native multimodal model, delivering state-of-the-art visual coding capability and a self-directed agent swarm paradigm. Built on Kimi K2 with continued pretraining over approximately 15T mixed.… (262K ctx)",
+		Description:         "$0.6/$2.8 per 1M — [unverified] Kimi K2.5 is Moonshot AI's native multimodal model, delivering state-of-the-art visual coding capability and a self-directed agent swarm paradigm. Built on Kimi K2 with continued pretraining over approximately 15T mixed.… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k2.5",
 		CostPer1MIn:         0.5700000000000001,
@@ -1837,7 +1837,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK26: {
 		ID:                  OpenRouterMoonshotaiKimiK26,
 		Name:                "MoonshotAI: Kimi K2.6",
-		Description:         "$0.6/$2.4 per 1M — Kimi K2.6 is Moonshot AI's next-generation multimodal model, designed for long-horizon coding, coding-driven UI/UX generation, and multi-agent orchestration. It handles complex end-to-end coding tasks across Python, Rust… (262K ctx)",
+		Description:         "$0.6/$2.4 per 1M — 1T MoE, 256K ctx, strong Rust/Go/Python/C (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k2.6",
 		CostPer1MIn:         0.5795,
@@ -1851,7 +1851,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK27Code: {
 		ID:                  OpenRouterMoonshotaiKimiK27Code,
 		Name:                "MoonshotAI: Kimi K2.7 Code",
-		Description:         "$0.7/$3.5 per 1M — MoonshotAI: Kimi K2.7 Code is a coding-focused model in Moonshot AI's Kimi K2 family, built to complete end-to-end programming tasks reliably over long contexts. It uses a native multimodal mixture-of-experts... (262K ctx)",
+		Description:         "$0.7/$3.5 per 1M — [unverified] MoonshotAI: Kimi K2.7 Code is a coding-focused model in Moonshot AI's Kimi K2 family, built to complete end-to-end programming tasks reliably over long contexts. It uses a native multimodal mixture-of-experts... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k2.7-code",
 		CostPer1MIn:         0.7,
@@ -1865,7 +1865,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK3: {
 		ID:                  OpenRouterMoonshotaiKimiK3,
 		Name:                "MoonshotAI: Kimi K3",
-		Description:         "$3.0/$15.0 per 1M — Kimi K3 is a 2.8T parameter open-weight multimodal reasoning model from Moonshot AI. It is suited for complex coding, knowledge work, and long-horizon agentic workflows, and is particularly strong at... (1048K ctx)",
+		Description:         "$3.0/$15.0 per 1M — [unverified] Kimi K3 is a 2.8T parameter open-weight multimodal reasoning model from Moonshot AI. It is suited for complex coding, knowledge work, and long-horizon agentic workflows, and is particularly strong at... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k3",
 		CostPer1MIn:         3,
@@ -1879,7 +1879,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNexAgiNexN2Mini: {
 		ID:                  OpenRouterNexAgiNexN2Mini,
 		Name:                "Nex AGI: Nex-N2-Mini",
-		Description:         "$0.02/$0.10 per 1M — Nex-N2-Mini is an open-source agentic mixture-of-experts model from Nex AGI, the smaller sibling in the Nex-N2 series (262K ctx)",
+		Description:         "$0.02/$0.10 per 1M — [unverified] Nex-N2-Mini is an open-source agentic mixture-of-experts model from Nex AGI, the smaller sibling in the Nex-N2 series (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nex-agi/nex-n2-mini",
 		CostPer1MIn:         0.024999999999999998,
@@ -1893,7 +1893,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNexAgiNexN2Pro: {
 		ID:                  OpenRouterNexAgiNexN2Pro,
 		Name:                "Nex AGI: Nex-N2-Pro",
-		Description:         "$0.2/$1.0 per 1M — Nex-N2-Pro is an agentic mixture-of-experts model from Nex AGI, with 17B active parameters out of 397B total (262K ctx)",
+		Description:         "$0.2/$1.0 per 1M — [unverified] Nex-N2-Pro is an agentic mixture-of-experts model from Nex AGI, with 17B active parameters out of 397B total (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nex-agi/nex-n2-pro",
 		CostPer1MIn:         0.25,
@@ -1907,7 +1907,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3Nano30bA3b: {
 		ID:                  OpenRouterNvidiaNemotron3Nano30bA3b,
 		Name:                "NVIDIA: Nemotron 3 Nano 30B A3B",
-		Description:         "$0.05/$0.20 per 1M — NVIDIA Nemotron 3 Nano 30B A3B is a small language MoE model with highest compute efficiency and accuracy for developers to build specialized agentic AI systems (262K ctx)",
+		Description:         "$0.05/$0.20 per 1M — 30B MoE (3B active), 128K ctx (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-nano-30b-a3b",
 		CostPer1MIn:         0.049999999999999996,
@@ -1921,7 +1921,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3Nano30bA3bFree: {
 		ID:                  OpenRouterNvidiaNemotron3Nano30bA3bFree,
 		Name:                "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
-		Description:         "FREE — NVIDIA Nemotron 3 Nano 30B A3B is a small language MoE model with highest compute efficiency and accuracy for developers to build specialized agentic AI systems (256K ctx)",
+		Description:         "FREE — [unverified] NVIDIA Nemotron 3 Nano 30B A3B is a small language MoE model with highest compute efficiency and accuracy for developers to build specialized agentic AI systems (256K ctx)",
 		Rank:                9,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-nano-30b-a3b:free",
@@ -1936,7 +1936,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3NanoOmni30bA3bReasoningFree: {
 		ID:                  OpenRouterNvidiaNemotron3NanoOmni30bA3bReasoningFree,
 		Name:                "NVIDIA: Nemotron 3 Nano Omni (free)",
-		Description:         "FREE — NVIDIA Nemotron™ 3 Nano Omni is a 30B-A3B open multimodal model designed to function as a perception and context sub-agent in enterprise agent systems (256K ctx)",
+		Description:         "FREE — [unverified] NVIDIA Nemotron™ 3 Nano Omni is a 30B-A3B open multimodal model designed to function as a perception and context sub-agent in enterprise agent systems (256K ctx)",
 		Rank:                10,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
@@ -1951,7 +1951,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3Super120bA12b: {
 		ID:                  OpenRouterNvidiaNemotron3Super120bA12b,
 		Name:                "NVIDIA: Nemotron 3 Super",
-		Description:         "$0.30/$0.90 per 1M — NVIDIA Nemotron 3 Super is a 120B-parameter open hybrid MoE model, activating just 12B parameters for maximum compute efficiency and accuracy in complex multi-agent applications (1000K ctx)",
+		Description:         "$0.30/$0.90 per 1M — 120B MoE, 1M ctx, best speed/quality NVIDIA tier (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-super-120b-a12b",
 		CostPer1MIn:         0.3,
@@ -1965,7 +1965,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3Super120bA12bFree: {
 		ID:                  OpenRouterNvidiaNemotron3Super120bA12bFree,
 		Name:                "NVIDIA: Nemotron 3 Super (free)",
-		Description:         "FREE — NVIDIA Nemotron 3 Super is a 120B-parameter open hybrid MoE model, activating just 12B parameters for maximum compute efficiency and accuracy in complex multi-agent applications (262K ctx)",
+		Description:         "FREE — [unverified] NVIDIA Nemotron 3 Super is a 120B-parameter open hybrid MoE model, activating just 12B parameters for maximum compute efficiency and accuracy in complex multi-agent applications (262K ctx)",
 		Rank:                5,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-super-120b-a12b:free",
@@ -1980,7 +1980,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3Ultra550bA55b: {
 		ID:                  OpenRouterNvidiaNemotron3Ultra550bA55b,
 		Name:                "NVIDIA: Nemotron 3 Ultra",
-		Description:         "$0.6/$3.6 per 1M — NVIDIA Nemotron 3 Ultra is an open frontier-reasoning and orchestration model from NVIDIA, with 55B active parameters out of 550B total (MoE) (512K ctx)",
+		Description:         "$0.6/$3.6 per 1M — 550B MoE, 1M ctx, hybrid Mamba-Transformer — won't lie about research: held tool-sourced facts under pressure, 2/2 runs (512K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-ultra-550b-a55b",
 		CostPer1MIn:         0.6,
@@ -1994,7 +1994,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3Ultra550bA55bFree: {
 		ID:                  OpenRouterNvidiaNemotron3Ultra550bA55bFree,
 		Name:                "NVIDIA: Nemotron 3 Ultra (free)",
-		Description:         "FREE — NVIDIA Nemotron 3 Ultra is an open frontier-reasoning and orchestration model from NVIDIA, with 55B active parameters out of 550B total (MoE) (1000K ctx)",
+		Description:         "FREE — [unverified] NVIDIA Nemotron 3 Ultra is an open frontier-reasoning and orchestration model from NVIDIA, with 55B active parameters out of 550B total (MoE) (1000K ctx)",
 		Rank:                1,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-ultra-550b-a55b:free",
@@ -2009,7 +2009,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotronNano12bV2VlFree: {
 		ID:                  OpenRouterNvidiaNemotronNano12bV2VlFree,
 		Name:                "NVIDIA: Nemotron Nano 12B 2 VL (free)",
-		Description:         "FREE — NVIDIA Nemotron Nano 2 VL is a 12-billion-parameter open multimodal reasoning model designed for video understanding and document intelligence (128K ctx)",
+		Description:         "FREE — [unverified] NVIDIA Nemotron Nano 2 VL is a 12-billion-parameter open multimodal reasoning model designed for video understanding and document intelligence (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-nano-12b-v2-vl:free",
 		CostPer1MIn:         0,
@@ -2023,7 +2023,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotronNano9bV2Free: {
 		ID:                  OpenRouterNvidiaNemotronNano9bV2Free,
 		Name:                "NVIDIA: Nemotron Nano 9B V2 (free)",
-		Description:         "FREE — NVIDIA-Nemotron-Nano-9B-v2 is a large language model (LLM) trained from scratch by NVIDIA, and designed as a unified model for both reasoning and non-reasoning tasks (128K ctx)",
+		Description:         "FREE — [unverified] NVIDIA-Nemotron-Nano-9B-v2 is a large language model (LLM) trained from scratch by NVIDIA, and designed as a unified model for both reasoning and non-reasoning tasks (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-nano-9b-v2:free",
 		CostPer1MIn:         0,
@@ -2037,7 +2037,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt35Turbo: {
 		ID:                  OpenRouterOpenaiGpt35Turbo,
 		Name:                "OpenAI: GPT-3.5 Turbo",
-		Description:         "$0.5/$1.5 per 1M — GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language or code, and is optimized for chat and traditional completion tasks. Training data up to Sep 2021. (16K ctx)",
+		Description:         "$0.5/$1.5 per 1M — [unverified] GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language or code, and is optimized for chat and traditional completion tasks. Training data up to Sep 2021. (16K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-3.5-turbo",
 		CostPer1MIn:         0.5,
@@ -2051,7 +2051,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt35Turbo0613: {
 		ID:                  OpenRouterOpenaiGpt35Turbo0613,
 		Name:                "OpenAI: GPT-3.5 Turbo (older v0613)",
-		Description:         "$1.0/$2.0 per 1M — GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language or code, and is optimized for chat and traditional completion tasks. Training data up to Sep 2021. (4K ctx)",
+		Description:         "$1.0/$2.0 per 1M — [unverified] GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language or code, and is optimized for chat and traditional completion tasks. Training data up to Sep 2021. (4K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-3.5-turbo-0613",
 		CostPer1MIn:         1,
@@ -2065,7 +2065,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt35Turbo16k: {
 		ID:                  OpenRouterOpenaiGpt35Turbo16k,
 		Name:                "OpenAI: GPT-3.5 Turbo 16k",
-		Description:         "$3.0/$4.0 per 1M — This model offers four times the context length of gpt-3 (16K ctx)",
+		Description:         "$3.0/$4.0 per 1M — [unverified] This model offers four times the context length of gpt-3 (16K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-3.5-turbo-16k",
 		CostPer1MIn:         3,
@@ -2079,7 +2079,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4: {
 		ID:                  OpenRouterOpenaiGpt4,
 		Name:                "OpenAI: GPT-4",
-		Description:         "$30.0/$60.0 per 1M — OpenAI's flagship model, GPT-4 is a large-scale multimodal language model capable of solving difficult problems with greater accuracy than previous models due to its broader general knowledge and advanced reasoning (8K ctx)",
+		Description:         "$30.0/$60.0 per 1M — [unverified] OpenAI's flagship model, GPT-4 is a large-scale multimodal language model capable of solving difficult problems with greater accuracy than previous models due to its broader general knowledge and advanced reasoning (8K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4",
 		CostPer1MIn:         30,
@@ -2093,7 +2093,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4Turbo: {
 		ID:                  OpenRouterOpenaiGpt4Turbo,
 		Name:                "OpenAI: GPT-4 Turbo",
-		Description:         "$10.0/$30.0 per 1M — The latest GPT-4 Turbo model with vision capabilities (128K ctx)",
+		Description:         "$10.0/$30.0 per 1M — [unverified] The latest GPT-4 Turbo model with vision capabilities (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4-turbo",
 		CostPer1MIn:         10,
@@ -2107,7 +2107,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4TurboPreview: {
 		ID:                  OpenRouterOpenaiGpt4TurboPreview,
 		Name:                "OpenAI: GPT-4 Turbo Preview",
-		Description:         "$10.0/$30.0 per 1M — The preview GPT-4 model with improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more (128K ctx)",
+		Description:         "$10.0/$30.0 per 1M — [unverified] The preview GPT-4 model with improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4-turbo-preview",
 		CostPer1MIn:         10,
@@ -2121,7 +2121,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt41: {
 		ID:                  OpenRouterOpenaiGpt41,
 		Name:                "OpenAI: GPT-4.1",
-		Description:         "$2.0/$8.0 per 1M — GPT-4.1 is a flagship large language model optimized for advanced instruction following, real-world software engineering, and long-context reasoning. It supports a 1 million token context window and outperforms GPT-4o an… (1047K ctx)",
+		Description:         "$2.0/$8.0 per 1M — [unverified] GPT-4.1 is a flagship large language model optimized for advanced instruction following, real-world software engineering, and long-context reasoning. It supports a 1 million token context window and outperforms GPT-4o an… (1047K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4.1",
 		CostPer1MIn:         2,
@@ -2135,7 +2135,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt41Mini: {
 		ID:                  OpenRouterOpenaiGpt41Mini,
 		Name:                "OpenAI: GPT-4.1 Mini",
-		Description:         "$0.4/$1.6 per 1M — GPT-4.1 Mini is a mid-sized model delivering performance competitive with GPT-4o at substantially lower latency and cost. It retains a 1 million token context window and scores 45.1% on hard... (1047K ctx)",
+		Description:         "$0.4/$1.6 per 1M — [unverified] GPT-4.1 Mini is a mid-sized model delivering performance competitive with GPT-4o at substantially lower latency and cost. It retains a 1 million token context window and scores 45.1% on hard... (1047K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4.1-mini",
 		CostPer1MIn:         0.39999999999999997,
@@ -2149,7 +2149,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt41Nano: {
 		ID:                  OpenRouterOpenaiGpt41Nano,
 		Name:                "OpenAI: GPT-4.1 Nano",
-		Description:         "$0.10/$0.40 per 1M — For tasks that demand low latency, GPT‑4 (1047K ctx)",
+		Description:         "$0.10/$0.40 per 1M — [unverified] For tasks that demand low latency, GPT‑4 (1047K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4.1-nano",
 		CostPer1MIn:         0.09999999999999999,
@@ -2163,7 +2163,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4o: {
 		ID:                  OpenRouterOpenaiGpt4o,
 		Name:                "OpenAI: GPT-4o",
-		Description:         "$2.5/$10.0 per 1M — GPT-4o (\"o\" for \"omni\") is OpenAI's latest AI model, supporting both text and image inputs with text outputs (128K ctx)",
+		Description:         "$2.5/$10.0 per 1M — [unverified] GPT-4o (\"o\" for \"omni\") is OpenAI's latest AI model, supporting both text and image inputs with text outputs (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4o",
 		CostPer1MIn:         2.5,
@@ -2177,7 +2177,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4o20240513: {
 		ID:                  OpenRouterOpenaiGpt4o20240513,
 		Name:                "OpenAI: GPT-4o (2024-05-13)",
-		Description:         "$5.0/$15.0 per 1M — GPT-4o (\"o\" for \"omni\") is OpenAI's latest AI model, supporting both text and image inputs with text outputs (128K ctx)",
+		Description:         "$5.0/$15.0 per 1M — [unverified] GPT-4o (\"o\" for \"omni\") is OpenAI's latest AI model, supporting both text and image inputs with text outputs (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4o-2024-05-13",
 		CostPer1MIn:         5,
@@ -2191,7 +2191,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4o20240806: {
 		ID:                  OpenRouterOpenaiGpt4o20240806,
 		Name:                "OpenAI: GPT-4o (2024-08-06)",
-		Description:         "$2.5/$10.0 per 1M — The 2024-08-06 version of GPT-4o offers improved performance in structured outputs, with the ability to supply a JSON schema in the respone_format (128K ctx)",
+		Description:         "$2.5/$10.0 per 1M — [unverified] The 2024-08-06 version of GPT-4o offers improved performance in structured outputs, with the ability to supply a JSON schema in the respone_format (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4o-2024-08-06",
 		CostPer1MIn:         2.5,
@@ -2205,7 +2205,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4o20241120: {
 		ID:                  OpenRouterOpenaiGpt4o20241120,
 		Name:                "OpenAI: GPT-4o (2024-11-20)",
-		Description:         "$2.5/$10.0 per 1M — The 2024-11-20 version of GPT-4o offers a leveled-up creative writing ability with more natural, engaging, and tailored writing to improve relevance & readability (128K ctx)",
+		Description:         "$2.5/$10.0 per 1M — [unverified] The 2024-11-20 version of GPT-4o offers a leveled-up creative writing ability with more natural, engaging, and tailored writing to improve relevance & readability (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4o-2024-11-20",
 		CostPer1MIn:         2.5,
@@ -2219,7 +2219,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4oMini: {
 		ID:                  OpenRouterOpenaiGpt4oMini,
 		Name:                "OpenAI: GPT-4o-mini",
-		Description:         "$0.15/$0.60 per 1M — GPT-4o mini is OpenAI's newest model after GPT-4 Omni, supporting both text and image inputs with text outputs (128K ctx)",
+		Description:         "$0.15/$0.60 per 1M — [unverified] GPT-4o mini is OpenAI's newest model after GPT-4 Omni, supporting both text and image inputs with text outputs (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4o-mini",
 		CostPer1MIn:         0.15,
@@ -2233,7 +2233,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4oMini20240718: {
 		ID:                  OpenRouterOpenaiGpt4oMini20240718,
 		Name:                "OpenAI: GPT-4o-mini (2024-07-18)",
-		Description:         "$0.15/$0.60 per 1M — GPT-4o mini is OpenAI's newest model after GPT-4 Omni, supporting both text and image inputs with text outputs (128K ctx)",
+		Description:         "$0.15/$0.60 per 1M — [unverified] GPT-4o mini is OpenAI's newest model after GPT-4 Omni, supporting both text and image inputs with text outputs (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4o-mini-2024-07-18",
 		CostPer1MIn:         0.15,
@@ -2247,7 +2247,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt5: {
 		ID:                  OpenRouterOpenaiGpt5,
 		Name:                "OpenAI: GPT-5",
-		Description:         "$1.2/$10.0 per 1M — GPT-5 is OpenAI’s most advanced model, offering major improvements in reasoning, code quality, and user experience (400K ctx)",
+		Description:         "$1.2/$10.0 per 1M — [unverified] GPT-5 is OpenAI’s most advanced model, offering major improvements in reasoning, code quality, and user experience (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5",
 		CostPer1MIn:         1.25,
@@ -2261,7 +2261,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt5Mini: {
 		ID:                  OpenRouterOpenaiGpt5Mini,
 		Name:                "OpenAI: GPT-5 Mini",
-		Description:         "$0.2/$2.0 per 1M — GPT-5 Mini is a compact version of GPT-5, designed to handle lighter-weight reasoning tasks (400K ctx)",
+		Description:         "$0.2/$2.0 per 1M — [unverified] GPT-5 Mini is a compact version of GPT-5, designed to handle lighter-weight reasoning tasks (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5-mini",
 		CostPer1MIn:         0.25,
@@ -2275,7 +2275,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt5Nano: {
 		ID:                  OpenRouterOpenaiGpt5Nano,
 		Name:                "OpenAI: GPT-5 Nano",
-		Description:         "$0.05/$0.40 per 1M — GPT-5-Nano is the smallest and fastest variant in the GPT-5 system, optimized for developer tools, rapid interactions, and ultra-low latency environments (400K ctx)",
+		Description:         "$0.05/$0.40 per 1M — [unverified] GPT-5-Nano is the smallest and fastest variant in the GPT-5 system, optimized for developer tools, rapid interactions, and ultra-low latency environments (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5-nano",
 		CostPer1MIn:         0.049999999999999996,
@@ -2289,7 +2289,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt5Pro: {
 		ID:                  OpenRouterOpenaiGpt5Pro,
 		Name:                "OpenAI: GPT-5 Pro",
-		Description:         "$15.0/$120.0 per 1M — GPT-5 Pro is OpenAI’s most advanced model, offering major improvements in reasoning, code quality, and user experience (400K ctx)",
+		Description:         "$15.0/$120.0 per 1M — [unverified] GPT-5 Pro is OpenAI’s most advanced model, offering major improvements in reasoning, code quality, and user experience (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5-pro",
 		CostPer1MIn:         15,
@@ -2303,7 +2303,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt51: {
 		ID:                  OpenRouterOpenaiGpt51,
 		Name:                "OpenAI: GPT-5.1",
-		Description:         "$1.2/$10.0 per 1M — GPT-5.1 is the latest frontier-grade model in the GPT-5 series, offering stronger general-purpose reasoning, improved instruction adherence, and a more natural conversational style compared to GPT-5. It uses adaptive rea… (400K ctx)",
+		Description:         "$1.2/$10.0 per 1M — [unverified] GPT-5.1 is the latest frontier-grade model in the GPT-5 series, offering stronger general-purpose reasoning, improved instruction adherence, and a more natural conversational style compared to GPT-5. It uses adaptive rea… (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.1",
 		CostPer1MIn:         1.25,
@@ -2317,7 +2317,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt51Codex: {
 		ID:                  OpenRouterOpenaiGpt51Codex,
 		Name:                "OpenAI: GPT-5.1-Codex",
-		Description:         "$1.2/$10.0 per 1M — GPT-5.1-Codex is a specialized version of GPT-5.1 optimized for software engineering and coding workflows. It is designed for both interactive development sessions and long, independent execution of complex engineering t… (400K ctx)",
+		Description:         "$1.2/$10.0 per 1M — [unverified] GPT-5.1-Codex is a specialized version of GPT-5.1 optimized for software engineering and coding workflows. It is designed for both interactive development sessions and long, independent execution of complex engineering t… (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.1-codex",
 		CostPer1MIn:         1.25,
@@ -2331,7 +2331,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt51CodexMax: {
 		ID:                  OpenRouterOpenaiGpt51CodexMax,
 		Name:                "OpenAI: GPT-5.1-Codex-Max",
-		Description:         "$1.2/$10.0 per 1M — GPT-5.1-Codex-Max is OpenAI’s latest agentic coding model, designed for long-running, high-context software development tasks. It is based on an updated version of the 5.1 reasoning stack and trained on agentic... (400K ctx)",
+		Description:         "$1.2/$10.0 per 1M — [unverified] GPT-5.1-Codex-Max is OpenAI’s latest agentic coding model, designed for long-running, high-context software development tasks. It is based on an updated version of the 5.1 reasoning stack and trained on agentic... (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.1-codex-max",
 		CostPer1MIn:         1.25,
@@ -2345,7 +2345,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt51CodexMini: {
 		ID:                  OpenRouterOpenaiGpt51CodexMini,
 		Name:                "OpenAI: GPT-5.1-Codex-Mini",
-		Description:         "$0.2/$2.0 per 1M — GPT-5.1-Codex-Mini is a smaller and faster version of GPT-5.1-Codex (400K ctx)",
+		Description:         "$0.2/$2.0 per 1M — [unverified] GPT-5.1-Codex-Mini is a smaller and faster version of GPT-5.1-Codex (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.1-codex-mini",
 		CostPer1MIn:         0.25,
@@ -2359,7 +2359,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt52: {
 		ID:                  OpenRouterOpenaiGpt52,
 		Name:                "OpenAI: GPT-5.2",
-		Description:         "$1.8/$14.0 per 1M — GPT-5.2 is the latest frontier-grade model in the GPT-5 series, offering stronger agentic and long context perfomance compared to GPT-5.1. It uses adaptive reasoning to allocate computation dynamically, responding quickl… (400K ctx)",
+		Description:         "$1.8/$14.0 per 1M — [unverified] GPT-5.2 is the latest frontier-grade model in the GPT-5 series, offering stronger agentic and long context perfomance compared to GPT-5.1. It uses adaptive reasoning to allocate computation dynamically, responding quickl… (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.2",
 		CostPer1MIn:         1.75,
@@ -2373,7 +2373,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt52Chat: {
 		ID:                  OpenRouterOpenaiGpt52Chat,
 		Name:                "OpenAI: GPT-5.2 Chat",
-		Description:         "$1.8/$14.0 per 1M — GPT-5.2 Chat (AKA Instant) is the fast, lightweight member of the 5.2 family, optimized for low-latency chat while retaining strong general intelligence. It uses adaptive reasoning to selectively “think” on... (128K ctx)",
+		Description:         "$1.8/$14.0 per 1M — [unverified] GPT-5.2 Chat (AKA Instant) is the fast, lightweight member of the 5.2 family, optimized for low-latency chat while retaining strong general intelligence. It uses adaptive reasoning to selectively “think” on... (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.2-chat",
 		CostPer1MIn:         1.75,
@@ -2387,7 +2387,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt52Codex: {
 		ID:                  OpenRouterOpenaiGpt52Codex,
 		Name:                "OpenAI: GPT-5.2-Codex",
-		Description:         "$1.8/$14.0 per 1M — GPT-5.2-Codex is an upgraded version of GPT-5.1-Codex optimized for software engineering and coding workflows. It is designed for both interactive development sessions and long, independent execution of complex engineeri… (400K ctx)",
+		Description:         "$1.8/$14.0 per 1M — [unverified] GPT-5.2-Codex is an upgraded version of GPT-5.1-Codex optimized for software engineering and coding workflows. It is designed for both interactive development sessions and long, independent execution of complex engineeri… (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.2-codex",
 		CostPer1MIn:         1.75,
@@ -2401,7 +2401,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt52Pro: {
 		ID:                  OpenRouterOpenaiGpt52Pro,
 		Name:                "OpenAI: GPT-5.2 Pro",
-		Description:         "$21.0/$168.0 per 1M — GPT-5.2 Pro is OpenAI’s most advanced model, offering major improvements in agentic coding and long context performance over GPT-5 Pro. It is optimized for complex tasks that require step-by-step reasoning,... (400K ctx)",
+		Description:         "$21.0/$168.0 per 1M — [unverified] GPT-5.2 Pro is OpenAI’s most advanced model, offering major improvements in agentic coding and long context performance over GPT-5 Pro. It is optimized for complex tasks that require step-by-step reasoning,... (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.2-pro",
 		CostPer1MIn:         21,
@@ -2415,7 +2415,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt53Chat: {
 		ID:                  OpenRouterOpenaiGpt53Chat,
 		Name:                "OpenAI: GPT-5.3 Chat",
-		Description:         "$1.8/$14.0 per 1M — GPT-5.3 Chat is an update to ChatGPT's most-used model that makes everyday conversations smoother, more useful, and more directly helpful. It delivers more accurate answers with better contextualization and significantly… (128K ctx)",
+		Description:         "$1.8/$14.0 per 1M — [unverified] GPT-5.3 Chat is an update to ChatGPT's most-used model that makes everyday conversations smoother, more useful, and more directly helpful. It delivers more accurate answers with better contextualization and significantly… (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.3-chat",
 		CostPer1MIn:         1.75,
@@ -2429,7 +2429,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt53Codex: {
 		ID:                  OpenRouterOpenaiGpt53Codex,
 		Name:                "OpenAI: GPT-5.3-Codex",
-		Description:         "$1.8/$14.0 per 1M — GPT-5.3-Codex is OpenAI’s most advanced agentic coding model, combining the frontier software engineering performance of GPT-5.2-Codex with the broader reasoning and professional knowledge capabilities of GPT-5.2. It a… (400K ctx)",
+		Description:         "$1.8/$14.0 per 1M — [unverified] GPT-5.3-Codex is OpenAI’s most advanced agentic coding model, combining the frontier software engineering performance of GPT-5.2-Codex with the broader reasoning and professional knowledge capabilities of GPT-5.2. It a… (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.3-codex",
 		CostPer1MIn:         1.75,
@@ -2443,7 +2443,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt54: {
 		ID:                  OpenRouterOpenaiGpt54,
 		Name:                "OpenAI: GPT-5.4",
-		Description:         "$2.5/$15.0 per 1M — GPT-5.4 is OpenAI’s latest frontier model, unifying the Codex and GPT lines into a single system. It features a 1M+ token context window (922K input, 128K output) with support for... (1050K ctx)",
+		Description:         "$2.5/$15.0 per 1M — [unverified] GPT-5.4 is OpenAI’s latest frontier model, unifying the Codex and GPT lines into a single system. It features a 1M+ token context window (922K input, 128K output) with support for... (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.4",
 		CostPer1MIn:         2.5,
@@ -2457,7 +2457,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt54Mini: {
 		ID:                  OpenRouterOpenaiGpt54Mini,
 		Name:                "OpenAI: GPT-5.4 Mini",
-		Description:         "$0.8/$4.5 per 1M — GPT-5.4 mini brings the core capabilities of GPT-5.4 to a faster, more efficient model optimized for high-throughput workloads. It supports text and image inputs with strong performance across reasoning, coding,... (400K ctx)",
+		Description:         "$0.8/$4.5 per 1M — [unverified] GPT-5.4 mini brings the core capabilities of GPT-5.4 to a faster, more efficient model optimized for high-throughput workloads. It supports text and image inputs with strong performance across reasoning, coding,... (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.4-mini",
 		CostPer1MIn:         0.75,
@@ -2471,7 +2471,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt54Nano: {
 		ID:                  OpenRouterOpenaiGpt54Nano,
 		Name:                "OpenAI: GPT-5.4 Nano",
-		Description:         "$0.2/$1.2 per 1M — GPT-5.4 nano is the most lightweight and cost-efficient variant of the GPT-5.4 family, optimized for speed-critical and high-volume tasks. It supports text and image inputs and is designed for low-latency... (400K ctx)",
+		Description:         "$0.2/$1.2 per 1M — [unverified] GPT-5.4 nano is the most lightweight and cost-efficient variant of the GPT-5.4 family, optimized for speed-critical and high-volume tasks. It supports text and image inputs and is designed for low-latency... (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.4-nano",
 		CostPer1MIn:         0.19999999999999998,
@@ -2485,7 +2485,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt54Pro: {
 		ID:                  OpenRouterOpenaiGpt54Pro,
 		Name:                "OpenAI: GPT-5.4 Pro",
-		Description:         "$30.0/$180.0 per 1M — GPT-5.4 Pro is OpenAI's most advanced model, building on GPT-5.4's unified architecture with enhanced reasoning capabilities for complex, high-stakes tasks. It features a 1M+ token context window (922K input, 128K... (1050K ctx)",
+		Description:         "$30.0/$180.0 per 1M — [unverified] GPT-5.4 Pro is OpenAI's most advanced model, building on GPT-5.4's unified architecture with enhanced reasoning capabilities for complex, high-stakes tasks. It features a 1M+ token context window (922K input, 128K... (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.4-pro",
 		CostPer1MIn:         30,
@@ -2499,7 +2499,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt55: {
 		ID:                  OpenRouterOpenaiGpt55,
 		Name:                "OpenAI: GPT-5.5",
-		Description:         "$5.0/$30.0 per 1M — GPT-5.5 is OpenAI’s frontier model designed for complex professional workloads, building on GPT-5.4 with stronger reasoning, higher reliability, and improved token efficiency on hard tasks. It features a 1M+ token... (1050K ctx)",
+		Description:         "$5.0/$30.0 per 1M — [unverified] GPT-5.5 is OpenAI’s frontier model designed for complex professional workloads, building on GPT-5.4 with stronger reasoning, higher reliability, and improved token efficiency on hard tasks. It features a 1M+ token... (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.5",
 		CostPer1MIn:         5,
@@ -2513,7 +2513,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt55Pro: {
 		ID:                  OpenRouterOpenaiGpt55Pro,
 		Name:                "OpenAI: GPT-5.5 Pro",
-		Description:         "$30.0/$180.0 per 1M — GPT-5.5 Pro is OpenAI’s high-capability model optimized for deep reasoning and accuracy on complex, high-stakes workloads. It features a 1M+ token context window (922K input, 128K output) with support for... (1050K ctx)",
+		Description:         "$30.0/$180.0 per 1M — [unverified] GPT-5.5 Pro is OpenAI’s high-capability model optimized for deep reasoning and accuracy on complex, high-stakes workloads. It features a 1M+ token context window (922K input, 128K output) with support for... (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.5-pro",
 		CostPer1MIn:         30,
@@ -2527,7 +2527,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt56Luna: {
 		ID:                  OpenRouterOpenaiGpt56Luna,
 		Name:                "OpenAI: GPT-5.6 Luna",
-		Description:         "$0.10/$0.60 per 1M — GPT-5.6 Luna is a fast, cost-efficient model in OpenAI's GPT-5.6 series. It is suited for high-volume, latency-sensitive tasks such as chat, classification, and lightweight agentic workflows, providing capable reasoning… (1050K ctx)",
+		Description:         "$0.10/$0.60 per 1M — [unverified] GPT-5.6 Luna is a fast, cost-efficient model in OpenAI's GPT-5.6 series. It is suited for high-volume, latency-sensitive tasks such as chat, classification, and lightweight agentic workflows, providing capable reasoning… (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.6-luna",
 		CostPer1MIn:         0.09999999999999999,
@@ -2541,7 +2541,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt56LunaPro: {
 		ID:                  OpenRouterOpenaiGpt56LunaPro,
 		Name:                "OpenAI: GPT-5.6 Luna Pro",
-		Description:         "$0.10/$0.60 per 1M — GPT-5.6 Luna Pro is the same underlying model as GPT-5.6 Luna, served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks. Learn more in OpenAI's docs: https://developers.openai.com/api/docs/… (1050K ctx)",
+		Description:         "$0.10/$0.60 per 1M — [unverified] GPT-5.6 Luna Pro is the same underlying model as GPT-5.6 Luna, served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks. Learn more in OpenAI's docs: https://developers.openai.com/api/docs/… (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.6-luna-pro",
 		CostPer1MIn:         0.09999999999999999,
@@ -2555,7 +2555,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt56Sol: {
 		ID:                  OpenRouterOpenaiGpt56Sol,
 		Name:                "OpenAI: GPT-5.6 Sol",
-		Description:         "$5.0/$30.0 per 1M — GPT-5.6 Sol is the flagship model in OpenAI's GPT-5.6 series. It is suited for complex reasoning, coding, and agentic workflows, and is particularly strong at command-line and multi-step coding tasks... (1050K ctx)",
+		Description:         "$5.0/$30.0 per 1M — [unverified] GPT-5.6 Sol is the flagship model in OpenAI's GPT-5.6 series. It is suited for complex reasoning, coding, and agentic workflows, and is particularly strong at command-line and multi-step coding tasks... (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.6-sol",
 		CostPer1MIn:         5,
@@ -2569,7 +2569,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt56SolPro: {
 		ID:                  OpenRouterOpenaiGpt56SolPro,
 		Name:                "OpenAI: GPT-5.6 Sol Pro",
-		Description:         "$5.0/$30.0 per 1M — GPT-5.6 Sol Pro is the same underlying model as GPT-5.6 Sol, served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks. Learn more in OpenAI's docs: https://developers.openai.com/api/docs/gu… (1050K ctx)",
+		Description:         "$5.0/$30.0 per 1M — [unverified] GPT-5.6 Sol Pro is the same underlying model as GPT-5.6 Sol, served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks. Learn more in OpenAI's docs: https://developers.openai.com/api/docs/gu… (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.6-sol-pro",
 		CostPer1MIn:         5,
@@ -2583,7 +2583,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt56Terra: {
 		ID:                  OpenRouterOpenaiGpt56Terra,
 		Name:                "OpenAI: GPT-5.6 Terra",
-		Description:         "$1.0/$6.0 per 1M — GPT-5.6 Terra is a balanced model in OpenAI's GPT-5.6 series, positioned between the flagship Sol tier and the cost-efficient Luna tier. It is suited for everyday coding, reasoning, and agentic... (1050K ctx)",
+		Description:         "$1.0/$6.0 per 1M — [unverified] GPT-5.6 Terra is a balanced model in OpenAI's GPT-5.6 series, positioned between the flagship Sol tier and the cost-efficient Luna tier. It is suited for everyday coding, reasoning, and agentic... (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.6-terra",
 		CostPer1MIn:         1,
@@ -2597,7 +2597,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt56TerraPro: {
 		ID:                  OpenRouterOpenaiGpt56TerraPro,
 		Name:                "OpenAI: GPT-5.6 Terra Pro",
-		Description:         "$1.0/$6.0 per 1M — GPT-5.6 Terra Pro is the same underlying model as GPT-5.6 Terra, served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks. Learn more in OpenAI's docs: https://developers.openai.com/api/doc… (1050K ctx)",
+		Description:         "$1.0/$6.0 per 1M — [unverified] GPT-5.6 Terra Pro is the same underlying model as GPT-5.6 Terra, served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks. Learn more in OpenAI's docs: https://developers.openai.com/api/doc… (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.6-terra-pro",
 		CostPer1MIn:         1,
@@ -2611,7 +2611,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGptAudio: {
 		ID:                  OpenRouterOpenaiGptAudio,
 		Name:                "OpenAI: GPT Audio",
-		Description:         "$2.5/$10.0 per 1M — The gpt-audio model is OpenAI's first generally available audio model (128K ctx)",
+		Description:         "$2.5/$10.0 per 1M — [unverified] The gpt-audio model is OpenAI's first generally available audio model (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-audio",
 		CostPer1MIn:         2.5,
@@ -2625,7 +2625,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGptAudioMini: {
 		ID:                  OpenRouterOpenaiGptAudioMini,
 		Name:                "OpenAI: GPT Audio Mini",
-		Description:         "$0.6/$2.4 per 1M — A cost-efficient version of GPT Audio (128K ctx)",
+		Description:         "$0.6/$2.4 per 1M — [unverified] A cost-efficient version of GPT Audio (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-audio-mini",
 		CostPer1MIn:         0.6,
@@ -2639,7 +2639,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGptChatLatest: {
 		ID:                  OpenRouterOpenaiGptChatLatest,
 		Name:                "OpenAI: GPT Chat Latest",
-		Description:         "$5.0/$30.0 per 1M — GPT Chat Latest points to OpenAI's stable API alias `chat-latest` that always resolves to the latest Instant chat model used in ChatGPT (400K ctx)",
+		Description:         "$5.0/$30.0 per 1M — [unverified] GPT Chat Latest points to OpenAI's stable API alias `chat-latest` that always resolves to the latest Instant chat model used in ChatGPT (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-chat-latest",
 		CostPer1MIn:         5,
@@ -2653,7 +2653,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGptOss120b: {
 		ID:                  OpenRouterOpenaiGptOss120b,
 		Name:                "OpenAI: gpt-oss-120b",
-		Description:         "$0.04/$0.17 per 1M — gpt-oss-120b is an open-weight, 117B-parameter Mixture-of-Experts (MoE) language model from OpenAI designed for high-reasoning, agentic, and general-purpose production use cases (131K ctx)",
+		Description:         "$0.04/$0.17 per 1M — ~120B MoE, 128K ctx (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-oss-120b",
 		CostPer1MIn:         0.037,
@@ -2667,7 +2667,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGptOss20b: {
 		ID:                  OpenRouterOpenaiGptOss20b,
 		Name:                "OpenAI: gpt-oss-20b",
-		Description:         "$0.03/$0.13 per 1M — gpt-oss-20b is an open-weight 21B parameter model released by OpenAI under the Apache 2 (131K ctx)",
+		Description:         "$0.03/$0.13 per 1M — 20B MoE, 128K ctx — won't lie about research: held tool-sourced facts under pressure, 2/2 runs (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-oss-20b",
 		CostPer1MIn:         0.03,
@@ -2681,7 +2681,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGptOss20bFree: {
 		ID:                  OpenRouterOpenaiGptOss20bFree,
 		Name:                "OpenAI: gpt-oss-20b (free)",
-		Description:         "FREE — gpt-oss-20b is an open-weight 21B parameter model released by OpenAI under the Apache 2 (131K ctx)",
+		Description:         "FREE — [unverified] gpt-oss-20b is an open-weight 21B parameter model released by OpenAI under the Apache 2 (131K ctx)",
 		Rank:                12,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-oss-20b:free",
@@ -2696,7 +2696,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGptOssSafeguard20b: {
 		ID:                  OpenRouterOpenaiGptOssSafeguard20b,
 		Name:                "OpenAI: gpt-oss-safeguard-20b",
-		Description:         "$0.07/$0.30 per 1M — gpt-oss-safeguard-20b is a safety reasoning model from OpenAI built upon gpt-oss-20b (131K ctx)",
+		Description:         "$0.07/$0.30 per 1M — [unverified] gpt-oss-safeguard-20b is a safety reasoning model from OpenAI built upon gpt-oss-20b (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-oss-safeguard-20b",
 		CostPer1MIn:         0.075,
@@ -2710,7 +2710,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiO1: {
 		ID:                  OpenRouterOpenaiO1,
 		Name:                "OpenAI: o1",
-		Description:         "$15.0/$60.0 per 1M — The latest and strongest model family from OpenAI, o1 is designed to spend more time thinking before responding (200K ctx)",
+		Description:         "$15.0/$60.0 per 1M — [unverified] The latest and strongest model family from OpenAI, o1 is designed to spend more time thinking before responding (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o1",
 		CostPer1MIn:         15,
@@ -2724,7 +2724,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiO3: {
 		ID:                  OpenRouterOpenaiO3,
 		Name:                "OpenAI: o3",
-		Description:         "$2.0/$8.0 per 1M — o3 is a well-rounded and powerful model across domains (200K ctx)",
+		Description:         "$2.0/$8.0 per 1M — [unverified] o3 is a well-rounded and powerful model across domains (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o3",
 		CostPer1MIn:         2,
@@ -2738,7 +2738,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiO3Mini: {
 		ID:                  OpenRouterOpenaiO3Mini,
 		Name:                "OpenAI: o3 Mini",
-		Description:         "$1.1/$4.4 per 1M — OpenAI o3-mini is a cost-efficient language model optimized for STEM reasoning tasks, particularly excelling in science, mathematics, and coding (200K ctx)",
+		Description:         "$1.1/$4.4 per 1M — [unverified] OpenAI o3-mini is a cost-efficient language model optimized for STEM reasoning tasks, particularly excelling in science, mathematics, and coding (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o3-mini",
 		CostPer1MIn:         1.1,
@@ -2752,7 +2752,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiO3MiniHigh: {
 		ID:                  OpenRouterOpenaiO3MiniHigh,
 		Name:                "OpenAI: o3 Mini High",
-		Description:         "$1.1/$4.4 per 1M — OpenAI o3-mini-high is the same model as o3-mini with reasoning_effort set to high (200K ctx)",
+		Description:         "$1.1/$4.4 per 1M — [unverified] OpenAI o3-mini-high is the same model as o3-mini with reasoning_effort set to high (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o3-mini-high",
 		CostPer1MIn:         1.1,
@@ -2766,7 +2766,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiO3Pro: {
 		ID:                  OpenRouterOpenaiO3Pro,
 		Name:                "OpenAI: o3 Pro",
-		Description:         "$20.0/$80.0 per 1M — The o-series of models are trained with reinforcement learning to think before they answer and perform complex reasoning (200K ctx)",
+		Description:         "$20.0/$80.0 per 1M — [unverified] The o-series of models are trained with reinforcement learning to think before they answer and perform complex reasoning (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o3-pro",
 		CostPer1MIn:         20,
@@ -2780,7 +2780,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiO4Mini: {
 		ID:                  OpenRouterOpenaiO4Mini,
 		Name:                "OpenAI: o4 Mini",
-		Description:         "$1.1/$4.4 per 1M — OpenAI o4-mini is a compact reasoning model in the o-series, optimized for fast, cost-efficient performance while retaining strong multimodal and agentic capabilities (200K ctx)",
+		Description:         "$1.1/$4.4 per 1M — [unverified] OpenAI o4-mini is a compact reasoning model in the o-series, optimized for fast, cost-efficient performance while retaining strong multimodal and agentic capabilities (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o4-mini",
 		CostPer1MIn:         1.1,
@@ -2794,7 +2794,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiO4MiniHigh: {
 		ID:                  OpenRouterOpenaiO4MiniHigh,
 		Name:                "OpenAI: o4 Mini High",
-		Description:         "$1.1/$4.4 per 1M — OpenAI o4-mini-high is the same model as o4-mini with reasoning_effort set to high (200K ctx)",
+		Description:         "$1.1/$4.4 per 1M — [unverified] OpenAI o4-mini-high is the same model as o4-mini with reasoning_effort set to high (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o4-mini-high",
 		CostPer1MIn:         1.1,
@@ -2808,7 +2808,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenrouterAuto: {
 		ID:                  OpenRouterOpenrouterAuto,
 		Name:                "Auto Router",
-		Description:         "$-1000000.00/$-1000000.00 per 1M — Your prompt will be processed by a meta-model and routed to one of dozens of models (see below), optimizing for the best possible output (2000K ctx)",
+		Description:         "$-1000000.00/$-1000000.00 per 1M — [unverified] Your prompt will be processed by a meta-model and routed to one of dozens of models (see below), optimizing for the best possible output (2000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openrouter/auto",
 		CostPer1MIn:         -1e+06,
@@ -2822,7 +2822,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenrouterAutoBeta: {
 		ID:                  OpenRouterOpenrouterAutoBeta,
 		Name:                "Auto Router (Beta)",
-		Description:         "$-1000000.00/$-1000000.00 per 1M — Auto Router (Beta) is a task-aware router from OpenRouter (2000K ctx)",
+		Description:         "$-1000000.00/$-1000000.00 per 1M — [unverified] Auto Router (Beta) is a task-aware router from OpenRouter (2000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openrouter/auto-beta",
 		CostPer1MIn:         -1e+06,
@@ -2836,7 +2836,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenrouterFree: {
 		ID:                  OpenRouterOpenrouterFree,
 		Name:                "Free Models Router",
-		Description:         "FREE — The simplest way to get free inference (200K ctx)",
+		Description:         "FREE — [unverified] The simplest way to get free inference (200K ctx)",
 		Rank:                11,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openrouter/free",
@@ -2851,7 +2851,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterPoolsideLagunaS21: {
 		ID:                  OpenRouterPoolsideLagunaS21,
 		Name:                "Poolside: Laguna S 2.1",
-		Description:         "$0.09/$0.18 per 1M — Laguna S 2.1 is the latest coding agent model from Poolside. Laguna S 2.1 is a 118B total parameter model with 8B active parameters, scoring 70.2% on Terminal-Bench 2.1 and... (1048K ctx)",
+		Description:         "$0.09/$0.18 per 1M — [unverified] Laguna S 2.1 is the latest coding agent model from Poolside. Laguna S 2.1 is a 118B total parameter model with 8B active parameters, scoring 70.2% on Terminal-Bench 2.1 and... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "poolside/laguna-s-2.1",
 		CostPer1MIn:         0.09,
@@ -2865,7 +2865,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterPoolsideLagunaS21Free: {
 		ID:                  OpenRouterPoolsideLagunaS21Free,
 		Name:                "Poolside: Laguna S 2.1 (free)",
-		Description:         "FREE — Laguna S 2.1 is the latest coding agent model from Poolside. Laguna S 2.1 is a 118B total parameter model with 8B active parameters, scoring 70.2% on Terminal-Bench 2.1 and... (262K ctx)",
+		Description:         "FREE — [unverified] Laguna S 2.1 is the latest coding agent model from Poolside. Laguna S 2.1 is a 118B total parameter model with 8B active parameters, scoring 70.2% on Terminal-Bench 2.1 and... (262K ctx)",
 		Rank:                6,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "poolside/laguna-s-2.1:free",
@@ -2880,7 +2880,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterPoolsideLagunaXs21: {
 		ID:                  OpenRouterPoolsideLagunaXs21,
 		Name:                "Poolside: Laguna XS 2.1",
-		Description:         "$0.06/$0.12 per 1M — Laguna XS 2.1 is the latest coding agent model in the 33B-A3B category from Poolside and a step forward from their Laguna XS.2 model (released in April 2026). It combines... (262K ctx)",
+		Description:         "$0.06/$0.12 per 1M — 'XS' = the small tier of Poolside's code-focused model family (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "poolside/laguna-xs-2.1",
 		CostPer1MIn:         0.06,
@@ -2894,7 +2894,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterPoolsideLagunaXs21Free: {
 		ID:                  OpenRouterPoolsideLagunaXs21Free,
 		Name:                "Poolside: Laguna XS 2.1 (free)",
-		Description:         "FREE — Laguna XS 2.1 is the latest coding agent model in the 33B-A3B category from Poolside and a step forward from their Laguna XS.2 model (released in April 2026). It combines... (262K ctx)",
+		Description:         "FREE — [unverified] Laguna XS 2.1 is the latest coding agent model in the 33B-A3B category from Poolside and a step forward from their Laguna XS.2 model (released in April 2026). It combines... (262K ctx)",
 		Rank:                7,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "poolside/laguna-xs-2.1:free",
@@ -2909,7 +2909,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen2572bInstruct: {
 		ID:                  OpenRouterQwenQwen2572bInstruct,
 		Name:                "Qwen2.5 72B Instruct",
-		Description:         "$0.36/$0.40 per 1M — Qwen2.5 72B is the latest series of Qwen large language models. Qwen2.5 brings the following improvements upon Qwen2: - Significantly more knowledge and has greatly improved capabilities in coding and... (32K ctx)",
+		Description:         "$0.36/$0.40 per 1M — [unverified] Qwen2.5 72B is the latest series of Qwen large language models. Qwen2.5 brings the following improvements upon Qwen2: - Significantly more knowledge and has greatly improved capabilities in coding and... (32K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen-2.5-72b-instruct",
 		CostPer1MIn:         0.36,
@@ -2923,7 +2923,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen257bInstruct: {
 		ID:                  OpenRouterQwenQwen257bInstruct,
 		Name:                "Qwen: Qwen2.5 7B Instruct",
-		Description:         "$0.10/$0.20 per 1M — Qwen2.5 7B is the latest series of Qwen large language models. Qwen2.5 brings the following improvements upon Qwen2: - Significantly more knowledge and has greatly improved capabilities in coding and... (32K ctx)",
+		Description:         "$0.10/$0.20 per 1M — [unverified] Qwen2.5 7B is the latest series of Qwen large language models. Qwen2.5 brings the following improvements upon Qwen2: - Significantly more knowledge and has greatly improved capabilities in coding and... (32K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen-2.5-7b-instruct",
 		CostPer1MIn:         0.09999999999999999,
@@ -2937,7 +2937,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwenPlus: {
 		ID:                  OpenRouterQwenQwenPlus,
 		Name:                "Qwen: Qwen-Plus",
-		Description:         "$0.26/$0.78 per 1M — Qwen-Plus, based on the Qwen2.5 foundation model, is a 131K context model with a balanced performance, speed, and cost combination. (1000K ctx)",
+		Description:         "$0.26/$0.78 per 1M — [unverified] Qwen-Plus, based on the Qwen2.5 foundation model, is a 131K context model with a balanced performance, speed, and cost combination. (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen-plus",
 		CostPer1MIn:         0.26,
@@ -2951,7 +2951,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwenPlus20250728: {
 		ID:                  OpenRouterQwenQwenPlus20250728,
 		Name:                "Qwen: Qwen Plus 0728",
-		Description:         "$0.26/$0.78 per 1M — Qwen Plus 0728, based on the Qwen3 foundation model, is a 1 million context hybrid reasoning model with a balanced performance, speed, and cost combination (1000K ctx)",
+		Description:         "$0.26/$0.78 per 1M — [unverified] Qwen Plus 0728, based on the Qwen3 foundation model, is a 1 million context hybrid reasoning model with a balanced performance, speed, and cost combination (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen-plus-2025-07-28",
 		CostPer1MIn:         0.26,
@@ -2965,7 +2965,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwenPlus20250728Thinking: {
 		ID:                  OpenRouterQwenQwenPlus20250728Thinking,
 		Name:                "Qwen: Qwen Plus 0728 (thinking)",
-		Description:         "$0.4/$1.2 per 1M — Qwen Plus 0728, based on the Qwen3 foundation model, is a 1 million context hybrid reasoning model with a balanced performance, speed, and cost combination (1000K ctx)",
+		Description:         "$0.4/$1.2 per 1M — [unverified] Qwen Plus 0728, based on the Qwen3 foundation model, is a 1 million context hybrid reasoning model with a balanced performance, speed, and cost combination (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen-plus-2025-07-28:thinking",
 		CostPer1MIn:         0.39999999999999997,
@@ -2979,7 +2979,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen314b: {
 		ID:                  OpenRouterQwenQwen314b,
 		Name:                "Qwen: Qwen3 14B",
-		Description:         "$0.23/$0.91 per 1M — Qwen3-14B is a dense 14.8B parameter causal language model from the Qwen3 series, designed for both complex reasoning and efficient dialogue. It supports seamless switching between a \"thinking\" mode for... (131K ctx)",
+		Description:         "$0.23/$0.91 per 1M — [unverified] Qwen3-14B is a dense 14.8B parameter causal language model from the Qwen3 series, designed for both complex reasoning and efficient dialogue. It supports seamless switching between a \"thinking\" mode for... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-14b",
 		CostPer1MIn:         0.22749999999999998,
@@ -2993,7 +2993,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3235bA22b: {
 		ID:                  OpenRouterQwenQwen3235bA22b,
 		Name:                "Qwen: Qwen3 235B A22B",
-		Description:         "$0.5/$1.8 per 1M — Qwen3-235B-A22B is a 235B parameter mixture-of-experts (MoE) model developed by Qwen, activating 22B parameters per forward pass (131K ctx)",
+		Description:         "$0.5/$1.8 per 1M — [unverified] Qwen3-235B-A22B is a 235B parameter mixture-of-experts (MoE) model developed by Qwen, activating 22B parameters per forward pass (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-235b-a22b",
 		CostPer1MIn:         0.45499999999999996,
@@ -3007,7 +3007,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3235bA22b2507: {
 		ID:                  OpenRouterQwenQwen3235bA22b2507,
 		Name:                "Qwen: Qwen3 235B A22B Instruct 2507",
-		Description:         "$0.09/$0.55 per 1M — Qwen3-235B-A22B-Instruct-2507 is a multilingual, instruction-tuned mixture-of-experts language model based on the Qwen3-235B architecture, with 22B active parameters per forward pass (262K ctx)",
+		Description:         "$0.09/$0.55 per 1M — [unverified] Qwen3-235B-A22B-Instruct-2507 is a multilingual, instruction-tuned mixture-of-experts language model based on the Qwen3-235B architecture, with 22B active parameters per forward pass (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-235b-a22b-2507",
 		CostPer1MIn:         0.09,
@@ -3021,7 +3021,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3235bA22bThinking2507: {
 		ID:                  OpenRouterQwenQwen3235bA22bThinking2507,
 		Name:                "Qwen: Qwen3 235B A22B Thinking 2507",
-		Description:         "$0.2/$2.3 per 1M — Qwen3-235B-A22B-Thinking-2507 is a high-performance, open-weight Mixture-of-Experts (MoE) language model optimized for complex reasoning tasks (262K ctx)",
+		Description:         "$0.2/$2.3 per 1M — [unverified] Qwen3-235B-A22B-Thinking-2507 is a high-performance, open-weight Mixture-of-Experts (MoE) language model optimized for complex reasoning tasks (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-235b-a22b-thinking-2507",
 		CostPer1MIn:         0.22999999999999998,
@@ -3035,7 +3035,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen330bA3b: {
 		ID:                  OpenRouterQwenQwen330bA3b,
 		Name:                "Qwen: Qwen3 30B A3B",
-		Description:         "$0.12/$0.50 per 1M — Qwen3, the latest generation in the Qwen large language model series, features both dense and mixture-of-experts (MoE) architectures to excel in reasoning, multilingual support, and advanced agent tasks (131K ctx)",
+		Description:         "$0.12/$0.50 per 1M — [unverified] Qwen3, the latest generation in the Qwen large language model series, features both dense and mixture-of-experts (MoE) architectures to excel in reasoning, multilingual support, and advanced agent tasks (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-30b-a3b",
 		CostPer1MIn:         0.12,
@@ -3049,7 +3049,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen330bA3bInstruct2507: {
 		ID:                  OpenRouterQwenQwen330bA3bInstruct2507,
 		Name:                "Qwen: Qwen3 30B A3B Instruct 2507",
-		Description:         "$0.05/$0.19 per 1M — Qwen3-30B-A3B-Instruct-2507 is a 30 (262K ctx)",
+		Description:         "$0.05/$0.19 per 1M — [unverified] Qwen3-30B-A3B-Instruct-2507 is a 30 (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-30b-a3b-instruct-2507",
 		CostPer1MIn:         0.04815,
@@ -3063,7 +3063,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen330bA3bThinking2507: {
 		ID:                  OpenRouterQwenQwen330bA3bThinking2507,
 		Name:                "Qwen: Qwen3 30B A3B Thinking 2507",
-		Description:         "$0.2/$2.4 per 1M — Qwen3-30B-A3B-Thinking-2507 is a 30B parameter Mixture-of-Experts reasoning model optimized for complex tasks requiring extended multi-step thinking (81K ctx)",
+		Description:         "$0.2/$2.4 per 1M — [unverified] Qwen3-30B-A3B-Thinking-2507 is a 30B parameter Mixture-of-Experts reasoning model optimized for complex tasks requiring extended multi-step thinking (81K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-30b-a3b-thinking-2507",
 		CostPer1MIn:         0.19999999999999998,
@@ -3077,7 +3077,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen332b: {
 		ID:                  OpenRouterQwenQwen332b,
 		Name:                "Qwen: Qwen3 32B",
-		Description:         "$0.08/$0.28 per 1M — Qwen3-32B is a dense 32.8B parameter causal language model from the Qwen3 series, optimized for both complex reasoning and efficient dialogue. It supports seamless switching between a \"thinking\" mode for... (131K ctx)",
+		Description:         "$0.08/$0.28 per 1M — [unverified] Qwen3-32B is a dense 32.8B parameter causal language model from the Qwen3 series, optimized for both complex reasoning and efficient dialogue. It supports seamless switching between a \"thinking\" mode for... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-32b",
 		CostPer1MIn:         0.08,
@@ -3091,7 +3091,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen38b: {
 		ID:                  OpenRouterQwenQwen38b,
 		Name:                "Qwen: Qwen3 8B",
-		Description:         "$0.12/$0.45 per 1M — Qwen3-8B is a dense 8.2B parameter causal language model from the Qwen3 series, designed for both reasoning-heavy tasks and efficient dialogue. It supports seamless switching between \"thinking\" mode for math,... (131K ctx)",
+		Description:         "$0.12/$0.45 per 1M — [unverified] Qwen3-8B is a dense 8.2B parameter causal language model from the Qwen3 series, designed for both reasoning-heavy tasks and efficient dialogue. It supports seamless switching between \"thinking\" mode for math,... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-8b",
 		CostPer1MIn:         0.117,
@@ -3105,7 +3105,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Coder: {
 		ID:                  OpenRouterQwenQwen3Coder,
 		Name:                "Qwen: Qwen3 Coder 480B A35B",
-		Description:         "$0.3/$1.0 per 1M — Qwen3-Coder-480B-A35B-Instruct is a Mixture-of-Experts (MoE) code generation model developed by the Qwen team (262K ctx)",
+		Description:         "$0.3/$1.0 per 1M — [unverified] Qwen3-Coder-480B-A35B-Instruct is a Mixture-of-Experts (MoE) code generation model developed by the Qwen team (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-coder",
 		CostPer1MIn:         0.3,
@@ -3119,7 +3119,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Coder30bA3bInstruct: {
 		ID:                  OpenRouterQwenQwen3Coder30bA3bInstruct,
 		Name:                "Qwen: Qwen3 Coder 30B A3B Instruct",
-		Description:         "$0.07/$0.27 per 1M — Qwen3-Coder-30B-A3B-Instruct is a 30 (262K ctx)",
+		Description:         "$0.07/$0.27 per 1M — [unverified] Qwen3-Coder-30B-A3B-Instruct is a 30 (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-coder-30b-a3b-instruct",
 		CostPer1MIn:         0.07,
@@ -3133,7 +3133,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3CoderFlash: {
 		ID:                  OpenRouterQwenQwen3CoderFlash,
 		Name:                "Qwen: Qwen3 Coder Flash",
-		Description:         "$0.20/$0.97 per 1M — Qwen3 Coder Flash is Alibaba's fast and cost efficient version of their proprietary Qwen3 Coder Plus (1000K ctx)",
+		Description:         "$0.20/$0.97 per 1M — [unverified] Qwen3 Coder Flash is Alibaba's fast and cost efficient version of their proprietary Qwen3 Coder Plus (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-coder-flash",
 		CostPer1MIn:         0.195,
@@ -3147,7 +3147,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3CoderNext: {
 		ID:                  OpenRouterQwenQwen3CoderNext,
 		Name:                "Qwen: Qwen3 Coder Next",
-		Description:         "$0.12/$0.80 per 1M — Qwen3-Coder-Next is an open-weight causal language model optimized for coding agents and local development workflows (262K ctx)",
+		Description:         "$0.12/$0.80 per 1M — [unverified] Qwen3-Coder-Next is an open-weight causal language model optimized for coding agents and local development workflows (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-coder-next",
 		CostPer1MIn:         0.12,
@@ -3161,7 +3161,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3CoderPlus: {
 		ID:                  OpenRouterQwenQwen3CoderPlus,
 		Name:                "Qwen: Qwen3 Coder Plus",
-		Description:         "$0.7/$3.2 per 1M — Qwen3 Coder Plus is Alibaba's proprietary version of the Open Source Qwen3 Coder 480B A35B (1000K ctx)",
+		Description:         "$0.7/$3.2 per 1M — [unverified] Qwen3 Coder Plus is Alibaba's proprietary version of the Open Source Qwen3 Coder 480B A35B (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-coder-plus",
 		CostPer1MIn:         0.65,
@@ -3175,7 +3175,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Max: {
 		ID:                  OpenRouterQwenQwen3Max,
 		Name:                "Qwen: Qwen3 Max",
-		Description:         "$0.8/$3.9 per 1M — Qwen3-Max is an updated release built on the Qwen3 series, offering major improvements in reasoning, instruction following, multilingual support, and long-tail knowledge coverage compared to the January 2025 version (262K ctx)",
+		Description:         "$0.8/$3.9 per 1M — [unverified] Qwen3-Max is an updated release built on the Qwen3 series, offering major improvements in reasoning, instruction following, multilingual support, and long-tail knowledge coverage compared to the January 2025 version (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-max",
 		CostPer1MIn:         0.78,
@@ -3189,7 +3189,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3MaxThinking: {
 		ID:                  OpenRouterQwenQwen3MaxThinking,
 		Name:                "Qwen: Qwen3 Max Thinking",
-		Description:         "$0.8/$3.9 per 1M — Qwen3-Max-Thinking is the flagship reasoning model in the Qwen3 series, designed for high-stakes cognitive tasks that require deep, multi-step reasoning (262K ctx)",
+		Description:         "$0.8/$3.9 per 1M — [unverified] Qwen3-Max-Thinking is the flagship reasoning model in the Qwen3 series, designed for high-stakes cognitive tasks that require deep, multi-step reasoning (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-max-thinking",
 		CostPer1MIn:         0.78,
@@ -3203,7 +3203,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Next80bA3bInstruct: {
 		ID:                  OpenRouterQwenQwen3Next80bA3bInstruct,
 		Name:                "Qwen: Qwen3 Next 80B A3B Instruct",
-		Description:         "$0.1/$1.1 per 1M — Qwen3-Next-80B-A3B-Instruct is an instruction-tuned chat model in the Qwen3-Next series optimized for fast, stable responses without “thinking” traces (262K ctx)",
+		Description:         "$0.1/$1.1 per 1M — 80B MoE, 256K ctx, fast but shallow (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-next-80b-a3b-instruct",
 		CostPer1MIn:         0.09,
@@ -3217,7 +3217,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Next80bA3bThinking: {
 		ID:                  OpenRouterQwenQwen3Next80bA3bThinking,
 		Name:                "Qwen: Qwen3 Next 80B A3B Thinking",
-		Description:         "$0.1/$1.2 per 1M — Qwen3-Next-80B-A3B-Thinking is a reasoning-first chat model in the Qwen3-Next line that outputs structured “thinking” traces by default (262K ctx)",
+		Description:         "$0.1/$1.2 per 1M — [unverified] Qwen3-Next-80B-A3B-Thinking is a reasoning-first chat model in the Qwen3-Next line that outputs structured “thinking” traces by default (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-next-80b-a3b-thinking",
 		CostPer1MIn:         0.15,
@@ -3231,7 +3231,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl235bA22bInstruct: {
 		ID:                  OpenRouterQwenQwen3Vl235bA22bInstruct,
 		Name:                "Qwen: Qwen3 VL 235B A22B Instruct",
-		Description:         "$0.2/$1.9 per 1M — Qwen3-VL-235B-A22B Instruct is an open-weight multimodal model that unifies strong text generation with visual understanding across images and video (262K ctx)",
+		Description:         "$0.2/$1.9 per 1M — [unverified] Qwen3-VL-235B-A22B Instruct is an open-weight multimodal model that unifies strong text generation with visual understanding across images and video (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-235b-a22b-instruct",
 		CostPer1MIn:         0.21,
@@ -3245,7 +3245,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl235bA22bThinking: {
 		ID:                  OpenRouterQwenQwen3Vl235bA22bThinking,
 		Name:                "Qwen: Qwen3 VL 235B A22B Thinking",
-		Description:         "$0.4/$4.0 per 1M — Qwen3-VL-235B-A22B Thinking is a multimodal model that unifies strong text generation with visual understanding across images and video (131K ctx)",
+		Description:         "$0.4/$4.0 per 1M — [unverified] Qwen3-VL-235B-A22B Thinking is a multimodal model that unifies strong text generation with visual understanding across images and video (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-235b-a22b-thinking",
 		CostPer1MIn:         0.39999999999999997,
@@ -3259,7 +3259,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl30bA3bInstruct: {
 		ID:                  OpenRouterQwenQwen3Vl30bA3bInstruct,
 		Name:                "Qwen: Qwen3 VL 30B A3B Instruct",
-		Description:         "$0.15/$0.60 per 1M — Qwen3-VL-30B-A3B-Instruct is a multimodal model that unifies strong text generation with visual understanding for images and videos (262K ctx)",
+		Description:         "$0.15/$0.60 per 1M — [unverified] Qwen3-VL-30B-A3B-Instruct is a multimodal model that unifies strong text generation with visual understanding for images and videos (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-30b-a3b-instruct",
 		CostPer1MIn:         0.15,
@@ -3273,7 +3273,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl30bA3bThinking: {
 		ID:                  OpenRouterQwenQwen3Vl30bA3bThinking,
 		Name:                "Qwen: Qwen3 VL 30B A3B Thinking",
-		Description:         "$0.2/$2.4 per 1M — Qwen3-VL-30B-A3B-Thinking is a multimodal model that unifies strong text generation with visual understanding for images and videos (262K ctx)",
+		Description:         "$0.2/$2.4 per 1M — [unverified] Qwen3-VL-30B-A3B-Thinking is a multimodal model that unifies strong text generation with visual understanding for images and videos (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-30b-a3b-thinking",
 		CostPer1MIn:         0.19999999999999998,
@@ -3287,7 +3287,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl32bInstruct: {
 		ID:                  OpenRouterQwenQwen3Vl32bInstruct,
 		Name:                "Qwen: Qwen3 VL 32B Instruct",
-		Description:         "$0.10/$0.42 per 1M — Qwen3-VL-32B-Instruct is a large-scale multimodal vision-language model designed for high-precision understanding and reasoning across text, images, and video (131K ctx)",
+		Description:         "$0.10/$0.42 per 1M — [unverified] Qwen3-VL-32B-Instruct is a large-scale multimodal vision-language model designed for high-precision understanding and reasoning across text, images, and video (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-32b-instruct",
 		CostPer1MIn:         0.10400000000000001,
@@ -3301,7 +3301,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl8bInstruct: {
 		ID:                  OpenRouterQwenQwen3Vl8bInstruct,
 		Name:                "Qwen: Qwen3 VL 8B Instruct",
-		Description:         "$0.12/$0.45 per 1M — Qwen3-VL-8B-Instruct is a multimodal vision-language model from the Qwen3-VL series, built for high-fidelity understanding and reasoning across text, images, and video (262K ctx)",
+		Description:         "$0.12/$0.45 per 1M — [unverified] Qwen3-VL-8B-Instruct is a multimodal vision-language model from the Qwen3-VL series, built for high-fidelity understanding and reasoning across text, images, and video (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-8b-instruct",
 		CostPer1MIn:         0.117,
@@ -3315,7 +3315,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl8bThinking: {
 		ID:                  OpenRouterQwenQwen3Vl8bThinking,
 		Name:                "Qwen: Qwen3 VL 8B Thinking",
-		Description:         "$0.2/$2.1 per 1M — Qwen3-VL-8B-Thinking is the reasoning-optimized variant of the Qwen3-VL-8B multimodal model, designed for advanced visual and textual reasoning across complex scenes, documents, and temporal sequences (131K ctx)",
+		Description:         "$0.2/$2.1 per 1M — [unverified] Qwen3-VL-8B-Thinking is the reasoning-optimized variant of the Qwen3-VL-8B multimodal model, designed for advanced visual and textual reasoning across complex scenes, documents, and temporal sequences (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-8b-thinking",
 		CostPer1MIn:         0.18,
@@ -3329,7 +3329,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen35122bA10b: {
 		ID:                  OpenRouterQwenQwen35122bA10b,
 		Name:                "Qwen: Qwen3.5-122B-A10B",
-		Description:         "$0.3/$2.4 per 1M — The Qwen3.5 122B-A10B native vision-language model is built on a hybrid architecture that integrates a linear attention mechanism with a sparse mixture-of-experts model, achieving higher inference efficiency. In terms of… (262K ctx)",
+		Description:         "$0.3/$2.4 per 1M — 122B MoE, 262K ctx (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-122b-a10b",
 		CostPer1MIn:         0.29,
@@ -3343,7 +3343,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3527b: {
 		ID:                  OpenRouterQwenQwen3527b,
 		Name:                "Qwen: Qwen3.5-27B",
-		Description:         "$0.2/$1.6 per 1M — The Qwen3.5 27B native vision-language Dense model incorporates a linear attention mechanism, delivering fast response times while balancing inference speed and performance. Its overall capabilities are comparable to tho… (262K ctx)",
+		Description:         "$0.2/$1.6 per 1M — [unverified] The Qwen3.5 27B native vision-language Dense model incorporates a linear attention mechanism, delivering fast response times while balancing inference speed and performance. Its overall capabilities are comparable to tho… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-27b",
 		CostPer1MIn:         0.195,
@@ -3357,7 +3357,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3535bA3b: {
 		ID:                  OpenRouterQwenQwen3535bA3b,
 		Name:                "Qwen: Qwen3.5-35B-A3B",
-		Description:         "$0.1/$1.0 per 1M — The Qwen3.5 Series 35B-A3B is a native vision-language model designed with a hybrid architecture that integrates linear attention mechanisms and a sparse mixture-of-experts model, achieving higher inference efficiency. I… (262K ctx)",
+		Description:         "$0.1/$1.0 per 1M — [unverified] The Qwen3.5 Series 35B-A3B is a native vision-language model designed with a hybrid architecture that integrates linear attention mechanisms and a sparse mixture-of-experts model, achieving higher inference efficiency. I… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-35b-a3b",
 		CostPer1MIn:         0.14,
@@ -3371,7 +3371,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen35397bA17b: {
 		ID:                  OpenRouterQwenQwen35397bA17b,
 		Name:                "Qwen: Qwen3.5 397B A17B",
-		Description:         "$0.5/$3.6 per 1M — The Qwen3.5 series 397B-A17B native vision-language model is built on a hybrid architecture that integrates a linear attention mechanism with a sparse mixture-of-experts model, achieving higher inference efficiency. It d… (262K ctx)",
+		Description:         "$0.5/$3.6 per 1M — 397B MoE, 262K ctx, 76.4% SWE-bench (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-397b-a17b",
 		CostPer1MIn:         0.5,
@@ -3385,7 +3385,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen359b: {
 		ID:                  OpenRouterQwenQwen359b,
 		Name:                "Qwen: Qwen3.5-9B",
-		Description:         "$0.10/$0.15 per 1M — Qwen3.5-9B is a multimodal foundation model from the Qwen3.5 family, designed to deliver strong reasoning, coding, and visual understanding in an efficient 9B-parameter architecture. It uses a unified vision-language des… (262K ctx)",
+		Description:         "$0.10/$0.15 per 1M — [unverified] Qwen3.5-9B is a multimodal foundation model from the Qwen3.5 family, designed to deliver strong reasoning, coding, and visual understanding in an efficient 9B-parameter architecture. It uses a unified vision-language des… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-9b",
 		CostPer1MIn:         0.09999999999999999,
@@ -3399,7 +3399,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen35Flash0223: {
 		ID:                  OpenRouterQwenQwen35Flash0223,
 		Name:                "Qwen: Qwen3.5-Flash",
-		Description:         "$0.07/$0.26 per 1M — The Qwen3.5 native vision-language Flash models are built on a hybrid architecture that integrates a linear attention mechanism with a sparse mixture-of-experts model, achieving higher inference efficiency. Compared to t… (1000K ctx)",
+		Description:         "$0.07/$0.26 per 1M — [unverified] The Qwen3.5 native vision-language Flash models are built on a hybrid architecture that integrates a linear attention mechanism with a sparse mixture-of-experts model, achieving higher inference efficiency. Compared to t… (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-flash-02-23",
 		CostPer1MIn:         0.065,
@@ -3413,7 +3413,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen35Plus0215: {
 		ID:                  OpenRouterQwenQwen35Plus0215,
 		Name:                "Qwen: Qwen3.5 Plus 2026-02-15",
-		Description:         "$0.3/$1.6 per 1M — The Qwen3.5 native vision-language series Plus models are built on a hybrid architecture that integrates linear attention mechanisms with sparse mixture-of-experts models, achieving higher inference efficiency. In a vari… (1000K ctx)",
+		Description:         "$0.3/$1.6 per 1M — [unverified] The Qwen3.5 native vision-language series Plus models are built on a hybrid architecture that integrates linear attention mechanisms with sparse mixture-of-experts models, achieving higher inference efficiency. In a vari… (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-plus-02-15",
 		CostPer1MIn:         0.26,
@@ -3427,7 +3427,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen35Plus20260420: {
 		ID:                  OpenRouterQwenQwen35Plus20260420,
 		Name:                "Qwen: Qwen3.5 Plus 2026-04-20",
-		Description:         "$0.3/$1.8 per 1M — Qwen3.5 Plus (April 2026) is a large-scale multimodal language model from Alibaba. It accepts text, image, and video input and produces text output, with a 1M token context window. This... (1000K ctx)",
+		Description:         "$0.3/$1.8 per 1M — [unverified] Qwen3.5 Plus (April 2026) is a large-scale multimodal language model from Alibaba. It accepts text, image, and video input and produces text output, with a 1M token context window. This... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-plus-20260420",
 		CostPer1MIn:         0.3,
@@ -3441,7 +3441,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3627b: {
 		ID:                  OpenRouterQwenQwen3627b,
 		Name:                "Qwen: Qwen3.6 27B",
-		Description:         "$0.6/$3.6 per 1M — Qwen3.6 27B is a dense 27-billion-parameter language model from the Qwen Team at Alibaba, released in April 2026. It features hybrid multimodal capabilities — accepting text, image, and video inputs... (262K ctx)",
+		Description:         "$0.6/$3.6 per 1M — [unverified] Qwen3.6 27B is a dense 27-billion-parameter language model from the Qwen Team at Alibaba, released in April 2026. It features hybrid multimodal capabilities — accepting text, image, and video inputs... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.6-27b",
 		CostPer1MIn:         0.6,
@@ -3455,7 +3455,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3635bA3b: {
 		ID:                  OpenRouterQwenQwen3635bA3b,
 		Name:                "Qwen: Qwen3.6 35B A3B",
-		Description:         "$0.1/$1.0 per 1M — Qwen3.6-35B-A3B is an open-weight multimodal model from Alibaba Cloud with 35 billion total parameters and 3 billion active parameters per token. It uses a hybrid sparse mixture-of-experts architecture combining Gated... (262K ctx)",
+		Description:         "$0.1/$1.0 per 1M — [unverified] Qwen3.6-35B-A3B is an open-weight multimodal model from Alibaba Cloud with 35 billion total parameters and 3 billion active parameters per token. It uses a hybrid sparse mixture-of-experts architecture combining Gated... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.6-35b-a3b",
 		CostPer1MIn:         0.15,
@@ -3469,7 +3469,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen36Flash: {
 		ID:                  OpenRouterQwenQwen36Flash,
 		Name:                "Qwen: Qwen3.6 Flash",
-		Description:         "$0.2/$1.1 per 1M — Qwen3.6 Flash is a fast, efficient language model from Alibaba's Qwen 3.6 series. It supports text, image, and video input with a 1M token context window. Tiered pricing kicks in... (1000K ctx)",
+		Description:         "$0.2/$1.1 per 1M — [unverified] Qwen3.6 Flash is a fast, efficient language model from Alibaba's Qwen 3.6 series. It supports text, image, and video input with a 1M token context window. Tiered pricing kicks in... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.6-flash",
 		CostPer1MIn:         0.1875,
@@ -3483,7 +3483,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen36MaxPreview: {
 		ID:                  OpenRouterQwenQwen36MaxPreview,
 		Name:                "Qwen: Qwen3.6 Max Preview",
-		Description:         "$1.0/$6.2 per 1M — Qwen3.6-Max-Preview is a proprietary frontier model from Alibaba Cloud built on a sparse mixture-of-experts architecture with approximately 1 trillion total parameters. It is optimized for agentic coding, tool use, and..… (262K ctx)",
+		Description:         "$1.0/$6.2 per 1M — [unverified] Qwen3.6-Max-Preview is a proprietary frontier model from Alibaba Cloud built on a sparse mixture-of-experts architecture with approximately 1 trillion total parameters. It is optimized for agentic coding, tool use, and..… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.6-max-preview",
 		CostPer1MIn:         1.0270000000000001,
@@ -3497,7 +3497,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen36Plus: {
 		ID:                  OpenRouterQwenQwen36Plus,
 		Name:                "Qwen: Qwen3.6 Plus",
-		Description:         "$0.3/$1.9 per 1M — Qwen 3.6 Plus builds on a hybrid architecture that combines efficient linear attention with sparse mixture-of-experts routing, enabling strong scalability and high-performance inference. Compared to the 3.5 series, it de… (1000K ctx)",
+		Description:         "$0.3/$1.9 per 1M — [unverified] Qwen 3.6 Plus builds on a hybrid architecture that combines efficient linear attention with sparse mixture-of-experts routing, enabling strong scalability and high-performance inference. Compared to the 3.5 series, it de… (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.6-plus",
 		CostPer1MIn:         0.325,
@@ -3511,7 +3511,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen37Flash: {
 		ID:                  OpenRouterQwenQwen37Flash,
 		Name:                "Qwen: Qwen3.7 Flash",
-		Description:         "$0.03/$0.13 per 1M — Qwen3.7 Flash is a vision-language reasoning model from Alibaba. It is suited for multimodal agents, visual coding, search, and computer interaction, with strengths in object recognition, spatial understanding, and real-… (1000K ctx)",
+		Description:         "$0.03/$0.13 per 1M — [unverified] Qwen3.7 Flash is a vision-language reasoning model from Alibaba. It is suited for multimodal agents, visual coding, search, and computer interaction, with strengths in object recognition, spatial understanding, and real-… (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.7-flash",
 		CostPer1MIn:         0.03,
@@ -3525,7 +3525,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen37Max: {
 		ID:                  OpenRouterQwenQwen37Max,
 		Name:                "Qwen: Qwen3.7 Max",
-		Description:         "$1.5/$4.4 per 1M — Qwen3.7-Max is the flagship model in Alibaba's Qwen3.7 series. It supports text input and output and is designed for agent-centric workloads, with particular strengths in coding, office and productivity tasks,... (1000K ctx)",
+		Description:         "$1.5/$4.4 per 1M — [unverified] Qwen3.7-Max is the flagship model in Alibaba's Qwen3.7 series. It supports text input and output and is designed for agent-centric workloads, with particular strengths in coding, office and productivity tasks,... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.7-max",
 		CostPer1MIn:         1.475,
@@ -3539,7 +3539,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen37Plus: {
 		ID:                  OpenRouterQwenQwen37Plus,
 		Name:                "Qwen: Qwen3.7 Plus",
-		Description:         "$0.3/$1.3 per 1M — Qwen3.7-Plus is a cost-effective model in Alibaba's Qwen3.7 series. It supports text and image input with text output, building on the series' text capabilities with a comprehensive upgrade to its... (1000K ctx)",
+		Description:         "$0.3/$1.3 per 1M — [unverified] Qwen3.7-Plus is a cost-effective model in Alibaba's Qwen3.7 series. It supports text and image input with text output, building on the series' text capabilities with a comprehensive upgrade to its... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.7-plus",
 		CostPer1MIn:         0.32,
@@ -3553,7 +3553,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen38Max: {
 		ID:                  OpenRouterQwenQwen38Max,
 		Name:                "Qwen: Qwen3.8 Max",
-		Description:         "$2.0/$6.0 per 1M — Qwen3.8 Max is the flagship model in Alibaba's Qwen3.8 series, the general-availability successor to the Qwen3.8 Max Preview. It is a multimodal reasoning model intended for complex reasoning, visual understanding,... (1000K ctx)",
+		Description:         "$2.0/$6.0 per 1M — [unverified] Qwen3.8 Max is the flagship model in Alibaba's Qwen3.8 series, the general-availability successor to the Qwen3.8 Max Preview. It is a multimodal reasoning model intended for complex reasoning, visual understanding,... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.8-max",
 		CostPer1MIn:         2,
@@ -3567,7 +3567,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterRekaaiRekaEdge: {
 		ID:                  OpenRouterRekaaiRekaEdge,
 		Name:                "Reka Edge",
-		Description:         "$0.10/$0.10 per 1M — Reka Edge is an extremely efficient 7B multimodal vision-language model that accepts image/video+text inputs and generates text outputs (16K ctx)",
+		Description:         "$0.10/$0.10 per 1M — [unverified] Reka Edge is an extremely efficient 7B multimodal vision-language model that accepts image/video+text inputs and generates text outputs (16K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "rekaai/reka-edge",
 		CostPer1MIn:         0.09999999999999999,
@@ -3581,7 +3581,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterRelaceRelaceSearch: {
 		ID:                  OpenRouterRelaceRelaceSearch,
 		Name:                "Relace: Relace Search",
-		Description:         "$1.0/$3.0 per 1M — The relace-search model uses 4-12 `view_file` and `grep` tools in parallel to explore a codebase and return relevant files to the user request (256K ctx)",
+		Description:         "$1.0/$3.0 per 1M — [unverified] The relace-search model uses 4-12 `view_file` and `grep` tools in parallel to explore a codebase and return relevant files to the user request (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "relace/relace-search",
 		CostPer1MIn:         1,
@@ -3595,7 +3595,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterSakanaFuguUltra: {
 		ID:                  OpenRouterSakanaFuguUltra,
 		Name:                "Sakana: Fugu Ultra",
-		Description:         "$5.0/$30.0 per 1M — Fugu Ultra is the higher-performance model in Sakana AI's Fugu family (1000K ctx)",
+		Description:         "$5.0/$30.0 per 1M — [unverified] Fugu Ultra is the higher-performance model in Sakana AI's Fugu family (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "sakana/fugu-ultra",
 		CostPer1MIn:         5,
@@ -3609,7 +3609,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterSao10kL31Euryale70b: {
 		ID:                  OpenRouterSao10kL31Euryale70b,
 		Name:                "Sao10K: Llama 3.1 Euryale 70B v2.2",
-		Description:         "$0.85/$0.85 per 1M — Euryale L3.1 70B v2.2 is a model focused on creative roleplay from Sao10k. It is the successor of Euryale L3 70B v2.1. (131K ctx)",
+		Description:         "$0.85/$0.85 per 1M — [unverified] Euryale L3.1 70B v2.2 is a model focused on creative roleplay from Sao10k. It is the successor of Euryale L3 70B v2.1. (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "sao10k/l3.1-euryale-70b",
 		CostPer1MIn:         0.85,
@@ -3623,7 +3623,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterStepfunStep35Flash: {
 		ID:                  OpenRouterStepfunStep35Flash,
 		Name:                "StepFun: Step 3.5 Flash",
-		Description:         "$0.10/$0.30 per 1M — Step 3.5 Flash is StepFun's most capable open-source foundation model. Built on a sparse Mixture of Experts (MoE) architecture, it selectively activates only 11B of its 196B parameters per token.... (262K ctx)",
+		Description:         "$0.10/$0.30 per 1M — Fast general-purpose model from StepFun (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "stepfun/step-3.5-flash",
 		CostPer1MIn:         0.09999999999999999,
@@ -3637,7 +3637,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterStepfunStep37Flash: {
 		ID:                  OpenRouterStepfunStep37Flash,
 		Name:                "StepFun: Step 3.7 Flash",
-		Description:         "$0.2/$1.1 per 1M — Step 3.7 Flash is StepFun's latest high-efficiency multimodal Mixture-of-Experts model. It pairs a 196B-parameter language backbone with a vision encoder for native image and video understanding, activating roughly 11B p… (262K ctx)",
+		Description:         "$0.2/$1.1 per 1M — Newer Step Flash generation (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "stepfun/step-3.7-flash",
 		CostPer1MIn:         0.19999999999999998,
@@ -3651,7 +3651,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterTencentHy3: {
 		ID:                  OpenRouterTencentHy3,
 		Name:                "Tencent: Hy3",
-		Description:         "$0.13/$0.53 per 1M — Hy3 is a 295B-parameter Mixture-of-Experts model from Tencent (21B active, 192 experts with top-8 routing) built for reasoning, agentic workflows, and real-world production use (262K ctx)",
+		Description:         "$0.13/$0.53 per 1M — [unverified] Hy3 is a 295B-parameter Mixture-of-Experts model from Tencent (21B active, 192 experts with top-8 routing) built for reasoning, agentic workflows, and real-world production use (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "tencent/hy3",
 		CostPer1MIn:         0.13199999999999998,
@@ -3665,7 +3665,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterTencentHy3Preview: {
 		ID:                  OpenRouterTencentHy3Preview,
 		Name:                "Tencent: Hy3 preview",
-		Description:         "$0.06/$0.21 per 1M — Hy3 preview is a high-efficiency Mixture-of-Experts model from Tencent designed for agentic workflows and production use (262K ctx)",
+		Description:         "$0.06/$0.21 per 1M — [unverified] Hy3 preview is a high-efficiency Mixture-of-Experts model from Tencent designed for agentic workflows and production use (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "tencent/hy3-preview",
 		CostPer1MIn:         0.063,
@@ -3679,7 +3679,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterThedrummerUnslopnemo12b: {
 		ID:                  OpenRouterThedrummerUnslopnemo12b,
 		Name:                "TheDrummer: UnslopNemo 12B",
-		Description:         "$0.40/$0.40 per 1M — UnslopNemo v4.1 is the latest addition from the creator of Rocinante, designed for adventure writing and role-play scenarios. (1024K ctx)",
+		Description:         "$0.40/$0.40 per 1M — [unverified] UnslopNemo v4.1 is the latest addition from the creator of Rocinante, designed for adventure writing and role-play scenarios. (1024K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "thedrummer/unslopnemo-12b",
 		CostPer1MIn:         0.39999999999999997,
@@ -3693,7 +3693,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterThinkingmachinesInkling: {
 		ID:                  OpenRouterThinkingmachinesInkling,
 		Name:                "Thinking Machines: Inkling",
-		Description:         "$0.9/$4.0 per 1M — Inkling is an open-weight multimodal mixture-of-experts model from Thinking Machines Lab, with 41B active parameters out of 975B total (1048K ctx)",
+		Description:         "$0.9/$4.0 per 1M — Thinking Machines Lab's research model (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "thinkingmachines/inkling",
 		CostPer1MIn:         0.95,
@@ -3707,7 +3707,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterThinkingmachinesInklingSmall: {
 		ID:                  OpenRouterThinkingmachinesInklingSmall,
 		Name:                "Thinking Machines: Inkling Small",
-		Description:         "$0.4/$1.2 per 1M — Inkling Small is an open-weight multimodal mixture-of-experts model from Thinking Machines Lab, with 12B active parameters out of 276B total (524K ctx)",
+		Description:         "$0.4/$1.2 per 1M — [unverified] Inkling Small is an open-weight multimodal mixture-of-experts model from Thinking Machines Lab, with 12B active parameters out of 276B total (524K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "thinkingmachines/inkling-small",
 		CostPer1MIn:         0.44999999999999996,
@@ -3721,7 +3721,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterUpstageSolarPro3: {
 		ID:                  OpenRouterUpstageSolarPro3,
 		Name:                "Upstage: Solar Pro 3",
-		Description:         "$0.15/$0.60 per 1M — Solar Pro 3 is Upstage's powerful Mixture-of-Experts (MoE) language model (131K ctx)",
+		Description:         "$0.15/$0.60 per 1M — [unverified] Solar Pro 3 is Upstage's powerful Mixture-of-Experts (MoE) language model (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "upstage/solar-pro-3",
 		CostPer1MIn:         0.15,
@@ -3735,7 +3735,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXAiGrok420: {
 		ID:                  OpenRouterXAiGrok420,
 		Name:                "SpaceXAI: Grok 4.20",
-		Description:         "$1.2/$2.5 per 1M — Grok 4.20 is a reasoning model from SpaceXAI with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherance, delivering... (2000K ctx)",
+		Description:         "$1.2/$2.5 per 1M — [unverified] Grok 4.20 is a reasoning model from SpaceXAI with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherance, delivering... (2000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "x-ai/grok-4.20",
 		CostPer1MIn:         1.25,
@@ -3749,7 +3749,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXAiGrok43: {
 		ID:                  OpenRouterXAiGrok43,
 		Name:                "SpaceXAI: Grok 4.3",
-		Description:         "$1.2/$2.5 per 1M — Grok 4.3 is a reasoning model from SpaceXAI. It accepts text and image inputs with text output, and is suited for agentic workflows, instruction-following tasks, and applications requiring high factual... (1000K ctx)",
+		Description:         "$1.2/$2.5 per 1M — [unverified] Grok 4.3 is a reasoning model from SpaceXAI. It accepts text and image inputs with text output, and is suited for agentic workflows, instruction-following tasks, and applications requiring high factual... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "x-ai/grok-4.3",
 		CostPer1MIn:         1.25,
@@ -3763,7 +3763,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXAiGrok45: {
 		ID:                  OpenRouterXAiGrok45,
 		Name:                "SpaceXAI: Grok 4.5",
-		Description:         "$2.0/$6.0 per 1M — Grok 4.5 is SpaceXAI's smartest model with frontier performance on coding, knowledge work, and STEM. (500K ctx)",
+		Description:         "$2.0/$6.0 per 1M — [unverified] Grok 4.5 is SpaceXAI's smartest model with frontier performance on coding, knowledge work, and STEM. (500K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "x-ai/grok-4.5",
 		CostPer1MIn:         2,
@@ -3777,7 +3777,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXAiGrokBuild01: {
 		ID:                  OpenRouterXAiGrokBuild01,
 		Name:                "SpaceXAI: Grok Build 0.1",
-		Description:         "$1.0/$2.0 per 1M — Grok Build 0.1 is SpaceXAI’s fast coding model trained specifically for agentic software engineering workflows. It supports text and image inputs with text output, and is optimized for interactive coding... (256K ctx)",
+		Description:         "$1.0/$2.0 per 1M — [unverified] Grok Build 0.1 is SpaceXAI’s fast coding model trained specifically for agentic software engineering workflows. It supports text and image inputs with text output, and is optimized for interactive coding... (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "x-ai/grok-build-0.1",
 		CostPer1MIn:         1,
@@ -3791,7 +3791,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXiaomiMimoV25: {
 		ID:                  OpenRouterXiaomiMimoV25,
 		Name:                "Xiaomi: MiMo-V2.5",
-		Description:         "$0.14/$0.28 per 1M — MiMo-V2.5 is a native omnimodal model by Xiaomi. It delivers Pro-level agentic performance at roughly half the inference cost, while surpassing MiMo-V2-Omni in multimodal perception across image and video understanding..… (1050K ctx)",
+		Description:         "$0.14/$0.28 per 1M — [unverified] MiMo-V2.5 is a native omnimodal model by Xiaomi. It delivers Pro-level agentic performance at roughly half the inference cost, while surpassing MiMo-V2-Omni in multimodal perception across image and video understanding..… (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "xiaomi/mimo-v2.5",
 		CostPer1MIn:         0.14,
@@ -3805,7 +3805,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXiaomiMimoV25Pro: {
 		ID:                  OpenRouterXiaomiMimoV25Pro,
 		Name:                "Xiaomi: MiMo-V2.5-Pro",
-		Description:         "$0.43/$0.87 per 1M — MiMo-V2.5-Pro is Xiaomi’s flagship model, delivering strong performance in general agentic capabilities, complex software engineering, and long-horizon tasks, with top rankings on benchmarks such as ClawEval, GDPVal, a… (1050K ctx)",
+		Description:         "$0.43/$0.87 per 1M — [unverified] MiMo-V2.5-Pro is Xiaomi’s flagship model, delivering strong performance in general agentic capabilities, complex software engineering, and long-horizon tasks, with top rankings on benchmarks such as ClawEval, GDPVal, a… (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "xiaomi/mimo-v2.5-pro",
 		CostPer1MIn:         0.435,
@@ -3819,7 +3819,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm45: {
 		ID:                  OpenRouterZAiGlm45,
 		Name:                "Z.ai: GLM 4.5",
-		Description:         "$0.6/$2.2 per 1M — GLM-4.5 is our latest flagship foundation model, purpose-built for agent-based applications. It leverages a Mixture-of-Experts (MoE) architecture and supports a context length of up to 128k tokens. GLM-4.5 delivers signi… (131K ctx)",
+		Description:         "$0.6/$2.2 per 1M — [unverified] GLM-4.5 is our latest flagship foundation model, purpose-built for agent-based applications. It leverages a Mixture-of-Experts (MoE) architecture and supports a context length of up to 128k tokens. GLM-4.5 delivers signi… (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.5",
 		CostPer1MIn:         0.6,
@@ -3833,7 +3833,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm45Air: {
 		ID:                  OpenRouterZAiGlm45Air,
 		Name:                "Z.ai: GLM 4.5 Air",
-		Description:         "$0.13/$0.85 per 1M — GLM-4.5-Air is the lightweight variant of our latest flagship model family, also purpose-built for agent-centric applications. Like GLM-4.5, it adopts the Mixture-of-Experts (MoE) architecture but with a more compact par… (131K ctx)",
+		Description:         "$0.13/$0.85 per 1M — [unverified] GLM-4.5-Air is the lightweight variant of our latest flagship model family, also purpose-built for agent-centric applications. Like GLM-4.5, it adopts the Mixture-of-Experts (MoE) architecture but with a more compact par… (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.5-air",
 		CostPer1MIn:         0.13,
@@ -3847,7 +3847,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm45v: {
 		ID:                  OpenRouterZAiGlm45v,
 		Name:                "Z.ai: GLM 4.5V",
-		Description:         "$0.6/$1.8 per 1M — GLM-4.5V is a vision-language foundation model for multimodal agent applications. Built on a Mixture-of-Experts (MoE) architecture with 106B parameters and 12B activated parameters, it achieves state-of-the-art results i… (65K ctx)",
+		Description:         "$0.6/$1.8 per 1M — [unverified] GLM-4.5V is a vision-language foundation model for multimodal agent applications. Built on a Mixture-of-Experts (MoE) architecture with 106B parameters and 12B activated parameters, it achieves state-of-the-art results i… (65K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.5v",
 		CostPer1MIn:         0.6,
@@ -3861,7 +3861,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm46: {
 		ID:                  OpenRouterZAiGlm46,
 		Name:                "Z.ai: GLM 4.6",
-		Description:         "$0.5/$2.0 per 1M — Compared with GLM-4.5, this generation brings several key improvements: Longer context window: The context window has been expanded from 128K to 200K tokens, enabling the model to handle more complex... (204K ctx)",
+		Description:         "$0.5/$2.0 per 1M — [unverified] Compared with GLM-4.5, this generation brings several key improvements: Longer context window: The context window has been expanded from 128K to 200K tokens, enabling the model to handle more complex... (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.6",
 		CostPer1MIn:         0.5,
@@ -3875,7 +3875,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm46v: {
 		ID:                  OpenRouterZAiGlm46v,
 		Name:                "Z.ai: GLM 4.6V",
-		Description:         "$0.30/$0.90 per 1M — GLM-4.6V is a large multimodal model designed for high-fidelity visual understanding and long-context reasoning across images, documents, and mixed media. It supports up to 128K tokens, processes complex page layouts... (131K ctx)",
+		Description:         "$0.30/$0.90 per 1M — [unverified] GLM-4.6V is a large multimodal model designed for high-fidelity visual understanding and long-context reasoning across images, documents, and mixed media. It supports up to 128K tokens, processes complex page layouts... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.6v",
 		CostPer1MIn:         0.3,
@@ -3889,7 +3889,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm47: {
 		ID:                  OpenRouterZAiGlm47,
 		Name:                "Z.ai: GLM 4.7",
-		Description:         "$0.4/$1.8 per 1M — GLM-4.7 is Z.ai’s latest flagship model, featuring upgrades in two key areas: enhanced programming capabilities and more stable multi-step reasoning/execution. It demonstrates significant improvements in executing comp… (204K ctx)",
+		Description:         "$0.4/$1.8 per 1M — [unverified] GLM-4.7 is Z.ai’s latest flagship model, featuring upgrades in two key areas: enhanced programming capabilities and more stable multi-step reasoning/execution. It demonstrates significant improvements in executing comp… (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.7",
 		CostPer1MIn:         0.39999999999999997,
@@ -3903,7 +3903,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm47Flash: {
 		ID:                  OpenRouterZAiGlm47Flash,
 		Name:                "Z.ai: GLM 4.7 Flash",
-		Description:         "$0.06/$0.40 per 1M — As a 30B-class SOTA model, GLM-4 (202K ctx)",
+		Description:         "$0.06/$0.40 per 1M — [unverified] As a 30B-class SOTA model, GLM-4 (202K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.7-flash",
 		CostPer1MIn:         0.06,
@@ -3917,7 +3917,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm5: {
 		ID:                  OpenRouterZAiGlm5,
 		Name:                "Z.ai: GLM 5",
-		Description:         "$0.9/$2.6 per 1M — GLM-5 is Z.ai’s flagship open-source foundation model engineered for complex systems design and long-horizon agent workflows. Built for expert developers, it delivers production-grade performance on large-scale program… (204K ctx)",
+		Description:         "$0.9/$2.6 per 1M — [unverified] GLM-5 is Z.ai’s flagship open-source foundation model engineered for complex systems design and long-horizon agent workflows. Built for expert developers, it delivers production-grade performance on large-scale program… (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-5",
 		CostPer1MIn:         0.95,
@@ -3931,7 +3931,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm5Turbo: {
 		ID:                  OpenRouterZAiGlm5Turbo,
 		Name:                "Z.ai: GLM 5 Turbo",
-		Description:         "$1.2/$4.0 per 1M — GLM-5 Turbo is a new model from Z (202K ctx)",
+		Description:         "$1.2/$4.0 per 1M — [unverified] GLM-5 Turbo is a new model from Z (202K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-5-turbo",
 		CostPer1MIn:         1.2,
@@ -3945,7 +3945,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm51: {
 		ID:                  OpenRouterZAiGlm51,
 		Name:                "Z.ai: GLM 5.1",
-		Description:         "$1.0/$3.0 per 1M — GLM-5.1 delivers a major leap in coding capability, with particularly significant gains in handling long-horizon tasks. Unlike previous models built around minute-level interactions, GLM-5.1 can work independently and co… (204K ctx)",
+		Description:         "$1.0/$3.0 per 1M — [unverified] GLM-5.1 delivers a major leap in coding capability, with particularly significant gains in handling long-horizon tasks. Unlike previous models built around minute-level interactions, GLM-5.1 can work independently and co… (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-5.1",
 		CostPer1MIn:         0.952,
@@ -3959,7 +3959,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm52: {
 		ID:                  OpenRouterZAiGlm52,
 		Name:                "Z.ai: GLM 5.2",
-		Description:         "$0.07/$0.22 per 1M — GLM 5.2 is a large-scale reasoning model from Z.ai. It supports text input and output with a 1M-token context window, and is suited for long-horizon agent workflows, project-level software engineering,... (1048K ctx)",
+		Description:         "$0.07/$0.22 per 1M — ~750B MoE, 1M ctx, best long-horizon agent (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-5.2",
 		CostPer1MIn:         0.07,
@@ -3973,7 +3973,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm5vTurbo: {
 		ID:                  OpenRouterZAiGlm5vTurbo,
 		Name:                "Z.ai: GLM 5V Turbo",
-		Description:         "$1.2/$4.0 per 1M — GLM-5V-Turbo is Z.ai’s first native multimodal agent foundation model, built for vision-based coding and agent-driven tasks. It natively handles image, video, and text inputs, excels at long-horizon planning, complex c… (202K ctx)",
+		Description:         "$1.2/$4.0 per 1M — [unverified] GLM-5V-Turbo is Z.ai’s first native multimodal agent foundation model, built for vision-based coding and agent-driven tasks. It natively handles image, video, and text inputs, excels at long-horizon planning, complex c… (202K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-5v-turbo",
 		CostPer1MIn:         1.2,
@@ -3987,7 +3987,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeFableLatest: {
 		ID:                  OpenRouterAnthropicClaudeFableLatest,
 		Name:                "Anthropic: Claude Fable Latest",
-		Description:         "$10.0/$50.0 per 1M — This model always redirects to the latest model in the Claude Fable family (1000K ctx)",
+		Description:         "$10.0/$50.0 per 1M — [unverified] This model always redirects to the latest model in the Claude Fable family (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "~anthropic/claude-fable-latest",
 		CostPer1MIn:         10,
@@ -4001,7 +4001,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeHaikuLatest: {
 		ID:                  OpenRouterAnthropicClaudeHaikuLatest,
 		Name:                "Anthropic Claude Haiku Latest",
-		Description:         "$1.0/$5.0 per 1M — This model always redirects to the latest model in the Anthropic Claude Haiku family (200K ctx)",
+		Description:         "$1.0/$5.0 per 1M — [unverified] This model always redirects to the latest model in the Anthropic Claude Haiku family (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "~anthropic/claude-haiku-latest",
 		CostPer1MIn:         1,
@@ -4015,7 +4015,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpusLatest: {
 		ID:                  OpenRouterAnthropicClaudeOpusLatest,
 		Name:                "Anthropic: Claude Opus Latest",
-		Description:         "$5.0/$25.0 per 1M — This model always redirects to the latest model in the Claude Opus family (1000K ctx)",
+		Description:         "$5.0/$25.0 per 1M — [unverified] This model always redirects to the latest model in the Claude Opus family (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "~anthropic/claude-opus-latest",
 		CostPer1MIn:         5,
@@ -4029,7 +4029,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeSonnetLatest: {
 		ID:                  OpenRouterAnthropicClaudeSonnetLatest,
 		Name:                "Anthropic Claude Sonnet Latest",
-		Description:         "$2.0/$10.0 per 1M — This model always redirects to the latest model in the Anthropic Claude Sonnet family (1000K ctx)",
+		Description:         "$2.0/$10.0 per 1M — [unverified] This model always redirects to the latest model in the Anthropic Claude Sonnet family (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "~anthropic/claude-sonnet-latest",
 		CostPer1MIn:         2,
@@ -4043,7 +4043,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekV4FlashLatest: {
 		ID:                  OpenRouterDeepseekDeepseekV4FlashLatest,
 		Name:                "DeepSeek V4 Flash Latest",
-		Description:         "$0.08/$0.25 per 1M — This model always redirects to the latest model in the DeepSeek V4 Flash family (1048K ctx)",
+		Description:         "$0.08/$0.25 per 1M — [unverified] This model always redirects to the latest model in the DeepSeek V4 Flash family (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "~deepseek/deepseek-v4-flash-latest",
 		CostPer1MIn:         0.079996,
@@ -4057,7 +4057,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGeminiFlashLatest: {
 		ID:                  OpenRouterGoogleGeminiFlashLatest,
 		Name:                "Google Gemini Flash Latest",
-		Description:         "$1.5/$7.5 per 1M — This model always redirects to the latest model in the Google Gemini Flash family (1048K ctx)",
+		Description:         "$1.5/$7.5 per 1M — [unverified] This model always redirects to the latest model in the Google Gemini Flash family (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "~google/gemini-flash-latest",
 		CostPer1MIn:         1.5,
@@ -4071,7 +4071,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGeminiProLatest: {
 		ID:                  OpenRouterGoogleGeminiProLatest,
 		Name:                "Google Gemini Pro Latest",
-		Description:         "$2.0/$12.0 per 1M — This model always redirects to the latest model in the Google Gemini Pro family (1048K ctx)",
+		Description:         "$2.0/$12.0 per 1M — [unverified] This model always redirects to the latest model in the Google Gemini Pro family (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "~google/gemini-pro-latest",
 		CostPer1MIn:         2,
@@ -4085,7 +4085,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiLatest: {
 		ID:                  OpenRouterMoonshotaiKimiLatest,
 		Name:                "MoonshotAI Kimi Latest",
-		Description:         "$2.8/$14.0 per 1M — This model always redirects to the latest model in the MoonshotAI Kimi family (1048K ctx)",
+		Description:         "$2.8/$14.0 per 1M — [unverified] This model always redirects to the latest model in the MoonshotAI Kimi family (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "~moonshotai/kimi-latest",
 		CostPer1MIn:         2.8,
@@ -4099,7 +4099,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGptLatest: {
 		ID:                  OpenRouterOpenaiGptLatest,
 		Name:                "OpenAI GPT Latest",
-		Description:         "$5.0/$30.0 per 1M — This model always redirects to the latest model in the OpenAI GPT family (1050K ctx)",
+		Description:         "$5.0/$30.0 per 1M — [unverified] This model always redirects to the latest model in the OpenAI GPT family (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "~openai/gpt-latest",
 		CostPer1MIn:         5,
@@ -4113,7 +4113,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGptMiniLatest: {
 		ID:                  OpenRouterOpenaiGptMiniLatest,
 		Name:                "OpenAI GPT Mini Latest",
-		Description:         "$0.8/$4.5 per 1M — This model always redirects to the latest model in the OpenAI GPT Mini family (400K ctx)",
+		Description:         "$0.8/$4.5 per 1M — [unverified] This model always redirects to the latest model in the OpenAI GPT Mini family (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "~openai/gpt-mini-latest",
 		CostPer1MIn:         0.75,
@@ -4127,7 +4127,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXAiGrokLatest: {
 		ID:                  OpenRouterXAiGrokLatest,
 		Name:                "xAI: Grok Latest",
-		Description:         "$2.0/$6.0 per 1M — This model always redirects to the latest Grok model from xAI (500K ctx)",
+		Description:         "$2.0/$6.0 per 1M — [unverified] This model always redirects to the latest Grok model from xAI (500K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "~x-ai/grok-latest",
 		CostPer1MIn:         2,
