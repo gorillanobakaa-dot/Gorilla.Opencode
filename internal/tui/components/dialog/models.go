@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -594,6 +595,13 @@ func bookmarkedModels() []models.Model {
 	var out []models.Model
 	for _, id := range config.BookmarkedModels() {
 		if m, ok := models.SupportedModels[models.ModelID(id)]; ok {
+			// The rank belongs to the model's home provider and means nothing
+			// here: the shortlist showed "10, 2, 3, 5, 6, 10 …" with two entries
+			// numbered 10, which reads as a broken sort. Cleared, so the list
+			// shows the only order the user authored — the one they added them
+			// in — and the "N ranked best-first" subtitle stops claiming a
+			// ranking that is not there.
+			m.Rank = 0
 			out = append(out, m)
 			continue
 		}
@@ -697,7 +705,14 @@ func providerDisplayName(p models.ModelProvider) string {
 	if s == "" {
 		return s
 	}
-	return strings.ToUpper(s[:1]) + s[1:]
+	// GORILLA FIX (2026-08-09): this was strings.ToUpper(s[:1]) + s[1:], which
+	// slices the first BYTE, not the first rune. Any provider name starting
+	// with a multi-byte character was cut into invalid UTF-8 fragments and
+	// rendered as one replacement glyph per byte - "★ bookmarks" came out as
+	// "◆◆◆ bookmarks", three diamonds for one star. Latent since the function
+	// was written; the bookmarks column was simply the first name to trigger it.
+	r := []rune(s)
+	return string(unicode.ToUpper(r[0])) + string(r[1:])
 }
 
 func NewModelDialogCmp() ModelDialog {

@@ -3,6 +3,7 @@ package dialog
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
@@ -98,5 +99,55 @@ func TestBookmarksColumnComesFirst(t *testing.T) {
 	}
 	if got[0] != ProviderBookmarks {
 		t.Fatalf("the shortlist must lead the carousel, got order: %v", got)
+	}
+}
+
+// providerDisplayName used to slice the first BYTE of a UTF-8 string, so any
+// name starting with a multi-byte rune came back as invalid fragments — one
+// replacement glyph per byte. "★ bookmarks" rendered as "◆◆◆ bookmarks".
+func TestProviderDisplayNameHandlesMultiByteNames(t *testing.T) {
+	got := providerDisplayName(ProviderBookmarks)
+	if !strings.HasPrefix(got, "★") {
+		t.Errorf("the star must survive intact, got %q (% x)", got, got)
+	}
+	if !utf8.ValidString(got) {
+		t.Errorf("produced invalid UTF-8: % x", got)
+	}
+	// The ASCII path must still capitalise.
+	if n := providerDisplayName("openai"); n != "Openai" {
+		t.Errorf("ASCII names should still be capitalised, got %q", n)
+	}
+	// And an empty name must not panic on r[0].
+	if n := providerDisplayName(""); n != "" {
+		t.Errorf("empty name should stay empty, got %q", n)
+	}
+}
+
+// A shortlist entry must not carry the rank it had at its home provider. Those
+// numbers are meaningless out of context and collide — the list showed two
+// entries numbered 10.
+func TestBookmarksDropInheritedRanks(t *testing.T) {
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatal(err)
+	}
+	var withRank models.ModelID
+	for id, m := range models.SupportedModels {
+		if m.Rank > 0 {
+			withRank = id
+			break
+		}
+	}
+	if withRank == "" {
+		t.Skip("no ranked model in the registry to test with")
+	}
+	if _, err := config.ToggleBookmark(string(withRank)); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = config.ToggleBookmark(string(withRank)) })
+
+	for _, m := range bookmarkedModels() {
+		if m.Rank != 0 {
+			t.Errorf("%s kept rank %d from its home provider", m.ID, m.Rank)
+		}
 	}
 }
