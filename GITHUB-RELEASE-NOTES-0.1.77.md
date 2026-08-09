@@ -20,7 +20,7 @@ Debian's own repository — which means Debian ships its security updates, not u
 
 | | Size |
 |---|---|
-| Download grows by | **12 KB** |
+| Download grows by | **~13 KB** |
 | lynx from Debian, if absent | 641 KB |
 | Package total | 19.2 MB |
 

@@ -16,7 +16,7 @@ An honest note, because "built in" is a fair question: lynx is **not** bundled
 inside the download. It comes from Debian's own repository, like everything else
 on your system, so it gets security updates from Debian rather than from us. The
 package simply says it would like lynx alongside it. The whole feature costs
-**12 KB** of download (plus 641 KB for lynx if you lack it) against a 19.2 MB
+about **13 KB** of download (plus 641 KB for lynx if you lack it) against a 19.2 MB
 package — about 0.06%. Bundling SearXNG, a better version of the same feature,
 would have added roughly 300 MB.
 
@@ -48,8 +48,9 @@ release checklist step 6 moved from `dpkg -i` to `apt install ./file.deb` —
 `dpkg` resolves neither Depends nor Recommends, so installing that way silently
 skipped lynx.
 
-Sizes: binary 51,073,316 → 51,089,700 (+16,384); .deb 19,208,080 → 19,220,404
-(+12,324).
+Sizes: binary 51,073,316 → 51,089,700 (+16,384); .deb 19,208,080 → ~19,221,700
+(~+13,600 — approximate because this changelog ships inside the package, so
+stating the exact size changes it).
 
 ## v0.1.76 — 2026-08-09 — the assistant offers to set up web search, instead of explaining how
 
