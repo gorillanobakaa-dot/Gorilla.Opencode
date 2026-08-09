@@ -87,27 +87,42 @@ const (
 
 Do not answer from memory as though a search had happened, and do not guess URLs.
 
-OFFER TO FIX IT. Tell the user, in your own words, that you can set up web search
-for them: it needs no account, no API key and no card, it runs entirely on their
-own machine, and it takes a couple of minutes. If they agree, run EXACTLY:
+OFFER TO FIX IT. The user is not expected to know any of this - say plainly that
+web search is off, that you can turn it on for them, and that it needs no
+account, no API key and no card. Offer the QUICK option first:
+
+QUICK (about five seconds, 641 KB) - install the lynx text browser, which this
+tool drives directly:
+
+  sudo -n apt-get install -y lynx
+
+Use -n so it fails immediately instead of hanging on a password prompt you
+cannot answer. If it fails for that reason, do NOT retry it and do NOT try to
+type a password. Show the user this exact line and ask them to run it in their
+own terminal, then tell them to ask you again:
+
+  sudo apt install lynx
+
+BETTER (a couple of minutes) - their own private SearXNG, which gives better
+results and reports which search engines failed. If they want it, run EXACTLY:
 
   /usr/share/gorilla-opencode/setup-searxng.sh
 
-DO NOT improvise the installation yourself, and do not retype its steps from
-memory. That script encodes two failures that are easy to reproduce and hard to
-spot: SearXNG's build needs msgspec and pyyaml present before "pip install -e ."
-will work, and the JSON API is disabled by default so the tool gets 403 without
-one line in settings.yml. It also verifies the result with a live query and
-exits non-zero if anything is wrong. Retyping the steps is how a half-built
-install gets reported as a success.
+DO NOT improvise either installation, and do not retype the script's steps from
+memory. It encodes two failures that are easy to reproduce and hard to spot:
+SearXNG's build needs msgspec and pyyaml present before "pip install -e ." will
+work, and its JSON API is disabled by default so this tool gets 403 without one
+line in settings.yml. It verifies itself with a live query and exits non-zero if
+anything is wrong. Retyping the steps is how a half-built install gets reported
+as a success.
 
-If the script is not on disk (running from source rather than the .deb), it is
-at packaging/setup-searxng.sh in the repository.
+If the script is not on disk (running from source rather than the .deb), it is at
+packaging/setup-searxng.sh in the repository.
 
-If the user declines, that is the end of it: ask them for a URL and read it with
-web_fetch. Do not go looking for another way to search - do not fetch a search
-engine's results page, and do not substitute remembered facts for a search you
-did not perform.
+If the user declines both, that is the end of it: ask them for a URL and read it
+with web_fetch. Do not go looking for another way to search - do not fetch a
+search engine's results page, and do not substitute remembered facts for a search
+you did not perform.
 
 Scholarly sources (scholar, medical, crossref, openaccess, books, reference) need
 none of this and still work.`

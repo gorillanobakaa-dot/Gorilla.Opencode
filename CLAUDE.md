@@ -146,14 +146,22 @@ cost real confusion; they are not optional.
    dpkg-deb -c gorilla-opencode_X.Y.Z_amd64.deb | grep release-notes   # this release's notes must be there
    ```
 5. **Checksums** over every artifact, then `sha256sum -c` to prove they verify.
-6. **Install the .deb — do not `install` the binary by hand.** A manual copy to
-   `/usr/bin` leaves dpkg's database reporting the *old* version, so
-   `gorilla-opencode --version` and `dpkg -l gorilla-opencode` disagree and nobody
-   can tell what is actually installed. Verify both agree:
+6. **Install the .deb with `apt`, not `dpkg -i` — and do not `install` the binary
+   by hand.** A manual copy to `/usr/bin` leaves dpkg's database reporting the
+   *old* version, so `gorilla-opencode --version` and `dpkg -l gorilla-opencode`
+   disagree and nobody can tell what is actually installed. Verify both agree:
    ```sh
-   sudo dpkg -i gorilla-opencode_X.Y.Z_amd64.deb
+   sudo apt install ./gorilla-opencode_X.Y.Z_amd64.deb
    gorilla-opencode --version && dpkg -l gorilla-opencode | tail -1
    ```
+   **`apt` rather than `dpkg -i` because dpkg does no dependency resolution at
+   all** — it honours neither `Depends:` nor `Recommends:`. The package
+   recommends `lynx`, which is what makes web search work with no setup; install
+   with `dpkg -i` and that quietly does not happen, so the release gets tested on
+   a machine missing the thing most users will have. Added 2026-08-09, after
+   `Recommends: lynx` was added and this checklist would have skipped it.
+   (Anyone double-clicking the .deb gets Recommends resolved by the graphical
+   installer, so this trap only catches the expert path — which is this one.)
 7. **Fast-forward `main` to the release tag, always.**
    ```sh
    git checkout main && git merge --ff-only vX.Y.Z && git push origin main
