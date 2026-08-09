@@ -292,7 +292,13 @@ func TestWebSearchRefusesUnconfiguredWebBeforeAskingPermission(t *testing.T) {
 	// (c) forbid improvising the steps, and (d) give a fallback. (c) is not
 	// decoration: on 2026-08-08 a model relaying an earlier version of this text
 	// silently dropped "pyyaml" from the pip line while merely paraphrasing.
-	for _, want := range []string{"not configured", "setup-searxng.sh", "do not improvise", "web_fetch"} {
+	// It must offer the CHEAP route (lynx) as well as the good one, use a
+	// non-blocking sudo, and give a paste-able fallback: a sudo password prompt
+	// inside the agent's shell has no way to be answered and would hang.
+	for _, want := range []string{
+		"not configured", "sudo -n apt-get install -y lynx", "sudo apt install lynx",
+		"setup-searxng.sh", "do not improvise", "web_fetch",
+	} {
 		if !strings.Contains(strings.ToLower(resp.Content), want) {
 			t.Errorf("refusal text must mention %q so the user can fix it; got:\n%s", want, resp.Content)
 		}
