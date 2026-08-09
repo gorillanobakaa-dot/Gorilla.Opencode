@@ -2,7 +2,7 @@
 //
 // Source: https://openrouter.ai/api/v1/models
 // Generated: 2026-08-09
-// Catalogue held 400 models; 333 advertise tool support and are listed here;
+// Catalogue held 400 models; 274 advertise tool support and are listed here;
 // 14 of those are free. Models that cannot call tools are omitted - a coding
 // agent handed one describes edits it cannot make.
 //
@@ -24,32 +24,21 @@ const (
 	OpenRouterAmazonNovaProV1                            ModelID = "openrouter.amazon/nova-pro-v1"
 	OpenRouterAnthropicClaude3Haiku                      ModelID = "openrouter.anthropic/claude-3-haiku"
 	OpenRouterAnthropicClaudeFable5                      ModelID = "openrouter.anthropic/claude-fable-5"
-	OpenRouterAnthropicClaudeFable5Batch                 ModelID = "openrouter.anthropic/claude-fable-5:batch"
 	OpenRouterAnthropicClaudeHaiku45                     ModelID = "openrouter.anthropic/claude-haiku-4.5"
-	OpenRouterAnthropicClaudeHaiku45Batch                ModelID = "openrouter.anthropic/claude-haiku-4.5:batch"
 	OpenRouterAnthropicClaudeOpus4                       ModelID = "openrouter.anthropic/claude-opus-4"
 	OpenRouterAnthropicClaudeOpus41                      ModelID = "openrouter.anthropic/claude-opus-4.1"
-	OpenRouterAnthropicClaudeOpus41Batch                 ModelID = "openrouter.anthropic/claude-opus-4.1:batch"
 	OpenRouterAnthropicClaudeOpus45                      ModelID = "openrouter.anthropic/claude-opus-4.5"
-	OpenRouterAnthropicClaudeOpus45Batch                 ModelID = "openrouter.anthropic/claude-opus-4.5:batch"
 	OpenRouterAnthropicClaudeOpus46                      ModelID = "openrouter.anthropic/claude-opus-4.6"
-	OpenRouterAnthropicClaudeOpus46Batch                 ModelID = "openrouter.anthropic/claude-opus-4.6:batch"
 	OpenRouterAnthropicClaudeOpus47                      ModelID = "openrouter.anthropic/claude-opus-4.7"
 	OpenRouterAnthropicClaudeOpus47Fast                  ModelID = "openrouter.anthropic/claude-opus-4.7-fast"
-	OpenRouterAnthropicClaudeOpus47Batch                 ModelID = "openrouter.anthropic/claude-opus-4.7:batch"
 	OpenRouterAnthropicClaudeOpus48                      ModelID = "openrouter.anthropic/claude-opus-4.8"
 	OpenRouterAnthropicClaudeOpus48Fast                  ModelID = "openrouter.anthropic/claude-opus-4.8-fast"
-	OpenRouterAnthropicClaudeOpus48Batch                 ModelID = "openrouter.anthropic/claude-opus-4.8:batch"
 	OpenRouterAnthropicClaudeOpus5                       ModelID = "openrouter.anthropic/claude-opus-5"
 	OpenRouterAnthropicClaudeOpus5Fast                   ModelID = "openrouter.anthropic/claude-opus-5-fast"
-	OpenRouterAnthropicClaudeOpus5Batch                  ModelID = "openrouter.anthropic/claude-opus-5:batch"
 	OpenRouterAnthropicClaudeSonnet4                     ModelID = "openrouter.anthropic/claude-sonnet-4"
 	OpenRouterAnthropicClaudeSonnet45                    ModelID = "openrouter.anthropic/claude-sonnet-4.5"
-	OpenRouterAnthropicClaudeSonnet45Batch               ModelID = "openrouter.anthropic/claude-sonnet-4.5:batch"
 	OpenRouterAnthropicClaudeSonnet46                    ModelID = "openrouter.anthropic/claude-sonnet-4.6"
-	OpenRouterAnthropicClaudeSonnet46Batch               ModelID = "openrouter.anthropic/claude-sonnet-4.6:batch"
 	OpenRouterAnthropicClaudeSonnet5                     ModelID = "openrouter.anthropic/claude-sonnet-5"
-	OpenRouterAnthropicClaudeSonnet5Batch                ModelID = "openrouter.anthropic/claude-sonnet-5:batch"
 	OpenRouterArceeAiTrinityLargeThinking                ModelID = "openrouter.arcee-ai/trinity-large-thinking"
 	OpenRouterArceeAiVirtuosoLarge                       ModelID = "openrouter.arcee-ai/virtuoso-large"
 	OpenRouterBytedanceSeedSeed16                        ModelID = "openrouter.bytedance-seed/seed-1.6"
@@ -72,27 +61,18 @@ const (
 	OpenRouterDeepseekDeepseekV4Pro                      ModelID = "openrouter.deepseek/deepseek-v4-pro"
 	OpenRouterGoogleGemini25Flash                        ModelID = "openrouter.google/gemini-2.5-flash"
 	OpenRouterGoogleGemini25FlashLite                    ModelID = "openrouter.google/gemini-2.5-flash-lite"
-	OpenRouterGoogleGemini25FlashLiteBatch               ModelID = "openrouter.google/gemini-2.5-flash-lite:batch"
-	OpenRouterGoogleGemini25FlashBatch                   ModelID = "openrouter.google/gemini-2.5-flash:batch"
 	OpenRouterGoogleGemini25Pro                          ModelID = "openrouter.google/gemini-2.5-pro"
 	OpenRouterGoogleGemini25ProPreview                   ModelID = "openrouter.google/gemini-2.5-pro-preview"
 	OpenRouterGoogleGemini25ProPreview0506               ModelID = "openrouter.google/gemini-2.5-pro-preview-05-06"
-	OpenRouterGoogleGemini25ProBatch                     ModelID = "openrouter.google/gemini-2.5-pro:batch"
 	OpenRouterGoogleGemini3FlashPreview                  ModelID = "openrouter.google/gemini-3-flash-preview"
-	OpenRouterGoogleGemini3FlashPreviewBatch             ModelID = "openrouter.google/gemini-3-flash-preview:batch"
 	OpenRouterGoogleGemini3ProImage                      ModelID = "openrouter.google/gemini-3-pro-image"
 	OpenRouterGoogleGemini31FlashLite                    ModelID = "openrouter.google/gemini-3.1-flash-lite"
 	OpenRouterGoogleGemini31FlashLitePreview             ModelID = "openrouter.google/gemini-3.1-flash-lite-preview"
-	OpenRouterGoogleGemini31FlashLiteBatch               ModelID = "openrouter.google/gemini-3.1-flash-lite:batch"
 	OpenRouterGoogleGemini31ProPreview                   ModelID = "openrouter.google/gemini-3.1-pro-preview"
 	OpenRouterGoogleGemini31ProPreviewCustomtools        ModelID = "openrouter.google/gemini-3.1-pro-preview-customtools"
-	OpenRouterGoogleGemini31ProPreviewBatch              ModelID = "openrouter.google/gemini-3.1-pro-preview:batch"
 	OpenRouterGoogleGemini35Flash                        ModelID = "openrouter.google/gemini-3.5-flash"
 	OpenRouterGoogleGemini35FlashLite                    ModelID = "openrouter.google/gemini-3.5-flash-lite"
-	OpenRouterGoogleGemini35FlashLiteBatch               ModelID = "openrouter.google/gemini-3.5-flash-lite:batch"
-	OpenRouterGoogleGemini35FlashBatch                   ModelID = "openrouter.google/gemini-3.5-flash:batch"
 	OpenRouterGoogleGemini36Flash                        ModelID = "openrouter.google/gemini-3.6-flash"
-	OpenRouterGoogleGemini36FlashBatch                   ModelID = "openrouter.google/gemini-3.6-flash:batch"
 	OpenRouterGoogleGemma312bIt                          ModelID = "openrouter.google/gemma-3-12b-it"
 	OpenRouterGoogleGemma327bIt                          ModelID = "openrouter.google/gemma-3-27b-it"
 	OpenRouterGoogleGemma426bA4bIt                       ModelID = "openrouter.google/gemma-4-26b-a4b-it"
@@ -123,7 +103,6 @@ const (
 	OpenRouterMinimaxMinimaxM25                          ModelID = "openrouter.minimax/minimax-m2.5"
 	OpenRouterMinimaxMinimaxM27                          ModelID = "openrouter.minimax/minimax-m2.7"
 	OpenRouterMinimaxMinimaxM3                           ModelID = "openrouter.minimax/minimax-m3"
-	OpenRouterMinimaxMinimaxM3Batch                      ModelID = "openrouter.minimax/minimax-m3:batch"
 	OpenRouterMistralaiCodestral2508                     ModelID = "openrouter.mistralai/codestral-2508"
 	OpenRouterMistralaiMinistral14b2512                  ModelID = "openrouter.mistralai/ministral-14b-2512"
 	OpenRouterMistralaiMinistral3b2512                   ModelID = "openrouter.mistralai/ministral-3b-2512"
@@ -146,7 +125,6 @@ const (
 	OpenRouterMoonshotaiKimiK25                          ModelID = "openrouter.moonshotai/kimi-k2.5"
 	OpenRouterMoonshotaiKimiK26                          ModelID = "openrouter.moonshotai/kimi-k2.6"
 	OpenRouterMoonshotaiKimiK27Code                      ModelID = "openrouter.moonshotai/kimi-k2.7-code"
-	OpenRouterMoonshotaiKimiK27CodeBatch                 ModelID = "openrouter.moonshotai/kimi-k2.7-code:batch"
 	OpenRouterMoonshotaiKimiK3                           ModelID = "openrouter.moonshotai/kimi-k3"
 	OpenRouterNexAgiNexN2Mini                            ModelID = "openrouter.nex-agi/nex-n2-mini"
 	OpenRouterNexAgiNexN2Pro                             ModelID = "openrouter.nex-agi/nex-n2-pro"
@@ -156,78 +134,50 @@ const (
 	OpenRouterNvidiaNemotron3Super120bA12b               ModelID = "openrouter.nvidia/nemotron-3-super-120b-a12b"
 	OpenRouterNvidiaNemotron3Super120bA12bFree           ModelID = "openrouter.nvidia/nemotron-3-super-120b-a12b:free"
 	OpenRouterNvidiaNemotron3Ultra550bA55b               ModelID = "openrouter.nvidia/nemotron-3-ultra-550b-a55b"
-	OpenRouterNvidiaNemotron3Ultra550bA55bBatch          ModelID = "openrouter.nvidia/nemotron-3-ultra-550b-a55b:batch"
 	OpenRouterNvidiaNemotron3Ultra550bA55bFree           ModelID = "openrouter.nvidia/nemotron-3-ultra-550b-a55b:free"
 	OpenRouterNvidiaNemotronNano12bV2VlFree              ModelID = "openrouter.nvidia/nemotron-nano-12b-v2-vl:free"
 	OpenRouterNvidiaNemotronNano9bV2Free                 ModelID = "openrouter.nvidia/nemotron-nano-9b-v2:free"
 	OpenRouterOpenaiGpt35Turbo                           ModelID = "openrouter.openai/gpt-3.5-turbo"
 	OpenRouterOpenaiGpt35Turbo0613                       ModelID = "openrouter.openai/gpt-3.5-turbo-0613"
 	OpenRouterOpenaiGpt35Turbo16k                        ModelID = "openrouter.openai/gpt-3.5-turbo-16k"
-	OpenRouterOpenaiGpt35TurboBatch                      ModelID = "openrouter.openai/gpt-3.5-turbo:batch"
 	OpenRouterOpenaiGpt4                                 ModelID = "openrouter.openai/gpt-4"
 	OpenRouterOpenaiGpt4Turbo                            ModelID = "openrouter.openai/gpt-4-turbo"
 	OpenRouterOpenaiGpt4TurboPreview                     ModelID = "openrouter.openai/gpt-4-turbo-preview"
-	OpenRouterOpenaiGpt4TurboBatch                       ModelID = "openrouter.openai/gpt-4-turbo:batch"
 	OpenRouterOpenaiGpt41                                ModelID = "openrouter.openai/gpt-4.1"
 	OpenRouterOpenaiGpt41Mini                            ModelID = "openrouter.openai/gpt-4.1-mini"
-	OpenRouterOpenaiGpt41MiniBatch                       ModelID = "openrouter.openai/gpt-4.1-mini:batch"
 	OpenRouterOpenaiGpt41Nano                            ModelID = "openrouter.openai/gpt-4.1-nano"
-	OpenRouterOpenaiGpt41NanoBatch                       ModelID = "openrouter.openai/gpt-4.1-nano:batch"
-	OpenRouterOpenaiGpt41Batch                           ModelID = "openrouter.openai/gpt-4.1:batch"
 	OpenRouterOpenaiGpt4o                                ModelID = "openrouter.openai/gpt-4o"
 	OpenRouterOpenaiGpt4o20240513                        ModelID = "openrouter.openai/gpt-4o-2024-05-13"
 	OpenRouterOpenaiGpt4o20240806                        ModelID = "openrouter.openai/gpt-4o-2024-08-06"
 	OpenRouterOpenaiGpt4o20241120                        ModelID = "openrouter.openai/gpt-4o-2024-11-20"
 	OpenRouterOpenaiGpt4oMini                            ModelID = "openrouter.openai/gpt-4o-mini"
 	OpenRouterOpenaiGpt4oMini20240718                    ModelID = "openrouter.openai/gpt-4o-mini-2024-07-18"
-	OpenRouterOpenaiGpt4oMiniBatch                       ModelID = "openrouter.openai/gpt-4o-mini:batch"
-	OpenRouterOpenaiGpt4oBatch                           ModelID = "openrouter.openai/gpt-4o:batch"
 	OpenRouterOpenaiGpt5                                 ModelID = "openrouter.openai/gpt-5"
-	OpenRouterOpenaiGpt5CodexBatch                       ModelID = "openrouter.openai/gpt-5-codex:batch"
 	OpenRouterOpenaiGpt5Mini                             ModelID = "openrouter.openai/gpt-5-mini"
-	OpenRouterOpenaiGpt5MiniBatch                        ModelID = "openrouter.openai/gpt-5-mini:batch"
 	OpenRouterOpenaiGpt5Nano                             ModelID = "openrouter.openai/gpt-5-nano"
-	OpenRouterOpenaiGpt5NanoBatch                        ModelID = "openrouter.openai/gpt-5-nano:batch"
 	OpenRouterOpenaiGpt5Pro                              ModelID = "openrouter.openai/gpt-5-pro"
-	OpenRouterOpenaiGpt5ProBatch                         ModelID = "openrouter.openai/gpt-5-pro:batch"
 	OpenRouterOpenaiGpt51                                ModelID = "openrouter.openai/gpt-5.1"
 	OpenRouterOpenaiGpt51Codex                           ModelID = "openrouter.openai/gpt-5.1-codex"
 	OpenRouterOpenaiGpt51CodexMax                        ModelID = "openrouter.openai/gpt-5.1-codex-max"
 	OpenRouterOpenaiGpt51CodexMini                       ModelID = "openrouter.openai/gpt-5.1-codex-mini"
-	OpenRouterOpenaiGpt51Batch                           ModelID = "openrouter.openai/gpt-5.1:batch"
 	OpenRouterOpenaiGpt52                                ModelID = "openrouter.openai/gpt-5.2"
 	OpenRouterOpenaiGpt52Chat                            ModelID = "openrouter.openai/gpt-5.2-chat"
 	OpenRouterOpenaiGpt52Codex                           ModelID = "openrouter.openai/gpt-5.2-codex"
 	OpenRouterOpenaiGpt52Pro                             ModelID = "openrouter.openai/gpt-5.2-pro"
-	OpenRouterOpenaiGpt52ProBatch                        ModelID = "openrouter.openai/gpt-5.2-pro:batch"
-	OpenRouterOpenaiGpt52Batch                           ModelID = "openrouter.openai/gpt-5.2:batch"
 	OpenRouterOpenaiGpt53Chat                            ModelID = "openrouter.openai/gpt-5.3-chat"
 	OpenRouterOpenaiGpt53Codex                           ModelID = "openrouter.openai/gpt-5.3-codex"
 	OpenRouterOpenaiGpt54                                ModelID = "openrouter.openai/gpt-5.4"
 	OpenRouterOpenaiGpt54Mini                            ModelID = "openrouter.openai/gpt-5.4-mini"
-	OpenRouterOpenaiGpt54MiniBatch                       ModelID = "openrouter.openai/gpt-5.4-mini:batch"
 	OpenRouterOpenaiGpt54Nano                            ModelID = "openrouter.openai/gpt-5.4-nano"
-	OpenRouterOpenaiGpt54NanoBatch                       ModelID = "openrouter.openai/gpt-5.4-nano:batch"
 	OpenRouterOpenaiGpt54Pro                             ModelID = "openrouter.openai/gpt-5.4-pro"
-	OpenRouterOpenaiGpt54ProBatch                        ModelID = "openrouter.openai/gpt-5.4-pro:batch"
-	OpenRouterOpenaiGpt54Batch                           ModelID = "openrouter.openai/gpt-5.4:batch"
 	OpenRouterOpenaiGpt55                                ModelID = "openrouter.openai/gpt-5.5"
 	OpenRouterOpenaiGpt55Pro                             ModelID = "openrouter.openai/gpt-5.5-pro"
-	OpenRouterOpenaiGpt55ProBatch                        ModelID = "openrouter.openai/gpt-5.5-pro:batch"
-	OpenRouterOpenaiGpt55Batch                           ModelID = "openrouter.openai/gpt-5.5:batch"
 	OpenRouterOpenaiGpt56Luna                            ModelID = "openrouter.openai/gpt-5.6-luna"
 	OpenRouterOpenaiGpt56LunaPro                         ModelID = "openrouter.openai/gpt-5.6-luna-pro"
-	OpenRouterOpenaiGpt56LunaProBatch                    ModelID = "openrouter.openai/gpt-5.6-luna-pro:batch"
-	OpenRouterOpenaiGpt56LunaBatch                       ModelID = "openrouter.openai/gpt-5.6-luna:batch"
 	OpenRouterOpenaiGpt56Sol                             ModelID = "openrouter.openai/gpt-5.6-sol"
 	OpenRouterOpenaiGpt56SolPro                          ModelID = "openrouter.openai/gpt-5.6-sol-pro"
-	OpenRouterOpenaiGpt56SolProBatch                     ModelID = "openrouter.openai/gpt-5.6-sol-pro:batch"
-	OpenRouterOpenaiGpt56SolBatch                        ModelID = "openrouter.openai/gpt-5.6-sol:batch"
 	OpenRouterOpenaiGpt56Terra                           ModelID = "openrouter.openai/gpt-5.6-terra"
 	OpenRouterOpenaiGpt56TerraPro                        ModelID = "openrouter.openai/gpt-5.6-terra-pro"
-	OpenRouterOpenaiGpt56TerraProBatch                   ModelID = "openrouter.openai/gpt-5.6-terra-pro:batch"
-	OpenRouterOpenaiGpt56TerraBatch                      ModelID = "openrouter.openai/gpt-5.6-terra:batch"
-	OpenRouterOpenaiGpt5Batch                            ModelID = "openrouter.openai/gpt-5:batch"
 	OpenRouterOpenaiGptAudio                             ModelID = "openrouter.openai/gpt-audio"
 	OpenRouterOpenaiGptAudioMini                         ModelID = "openrouter.openai/gpt-audio-mini"
 	OpenRouterOpenaiGptChatLatest                        ModelID = "openrouter.openai/gpt-chat-latest"
@@ -236,19 +186,12 @@ const (
 	OpenRouterOpenaiGptOss20bFree                        ModelID = "openrouter.openai/gpt-oss-20b:free"
 	OpenRouterOpenaiGptOssSafeguard20b                   ModelID = "openrouter.openai/gpt-oss-safeguard-20b"
 	OpenRouterOpenaiO1                                   ModelID = "openrouter.openai/o1"
-	OpenRouterOpenaiO1Batch                              ModelID = "openrouter.openai/o1:batch"
 	OpenRouterOpenaiO3                                   ModelID = "openrouter.openai/o3"
 	OpenRouterOpenaiO3Mini                               ModelID = "openrouter.openai/o3-mini"
 	OpenRouterOpenaiO3MiniHigh                           ModelID = "openrouter.openai/o3-mini-high"
-	OpenRouterOpenaiO3MiniHighBatch                      ModelID = "openrouter.openai/o3-mini-high:batch"
-	OpenRouterOpenaiO3MiniBatch                          ModelID = "openrouter.openai/o3-mini:batch"
 	OpenRouterOpenaiO3Pro                                ModelID = "openrouter.openai/o3-pro"
-	OpenRouterOpenaiO3ProBatch                           ModelID = "openrouter.openai/o3-pro:batch"
-	OpenRouterOpenaiO3Batch                              ModelID = "openrouter.openai/o3:batch"
 	OpenRouterOpenaiO4Mini                               ModelID = "openrouter.openai/o4-mini"
 	OpenRouterOpenaiO4MiniHigh                           ModelID = "openrouter.openai/o4-mini-high"
-	OpenRouterOpenaiO4MiniHighBatch                      ModelID = "openrouter.openai/o4-mini-high:batch"
-	OpenRouterOpenaiO4MiniBatch                          ModelID = "openrouter.openai/o4-mini:batch"
 	OpenRouterOpenrouterAuto                             ModelID = "openrouter.openrouter/auto"
 	OpenRouterOpenrouterAutoBeta                         ModelID = "openrouter.openrouter/auto-beta"
 	OpenRouterOpenrouterFree                             ModelID = "openrouter.openrouter/free"
@@ -314,7 +257,6 @@ const (
 	OpenRouterThedrummerUnslopnemo12b                    ModelID = "openrouter.thedrummer/unslopnemo-12b"
 	OpenRouterThinkingmachinesInkling                    ModelID = "openrouter.thinkingmachines/inkling"
 	OpenRouterThinkingmachinesInklingSmall               ModelID = "openrouter.thinkingmachines/inkling-small"
-	OpenRouterThinkingmachinesInklingBatch               ModelID = "openrouter.thinkingmachines/inkling:batch"
 	OpenRouterUpstageSolarPro3                           ModelID = "openrouter.upstage/solar-pro-3"
 	OpenRouterXAiGrok420                                 ModelID = "openrouter.x-ai/grok-4.20"
 	OpenRouterXAiGrok43                                  ModelID = "openrouter.x-ai/grok-4.3"
@@ -333,7 +275,6 @@ const (
 	OpenRouterZAiGlm5Turbo                               ModelID = "openrouter.z-ai/glm-5-turbo"
 	OpenRouterZAiGlm51                                   ModelID = "openrouter.z-ai/glm-5.1"
 	OpenRouterZAiGlm52                                   ModelID = "openrouter.z-ai/glm-5.2"
-	OpenRouterZAiGlm52Batch                              ModelID = "openrouter.z-ai/glm-5.2:batch"
 	OpenRouterZAiGlm5vTurbo                              ModelID = "openrouter.z-ai/glm-5v-turbo"
 	OpenRouterAnthropicClaudeFableLatest                 ModelID = "openrouter.~anthropic/claude-fable-latest"
 	OpenRouterAnthropicClaudeHaikuLatest                 ModelID = "openrouter.~anthropic/claude-haiku-latest"
@@ -352,7 +293,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAi21JambaLarge17: {
 		ID:                  OpenRouterAi21JambaLarge17,
 		Name:                "AI21: Jamba Large 1.7",
-		Description:         "Jamba Large 1.7 is the latest model in the Jamba open family, offering improvements in gro… (256K ctx)",
+		Description:         "Jamba Large 1.7 is the latest model in the Jamba open family, offering improvements in grounding, instruction-following, and overall efficiency. Built on a hybrid SSM-Transformer architecture with a 256K context... (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "ai21/jamba-large-1.7",
 		CostPer1MIn:         2,
@@ -366,7 +307,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAionLabsAion20: {
 		ID:                  OpenRouterAionLabsAion20,
 		Name:                "AionLabs: Aion-2.0",
-		Description:         "Aion-2.0 is a variant of DeepSeek V3.2 optimized for immersive roleplaying and storytellin… (131K ctx)",
+		Description:         "Aion-2.0 is a variant of DeepSeek V3.2 optimized for immersive roleplaying and storytelling. It is particularly strong at introducing tension, crises, and conflict into stories, making narratives feel more engaging.... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "aion-labs/aion-2.0",
 		CostPer1MIn:         0.7999999999999999,
@@ -380,7 +321,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAionLabsAion30: {
 		ID:                  OpenRouterAionLabsAion30,
 		Name:                "AionLabs: Aion-3.0",
-		Description:         "Aion-3.0 is a multi-model roleplaying and storytelling system from AionLabs, built on the… (131K ctx)",
+		Description:         "Aion-3.0 is a multi-model roleplaying and storytelling system from AionLabs, built on the GLM family of models. It uses a collaborative generation process in which multiple specialized models each contribute... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "aion-labs/aion-3.0",
 		CostPer1MIn:         3,
@@ -394,7 +335,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAionLabsAion30Mini: {
 		ID:                  OpenRouterAionLabsAion30Mini,
 		Name:                "AionLabs: Aion-3.0-Mini",
-		Description:         "Aion-3.0 Mini is a multi-model roleplaying and storytelling system from AionLabs, built on… (131K ctx)",
+		Description:         "Aion-3.0 Mini is a multi-model roleplaying and storytelling system from AionLabs, built on the DeepSeek family of models. It uses a collaborative generation process in which multiple specialized models each... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "aion-labs/aion-3.0-mini",
 		CostPer1MIn:         0.7,
@@ -408,7 +349,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAmazonNova2LiteV1: {
 		ID:                  OpenRouterAmazonNova2LiteV1,
 		Name:                "Amazon: Nova 2 Lite",
-		Description:         "Nova 2 Lite is a fast, cost-effective reasoning model for everyday workloads that can proc… (1000K ctx)",
+		Description:         "Nova 2 Lite is a fast, cost-effective reasoning model for everyday workloads that can process text, images, and videos to generate text (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "amazon/nova-2-lite-v1",
 		CostPer1MIn:         0.3,
@@ -422,7 +363,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAmazonNovaLiteV1: {
 		ID:                  OpenRouterAmazonNovaLiteV1,
 		Name:                "Amazon: Nova Lite 1.0",
-		Description:         "Amazon Nova Lite 1.0 is a very low-cost multimodal model from Amazon that focused on fast… (300K ctx)",
+		Description:         "Amazon Nova Lite 1.0 is a very low-cost multimodal model from Amazon that focused on fast processing of image, video, and text inputs to generate text output. Amazon Nova Lite... (300K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "amazon/nova-lite-v1",
 		CostPer1MIn:         0.06,
@@ -436,7 +377,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAmazonNovaMicroV1: {
 		ID:                  OpenRouterAmazonNovaMicroV1,
 		Name:                "Amazon: Nova Micro 1.0",
-		Description:         "Amazon Nova Micro 1.0 is a text-only model that delivers the lowest latency responses in t… (128K ctx)",
+		Description:         "Amazon Nova Micro 1.0 is a text-only model that delivers the lowest latency responses in the Amazon Nova family of models at a very low cost. With a context length... (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "amazon/nova-micro-v1",
 		CostPer1MIn:         0.035,
@@ -450,7 +391,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAmazonNovaPremierV1: {
 		ID:                  OpenRouterAmazonNovaPremierV1,
 		Name:                "Amazon: Nova Premier 1.0",
-		Description:         "Amazon Nova Premier is the most capable of Amazon’s multimodal models for complex reason… (1000K ctx)",
+		Description:         "Amazon Nova Premier is the most capable of Amazon’s multimodal models for complex reasoning tasks and for use as the best teacher for distilling custom models (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "amazon/nova-premier-v1",
 		CostPer1MIn:         2.5,
@@ -464,7 +405,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAmazonNovaProV1: {
 		ID:                  OpenRouterAmazonNovaProV1,
 		Name:                "Amazon: Nova Pro 1.0",
-		Description:         "Amazon Nova Pro 1.0 is a capable multimodal model from Amazon focused on providing a combi… (300K ctx)",
+		Description:         "Amazon Nova Pro 1.0 is a capable multimodal model from Amazon focused on providing a combination of accuracy, speed, and cost for a wide range of tasks. As of December... (300K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "amazon/nova-pro-v1",
 		CostPer1MIn:         0.7999999999999999,
@@ -478,7 +419,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaude3Haiku: {
 		ID:                  OpenRouterAnthropicClaude3Haiku,
 		Name:                "Anthropic: Claude 3 Haiku",
-		Description:         "Claude 3 Haiku is Anthropic's fastest and most compact model for near-instant responsivene… (200K ctx)",
+		Description:         "Claude 3 Haiku is Anthropic's fastest and most compact model for near-instant responsiveness (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-3-haiku",
 		CostPer1MIn:         0.25,
@@ -492,7 +433,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeFable5: {
 		ID:                  OpenRouterAnthropicClaudeFable5,
 		Name:                "Anthropic: Claude Fable 5",
-		Description:         "Claude Fable 5 is a Mythos-class model from Anthropic, built for autonomous knowledge work… (1000K ctx)",
+		Description:         "Claude Fable 5 is a Mythos-class model from Anthropic, built for autonomous knowledge work and coding (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-fable-5",
 		CostPer1MIn:         10,
@@ -503,24 +444,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterAnthropicClaudeFable5Batch: {
-		ID:                  OpenRouterAnthropicClaudeFable5Batch,
-		Name:                "Anthropic: Claude Fable 5 (batch)",
-		Description:         "Claude Fable 5 is a Mythos-class model from Anthropic, built for autonomous knowledge work… (1000K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "anthropic/claude-fable-5:batch",
-		CostPer1MIn:         5,
-		CostPer1MOut:        25,
-		CostPer1MInCached:   0.5,
-		ContextWindow:       1000000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterAnthropicClaudeHaiku45: {
 		ID:                  OpenRouterAnthropicClaudeHaiku45,
 		Name:                "Anthropic: Claude Haiku 4.5",
-		Description:         "Claude Haiku 4.5 is Anthropic’s fastest and most efficient model, delivering near-fronti… (200K ctx)",
+		Description:         "Claude Haiku 4.5 is Anthropic’s fastest and most efficient model, delivering near-frontier intelligence at a fraction of the cost and latency of larger Claude models. Matching Claude Sonnet 4’s performance... (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-haiku-4.5",
 		CostPer1MIn:         1,
@@ -531,24 +458,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterAnthropicClaudeHaiku45Batch: {
-		ID:                  OpenRouterAnthropicClaudeHaiku45Batch,
-		Name:                "Anthropic: Claude Haiku 4.5 (batch)",
-		Description:         "Claude Haiku 4.5 is Anthropic’s fastest and most efficient model, delivering near-fronti… (200K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "anthropic/claude-haiku-4.5:batch",
-		CostPer1MIn:         0.5,
-		CostPer1MOut:        2.5,
-		CostPer1MInCached:   0.049999999999999996,
-		ContextWindow:       200000,
-		DefaultMaxTokens:    64000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterAnthropicClaudeOpus4: {
 		ID:                  OpenRouterAnthropicClaudeOpus4,
 		Name:                "Anthropic: Claude Opus 4",
-		Description:         "Claude Opus 4 is benchmarked as the world’s best coding model, at time of release, bring… (200K ctx)",
+		Description:         "Claude Opus 4 is benchmarked as the world’s best coding model, at time of release, bringing sustained performance on complex, long-running tasks and agent workflows (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4",
 		CostPer1MIn:         15,
@@ -562,7 +475,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus41: {
 		ID:                  OpenRouterAnthropicClaudeOpus41,
 		Name:                "Anthropic: Claude Opus 4.1",
-		Description:         "Claude Opus 4.1 is an updated version of Anthropic’s flagship model, offering improved p… (200K ctx)",
+		Description:         "Claude Opus 4.1 is an updated version of Anthropic’s flagship model, offering improved performance in coding, reasoning, and agentic tasks. It achieves 74.5% on SWE-bench Verified and shows notable gains... (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.1",
 		CostPer1MIn:         15,
@@ -573,24 +486,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterAnthropicClaudeOpus41Batch: {
-		ID:                  OpenRouterAnthropicClaudeOpus41Batch,
-		Name:                "Anthropic: Claude Opus 4.1 (batch)",
-		Description:         "Claude Opus 4.1 is an updated version of Anthropic’s flagship model, offering improved p… (200K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "anthropic/claude-opus-4.1:batch",
-		CostPer1MIn:         7.5,
-		CostPer1MOut:        37.5,
-		CostPer1MInCached:   0.75,
-		ContextWindow:       200000,
-		DefaultMaxTokens:    32000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterAnthropicClaudeOpus45: {
 		ID:                  OpenRouterAnthropicClaudeOpus45,
 		Name:                "Anthropic: Claude Opus 4.5",
-		Description:         "Claude Opus 4.5 is Anthropic’s frontier reasoning model optimized for complex software e… (200K ctx)",
+		Description:         "Claude Opus 4.5 is Anthropic’s frontier reasoning model optimized for complex software engineering, agentic workflows, and long-horizon computer use. It offers strong multimodal capabilities, competitive performance ac… (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.5",
 		CostPer1MIn:         5,
@@ -601,24 +500,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterAnthropicClaudeOpus45Batch: {
-		ID:                  OpenRouterAnthropicClaudeOpus45Batch,
-		Name:                "Anthropic: Claude Opus 4.5 (batch)",
-		Description:         "Claude Opus 4.5 is Anthropic’s frontier reasoning model optimized for complex software e… (200K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "anthropic/claude-opus-4.5:batch",
-		CostPer1MIn:         2.5,
-		CostPer1MOut:        12.5,
-		CostPer1MInCached:   0.25,
-		ContextWindow:       200000,
-		DefaultMaxTokens:    64000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterAnthropicClaudeOpus46: {
 		ID:                  OpenRouterAnthropicClaudeOpus46,
 		Name:                "Anthropic: Claude Opus 4.6",
-		Description:         "Opus 4.6 is Anthropic’s strongest model for coding and long-running professional tasks.… (1000K ctx)",
+		Description:         "Opus 4.6 is Anthropic’s strongest model for coding and long-running professional tasks. It is built for agents that operate across entire workflows rather than single prompts, making it especially effective... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.6",
 		CostPer1MIn:         5,
@@ -629,24 +514,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterAnthropicClaudeOpus46Batch: {
-		ID:                  OpenRouterAnthropicClaudeOpus46Batch,
-		Name:                "Anthropic: Claude Opus 4.6 (batch)",
-		Description:         "Opus 4.6 is Anthropic’s strongest model for coding and long-running professional tasks.… (1000K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "anthropic/claude-opus-4.6:batch",
-		CostPer1MIn:         2.5,
-		CostPer1MOut:        12.5,
-		CostPer1MInCached:   0.25,
-		ContextWindow:       1000000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterAnthropicClaudeOpus47: {
 		ID:                  OpenRouterAnthropicClaudeOpus47,
 		Name:                "Anthropic: Claude Opus 4.7",
-		Description:         "Opus 4.7 is the next generation of Anthropic's Opus family, built for long-running, asynch… (1000K ctx)",
+		Description:         "Opus 4.7 is the next generation of Anthropic's Opus family, built for long-running, asynchronous agents. Building on the coding and agentic strengths of Opus 4.6, it delivers stronger performance on... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.7",
 		CostPer1MIn:         5,
@@ -660,7 +531,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus47Fast: {
 		ID:                  OpenRouterAnthropicClaudeOpus47Fast,
 		Name:                "Anthropic: Claude Opus 4.7 (Fast)",
-		Description:         "Fast-mode variant of [Opus 4.7](/anthropic/claude-opus-4.7) - identical capabilities with… (1000K ctx)",
+		Description:         "Fast-mode variant of Opus 4.7 - identical capabilities with higher output speed at premium 6x pricing. Learn more in Anthropic's docs: https://platform.claude.com/docs/en/build-with-claude/fast-mode (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.7-fast",
 		CostPer1MIn:         30,
@@ -671,24 +542,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterAnthropicClaudeOpus47Batch: {
-		ID:                  OpenRouterAnthropicClaudeOpus47Batch,
-		Name:                "Anthropic: Claude Opus 4.7 (batch)",
-		Description:         "Opus 4.7 is the next generation of Anthropic's Opus family, built for long-running, asynch… (1000K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "anthropic/claude-opus-4.7:batch",
-		CostPer1MIn:         2.5,
-		CostPer1MOut:        12.5,
-		CostPer1MInCached:   0.25,
-		ContextWindow:       1000000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterAnthropicClaudeOpus48: {
 		ID:                  OpenRouterAnthropicClaudeOpus48,
 		Name:                "Anthropic: Claude Opus 4.8",
-		Description:         "Claude Opus 4.8 is Anthropic's most capable generally available model in the Opus family.… (1000K ctx)",
+		Description:         "Claude Opus 4.8 is Anthropic's most capable generally available model in the Opus family. It supports text, image, and file inputs with text output, with reasoning support and a 1M-token... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.8",
 		CostPer1MIn:         5,
@@ -702,7 +559,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus48Fast: {
 		ID:                  OpenRouterAnthropicClaudeOpus48Fast,
 		Name:                "Anthropic: Claude Opus 4.8 (Fast)",
-		Description:         "Fast-mode variant of [Opus 4.8](/anthropic/claude-opus-4.8) - identical capabilities with… (1000K ctx)",
+		Description:         "Fast-mode variant of Opus 4.8 - identical capabilities with higher output speed at 2x pricing relative to regular Opus 4.8. Learn more in Anthropic's docs: https://platform.claude.com/docs/en/build-with-claude/fast-mode (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-4.8-fast",
 		CostPer1MIn:         10,
@@ -713,24 +570,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterAnthropicClaudeOpus48Batch: {
-		ID:                  OpenRouterAnthropicClaudeOpus48Batch,
-		Name:                "Anthropic: Claude Opus 4.8 (batch)",
-		Description:         "Claude Opus 4.8 is Anthropic's most capable generally available model in the Opus family.… (1000K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "anthropic/claude-opus-4.8:batch",
-		CostPer1MIn:         2.5,
-		CostPer1MOut:        12.5,
-		CostPer1MInCached:   0.25,
-		ContextWindow:       1000000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterAnthropicClaudeOpus5: {
 		ID:                  OpenRouterAnthropicClaudeOpus5,
 		Name:                "Claude Opus 5",
-		Description:         "Claude Opus 5 is Anthropic’s flagship model for demanding reasoning, coding, and long-ho… (1000K ctx)",
+		Description:         "Claude Opus 5 is Anthropic’s flagship model for demanding reasoning, coding, and long-horizon agentic work (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-5",
 		CostPer1MIn:         5,
@@ -744,26 +587,12 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeOpus5Fast: {
 		ID:                  OpenRouterAnthropicClaudeOpus5Fast,
 		Name:                "Claude Opus 5 (Fast)",
-		Description:         "Fast-mode variant of [Opus 5](/anthropic/claude-opus-5) - identical capabilities with high… (1000K ctx)",
+		Description:         "Fast-mode variant of Opus 5 - identical capabilities with higher output speed at 2x pricing relative to regular Opus 5 (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-opus-5-fast",
 		CostPer1MIn:         10,
 		CostPer1MOut:        50,
 		CostPer1MInCached:   1,
-		ContextWindow:       1000000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterAnthropicClaudeOpus5Batch: {
-		ID:                  OpenRouterAnthropicClaudeOpus5Batch,
-		Name:                "Claude Opus 5 (batch)",
-		Description:         "Claude Opus 5 is Anthropic’s flagship model for demanding reasoning, coding, and long-ho… (1000K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "anthropic/claude-opus-5:batch",
-		CostPer1MIn:         2.5,
-		CostPer1MOut:        12.5,
-		CostPer1MInCached:   0.25,
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    128000,
 		CanReason:           true,
@@ -786,7 +615,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterAnthropicClaudeSonnet45: {
 		ID:                  OpenRouterAnthropicClaudeSonnet45,
 		Name:                "Anthropic: Claude Sonnet 4.5",
-		Description:         "Claude Sonnet 4.5 is Anthropic’s most advanced Sonnet model to date, optimized for real-… (1000K ctx)",
+		Description:         "Claude Sonnet 4.5 is Anthropic’s most advanced Sonnet model to date, optimized for real-world agents and coding workflows. It delivers state-of-the-art performance on coding benchmarks such as SWE-bench Verified, with.… (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-sonnet-4.5",
 		CostPer1MIn:         3,
@@ -797,24 +626,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterAnthropicClaudeSonnet45Batch: {
-		ID:                  OpenRouterAnthropicClaudeSonnet45Batch,
-		Name:                "Anthropic: Claude Sonnet 4.5 (batch)",
-		Description:         "Claude Sonnet 4.5 is Anthropic’s most advanced Sonnet model to date, optimized for real-… (1000K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "anthropic/claude-sonnet-4.5:batch",
-		CostPer1MIn:         1.5,
-		CostPer1MOut:        7.5,
-		CostPer1MInCached:   0.15,
-		ContextWindow:       1000000,
-		DefaultMaxTokens:    64000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterAnthropicClaudeSonnet46: {
 		ID:                  OpenRouterAnthropicClaudeSonnet46,
 		Name:                "Anthropic: Claude Sonnet 4.6",
-		Description:         "Sonnet 4.6 is Anthropic's most capable Sonnet-class model yet, with frontier performance a… (1000K ctx)",
+		Description:         "Sonnet 4.6 is Anthropic's most capable Sonnet-class model yet, with frontier performance across coding, agents, and professional work. It excels at iterative development, complex codebase navigation, end-to-end project m… (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-sonnet-4.6",
 		CostPer1MIn:         3,
@@ -825,43 +640,15 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterAnthropicClaudeSonnet46Batch: {
-		ID:                  OpenRouterAnthropicClaudeSonnet46Batch,
-		Name:                "Anthropic: Claude Sonnet 4.6 (batch)",
-		Description:         "Sonnet 4.6 is Anthropic's most capable Sonnet-class model yet, with frontier performance a… (1000K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "anthropic/claude-sonnet-4.6:batch",
-		CostPer1MIn:         1.5,
-		CostPer1MOut:        7.5,
-		CostPer1MInCached:   0.15,
-		ContextWindow:       1000000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterAnthropicClaudeSonnet5: {
 		ID:                  OpenRouterAnthropicClaudeSonnet5,
 		Name:                "Anthropic: Claude Sonnet 5",
-		Description:         "Sonnet 5 is Anthropic's most capable Sonnet-class model, with frontier performance across… (1000K ctx)",
+		Description:         "Sonnet 5 is Anthropic's most capable Sonnet-class model, with frontier performance across coding, agents, and professional work (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "anthropic/claude-sonnet-5",
 		CostPer1MIn:         2,
 		CostPer1MOut:        10,
 		CostPer1MInCached:   0.19999999999999998,
-		ContextWindow:       1000000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterAnthropicClaudeSonnet5Batch: {
-		ID:                  OpenRouterAnthropicClaudeSonnet5Batch,
-		Name:                "Anthropic: Claude Sonnet 5 (batch)",
-		Description:         "Sonnet 5 is Anthropic's most capable Sonnet-class model, with frontier performance across… (1000K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "anthropic/claude-sonnet-5:batch",
-		CostPer1MIn:         1,
-		CostPer1MOut:        5,
-		CostPer1MInCached:   0.09999999999999999,
 		ContextWindow:       1000000,
 		DefaultMaxTokens:    128000,
 		CanReason:           true,
@@ -884,7 +671,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterArceeAiVirtuosoLarge: {
 		ID:                  OpenRouterArceeAiVirtuosoLarge,
 		Name:                "Arcee AI: Virtuoso Large",
-		Description:         "Virtuoso‑Large is Arcee's top‑tier general‑purpose LLM at 72 B parameters, tuned to… (131K ctx)",
+		Description:         "Virtuoso‑Large is Arcee's top‑tier general‑purpose LLM at 72 B parameters, tuned to tackle cross‑domain reasoning, creative writing and enterprise QA (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "arcee-ai/virtuoso-large",
 		CostPer1MIn:         0.75,
@@ -898,7 +685,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterBytedanceSeedSeed16: {
 		ID:                  OpenRouterBytedanceSeedSeed16,
 		Name:                "ByteDance Seed: Seed 1.6",
-		Description:         "Seed 1.6 is a general-purpose model released by the ByteDance Seed team. It incorporates m… (262K ctx)",
+		Description:         "Seed 1.6 is a general-purpose model released by the ByteDance Seed team. It incorporates multimodal capabilities and adaptive deep thinking with a 256K context window. (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "bytedance-seed/seed-1.6",
 		CostPer1MIn:         0.25,
@@ -912,7 +699,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterBytedanceSeedSeed16Flash: {
 		ID:                  OpenRouterBytedanceSeedSeed16Flash,
 		Name:                "ByteDance Seed: Seed 1.6 Flash",
-		Description:         "Seed 1.6 Flash is an ultra-fast multimodal deep thinking model by ByteDance Seed, supporti… (262K ctx)",
+		Description:         "Seed 1.6 Flash is an ultra-fast multimodal deep thinking model by ByteDance Seed, supporting both text and visual understanding. It features a 256k context window and can generate outputs of... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "bytedance-seed/seed-1.6-flash",
 		CostPer1MIn:         0.075,
@@ -926,7 +713,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterBytedanceSeedSeed20Lite: {
 		ID:                  OpenRouterBytedanceSeedSeed20Lite,
 		Name:                "ByteDance Seed: Seed-2.0-Lite",
-		Description:         "Seed-2.0-Lite is a versatile, cost‑efficient enterprise workhorse that delivers strong m… (262K ctx)",
+		Description:         "Seed-2.0-Lite is a versatile, cost‑efficient enterprise workhorse that delivers strong multimodal and agent capabilities while offering noticeably lower latency, making it a practical default choice for most production… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "bytedance-seed/seed-2.0-lite",
 		CostPer1MIn:         0.25,
@@ -940,7 +727,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterBytedanceSeedSeed20Mini: {
 		ID:                  OpenRouterBytedanceSeedSeed20Mini,
 		Name:                "ByteDance Seed: Seed-2.0-Mini",
-		Description:         "Seed-2.0-mini targets latency-sensitive, high-concurrency, and cost-sensitive scenarios, e… (262K ctx)",
+		Description:         "Seed-2.0-mini targets latency-sensitive, high-concurrency, and cost-sensitive scenarios, emphasizing fast response and flexible inference deployment. It delivers performance comparable to ByteDance-Seed-1.6, supports 256… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "bytedance-seed/seed-2.0-mini",
 		CostPer1MIn:         0.09999999999999999,
@@ -954,7 +741,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterCohereCommandR082024: {
 		ID:                  OpenRouterCohereCommandR082024,
 		Name:                "Cohere: Command R (08-2024)",
-		Description:         "command-r-08-2024 is an update of the [Command R](/models/cohere/command-r) with improved… (128K ctx)",
+		Description:         "command-r-08-2024 is an update of the Command R with improved performance for multilingual retrieval-augmented generation (RAG) and tool use (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "cohere/command-r-08-2024",
 		CostPer1MIn:         0.15,
@@ -968,7 +755,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterCohereCommandRPlus082024: {
 		ID:                  OpenRouterCohereCommandRPlus082024,
 		Name:                "Cohere: Command R+ (08-2024)",
-		Description:         "command-r-plus-08-2024 is an update of the [Command R+](/models/cohere/command-r-plus) wit… (128K ctx)",
+		Description:         "command-r-plus-08-2024 is an update of the Command R+ with roughly 50% higher throughput and 25% lower latencies as compared to the previous Command R+ version, while keeping the hardware footprint (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "cohere/command-r-plus-08-2024",
 		CostPer1MIn:         2.5,
@@ -997,7 +784,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekChat: {
 		ID:                  OpenRouterDeepseekDeepseekChat,
 		Name:                "DeepSeek: DeepSeek V3",
-		Description:         "DeepSeek-V3 is the latest model from the DeepSeek team, building upon the instruction foll… (163K ctx)",
+		Description:         "DeepSeek-V3 is the latest model from the DeepSeek team, building upon the instruction following and coding abilities of the previous versions (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-chat",
 		CostPer1MIn:         0.2574,
@@ -1011,7 +798,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekChatV30324: {
 		ID:                  OpenRouterDeepseekDeepseekChatV30324,
 		Name:                "DeepSeek: DeepSeek V3 0324",
-		Description:         "DeepSeek V3, a 685B-parameter, mixture-of-experts model, is the latest iteration of the fl… (163K ctx)",
+		Description:         "DeepSeek V3, a 685B-parameter, mixture-of-experts model, is the latest iteration of the flagship chat model family from the DeepSeek team (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-chat-v3-0324",
 		CostPer1MIn:         0.27,
@@ -1025,7 +812,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekChatV31: {
 		ID:                  OpenRouterDeepseekDeepseekChatV31,
 		Name:                "DeepSeek: DeepSeek V3.1",
-		Description:         "DeepSeek-V3.1 is a large hybrid reasoning model (671B parameters, 37B active) that support… (163K ctx)",
+		Description:         "DeepSeek-V3.1 is a large hybrid reasoning model (671B parameters, 37B active) that supports both thinking and non-thinking modes via prompt templates. It extends the DeepSeek-V3 base with a two-phase long-context... (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-chat-v3.1",
 		CostPer1MIn:         0.25,
@@ -1039,7 +826,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekR1: {
 		ID:                  OpenRouterDeepseekDeepseekR1,
 		Name:                "DeepSeek: R1",
-		Description:         "DeepSeek R1 is here: Performance on par with [OpenAI o1](/openai/o1), but open-sourced and… (163K ctx)",
+		Description:         "DeepSeek R1 is here: Performance on par with OpenAI o1, but open-sourced and with fully open reasoning tokens (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-r1",
 		CostPer1MIn:         0.7,
@@ -1053,7 +840,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekR10528: {
 		ID:                  OpenRouterDeepseekDeepseekR10528,
 		Name:                "DeepSeek: R1 0528",
-		Description:         "May 28th update to the [original DeepSeek R1](/deepseek/deepseek-r1) Performance on par wi… (163K ctx)",
+		Description:         "May 28th update to the original DeepSeek R1 Performance on par with OpenAI o1, but open-sourced and with fully open reasoning tokens (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-r1-0528",
 		CostPer1MIn:         0.5,
@@ -1067,7 +854,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekV31Terminus: {
 		ID:                  OpenRouterDeepseekDeepseekV31Terminus,
 		Name:                "DeepSeek: DeepSeek V3.1 Terminus",
-		Description:         "DeepSeek-V3.1 Terminus is an update to [DeepSeek V3.1](/deepseek/deepseek-chat-v3.1) that… (163K ctx)",
+		Description:         "DeepSeek-V3.1 Terminus is an update to DeepSeek V3.1 that maintains the model's original capabilities while addressing issues reported by users, including language consistency and agent capabilities, further optimizing t… (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-v3.1-terminus",
 		CostPer1MIn:         0.27,
@@ -1081,7 +868,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekV32: {
 		ID:                  OpenRouterDeepseekDeepseekV32,
 		Name:                "DeepSeek: DeepSeek V3.2",
-		Description:         "DeepSeek-V3.2 is a large language model designed to harmonize high computational efficienc… (163K ctx)",
+		Description:         "DeepSeek-V3.2 is a large language model designed to harmonize high computational efficiency with strong reasoning and agentic tool-use performance. It introduces DeepSeek Sparse Attention (DSA), a fine-grained sparse att… (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-v3.2",
 		CostPer1MIn:         0.26899999999999996,
@@ -1095,7 +882,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekV32Exp: {
 		ID:                  OpenRouterDeepseekDeepseekV32Exp,
 		Name:                "DeepSeek: DeepSeek V3.2 Exp",
-		Description:         "DeepSeek-V3.2-Exp is an experimental large language model released by DeepSeek as an inter… (163K ctx)",
+		Description:         "DeepSeek-V3.2-Exp is an experimental large language model released by DeepSeek as an intermediate step between V3.1 and future architectures. It introduces DeepSeek Sparse Attention (DSA), a fine-grained sparse attention… (163K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-v3.2-exp",
 		CostPer1MIn:         0.27,
@@ -1109,7 +896,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekV4Flash: {
 		ID:                  OpenRouterDeepseekDeepseekV4Flash,
 		Name:                "DeepSeek: DeepSeek V4 Flash 0423",
-		Description:         "DeepSeek V4 Flash is an efficiency-optimized Mixture-of-Experts model from DeepSeek with 2… (1048K ctx)",
+		Description:         "DeepSeek V4 Flash is an efficiency-optimized Mixture-of-Experts model from DeepSeek with 284B total parameters and 13B activated parameters, supporting a 1M-token context window (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-v4-flash",
 		CostPer1MIn:         0.14,
@@ -1123,7 +910,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterDeepseekDeepseekV4Flash0731: {
 		ID:                  OpenRouterDeepseekDeepseekV4Flash0731,
 		Name:                "DeepSeek: DeepSeek V4 Flash 0731",
-		Description:         "DeepSeek V4 Flash 0731 is a sparse mixture-of-experts model from DeepSeek, with 13B active… (1048K ctx)",
+		Description:         "DeepSeek V4 Flash 0731 is a sparse mixture-of-experts model from DeepSeek, with 13B active parameters out of 284B total (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "deepseek/deepseek-v4-flash-0731",
 		CostPer1MIn:         0.09,
@@ -1151,7 +938,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini25Flash: {
 		ID:                  OpenRouterGoogleGemini25Flash,
 		Name:                "Google: Gemini 2.5 Flash",
-		Description:         "Gemini 2.5 Flash is Google's state-of-the-art workhorse model, specifically designed for a… (1048K ctx)",
+		Description:         "Gemini 2.5 Flash is Google's state-of-the-art workhorse model, specifically designed for advanced reasoning, coding, mathematics, and scientific tasks. It includes built-in \"thinking\" capabilities, enabling it to provide… (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-2.5-flash",
 		CostPer1MIn:         0.3,
@@ -1165,7 +952,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini25FlashLite: {
 		ID:                  OpenRouterGoogleGemini25FlashLite,
 		Name:                "Google: Gemini 2.5 Flash Lite",
-		Description:         "Gemini 2.5 Flash-Lite is a lightweight reasoning model in the Gemini 2.5 family, optimized… (1048K ctx)",
+		Description:         "Gemini 2.5 Flash-Lite is a lightweight reasoning model in the Gemini 2.5 family, optimized for ultra-low latency and cost efficiency. It offers improved throughput, faster token generation, and better performance... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-2.5-flash-lite",
 		CostPer1MIn:         0.09999999999999999,
@@ -1176,38 +963,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterGoogleGemini25FlashLiteBatch: {
-		ID:                  OpenRouterGoogleGemini25FlashLiteBatch,
-		Name:                "Google: Gemini 2.5 Flash Lite (batch)",
-		Description:         "Gemini 2.5 Flash-Lite is a lightweight reasoning model in the Gemini 2.5 family, optimized… (1048K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "google/gemini-2.5-flash-lite:batch",
-		CostPer1MIn:         0.049999999999999996,
-		CostPer1MOut:        0.19999999999999998,
-		CostPer1MInCached:   0.01,
-		ContextWindow:       1048576,
-		DefaultMaxTokens:    65535,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterGoogleGemini25FlashBatch: {
-		ID:                  OpenRouterGoogleGemini25FlashBatch,
-		Name:                "Google: Gemini 2.5 Flash (batch)",
-		Description:         "Gemini 2.5 Flash is Google's state-of-the-art workhorse model, specifically designed for a… (1048K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "google/gemini-2.5-flash:batch",
-		CostPer1MIn:         0.15,
-		CostPer1MOut:        1.25,
-		CostPer1MInCached:   0.03,
-		ContextWindow:       1048576,
-		DefaultMaxTokens:    65535,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterGoogleGemini25Pro: {
 		ID:                  OpenRouterGoogleGemini25Pro,
 		Name:                "Google: Gemini 2.5 Pro",
-		Description:         "Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, co… (1048K ctx)",
+		Description:         "Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, coding, mathematics, and scientific tasks. It employs “thinking” capabilities, enabling it to reason through responses with enha… (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-2.5-pro",
 		CostPer1MIn:         1.25,
@@ -1221,7 +980,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini25ProPreview: {
 		ID:                  OpenRouterGoogleGemini25ProPreview,
 		Name:                "Google: Gemini 2.5 Pro Preview 06-05",
-		Description:         "Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, co… (1048K ctx)",
+		Description:         "Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, coding, mathematics, and scientific tasks. It employs “thinking” capabilities, enabling it to reason through responses with enha… (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-2.5-pro-preview",
 		CostPer1MIn:         1.25,
@@ -1235,7 +994,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini25ProPreview0506: {
 		ID:                  OpenRouterGoogleGemini25ProPreview0506,
 		Name:                "Google: Gemini 2.5 Pro Preview 05-06",
-		Description:         "Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, co… (1048K ctx)",
+		Description:         "Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, coding, mathematics, and scientific tasks. It employs “thinking” capabilities, enabling it to reason through responses with enha… (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-2.5-pro-preview-05-06",
 		CostPer1MIn:         1.25,
@@ -1246,24 +1005,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterGoogleGemini25ProBatch: {
-		ID:                  OpenRouterGoogleGemini25ProBatch,
-		Name:                "Google: Gemini 2.5 Pro (batch)",
-		Description:         "Gemini 2.5 Pro is Google’s state-of-the-art AI model designed for advanced reasoning, co… (1048K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "google/gemini-2.5-pro:batch",
-		CostPer1MIn:         0.625,
-		CostPer1MOut:        5,
-		CostPer1MInCached:   0.125,
-		ContextWindow:       1048576,
-		DefaultMaxTokens:    65536,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterGoogleGemini3FlashPreview: {
 		ID:                  OpenRouterGoogleGemini3FlashPreview,
 		Name:                "Google: Gemini 3 Flash Preview",
-		Description:         "Gemini 3 Flash Preview is a high speed, high value thinking model designed for agentic wor… (1048K ctx)",
+		Description:         "Gemini 3 Flash Preview is a high speed, high value thinking model designed for agentic workflows, multi turn chat, and coding assistance (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3-flash-preview",
 		CostPer1MIn:         0.5,
@@ -1274,24 +1019,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterGoogleGemini3FlashPreviewBatch: {
-		ID:                  OpenRouterGoogleGemini3FlashPreviewBatch,
-		Name:                "Google: Gemini 3 Flash Preview (batch)",
-		Description:         "Gemini 3 Flash Preview is a high speed, high value thinking model designed for agentic wor… (1048K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "google/gemini-3-flash-preview:batch",
-		CostPer1MIn:         0.25,
-		CostPer1MOut:        1.5,
-		CostPer1MInCached:   0,
-		ContextWindow:       1048576,
-		DefaultMaxTokens:    65536,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterGoogleGemini3ProImage: {
 		ID:                  OpenRouterGoogleGemini3ProImage,
 		Name:                "Google: Nano Banana Pro (Gemini 3 Pro Image)",
-		Description:         "Nano Banana Pro is Google’s most advanced image-generation and editing model, built on G… (131K ctx)",
+		Description:         "Nano Banana Pro is Google’s most advanced image-generation and editing model, built on Gemini 3 Pro (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3-pro-image",
 		CostPer1MIn:         2,
@@ -1305,7 +1036,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini31FlashLite: {
 		ID:                  OpenRouterGoogleGemini31FlashLite,
 		Name:                "Google: Gemini 3.1 Flash Lite",
-		Description:         "Gemini 3.1 Flash Lite is Google’s GA high-efficiency multimodal model optimized for low-… (1048K ctx)",
+		Description:         "Gemini 3.1 Flash Lite is Google’s GA high-efficiency multimodal model optimized for low-latency, high-volume workloads. It supports text, image, video, audio, and PDF inputs, and is designed for lightweight agentic... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.1-flash-lite",
 		CostPer1MIn:         0.25,
@@ -1319,7 +1050,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini31FlashLitePreview: {
 		ID:                  OpenRouterGoogleGemini31FlashLitePreview,
 		Name:                "Google: Gemini 3.1 Flash Lite Preview",
-		Description:         "Gemini 3.1 Flash Lite Preview is Google's high-efficiency model optimized for high-volume… (1048K ctx)",
+		Description:         "Gemini 3.1 Flash Lite Preview is Google's high-efficiency model optimized for high-volume use cases. It outperforms Gemini 2.5 Flash Lite on overall quality and approaches Gemini 2.5 Flash performance across... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.1-flash-lite-preview",
 		CostPer1MIn:         0.25,
@@ -1330,24 +1061,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterGoogleGemini31FlashLiteBatch: {
-		ID:                  OpenRouterGoogleGemini31FlashLiteBatch,
-		Name:                "Google: Gemini 3.1 Flash Lite (batch)",
-		Description:         "Gemini 3.1 Flash Lite is Google’s GA high-efficiency multimodal model optimized for low-… (1048K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "google/gemini-3.1-flash-lite:batch",
-		CostPer1MIn:         0.125,
-		CostPer1MOut:        0.75,
-		CostPer1MInCached:   0.012499999999999999,
-		ContextWindow:       1048576,
-		DefaultMaxTokens:    65536,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterGoogleGemini31ProPreview: {
 		ID:                  OpenRouterGoogleGemini31ProPreview,
 		Name:                "Google: Gemini 3.1 Pro Preview",
-		Description:         "Gemini 3.1 Pro Preview is Google’s frontier reasoning model, delivering enhanced softwar… (1048K ctx)",
+		Description:         "Gemini 3.1 Pro Preview is Google’s frontier reasoning model, delivering enhanced software engineering performance, improved agentic reliability, and more efficient token usage across complex workflows. Building on the… (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.1-pro-preview",
 		CostPer1MIn:         2,
@@ -1361,7 +1078,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini31ProPreviewCustomtools: {
 		ID:                  OpenRouterGoogleGemini31ProPreviewCustomtools,
 		Name:                "Google: Gemini 3.1 Pro Preview Custom Tools",
-		Description:         "Gemini 3.1 Pro Preview Custom Tools is a variant of Gemini 3.1 Pro that improves tool sele… (1048K ctx)",
+		Description:         "Gemini 3.1 Pro Preview Custom Tools is a variant of Gemini 3.1 Pro that improves tool selection behavior by preventing overuse of a general bash tool when more efficient third-party... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.1-pro-preview-customtools",
 		CostPer1MIn:         2,
@@ -1372,24 +1089,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterGoogleGemini31ProPreviewBatch: {
-		ID:                  OpenRouterGoogleGemini31ProPreviewBatch,
-		Name:                "Google: Gemini 3.1 Pro Preview (batch)",
-		Description:         "Gemini 3.1 Pro Preview is Google’s frontier reasoning model, delivering enhanced softwar… (1048K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "google/gemini-3.1-pro-preview:batch",
-		CostPer1MIn:         1,
-		CostPer1MOut:        6,
-		CostPer1MInCached:   0,
-		ContextWindow:       1048576,
-		DefaultMaxTokens:    65536,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterGoogleGemini35Flash: {
 		ID:                  OpenRouterGoogleGemini35Flash,
 		Name:                "Google: Gemini 3.5 Flash",
-		Description:         "Gemini 3.5 Flash is Google's high-efficiency multimodal model, bringing near-Pro level cod… (1048K ctx)",
+		Description:         "Gemini 3.5 Flash is Google's high-efficiency multimodal model, bringing near-Pro level coding and reasoning at Flash-tier cost and speed. It is highly optimized for coding proficiency and parallel agentic execution... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.5-flash",
 		CostPer1MIn:         1.5,
@@ -1403,7 +1106,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemini35FlashLite: {
 		ID:                  OpenRouterGoogleGemini35FlashLite,
 		Name:                "Google: Gemini 3.5 Flash Lite",
-		Description:         "Gemini 3.5 Flash Lite is a high-efficiency model from Google with upgraded agentic capabil… (1048K ctx)",
+		Description:         "Gemini 3.5 Flash Lite is a high-efficiency model from Google with upgraded agentic capabilities. It is suited for subagents that execute focused tasks within complex, multi-agent workflows. (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.5-flash-lite",
 		CostPer1MIn:         0.3,
@@ -1414,57 +1117,15 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterGoogleGemini35FlashLiteBatch: {
-		ID:                  OpenRouterGoogleGemini35FlashLiteBatch,
-		Name:                "Google: Gemini 3.5 Flash Lite (batch)",
-		Description:         "Gemini 3.5 Flash Lite is a high-efficiency model from Google with upgraded agentic capabil… (1048K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "google/gemini-3.5-flash-lite:batch",
-		CostPer1MIn:         0.15,
-		CostPer1MOut:        1.25,
-		CostPer1MInCached:   0.015,
-		ContextWindow:       1048576,
-		DefaultMaxTokens:    65536,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterGoogleGemini35FlashBatch: {
-		ID:                  OpenRouterGoogleGemini35FlashBatch,
-		Name:                "Google: Gemini 3.5 Flash (batch)",
-		Description:         "Gemini 3.5 Flash is Google's high-efficiency multimodal model, bringing near-Pro level cod… (1048K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "google/gemini-3.5-flash:batch",
-		CostPer1MIn:         0.75,
-		CostPer1MOut:        4.5,
-		CostPer1MInCached:   0.075,
-		ContextWindow:       1048576,
-		DefaultMaxTokens:    65536,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterGoogleGemini36Flash: {
 		ID:                  OpenRouterGoogleGemini36Flash,
 		Name:                "Google: Gemini 3.6 Flash",
-		Description:         "Gemini 3.6 Flash is a high-efficiency model from Google for coding, agentic workflows, and… (1048K ctx)",
+		Description:         "Gemini 3.6 Flash is a high-efficiency model from Google for coding, agentic workflows, and web and app development. It is designed to produce polished outputs with fewer unnecessary edits and... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemini-3.6-flash",
 		CostPer1MIn:         1.5,
 		CostPer1MOut:        7.5,
 		CostPer1MInCached:   0.15,
-		ContextWindow:       1048576,
-		DefaultMaxTokens:    65536,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterGoogleGemini36FlashBatch: {
-		ID:                  OpenRouterGoogleGemini36FlashBatch,
-		Name:                "Google: Gemini 3.6 Flash (batch)",
-		Description:         "Gemini 3.6 Flash is a high-efficiency model from Google for coding, agentic workflows, and… (1048K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "google/gemini-3.6-flash:batch",
-		CostPer1MIn:         0.75,
-		CostPer1MOut:        3.75,
-		CostPer1MInCached:   0.075,
 		ContextWindow:       1048576,
 		DefaultMaxTokens:    65536,
 		CanReason:           true,
@@ -1501,7 +1162,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemma426bA4bIt: {
 		ID:                  OpenRouterGoogleGemma426bA4bIt,
 		Name:                "Google: Gemma 4 26B A4B ",
-		Description:         "Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google Deep… (262K ctx)",
+		Description:         "Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemma-4-26b-a4b-it",
 		CostPer1MIn:         0.07,
@@ -1515,7 +1176,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterGoogleGemma426bA4bItFree: {
 		ID:                  OpenRouterGoogleGemma426bA4bItFree,
 		Name:                "Google: Gemma 4 26B A4B  (free)",
-		Description:         "FREE — Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google Deep… (262K ctx)",
+		Description:         "FREE — Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind (262K ctx)",
 		Rank:                2,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "google/gemma-4-26b-a4b-it:free",
@@ -1559,7 +1220,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterIbmGraniteGranite418b: {
 		ID:                  OpenRouterIbmGraniteGranite418b,
 		Name:                "IBM: Granite 4.1 8B",
-		Description:         "Granite 4.1 8B is a dense, decoder-only 8-billion-parameter language model from IBM, part… (131K ctx)",
+		Description:         "Granite 4.1 8B is a dense, decoder-only 8-billion-parameter language model from IBM, part of the Granite 4.1 family. It supports a 131K-token context window and is designed for enterprise tasks... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "ibm-granite/granite-4.1-8b",
 		CostPer1MIn:         0.049999999999999996,
@@ -1587,7 +1248,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterInclusionaiLing261t: {
 		ID:                  OpenRouterInclusionaiLing261t,
 		Name:                "inclusionAI: Ling-2.6-1T",
-		Description:         "Ling-2.6-1T is an instant (instruct) model from inclusionAI and the company’s trillion-p… (262K ctx)",
+		Description:         "Ling-2.6-1T is an instant (instruct) model from inclusionAI and the company’s trillion-parameter flagship, designed for real-world agents that require fast execution and high efficiency at scale. It uses a “fast... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "inclusionai/ling-2.6-1t",
 		CostPer1MIn:         0.075,
@@ -1601,7 +1262,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterInclusionaiLing26Flash: {
 		ID:                  OpenRouterInclusionaiLing26Flash,
 		Name:                "inclusionAI: Ling-2.6-flash",
-		Description:         "Ling-2.6-flash is an instant (instruct) model from inclusionAI with 104B total parameters… (262K ctx)",
+		Description:         "Ling-2.6-flash is an instant (instruct) model from inclusionAI with 104B total parameters and 7.4B active parameters, designed for real-world agents that require fast responses, strong execution, and high token efficienc… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "inclusionai/ling-2.6-flash",
 		CostPer1MIn:         0.01,
@@ -1615,7 +1276,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterInclusionaiLing30Flash: {
 		ID:                  OpenRouterInclusionaiLing30Flash,
 		Name:                "Ling-3.0-flash",
-		Description:         "*Ling-3.0-flash* is a *124B-parameter Mixture-of-Experts (MoE) model*, with approximately… (262K ctx)",
+		Description:         "*Ling-3.0-flash* is a *124B-parameter Mixture-of-Experts (MoE) model*, with approximately *5.1B parameters activated per token*. The model is designed with *token efficiency and production-scale agentic inference* as key… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "inclusionai/ling-3.0-flash",
 		CostPer1MIn:         0.020999999999999998,
@@ -1629,7 +1290,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterInclusionaiLing30TinyFree: {
 		ID:                  OpenRouterInclusionaiLing30TinyFree,
 		Name:                "inclusionAI: Ling 3.0 Tiny (free)",
-		Description:         "FREE — Ling 3.0 Tiny is a mixture-of-experts model from InclusionAI, with 1.3B active parameters… (262K ctx)",
+		Description:         "FREE — Ling 3.0 Tiny is a mixture-of-experts model from InclusionAI, with 1.3B active parameters out of 7.9B total. It is designed for responsive agents, instruction following, and multi-turn conversations, with switchable... (262K ctx)",
 		Rank:                4,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "inclusionai/ling-3.0-tiny:free",
@@ -1644,7 +1305,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterInclusionaiRing261t: {
 		ID:                  OpenRouterInclusionaiRing261t,
 		Name:                "inclusionAI: Ring-2.6-1T",
-		Description:         "Ring-2.6-1T is a 1T-parameter-scale thinking model with 63B active parameters, built for r… (262K ctx)",
+		Description:         "Ring-2.6-1T is a 1T-parameter-scale thinking model with 63B active parameters, built for real-world agent workflows that require both strong capability and operational efficiency. It is optimized for coding agents, tool.… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "inclusionai/ring-2.6-1t",
 		CostPer1MIn:         0.075,
@@ -1658,7 +1319,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterKwaipilotKatCoderAirV25: {
 		ID:                  OpenRouterKwaipilotKatCoderAirV25,
 		Name:                "Kwaipilot: KAT-Coder-Air V2.5",
-		Description:         "KAT-Coder-Air V2.5 is a flagship-level Agentic Coding model that can directly hand over an… (256K ctx)",
+		Description:         "KAT-Coder-Air V2.5 is a flagship-level Agentic Coding model that can directly hand over an entire issue or an entire business workflow to it, allowing it to autonomously locate and make... (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "kwaipilot/kat-coder-air-v2.5",
 		CostPer1MIn:         0.15,
@@ -1672,7 +1333,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterKwaipilotKatCoderProV2: {
 		ID:                  OpenRouterKwaipilotKatCoderProV2,
 		Name:                "Kwaipilot: KAT-Coder-Pro V2",
-		Description:         "KAT-Coder-Pro V2 is the latest high-performance model in KwaiKAT’s KAT-Coder series, des… (262K ctx)",
+		Description:         "KAT-Coder-Pro V2 is the latest high-performance model in KwaiKAT’s KAT-Coder series, designed for complex enterprise-grade software engineering and SaaS integration (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "kwaipilot/kat-coder-pro-v2",
 		CostPer1MIn:         0.3,
@@ -1686,7 +1347,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterKwaipilotKatCoderProV25: {
 		ID:                  OpenRouterKwaipilotKatCoderProV25,
 		Name:                "Kwaipilot: KAT-Coder-Pro V2.5",
-		Description:         "KAT-Coder-Pro V2.5 is a flagship-level Agentic Coding model that can directly hand over an… (256K ctx)",
+		Description:         "KAT-Coder-Pro V2.5 is a flagship-level Agentic Coding model that can directly hand over an entire issue or an entire business workflow to it, allowing it to autonomously locate and make... (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "kwaipilot/kat-coder-pro-v2.5",
 		CostPer1MIn:         0.74,
@@ -1700,7 +1361,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMeituanLongcat20: {
 		ID:                  OpenRouterMeituanLongcat20,
 		Name:                "Meituan: LongCat 2.0",
-		Description:         "LongCat 2.0 is a sparse mixture-of-experts language model from Meituan, with 48B active pa… (1048K ctx)",
+		Description:         "LongCat 2.0 is a sparse mixture-of-experts language model from Meituan, with 48B active parameters out of 1.6T total. It is suited for coding, repository-level changes, long-horizon problem solving, and agentic... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meituan/longcat-2.0",
 		CostPer1MIn:         0.3,
@@ -1742,7 +1403,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaLlamaLlama3370bInstruct: {
 		ID:                  OpenRouterMetaLlamaLlama3370bInstruct,
 		Name:                "Meta: Llama 3.3 70B Instruct",
-		Description:         "The Meta Llama 3.3 multilingual large language model (LLM) is a pretrained and instruction… (131K ctx)",
+		Description:         "The Meta Llama 3.3 multilingual large language model (LLM) is a pretrained and instruction tuned generative model in 70B (text in/text out). The Llama 3.3 instruction tuned text only model... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta-llama/llama-3.3-70b-instruct",
 		CostPer1MIn:         0.09999999999999999,
@@ -1756,7 +1417,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaLlamaLlama4Maverick: {
 		ID:                  OpenRouterMetaLlamaLlama4Maverick,
 		Name:                "Meta: Llama 4 Maverick",
-		Description:         "Llama 4 Maverick 17B Instruct (128E) is a high-capacity multimodal language model from Met… (1048K ctx)",
+		Description:         "Llama 4 Maverick 17B Instruct (128E) is a high-capacity multimodal language model from Meta, built on a mixture-of-experts (MoE) architecture with 128 experts and 17 billion active parameters per forward (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta-llama/llama-4-maverick",
 		CostPer1MIn:         0.19999999999999998,
@@ -1770,7 +1431,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaLlamaLlama4Scout: {
 		ID:                  OpenRouterMetaLlamaLlama4Scout,
 		Name:                "Meta: Llama 4 Scout",
-		Description:         "Llama 4 Scout 17B Instruct (16E) is a mixture-of-experts (MoE) language model developed by… (1310K ctx)",
+		Description:         "Llama 4 Scout 17B Instruct (16E) is a mixture-of-experts (MoE) language model developed by Meta, activating 17 billion parameters out of a total of 109B (1310K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta-llama/llama-4-scout",
 		CostPer1MIn:         0.09999999999999999,
@@ -1784,7 +1445,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaMuseSpark11: {
 		ID:                  OpenRouterMetaMuseSpark11,
 		Name:                "Meta: Muse Spark 1.1",
-		Description:         "Muse Spark 1.1 is a multimodal reasoning model from Meta, built for agentic tasks. It acce… (1048K ctx)",
+		Description:         "Muse Spark 1.1 is a multimodal reasoning model from Meta, built for agentic tasks. It accepts text, images, video, audio, and PDF documents and returns text, with a 1M-token context... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta/muse-spark-1.1",
 		CostPer1MIn:         1.25,
@@ -1798,7 +1459,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaMuseSpark12: {
 		ID:                  OpenRouterMetaMuseSpark12,
 		Name:                "Meta: Muse Spark 1.2",
-		Description:         "Muse Spark 1.2 is a reasoning model from Meta, designed for complex agentic tasks. It acce… (1048K ctx)",
+		Description:         "Muse Spark 1.2 is a reasoning model from Meta, designed for complex agentic tasks. It accepts text, images, video, audio, and PDF documents, returns text, and offers a 1M-token context... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta/muse-spark-1.2",
 		CostPer1MIn:         1.25,
@@ -1812,7 +1473,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMinimaxMinimaxM1: {
 		ID:                  OpenRouterMinimaxMinimaxM1,
 		Name:                "MiniMax: MiniMax M1",
-		Description:         "MiniMax-M1 is a large-scale, open-weight reasoning model designed for extended context and… (1000K ctx)",
+		Description:         "MiniMax-M1 is a large-scale, open-weight reasoning model designed for extended context and high-efficiency inference (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "minimax/minimax-m1",
 		CostPer1MIn:         0.55,
@@ -1826,7 +1487,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMinimaxMinimaxM2: {
 		ID:                  OpenRouterMinimaxMinimaxM2,
 		Name:                "MiniMax: MiniMax M2",
-		Description:         "MiniMax-M2 is a compact, high-efficiency large language model optimized for end-to-end cod… (204K ctx)",
+		Description:         "MiniMax-M2 is a compact, high-efficiency large language model optimized for end-to-end coding and agentic workflows (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "minimax/minimax-m2",
 		CostPer1MIn:         0.255,
@@ -1840,7 +1501,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMinimaxMinimaxM21: {
 		ID:                  OpenRouterMinimaxMinimaxM21,
 		Name:                "MiniMax: MiniMax M2.1",
-		Description:         "MiniMax-M2.1 is a lightweight, state-of-the-art large language model optimized for coding,… (204K ctx)",
+		Description:         "MiniMax-M2.1 is a lightweight, state-of-the-art large language model optimized for coding, agentic workflows, and modern application development. With only 10 billion activated parameters, it delivers a major jump in rea… (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "minimax/minimax-m2.1",
 		CostPer1MIn:         0.3,
@@ -1854,7 +1515,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMinimaxMinimaxM25: {
 		ID:                  OpenRouterMinimaxMinimaxM25,
 		Name:                "MiniMax: MiniMax M2.5",
-		Description:         "MiniMax-M2.5 is a SOTA large language model designed for real-world productivity. Trained… (204K ctx)",
+		Description:         "MiniMax-M2.5 is a SOTA large language model designed for real-world productivity. Trained in a diverse range of complex real-world digital working environments, M2.5 builds upon the coding expertise of M2.1... (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "minimax/minimax-m2.5",
 		CostPer1MIn:         0.22,
@@ -1868,7 +1529,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMinimaxMinimaxM27: {
 		ID:                  OpenRouterMinimaxMinimaxM27,
 		Name:                "MiniMax: MiniMax M2.7",
-		Description:         "MiniMax-M2.7 is a next-generation large language model designed for autonomous, real-world… (204K ctx)",
+		Description:         "MiniMax-M2.7 is a next-generation large language model designed for autonomous, real-world productivity and continuous improvement. Built to actively participate in its own evolution, M2.7 integrates advanced agentic cap… (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "minimax/minimax-m2.7",
 		CostPer1MIn:         0.3,
@@ -1893,20 +1554,6 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterMinimaxMinimaxM3Batch: {
-		ID:                  OpenRouterMinimaxMinimaxM3Batch,
-		Name:                "MiniMax: MiniMax M3 (batch)",
-		Description:         "MiniMax-M3 is a multimodal foundation model from MiniMax (524K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "minimax/minimax-m3:batch",
-		CostPer1MIn:         0.15,
-		CostPer1MOut:        0.6,
-		CostPer1MInCached:   0.03,
-		ContextWindow:       524288,
-		DefaultMaxTokens:    4096,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterMistralaiCodestral2508: {
 		ID:                  OpenRouterMistralaiCodestral2508,
 		Name:                "Mistral: Codestral 2508",
@@ -1924,7 +1571,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMinistral14b2512: {
 		ID:                  OpenRouterMistralaiMinistral14b2512,
 		Name:                "Mistral: Ministral 3 14B 2512",
-		Description:         "The largest model in the Ministral 3 family, Ministral 3 14B offers frontier capabilities… (262K ctx)",
+		Description:         "The largest model in the Ministral 3 family, Ministral 3 14B offers frontier capabilities and performance comparable to its larger Mistral Small 3 (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/ministral-14b-2512",
 		CostPer1MIn:         0.19999999999999998,
@@ -1938,7 +1585,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMinistral3b2512: {
 		ID:                  OpenRouterMistralaiMinistral3b2512,
 		Name:                "Mistral: Ministral 3 3B 2512",
-		Description:         "The smallest model in the Ministral 3 family, Ministral 3 3B is a powerful, efficient tiny… (131K ctx)",
+		Description:         "The smallest model in the Ministral 3 family, Ministral 3 3B is a powerful, efficient tiny language model with vision capabilities (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/ministral-3b-2512",
 		CostPer1MIn:         0.09999999999999999,
@@ -1952,7 +1599,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMinistral8b2512: {
 		ID:                  OpenRouterMistralaiMinistral8b2512,
 		Name:                "Mistral: Ministral 3 8B 2512",
-		Description:         "A balanced model in the Ministral 3 family, Ministral 3 8B is a powerful, efficient tiny l… (262K ctx)",
+		Description:         "A balanced model in the Ministral 3 family, Ministral 3 8B is a powerful, efficient tiny language model with vision capabilities (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/ministral-8b-2512",
 		CostPer1MIn:         0.15,
@@ -1994,7 +1641,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralLarge2512: {
 		ID:                  OpenRouterMistralaiMistralLarge2512,
 		Name:                "Mistral: Mistral Large 3 2512",
-		Description:         "Mistral Large 3 2512 is Mistral’s most capable model to date, featuring a sparse mixture… (262K ctx)",
+		Description:         "Mistral Large 3 2512 is Mistral’s most capable model to date, featuring a sparse mixture-of-experts architecture with 41B active parameters (675B total), and released under the Apache 2 (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-large-2512",
 		CostPer1MIn:         0.5,
@@ -2008,7 +1655,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralMedium3: {
 		ID:                  OpenRouterMistralaiMistralMedium3,
 		Name:                "Mistral: Mistral Medium 3",
-		Description:         "Mistral Medium 3 is a high-performance enterprise-grade language model designed to deliver… (131K ctx)",
+		Description:         "Mistral Medium 3 is a high-performance enterprise-grade language model designed to deliver frontier-level capabilities at significantly reduced operational cost (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-medium-3",
 		CostPer1MIn:         0.39999999999999997,
@@ -2022,7 +1669,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralMedium35: {
 		ID:                  OpenRouterMistralaiMistralMedium35,
 		Name:                "Mistral: Mistral Medium 3.5",
-		Description:         "Mistral Medium 3.5 is a dense 128B instruction-following model from Mistral AI. It support… (262K ctx)",
+		Description:         "Mistral Medium 3.5 is a dense 128B instruction-following model from Mistral AI. It supports text and image inputs with text output, and is designed for agentic workflows, coding, and complex... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-medium-3-5",
 		CostPer1MIn:         1.5,
@@ -2036,7 +1683,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralMedium31: {
 		ID:                  OpenRouterMistralaiMistralMedium31,
 		Name:                "Mistral: Mistral Medium 3.1",
-		Description:         "Mistral Medium 3.1 is an updated version of Mistral Medium 3, which is a high-performance… (131K ctx)",
+		Description:         "Mistral Medium 3.1 is an updated version of Mistral Medium 3, which is a high-performance enterprise-grade language model designed to deliver frontier-level capabilities at significantly reduced operational cost. It bala… (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-medium-3.1",
 		CostPer1MIn:         0.39999999999999997,
@@ -2050,7 +1697,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralNemo: {
 		ID:                  OpenRouterMistralaiMistralNemo,
 		Name:                "Mistral: Mistral Nemo",
-		Description:         "A 12B parameter model with a 128k token context length built by Mistral in collaboration w… (131K ctx)",
+		Description:         "A 12B parameter model with a 128k token context length built by Mistral in collaboration with NVIDIA (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-nemo",
 		CostPer1MIn:         0.019000000000000003,
@@ -2064,7 +1711,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralSaba: {
 		ID:                  OpenRouterMistralaiMistralSaba,
 		Name:                "Mistral: Saba",
-		Description:         "Mistral Saba is a 24B-parameter language model specifically designed for the Middle East a… (32K ctx)",
+		Description:         "Mistral Saba is a 24B-parameter language model specifically designed for the Middle East and South Asia, delivering accurate and contextually relevant responses while maintaining efficient performance (32K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-saba",
 		CostPer1MIn:         0.19999999999999998,
@@ -2078,7 +1725,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralSmall2603: {
 		ID:                  OpenRouterMistralaiMistralSmall2603,
 		Name:                "Mistral: Mistral Small 4",
-		Description:         "Mistral Small 4 is the next major release in the Mistral Small family, unifying the capabi… (262K ctx)",
+		Description:         "Mistral Small 4 is the next major release in the Mistral Small family, unifying the capabilities of several flagship Mistral models into a single system (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-small-2603",
 		CostPer1MIn:         0.15,
@@ -2092,7 +1739,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMistralSmall3224bInstruct: {
 		ID:                  OpenRouterMistralaiMistralSmall3224bInstruct,
 		Name:                "Mistral: Mistral Small 3.2 24B",
-		Description:         "Mistral-Small-3.2-24B-Instruct-2506 is an updated 24B parameter model from Mistral optimiz… (256K ctx)",
+		Description:         "Mistral-Small-3.2-24B-Instruct-2506 is an updated 24B parameter model from Mistral optimized for instruction following, repetition reduction, and improved function calling. Compared to the 3.1 release, version 3.2 signif… (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mistral-small-3.2-24b-instruct",
 		CostPer1MIn:         0.09375,
@@ -2106,7 +1753,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiMixtral8x22bInstruct: {
 		ID:                  OpenRouterMistralaiMixtral8x22bInstruct,
 		Name:                "Mistral: Mixtral 8x22B Instruct",
-		Description:         "Mistral's official instruct fine-tuned version of [Mixtral 8x22B](/models/mistralai/mixtra… (65K ctx)",
+		Description:         "Mistral's official instruct fine-tuned version of Mixtral 8x22B (65K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/mixtral-8x22b-instruct",
 		CostPer1MIn:         2,
@@ -2120,7 +1767,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMistralaiVoxtralSmall24b2507: {
 		ID:                  OpenRouterMistralaiVoxtralSmall24b2507,
 		Name:                "Mistral: Voxtral Small 24B 2507",
-		Description:         "Voxtral Small is an enhancement of Mistral Small 3, incorporating state-of-the-art audio i… (32K ctx)",
+		Description:         "Voxtral Small is an enhancement of Mistral Small 3, incorporating state-of-the-art audio input capabilities while retaining best-in-class text performance (32K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "mistralai/voxtral-small-24b-2507",
 		CostPer1MIn:         0.09999999999999999,
@@ -2134,7 +1781,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK2: {
 		ID:                  OpenRouterMoonshotaiKimiK2,
 		Name:                "MoonshotAI: Kimi K2 0711",
-		Description:         "Kimi K2 Instruct is a large-scale Mixture-of-Experts (MoE) language model developed by Moo… (131K ctx)",
+		Description:         "Kimi K2 Instruct is a large-scale Mixture-of-Experts (MoE) language model developed by Moonshot AI, featuring 1 trillion total parameters with 32 billion active per forward pass (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k2",
 		CostPer1MIn:         0.5700000000000001,
@@ -2148,7 +1795,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK20905: {
 		ID:                  OpenRouterMoonshotaiKimiK20905,
 		Name:                "MoonshotAI: Kimi K2 0905",
-		Description:         "Kimi K2 0905 is the September update of [Kimi K2 0711](moonshotai/kimi-k2) (262K ctx)",
+		Description:         "Kimi K2 0905 is the September update of Kimi K2 0711 (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k2-0905",
 		CostPer1MIn:         0.6,
@@ -2162,7 +1809,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK2Thinking: {
 		ID:                  OpenRouterMoonshotaiKimiK2Thinking,
 		Name:                "MoonshotAI: Kimi K2 Thinking",
-		Description:         "Kimi K2 Thinking is Moonshot AI’s most advanced open reasoning model to date, extending… (262K ctx)",
+		Description:         "Kimi K2 Thinking is Moonshot AI’s most advanced open reasoning model to date, extending the K2 series into agentic, long-horizon reasoning (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k2-thinking",
 		CostPer1MIn:         0.6,
@@ -2176,7 +1823,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK25: {
 		ID:                  OpenRouterMoonshotaiKimiK25,
 		Name:                "MoonshotAI: Kimi K2.5",
-		Description:         "Kimi K2.5 is Moonshot AI's native multimodal model, delivering state-of-the-art visual cod… (262K ctx)",
+		Description:         "Kimi K2.5 is Moonshot AI's native multimodal model, delivering state-of-the-art visual coding capability and a self-directed agent swarm paradigm. Built on Kimi K2 with continued pretraining over approximately 15T mixed.… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k2.5",
 		CostPer1MIn:         0.5700000000000001,
@@ -2190,7 +1837,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK26: {
 		ID:                  OpenRouterMoonshotaiKimiK26,
 		Name:                "MoonshotAI: Kimi K2.6",
-		Description:         "Kimi K2.6 is Moonshot AI's next-generation multimodal model, designed for long-horizon cod… (262K ctx)",
+		Description:         "Kimi K2.6 is Moonshot AI's next-generation multimodal model, designed for long-horizon coding, coding-driven UI/UX generation, and multi-agent orchestration. It handles complex end-to-end coding tasks across Python, Rust… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k2.6",
 		CostPer1MIn:         0.5795,
@@ -2204,7 +1851,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMoonshotaiKimiK27Code: {
 		ID:                  OpenRouterMoonshotaiKimiK27Code,
 		Name:                "MoonshotAI: Kimi K2.7 Code",
-		Description:         "MoonshotAI: Kimi K2.7 Code is a coding-focused model in Moonshot AI's Kimi K2 family, buil… (262K ctx)",
+		Description:         "MoonshotAI: Kimi K2.7 Code is a coding-focused model in Moonshot AI's Kimi K2 family, built to complete end-to-end programming tasks reliably over long contexts. It uses a native multimodal mixture-of-experts... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k2.7-code",
 		CostPer1MIn:         0.7,
@@ -2215,24 +1862,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterMoonshotaiKimiK27CodeBatch: {
-		ID:                  OpenRouterMoonshotaiKimiK27CodeBatch,
-		Name:                "MoonshotAI: Kimi K2.7 Code (batch)",
-		Description:         "MoonshotAI: Kimi K2.7 Code is a coding-focused model in Moonshot AI's Kimi K2 family, buil… (262K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "moonshotai/kimi-k2.7-code:batch",
-		CostPer1MIn:         0.475,
-		CostPer1MOut:        2,
-		CostPer1MInCached:   0.095,
-		ContextWindow:       262144,
-		DefaultMaxTokens:    4096,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterMoonshotaiKimiK3: {
 		ID:                  OpenRouterMoonshotaiKimiK3,
 		Name:                "MoonshotAI: Kimi K3",
-		Description:         "Kimi K3 is a 2.8T parameter open-weight multimodal reasoning model from Moonshot AI. It is… (1048K ctx)",
+		Description:         "Kimi K3 is a 2.8T parameter open-weight multimodal reasoning model from Moonshot AI. It is suited for complex coding, knowledge work, and long-horizon agentic workflows, and is particularly strong at... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "moonshotai/kimi-k3",
 		CostPer1MIn:         3,
@@ -2246,7 +1879,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNexAgiNexN2Mini: {
 		ID:                  OpenRouterNexAgiNexN2Mini,
 		Name:                "Nex AGI: Nex-N2-Mini",
-		Description:         "Nex-N2-Mini is an open-source agentic mixture-of-experts model from Nex AGI, the smaller s… (262K ctx)",
+		Description:         "Nex-N2-Mini is an open-source agentic mixture-of-experts model from Nex AGI, the smaller sibling in the Nex-N2 series (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nex-agi/nex-n2-mini",
 		CostPer1MIn:         0.024999999999999998,
@@ -2260,7 +1893,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNexAgiNexN2Pro: {
 		ID:                  OpenRouterNexAgiNexN2Pro,
 		Name:                "Nex AGI: Nex-N2-Pro",
-		Description:         "Nex-N2-Pro is an agentic mixture-of-experts model from Nex AGI, with 17B active parameters… (262K ctx)",
+		Description:         "Nex-N2-Pro is an agentic mixture-of-experts model from Nex AGI, with 17B active parameters out of 397B total (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nex-agi/nex-n2-pro",
 		CostPer1MIn:         0.25,
@@ -2274,7 +1907,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3Nano30bA3b: {
 		ID:                  OpenRouterNvidiaNemotron3Nano30bA3b,
 		Name:                "NVIDIA: Nemotron 3 Nano 30B A3B",
-		Description:         "NVIDIA Nemotron 3 Nano 30B A3B is a small language MoE model with highest compute efficien… (262K ctx)",
+		Description:         "NVIDIA Nemotron 3 Nano 30B A3B is a small language MoE model with highest compute efficiency and accuracy for developers to build specialized agentic AI systems (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-nano-30b-a3b",
 		CostPer1MIn:         0.049999999999999996,
@@ -2288,7 +1921,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3Nano30bA3bFree: {
 		ID:                  OpenRouterNvidiaNemotron3Nano30bA3bFree,
 		Name:                "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
-		Description:         "FREE — NVIDIA Nemotron 3 Nano 30B A3B is a small language MoE model with highest compute efficien… (256K ctx)",
+		Description:         "FREE — NVIDIA Nemotron 3 Nano 30B A3B is a small language MoE model with highest compute efficiency and accuracy for developers to build specialized agentic AI systems (256K ctx)",
 		Rank:                9,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-nano-30b-a3b:free",
@@ -2303,7 +1936,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3NanoOmni30bA3bReasoningFree: {
 		ID:                  OpenRouterNvidiaNemotron3NanoOmni30bA3bReasoningFree,
 		Name:                "NVIDIA: Nemotron 3 Nano Omni (free)",
-		Description:         "FREE — NVIDIA Nemotron™ 3 Nano Omni is a 30B-A3B open multimodal model designed to function as… (256K ctx)",
+		Description:         "FREE — NVIDIA Nemotron™ 3 Nano Omni is a 30B-A3B open multimodal model designed to function as a perception and context sub-agent in enterprise agent systems (256K ctx)",
 		Rank:                10,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
@@ -2318,7 +1951,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3Super120bA12b: {
 		ID:                  OpenRouterNvidiaNemotron3Super120bA12b,
 		Name:                "NVIDIA: Nemotron 3 Super",
-		Description:         "NVIDIA Nemotron 3 Super is a 120B-parameter open hybrid MoE model, activating just 12B par… (1000K ctx)",
+		Description:         "NVIDIA Nemotron 3 Super is a 120B-parameter open hybrid MoE model, activating just 12B parameters for maximum compute efficiency and accuracy in complex multi-agent applications (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-super-120b-a12b",
 		CostPer1MIn:         0.3,
@@ -2332,7 +1965,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3Super120bA12bFree: {
 		ID:                  OpenRouterNvidiaNemotron3Super120bA12bFree,
 		Name:                "NVIDIA: Nemotron 3 Super (free)",
-		Description:         "FREE — NVIDIA Nemotron 3 Super is a 120B-parameter open hybrid MoE model, activating just 12B par… (262K ctx)",
+		Description:         "FREE — NVIDIA Nemotron 3 Super is a 120B-parameter open hybrid MoE model, activating just 12B parameters for maximum compute efficiency and accuracy in complex multi-agent applications (262K ctx)",
 		Rank:                5,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-super-120b-a12b:free",
@@ -2347,7 +1980,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotron3Ultra550bA55b: {
 		ID:                  OpenRouterNvidiaNemotron3Ultra550bA55b,
 		Name:                "NVIDIA: Nemotron 3 Ultra",
-		Description:         "NVIDIA Nemotron 3 Ultra is an open frontier-reasoning and orchestration model from NVIDIA,… (512K ctx)",
+		Description:         "NVIDIA Nemotron 3 Ultra is an open frontier-reasoning and orchestration model from NVIDIA, with 55B active parameters out of 550B total (MoE) (512K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-ultra-550b-a55b",
 		CostPer1MIn:         0.6,
@@ -2358,24 +1991,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: false,
 	},
-	OpenRouterNvidiaNemotron3Ultra550bA55bBatch: {
-		ID:                  OpenRouterNvidiaNemotron3Ultra550bA55bBatch,
-		Name:                "NVIDIA: Nemotron 3 Ultra (batch)",
-		Description:         "NVIDIA Nemotron 3 Ultra is an open frontier-reasoning and orchestration model from NVIDIA,… (512K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "nvidia/nemotron-3-ultra-550b-a55b:batch",
-		CostPer1MIn:         0.3,
-		CostPer1MOut:        1.7999999999999998,
-		CostPer1MInCached:   0.09999999999999999,
-		ContextWindow:       512288,
-		DefaultMaxTokens:    4096,
-		CanReason:           true,
-		SupportsAttachments: false,
-	},
 	OpenRouterNvidiaNemotron3Ultra550bA55bFree: {
 		ID:                  OpenRouterNvidiaNemotron3Ultra550bA55bFree,
 		Name:                "NVIDIA: Nemotron 3 Ultra (free)",
-		Description:         "FREE — NVIDIA Nemotron 3 Ultra is an open frontier-reasoning and orchestration model from NVIDIA,… (1000K ctx)",
+		Description:         "FREE — NVIDIA Nemotron 3 Ultra is an open frontier-reasoning and orchestration model from NVIDIA, with 55B active parameters out of 550B total (MoE) (1000K ctx)",
 		Rank:                1,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-3-ultra-550b-a55b:free",
@@ -2390,7 +2009,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotronNano12bV2VlFree: {
 		ID:                  OpenRouterNvidiaNemotronNano12bV2VlFree,
 		Name:                "NVIDIA: Nemotron Nano 12B 2 VL (free)",
-		Description:         "FREE — NVIDIA Nemotron Nano 2 VL is a 12-billion-parameter open multimodal reasoning model design… (128K ctx)",
+		Description:         "FREE — NVIDIA Nemotron Nano 2 VL is a 12-billion-parameter open multimodal reasoning model designed for video understanding and document intelligence (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-nano-12b-v2-vl:free",
 		CostPer1MIn:         0,
@@ -2404,7 +2023,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterNvidiaNemotronNano9bV2Free: {
 		ID:                  OpenRouterNvidiaNemotronNano9bV2Free,
 		Name:                "NVIDIA: Nemotron Nano 9B V2 (free)",
-		Description:         "FREE — NVIDIA-Nemotron-Nano-9B-v2 is a large language model (LLM) trained from scratch by NVIDIA,… (128K ctx)",
+		Description:         "FREE — NVIDIA-Nemotron-Nano-9B-v2 is a large language model (LLM) trained from scratch by NVIDIA, and designed as a unified model for both reasoning and non-reasoning tasks (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "nvidia/nemotron-nano-9b-v2:free",
 		CostPer1MIn:         0,
@@ -2418,7 +2037,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt35Turbo: {
 		ID:                  OpenRouterOpenaiGpt35Turbo,
 		Name:                "OpenAI: GPT-3.5 Turbo",
-		Description:         "GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language o… (16K ctx)",
+		Description:         "GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language or code, and is optimized for chat and traditional completion tasks. Training data up to Sep 2021. (16K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-3.5-turbo",
 		CostPer1MIn:         0.5,
@@ -2432,7 +2051,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt35Turbo0613: {
 		ID:                  OpenRouterOpenaiGpt35Turbo0613,
 		Name:                "OpenAI: GPT-3.5 Turbo (older v0613)",
-		Description:         "GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language o… (4K ctx)",
+		Description:         "GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language or code, and is optimized for chat and traditional completion tasks. Training data up to Sep 2021. (4K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-3.5-turbo-0613",
 		CostPer1MIn:         1,
@@ -2457,24 +2076,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           false,
 		SupportsAttachments: false,
 	},
-	OpenRouterOpenaiGpt35TurboBatch: {
-		ID:                  OpenRouterOpenaiGpt35TurboBatch,
-		Name:                "OpenAI: GPT-3.5 Turbo (batch)",
-		Description:         "GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language o… (16K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-3.5-turbo:batch",
-		CostPer1MIn:         0.25,
-		CostPer1MOut:        0.75,
-		CostPer1MInCached:   0,
-		ContextWindow:       16385,
-		DefaultMaxTokens:    4096,
-		CanReason:           false,
-		SupportsAttachments: false,
-	},
 	OpenRouterOpenaiGpt4: {
 		ID:                  OpenRouterOpenaiGpt4,
 		Name:                "OpenAI: GPT-4",
-		Description:         "OpenAI's flagship model, GPT-4 is a large-scale multimodal language model capable of solvi… (8K ctx)",
+		Description:         "OpenAI's flagship model, GPT-4 is a large-scale multimodal language model capable of solving difficult problems with greater accuracy than previous models due to its broader general knowledge and advanced reasoning (8K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4",
 		CostPer1MIn:         30,
@@ -2502,7 +2107,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4TurboPreview: {
 		ID:                  OpenRouterOpenaiGpt4TurboPreview,
 		Name:                "OpenAI: GPT-4 Turbo Preview",
-		Description:         "The preview GPT-4 model with improved instruction following, JSON mode, reproducible outpu… (128K ctx)",
+		Description:         "The preview GPT-4 model with improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4-turbo-preview",
 		CostPer1MIn:         10,
@@ -2513,24 +2118,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           false,
 		SupportsAttachments: false,
 	},
-	OpenRouterOpenaiGpt4TurboBatch: {
-		ID:                  OpenRouterOpenaiGpt4TurboBatch,
-		Name:                "OpenAI: GPT-4 Turbo (batch)",
-		Description:         "The latest GPT-4 Turbo model with vision capabilities (128K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-4-turbo:batch",
-		CostPer1MIn:         5,
-		CostPer1MOut:        15,
-		CostPer1MInCached:   0,
-		ContextWindow:       128000,
-		DefaultMaxTokens:    4096,
-		CanReason:           false,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt41: {
 		ID:                  OpenRouterOpenaiGpt41,
 		Name:                "OpenAI: GPT-4.1",
-		Description:         "GPT-4.1 is a flagship large language model optimized for advanced instruction following, r… (1047K ctx)",
+		Description:         "GPT-4.1 is a flagship large language model optimized for advanced instruction following, real-world software engineering, and long-context reasoning. It supports a 1 million token context window and outperforms GPT-4o an… (1047K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4.1",
 		CostPer1MIn:         2,
@@ -2544,26 +2135,12 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt41Mini: {
 		ID:                  OpenRouterOpenaiGpt41Mini,
 		Name:                "OpenAI: GPT-4.1 Mini",
-		Description:         "GPT-4.1 Mini is a mid-sized model delivering performance competitive with GPT-4o at substa… (1047K ctx)",
+		Description:         "GPT-4.1 Mini is a mid-sized model delivering performance competitive with GPT-4o at substantially lower latency and cost. It retains a 1 million token context window and scores 45.1% on hard... (1047K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4.1-mini",
 		CostPer1MIn:         0.39999999999999997,
 		CostPer1MOut:        1.5999999999999999,
 		CostPer1MInCached:   0.09999999999999999,
-		ContextWindow:       1047576,
-		DefaultMaxTokens:    32768,
-		CanReason:           false,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiGpt41MiniBatch: {
-		ID:                  OpenRouterOpenaiGpt41MiniBatch,
-		Name:                "OpenAI: GPT-4.1 Mini (batch)",
-		Description:         "GPT-4.1 Mini is a mid-sized model delivering performance competitive with GPT-4o at substa… (1047K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-4.1-mini:batch",
-		CostPer1MIn:         0.19999999999999998,
-		CostPer1MOut:        0.7999999999999999,
-		CostPer1MInCached:   0.049999999999999996,
 		ContextWindow:       1047576,
 		DefaultMaxTokens:    32768,
 		CanReason:           false,
@@ -2583,38 +2160,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           false,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt41NanoBatch: {
-		ID:                  OpenRouterOpenaiGpt41NanoBatch,
-		Name:                "OpenAI: GPT-4.1 Nano (batch)",
-		Description:         "For tasks that demand low latency, GPT‑4 (1047K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-4.1-nano:batch",
-		CostPer1MIn:         0.049999999999999996,
-		CostPer1MOut:        0.19999999999999998,
-		CostPer1MInCached:   0.012499999999999999,
-		ContextWindow:       1047576,
-		DefaultMaxTokens:    32768,
-		CanReason:           false,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiGpt41Batch: {
-		ID:                  OpenRouterOpenaiGpt41Batch,
-		Name:                "OpenAI: GPT-4.1 (batch)",
-		Description:         "GPT-4.1 is a flagship large language model optimized for advanced instruction following, r… (1047K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-4.1:batch",
-		CostPer1MIn:         1,
-		CostPer1MOut:        4,
-		CostPer1MInCached:   0.25,
-		ContextWindow:       1047576,
-		DefaultMaxTokens:    32768,
-		CanReason:           false,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt4o: {
 		ID:                  OpenRouterOpenaiGpt4o,
 		Name:                "OpenAI: GPT-4o",
-		Description:         "GPT-4o (\"o\" for \"omni\") is OpenAI's latest AI model, supporting both text and image inputs… (128K ctx)",
+		Description:         "GPT-4o (\"o\" for \"omni\") is OpenAI's latest AI model, supporting both text and image inputs with text outputs (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4o",
 		CostPer1MIn:         2.5,
@@ -2628,7 +2177,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4o20240513: {
 		ID:                  OpenRouterOpenaiGpt4o20240513,
 		Name:                "OpenAI: GPT-4o (2024-05-13)",
-		Description:         "GPT-4o (\"o\" for \"omni\") is OpenAI's latest AI model, supporting both text and image inputs… (128K ctx)",
+		Description:         "GPT-4o (\"o\" for \"omni\") is OpenAI's latest AI model, supporting both text and image inputs with text outputs (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4o-2024-05-13",
 		CostPer1MIn:         5,
@@ -2642,7 +2191,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4o20240806: {
 		ID:                  OpenRouterOpenaiGpt4o20240806,
 		Name:                "OpenAI: GPT-4o (2024-08-06)",
-		Description:         "The 2024-08-06 version of GPT-4o offers improved performance in structured outputs, with t… (128K ctx)",
+		Description:         "The 2024-08-06 version of GPT-4o offers improved performance in structured outputs, with the ability to supply a JSON schema in the respone_format (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4o-2024-08-06",
 		CostPer1MIn:         2.5,
@@ -2656,7 +2205,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4o20241120: {
 		ID:                  OpenRouterOpenaiGpt4o20241120,
 		Name:                "OpenAI: GPT-4o (2024-11-20)",
-		Description:         "The 2024-11-20 version of GPT-4o offers a leveled-up creative writing ability with more na… (128K ctx)",
+		Description:         "The 2024-11-20 version of GPT-4o offers a leveled-up creative writing ability with more natural, engaging, and tailored writing to improve relevance & readability (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4o-2024-11-20",
 		CostPer1MIn:         2.5,
@@ -2670,7 +2219,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4oMini: {
 		ID:                  OpenRouterOpenaiGpt4oMini,
 		Name:                "OpenAI: GPT-4o-mini",
-		Description:         "GPT-4o mini is OpenAI's newest model after [GPT-4 Omni](/models/openai/gpt-4o), supporting… (128K ctx)",
+		Description:         "GPT-4o mini is OpenAI's newest model after GPT-4 Omni, supporting both text and image inputs with text outputs (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4o-mini",
 		CostPer1MIn:         0.15,
@@ -2684,7 +2233,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4oMini20240718: {
 		ID:                  OpenRouterOpenaiGpt4oMini20240718,
 		Name:                "OpenAI: GPT-4o-mini (2024-07-18)",
-		Description:         "GPT-4o mini is OpenAI's newest model after [GPT-4 Omni](/models/openai/gpt-4o), supporting… (128K ctx)",
+		Description:         "GPT-4o mini is OpenAI's newest model after GPT-4 Omni, supporting both text and image inputs with text outputs (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4o-mini-2024-07-18",
 		CostPer1MIn:         0.15,
@@ -2695,38 +2244,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           false,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt4oMiniBatch: {
-		ID:                  OpenRouterOpenaiGpt4oMiniBatch,
-		Name:                "OpenAI: GPT-4o-mini (batch)",
-		Description:         "GPT-4o mini is OpenAI's newest model after [GPT-4 Omni](/models/openai/gpt-4o), supporting… (128K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-4o-mini:batch",
-		CostPer1MIn:         0.075,
-		CostPer1MOut:        0.3,
-		CostPer1MInCached:   0.0375,
-		ContextWindow:       128000,
-		DefaultMaxTokens:    16384,
-		CanReason:           false,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiGpt4oBatch: {
-		ID:                  OpenRouterOpenaiGpt4oBatch,
-		Name:                "OpenAI: GPT-4o (batch)",
-		Description:         "GPT-4o (\"o\" for \"omni\") is OpenAI's latest AI model, supporting both text and image inputs… (128K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-4o:batch",
-		CostPer1MIn:         1.25,
-		CostPer1MOut:        5,
-		CostPer1MInCached:   0.625,
-		ContextWindow:       128000,
-		DefaultMaxTokens:    16384,
-		CanReason:           false,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt5: {
 		ID:                  OpenRouterOpenaiGpt5,
 		Name:                "OpenAI: GPT-5",
-		Description:         "GPT-5 is OpenAI’s most advanced model, offering major improvements in reasoning, code qu… (400K ctx)",
+		Description:         "GPT-5 is OpenAI’s most advanced model, offering major improvements in reasoning, code quality, and user experience (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5",
 		CostPer1MIn:         1.25,
@@ -2737,24 +2258,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt5CodexBatch: {
-		ID:                  OpenRouterOpenaiGpt5CodexBatch,
-		Name:                "OpenAI: GPT-5 Codex (batch)",
-		Description:         "GPT-5-Codex is a specialized version of GPT-5 optimized for software engineering and codin… (400K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5-codex:batch",
-		CostPer1MIn:         0.625,
-		CostPer1MOut:        5,
-		CostPer1MInCached:   0.0625,
-		ContextWindow:       400000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt5Mini: {
 		ID:                  OpenRouterOpenaiGpt5Mini,
 		Name:                "OpenAI: GPT-5 Mini",
-		Description:         "GPT-5 Mini is a compact version of GPT-5, designed to handle lighter-weight reasoning task… (400K ctx)",
+		Description:         "GPT-5 Mini is a compact version of GPT-5, designed to handle lighter-weight reasoning tasks (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5-mini",
 		CostPer1MIn:         0.25,
@@ -2765,24 +2272,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt5MiniBatch: {
-		ID:                  OpenRouterOpenaiGpt5MiniBatch,
-		Name:                "OpenAI: GPT-5 Mini (batch)",
-		Description:         "GPT-5 Mini is a compact version of GPT-5, designed to handle lighter-weight reasoning task… (400K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5-mini:batch",
-		CostPer1MIn:         0.125,
-		CostPer1MOut:        1,
-		CostPer1MInCached:   0.012499999999999999,
-		ContextWindow:       400000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt5Nano: {
 		ID:                  OpenRouterOpenaiGpt5Nano,
 		Name:                "OpenAI: GPT-5 Nano",
-		Description:         "GPT-5-Nano is the smallest and fastest variant in the GPT-5 system, optimized for develope… (400K ctx)",
+		Description:         "GPT-5-Nano is the smallest and fastest variant in the GPT-5 system, optimized for developer tools, rapid interactions, and ultra-low latency environments (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5-nano",
 		CostPer1MIn:         0.049999999999999996,
@@ -2793,24 +2286,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt5NanoBatch: {
-		ID:                  OpenRouterOpenaiGpt5NanoBatch,
-		Name:                "OpenAI: GPT-5 Nano (batch)",
-		Description:         "GPT-5-Nano is the smallest and fastest variant in the GPT-5 system, optimized for develope… (400K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5-nano:batch",
-		CostPer1MIn:         0.024999999999999998,
-		CostPer1MOut:        0.19999999999999998,
-		CostPer1MInCached:   0.0025,
-		ContextWindow:       400000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt5Pro: {
 		ID:                  OpenRouterOpenaiGpt5Pro,
 		Name:                "OpenAI: GPT-5 Pro",
-		Description:         "GPT-5 Pro is OpenAI’s most advanced model, offering major improvements in reasoning, cod… (400K ctx)",
+		Description:         "GPT-5 Pro is OpenAI’s most advanced model, offering major improvements in reasoning, code quality, and user experience (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5-pro",
 		CostPer1MIn:         15,
@@ -2821,24 +2300,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt5ProBatch: {
-		ID:                  OpenRouterOpenaiGpt5ProBatch,
-		Name:                "OpenAI: GPT-5 Pro (batch)",
-		Description:         "GPT-5 Pro is OpenAI’s most advanced model, offering major improvements in reasoning, cod… (400K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5-pro:batch",
-		CostPer1MIn:         7.5,
-		CostPer1MOut:        60,
-		CostPer1MInCached:   0,
-		ContextWindow:       400000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt51: {
 		ID:                  OpenRouterOpenaiGpt51,
 		Name:                "OpenAI: GPT-5.1",
-		Description:         "GPT-5.1 is the latest frontier-grade model in the GPT-5 series, offering stronger general-… (400K ctx)",
+		Description:         "GPT-5.1 is the latest frontier-grade model in the GPT-5 series, offering stronger general-purpose reasoning, improved instruction adherence, and a more natural conversational style compared to GPT-5. It uses adaptive rea… (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.1",
 		CostPer1MIn:         1.25,
@@ -2852,7 +2317,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt51Codex: {
 		ID:                  OpenRouterOpenaiGpt51Codex,
 		Name:                "OpenAI: GPT-5.1-Codex",
-		Description:         "GPT-5.1-Codex is a specialized version of GPT-5.1 optimized for software engineering and c… (400K ctx)",
+		Description:         "GPT-5.1-Codex is a specialized version of GPT-5.1 optimized for software engineering and coding workflows. It is designed for both interactive development sessions and long, independent execution of complex engineering t… (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.1-codex",
 		CostPer1MIn:         1.25,
@@ -2866,7 +2331,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt51CodexMax: {
 		ID:                  OpenRouterOpenaiGpt51CodexMax,
 		Name:                "OpenAI: GPT-5.1-Codex-Max",
-		Description:         "GPT-5.1-Codex-Max is OpenAI’s latest agentic coding model, designed for long-running, hi… (400K ctx)",
+		Description:         "GPT-5.1-Codex-Max is OpenAI’s latest agentic coding model, designed for long-running, high-context software development tasks. It is based on an updated version of the 5.1 reasoning stack and trained on agentic... (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.1-codex-max",
 		CostPer1MIn:         1.25,
@@ -2891,24 +2356,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt51Batch: {
-		ID:                  OpenRouterOpenaiGpt51Batch,
-		Name:                "OpenAI: GPT-5.1 (batch)",
-		Description:         "GPT-5.1 is the latest frontier-grade model in the GPT-5 series, offering stronger general-… (400K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.1:batch",
-		CostPer1MIn:         0.625,
-		CostPer1MOut:        5,
-		CostPer1MInCached:   0.0625,
-		ContextWindow:       400000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt52: {
 		ID:                  OpenRouterOpenaiGpt52,
 		Name:                "OpenAI: GPT-5.2",
-		Description:         "GPT-5.2 is the latest frontier-grade model in the GPT-5 series, offering stronger agentic… (400K ctx)",
+		Description:         "GPT-5.2 is the latest frontier-grade model in the GPT-5 series, offering stronger agentic and long context perfomance compared to GPT-5.1. It uses adaptive reasoning to allocate computation dynamically, responding quickl… (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.2",
 		CostPer1MIn:         1.75,
@@ -2922,7 +2373,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt52Chat: {
 		ID:                  OpenRouterOpenaiGpt52Chat,
 		Name:                "OpenAI: GPT-5.2 Chat",
-		Description:         "GPT-5.2 Chat (AKA Instant) is the fast, lightweight member of the 5.2 family, optimized fo… (128K ctx)",
+		Description:         "GPT-5.2 Chat (AKA Instant) is the fast, lightweight member of the 5.2 family, optimized for low-latency chat while retaining strong general intelligence. It uses adaptive reasoning to selectively “think” on... (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.2-chat",
 		CostPer1MIn:         1.75,
@@ -2936,7 +2387,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt52Codex: {
 		ID:                  OpenRouterOpenaiGpt52Codex,
 		Name:                "OpenAI: GPT-5.2-Codex",
-		Description:         "GPT-5.2-Codex is an upgraded version of GPT-5.1-Codex optimized for software engineering a… (400K ctx)",
+		Description:         "GPT-5.2-Codex is an upgraded version of GPT-5.1-Codex optimized for software engineering and coding workflows. It is designed for both interactive development sessions and long, independent execution of complex engineeri… (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.2-codex",
 		CostPer1MIn:         1.75,
@@ -2950,7 +2401,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt52Pro: {
 		ID:                  OpenRouterOpenaiGpt52Pro,
 		Name:                "OpenAI: GPT-5.2 Pro",
-		Description:         "GPT-5.2 Pro is OpenAI’s most advanced model, offering major improvements in agentic codi… (400K ctx)",
+		Description:         "GPT-5.2 Pro is OpenAI’s most advanced model, offering major improvements in agentic coding and long context performance over GPT-5 Pro. It is optimized for complex tasks that require step-by-step reasoning,... (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.2-pro",
 		CostPer1MIn:         21,
@@ -2961,38 +2412,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt52ProBatch: {
-		ID:                  OpenRouterOpenaiGpt52ProBatch,
-		Name:                "OpenAI: GPT-5.2 Pro (batch)",
-		Description:         "GPT-5.2 Pro is OpenAI’s most advanced model, offering major improvements in agentic codi… (400K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.2-pro:batch",
-		CostPer1MIn:         10.5,
-		CostPer1MOut:        84,
-		CostPer1MInCached:   0,
-		ContextWindow:       400000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiGpt52Batch: {
-		ID:                  OpenRouterOpenaiGpt52Batch,
-		Name:                "OpenAI: GPT-5.2 (batch)",
-		Description:         "GPT-5.2 is the latest frontier-grade model in the GPT-5 series, offering stronger agentic… (400K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.2:batch",
-		CostPer1MIn:         0.875,
-		CostPer1MOut:        7,
-		CostPer1MInCached:   0.0875,
-		ContextWindow:       400000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt53Chat: {
 		ID:                  OpenRouterOpenaiGpt53Chat,
 		Name:                "OpenAI: GPT-5.3 Chat",
-		Description:         "GPT-5.3 Chat is an update to ChatGPT's most-used model that makes everyday conversations s… (128K ctx)",
+		Description:         "GPT-5.3 Chat is an update to ChatGPT's most-used model that makes everyday conversations smoother, more useful, and more directly helpful. It delivers more accurate answers with better contextualization and significantly… (128K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.3-chat",
 		CostPer1MIn:         1.75,
@@ -3006,7 +2429,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt53Codex: {
 		ID:                  OpenRouterOpenaiGpt53Codex,
 		Name:                "OpenAI: GPT-5.3-Codex",
-		Description:         "GPT-5.3-Codex is OpenAI’s most advanced agentic coding model, combining the frontier sof… (400K ctx)",
+		Description:         "GPT-5.3-Codex is OpenAI’s most advanced agentic coding model, combining the frontier software engineering performance of GPT-5.2-Codex with the broader reasoning and professional knowledge capabilities of GPT-5.2. It a… (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.3-codex",
 		CostPer1MIn:         1.75,
@@ -3020,7 +2443,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt54: {
 		ID:                  OpenRouterOpenaiGpt54,
 		Name:                "OpenAI: GPT-5.4",
-		Description:         "GPT-5.4 is OpenAI’s latest frontier model, unifying the Codex and GPT lines into a singl… (1050K ctx)",
+		Description:         "GPT-5.4 is OpenAI’s latest frontier model, unifying the Codex and GPT lines into a single system. It features a 1M+ token context window (922K input, 128K output) with support for... (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.4",
 		CostPer1MIn:         2.5,
@@ -3034,7 +2457,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt54Mini: {
 		ID:                  OpenRouterOpenaiGpt54Mini,
 		Name:                "OpenAI: GPT-5.4 Mini",
-		Description:         "GPT-5.4 mini brings the core capabilities of GPT-5.4 to a faster, more efficient model opt… (400K ctx)",
+		Description:         "GPT-5.4 mini brings the core capabilities of GPT-5.4 to a faster, more efficient model optimized for high-throughput workloads. It supports text and image inputs with strong performance across reasoning, coding,... (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.4-mini",
 		CostPer1MIn:         0.75,
@@ -3045,24 +2468,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt54MiniBatch: {
-		ID:                  OpenRouterOpenaiGpt54MiniBatch,
-		Name:                "OpenAI: GPT-5.4 Mini (batch)",
-		Description:         "GPT-5.4 mini brings the core capabilities of GPT-5.4 to a faster, more efficient model opt… (400K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.4-mini:batch",
-		CostPer1MIn:         0.375,
-		CostPer1MOut:        2.25,
-		CostPer1MInCached:   0.0375,
-		ContextWindow:       400000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt54Nano: {
 		ID:                  OpenRouterOpenaiGpt54Nano,
 		Name:                "OpenAI: GPT-5.4 Nano",
-		Description:         "GPT-5.4 nano is the most lightweight and cost-efficient variant of the GPT-5.4 family, opt… (400K ctx)",
+		Description:         "GPT-5.4 nano is the most lightweight and cost-efficient variant of the GPT-5.4 family, optimized for speed-critical and high-volume tasks. It supports text and image inputs and is designed for low-latency... (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.4-nano",
 		CostPer1MIn:         0.19999999999999998,
@@ -3073,24 +2482,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt54NanoBatch: {
-		ID:                  OpenRouterOpenaiGpt54NanoBatch,
-		Name:                "OpenAI: GPT-5.4 Nano (batch)",
-		Description:         "GPT-5.4 nano is the most lightweight and cost-efficient variant of the GPT-5.4 family, opt… (400K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.4-nano:batch",
-		CostPer1MIn:         0.09999999999999999,
-		CostPer1MOut:        0.625,
-		CostPer1MInCached:   0.01,
-		ContextWindow:       400000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt54Pro: {
 		ID:                  OpenRouterOpenaiGpt54Pro,
 		Name:                "OpenAI: GPT-5.4 Pro",
-		Description:         "GPT-5.4 Pro is OpenAI's most advanced model, building on GPT-5.4's unified architecture wi… (1050K ctx)",
+		Description:         "GPT-5.4 Pro is OpenAI's most advanced model, building on GPT-5.4's unified architecture with enhanced reasoning capabilities for complex, high-stakes tasks. It features a 1M+ token context window (922K input, 128K... (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.4-pro",
 		CostPer1MIn:         30,
@@ -3101,38 +2496,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt54ProBatch: {
-		ID:                  OpenRouterOpenaiGpt54ProBatch,
-		Name:                "OpenAI: GPT-5.4 Pro (batch)",
-		Description:         "GPT-5.4 Pro is OpenAI's most advanced model, building on GPT-5.4's unified architecture wi… (1050K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.4-pro:batch",
-		CostPer1MIn:         15,
-		CostPer1MOut:        90,
-		CostPer1MInCached:   0,
-		ContextWindow:       1050000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiGpt54Batch: {
-		ID:                  OpenRouterOpenaiGpt54Batch,
-		Name:                "OpenAI: GPT-5.4 (batch)",
-		Description:         "GPT-5.4 is OpenAI’s latest frontier model, unifying the Codex and GPT lines into a singl… (1050K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.4:batch",
-		CostPer1MIn:         1.25,
-		CostPer1MOut:        7.5,
-		CostPer1MInCached:   0.125,
-		ContextWindow:       1050000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt55: {
 		ID:                  OpenRouterOpenaiGpt55,
 		Name:                "OpenAI: GPT-5.5",
-		Description:         "GPT-5.5 is OpenAI’s frontier model designed for complex professional workloads, building… (1050K ctx)",
+		Description:         "GPT-5.5 is OpenAI’s frontier model designed for complex professional workloads, building on GPT-5.4 with stronger reasoning, higher reliability, and improved token efficiency on hard tasks. It features a 1M+ token... (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.5",
 		CostPer1MIn:         5,
@@ -3146,7 +2513,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt55Pro: {
 		ID:                  OpenRouterOpenaiGpt55Pro,
 		Name:                "OpenAI: GPT-5.5 Pro",
-		Description:         "GPT-5.5 Pro is OpenAI’s high-capability model optimized for deep reasoning and accuracy… (1050K ctx)",
+		Description:         "GPT-5.5 Pro is OpenAI’s high-capability model optimized for deep reasoning and accuracy on complex, high-stakes workloads. It features a 1M+ token context window (922K input, 128K output) with support for... (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.5-pro",
 		CostPer1MIn:         30,
@@ -3157,38 +2524,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt55ProBatch: {
-		ID:                  OpenRouterOpenaiGpt55ProBatch,
-		Name:                "OpenAI: GPT-5.5 Pro (batch)",
-		Description:         "GPT-5.5 Pro is OpenAI’s high-capability model optimized for deep reasoning and accuracy… (1050K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.5-pro:batch",
-		CostPer1MIn:         15,
-		CostPer1MOut:        90,
-		CostPer1MInCached:   0,
-		ContextWindow:       1050000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiGpt55Batch: {
-		ID:                  OpenRouterOpenaiGpt55Batch,
-		Name:                "OpenAI: GPT-5.5 (batch)",
-		Description:         "GPT-5.5 is OpenAI’s frontier model designed for complex professional workloads, building… (1050K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.5:batch",
-		CostPer1MIn:         2.5,
-		CostPer1MOut:        15,
-		CostPer1MInCached:   0.25,
-		ContextWindow:       1050000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt56Luna: {
 		ID:                  OpenRouterOpenaiGpt56Luna,
 		Name:                "OpenAI: GPT-5.6 Luna",
-		Description:         "GPT-5.6 Luna is a fast, cost-efficient model in OpenAI's GPT-5.6 series. It is suited for… (1050K ctx)",
+		Description:         "GPT-5.6 Luna is a fast, cost-efficient model in OpenAI's GPT-5.6 series. It is suited for high-volume, latency-sensitive tasks such as chat, classification, and lightweight agentic workflows, providing capable reasoning… (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.6-luna",
 		CostPer1MIn:         0.09999999999999999,
@@ -3202,37 +2541,9 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt56LunaPro: {
 		ID:                  OpenRouterOpenaiGpt56LunaPro,
 		Name:                "OpenAI: GPT-5.6 Luna Pro",
-		Description:         "GPT-5.6 Luna Pro is the same underlying model as [GPT-5.6 Luna](https://openrouter.ai/open… (1050K ctx)",
+		Description:         "GPT-5.6 Luna Pro is the same underlying model as GPT-5.6 Luna, served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks. Learn more in OpenAI's docs: https://developers.openai.com/api/docs/… (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.6-luna-pro",
-		CostPer1MIn:         0.09999999999999999,
-		CostPer1MOut:        0.6,
-		CostPer1MInCached:   0.01,
-		ContextWindow:       1050000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiGpt56LunaProBatch: {
-		ID:                  OpenRouterOpenaiGpt56LunaProBatch,
-		Name:                "OpenAI: GPT-5.6 Luna Pro (batch)",
-		Description:         "GPT-5.6 Luna Pro is the same underlying model as [GPT-5.6 Luna](https://openrouter.ai/open… (1050K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.6-luna-pro:batch",
-		CostPer1MIn:         0.09999999999999999,
-		CostPer1MOut:        0.6,
-		CostPer1MInCached:   0.01,
-		ContextWindow:       1050000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiGpt56LunaBatch: {
-		ID:                  OpenRouterOpenaiGpt56LunaBatch,
-		Name:                "OpenAI: GPT-5.6 Luna (batch)",
-		Description:         "GPT-5.6 Luna is a fast, cost-efficient model in OpenAI's GPT-5.6 series. It is suited for… (1050K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.6-luna:batch",
 		CostPer1MIn:         0.09999999999999999,
 		CostPer1MOut:        0.6,
 		CostPer1MInCached:   0.01,
@@ -3244,7 +2555,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt56Sol: {
 		ID:                  OpenRouterOpenaiGpt56Sol,
 		Name:                "OpenAI: GPT-5.6 Sol",
-		Description:         "GPT-5.6 Sol is the flagship model in OpenAI's GPT-5.6 series. It is suited for complex rea… (1050K ctx)",
+		Description:         "GPT-5.6 Sol is the flagship model in OpenAI's GPT-5.6 series. It is suited for complex reasoning, coding, and agentic workflows, and is particularly strong at command-line and multi-step coding tasks... (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.6-sol",
 		CostPer1MIn:         5,
@@ -3258,7 +2569,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt56SolPro: {
 		ID:                  OpenRouterOpenaiGpt56SolPro,
 		Name:                "OpenAI: GPT-5.6 Sol Pro",
-		Description:         "GPT-5.6 Sol Pro is the same underlying model as [GPT-5.6 Sol](https://openrouter.ai/openai… (1050K ctx)",
+		Description:         "GPT-5.6 Sol Pro is the same underlying model as GPT-5.6 Sol, served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks. Learn more in OpenAI's docs: https://developers.openai.com/api/docs/gu… (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.6-sol-pro",
 		CostPer1MIn:         5,
@@ -3269,38 +2580,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiGpt56SolProBatch: {
-		ID:                  OpenRouterOpenaiGpt56SolProBatch,
-		Name:                "OpenAI: GPT-5.6 Sol Pro (batch)",
-		Description:         "GPT-5.6 Sol Pro is the same underlying model as [GPT-5.6 Sol](https://openrouter.ai/openai… (1050K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.6-sol-pro:batch",
-		CostPer1MIn:         2.5,
-		CostPer1MOut:        15,
-		CostPer1MInCached:   0.25,
-		ContextWindow:       1050000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiGpt56SolBatch: {
-		ID:                  OpenRouterOpenaiGpt56SolBatch,
-		Name:                "OpenAI: GPT-5.6 Sol (batch)",
-		Description:         "GPT-5.6 Sol is the flagship model in OpenAI's GPT-5.6 series. It is suited for complex rea… (1050K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.6-sol:batch",
-		CostPer1MIn:         2.5,
-		CostPer1MOut:        15,
-		CostPer1MInCached:   0.25,
-		ContextWindow:       1050000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiGpt56Terra: {
 		ID:                  OpenRouterOpenaiGpt56Terra,
 		Name:                "OpenAI: GPT-5.6 Terra",
-		Description:         "GPT-5.6 Terra is a balanced model in OpenAI's GPT-5.6 series, positioned between the flags… (1050K ctx)",
+		Description:         "GPT-5.6 Terra is a balanced model in OpenAI's GPT-5.6 series, positioned between the flagship Sol tier and the cost-efficient Luna tier. It is suited for everyday coding, reasoning, and agentic... (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.6-terra",
 		CostPer1MIn:         1,
@@ -3314,55 +2597,13 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt56TerraPro: {
 		ID:                  OpenRouterOpenaiGpt56TerraPro,
 		Name:                "OpenAI: GPT-5.6 Terra Pro",
-		Description:         "GPT-5.6 Terra Pro is the same underlying model as [GPT-5.6 Terra](https://openrouter.ai/op… (1050K ctx)",
+		Description:         "GPT-5.6 Terra Pro is the same underlying model as GPT-5.6 Terra, served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks. Learn more in OpenAI's docs: https://developers.openai.com/api/doc… (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-5.6-terra-pro",
 		CostPer1MIn:         1,
 		CostPer1MOut:        6,
 		CostPer1MInCached:   0.09999999999999999,
 		ContextWindow:       1050000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiGpt56TerraProBatch: {
-		ID:                  OpenRouterOpenaiGpt56TerraProBatch,
-		Name:                "OpenAI: GPT-5.6 Terra Pro (batch)",
-		Description:         "GPT-5.6 Terra Pro is the same underlying model as [GPT-5.6 Terra](https://openrouter.ai/op… (1050K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.6-terra-pro:batch",
-		CostPer1MIn:         1,
-		CostPer1MOut:        6,
-		CostPer1MInCached:   0.09999999999999999,
-		ContextWindow:       1050000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiGpt56TerraBatch: {
-		ID:                  OpenRouterOpenaiGpt56TerraBatch,
-		Name:                "OpenAI: GPT-5.6 Terra (batch)",
-		Description:         "GPT-5.6 Terra is a balanced model in OpenAI's GPT-5.6 series, positioned between the flags… (1050K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5.6-terra:batch",
-		CostPer1MIn:         1,
-		CostPer1MOut:        6,
-		CostPer1MInCached:   0.09999999999999999,
-		ContextWindow:       1050000,
-		DefaultMaxTokens:    128000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiGpt5Batch: {
-		ID:                  OpenRouterOpenaiGpt5Batch,
-		Name:                "OpenAI: GPT-5 (batch)",
-		Description:         "GPT-5 is OpenAI’s most advanced model, offering major improvements in reasoning, code qu… (400K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/gpt-5:batch",
-		CostPer1MIn:         0.625,
-		CostPer1MOut:        5,
-		CostPer1MInCached:   0.0625,
-		ContextWindow:       400000,
 		DefaultMaxTokens:    128000,
 		CanReason:           true,
 		SupportsAttachments: true,
@@ -3398,7 +2639,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGptChatLatest: {
 		ID:                  OpenRouterOpenaiGptChatLatest,
 		Name:                "OpenAI: GPT Chat Latest",
-		Description:         "GPT Chat Latest points to OpenAI's stable API alias `chat-latest` that always resolves to… (400K ctx)",
+		Description:         "GPT Chat Latest points to OpenAI's stable API alias `chat-latest` that always resolves to the latest Instant chat model used in ChatGPT (400K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-chat-latest",
 		CostPer1MIn:         5,
@@ -3412,7 +2653,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGptOss120b: {
 		ID:                  OpenRouterOpenaiGptOss120b,
 		Name:                "OpenAI: gpt-oss-120b",
-		Description:         "gpt-oss-120b is an open-weight, 117B-parameter Mixture-of-Experts (MoE) language model fro… (131K ctx)",
+		Description:         "gpt-oss-120b is an open-weight, 117B-parameter Mixture-of-Experts (MoE) language model from OpenAI designed for high-reasoning, agentic, and general-purpose production use cases (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-oss-120b",
 		CostPer1MIn:         0.037,
@@ -3469,26 +2710,12 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiO1: {
 		ID:                  OpenRouterOpenaiO1,
 		Name:                "OpenAI: o1",
-		Description:         "The latest and strongest model family from OpenAI, o1 is designed to spend more time think… (200K ctx)",
+		Description:         "The latest and strongest model family from OpenAI, o1 is designed to spend more time thinking before responding (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o1",
 		CostPer1MIn:         15,
 		CostPer1MOut:        60,
 		CostPer1MInCached:   7.5,
-		ContextWindow:       200000,
-		DefaultMaxTokens:    100000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiO1Batch: {
-		ID:                  OpenRouterOpenaiO1Batch,
-		Name:                "OpenAI: o1 (batch)",
-		Description:         "The latest and strongest model family from OpenAI, o1 is designed to spend more time think… (200K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/o1:batch",
-		CostPer1MIn:         7.5,
-		CostPer1MOut:        30,
-		CostPer1MInCached:   3.75,
 		ContextWindow:       200000,
 		DefaultMaxTokens:    100000,
 		CanReason:           true,
@@ -3511,7 +2738,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiO3Mini: {
 		ID:                  OpenRouterOpenaiO3Mini,
 		Name:                "OpenAI: o3 Mini",
-		Description:         "OpenAI o3-mini is a cost-efficient language model optimized for STEM reasoning tasks, part… (200K ctx)",
+		Description:         "OpenAI o3-mini is a cost-efficient language model optimized for STEM reasoning tasks, particularly excelling in science, mathematics, and coding (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o3-mini",
 		CostPer1MIn:         1.1,
@@ -3525,7 +2752,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiO3MiniHigh: {
 		ID:                  OpenRouterOpenaiO3MiniHigh,
 		Name:                "OpenAI: o3 Mini High",
-		Description:         "OpenAI o3-mini-high is the same model as [o3-mini](/openai/o3-mini) with reasoning_effort… (200K ctx)",
+		Description:         "OpenAI o3-mini-high is the same model as o3-mini with reasoning_effort set to high (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o3-mini-high",
 		CostPer1MIn:         1.1,
@@ -3536,38 +2763,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: false,
 	},
-	OpenRouterOpenaiO3MiniHighBatch: {
-		ID:                  OpenRouterOpenaiO3MiniHighBatch,
-		Name:                "OpenAI: o3 Mini High (batch)",
-		Description:         "OpenAI o3-mini-high is the same model as [o3-mini](/openai/o3-mini) with reasoning_effort… (200K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/o3-mini-high:batch",
-		CostPer1MIn:         0.55,
-		CostPer1MOut:        2.2,
-		CostPer1MInCached:   0.275,
-		ContextWindow:       200000,
-		DefaultMaxTokens:    100000,
-		CanReason:           true,
-		SupportsAttachments: false,
-	},
-	OpenRouterOpenaiO3MiniBatch: {
-		ID:                  OpenRouterOpenaiO3MiniBatch,
-		Name:                "OpenAI: o3 Mini (batch)",
-		Description:         "OpenAI o3-mini is a cost-efficient language model optimized for STEM reasoning tasks, part… (200K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/o3-mini:batch",
-		CostPer1MIn:         0.55,
-		CostPer1MOut:        2.2,
-		CostPer1MInCached:   0.275,
-		ContextWindow:       200000,
-		DefaultMaxTokens:    100000,
-		CanReason:           true,
-		SupportsAttachments: false,
-	},
 	OpenRouterOpenaiO3Pro: {
 		ID:                  OpenRouterOpenaiO3Pro,
 		Name:                "OpenAI: o3 Pro",
-		Description:         "The o-series of models are trained with reinforcement learning to think before they answer… (200K ctx)",
+		Description:         "The o-series of models are trained with reinforcement learning to think before they answer and perform complex reasoning (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o3-pro",
 		CostPer1MIn:         20,
@@ -3578,38 +2777,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiO3ProBatch: {
-		ID:                  OpenRouterOpenaiO3ProBatch,
-		Name:                "OpenAI: o3 Pro (batch)",
-		Description:         "The o-series of models are trained with reinforcement learning to think before they answer… (200K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/o3-pro:batch",
-		CostPer1MIn:         10,
-		CostPer1MOut:        40,
-		CostPer1MInCached:   0,
-		ContextWindow:       200000,
-		DefaultMaxTokens:    100000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiO3Batch: {
-		ID:                  OpenRouterOpenaiO3Batch,
-		Name:                "OpenAI: o3 (batch)",
-		Description:         "o3 is a well-rounded and powerful model across domains (200K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/o3:batch",
-		CostPer1MIn:         1,
-		CostPer1MOut:        4,
-		CostPer1MInCached:   0.25,
-		ContextWindow:       200000,
-		DefaultMaxTokens:    100000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenaiO4Mini: {
 		ID:                  OpenRouterOpenaiO4Mini,
 		Name:                "OpenAI: o4 Mini",
-		Description:         "OpenAI o4-mini is a compact reasoning model in the o-series, optimized for fast, cost-effi… (200K ctx)",
+		Description:         "OpenAI o4-mini is a compact reasoning model in the o-series, optimized for fast, cost-efficient performance while retaining strong multimodal and agentic capabilities (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o4-mini",
 		CostPer1MIn:         1.1,
@@ -3623,7 +2794,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiO4MiniHigh: {
 		ID:                  OpenRouterOpenaiO4MiniHigh,
 		Name:                "OpenAI: o4 Mini High",
-		Description:         "OpenAI o4-mini-high is the same model as [o4-mini](/openai/o4-mini) with reasoning_effort… (200K ctx)",
+		Description:         "OpenAI o4-mini-high is the same model as o4-mini with reasoning_effort set to high (200K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/o4-mini-high",
 		CostPer1MIn:         1.1,
@@ -3634,38 +2805,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
-	OpenRouterOpenaiO4MiniHighBatch: {
-		ID:                  OpenRouterOpenaiO4MiniHighBatch,
-		Name:                "OpenAI: o4 Mini High (batch)",
-		Description:         "OpenAI o4-mini-high is the same model as [o4-mini](/openai/o4-mini) with reasoning_effort… (200K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/o4-mini-high:batch",
-		CostPer1MIn:         0.55,
-		CostPer1MOut:        2.2,
-		CostPer1MInCached:   0.1375,
-		ContextWindow:       200000,
-		DefaultMaxTokens:    100000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterOpenaiO4MiniBatch: {
-		ID:                  OpenRouterOpenaiO4MiniBatch,
-		Name:                "OpenAI: o4 Mini (batch)",
-		Description:         "OpenAI o4-mini is a compact reasoning model in the o-series, optimized for fast, cost-effi… (200K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "openai/o4-mini:batch",
-		CostPer1MIn:         0.55,
-		CostPer1MOut:        2.2,
-		CostPer1MInCached:   0.1375,
-		ContextWindow:       200000,
-		DefaultMaxTokens:    100000,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
 	OpenRouterOpenrouterAuto: {
 		ID:                  OpenRouterOpenrouterAuto,
 		Name:                "Auto Router",
-		Description:         "Your prompt will be processed by a meta-model and routed to one of dozens of models (see b… (2000K ctx)",
+		Description:         "Your prompt will be processed by a meta-model and routed to one of dozens of models (see below), optimizing for the best possible output (2000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openrouter/auto",
 		CostPer1MIn:         -1e+06,
@@ -3708,7 +2851,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterPoolsideLagunaS21: {
 		ID:                  OpenRouterPoolsideLagunaS21,
 		Name:                "Poolside: Laguna S 2.1",
-		Description:         "Laguna S 2.1 is the latest coding agent model from [Poolside](<https://poolside.ai/>). Lag… (1048K ctx)",
+		Description:         "Laguna S 2.1 is the latest coding agent model from Poolside. Laguna S 2.1 is a 118B total parameter model with 8B active parameters, scoring 70.2% on Terminal-Bench 2.1 and... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "poolside/laguna-s-2.1",
 		CostPer1MIn:         0.09,
@@ -3722,7 +2865,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterPoolsideLagunaS21Free: {
 		ID:                  OpenRouterPoolsideLagunaS21Free,
 		Name:                "Poolside: Laguna S 2.1 (free)",
-		Description:         "FREE — Laguna S 2.1 is the latest coding agent model from [Poolside](<https://poolside.ai/>). Lag… (262K ctx)",
+		Description:         "FREE — Laguna S 2.1 is the latest coding agent model from Poolside. Laguna S 2.1 is a 118B total parameter model with 8B active parameters, scoring 70.2% on Terminal-Bench 2.1 and... (262K ctx)",
 		Rank:                6,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "poolside/laguna-s-2.1:free",
@@ -3737,7 +2880,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterPoolsideLagunaXs21: {
 		ID:                  OpenRouterPoolsideLagunaXs21,
 		Name:                "Poolside: Laguna XS 2.1",
-		Description:         "Laguna XS 2.1 is the latest coding agent model in the 33B-A3B category from [Poolside](htt… (262K ctx)",
+		Description:         "Laguna XS 2.1 is the latest coding agent model in the 33B-A3B category from Poolside and a step forward from their Laguna XS.2 model (released in April 2026). It combines... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "poolside/laguna-xs-2.1",
 		CostPer1MIn:         0.06,
@@ -3751,7 +2894,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterPoolsideLagunaXs21Free: {
 		ID:                  OpenRouterPoolsideLagunaXs21Free,
 		Name:                "Poolside: Laguna XS 2.1 (free)",
-		Description:         "FREE — Laguna XS 2.1 is the latest coding agent model in the 33B-A3B category from [Poolside](htt… (262K ctx)",
+		Description:         "FREE — Laguna XS 2.1 is the latest coding agent model in the 33B-A3B category from Poolside and a step forward from their Laguna XS.2 model (released in April 2026). It combines... (262K ctx)",
 		Rank:                7,
 		Provider:            ProviderOpenRouter,
 		APIModel:            "poolside/laguna-xs-2.1:free",
@@ -3766,7 +2909,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen2572bInstruct: {
 		ID:                  OpenRouterQwenQwen2572bInstruct,
 		Name:                "Qwen2.5 72B Instruct",
-		Description:         "Qwen2.5 72B is the latest series of Qwen large language models. Qwen2.5 brings the followi… (32K ctx)",
+		Description:         "Qwen2.5 72B is the latest series of Qwen large language models. Qwen2.5 brings the following improvements upon Qwen2: - Significantly more knowledge and has greatly improved capabilities in coding and... (32K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen-2.5-72b-instruct",
 		CostPer1MIn:         0.36,
@@ -3780,7 +2923,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen257bInstruct: {
 		ID:                  OpenRouterQwenQwen257bInstruct,
 		Name:                "Qwen: Qwen2.5 7B Instruct",
-		Description:         "Qwen2.5 7B is the latest series of Qwen large language models. Qwen2.5 brings the followin… (32K ctx)",
+		Description:         "Qwen2.5 7B is the latest series of Qwen large language models. Qwen2.5 brings the following improvements upon Qwen2: - Significantly more knowledge and has greatly improved capabilities in coding and... (32K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen-2.5-7b-instruct",
 		CostPer1MIn:         0.09999999999999999,
@@ -3794,7 +2937,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwenPlus: {
 		ID:                  OpenRouterQwenQwenPlus,
 		Name:                "Qwen: Qwen-Plus",
-		Description:         "Qwen-Plus, based on the Qwen2.5 foundation model, is a 131K context model with a balanced… (1000K ctx)",
+		Description:         "Qwen-Plus, based on the Qwen2.5 foundation model, is a 131K context model with a balanced performance, speed, and cost combination. (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen-plus",
 		CostPer1MIn:         0.26,
@@ -3808,7 +2951,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwenPlus20250728: {
 		ID:                  OpenRouterQwenQwenPlus20250728,
 		Name:                "Qwen: Qwen Plus 0728",
-		Description:         "Qwen Plus 0728, based on the Qwen3 foundation model, is a 1 million context hybrid reasoni… (1000K ctx)",
+		Description:         "Qwen Plus 0728, based on the Qwen3 foundation model, is a 1 million context hybrid reasoning model with a balanced performance, speed, and cost combination (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen-plus-2025-07-28",
 		CostPer1MIn:         0.26,
@@ -3822,7 +2965,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwenPlus20250728Thinking: {
 		ID:                  OpenRouterQwenQwenPlus20250728Thinking,
 		Name:                "Qwen: Qwen Plus 0728 (thinking)",
-		Description:         "Qwen Plus 0728, based on the Qwen3 foundation model, is a 1 million context hybrid reasoni… (1000K ctx)",
+		Description:         "Qwen Plus 0728, based on the Qwen3 foundation model, is a 1 million context hybrid reasoning model with a balanced performance, speed, and cost combination (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen-plus-2025-07-28:thinking",
 		CostPer1MIn:         0.39999999999999997,
@@ -3836,7 +2979,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen314b: {
 		ID:                  OpenRouterQwenQwen314b,
 		Name:                "Qwen: Qwen3 14B",
-		Description:         "Qwen3-14B is a dense 14.8B parameter causal language model from the Qwen3 series, designed… (131K ctx)",
+		Description:         "Qwen3-14B is a dense 14.8B parameter causal language model from the Qwen3 series, designed for both complex reasoning and efficient dialogue. It supports seamless switching between a \"thinking\" mode for... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-14b",
 		CostPer1MIn:         0.22749999999999998,
@@ -3850,7 +2993,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3235bA22b: {
 		ID:                  OpenRouterQwenQwen3235bA22b,
 		Name:                "Qwen: Qwen3 235B A22B",
-		Description:         "Qwen3-235B-A22B is a 235B parameter mixture-of-experts (MoE) model developed by Qwen, acti… (131K ctx)",
+		Description:         "Qwen3-235B-A22B is a 235B parameter mixture-of-experts (MoE) model developed by Qwen, activating 22B parameters per forward pass (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-235b-a22b",
 		CostPer1MIn:         0.45499999999999996,
@@ -3864,7 +3007,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3235bA22b2507: {
 		ID:                  OpenRouterQwenQwen3235bA22b2507,
 		Name:                "Qwen: Qwen3 235B A22B Instruct 2507",
-		Description:         "Qwen3-235B-A22B-Instruct-2507 is a multilingual, instruction-tuned mixture-of-experts lang… (262K ctx)",
+		Description:         "Qwen3-235B-A22B-Instruct-2507 is a multilingual, instruction-tuned mixture-of-experts language model based on the Qwen3-235B architecture, with 22B active parameters per forward pass (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-235b-a22b-2507",
 		CostPer1MIn:         0.09,
@@ -3878,7 +3021,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3235bA22bThinking2507: {
 		ID:                  OpenRouterQwenQwen3235bA22bThinking2507,
 		Name:                "Qwen: Qwen3 235B A22B Thinking 2507",
-		Description:         "Qwen3-235B-A22B-Thinking-2507 is a high-performance, open-weight Mixture-of-Experts (MoE)… (262K ctx)",
+		Description:         "Qwen3-235B-A22B-Thinking-2507 is a high-performance, open-weight Mixture-of-Experts (MoE) language model optimized for complex reasoning tasks (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-235b-a22b-thinking-2507",
 		CostPer1MIn:         0.22999999999999998,
@@ -3892,7 +3035,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen330bA3b: {
 		ID:                  OpenRouterQwenQwen330bA3b,
 		Name:                "Qwen: Qwen3 30B A3B",
-		Description:         "Qwen3, the latest generation in the Qwen large language model series, features both dense… (131K ctx)",
+		Description:         "Qwen3, the latest generation in the Qwen large language model series, features both dense and mixture-of-experts (MoE) architectures to excel in reasoning, multilingual support, and advanced agent tasks (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-30b-a3b",
 		CostPer1MIn:         0.12,
@@ -3920,7 +3063,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen330bA3bThinking2507: {
 		ID:                  OpenRouterQwenQwen330bA3bThinking2507,
 		Name:                "Qwen: Qwen3 30B A3B Thinking 2507",
-		Description:         "Qwen3-30B-A3B-Thinking-2507 is a 30B parameter Mixture-of-Experts reasoning model optimize… (81K ctx)",
+		Description:         "Qwen3-30B-A3B-Thinking-2507 is a 30B parameter Mixture-of-Experts reasoning model optimized for complex tasks requiring extended multi-step thinking (81K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-30b-a3b-thinking-2507",
 		CostPer1MIn:         0.19999999999999998,
@@ -3934,7 +3077,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen332b: {
 		ID:                  OpenRouterQwenQwen332b,
 		Name:                "Qwen: Qwen3 32B",
-		Description:         "Qwen3-32B is a dense 32.8B parameter causal language model from the Qwen3 series, optimize… (131K ctx)",
+		Description:         "Qwen3-32B is a dense 32.8B parameter causal language model from the Qwen3 series, optimized for both complex reasoning and efficient dialogue. It supports seamless switching between a \"thinking\" mode for... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-32b",
 		CostPer1MIn:         0.08,
@@ -3948,7 +3091,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen38b: {
 		ID:                  OpenRouterQwenQwen38b,
 		Name:                "Qwen: Qwen3 8B",
-		Description:         "Qwen3-8B is a dense 8.2B parameter causal language model from the Qwen3 series, designed f… (131K ctx)",
+		Description:         "Qwen3-8B is a dense 8.2B parameter causal language model from the Qwen3 series, designed for both reasoning-heavy tasks and efficient dialogue. It supports seamless switching between \"thinking\" mode for math,... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-8b",
 		CostPer1MIn:         0.117,
@@ -3962,7 +3105,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Coder: {
 		ID:                  OpenRouterQwenQwen3Coder,
 		Name:                "Qwen: Qwen3 Coder 480B A35B",
-		Description:         "Qwen3-Coder-480B-A35B-Instruct is a Mixture-of-Experts (MoE) code generation model develop… (262K ctx)",
+		Description:         "Qwen3-Coder-480B-A35B-Instruct is a Mixture-of-Experts (MoE) code generation model developed by the Qwen team (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-coder",
 		CostPer1MIn:         0.3,
@@ -3990,7 +3133,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3CoderFlash: {
 		ID:                  OpenRouterQwenQwen3CoderFlash,
 		Name:                "Qwen: Qwen3 Coder Flash",
-		Description:         "Qwen3 Coder Flash is Alibaba's fast and cost efficient version of their proprietary Qwen3… (1000K ctx)",
+		Description:         "Qwen3 Coder Flash is Alibaba's fast and cost efficient version of their proprietary Qwen3 Coder Plus (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-coder-flash",
 		CostPer1MIn:         0.195,
@@ -4004,7 +3147,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3CoderNext: {
 		ID:                  OpenRouterQwenQwen3CoderNext,
 		Name:                "Qwen: Qwen3 Coder Next",
-		Description:         "Qwen3-Coder-Next is an open-weight causal language model optimized for coding agents and l… (262K ctx)",
+		Description:         "Qwen3-Coder-Next is an open-weight causal language model optimized for coding agents and local development workflows (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-coder-next",
 		CostPer1MIn:         0.12,
@@ -4032,7 +3175,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Max: {
 		ID:                  OpenRouterQwenQwen3Max,
 		Name:                "Qwen: Qwen3 Max",
-		Description:         "Qwen3-Max is an updated release built on the Qwen3 series, offering major improvements in… (262K ctx)",
+		Description:         "Qwen3-Max is an updated release built on the Qwen3 series, offering major improvements in reasoning, instruction following, multilingual support, and long-tail knowledge coverage compared to the January 2025 version (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-max",
 		CostPer1MIn:         0.78,
@@ -4046,7 +3189,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3MaxThinking: {
 		ID:                  OpenRouterQwenQwen3MaxThinking,
 		Name:                "Qwen: Qwen3 Max Thinking",
-		Description:         "Qwen3-Max-Thinking is the flagship reasoning model in the Qwen3 series, designed for high-… (262K ctx)",
+		Description:         "Qwen3-Max-Thinking is the flagship reasoning model in the Qwen3 series, designed for high-stakes cognitive tasks that require deep, multi-step reasoning (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-max-thinking",
 		CostPer1MIn:         0.78,
@@ -4060,7 +3203,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Next80bA3bInstruct: {
 		ID:                  OpenRouterQwenQwen3Next80bA3bInstruct,
 		Name:                "Qwen: Qwen3 Next 80B A3B Instruct",
-		Description:         "Qwen3-Next-80B-A3B-Instruct is an instruction-tuned chat model in the Qwen3-Next series op… (262K ctx)",
+		Description:         "Qwen3-Next-80B-A3B-Instruct is an instruction-tuned chat model in the Qwen3-Next series optimized for fast, stable responses without “thinking” traces (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-next-80b-a3b-instruct",
 		CostPer1MIn:         0.09,
@@ -4074,7 +3217,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Next80bA3bThinking: {
 		ID:                  OpenRouterQwenQwen3Next80bA3bThinking,
 		Name:                "Qwen: Qwen3 Next 80B A3B Thinking",
-		Description:         "Qwen3-Next-80B-A3B-Thinking is a reasoning-first chat model in the Qwen3-Next line that ou… (262K ctx)",
+		Description:         "Qwen3-Next-80B-A3B-Thinking is a reasoning-first chat model in the Qwen3-Next line that outputs structured “thinking” traces by default (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-next-80b-a3b-thinking",
 		CostPer1MIn:         0.15,
@@ -4088,7 +3231,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl235bA22bInstruct: {
 		ID:                  OpenRouterQwenQwen3Vl235bA22bInstruct,
 		Name:                "Qwen: Qwen3 VL 235B A22B Instruct",
-		Description:         "Qwen3-VL-235B-A22B Instruct is an open-weight multimodal model that unifies strong text ge… (262K ctx)",
+		Description:         "Qwen3-VL-235B-A22B Instruct is an open-weight multimodal model that unifies strong text generation with visual understanding across images and video (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-235b-a22b-instruct",
 		CostPer1MIn:         0.21,
@@ -4102,7 +3245,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl235bA22bThinking: {
 		ID:                  OpenRouterQwenQwen3Vl235bA22bThinking,
 		Name:                "Qwen: Qwen3 VL 235B A22B Thinking",
-		Description:         "Qwen3-VL-235B-A22B Thinking is a multimodal model that unifies strong text generation with… (131K ctx)",
+		Description:         "Qwen3-VL-235B-A22B Thinking is a multimodal model that unifies strong text generation with visual understanding across images and video (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-235b-a22b-thinking",
 		CostPer1MIn:         0.39999999999999997,
@@ -4116,7 +3259,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl30bA3bInstruct: {
 		ID:                  OpenRouterQwenQwen3Vl30bA3bInstruct,
 		Name:                "Qwen: Qwen3 VL 30B A3B Instruct",
-		Description:         "Qwen3-VL-30B-A3B-Instruct is a multimodal model that unifies strong text generation with v… (262K ctx)",
+		Description:         "Qwen3-VL-30B-A3B-Instruct is a multimodal model that unifies strong text generation with visual understanding for images and videos (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-30b-a3b-instruct",
 		CostPer1MIn:         0.15,
@@ -4130,7 +3273,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl30bA3bThinking: {
 		ID:                  OpenRouterQwenQwen3Vl30bA3bThinking,
 		Name:                "Qwen: Qwen3 VL 30B A3B Thinking",
-		Description:         "Qwen3-VL-30B-A3B-Thinking is a multimodal model that unifies strong text generation with v… (262K ctx)",
+		Description:         "Qwen3-VL-30B-A3B-Thinking is a multimodal model that unifies strong text generation with visual understanding for images and videos (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-30b-a3b-thinking",
 		CostPer1MIn:         0.19999999999999998,
@@ -4144,7 +3287,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl32bInstruct: {
 		ID:                  OpenRouterQwenQwen3Vl32bInstruct,
 		Name:                "Qwen: Qwen3 VL 32B Instruct",
-		Description:         "Qwen3-VL-32B-Instruct is a large-scale multimodal vision-language model designed for high-… (131K ctx)",
+		Description:         "Qwen3-VL-32B-Instruct is a large-scale multimodal vision-language model designed for high-precision understanding and reasoning across text, images, and video (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-32b-instruct",
 		CostPer1MIn:         0.10400000000000001,
@@ -4158,7 +3301,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl8bInstruct: {
 		ID:                  OpenRouterQwenQwen3Vl8bInstruct,
 		Name:                "Qwen: Qwen3 VL 8B Instruct",
-		Description:         "Qwen3-VL-8B-Instruct is a multimodal vision-language model from the Qwen3-VL series, built… (262K ctx)",
+		Description:         "Qwen3-VL-8B-Instruct is a multimodal vision-language model from the Qwen3-VL series, built for high-fidelity understanding and reasoning across text, images, and video (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-8b-instruct",
 		CostPer1MIn:         0.117,
@@ -4172,7 +3315,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl8bThinking: {
 		ID:                  OpenRouterQwenQwen3Vl8bThinking,
 		Name:                "Qwen: Qwen3 VL 8B Thinking",
-		Description:         "Qwen3-VL-8B-Thinking is the reasoning-optimized variant of the Qwen3-VL-8B multimodal mode… (131K ctx)",
+		Description:         "Qwen3-VL-8B-Thinking is the reasoning-optimized variant of the Qwen3-VL-8B multimodal model, designed for advanced visual and textual reasoning across complex scenes, documents, and temporal sequences (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-8b-thinking",
 		CostPer1MIn:         0.18,
@@ -4186,7 +3329,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen35122bA10b: {
 		ID:                  OpenRouterQwenQwen35122bA10b,
 		Name:                "Qwen: Qwen3.5-122B-A10B",
-		Description:         "The Qwen3.5 122B-A10B native vision-language model is built on a hybrid architecture that… (262K ctx)",
+		Description:         "The Qwen3.5 122B-A10B native vision-language model is built on a hybrid architecture that integrates a linear attention mechanism with a sparse mixture-of-experts model, achieving higher inference efficiency. In terms of… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-122b-a10b",
 		CostPer1MIn:         0.29,
@@ -4200,7 +3343,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3527b: {
 		ID:                  OpenRouterQwenQwen3527b,
 		Name:                "Qwen: Qwen3.5-27B",
-		Description:         "The Qwen3.5 27B native vision-language Dense model incorporates a linear attention mechani… (262K ctx)",
+		Description:         "The Qwen3.5 27B native vision-language Dense model incorporates a linear attention mechanism, delivering fast response times while balancing inference speed and performance. Its overall capabilities are comparable to tho… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-27b",
 		CostPer1MIn:         0.195,
@@ -4214,7 +3357,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3535bA3b: {
 		ID:                  OpenRouterQwenQwen3535bA3b,
 		Name:                "Qwen: Qwen3.5-35B-A3B",
-		Description:         "The Qwen3.5 Series 35B-A3B is a native vision-language model designed with a hybrid archit… (262K ctx)",
+		Description:         "The Qwen3.5 Series 35B-A3B is a native vision-language model designed with a hybrid architecture that integrates linear attention mechanisms and a sparse mixture-of-experts model, achieving higher inference efficiency. I… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-35b-a3b",
 		CostPer1MIn:         0.14,
@@ -4228,21 +3371,21 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen35397bA17b: {
 		ID:                  OpenRouterQwenQwen35397bA17b,
 		Name:                "Qwen: Qwen3.5 397B A17B",
-		Description:         "The Qwen3.5 series 397B-A17B native vision-language model is built on a hybrid architectur… (262K ctx)",
+		Description:         "The Qwen3.5 series 397B-A17B native vision-language model is built on a hybrid architecture that integrates a linear attention mechanism with a sparse mixture-of-experts model, achieving higher inference efficiency. It d… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-397b-a17b",
-		CostPer1MIn:         0.39,
-		CostPer1MOut:        2.34,
-		CostPer1MInCached:   0,
+		CostPer1MIn:         0.5,
+		CostPer1MOut:        3.5999999999999996,
+		CostPer1MInCached:   0.3,
 		ContextWindow:       262144,
-		DefaultMaxTokens:    65536,
+		DefaultMaxTokens:    262144,
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
 	OpenRouterQwenQwen359b: {
 		ID:                  OpenRouterQwenQwen359b,
 		Name:                "Qwen: Qwen3.5-9B",
-		Description:         "Qwen3.5-9B is a multimodal foundation model from the Qwen3.5 family, designed to deliver s… (262K ctx)",
+		Description:         "Qwen3.5-9B is a multimodal foundation model from the Qwen3.5 family, designed to deliver strong reasoning, coding, and visual understanding in an efficient 9B-parameter architecture. It uses a unified vision-language des… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-9b",
 		CostPer1MIn:         0.09999999999999999,
@@ -4256,7 +3399,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen35Flash0223: {
 		ID:                  OpenRouterQwenQwen35Flash0223,
 		Name:                "Qwen: Qwen3.5-Flash",
-		Description:         "The Qwen3.5 native vision-language Flash models are built on a hybrid architecture that in… (1000K ctx)",
+		Description:         "The Qwen3.5 native vision-language Flash models are built on a hybrid architecture that integrates a linear attention mechanism with a sparse mixture-of-experts model, achieving higher inference efficiency. Compared to t… (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-flash-02-23",
 		CostPer1MIn:         0.065,
@@ -4270,7 +3413,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen35Plus0215: {
 		ID:                  OpenRouterQwenQwen35Plus0215,
 		Name:                "Qwen: Qwen3.5 Plus 2026-02-15",
-		Description:         "The Qwen3.5 native vision-language series Plus models are built on a hybrid architecture t… (1000K ctx)",
+		Description:         "The Qwen3.5 native vision-language series Plus models are built on a hybrid architecture that integrates linear attention mechanisms with sparse mixture-of-experts models, achieving higher inference efficiency. In a vari… (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-plus-02-15",
 		CostPer1MIn:         0.26,
@@ -4284,7 +3427,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen35Plus20260420: {
 		ID:                  OpenRouterQwenQwen35Plus20260420,
 		Name:                "Qwen: Qwen3.5 Plus 2026-04-20",
-		Description:         "Qwen3.5 Plus (April 2026) is a large-scale multimodal language model from Alibaba. It acce… (1000K ctx)",
+		Description:         "Qwen3.5 Plus (April 2026) is a large-scale multimodal language model from Alibaba. It accepts text, image, and video input and produces text output, with a 1M token context window. This... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.5-plus-20260420",
 		CostPer1MIn:         0.3,
@@ -4298,7 +3441,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3627b: {
 		ID:                  OpenRouterQwenQwen3627b,
 		Name:                "Qwen: Qwen3.6 27B",
-		Description:         "Qwen3.6 27B is a dense 27-billion-parameter language model from the Qwen Team at Alibaba,… (262K ctx)",
+		Description:         "Qwen3.6 27B is a dense 27-billion-parameter language model from the Qwen Team at Alibaba, released in April 2026. It features hybrid multimodal capabilities — accepting text, image, and video inputs... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.6-27b",
 		CostPer1MIn:         0.6,
@@ -4312,7 +3455,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3635bA3b: {
 		ID:                  OpenRouterQwenQwen3635bA3b,
 		Name:                "Qwen: Qwen3.6 35B A3B",
-		Description:         "Qwen3.6-35B-A3B is an open-weight multimodal model from Alibaba Cloud with 35 billion tota… (262K ctx)",
+		Description:         "Qwen3.6-35B-A3B is an open-weight multimodal model from Alibaba Cloud with 35 billion total parameters and 3 billion active parameters per token. It uses a hybrid sparse mixture-of-experts architecture combining Gated... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.6-35b-a3b",
 		CostPer1MIn:         0.15,
@@ -4326,7 +3469,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen36Flash: {
 		ID:                  OpenRouterQwenQwen36Flash,
 		Name:                "Qwen: Qwen3.6 Flash",
-		Description:         "Qwen3.6 Flash is a fast, efficient language model from Alibaba's Qwen 3.6 series. It suppo… (1000K ctx)",
+		Description:         "Qwen3.6 Flash is a fast, efficient language model from Alibaba's Qwen 3.6 series. It supports text, image, and video input with a 1M token context window. Tiered pricing kicks in... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.6-flash",
 		CostPer1MIn:         0.1875,
@@ -4340,7 +3483,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen36MaxPreview: {
 		ID:                  OpenRouterQwenQwen36MaxPreview,
 		Name:                "Qwen: Qwen3.6 Max Preview",
-		Description:         "Qwen3.6-Max-Preview is a proprietary frontier model from Alibaba Cloud built on a sparse m… (262K ctx)",
+		Description:         "Qwen3.6-Max-Preview is a proprietary frontier model from Alibaba Cloud built on a sparse mixture-of-experts architecture with approximately 1 trillion total parameters. It is optimized for agentic coding, tool use, and..… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.6-max-preview",
 		CostPer1MIn:         1.0270000000000001,
@@ -4354,7 +3497,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen36Plus: {
 		ID:                  OpenRouterQwenQwen36Plus,
 		Name:                "Qwen: Qwen3.6 Plus",
-		Description:         "Qwen 3.6 Plus builds on a hybrid architecture that combines efficient linear attention wit… (1000K ctx)",
+		Description:         "Qwen 3.6 Plus builds on a hybrid architecture that combines efficient linear attention with sparse mixture-of-experts routing, enabling strong scalability and high-performance inference. Compared to the 3.5 series, it de… (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.6-plus",
 		CostPer1MIn:         0.325,
@@ -4368,7 +3511,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen37Flash: {
 		ID:                  OpenRouterQwenQwen37Flash,
 		Name:                "Qwen: Qwen3.7 Flash",
-		Description:         "Qwen3.7 Flash is a vision-language reasoning model from Alibaba. It is suited for multimod… (1000K ctx)",
+		Description:         "Qwen3.7 Flash is a vision-language reasoning model from Alibaba. It is suited for multimodal agents, visual coding, search, and computer interaction, with strengths in object recognition, spatial understanding, and real-… (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.7-flash",
 		CostPer1MIn:         0.03,
@@ -4382,7 +3525,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen37Max: {
 		ID:                  OpenRouterQwenQwen37Max,
 		Name:                "Qwen: Qwen3.7 Max",
-		Description:         "Qwen3.7-Max is the flagship model in Alibaba's Qwen3.7 series. It supports text input and… (1000K ctx)",
+		Description:         "Qwen3.7-Max is the flagship model in Alibaba's Qwen3.7 series. It supports text input and output and is designed for agent-centric workloads, with particular strengths in coding, office and productivity tasks,... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.7-max",
 		CostPer1MIn:         1.475,
@@ -4396,7 +3539,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen37Plus: {
 		ID:                  OpenRouterQwenQwen37Plus,
 		Name:                "Qwen: Qwen3.7 Plus",
-		Description:         "Qwen3.7-Plus is a cost-effective model in Alibaba's Qwen3.7 series. It supports text and i… (1000K ctx)",
+		Description:         "Qwen3.7-Plus is a cost-effective model in Alibaba's Qwen3.7 series. It supports text and image input with text output, building on the series' text capabilities with a comprehensive upgrade to its... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.7-plus",
 		CostPer1MIn:         0.32,
@@ -4410,7 +3553,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen38Max: {
 		ID:                  OpenRouterQwenQwen38Max,
 		Name:                "Qwen: Qwen3.8 Max",
-		Description:         "Qwen3.8 Max is the flagship model in Alibaba's Qwen3.8 series, the general-availability su… (1000K ctx)",
+		Description:         "Qwen3.8 Max is the flagship model in Alibaba's Qwen3.8 series, the general-availability successor to the Qwen3.8 Max Preview. It is a multimodal reasoning model intended for complex reasoning, visual understanding,... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3.8-max",
 		CostPer1MIn:         2,
@@ -4424,7 +3567,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterRekaaiRekaEdge: {
 		ID:                  OpenRouterRekaaiRekaEdge,
 		Name:                "Reka Edge",
-		Description:         "Reka Edge is an extremely efficient 7B multimodal vision-language model that accepts image… (16K ctx)",
+		Description:         "Reka Edge is an extremely efficient 7B multimodal vision-language model that accepts image/video+text inputs and generates text outputs (16K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "rekaai/reka-edge",
 		CostPer1MIn:         0.09999999999999999,
@@ -4438,7 +3581,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterRelaceRelaceSearch: {
 		ID:                  OpenRouterRelaceRelaceSearch,
 		Name:                "Relace: Relace Search",
-		Description:         "The relace-search model uses 4-12 `view_file` and `grep` tools in parallel to explore a co… (256K ctx)",
+		Description:         "The relace-search model uses 4-12 `view_file` and `grep` tools in parallel to explore a codebase and return relevant files to the user request (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "relace/relace-search",
 		CostPer1MIn:         1,
@@ -4466,7 +3609,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterSao10kL31Euryale70b: {
 		ID:                  OpenRouterSao10kL31Euryale70b,
 		Name:                "Sao10K: Llama 3.1 Euryale 70B v2.2",
-		Description:         "Euryale L3.1 70B v2.2 is a model focused on creative roleplay from [Sao10k](https://ko-fi.… (131K ctx)",
+		Description:         "Euryale L3.1 70B v2.2 is a model focused on creative roleplay from Sao10k. It is the successor of Euryale L3 70B v2.1. (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "sao10k/l3.1-euryale-70b",
 		CostPer1MIn:         0.85,
@@ -4480,7 +3623,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterStepfunStep35Flash: {
 		ID:                  OpenRouterStepfunStep35Flash,
 		Name:                "StepFun: Step 3.5 Flash",
-		Description:         "Step 3.5 Flash is StepFun's most capable open-source foundation model. Built on a sparse M… (262K ctx)",
+		Description:         "Step 3.5 Flash is StepFun's most capable open-source foundation model. Built on a sparse Mixture of Experts (MoE) architecture, it selectively activates only 11B of its 196B parameters per token.... (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "stepfun/step-3.5-flash",
 		CostPer1MIn:         0.09999999999999999,
@@ -4494,7 +3637,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterStepfunStep37Flash: {
 		ID:                  OpenRouterStepfunStep37Flash,
 		Name:                "StepFun: Step 3.7 Flash",
-		Description:         "Step 3.7 Flash is StepFun's latest high-efficiency multimodal Mixture-of-Experts model. It… (262K ctx)",
+		Description:         "Step 3.7 Flash is StepFun's latest high-efficiency multimodal Mixture-of-Experts model. It pairs a 196B-parameter language backbone with a vision encoder for native image and video understanding, activating roughly 11B p… (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "stepfun/step-3.7-flash",
 		CostPer1MIn:         0.19999999999999998,
@@ -4508,7 +3651,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterTencentHy3: {
 		ID:                  OpenRouterTencentHy3,
 		Name:                "Tencent: Hy3",
-		Description:         "Hy3 is a 295B-parameter Mixture-of-Experts model from Tencent (21B active, 192 experts wit… (262K ctx)",
+		Description:         "Hy3 is a 295B-parameter Mixture-of-Experts model from Tencent (21B active, 192 experts with top-8 routing) built for reasoning, agentic workflows, and real-world production use (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "tencent/hy3",
 		CostPer1MIn:         0.13199999999999998,
@@ -4522,7 +3665,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterTencentHy3Preview: {
 		ID:                  OpenRouterTencentHy3Preview,
 		Name:                "Tencent: Hy3 preview",
-		Description:         "Hy3 preview is a high-efficiency Mixture-of-Experts model from Tencent designed for agenti… (262K ctx)",
+		Description:         "Hy3 preview is a high-efficiency Mixture-of-Experts model from Tencent designed for agentic workflows and production use (262K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "tencent/hy3-preview",
 		CostPer1MIn:         0.063,
@@ -4536,7 +3679,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterThedrummerUnslopnemo12b: {
 		ID:                  OpenRouterThedrummerUnslopnemo12b,
 		Name:                "TheDrummer: UnslopNemo 12B",
-		Description:         "UnslopNemo v4.1 is the latest addition from the creator of Rocinante, designed for adventu… (1024K ctx)",
+		Description:         "UnslopNemo v4.1 is the latest addition from the creator of Rocinante, designed for adventure writing and role-play scenarios. (1024K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "thedrummer/unslopnemo-12b",
 		CostPer1MIn:         0.39999999999999997,
@@ -4550,7 +3693,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterThinkingmachinesInkling: {
 		ID:                  OpenRouterThinkingmachinesInkling,
 		Name:                "Thinking Machines: Inkling",
-		Description:         "Inkling is an open-weight multimodal mixture-of-experts model from Thinking Machines Lab,… (1048K ctx)",
+		Description:         "Inkling is an open-weight multimodal mixture-of-experts model from Thinking Machines Lab, with 41B active parameters out of 975B total (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "thinkingmachines/inkling",
 		CostPer1MIn:         0.95,
@@ -4564,7 +3707,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterThinkingmachinesInklingSmall: {
 		ID:                  OpenRouterThinkingmachinesInklingSmall,
 		Name:                "Thinking Machines: Inkling Small",
-		Description:         "Inkling Small is an open-weight multimodal mixture-of-experts model from Thinking Machines… (524K ctx)",
+		Description:         "Inkling Small is an open-weight multimodal mixture-of-experts model from Thinking Machines Lab, with 12B active parameters out of 276B total (524K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "thinkingmachines/inkling-small",
 		CostPer1MIn:         0.44999999999999996,
@@ -4572,20 +3715,6 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CostPer1MInCached:   0.09999999999999999,
 		ContextWindow:       524288,
 		DefaultMaxTokens:    262144,
-		CanReason:           true,
-		SupportsAttachments: true,
-	},
-	OpenRouterThinkingmachinesInklingBatch: {
-		ID:                  OpenRouterThinkingmachinesInklingBatch,
-		Name:                "Thinking Machines: Inkling (batch)",
-		Description:         "Inkling is an open-weight multimodal mixture-of-experts model from Thinking Machines Lab,… (524K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "thinkingmachines/inkling:batch",
-		CostPer1MIn:         0.5,
-		CostPer1MOut:        2.025,
-		CostPer1MInCached:   0.08499999999999999,
-		ContextWindow:       524288,
-		DefaultMaxTokens:    4096,
 		CanReason:           true,
 		SupportsAttachments: true,
 	},
@@ -4606,7 +3735,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXAiGrok420: {
 		ID:                  OpenRouterXAiGrok420,
 		Name:                "SpaceXAI: Grok 4.20",
-		Description:         "Grok 4.20 is a reasoning model from SpaceXAI with industry-leading speed and agentic tool… (2000K ctx)",
+		Description:         "Grok 4.20 is a reasoning model from SpaceXAI with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherance, delivering... (2000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "x-ai/grok-4.20",
 		CostPer1MIn:         1.25,
@@ -4620,7 +3749,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXAiGrok43: {
 		ID:                  OpenRouterXAiGrok43,
 		Name:                "SpaceXAI: Grok 4.3",
-		Description:         "Grok 4.3 is a reasoning model from SpaceXAI. It accepts text and image inputs with text ou… (1000K ctx)",
+		Description:         "Grok 4.3 is a reasoning model from SpaceXAI. It accepts text and image inputs with text output, and is suited for agentic workflows, instruction-following tasks, and applications requiring high factual... (1000K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "x-ai/grok-4.3",
 		CostPer1MIn:         1.25,
@@ -4634,7 +3763,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXAiGrok45: {
 		ID:                  OpenRouterXAiGrok45,
 		Name:                "SpaceXAI: Grok 4.5",
-		Description:         "Grok 4.5 is SpaceXAI's smartest model with frontier performance on coding, knowledge work,… (500K ctx)",
+		Description:         "Grok 4.5 is SpaceXAI's smartest model with frontier performance on coding, knowledge work, and STEM. (500K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "x-ai/grok-4.5",
 		CostPer1MIn:         2,
@@ -4648,7 +3777,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXAiGrokBuild01: {
 		ID:                  OpenRouterXAiGrokBuild01,
 		Name:                "SpaceXAI: Grok Build 0.1",
-		Description:         "Grok Build 0.1 is SpaceXAI’s fast coding model trained specifically for agentic software… (256K ctx)",
+		Description:         "Grok Build 0.1 is SpaceXAI’s fast coding model trained specifically for agentic software engineering workflows. It supports text and image inputs with text output, and is optimized for interactive coding... (256K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "x-ai/grok-build-0.1",
 		CostPer1MIn:         1,
@@ -4662,7 +3791,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXiaomiMimoV25: {
 		ID:                  OpenRouterXiaomiMimoV25,
 		Name:                "Xiaomi: MiMo-V2.5",
-		Description:         "MiMo-V2.5 is a native omnimodal model by Xiaomi. It delivers Pro-level agentic performance… (1050K ctx)",
+		Description:         "MiMo-V2.5 is a native omnimodal model by Xiaomi. It delivers Pro-level agentic performance at roughly half the inference cost, while surpassing MiMo-V2-Omni in multimodal perception across image and video understanding..… (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "xiaomi/mimo-v2.5",
 		CostPer1MIn:         0.14,
@@ -4676,7 +3805,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterXiaomiMimoV25Pro: {
 		ID:                  OpenRouterXiaomiMimoV25Pro,
 		Name:                "Xiaomi: MiMo-V2.5-Pro",
-		Description:         "MiMo-V2.5-Pro is Xiaomi’s flagship model, delivering strong performance in general agent… (1050K ctx)",
+		Description:         "MiMo-V2.5-Pro is Xiaomi’s flagship model, delivering strong performance in general agentic capabilities, complex software engineering, and long-horizon tasks, with top rankings on benchmarks such as ClawEval, GDPVal, a… (1050K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "xiaomi/mimo-v2.5-pro",
 		CostPer1MIn:         0.435,
@@ -4690,7 +3819,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm45: {
 		ID:                  OpenRouterZAiGlm45,
 		Name:                "Z.ai: GLM 4.5",
-		Description:         "GLM-4.5 is our latest flagship foundation model, purpose-built for agent-based application… (131K ctx)",
+		Description:         "GLM-4.5 is our latest flagship foundation model, purpose-built for agent-based applications. It leverages a Mixture-of-Experts (MoE) architecture and supports a context length of up to 128k tokens. GLM-4.5 delivers signi… (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.5",
 		CostPer1MIn:         0.6,
@@ -4704,7 +3833,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm45Air: {
 		ID:                  OpenRouterZAiGlm45Air,
 		Name:                "Z.ai: GLM 4.5 Air",
-		Description:         "GLM-4.5-Air is the lightweight variant of our latest flagship model family, also purpose-b… (131K ctx)",
+		Description:         "GLM-4.5-Air is the lightweight variant of our latest flagship model family, also purpose-built for agent-centric applications. Like GLM-4.5, it adopts the Mixture-of-Experts (MoE) architecture but with a more compact par… (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.5-air",
 		CostPer1MIn:         0.13,
@@ -4718,7 +3847,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm45v: {
 		ID:                  OpenRouterZAiGlm45v,
 		Name:                "Z.ai: GLM 4.5V",
-		Description:         "GLM-4.5V is a vision-language foundation model for multimodal agent applications. Built on… (65K ctx)",
+		Description:         "GLM-4.5V is a vision-language foundation model for multimodal agent applications. Built on a Mixture-of-Experts (MoE) architecture with 106B parameters and 12B activated parameters, it achieves state-of-the-art results i… (65K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.5v",
 		CostPer1MIn:         0.6,
@@ -4732,7 +3861,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm46: {
 		ID:                  OpenRouterZAiGlm46,
 		Name:                "Z.ai: GLM 4.6",
-		Description:         "Compared with GLM-4.5, this generation brings several key improvements: Longer context win… (204K ctx)",
+		Description:         "Compared with GLM-4.5, this generation brings several key improvements: Longer context window: The context window has been expanded from 128K to 200K tokens, enabling the model to handle more complex... (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.6",
 		CostPer1MIn:         0.5,
@@ -4746,7 +3875,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm46v: {
 		ID:                  OpenRouterZAiGlm46v,
 		Name:                "Z.ai: GLM 4.6V",
-		Description:         "GLM-4.6V is a large multimodal model designed for high-fidelity visual understanding and l… (131K ctx)",
+		Description:         "GLM-4.6V is a large multimodal model designed for high-fidelity visual understanding and long-context reasoning across images, documents, and mixed media. It supports up to 128K tokens, processes complex page layouts... (131K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.6v",
 		CostPer1MIn:         0.3,
@@ -4760,7 +3889,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm47: {
 		ID:                  OpenRouterZAiGlm47,
 		Name:                "Z.ai: GLM 4.7",
-		Description:         "GLM-4.7 is Z.ai’s latest flagship model, featuring upgrades in two key areas: enhanced p… (204K ctx)",
+		Description:         "GLM-4.7 is Z.ai’s latest flagship model, featuring upgrades in two key areas: enhanced programming capabilities and more stable multi-step reasoning/execution. It demonstrates significant improvements in executing comp… (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-4.7",
 		CostPer1MIn:         0.39999999999999997,
@@ -4788,7 +3917,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm5: {
 		ID:                  OpenRouterZAiGlm5,
 		Name:                "Z.ai: GLM 5",
-		Description:         "GLM-5 is Z.ai’s flagship open-source foundation model engineered for complex systems des… (204K ctx)",
+		Description:         "GLM-5 is Z.ai’s flagship open-source foundation model engineered for complex systems design and long-horizon agent workflows. Built for expert developers, it delivers production-grade performance on large-scale program… (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-5",
 		CostPer1MIn:         0.95,
@@ -4816,7 +3945,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm51: {
 		ID:                  OpenRouterZAiGlm51,
 		Name:                "Z.ai: GLM 5.1",
-		Description:         "GLM-5.1 delivers a major leap in coding capability, with particularly significant gains in… (204K ctx)",
+		Description:         "GLM-5.1 delivers a major leap in coding capability, with particularly significant gains in handling long-horizon tasks. Unlike previous models built around minute-level interactions, GLM-5.1 can work independently and co… (204K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-5.1",
 		CostPer1MIn:         0.952,
@@ -4830,7 +3959,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterZAiGlm52: {
 		ID:                  OpenRouterZAiGlm52,
 		Name:                "Z.ai: GLM 5.2",
-		Description:         "GLM 5.2 is a large-scale reasoning model from Z.ai. It supports text input and output with… (1048K ctx)",
+		Description:         "GLM 5.2 is a large-scale reasoning model from Z.ai. It supports text input and output with a 1M-token context window, and is suited for long-horizon agent workflows, project-level software engineering,... (1048K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-5.2",
 		CostPer1MIn:         0.07,
@@ -4841,24 +3970,10 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: false,
 	},
-	OpenRouterZAiGlm52Batch: {
-		ID:                  OpenRouterZAiGlm52Batch,
-		Name:                "Z.ai: GLM 5.2 (batch)",
-		Description:         "GLM 5.2 is a large-scale reasoning model from Z.ai. It supports text input and output with… (512K ctx)",
-		Provider:            ProviderOpenRouter,
-		APIModel:            "z-ai/glm-5.2:batch",
-		CostPer1MIn:         0.7,
-		CostPer1MOut:        2.2,
-		CostPer1MInCached:   0.13,
-		ContextWindow:       512000,
-		DefaultMaxTokens:    4096,
-		CanReason:           true,
-		SupportsAttachments: false,
-	},
 	OpenRouterZAiGlm5vTurbo: {
 		ID:                  OpenRouterZAiGlm5vTurbo,
 		Name:                "Z.ai: GLM 5V Turbo",
-		Description:         "GLM-5V-Turbo is Z.ai’s first native multimodal agent foundation model, built for vision-… (202K ctx)",
+		Description:         "GLM-5V-Turbo is Z.ai’s first native multimodal agent foundation model, built for vision-based coding and agent-driven tasks. It natively handles image, video, and text inputs, excels at long-horizon planning, complex c… (202K ctx)",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "z-ai/glm-5v-turbo",
 		CostPer1MIn:         1.2,
