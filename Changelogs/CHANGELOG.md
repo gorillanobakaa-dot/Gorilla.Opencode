@@ -1,3 +1,62 @@
+## v0.1.78 — 2026-08-09 — web search with no setup, and a model list that tells the truth
+
+Full dual-track document: [v0.1.78-release-notes.md](v0.1.78-release-notes.md).
+
+**Plain-language version:** Twenty changes. The three that matter:
+
+**Web search now works out of the box.** Last release it needed you to run your
+own search engine. Now it uses lynx — a text-only browser from 1992, 641 KB,
+already in Debian — and needs no account, no key and no card. lynx is not bundled
+in the download; it comes from Debian's repository like everything else on your
+system, so Debian ships its security updates rather than us. The whole feature
+costs about 13 KB. Install with `sudo apt install ./Compiled.Builds/...deb`, not
+`dpkg -i`, because dpkg does not fetch what a package recommends.
+
+**Every model now says what it costs and what it is good for.** Prices come
+first — "FREE", "$0.04/$0.14 per 1M", "$2.5/$12.5 per 1M" — because free models
+were marked and paid ones were not, so telling them apart meant knowing that
+silence means paid, and 260 of 274 entries were silent. Then a plain verdict:
+"shit tier for code — vendor calls it roleplay", "CAN CODE", or "UNTESTED for
+coding work — use at your own risk". Where the label comes from the vendor's own
+description the triggering word is quoted, so you can check it rather than trust
+us. Where we have used a model and it caused damage we say so and cite where that
+was recorded. Where nobody knows, it says so instead of guessing. This matters
+because looking up an unfamiliar model name means a web search and a heavy vendor
+page, which on a slow connection is not inconvenient but impossible.
+
+**A personal shortlist.** Space bookmarks a model, `b` jumps to your list, space
+again removes it. It spans every provider, so what you actually use sits in one
+place instead of being hunted for among hundreds.
+
+Also: the model list has ends (it used to wrap forever, so at 128 models you
+could scroll past the top and lose your place); OpenRouter works again — nine of
+its models had been retired by the provider, including the two used as defaults,
+so setting it up produced something that could not answer at all; and
+`gorilla-opencode models refresh` lets you update the list yourself without
+waiting for a release.
+
+**Technical:** lynx chosen on measurement — curl gets a 14 KB block page from
+DuckDuckGo where lynx gets real results; the user agent is left honest because
+spoofing Chrome converts a 157-byte exit-1 failure into a 1,122-byte exit-0
+CAPTCHA page; success is counted in extracted result URLs, the only check that
+survives every observed failure. Engine order measured (marginalia 43, brave 28,
+ecosia 27, mojeek 19; duckduckgo and google 0 and permanently excluded).
+OpenRouter's 400 published models become 274 after dropping 67 that cannot call
+tools and 59 asynchronous batch endpoints. Descriptions are built in four
+traceable layers — earned verdict with citation, curated judgement for the same
+underlying model, vendor claim with the trigger quoted, or an admission that
+nothing is known — and a test fails the build if any earned verdict lacks
+evidence. The refresh cache carries a schema version so one built under older
+rules is discarded rather than silently reverting a fix.
+
+Prompt lines now carry `[[needs tool.x]]` and disappear with the tool they
+describe; the worst case had been telling the model "never say you cannot reach a
+page" while the fetch tool was switched off. The environment block lists
+directories first and collapses version families, after ASCII sort let 13
+release-notes files consume the whole 25-entry budget and the model was never
+shown `cmd/`, `internal/` or `go.mod`. Built packages now go in
+`Compiled.Builds/` rather than the repo root.
+
 ## v0.1.77 — 2026-08-09 — web search that needs no setup at all
 
 Full dual-track document: [v0.1.77-release-notes.md](v0.1.77-release-notes.md).
