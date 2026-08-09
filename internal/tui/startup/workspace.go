@@ -31,6 +31,9 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/llm/models"
 )
 
 // Choice is what the picker returns.
@@ -331,6 +334,25 @@ func (m *model) View() string {
 	b.WriteString(line(lipgloss.NewStyle().Foreground(dim).Render(
 		"enter choose  ↑↓ move  esc quit    add more folders later with /add-dir")))
 
+	// GORILLA OVERRIDE: tell people their model list has gone stale, but only
+	// when it actually has.
+	//
+	// Model providers retire models constantly and a retired one does not fail
+	// politely - it errors the moment you pick it. This shipped with a
+	// hand-written OpenRouter list in which NINE of twenty-two models no longer
+	// existed, including the default, so the provider simply did not work and
+	// nothing said why.
+	//
+	// Shown only when the list has never been refreshed or is over a month old.
+	// A banner on every launch is nagging, and nagging is noise - the thing this
+	// project spends most of its effort removing. The cost is stated in seconds
+	// on a slow line, not just kilobytes, because that is the unit someone
+	// waiting actually feels.
+	if note := staleModelsNotice(); note != "" {
+		b.WriteString("\n\n")
+		b.WriteString(note)
+	}
+
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(accent).
@@ -389,4 +411,37 @@ func AnswerLine(dir string, remembered bool) string {
 		return "folder: " + dir + " (remembered — /add-dir to add more)"
 	}
 	return "folder: " + dir
+}
+
+// staleModelsNotice returns the refresh prompt, or "" when the list is current.
+func staleModelsNotice() string {
+	age, refreshed := models.CatalogueAge(config.ConfigBase())
+	switch {
+	case !refreshed:
+		// Never refreshed: they are running whatever shipped with the build.
+	case age < models.StaleAfter:
+		return ""
+	}
+
+	warn := lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
+	body := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+
+	when := "never been updated"
+	if refreshed {
+		when = fmt.Sprintf("last updated %d days ago", int(age.Hours()/24))
+	}
+
+	var b strings.Builder
+	b.WriteString(warn.Render(fmt.Sprintf("  🦍  Your AI model list has %s.", when)))
+	b.WriteString("\n")
+	b.WriteString(body.Render("      Providers retire models all the time, and a retired one just errors"))
+	b.WriteString("\n")
+	b.WriteString(body.Render("      when you pick it. Refreshing takes about 650 KB — roughly 80 seconds"))
+	b.WriteString("\n")
+	b.WriteString(body.Render("      even on a very slow line, and it saves a lot of swearing later:"))
+	b.WriteString("\n\n")
+	b.WriteString(warn.Render("      gorilla-opencode models refresh"))
+	b.WriteString("\n")
+	b.WriteString(body.Render("      No account, nothing sent about you. You're welcome.  🦍"))
+	return b.String()
 }
