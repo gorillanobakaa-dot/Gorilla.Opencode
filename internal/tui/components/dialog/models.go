@@ -364,6 +364,30 @@ func (m *modelDialogCmp) View() string {
 
 	scrollIndicator := m.getScrollIndicators(w)
 
+	// GORILLA OVERRIDE: say what the keys do, on every provider column.
+	//
+	// Bookmarking was unfindable: nothing anywhere mentioned space, and the only
+	// label naming the shortlist appeared AFTER you had already used it —
+	// a feature you cannot discover without already knowing it. Reported from a
+	// live run: "there's no indication that YOU HAVE THE OPTION to even select
+	// your models and bookmark them".
+	//
+	// One line, on every column, in the frame the user is already reading.
+	hint := "space ★ bookmark"
+	if m.provider == ProviderBookmarks {
+		hint = "space remove from bookmarks"
+	}
+	if m.hScrollPossible {
+		hint += "   ←/→ other providers"
+	}
+	hint += "   enter use   esc close"
+	// Never wider than the frame: an over-wide line makes bubbletea's erase
+	// under-reach and the footer marches down the screen (see clampToWidth).
+	if r := []rune(hint); len(r) > w {
+		hint = string(r[:w])
+	}
+	hintLine := baseStyle.Width(w).Foreground(t.TextMuted()).Render(hint)
+
 	parts := []string{title}
 	if subtitle != "" {
 		parts = append(parts, subtitle)
@@ -371,6 +395,7 @@ func (m *modelDialogCmp) View() string {
 	parts = append(parts,
 		baseStyle.Width(w).Render(lipgloss.JoinVertical(lipgloss.Left, modelItems...)),
 		scrollIndicator,
+		hintLine,
 	)
 	content := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
@@ -700,6 +725,12 @@ func providerDisplayName(p models.ModelProvider) string {
 		return "Gemini (Google login)"
 	case models.ProviderAntigravity:
 		return "Antigravity (Google login — Claude/GPT/Gemini)"
+	case ProviderBookmarks:
+		// "★ bookmarks" was accurate and told nobody anything. Someone landing
+		// here has to work out that this is THEIR list, assembled by them —
+		// which is exactly the reading-comprehension tax this list exists to
+		// remove.
+		return "★ YOUR BOOKMARKS — the models you picked"
 	}
 	s := string(p)
 	if s == "" {
