@@ -70,6 +70,11 @@ type modelKeyMap struct {
 	K      key.Binding
 	H      key.Binding
 	L      key.Binding
+	// GORILLA OVERRIDE: space toggles. Deselection is as important as
+	// selection — "this one did not do what it claimed" is exactly as useful a
+	// judgement as "this one is good", and a list you can only add to becomes
+	// another wall.
+	Bookmark key.Binding
 }
 
 var modelKeys = modelKeyMap{
@@ -113,6 +118,10 @@ var modelKeys = modelKeyMap{
 		key.WithKeys("l"),
 		key.WithHelp("l", "scroll right"),
 	),
+	Bookmark: key.NewBinding(
+		key.WithKeys(" "),
+		key.WithHelp("space", "bookmark / unbookmark"),
+	),
 }
 
 func (m *modelDialogCmp) Init() tea.Cmd {
@@ -136,6 +145,38 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.hScrollPossible {
 				m.switchProvider(1)
 			}
+		case key.Matches(msg, modelKeys.Bookmark):
+			if len(m.models) == 0 {
+				break
+			}
+			id := string(m.models[m.selectedIdx].ID)
+			on, err := config.ToggleBookmark(id)
+			if err != nil {
+				return m, util.ReportError(err)
+			}
+			// Rebuild: the shortlist column may have just appeared or emptied,
+			// and leaving the carousel describing a state that no longer exists
+			// is how a menu starts lying about itself.
+			keep := m.provider
+			m.availableProviders = getEnabledProviders(config.Get())
+			m.hScrollPossible = len(m.availableProviders) > 1
+			if idx := findProviderIndex(m.availableProviders, keep); idx >= 0 {
+				m.hScrollOffset = idx
+			} else {
+				m.hScrollOffset = 0
+				keep = m.availableProviders[0]
+			}
+			sel := m.selectedIdx
+			m.setupModelsForProvider(keep)
+			if sel < len(m.models) {
+				m.selectedIdx = sel
+			}
+			if on {
+				util.ReportInfo("bookmarked — it will appear in ★ bookmarks")
+			} else {
+				util.ReportInfo("removed from bookmarks")
+			}
+			return m, nil
 		case key.Matches(msg, modelKeys.Enter):
 			util.ReportInfo(fmt.Sprintf("selected model: %s", m.models[m.selectedIdx].Name))
 			return m, util.CmdHandler(ModelSelectedMsg{Model: m.models[m.selectedIdx]})
@@ -288,6 +329,13 @@ func (m *modelDialogCmp) View() string {
 		if r := m.models[i].Rank; r > 0 {
 			label = fmt.Sprintf("%2d. %s", r, label)
 		}
+		// GORILLA OVERRIDE: mark what is already on the shortlist, everywhere it
+		// appears. Without it, someone browsing a provider has no way to tell
+		// whether they already bookmarked something and toggles it back off by
+		// accident — and the whole point of the list is that you decide once.
+		if m.provider != ProviderBookmarks && config.IsBookmarked(string(m.models[i].ID)) {
+			label = "★ " + label
+		}
 		if r := []rune(label); len(r) > w-1 {
 			label = string(r[:w-2]) + "…"
 		}
@@ -388,6 +436,16 @@ func getEnabledProviders(cfg *config.Config) []models.ModelProvider {
 	seen := make(map[models.ModelProvider]bool)
 	var providers []models.ModelProvider
 
+	// GORILLA OVERRIDE: the shortlist leads, and only when it has something in
+	// it. Showing an empty column to someone who has never bookmarked anything
+	// would put a blank screen between them and the models - the opposite of
+	// the problem it is here to solve. With no bookmarks the picker behaves
+	// exactly as before, opening on the curated ranked list.
+	if len(config.BookmarkedModels()) > 0 {
+		providers = append(providers, ProviderBookmarks)
+		seen[ProviderBookmarks] = true
+	}
+
 	// Providers saved in config (added via /connect, or backfilled from env
 	// at Load time).
 	for providerId, provider := range cfg.Providers {
@@ -464,7 +522,11 @@ func (m *modelDialogCmp) setupModelsForProvider(provider models.ModelProvider) {
 	selectedModelId := agentCfg.Model
 
 	m.provider = provider
-	m.models = getModelsForProvider(provider)
+	if provider == ProviderBookmarks {
+		m.models = bookmarkedModels()
+	} else {
+		m.models = getModelsForProvider(provider)
+	}
 	m.selectedIdx = 0
 	m.scrollOffset = 0
 
@@ -481,6 +543,40 @@ func (m *modelDialogCmp) setupModelsForProvider(provider models.ModelProvider) {
 			}
 		}
 	}
+}
+
+// GORILLA OVERRIDE: a virtual provider holding the user's personal shortlist.
+//
+// It is not a real backend - it is a view across every provider, pinned to the
+// front of the carousel so it is the first thing anyone sees. That placement is
+// the whole point: the catalogue is now hundreds of models with names like
+// "inclusionai/ling-3.0-tiny:free", and for someone who just wants to learn to
+// code, that is not a choice, it is a wall. Worse, working out what those names
+// mean would take a web search and a heavy vendor page PER MODEL - which on a
+// single-digit-KB/s line is not slow, it is impossible.
+//
+// So: decide once, from the curated descriptions already here, and never scroll
+// the catalogue again.
+const ProviderBookmarks models.ModelProvider = "★ bookmarks"
+
+// bookmarkedModels resolves the saved ids. Entries that no longer resolve are
+// kept and marked unavailable rather than dropped: a bookmark disappearing with
+// no explanation is exactly the silent failure this project keeps finding.
+func bookmarkedModels() []models.Model {
+	var out []models.Model
+	for _, id := range config.BookmarkedModels() {
+		if m, ok := models.SupportedModels[models.ModelID(id)]; ok {
+			out = append(out, m)
+			continue
+		}
+		out = append(out, models.Model{
+			ID:          models.ModelID(id),
+			Name:        string(id),
+			Description: "UNAVAILABLE — this model is no longer offered; press space to remove it",
+			Provider:    ProviderBookmarks,
+		})
+	}
+	return out
 }
 
 func getModelsForProvider(provider models.ModelProvider) []models.Model {
