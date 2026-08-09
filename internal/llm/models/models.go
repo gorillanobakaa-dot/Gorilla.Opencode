@@ -101,7 +101,7 @@ func init() {
 	maps.Copy(SupportedModels, GroqModels)
 	maps.Copy(SupportedModels, CerebrasModels)
 	maps.Copy(SupportedModels, AzureModels)
-	maps.Copy(SupportedModels, OpenRouterModels)
+	maps.Copy(SupportedModels, OpenRouterGeneratedModels)
 	maps.Copy(SupportedModels, XAIModels)
 	maps.Copy(SupportedModels, VertexAIGeminiModels)
 	maps.Copy(SupportedModels, DeepSeekModels)

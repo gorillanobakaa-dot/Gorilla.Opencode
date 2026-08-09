@@ -62,7 +62,7 @@ var portalDefaults = map[string]struct{ coder, title models.ModelID }{
 	"gemini-api": {models.GeminiFlashLatest, models.GeminiFlashLiteLatest},
 	"groq":       {models.Llama3_3_70BVersatile, models.Llama3_3_70BVersatile},
 	"cerebras":   {models.CerebrasGLM47, models.CerebrasGLM47},
-	"openrouter": {models.OpenRouterClaude37Sonnet, models.OpenRouterClaude35Haiku},
+	"openrouter": {models.OpenRouterNvidiaNemotron3Ultra550bA55bFree, models.OpenRouterOpenaiGptOss20bFree},
 	"xai":        {models.XAIGrok3Beta, models.XAIGrok3MiniBeta},
 }
 
