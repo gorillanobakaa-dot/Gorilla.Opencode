@@ -143,7 +143,7 @@ cost real confusion; they are not optional.
 4. **Build and inspect the .deb**:
    ```sh
    scripts/build-deb.sh X.Y.Z
-   dpkg-deb -c gorilla-opencode_X.Y.Z_amd64.deb | grep release-notes   # this release's notes must be there
+   dpkg-deb -c Compiled.Builds/gorilla-opencode_X.Y.Z_amd64.deb | grep release-notes   # this release's notes must be there
    ```
 5. **Checksums** over every artifact, then `sha256sum -c` to prove they verify.
 6. **Install the .deb with `apt`, not `dpkg -i` — and do not `install` the binary
@@ -151,7 +151,7 @@ cost real confusion; they are not optional.
    *old* version, so `gorilla-opencode --version` and `dpkg -l gorilla-opencode`
    disagree and nobody can tell what is actually installed. Verify both agree:
    ```sh
-   sudo apt install ./gorilla-opencode_X.Y.Z_amd64.deb
+   sudo apt install ./Compiled.Builds/gorilla-opencode_X.Y.Z_amd64.deb
    gorilla-opencode --version && dpkg -l gorilla-opencode | tail -1
    ```
    **`apt` rather than `dpkg -i` because dpkg does no dependency resolution at
@@ -349,6 +349,16 @@ decision. **Do not commit them.** They exist on the developer's machine:
 - `Documentation.Scripts/Code.review/code_review_toolkit/` — a code-review toolkit
   (`code_review.py`, `tools_registry.py`, a PLAYBOOK). Not yet used by any session;
   read it before hand-rolling a review process.
+
+**Built packages go in `Compiled.Builds/`, never the repo root.** `build-deb.sh`
+writes there and the pipeline's asset path expects it. This is not tidiness: one
+.deb per release into the root looked harmless, and after ~30 releases the root
+held 47 of them. The system prompt's top-level listing is capped at 25 entries,
+so build output consumed every slot and the model was never shown `cmd/`,
+`internal/` or `go.mod` at all. Worse, thirteen `GITHUB-RELEASE-NOTES-0.1.65…77`
+lines read as a counter: on 2026-08-09 a model sent the single word "oi", with no
+instruction, continued the sequence and ran `git tag -a v0.1.78`. The tag was
+really created. Anything generated per-release belongs outside the root.
 
 `gorilla-opencode` (the built binary) and `*.deb` are also ignored; they are build
 outputs and must never be committed.

@@ -90,3 +90,6 @@ gorilla-opencode.backup
 # directory itself would reappear the moment a new file landed there and the
 # release pipeline ran `git add -A`. Named here so it cannot come back.
 TO.DO.TO.FIX/
+
+# GORILLA: built packages (see scripts/build-deb.sh)
+Compiled.Builds/
