@@ -492,10 +492,10 @@ func setProviderDefaults() {
 
 	// OpenRouter configuration
 	if key := viper.GetString("providers.openrouter.apiKey"); strings.TrimSpace(key) != "" {
-		viper.SetDefault("agents.coder.model", models.OpenRouterClaude37Sonnet)
-		viper.SetDefault("agents.summarizer.model", models.OpenRouterClaude37Sonnet)
-		viper.SetDefault("agents.task.model", models.OpenRouterClaude37Sonnet)
-		viper.SetDefault("agents.title.model", models.OpenRouterClaude35Haiku)
+		viper.SetDefault("agents.coder.model", models.OpenRouterNvidiaNemotron3Ultra550bA55bFree)
+		viper.SetDefault("agents.summarizer.model", models.OpenRouterNvidiaNemotron3Ultra550bA55bFree)
+		viper.SetDefault("agents.task.model", models.OpenRouterNvidiaNemotron3Ultra550bA55bFree)
+		viper.SetDefault("agents.title.model", models.OpenRouterOpenaiGptOss20bFree)
 		return
 	}
 
@@ -1066,12 +1066,12 @@ func setDefaultModelForAgent(agent AgentName) bool {
 
 		switch agent {
 		case AgentTitle:
-			model = models.OpenRouterClaude35Haiku
+			model = models.OpenRouterOpenaiGptOss20bFree
 			maxTokens = 80
 		case AgentTask:
-			model = models.OpenRouterClaude37Sonnet
+			model = models.OpenRouterNvidiaNemotron3Ultra550bA55bFree
 		default:
-			model = models.OpenRouterClaude37Sonnet
+			model = models.OpenRouterNvidiaNemotron3Ultra550bA55bFree
 		}
 
 		// Check if model supports reasoning
