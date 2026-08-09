@@ -16,6 +16,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/config"
@@ -39,6 +40,141 @@ func humanSeconds(bytes int64) string {
 var modelsCmd = &cobra.Command{
 	Use:   "models",
 	Short: "Inspect and refresh the list of available AI models",
+}
+
+// providerAliases are what someone may reasonably type. Kept generous - the
+// point is that "/update nvidia" works, not that people learn our spelling.
+var providerAliases = map[string]models.ModelProvider{
+	"openrouter": models.ProviderOpenRouter, "or": models.ProviderOpenRouter,
+	"groq":     models.ProviderGROQ,
+	"cerebras": models.ProviderCerebras,
+	"openai":   models.ProviderOpenAI, "gpt": models.ProviderOpenAI,
+	"xai": models.ProviderXAI, "grok": models.ProviderXAI,
+}
+
+var modelsCheckCmd = &cobra.Command{
+	Use:   "check [provider...]",
+	Short: "Ask your providers whether the models we list still exist",
+	Long: `Check the models this program offers against what each provider actually has.
+
+Providers retire models constantly, and a retired model does not fail politely -
+it errors the moment you pick it. This asks each provider for its current list
+and tells you which of ours have gone.
+
+It only reports. Nothing is changed, because for most providers the published
+list is bare identifiers with no context size or price, and replacing a curated
+entry with a bare name would be a downgrade dressed up as an update.
+
+  models check                  every provider you have a key for
+  models check groq+cerebras    just those
+  models check all              every provider that publishes a list
+
+Each check is a few kilobytes. Providers you have no key for are named, with
+where to get one - most have a free tier.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg := config.Get()
+		want := map[models.ModelProvider]bool{}
+		all := len(args) == 1 && strings.EqualFold(args[0], "all")
+		for _, a := range args {
+			for _, part := range strings.Split(strings.ToLower(a), "+") {
+				if p, ok := providerAliases[strings.TrimSpace(part)]; ok {
+					want[p] = true
+				} else if !strings.EqualFold(part, "all") {
+					return fmt.Errorf("unknown provider %q — try one of: openrouter groq cerebras openai xai", part)
+				}
+			}
+		}
+
+		if want[models.ProviderOpenRouter] {
+			fmt.Println()
+			fmt.Println("  OpenRouter publishes prices and context sizes, so its list can be")
+			fmt.Println("  rebuilt outright rather than only checked:")
+			fmt.Println()
+			fmt.Println("      gorilla-opencode models refresh")
+			fmt.Println()
+			delete(want, models.ProviderOpenRouter)
+			if len(want) == 0 {
+				return nil
+			}
+		}
+
+		var todo []models.ModelProvider
+		for p := range models.CatalogueEndpoints {
+			configured := false
+			if cfg != nil {
+				if pc, ok := cfg.Providers[p]; ok && strings.TrimSpace(pc.APIKey) != "" && !pc.Disabled {
+					configured = true
+				}
+			}
+			switch {
+			case len(want) > 0:
+				if want[p] {
+					todo = append(todo, p)
+				}
+			case all || configured:
+				todo = append(todo, p)
+			}
+		}
+		sort.Slice(todo, func(i, j int) bool { return todo[i] < todo[j] })
+
+		if len(todo) == 0 {
+			fmt.Println()
+			fmt.Println("  Nothing to check — no API keys configured for a provider that publishes a list.")
+			fmt.Println("  Most have a free tier. Go and get one, then come back:")
+			// Free first, deliberately: map order is random and would otherwise
+			// put the paid ones at the top of a list read by people with no card.
+			var eps []models.CatalogueEndpoint
+			for _, ep := range models.CatalogueEndpoints {
+				eps = append(eps, ep)
+			}
+			sort.Slice(eps, func(i, j int) bool {
+				if eps[i].Free != eps[j].Free {
+					return eps[i].Free
+				}
+				return eps[i].Name < eps[j].Name
+			})
+			for _, ep := range eps {
+				tag := "paid"
+				if ep.Free {
+					tag = "FREE"
+				}
+				fmt.Printf("    %-10s %-4s  %s\n", ep.Name, tag, ep.KeyHint)
+			}
+			fmt.Println()
+			return nil
+		}
+
+		fmt.Println()
+		for _, p := range todo {
+			key := ""
+			if cfg != nil {
+				if pc, ok := cfg.Providers[p]; ok {
+					key = pc.APIKey
+				}
+			}
+			r := models.VerifyProvider(p, key)
+			label := r.Name
+			if label == "" {
+				label = string(p)
+			}
+			if r.Err != nil {
+				fmt.Printf("  %-10s  %v\n", label, r.Err)
+				continue
+			}
+			fmt.Printf("  %-10s  we list %d, they offer %d\n", label, r.Listed, r.Upstream)
+			if len(r.Missing) > 0 {
+				fmt.Printf("              GONE (these error if you pick them): %s\n", strings.Join(r.Missing, ", "))
+			}
+			if n := len(r.NewThere); n > 0 {
+				fmt.Printf("              %d model(s) they have that we do not list\n", n)
+			}
+			if len(r.Missing) == 0 {
+				fmt.Printf("              all good\n")
+			}
+		}
+		fmt.Println()
+		return nil
+	},
 }
 
 var modelsRefreshCmd = &cobra.Command{
@@ -106,6 +242,6 @@ and if the download fails the list you already have keeps working.`,
 }
 
 func init() {
-	modelsCmd.AddCommand(modelsRefreshCmd)
+	modelsCmd.AddCommand(modelsRefreshCmd, modelsCheckCmd)
 	rootCmd.AddCommand(modelsCmd)
 }
