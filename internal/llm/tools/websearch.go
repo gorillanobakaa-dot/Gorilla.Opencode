@@ -86,41 +86,31 @@ const (
 	searxngSetup = `General web search is NOT configured, so nothing was searched.
 
 Do not answer from memory as though a search had happened, and do not guess URLs.
-Tell the user web search is off, and that they can turn it on by running their own
-SearXNG (no API key, no account, no card):
 
-From source, no container needed (verified on Debian 13, python 3.13):
+OFFER TO FIX IT. Tell the user, in your own words, that you can set up web search
+for them: it needs no account, no API key and no card, it runs entirely on their
+own machine, and it takes a couple of minutes. If they agree, run EXACTLY:
 
-  git clone --depth 1 https://github.com/searxng/searxng.git
-  python3 -m venv searxvenv
-  ./searxvenv/bin/pip install pyyaml -r searxng/requirements.txt
+  /usr/share/gorilla-opencode/setup-searxng.sh
 
-  cat > settings.yml <<'YML'
-  use_default_settings: true
-  server:
-    secret_key: "change-me"
-    limiter: false          # the bot limiter 429s local automation
-    bind_address: "127.0.0.1"
-    port: 8888
-  search:
-    formats: [html, json]   # json is OFF by default; without it you get 403
-  YML
+DO NOT improvise the installation yourself, and do not retype its steps from
+memory. That script encodes two failures that are easy to reproduce and hard to
+spot: SearXNG's build needs msgspec and pyyaml present before "pip install -e ."
+will work, and the JSON API is disabled by default so the tool gets 403 without
+one line in settings.yml. It also verifies the result with a live query and
+exits non-zero if anything is wrong. Retyping the steps is how a half-built
+install gets reported as a success.
 
-  SEARXNG_SETTINGS_PATH=$PWD/settings.yml PYTHONPATH=$PWD/searxng \
-    ./searxvenv/bin/python -m searx.webapp
+If the script is not on disk (running from source rather than the .deb), it is
+at packaging/setup-searxng.sh in the repository.
 
-(Do NOT "pip install -e ." — its build needs msgspec and pyyaml present first.
-Running from source with PYTHONPATH skips that entirely. If you prefer a
-container, the official image is searxng/searxng with the same two settings.)
+If the user declines, that is the end of it: ask them for a URL and read it with
+web_fetch. Do not go looking for another way to search - do not fetch a search
+engine's results page, and do not substitute remembered facts for a search you
+did not perform.
 
-and pointing this tool at it, either with
-
-  searxngURL in ~/.config/gorilla-opencode/config.json, or
-  the SEARXNG_URL environment variable.
-
-Until then: if the user needs something from the open web, ask them for the URL
-and read it with web_fetch. Scholarly sources (scholar, medical, crossref,
-openaccess, books, reference) do not need any of this and still work.`
+Scholarly sources (scholar, medical, crossref, openaccess, books, reference) need
+none of this and still work.`
 
 	webSearchDescription = `Find papers, articles and references by keyword.
 
