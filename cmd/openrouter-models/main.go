@@ -223,7 +223,7 @@ const (
 		fmt.Fprintf(w, "\t%s: {\n", goIdent(m.ID))
 		fmt.Fprintf(w, "\t\tID:                  %s,\n", goIdent(m.ID))
 		fmt.Fprintf(w, "\t\tName:                %q,\n", m.Name)
-		fmt.Fprintf(w, "\t\tDescription:         %q,\n", models.CleanCatalogueDescription(m.Description, m.ContextLength, m.isFree()))
+		fmt.Fprintf(w, "\t\tDescription:         %q,\n", models.CleanCatalogueDescription(m.Description, m.ContextLength, perMillion(m.Pricing.Prompt), perMillion(m.Pricing.Completion)))
 		if r := rank[m.ID]; r > 0 {
 			fmt.Fprintf(w, "\t\tRank:                %d,\n", r)
 		}

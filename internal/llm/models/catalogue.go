@@ -34,7 +34,7 @@ func IsBatchVariant(id string) bool {
 // [Poolside](<https://poolside.ai/>)" renders as exactly that in a terminal,
 // spending characters on a URL nobody can click. The link text is kept and the
 // address dropped.
-func CleanCatalogueDescription(desc string, ctx int64, free bool) string {
+func CleanCatalogueDescription(desc string, ctx int64, inPer1M, outPer1M float64) string {
 	s := markdownLink.ReplaceAllString(desc, "$1")
 	s = strings.ReplaceAll(s, "\n", " ")
 	if i := strings.IndexAny(s, ".!"); i > 30 {
@@ -53,9 +53,25 @@ func CleanCatalogueDescription(desc string, ctx int64, free bool) string {
 	if len(s) > 220 {
 		s = strings.TrimSpace(s[:220]) + "…"
 	}
+	// GORILLA OVERRIDE (2026-08-09): price goes FIRST, on every entry.
+	//
+	// Free models were marked and paid ones were not, so telling them apart
+	// meant knowing that absence means paid — and 262 of 274 entries were
+	// silent. Reported plainly: "I am still picking up the wrong models because
+	// I have no way of knowing which one is free and which one requires a
+	// subscription."
+	//
+	// Leading with it makes the column scannable: every row starts with either
+	// FREE or a number. No probing needed - OpenRouter publishes exact prices
+	// and they are already stored on the model.
 	prefix := ""
-	if free {
+	switch {
+	case inPer1M == 0 && outPer1M == 0:
 		prefix = "FREE — "
+	case inPer1M < 1 && outPer1M < 1:
+		prefix = fmt.Sprintf("$%.2f/$%.2f per 1M — ", inPer1M, outPer1M)
+	default:
+		prefix = fmt.Sprintf("$%.1f/$%.1f per 1M — ", inPer1M, outPer1M)
 	}
 	if ctx > 0 {
 		return fmt.Sprintf("%s%s (%dK ctx)", prefix, s, ctx/1000)
