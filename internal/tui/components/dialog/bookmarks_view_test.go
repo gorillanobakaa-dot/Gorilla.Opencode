@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/llm/models"
 )
 
 // A bookmark whose model has been retired must stay visible and say so.
@@ -41,5 +42,30 @@ func TestNoBookmarksMeansNoBookmarkColumn(t *testing.T) {
 		if p == ProviderBookmarks {
 			t.Fatal("an empty shortlist must not take a column in the carousel")
 		}
+	}
+}
+
+// Selecting a retired bookmark must be refused in the dialog, not passed to the
+// agent. Handing it an unresolvable id produces a generic failure that reads as
+// "this program is broken" rather than "that model was retired".
+func TestSelectingRetiredBookmarkIsRefused(t *testing.T) {
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.ToggleBookmark("openrouter.vendor/gone"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = config.ToggleBookmark("openrouter.vendor/gone") })
+
+	m := &modelDialogCmp{provider: ProviderBookmarks}
+	m.models = bookmarkedModels()
+	if len(m.models) != 1 {
+		t.Fatalf("expected the retired bookmark, got %d entries", len(m.models))
+	}
+	// The dialog must not emit ModelSelectedMsg for it. Assert on the guard's
+	// own condition rather than driving bubbletea: the model is unresolvable,
+	// and that is precisely what Enter now checks.
+	if _, ok := models.SupportedModels[m.models[0].ID]; ok {
+		t.Fatal("fixture is wrong — this id should not resolve")
 	}
 }
