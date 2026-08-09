@@ -1,3 +1,56 @@
+## v0.1.77 — 2026-08-09 — web search that needs no setup at all
+
+Full dual-track document: [v0.1.77-release-notes.md](v0.1.77-release-notes.md).
+
+**Plain-language version:** Two releases ago web search became possible, if you
+ran your own search engine. Last release the assistant learned to offer to set
+that up. Now it just works.
+
+The assistant can search the web through **lynx**, a text-only browser that has
+been around since 1992 and is 641 KB. No account, no API key, no card, no
+background service, nothing to configure. If lynx is on your machine it is used
+automatically; if not, the assistant offers to install it — about five seconds —
+or to set up the fuller SearXNG option instead.
+
+An honest note, because "built in" is a fair question: lynx is **not** bundled
+inside the download. It comes from Debian's own repository, like everything else
+on your system, so it gets security updates from Debian rather than from us. The
+package simply says it would like lynx alongside it. The whole feature costs
+**12 KB** of download (plus 641 KB for lynx if you lack it) against a 19.2 MB
+package — about 0.06%. Bundling SearXNG, a better version of the same feature,
+would have added roughly 300 MB.
+
+One thing worth knowing: search engines are not keen on being read by programs
+and sometimes refuse. When that happens the assistant is told the search failed
+and will say so, rather than answer from memory. A search that quietly returns
+nothing is far more dangerous than one that admits failure, because "nothing
+found" reads as "this does not exist".
+
+**Technical:** `source: web` resolves SearXNG → lynx → refuse. Engine order is
+measured, not assumed (marginalia 43, brave 28, ecosia 27, mojeek 19 external
+result URLs; duckduckgo and google 0 and permanently excluded — Google refuses
+text browsers outright). The user agent is left honest on purpose: spoofing
+Chrome raises the hit rate but converts a 157-byte exit-1 failure into a
+1,122-byte exit-0 CAPTCHA page, and a model handed that summarises the CAPTCHA.
+Success is therefore measured as "did any external result URL come out", the only
+check that survives every observed failure. The parser keys off lynx's own
+`References` list and `[n]` markers rather than any engine's HTML.
+
+Two bugs were found by running it, both producing plausible-looking output: every
+title came out as "More on reddit.com", and — worse — a real title got attached
+to the wrong URL when lynx wrapped a link label across two lines and the parser
+searched forward into the next result. Fixed structurally: a marker with text
+carries its own label and looking elsewhere is never allowed.
+
+Also: the refusal now offers `sudo -n apt-get install -y lynx` first (with `-n`
+so a password prompt fails fast instead of hanging the agent forever), and
+release checklist step 6 moved from `dpkg -i` to `apt install ./file.deb` —
+`dpkg` resolves neither Depends nor Recommends, so installing that way silently
+skipped lynx.
+
+Sizes: binary 51,073,316 → 51,089,700 (+16,384); .deb 19,208,080 → 19,220,404
+(+12,324).
+
 ## v0.1.76 — 2026-08-09 — the assistant offers to set up web search, instead of explaining how
 
 Full dual-track document: [v0.1.76-release-notes.md](v0.1.76-release-notes.md).
