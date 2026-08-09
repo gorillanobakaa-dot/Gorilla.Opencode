@@ -58,7 +58,7 @@ const cacheFileName = "openrouter-models.json"
 //
 // A cache built under different rules is now discarded rather than trusted. It
 // costs one refresh; trusting it costs a fix nobody can see.
-const catalogueSchema = 2
+const catalogueSchema = 3
 
 // cachedCatalogue is what gets written to disk. The Model values are stored
 // whole rather than re-derived, so a future change to the conversion cannot
@@ -219,7 +219,7 @@ func RefreshOpenRouter(configDir string) (*RefreshResult, error) {
 		fresh[id] = Model{
 			ID:                  id,
 			Name:                m.Name,
-			Description:         CleanCatalogueDescription(m.Description, m.ContextLength, free),
+			Description:         CleanCatalogueDescription(m.Description, m.ContextLength, perMillionPrice(m.Pricing.Prompt), perMillionPrice(m.Pricing.Completion)),
 			Provider:            ProviderOpenRouter,
 			APIModel:            m.ID,
 			CostPer1MIn:         perMillionPrice(m.Pricing.Prompt),
