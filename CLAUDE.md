@@ -183,13 +183,16 @@ cost real confusion; they are not optional.
    gorilla-opencode --version && dpkg -l gorilla-opencode | tail -1
    ```
    **`apt` rather than `dpkg -i` because dpkg does no dependency resolution at
-   all** — it honours neither `Depends:` nor `Recommends:`. The package
-   recommends `lynx`, which is what makes web search work with no setup; install
-   with `dpkg -i` and that quietly does not happen, so the release gets tested on
-   a machine missing the thing most users will have. Added 2026-08-09, after
-   `Recommends: lynx` was added and this checklist would have skipped it.
-   (Anyone double-clicking the .deb gets Recommends resolved by the graphical
-   installer, so this trap only catches the expert path — which is this one.)
+   all.** The package DEPENDS on `lynx`, which is what makes web search work with
+   no setup. `apt` and `gdebi` both resolve it; `dpkg -i` resolves nothing and
+   will leave the package unconfigured.
+
+   It was a `Recommends:` for a few hours on 2026-08-09, which was wrong: apt
+   honours Recommends and **gdebi does not** — its source never mentions the
+   field — so the right-click graphical install, the realistic path for a
+   non-technical user, silently skipped it and web search would have looked
+   broken to exactly the audience it was built for. A promise that only holds
+   when you install the expert way is not a promise.
 7. **Fast-forward `main` to the release tag, always.**
    ```sh
    git checkout main && git merge --ff-only vX.Y.Z && git push origin main
