@@ -21,6 +21,10 @@ const (
 	// GORILLA OVERRIDE: widened from 40 and 10 — 40 cols truncated
 	// longer model names and the product name; 10 rows hid most of a
 	// large discovered provider (NVIDIA NIM ships ~119 models).
+	// numVisibleModels is the FLOOR. The real count comes from visibleRows(),
+	// which grows the list to fit the window — a shortlist of thirty on a
+	// 1600x900 screen was showing fourteen rows and hiding the rest behind a
+	// scroll, which is the wall this list exists to remove.
 	numVisibleModels = 14
 	maxDialogWidth   = 62
 )
@@ -133,6 +137,30 @@ var modelKeys = modelKeyMap{
 		key.WithKeys("b"),
 		key.WithHelp("b", "jump to your bookmarks"),
 	),
+}
+
+// visibleRows is how many models fit in the current window.
+//
+// GORILLA OVERRIDE (2026-08-09): this was a hard-coded 14 regardless of screen.
+// The shortlist is the one list people are meant to read at a glance, and at
+// thirty entries most of it sat below the fold. Sized to the window instead,
+// with a floor for tiny terminals and a ceiling so the frame can never grow
+// taller than the window — a frame taller than its window is the bug that makes
+// the footer march down the screen (see TestFooterMustStaySmallerThanTheWindow).
+func (m *modelDialogCmp) visibleRows() int {
+	// title + subtitle + scroll indicator + hint + padding + border + margin
+	const chrome = 12
+	if m.height <= 0 {
+		return numVisibleModels // not sized yet
+	}
+	n := m.height - chrome
+	if n < numVisibleModels {
+		n = numVisibleModels
+	}
+	if n > 30 {
+		n = 30
+	}
+	return n
 }
 
 func (m *modelDialogCmp) Init() tea.Cmd {
@@ -258,8 +286,8 @@ func (m *modelDialogCmp) moveSelectionDown() {
 	m.selectedIdx++
 
 	// Keep selection visible
-	if m.selectedIdx >= m.scrollOffset+numVisibleModels {
-		m.scrollOffset = m.selectedIdx - (numVisibleModels - 1)
+	if m.selectedIdx >= m.scrollOffset+m.visibleRows() {
+		m.scrollOffset = m.selectedIdx - (m.visibleRows() - 1)
 	}
 }
 
@@ -342,7 +370,7 @@ func (m *modelDialogCmp) View() string {
 	}
 
 	// Render visible models
-	endIdx := min(m.scrollOffset+numVisibleModels, len(m.models))
+	endIdx := min(m.scrollOffset+m.visibleRows(), len(m.models))
 	modelItems := make([]string, 0, endIdx-m.scrollOffset)
 
 	for i := m.scrollOffset; i < endIdx; i++ {
@@ -360,6 +388,19 @@ func (m *modelDialogCmp) View() string {
 		// the machine in the room.
 		if ep := models.LocalEndpointFor(m.models[i].ID); ep != "" {
 			label = fmt.Sprintf("[%s] %s", ep, label)
+		} else if m.provider == ProviderBookmarks {
+			// GORILLA OVERRIDE: name the provider inside the shortlist.
+			//
+			// It is the one list that mixes them, so "Gemini 3.6 Flash" can
+			// appear twice — once via Antigravity, once via a Gemini API key —
+			// and with nothing to tell them apart they read as duplicates. The
+			// reported instinct was to delete one, which would silently remove
+			// a different route to the same model, on a different quota.
+			// Local models already carry their endpoint name from the branch
+			// above; everything else needs its provider.
+			if home := models.SupportedModels[m.models[i].ID].Provider; home != "" {
+				label = fmt.Sprintf("[%s] %s", home, label)
+			}
 		}
 		if r := m.models[i].Rank; r > 0 {
 			label = fmt.Sprintf("%2d. %s", r, label)
@@ -406,7 +447,29 @@ func (m *modelDialogCmp) View() string {
 	if r := []rune(hint); len(r) > w {
 		hint = string(r[:w])
 	}
-	hintLine := baseStyle.Width(w).Foreground(t.TextMuted()).Render(hint)
+	// GORILLA OVERRIDE: "b" is the only way to reach the shortlist from a
+	// distant column, so it must not be the same grey as the rest of the hint.
+	// t.Accent() is a lipgloss.AdaptiveColor, so it resolves separately for
+	// light and dark terminals rather than being a fixed value that vanishes
+	// on one of them.
+	key := lipgloss.NewStyle().Foreground(t.Accent()).Bold(true)
+	muted := lipgloss.NewStyle().Foreground(t.TextMuted())
+	hintLine := baseStyle.Width(w).Render(
+		muted.Render(strings.Split(hint, "b YOUR LIST")[0]) +
+			func() string {
+				if strings.Contains(hint, "b YOUR LIST") {
+					return key.Render("b YOUR LIST")
+				}
+				return ""
+			}() +
+			muted.Render(func() string {
+				parts := strings.SplitN(hint, "b YOUR LIST", 2)
+				if len(parts) == 2 {
+					return parts[1]
+				}
+				return ""
+			}()),
+	)
 
 	parts := []string{title}
 	if subtitle != "" {
@@ -430,11 +493,11 @@ func (m *modelDialogCmp) View() string {
 func (m *modelDialogCmp) getScrollIndicators(maxWidth int) string {
 	var indicator string
 
-	if len(m.models) > numVisibleModels {
+	if len(m.models) > m.visibleRows() {
 		if m.scrollOffset > 0 {
 			indicator += "↑ "
 		}
-		if m.scrollOffset+numVisibleModels < len(m.models) {
+		if m.scrollOffset+m.visibleRows() < len(m.models) {
 			indicator += "↓ "
 		}
 	}
@@ -610,8 +673,8 @@ func (m *modelDialogCmp) setupModelsForProvider(provider models.ModelProvider) {
 			if model.ID == selectedModelId {
 				m.selectedIdx = i
 				// Adjust scroll position to keep selected model visible
-				if m.selectedIdx >= numVisibleModels {
-					m.scrollOffset = m.selectedIdx - (numVisibleModels - 1)
+				if m.selectedIdx >= m.visibleRows() {
+					m.scrollOffset = m.selectedIdx - (m.visibleRows() - 1)
 				}
 				break
 			}
