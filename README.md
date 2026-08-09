@@ -49,6 +49,35 @@ API keys or run models on your own machine.
 > [DOCUMENTATION.dual-track.md](Changelogs/DOCUMENTATION.dual-track.md), per this
 > project's [Open Source Philosophy](PHILOSOPHY.md).
 
+## Who this is built for
+
+**Old, slow, cheap hardware. Bad internet. No credit card.**
+
+That is the whole design brief. Gorilla OpenCode is built for people running
+2012 laptops on connections measured in single-digit kilobytes per second —
+often young, often with no money for subscriptions, often on a machine someone
+else threw away. The same is true of every Gorilla project: the
+[kernel](https://github.com/gorillanobakaa-dot/gorilla-unleashed-kernel-7.1.2),
+the [Firefox fork](https://github.com/gorillanobakaa-dot/firefox.154), this.
+
+It is not charity and it is not a stripped-down edition. It is the actual
+target, and it shapes everything:
+
+- **The download is kept small** because 18 MB at 8 KB/s is forty minutes of
+  your life. Release builds are stripped for exactly this reason.
+- **You can see what every turn costs you**, before you spend it — `/context`
+  prices every piece of what gets sent, and you can switch any of it off.
+- **The free paths come first.** Sign in with a Gmail and use Google's free
+  tier with no API key at all; run models on your own machine with Ollama; use
+  free models where they exist. Paid keys work, but they are never the only door.
+- **No accounts, no telemetry, no vendor funnel.** Don't take our word for it —
+  [SECURITY.md](SECURITY.md) is a reproducible network audit you can run yourself.
+- **Everything is explained twice**, once for developers and once in plain
+  English, because software you cannot verify is software you have to trust.
+
+If you have a fast machine and a good connection, it works fine there too. It
+just was not built with you in mind first.
+
 ## Copying a whole session
 
 The normal interface draws in the terminal's *alternate* screen, which has no

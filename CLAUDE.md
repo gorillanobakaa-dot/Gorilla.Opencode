@@ -14,8 +14,36 @@ Full lesson: brain atom `Mach_Build_Output_Limited_Under_AI_Agent` (Firefox.154.
 opencode build: `go build ... 2>&1 | tee build.log; exit=${PIPESTATUS[0]}`; verify the binary after.
 
 A Go fork of OpenCode: a Bubble Tea TUI coding agent. Target machine is a Sony VAIO
-SVE (i7-3632QM, 16 GB, Intel HD 4000, Debian 13) — assume modest hardware and a
-possibly high-latency link.
+SVE (i7-3632QM, 16 GB, Intel HD 4000, 1600×900, Debian 13) — assume modest hardware
+and a possibly high-latency link.
+
+## Who this is for — read before making any design decision
+
+**People without money, often young, on hardware someone else threw away, over
+connections measured in single-digit KB/s.** That is the same audience as every
+other Gorilla project — the kernel, the Firefox fork — and it is not a
+demographic note. It is a constraint list, and it decides arguments:
+
+- **Download size is time, not bytes.** 18 MB at 8 KB/s is ~40 minutes of
+  someone's life. This is why `-s -w` is mandatory on release builds, and why
+  bundling a 300 MB dependency loses to a 641 KB one that does 80% of the job.
+- **Tokens are money they do not have.** Anything riding every turn — prompt
+  sections, tool schemas, the env block — is a recurring bill. That is what the
+  `/context` loadout exists to expose and control.
+- **Free and no-card options come first.** Not as a fallback: as the default
+  path. A feature that requires a credit card is unavailable to much of this
+  audience, however good it is. Prefer no-account > free-tier > paid, and say
+  plainly which is which.
+- **Never assume a fast machine, a big screen, or a flat-rate connection.**
+  1600×900 is the reference display. A list of 300 items is not access, it is a
+  new cage.
+- **Plain language is not politeness, it is the product.** Someone who cannot
+  read the code has to be able to check the claims anyway — hence dual-track
+  docs, cited sources and reproducible audits. "Transparent in theory, closed
+  door in practice" is the failure this project exists to avoid (PHILOSOPHY.md).
+
+When a decision is close, the tiebreaker is: **which option works for someone on
+a 2012 laptop, a metered connection, and no credit card?**
 
 Mark every intentional divergence from upstream with a `GORILLA OVERRIDE:` comment
 that says **why**, not what. Future readers need the reason; the diff already shows
