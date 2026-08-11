@@ -1,7 +1,8 @@
 # Gorilla OpenCode — screenshots & proof
 
 Real screenshots from a Debian 13 / GNOME 48 machine running the revived
-OpenCode on an NVIDIA NIM key. **New here? Read the plain-English
+OpenCode — the newest set on the free Antigravity tier (no API key, no
+card), the older sets on an NVIDIA NIM key. **New here? Read the plain-English
 [GUIDE.md](GUIDE.md)** — it explains every part of the screen, the
 menus, and the not-obvious ← → arrow trick to switch to the Google
 models.
@@ -9,6 +10,87 @@ models.
 Every screenshot is unscaled, at whatever size the window was captured
 (1583–1600 px wide), so the terminal text stays readable — the complete
 set is in [`screenshots/gallery/`](screenshots/gallery/).
+
+## v0.1.80 — the banana meter, from full barrel to empty peel
+
+All shots below are one real morning (2026-08-11) on the Antigravity free
+tier: a heavy agent session burned the weekly Claude/GPT pool from 100% to
+0% before 8am, and the meter narrated every step of the descent. Nothing is
+staged — the percentages fall because the work was real.
+
+### `/usage` — the panel
+
+Each model group gets a thermometer bar (red at the left end, green at the
+right) that shrinks from the green end as the week burns. Both numbers are
+spelled out — *"71% left, 29% used · resets in 2d"* — because "96%" alone
+forces you to guess which direction it runs. Paid providers with a real
+balance endpoint appear below: OpenRouter here, truthfully reporting a
+free-tier key as "no credits purchased — free models only".
+
+[![The quota panel, healthy: 100% and 71%, triple bananas](screenshots/gallery/v0180-usage-panel-healthy.png)](screenshots/gallery/v0180-usage-panel-healthy.png)
+
+### The descent
+
+The gorilla's verdicts escalate as the barrel empties — the exact numbers
+always printed right next to the mood:
+
+[![59% left — and the one-line quota reading echoed on the status bar](screenshots/gallery/v0180-usage-59pct-footer-toast.png)](screenshots/gallery/v0180-usage-59pct-footer-toast.png)
+
+[![30% left: "Yeah... just a few bananas left."](screenshots/gallery/v0180-usage-30pct-few-bananas.png)](screenshots/gallery/v0180-usage-30pct-few-bananas.png)
+
+[![9% left: "Banana emergency! Scraping the peel..."](screenshots/gallery/v0180-usage-9pct-emergency.png)](screenshots/gallery/v0180-usage-9pct-emergency.png)
+
+[![5% left: "Last banana spotted. Nobody make any sudden prompts."](screenshots/gallery/v0180-usage-5pct-last-banana.png)](screenshots/gallery/v0180-usage-5pct-last-banana.png)
+
+[![4% left — the red sliver](screenshots/gallery/v0180-usage-4pct.png)](screenshots/gallery/v0180-usage-4pct.png)
+
+[![0%: "Zero bananas. Even the peel is gone."](screenshots/gallery/v0180-usage-zero-bananas.png)](screenshots/gallery/v0180-usage-zero-bananas.png)
+
+[![The empty barrel, clean shot](screenshots/gallery/v0180-usage-zero-clean.png)](screenshots/gallery/v0180-usage-zero-clean.png)
+
+### Live crossing alerts — you don't have to ask
+
+After each response the meter is re-checked quietly (one small request every
+half minute at most, only for signed-in Antigravity users). The moment a
+group crosses a banana threshold, the crossing is announced: timestamped in
+the scrollback with the gorilla, echoed on the status bar without him (the
+status bar is redrawn in place, where emoji width quirks can smear a frame —
+so the words travel, the gorilla stays in the history).
+
+[![The status bar and scrollback announcing: "Last banana spotted. Nobody make any sudden prompts. — Claude and GPT models: 5% left"](screenshots/gallery/v0180-alert-last-banana-footer.png)](screenshots/gallery/v0180-alert-last-banana-footer.png)
+
+[![The same alert arriving mid-session, between tool calls](screenshots/gallery/v0180-alert-last-banana-session.png)](screenshots/gallery/v0180-alert-last-banana-session.png)
+
+[![07:42:41 — the zero-crossing announced live: "Zero bananas. Even the peel is gone."](screenshots/gallery/v0180-alert-zero-bananas-live.png)](screenshots/gallery/v0180-alert-zero-bananas-live.png)
+
+### The agent at work
+
+The hero shot from the README: quota panel above, a challenge below, and the
+agent reaching for `lynx` — the 641 KB text browser that ships as a hard
+dependency — to research job listings with no API key and no card.
+
+[![The agent running lynx-powered web research, quota panel above](screenshots/gallery/v0180-agent-at-work.png)](screenshots/gallery/v0180-agent-at-work.png)
+
+Every file write asks first, with a full diff — here the agent proposing a
+`profile.json` template (placeholders, not invented personal data):
+
+[![The permission dialog: tool, path, and the full diff of what would be written](screenshots/gallery/v0180-permission-dialog.png)](screenshots/gallery/v0180-permission-dialog.png)
+
+### The dialogs, as of v0.1.80
+
+[![The provider portal: Antigravity free tier, Code Assist, NIM, Ollama, Cloudflare, and the API-key providers — free paths first](screenshots/gallery/v0180-provider-portal.png)](screenshots/gallery/v0180-provider-portal.png)
+
+[![/help — commands grouped by what you are trying to do, including "/usage — how many bananas are left"](screenshots/gallery/v0180-help.png)](screenshots/gallery/v0180-help.png)
+
+[![/context — the Gorilla controls: request pace-setter, agent leash, and every tool priced in tokens](screenshots/gallery/v0180-context-loadout.png)](screenshots/gallery/v0180-context-loadout.png)
+
+[![/settings — every option, what it accepts, and its default, with plain-English consequences](screenshots/gallery/v0180-settings.png)](screenshots/gallery/v0180-settings.png)
+
+[![/prompts — the system prompts the AI is given, with token counts and a trustworthy reset](screenshots/gallery/v0180-prompts.png)](screenshots/gallery/v0180-prompts.png)
+
+[![The coder prompt split into sections — each behavioural block can be switched off, with an honest warning about what that costs you](screenshots/gallery/v0180-prompt-sections.png)](screenshots/gallery/v0180-prompt-sections.png)
+
+[![The summarizer, task and title prompts — small, and all visible](screenshots/gallery/v0180-prompts-summarizer.png)](screenshots/gallery/v0180-prompts-summarizer.png)
 
 ## v0.1.46 — two interfaces, one program
 

@@ -6,7 +6,7 @@
 licensed, no telemetry, no accounts, no vendor funnel. Bring your own
 API keys or run models on your own machine.
 
-![Gorilla OpenCode running on NVIDIA NIM](docs/screenshots/01-running-nvidia-nim.png)
+![Gorilla OpenCode at work: the quota meter, the banana ladder, and the agent running lynx-powered web research on the Antigravity free tier](docs/screenshots/gallery/v0180-agent-at-work.png)
 
 > New to a tool like this? A plain-English walkthrough of the screen
 > and menus (incl. how to reach the Google models): **[docs/GUIDE.md](docs/GUIDE.md)**.
@@ -311,6 +311,33 @@ them. Here's the Gemini page; the counter (e.g. `10/14 →`) shows where you are
 More providers (Groq, Cerebras, NIM) side by side:
 **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md#one-tool-every-provider--the-latest-models-v0130)**.
 
+**`/usage` — your quota as a meter, in bananas.** No more guessing whether
+"96%" means left or spent. Each model group gets a thermometer bar — red at the
+left end, green at the right — that shrinks from the green end as your week
+burns down, with both numbers in words: *"71% left, 29% used · resets in 2d"*.
+The gorilla narrates the descent: 🍌🍌🍌 *"Loaded up on bananas... let's go
+nuts."* through *"You're halfway through your bananas..."* down to 🦍 *"Zero
+bananas. Even the peel is gone."* If you have a DeepSeek or OpenRouter key,
+your balance shows in the same panel — and a free-tier key is told the truth
+("no credits purchased — free models only") instead of an empty-tank guilt trip.
+
+![The /usage panel: gradient meters, plain-language numbers, and the banana verdict](docs/screenshots/gallery/v0180-usage-panel-healthy.png)
+
+**And you don't have to ask.** After each response the meter is re-checked
+quietly; the moment a group crosses a banana threshold, the crossing is
+announced — timestamped in the scrollback, echoed on the status bar. Watch a
+heavy session ride the whole ladder down:
+
+![9% left: Banana emergency! Scraping the peel...](docs/screenshots/gallery/v0180-usage-9pct-emergency.png)
+
+![The live alert the moment the barrel empties: Zero bananas. Even the peel is gone.](docs/screenshots/gallery/v0180-alert-zero-bananas-live.png)
+
+Every reading is printed into the terminal history with a timestamp, because a
+quota figure without a time is not a measurement — two dated readings are what
+give you a burn rate. (This morning's burn rate, for the record: one
+overambitious job-hunting agent, 100% → 0% before 8am. The gorilla warned us
+at every step.)
+
 **The `/context` menu — see (and control) exactly what every message costs.**
 The top **🦍 GORILLA CONTROLS** section holds two live dials you drive with the
 arrow keys: an **AI-server request pace-setter** (requests/min, to glide under
@@ -320,7 +347,7 @@ switch, each with its **token *and* dollar cost**; the `⚠` marks what the
 assistant can't work without. Turning off the big ones drops the number — and the
 bill — immediately.
 
-![The context loadout menu with the Gorilla controls](docs/screenshots/02-context-loadout.png)
+![The context loadout menu with the Gorilla controls](docs/screenshots/gallery/v0180-context-loadout.png)
 
 **Lost? `/help` explains every command in plain language.** Grouped by what you
 are trying to do rather than alphabetically — because someone who does not know a
@@ -328,7 +355,7 @@ command's name cannot look it up alphabetically. The selected command's full
 explanation, including what it costs, shows in place; `/` searches the
 descriptions as well as the names.
 
-[![The /help command reference](docs/screenshots/gallery/v0142-help.png)](docs/screenshots/gallery/v0142-help.png)
+[![The /help command reference](docs/screenshots/gallery/v0180-help.png)](docs/screenshots/gallery/v0180-help.png)
 
 **Two interfaces, one program — and no flags to remember.** Launch the icon
 normally for the full interface above. **Right-click the icon → "Plain mode
