@@ -1,3 +1,30 @@
+## v0.1.80 — 2026-08-11 — /usage draws a real meter, with bananas
+
+Full dual-track document: [v0.1.80-release-notes.md](v0.1.80-release-notes.md).
+
+**Plain-language version:** Checking your free weekly allowance used to print
+one line — `Claude and GPT models: 96%` — and you had to guess whether that
+meant 96% left or 96% spent. Now `/usage` draws a panel: a coloured bar per
+model group, painted like a thermometer (red at the left, green at the right)
+that shrinks from the green end as your week burns, both numbers spelled out
+("75% left, 25% used · resets in 2d"), and bananas for the mood — three when
+you are loaded, thinning as you run down, a gorilla when the barrel is empty.
+If you pay for DeepSeek or OpenRouter, your balance shows in the same panel;
+an OpenRouter key with no credits bought says exactly that instead of
+pretending an empty wallet is an empty tank. A balance check that fails says
+so, rather than quietly disappearing.
+
+**Technical:** New `internal/quota` package (DeepSeek `/user/balance`,
+OpenRouter `/api/v1/credits`; readings normalise to Text/Fraction/FreeTier/Err,
+fraction −1 = no denominator, error bodies never echoed). Pure renderer in
+`internal/tui/quota_panel.go`: fixed-scale gauge cells (hue = 120° × position),
+banana thresholds ≥50 / ≥⅓ / ≥20 / >0 / 0, reflow wordwrap with hanging
+indents, emoji confined to the scrollback panel (the footer is inline-frame).
+Driving the real binary live caught what the fixtures could not: agy 1.1.11
+renamed the bucket displayName, doubling the word "Remaining" — fixed, both
+wire shapes in the fixture, regression test pinned. Live verification method
+(GNU screen) recorded in CLAUDE.md.
+
 ## v0.1.79 — 2026-08-09 — lynx is now required, not suggested
 
 Full dual-track document: [v0.1.79-release-notes.md](v0.1.79-release-notes.md).
