@@ -230,10 +230,18 @@ cost real confusion; they are not optional.
 - **TUI work needs headless render assertions** — build the component in-package,
   call `View()`, assert `lipgloss.Width()` per line and the row count. Never fix a
   visual bug by guessing at a screenshot.
-- **Interactive TUIs cannot be driven from an agent shell here.** A *minimal* Bubble
-  Tea program also fails to receive piped-PTY input, so it is environmental. Assert
-  layout and logic headlessly, and tell the user plainly which interactive parts
-  they must confirm themselves.
+- **Interactive TUIs CAN be driven from an agent shell — via GNU screen, not pipes.**
+  Piped-PTY input fails environmentally (even a minimal Bubble Tea program), which
+  is what an earlier version of this entry concluded from. But a detached screen
+  session works, proven 2026-08-11 driving /usage end-to-end:
+  `screen -dmS s -s /bin/bash`, `screen -S s -X stuff '<text>'` (Enter is `$'\r'`,
+  NOT `\n`; esc is `$'\033'`), `screen -S s -X hardcopy -h file` to capture screen
+  plus scrollback. Two limits: hardcopy mangles UTF-8 (block/emoji glyphs come out
+  as `�` — assert content, not glyphs) and carries no colour. Driving the real
+  binary live caught a wire-shape drift the same day that every headless test had
+  missed (agy 1.1.11 renamed a displayName; fixture was from 1.1.10). Headless
+  assertions remain the regression net; the screen run is how a change is confirmed
+  against live reality. `tmux` is not installed; screen is.
 - **Never test config-writing code by running the built binary against the live
   config.** That has overwritten the user's real `~/.config/gorilla-opencode/`
   twice. Unit-test against an isolated `XDG_CONFIG_HOME` with a guard that panics
