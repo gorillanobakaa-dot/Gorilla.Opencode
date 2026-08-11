@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/pubsub"
+	"github.com/opencode-ai/opencode/internal/quota"
 	"github.com/opencode-ai/opencode/internal/session"
 	"github.com/opencode-ai/opencode/internal/tui/components/chat"
 	"github.com/opencode-ai/opencode/internal/tui/components/core"
@@ -303,6 +305,43 @@ func formatQuotaScrollbackLine(at time.Time, line string) string {
 type quotaLineMsg struct {
 	line string
 	kind util.InfoType
+	// summary, when non-nil, renders the full Models & Quota panel into the
+	// scrollback (bars, plain-language "left/used", green→red colour). Set only
+	// on an explicit /usage: the automatic session-start reading stays one line
+	// so it never floods the top of every conversation.
+	summary *auth.QuotaSummary
+	account string
+	// balances are paid-provider readings (DeepSeek, OpenRouter) for providers
+	// the user has a key for. Also /usage-only: each is a network call.
+	balances []quota.Reading
+}
+
+// configuredBalances fetches a balance reading for every supported provider
+// the user actually has a key for — config first, then the environment (the
+// same two places the agent's own requests resolve a key from).
+func configuredBalances(ctx context.Context) []quota.Reading {
+	cfg := config.Get()
+	envKeys := map[string]string{
+		"deepseek":   os.Getenv("DEEPSEEK_API_KEY"),
+		"openrouter": os.Getenv("OPENROUTER_API_KEY"),
+	}
+	var out []quota.Reading
+	for _, id := range quota.Supported() {
+		key := ""
+		if cfg != nil {
+			if p, ok := cfg.Providers[models.ModelProvider(id)]; ok && !p.Disabled {
+				key = p.APIKey
+			}
+		}
+		if key == "" {
+			key = envKeys[id]
+		}
+		if key == "" {
+			continue
+		}
+		out = append(out, quota.Fetch(ctx, id, key))
+	}
+	return out
 }
 
 // nothing); quiet=false reports the reason (used by /usage on demand).
@@ -313,16 +352,26 @@ func antigravityUsageCmd(quiet bool) tea.Cmd {
 			if quiet {
 				return nil
 			}
-			return quotaLineMsg{line: "Not signed in to Antigravity — pick it in the provider portal to sign in.", kind: util.InfoTypeWarn}
+			// No Antigravity, but a paid provider's balance is still worth a
+			// panel — a DeepSeek-only user asked /usage about THEIR meter.
+			msg := quotaLineMsg{line: "Not signed in to Antigravity — pick it in the provider portal to sign in.", kind: util.InfoTypeWarn}
+			msg.balances = configuredBalances(context.Background())
+			return msg
 		}
-		line, err := creds.QuotaSummaryLine(context.Background())
+		q, err := creds.RetrieveQuota(context.Background())
 		if err != nil {
 			if quiet {
 				return nil
 			}
 			return quotaLineMsg{line: "Antigravity usage: " + err.Error(), kind: util.InfoTypeError}
 		}
-		return quotaLineMsg{line: line, kind: util.InfoTypeInfo}
+		msg := quotaLineMsg{line: auth.FormatQuotaLine(q, time.Now()), kind: util.InfoTypeInfo}
+		if !quiet {
+			msg.summary = q
+			msg.account = creds.Email
+			msg.balances = configuredBalances(context.Background())
+		}
+		return msg
 	}
 }
 
@@ -469,7 +518,11 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// renderer, and no redraw can ever clear it (see the trap list in CLAUDE.md).
 	case quotaLineMsg:
 		if a.scrollback {
-			cmds = append(cmds, tea.Println(formatQuotaScrollbackLine(time.Now(), msg.line)))
+			out := formatQuotaScrollbackLine(time.Now(), msg.line)
+			if msg.summary != nil || len(msg.balances) > 0 {
+				out += "\n\n" + renderQuotaPanel(msg.summary, msg.account, msg.balances, a.width, time.Now()) + "\n"
+			}
+			cmds = append(cmds, tea.Println(out))
 		}
 		info := util.InfoMsg{Type: msg.kind, Msg: msg.line}
 		st, cmd := a.status.Update(info)
@@ -1916,7 +1969,7 @@ If there are Cursor rules (in .cursor/rules/ or .cursorrules) or Copilot rules (
 	model.RegisterCommand(dialog.Command{
 		ID:          "usage",
 		Title:       "Antigravity Usage",
-		Description: "Show your Antigravity free-tier weekly quota (Claude/GPT/Gemini)",
+		Description: "Show your quota and provider balances (Antigravity, DeepSeek, OpenRouter)",
 		Handler: func(cmd dialog.Command) tea.Cmd {
 			return antigravityUsageCmd(false)
 		},

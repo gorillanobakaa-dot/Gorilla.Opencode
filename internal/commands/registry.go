@@ -159,11 +159,13 @@ var All = []Command{
 	{
 		Name:    "usage",
 		Group:   GroupModels,
-		Summary: "Show your Antigravity free weekly quota.",
-		Detail: "If you signed in with the Antigravity free tier, this shows how much " +
-			"of your weekly allowance is left — Gemini has a separate pool from " +
-			"Claude and GPT-OSS — and when each resets. It also appears on its own " +
-			"at the start of each session. Nothing to see if you use another provider.",
+		Summary: "Show your quota and balances — how many bananas are left.",
+		Detail: "Shows what you have left to spend, in plain words. If you signed in " +
+			"with the Antigravity free tier: how much of your weekly allowance " +
+			"remains — Gemini has a separate pool from Claude and GPT-OSS — and " +
+			"when each resets. If you have a DeepSeek or OpenRouter key: your " +
+			"remaining balance there too. A one-line summary also appears on its " +
+			"own at the start of each session.",
 	},
 
 	// ─── Cost, speed and behaviour ───────────────────────────────────

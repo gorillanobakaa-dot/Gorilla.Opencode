@@ -326,13 +326,15 @@ func (c *AntigravityCreds) QuotaSummaryLine(ctx context.Context) (string, error)
 	if err != nil {
 		return "", err
 	}
-	return formatQuotaLine(q, time.Now()), nil
+	return FormatQuotaLine(q, time.Now()), nil
 }
 
-// formatQuotaLine is the pure formatter (no network, no wall clock) so the wire
+// FormatQuotaLine is the pure formatter (no network, no wall clock) so the wire
 // shape and the wording can be tested against a captured response. `now` is
-// passed in for a deterministic "resets in Nd".
-func formatQuotaLine(q *QuotaSummary, now time.Time) string {
+// passed in for a deterministic "resets in Nd". Exported so the TUI can format
+// the footer line from a QuotaSummary it already fetched for the full /usage
+// panel — one request, two views.
+func FormatQuotaLine(q *QuotaSummary, now time.Time) string {
 	var parts []string
 	for _, g := range q.Groups {
 		if len(g.Buckets) == 0 {

@@ -42,7 +42,7 @@ func TestQuotaShapeAndFormatting(t *testing.T) {
 	// remainingFraction must round to a percentage, resetTime to whole days from
 	// a FIXED now so the assertion is deterministic.
 	now := time.Date(2026, 8, 3, 14, 34, 46, 0, time.UTC) // exactly 7 days before Gemini reset
-	line := formatQuotaLine(&q, now)
+	line := FormatQuotaLine(&q, now)
 	for _, want := range []string{
 		"Gemini Models: 31%",
 		"Claude and GPT models: 100%",
@@ -55,7 +55,7 @@ func TestQuotaShapeAndFormatting(t *testing.T) {
 }
 
 func TestQuotaEmptyGroups(t *testing.T) {
-	if got := formatQuotaLine(&QuotaSummary{}, time.Now()); !strings.Contains(got, "no quota groups") {
+	if got := FormatQuotaLine(&QuotaSummary{}, time.Now()); !strings.Contains(got, "no quota groups") {
 		t.Fatalf("empty summary should say so, got %q", got)
 	}
 }
