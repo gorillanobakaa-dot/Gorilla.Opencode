@@ -25,6 +25,17 @@
 // tools, cheapest-capable first, because for this project's audience "free" is
 // the difference between usable and not. Everything else is emitted unranked and
 // falls to the codingRank heuristic, which is guidance rather than a gate.
+//
+// # WHY IT ALSO FETCHES EVERY MODEL'S WEB PAGE
+//
+// OpenRouter's list API truncates descriptions server-side: 354 of 406 ended
+// in "..." when measured on 2026-08-12, cut around 215 characters. The full
+// text exists only in each model's public page. A detail page built from the
+// truncated copy tells the user nothing — so this generator, which runs on the
+// developer's machine at release time, fetches the ~280 pages (~300 KB each)
+// and embeds the full text. The runtime refresh on user machines never does
+// this (§8: that is ~85 MB, hours on a metered link); it keeps the bundled
+// full text instead via PreferFullerDetail.
 package main
 
 import (
@@ -157,7 +168,173 @@ func main() {
 	}
 
 	sort.Slice(usable, func(i, j int) bool { return usable[i].ID < usable[j].ID })
-	emit(usable, rank, len(catalogue), len(free))
+	full := fetchFullDescriptions(usable)
+	emit(usable, rank, full, len(catalogue), len(free))
+}
+
+// fetchFullDescriptions pulls each model's public page and extracts the
+// untruncated description. Returns id → full text; an absent entry means the
+// page could not be fetched or matched and the API's truncated text stands.
+// Variants of one model (":free") share their base model's page, so pages are
+// fetched once per base id.
+func fetchFullDescriptions(usable []orModel) map[string]string {
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	baseID := func(id string) string {
+		if i := strings.Index(id, ":"); i > 0 {
+			return id[:i]
+		}
+		return id
+	}
+
+	// One representative API description per base page, to anchor extraction.
+	anchors := map[string]string{}
+	var bases []string
+	for _, m := range usable {
+		b := baseID(m.ID)
+		if _, seen := anchors[b]; !seen {
+			anchors[b] = m.Description
+			bases = append(bases, b)
+		}
+	}
+
+	type result struct{ base, text string }
+	jobs := make(chan string)
+	results := make(chan result)
+	const workers = 4
+	for w := 0; w < workers; w++ {
+		go func() {
+			for b := range jobs {
+				text := fetchPageDescription(client, b, anchors[b])
+				if text == "" {
+					// One retry: measured across runs, a single pass loses
+					// ~10 pages to transient fetch failures.
+					time.Sleep(2 * time.Second)
+					text = fetchPageDescription(client, b, anchors[b])
+				}
+				results <- result{b, text}
+			}
+		}()
+	}
+	go func() {
+		for _, b := range bases {
+			jobs <- b
+		}
+		close(jobs)
+	}()
+
+	full := map[string]string{}
+	byBase := map[string]string{}
+	done, missed := 0, 0
+	for range bases {
+		r := <-results
+		done++
+		if r.text == "" {
+			missed++
+		} else {
+			byBase[r.base] = r.text
+		}
+		if done%50 == 0 {
+			fmt.Fprintf(os.Stderr, "openrouter-models: %d/%d pages fetched\n", done, len(bases))
+		}
+	}
+	for _, m := range usable {
+		if t := byBase[baseID(m.ID)]; t != "" {
+			full[m.ID] = t
+		}
+	}
+	fmt.Fprintf(os.Stderr, "openrouter-models: full descriptions for %d/%d models (%d pages unmatched — those keep the API text)\n",
+		len(full), len(usable), missed)
+	return full
+}
+
+// fetchPageDescription downloads one model page and returns the untruncated
+// description, or "" if it cannot be found. The page embeds several models'
+// descriptions (related-model sections), so the right one is the LONGEST field
+// that starts with the API text's stem — the API truncation is a prefix cut.
+func fetchPageDescription(client *http.Client, id, apiDesc string) string {
+	req, err := http.NewRequest("GET", "https://openrouter.ai/"+id, nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) gorilla-opencode-generator")
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	page, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return ""
+	}
+
+	stem := strings.TrimRight(strings.TrimSpace(apiDesc), ".…")
+	if len(stem) > 100 {
+		stem = stem[:100]
+	}
+	if stem == "" {
+		return ""
+	}
+	html := string(page)
+	best := ""
+	const marker = `\"description\":\"`
+	for i := 0; ; {
+		j := strings.Index(html[i:], marker)
+		if j < 0 {
+			break
+		}
+		txt, next := decodeFlightString(html, i+j+len(marker))
+		if strings.HasPrefix(txt, stem) && len(txt) > len(best) {
+			best = txt
+		}
+		i = next
+	}
+	// Anything not meaningfully longer than the API copy is not worth the
+	// bytes it would add to the binary.
+	if len(best) <= len(apiDesc) {
+		return ""
+	}
+	return best
+}
+
+// decodeFlightString reads a backslash-escaped JSON string embedded in the
+// page's script payload, starting just after its opening quote. Returns the
+// decoded text and the index after the closing quote.
+func decodeFlightString(s string, start int) (string, int) {
+	var b strings.Builder
+	i := start
+	for i < len(s)-1 {
+		switch {
+		// A newline in the text is JSON-escaped twice (once by the model
+		// object, once by the script payload wrapping it), arriving as the
+		// three characters \\n. Decoding the pair alone leaves a literal
+		// "\n" in the description, which the picker then prints verbatim.
+		case strings.HasPrefix(s[i:], `\\n`):
+			b.WriteByte('\n')
+			i += 3
+		case s[i] == '\\' && s[i+1] == '\\':
+			b.WriteByte('\\')
+			i += 2
+		case s[i] == '\\' && s[i+1] == '"':
+			// The closing quote of the field is followed by a JSON separator;
+			// an inner escaped quote is not.
+			if i+2 < len(s) && (s[i+2] == ',' || s[i+2] == '}' || s[i+2] == ']') {
+				return b.String(), i + 2
+			}
+			b.WriteByte('"')
+			i += 2
+		case s[i] == '\\' && s[i+1] == 'n':
+			b.WriteByte('\n')
+			i += 2
+		default:
+			b.WriteByte(s[i])
+			i++
+		}
+	}
+	return b.String(), i
 }
 
 func fetch() ([]orModel, error) {
@@ -185,7 +362,7 @@ func fetch() ([]orModel, error) {
 	return out.Data, nil
 }
 
-func emit(usable []orModel, rank map[string]int, total, freeCount int) {
+func emit(usable []orModel, rank map[string]int, full map[string]string, total, freeCount int) {
 	w := os.Stdout
 	fmt.Fprintf(w, `// Code generated by "go run ./cmd/openrouter-models". DO NOT EDIT.
 //
@@ -220,10 +397,20 @@ const (
 				attach = true
 			}
 		}
+		// The full page text feeds BOTH fields: the one-line label benefits
+		// too, because classification (CAN CODE / roleplay / …) reads words
+		// the API's truncation may have cut off.
+		desc := m.Description
+		if f := full[m.ID]; f != "" {
+			desc = f
+		}
 		fmt.Fprintf(w, "\t%s: {\n", goIdent(m.ID))
 		fmt.Fprintf(w, "\t\tID:                  %s,\n", goIdent(m.ID))
 		fmt.Fprintf(w, "\t\tName:                %q,\n", m.Name)
-		fmt.Fprintf(w, "\t\tDescription:         %q,\n", models.DescribeForPicker(m.ID, m.Description, m.ContextLength, perMillion(m.Pricing.Prompt), perMillion(m.Pricing.Completion)))
+		fmt.Fprintf(w, "\t\tDescription:         %q,\n", models.DescribeForPicker(m.ID, desc, m.ContextLength, perMillion(m.Pricing.Prompt), perMillion(m.Pricing.Completion)))
+		if d := models.DetailForPicker(m.ID, desc); d != "" {
+			fmt.Fprintf(w, "\t\tDetail:              %q,\n", d)
+		}
 		if r := rank[m.ID]; r > 0 {
 			fmt.Fprintf(w, "\t\tRank:                %d,\n", r)
 		}

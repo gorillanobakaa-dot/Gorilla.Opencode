@@ -58,7 +58,16 @@ const cacheFileName = "openrouter-models.json"
 //
 // A cache built under different rules is now discarded rather than trusted. It
 // costs one refresh; trusting it costs a fix nobody can see.
-const catalogueSchema = 5
+//
+// Schema 6: rows gained Detail (the full vendor text for the detail page). A
+// schema-5 cache would merge over the built-in list with every Detail empty —
+// the detail page would silently show less for exactly the models refreshed
+// most recently, which is the invisible-fix bug the schema exists to prevent.
+//
+// Schema 7: Detail keeps the fuller bundled text when the API's copy is a
+// truncated prefix (see PreferFullerDetail). A schema-6 cache holds the
+// truncated copies and would paint them over the full bundled ones at startup.
+const catalogueSchema = 7
 
 // cachedCatalogue is what gets written to disk. The Model values are stored
 // whole rather than re-derived, so a future change to the conversion cannot
@@ -217,9 +226,12 @@ func RefreshOpenRouter(configDir string) (*RefreshResult, error) {
 		free := m.Pricing.Prompt == "0" && m.Pricing.Completion == "0"
 		id := ModelID("openrouter." + m.ID)
 		fresh[id] = Model{
-			ID:                  id,
-			Name:                m.Name,
-			Description:         DescribeForPicker(m.ID, m.Description, m.ContextLength, perMillionPrice(m.Pricing.Prompt), perMillionPrice(m.Pricing.Completion)),
+			ID:          id,
+			Name:        m.Name,
+			Description: DescribeForPicker(m.ID, m.Description, m.ContextLength, perMillionPrice(m.Pricing.Prompt), perMillionPrice(m.Pricing.Completion)),
+			// The list API truncates descriptions; the bundled text may be the
+			// full page version. Never trade the full text for a shorter copy.
+			Detail:              PreferFullerDetail(DetailForPicker(m.ID, m.Description), SupportedModels[id].Detail),
 			Provider:            ProviderOpenRouter,
 			APIModel:            m.ID,
 			CostPer1MIn:         perMillionPrice(m.Pricing.Prompt),

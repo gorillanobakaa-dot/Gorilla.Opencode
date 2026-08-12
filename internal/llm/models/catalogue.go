@@ -124,6 +124,88 @@ func normaliseModelKey(id string) string {
 	return b.String()
 }
 
+// DetailForPicker builds the LONG text for the picker's detail page: the same
+// trust ladder as DescribeForPicker, but nothing is cut to fit a row. Earned
+// verdicts lead and carry their evidence citation; the vendor's full paragraph
+// follows, cleaned of markdown links, labelled as the vendor's claim.
+//
+// Capped at 2400 characters because it is embedded in the binary for every
+// model and §8 says download size is someone's time — the cap bounds the cost
+// at well under a megabyte across the whole catalogue while keeping every real
+// description whole (the longest observed full text is ~1.1K).
+func DetailForPicker(apiModel, vendorDesc string) string {
+	var parts []string
+	if v, ok := EarnedVerdict(apiModel); ok {
+		s := "TESTED HERE: " + v.Verdict
+		if v.Evidence != "" {
+			s += " (evidence: " + v.Evidence + ")"
+		}
+		parts = append(parts, s)
+	} else if v, ok := CuratedVerdict(apiModel); ok {
+		parts = append(parts, "CURATED: "+v)
+	}
+	if d := strings.TrimSpace(vendorDesc); d != "" {
+		s := markdownLink.ReplaceAllString(d, "$1")
+		s = strings.Join(strings.Fields(s), " ")
+		// Upstream truncation is detected BEFORE our own cap, so the apology
+		// below can never blame OpenRouter for a cut we made ourselves.
+		upstreamCut := strings.HasSuffix(s, "...") || strings.HasSuffix(s, "…")
+		if len(s) > 2400 {
+			s = strings.TrimSpace(s[:2400]) + "…"
+			upstreamCut = false
+		}
+		parts = append(parts, "Vendor's own description (their claim, not our finding): "+s)
+		if upstreamCut {
+			// GORILLA OVERRIDE: ~15 models are truncated AT THE SOURCE —
+			// OpenRouter's API cuts descriptions around 215 characters and for
+			// these not even their own web page carries the rest (measured
+			// 2026-08-12). Baked into the data, not the renderer, so every
+			// view that shows the text also shows whose cut it is — it was
+			// reported as this program's bug, twice.
+			parts = append(parts, upstreamApology)
+		}
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+// upstreamApology is appended by DetailForPicker to descriptions OpenRouter
+// itself truncates. One constant, because PreferFullerDetail must recognise
+// and strip it before comparing texts — a paraphrased copy would smuggle a
+// truncated refresh past the prefix check with a false apology attached.
+const upstreamApology = "(sorry lads — not our fault: that is ALL OpenRouter provides as a description for this model)"
+
+// PreferFullerDetail chooses between a freshly fetched detail text and the one
+// already registered for the same model.
+//
+// GORILLA OVERRIDE: OpenRouter's LIST API truncates descriptions server-side
+// (354 of 406 ended in "..." when measured on 2026-08-12); the full text only
+// exists on each model's web page, which the build-time generator fetches. A
+// user-side `models refresh` cannot afford 279 page loads on a metered link,
+// so it gets the truncated API text — and without this rule it would OVERWRITE
+// the full bundled text with the truncated copy, making the detail page worse
+// after every refresh. If the fresh text is just a shortened prefix of what we
+// already have, the fuller text wins; if the vendor genuinely rewrote the
+// description, the prefix no longer matches and the fresh text wins.
+func PreferFullerDetail(fresh, existing string) string {
+	// Compare the texts themselves: the apology DetailForPicker appends to an
+	// upstream-truncated refresh is not part of the vendor's words, and left
+	// in place it would end the string with ")" — never matching as a prefix
+	// of the fuller text, handing the win to the truncated copy.
+	f := strings.TrimSpace(strings.TrimSuffix(fresh, upstreamApology))
+	e := strings.TrimSpace(strings.TrimSuffix(existing, upstreamApology))
+	if e == "" || len(e) <= len(f) {
+		return fresh
+	}
+	if f == "" {
+		return existing
+	}
+	stem := strings.TrimRight(f, ".…")
+	if stem != "" && strings.HasPrefix(e, stem) {
+		return existing
+	}
+	return fresh
+}
+
 // DescribeForPicker builds the line shown in the model picker, in the order
 // this project trusts things: what we found ourselves, then a judgement already
 // written for the same model, then the vendor's own claim with the word that

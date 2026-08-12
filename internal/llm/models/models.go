@@ -14,6 +14,11 @@ type Model struct {
 	// (params, context window, coding strength) shown in the model
 	// picker. Populated for discovered models from bundled metadata.
 	Description string `json:"description,omitempty"`
+	// GORILLA OVERRIDE: the full, untruncated description for the picker's
+	// detail page (tab on a model). Description is one row and must fit one;
+	// this is everything that was cut to make it fit. Empty means "no longer
+	// text exists" and the detail page falls back to the structured fields.
+	Detail string `json:"detail,omitempty"`
 	// GORILLA OVERRIDE: curated rank (1 = best). 0 = not on the
 	// verified best-models list; the picker can hide these.
 	Rank                int           `json:"rank,omitempty"`

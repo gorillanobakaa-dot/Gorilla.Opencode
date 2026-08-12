@@ -94,3 +94,74 @@ func TestCuratedVerdictMatchesAcrossProviders(t *testing.T) {
 		t.Error("an unknown model must not match anything")
 	}
 }
+
+// PreferFullerDetail guards the one regression a refresh could smuggle in:
+// OpenRouter's list API truncates descriptions, the bundled catalogue carries
+// the full page text, and a refresh must not trade the second for the first.
+func TestPreferFullerDetailKeepsBundledFullText(t *testing.T) {
+	fresh := "Vendor's own description (their claim, not our finding): Qwen3-VL is optimized for reasoning in STEM and math...."
+	bundled := "Vendor's own description (their claim, not our finding): Qwen3-VL is optimized for reasoning in STEM and math. The series emphasizes robust perception and long-form visual comprehension."
+	if got := PreferFullerDetail(fresh, bundled); got != bundled {
+		t.Fatalf("a truncated refresh copy must not replace the full bundled text; got %q", got)
+	}
+}
+
+func TestPreferFullerDetailTakesGenuinelyNewText(t *testing.T) {
+	fresh := "Vendor's own description (their claim, not our finding): A complete rewrite the vendor shipped yesterday...."
+	bundled := "Vendor's own description (their claim, not our finding): The old text, which is longer than the new one but no longer what the vendor says about this model at all."
+	if got := PreferFullerDetail(fresh, bundled); got != fresh {
+		t.Fatalf("a rewritten description must win even if shorter; got %q", got)
+	}
+}
+
+func TestPreferFullerDetailHandlesEmpty(t *testing.T) {
+	if got := PreferFullerDetail("", "kept"); got != "kept" {
+		t.Fatalf("empty fresh must keep existing, got %q", got)
+	}
+	if got := PreferFullerDetail("fresh", ""); got != "fresh" {
+		t.Fatalf("empty existing must take fresh, got %q", got)
+	}
+}
+
+// The apology for upstream-truncated descriptions lives in the DATA, and it
+// must only ever blame OpenRouter for OpenRouter's cut — never for our own
+// 2400-character cap.
+func TestDetailForPickerBlamesUpstreamForItsTruncation(t *testing.T) {
+	d := DetailForPicker("mocklab/cut-short", "North Mini Code is an agentic coding model, optimized...")
+	if !strings.Contains(d, "sorry lads — not our fault") {
+		t.Fatalf("an upstream-truncated description must carry the apology; got %q", d)
+	}
+}
+
+func TestDetailForPickerDoesNotBlameUpstreamForCompleteText(t *testing.T) {
+	d := DetailForPicker("mocklab/whole", "A complete description that ends like a sentence should.")
+	if strings.Contains(d, "sorry lads") {
+		t.Fatalf("a complete description must not carry the apology; got %q", d)
+	}
+}
+
+func TestDetailForPickerDoesNotBlameUpstreamForOurOwnCap(t *testing.T) {
+	long := strings.Repeat("many words about a model with no trailing dots whatsoever ", 60) + "the end"
+	d := DetailForPicker("mocklab/long", long)
+	if !strings.Contains(d, "…") {
+		t.Fatalf("text over the cap should be visibly cut; got tail %q", d[len(d)-80:])
+	}
+	if strings.Contains(d, "sorry lads") {
+		t.Fatal("our own cap must never be blamed on OpenRouter")
+	}
+}
+
+// The trap the shared constant exists to prevent: a refresh hands over the
+// truncated API text WITH the apology already stamped on it. The apology ends
+// in ")" so a naive prefix check never matches — and the truncated copy would
+// replace the full bundled text, false apology and all.
+func TestPreferFullerDetailStripsApologyBeforeComparing(t *testing.T) {
+	fresh := DetailForPicker("mocklab/x", "The vendor text, cut by the API right here, optimized...")
+	if !strings.Contains(fresh, "sorry lads") {
+		t.Fatal("test setup: fresh refresh text should carry the apology")
+	}
+	bundled := DetailForPicker("mocklab/x", "The vendor text, cut by the API right here, optimized for the full story that only the web page carries, at length.")
+	if got := PreferFullerDetail(fresh, bundled); got != bundled {
+		t.Fatalf("apology-stamped truncated refresh must not beat the full bundled text; got %q", got)
+	}
+}
