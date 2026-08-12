@@ -52,19 +52,81 @@ func quotaHexColor(remaining float64) string {
 // mood, not data. Emoji live ONLY in the scrollback panel, never in the footer
 // line: the footer is part of the inline frame, where a width the terminal
 // disagrees with strands debris (see the trap list in CLAUDE.md).
-func bananaStatus(remaining float64) string {
+// bananaTier is the rung on the ladder, 8 (loaded) down to 0 (empty). The
+// alert system compares tiers between readings, so the ladder must live in
+// exactly one place — this switch — or a threshold edit desynchronises the
+// panel wording from the crossing alerts. Below 20% the band splits into
+// sub-tiers so the gorilla's bulletins escalate as the barrel empties — and
+// every sub-tier crossing fires its own live alert.
+func bananaTier(remaining float64) int {
 	switch {
+	case remaining >= 2.0/3:
+		return 8
 	case remaining >= 0.5:
-		return "🍌🍌🍌 Loaded up on bananas... let's go nuts."
+		return 7
 	case remaining >= 1.0/3:
-		return "🍌🍌 Running low on bananas..."
+		return 6
 	case remaining >= 0.2:
-		return "🍌 Yeah... just a few bananas left."
+		return 5
+	case remaining >= 0.15:
+		return 4
+	case remaining >= 0.10:
+		return 3
+	case remaining >= 0.05:
+		return 2
 	case remaining > 0:
-		return "🦍 Banana emergency! Scraping the peel..."
+		return 1
 	default:
-		return "🦍 No more bananas for today."
+		return 0
 	}
+}
+
+func bananaStatus(remaining float64) string {
+	switch bananaTier(remaining) {
+	case 8:
+		return "🍌🍌🍌 Loaded up on bananas... let's go nuts."
+	case 7:
+		return "🍌🍌 You're halfway through your bananas..."
+	case 6:
+		return "🍌🍌 Running low on bananas..."
+	case 5:
+		return "🍌 Yeah... just a few bananas left."
+	case 4:
+		return "🦍 Banana emergency! Scraping the peel..."
+	case 3:
+		return "🦍 This is not a drill. The barrel has a bottom and I can see it."
+	case 2:
+		return "🦍 Rationing mode: sniff the banana, don't eat it."
+	case 1:
+		return "🦍 Last banana spotted. Nobody make any sudden prompts."
+	default:
+		return "🦍 Zero bananas. Even the peel is gone."
+	}
+}
+
+// bananaAlerts compares a new quota reading against the previous fractions
+// and returns one announcement per group whose banana tier DROPPED, plus the
+// fractions to store for next time. Rises (the weekly reset) stay silent, and
+// a group never seen before only seeds — announcing a tier on first sight
+// would fire a spurious "alert" at every session start.
+func bananaAlerts(prev map[string]float64, q *auth.QuotaSummary) (alerts []string, next map[string]float64) {
+	next = make(map[string]float64)
+	if q == nil {
+		return nil, next
+	}
+	for _, g := range q.Groups {
+		if len(g.Buckets) == 0 {
+			continue
+		}
+		f := math.Min(1, math.Max(0, g.Buckets[0].RemainingFraction))
+		next[g.DisplayName] = f
+		old, seen := prev[g.DisplayName]
+		if seen && bananaTier(f) < bananaTier(old) {
+			alerts = append(alerts, fmt.Sprintf("%s — %s: %d%% left",
+				bananaStatus(f), g.DisplayName, int(f*100+0.5)))
+		}
+	}
+	return alerts, next
 }
 
 // barCellColor is the fixed colour of cell i on the gauge scale: red at the
@@ -72,6 +134,20 @@ func bananaStatus(remaining float64) string {
 // rendered ANSI is stripped in a non-TTY test run.
 func barCellColor(i, cells int) string {
 	return quotaHexColor(float64(i+1) / float64(cells))
+}
+
+// stripBananaEmoji removes the emoji from a banana line so it can ride the
+// FOOTER status bar. The footer is inline-frame real estate: a glyph the
+// terminal measures differently than we do under-erases a row per render and
+// strands debris (see the trap list in CLAUDE.md). Scrollback keeps the
+// gorilla; the frame gets his words only.
+func stripBananaEmoji(s string) string {
+	return strings.TrimSpace(strings.Map(func(r rune) rune {
+		if r >= 0x1F000 { // supplementary-plane pictographs: 🍌 U+1F34C, 🦍 U+1F98D
+			return -1
+		}
+		return r
+	}, s))
 }
 
 // quotaBar draws "[████░░░░]" as a thermometer scale: every cell has a FIXED

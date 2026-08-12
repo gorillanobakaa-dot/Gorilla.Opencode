@@ -146,7 +146,14 @@ type appModel struct {
 	// anyOverlayOpen in overlay_state.go.
 	scrollback bool
 	// bannerShown keeps the identity banner to exactly one printing per session.
-	bannerShown     bool
+	bannerShown bool
+	// quotaFractions is the last-seen remaining fraction per Antigravity quota
+	// group, seeded by the session-start fetch. After each completed response
+	// the tier check compares a fresh reading against these and announces any
+	// banana-tier crossing — otherwise a session that burns through 50% in one
+	// long tool loop crosses every threshold invisibly between /usage calls.
+	quotaFractions  map[string]float64
+	lastQuotaCheck  time.Time
 	selectionMode   bool
 	currentPage     page.PageID
 	previousPage    page.PageID
@@ -314,6 +321,38 @@ type quotaLineMsg struct {
 	// balances are paid-provider readings (DeepSeek, OpenRouter) for providers
 	// the user has a key for. Also /usage-only: each is a network call.
 	balances []quota.Reading
+	// fractions seeds/updates the crossing-alert baseline on every reading.
+	fractions map[string]float64
+}
+
+// quotaAlertMsg carries banana-tier crossings detected by the post-response
+// check, plus the fresh fractions to store as the new baseline.
+type quotaAlertMsg struct {
+	alerts    []string
+	fractions map[string]float64
+}
+
+// quotaCheckMinInterval throttles the post-response quota check. A tool-heavy
+// turn can complete several responses a minute; one small request every half
+// minute is enough to catch a crossing while it is happening.
+const quotaCheckMinInterval = 30 * time.Second
+
+// quotaTierCheckCmd fetches a fresh quota reading and compares it against the
+// previous fractions. Silent on every failure path: an alert system that nags
+// about its own plumbing is worse than none.
+func quotaTierCheckCmd(prev map[string]float64) tea.Cmd {
+	return func() tea.Msg {
+		creds, _ := auth.LoadAntigravityCreds()
+		if creds == nil || creds.AccessToken == "" {
+			return nil
+		}
+		q, err := creds.RetrieveQuota(context.Background())
+		if err != nil {
+			return nil
+		}
+		alerts, next := bananaAlerts(prev, q)
+		return quotaAlertMsg{alerts: alerts, fractions: next}
+	}
 }
 
 // configuredBalances fetches a balance reading for every supported provider
@@ -366,6 +405,7 @@ func antigravityUsageCmd(quiet bool) tea.Cmd {
 			return quotaLineMsg{line: "Antigravity usage: " + err.Error(), kind: util.InfoTypeError}
 		}
 		msg := quotaLineMsg{line: auth.FormatQuotaLine(q, time.Now()), kind: util.InfoTypeInfo}
+		_, msg.fractions = bananaAlerts(nil, q) // seed/update the alert baseline
 		if !quiet {
 			msg.summary = q
 			msg.account = creds.Email
@@ -517,6 +557,9 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// stdout directly is painted over by the next render with no record in the
 	// renderer, and no redraw can ever clear it (see the trap list in CLAUDE.md).
 	case quotaLineMsg:
+		if len(msg.fractions) > 0 {
+			a.quotaFractions = msg.fractions
+		}
 		if a.scrollback {
 			out := formatQuotaScrollbackLine(time.Now(), msg.line)
 			if msg.summary != nil || len(msg.balances) > 0 {
@@ -528,6 +571,31 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		st, cmd := a.status.Update(info)
 		a.status = st.(core.StatusCmp)
 		cmds = append(cmds, cmd)
+		return a, tea.Batch(cmds...)
+
+	// GORILLA OVERRIDE: banana-tier crossings, announced as they happen — in
+	// the scrollback with the gorilla, and on the footer status bar with the
+	// emoji stripped (the frame is where emoji width mismatches strand
+	// debris; see the trap list).
+	case quotaAlertMsg:
+		if len(msg.fractions) > 0 {
+			a.quotaFractions = msg.fractions
+		}
+		if a.scrollback {
+			for _, al := range msg.alerts {
+				cmds = append(cmds, tea.Println(formatQuotaScrollbackLine(time.Now(), al)))
+			}
+		}
+		if len(msg.alerts) > 0 {
+			info := util.InfoMsg{
+				Type: util.InfoTypeWarn,
+				Msg:  stripBananaEmoji(strings.Join(msg.alerts, " · ")),
+				TTL:  15 * time.Second,
+			}
+			st, cmd := a.status.Update(info)
+			a.status = st.(core.StatusCmp)
+			cmds = append(cmds, cmd)
+		}
 		return a, tea.Batch(cmds...)
 
 	// Status
@@ -641,15 +709,29 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.isCompacting = false
 			return a, util.ReportInfo("Session summarization complete")
 		} else if payload.Done && payload.Type == agent.AgentEventTypeResponse && a.selectedSession.ID != "" {
+			// GORILLA OVERRIDE: after each completed response, re-read the
+			// quota (throttled) and announce any banana-tier crossing. Without
+			// this, a tool-heavy session can fall from "loaded up" to "just a
+			// few" entirely between two /usage calls — observed live: 59% to
+			// 30% in five minutes, every threshold crossed invisibly. Gated on
+			// quotaFractions so non-Antigravity users never pay the check.
+			if len(a.quotaFractions) > 0 && time.Since(a.lastQuotaCheck) > quotaCheckMinInterval {
+				a.lastQuotaCheck = time.Now()
+				prev := make(map[string]float64, len(a.quotaFractions))
+				for k, v := range a.quotaFractions {
+					prev[k] = v
+				}
+				cmds = append(cmds, quotaTierCheckCmd(prev))
+			}
 			model := a.app.CoderAgent.Model()
 			contextWindow := model.ContextWindow
 			tokens := a.selectedSession.CompletionTokens + a.selectedSession.PromptTokens
 			if (tokens >= int64(float64(contextWindow)*0.95)) && config.Get().AutoCompact {
-				return a, util.CmdHandler(startCompactSessionMsg{})
+				cmds = append(cmds, util.CmdHandler(startCompactSessionMsg{}))
 			}
 		}
 		// Continue listening for events
-		return a, nil
+		return a, tea.Batch(cmds...)
 
 	case dialog.CloseThemeDialogMsg:
 		a.showThemeDialog = false

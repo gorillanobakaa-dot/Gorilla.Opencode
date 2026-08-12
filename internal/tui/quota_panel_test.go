@@ -85,18 +85,79 @@ func TestBananaLadder(t *testing.T) {
 		want      string
 	}{
 		{1, "🍌🍌🍌 Loaded up on bananas... let's go nuts."},
-		{0.5, "🍌🍌🍌 Loaded up on bananas... let's go nuts."},
+		{2.0 / 3, "🍌🍌🍌 Loaded up on bananas... let's go nuts."},
+		{0.59, "🍌🍌 You're halfway through your bananas..."},
+		{0.5, "🍌🍌 You're halfway through your bananas..."},
+		{0.49, "🍌🍌 Running low on bananas..."},
 		{0.4, "🍌🍌 Running low on bananas..."},
 		{1.0 / 3, "🍌🍌 Running low on bananas..."},
 		{0.25, "🍌 Yeah... just a few bananas left."},
 		{0.2, "🍌 Yeah... just a few bananas left."},
-		{0.1, "🦍 Banana emergency! Scraping the peel..."},
-		{0, "🦍 No more bananas for today."},
+		// The emergency band escalates in 5% steps — each crossing fires its
+		// own live alert.
+		{0.19, "🦍 Banana emergency! Scraping the peel..."},
+		{0.15, "🦍 Banana emergency! Scraping the peel..."},
+		{0.12, "🦍 This is not a drill. The barrel has a bottom and I can see it."},
+		{0.10, "🦍 This is not a drill. The barrel has a bottom and I can see it."},
+		{0.07, "🦍 Rationing mode: sniff the banana, don't eat it."},
+		{0.05, "🦍 Rationing mode: sniff the banana, don't eat it."},
+		{0.03, "🦍 Last banana spotted. Nobody make any sudden prompts."},
+		{0.001, "🦍 Last banana spotted. Nobody make any sudden prompts."},
+		{0, "🦍 Zero bananas. Even the peel is gone."},
 	}
 	for _, c := range cases {
 		if got := bananaStatus(c.remaining); got != c.want {
 			t.Errorf("bananaStatus(%v) = %q, want %q", c.remaining, got, c.want)
 		}
+	}
+}
+
+// Crossing detection: a tier drop announces, same tier stays silent, a rise
+// (the weekly reset) stays silent, and a never-seen group only seeds.
+func TestBananaAlerts(t *testing.T) {
+	t.Parallel()
+	summary := func(f float64) *auth.QuotaSummary {
+		return &auth.QuotaSummary{Groups: []auth.QuotaGroup{{
+			DisplayName: "Claude and GPT models",
+			Buckets:     []auth.QuotaBucket{{RemainingFraction: f}},
+		}}}
+	}
+	// Observed live 2026-08-11: 59% -> 30% in five minutes crossed two tiers
+	// invisibly. The alert must fire and describe the CURRENT tier.
+	alerts, next := bananaAlerts(map[string]float64{"Claude and GPT models": 0.59}, summary(0.2971))
+	if len(alerts) != 1 || !strings.Contains(alerts[0], "just a few bananas") ||
+		!strings.Contains(alerts[0], "Claude and GPT models: 30% left") {
+		t.Errorf("59%%->30%% must announce the current tier with the number, got %v", alerts)
+	}
+	if next["Claude and GPT models"] != 0.2971 {
+		t.Errorf("baseline not updated: %v", next)
+	}
+	// Same tier: silent.
+	if alerts, _ := bananaAlerts(map[string]float64{"Claude and GPT models": 0.59}, summary(0.55)); len(alerts) != 0 {
+		t.Errorf("no crossing must mean no alert, got %v", alerts)
+	}
+	// Weekly reset (rise): silent.
+	if alerts, _ := bananaAlerts(map[string]float64{"Claude and GPT models": 0.05}, summary(1)); len(alerts) != 0 {
+		t.Errorf("a rise must stay silent, got %v", alerts)
+	}
+	// First sighting: seeds, no spurious alert.
+	alerts, next = bananaAlerts(nil, summary(0.1))
+	if len(alerts) != 0 || next["Claude and GPT models"] != 0.1 {
+		t.Errorf("first sighting must seed silently, got alerts=%v next=%v", alerts, next)
+	}
+}
+
+// The footer copy of an alert must carry the words and none of the emoji —
+// the frame is where emoji width mismatches strand debris.
+func TestStripBananaEmoji(t *testing.T) {
+	t.Parallel()
+	in := "🦍 Last banana spotted. Nobody make any sudden prompts. — Claude and GPT models: 3% left"
+	got := stripBananaEmoji(in)
+	if strings.ContainsRune(got, '🦍') || strings.ContainsRune(got, '🍌') {
+		t.Errorf("emoji survived into the footer copy: %q", got)
+	}
+	if !strings.HasPrefix(got, "Last banana spotted") || !strings.Contains(got, "3% left") {
+		t.Errorf("words must survive intact: %q", got)
 	}
 }
 
