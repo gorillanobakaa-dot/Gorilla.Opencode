@@ -2,6 +2,7 @@
 package config
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -927,6 +928,49 @@ func getProviderAPIKey(provider models.ModelProvider) string {
 		}
 	}
 	return ""
+}
+
+// ProviderKeyFingerprint says WHICH credential currently backs a provider
+// without revealing it. People on free tiers rotate several keys to spread
+// quota across them, and the model picker has to answer "which of my keys is
+// this column billing right now" — but a credential must never appear in a
+// frame, because picker frames get screenshotted into chats (directive:
+// a length and a short prefix, never the value).
+//
+// Format: "sk-or-…#a3f2 (73 chars)". The prefix is the first six characters —
+// vendor boilerplate shared by every key from that vendor. The hash is the
+// first two bytes of SHA-256, which is what actually distinguishes two rotated
+// keys, and is useless for recovering one. Empty string = no key-based
+// credential (OAuth providers, nothing configured).
+func ProviderKeyFingerprint(provider models.ModelProvider) string {
+	key := ""
+	if cfg != nil {
+		if p, ok := cfg.Providers[provider]; ok {
+			key = p.APIKey
+		}
+	}
+	fromEnv := false
+	if key == "" {
+		key = getProviderAPIKey(provider)
+		fromEnv = key != ""
+	}
+	switch key {
+	case "":
+		return ""
+	case "aws-credentials-available", "vertex-ai-credentials-available":
+		// Sentinels for ambient cloud auth, not credentials someone rotates.
+		return "ambient cloud credentials"
+	}
+	sum := sha256.Sum256([]byte(key))
+	prefix := ""
+	if r := []rune(key); len(r) >= 20 {
+		prefix = string(r[:6])
+	}
+	fp := fmt.Sprintf("%s…#%02x%02x (%d chars", prefix, sum[0], sum[1], len(key))
+	if fromEnv {
+		fp += ", from env"
+	}
+	return fp + ")"
 }
 
 // registerLSPLoadoutRows creates a /context row per configured language server.

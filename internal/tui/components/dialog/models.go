@@ -62,6 +62,23 @@ type modelDialogCmp struct {
 	scrollOffset    int
 	hScrollOffset   int
 	hScrollPossible bool
+
+	// GORILLA OVERRIDE: "/" filters ALL enabled providers at once, matching on
+	// name AND description. The catalogue is past 270 entries on OpenRouter
+	// alone; walking columns row by row to find "the free coding models" is a
+	// reading assignment, and the whole point of the descriptions is that they
+	// carry the words someone would search for ("coding", "reasoning", "FREE").
+	searchActive bool
+	query        string
+	searchDomain []models.Model // every enabled provider's models, built on open
+	savedIdx     int            // selection to restore when search closes
+	savedScroll  int
+
+	// GORILLA OVERRIDE: tab opens a full page for the highlighted model. One
+	// row cannot hold what an informed choice needs — the row is the headline,
+	// this is the article: full description, exact prices, context, and WHICH
+	// credential serves it.
+	detail *models.Model
 }
 
 type modelKeyMap struct {
@@ -86,6 +103,10 @@ type modelKeyMap struct {
 	// built was reachable only by pressing left repeatedly, or by closing the
 	// dialog and reopening it. Neither is discoverable.
 	ShowBookmarks key.Binding
+	// GORILLA OVERRIDE: search every provider by name AND description.
+	Search key.Binding
+	// GORILLA OVERRIDE: full detail page for the highlighted model.
+	Details key.Binding
 }
 
 var modelKeys = modelKeyMap{
@@ -137,6 +158,14 @@ var modelKeys = modelKeyMap{
 		key.WithKeys("b"),
 		key.WithHelp("b", "jump to your bookmarks"),
 	),
+	Search: key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "search all providers"),
+	),
+	Details: key.NewBinding(
+		key.WithKeys("tab"),
+		key.WithHelp("tab", "full model details"),
+	),
 }
 
 // visibleRows is how many models fit in the current window.
@@ -148,8 +177,9 @@ var modelKeys = modelKeyMap{
 // taller than the window — a frame taller than its window is the bug that makes
 // the footer march down the screen (see TestFooterMustStaySmallerThanTheWindow).
 func (m *modelDialogCmp) visibleRows() int {
-	// title + subtitle + scroll indicator + hint + padding + border + margin
-	const chrome = 12
+	// title + subtitle + connection line (or search query line) + scroll
+	// indicator + hint + padding + border + margin
+	const chrome = 13
 	if m.height <= 0 {
 		return numVisibleModels // not sized yet
 	}
@@ -171,6 +201,15 @@ func (m *modelDialogCmp) Init() tea.Cmd {
 func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Modal states first: the detail page and the search prompt both
+		// repurpose keys the list uses (space, letters), so they must see the
+		// keystroke before the list bindings do.
+		if m.detail != nil {
+			return m.updateDetail(msg)
+		}
+		if m.searchActive {
+			return m.updateSearch(msg)
+		}
 		switch {
 		case key.Matches(msg, modelKeys.Up) || key.Matches(msg, modelKeys.K):
 			m.moveSelectionUp()
@@ -195,54 +234,15 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setupModelsForProvider(ProviderBookmarks)
 			return m, nil
 		case key.Matches(msg, modelKeys.Bookmark):
-			if len(m.models) == 0 {
-				break
-			}
-			id := string(m.models[m.selectedIdx].ID)
-			on, err := config.ToggleBookmark(id)
-			if err != nil {
-				return m, util.ReportError(err)
-			}
-			// Rebuild: the shortlist column may have just appeared or emptied,
-			// and leaving the carousel describing a state that no longer exists
-			// is how a menu starts lying about itself.
-			keep := m.provider
-			m.availableProviders = getEnabledProviders(config.Get())
-			m.hScrollPossible = len(m.availableProviders) > 1
-			if idx := findProviderIndex(m.availableProviders, keep); idx >= 0 {
-				m.hScrollOffset = idx
-			} else {
-				m.hScrollOffset = 0
-				keep = m.availableProviders[0]
-			}
-			sel := m.selectedIdx
-			m.setupModelsForProvider(keep)
-			if sel < len(m.models) {
-				m.selectedIdx = sel
-			}
-			if on {
-				util.ReportInfo("bookmarked — press b to see your list")
-			} else {
-				util.ReportInfo("removed from bookmarks")
-			}
-			return m, nil
+			return m.toggleBookmarkCurrent()
 		case key.Matches(msg, modelKeys.Enter):
-			if len(m.models) == 0 {
-				break
-			}
-			chosen := m.models[m.selectedIdx]
-			// GORILLA OVERRIDE: refuse a bookmark whose model no longer exists.
-			// Without this the unresolvable id reaches the agent and comes back
-			// as a generic failure, which reads as "this program is broken"
-			// rather than "that model was retired". Say which, and say what to
-			// press.
-			if _, ok := models.SupportedModels[chosen.ID]; !ok {
-				return m, util.ReportWarn(fmt.Sprintf(
-					"%s is no longer offered by its provider — press space to remove it from your bookmarks",
-					chosen.ID))
-			}
-			util.ReportInfo(fmt.Sprintf("selected model: %s", chosen.Name))
-			return m, util.CmdHandler(ModelSelectedMsg{Model: chosen})
+			return m.selectCurrent()
+		case key.Matches(msg, modelKeys.Search):
+			m.openSearch()
+			return m, nil
+		case key.Matches(msg, modelKeys.Details):
+			m.openDetail()
+			return m, nil
 		case key.Matches(msg, modelKeys.Escape):
 			return m, util.CmdHandler(CloseModelDialogMsg{})
 		}
@@ -251,6 +251,211 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 	}
 
+	return m, nil
+}
+
+// selectCurrent emits the highlighted (or detailed) model as the session's
+// choice. Shared by the column list, the search results and the detail page so
+// the three cannot drift on the retired-bookmark refusal below.
+func (m *modelDialogCmp) selectCurrent() (tea.Model, tea.Cmd) {
+	if m.detail == nil && len(m.models) == 0 {
+		return m, nil
+	}
+	var chosen models.Model
+	if m.detail != nil {
+		chosen = *m.detail
+	} else {
+		chosen = m.models[m.selectedIdx]
+	}
+	// GORILLA OVERRIDE: refuse a bookmark whose model no longer exists.
+	// Without this the unresolvable id reaches the agent and comes back
+	// as a generic failure, which reads as "this program is broken"
+	// rather than "that model was retired". Say which, and say what to
+	// press.
+	if _, ok := models.SupportedModels[chosen.ID]; !ok {
+		return m, util.ReportWarn(fmt.Sprintf(
+			"%s is no longer offered by its provider — press space to remove it from your bookmarks",
+			chosen.ID))
+	}
+	util.ReportInfo(fmt.Sprintf("selected model: %s", chosen.Name))
+	// Leave the dialog the way the next open should find it: on a provider
+	// column, not inside a stale search or detail page — this object is
+	// reused between opens without a reset.
+	m.detail = nil
+	if m.searchActive {
+		m.closeSearch()
+	}
+	return m, util.CmdHandler(ModelSelectedMsg{Model: chosen})
+}
+
+// toggleBookmarkCurrent flips the bookmark on the highlighted model and, when
+// a provider column is showing, rebuilds the carousel: the shortlist column
+// may have just appeared or emptied, and leaving the carousel describing a
+// state that no longer exists is how a menu starts lying about itself. In
+// search mode the rebuild waits until the search closes — the filtered list on
+// screen must not be yanked out from under the cursor.
+func (m *modelDialogCmp) toggleBookmarkCurrent() (tea.Model, tea.Cmd) {
+	var id string
+	switch {
+	case m.detail != nil:
+		// The detail page holds its own copy: after a rebuild below the list
+		// selection can move, and a second space must still mean THIS model.
+		id = string(m.detail.ID)
+	case len(m.models) > 0:
+		id = string(m.models[m.selectedIdx].ID)
+	default:
+		return m, nil
+	}
+	on, err := config.ToggleBookmark(id)
+	if err != nil {
+		return m, util.ReportError(err)
+	}
+	if !m.searchActive {
+		keep := m.provider
+		m.availableProviders = getEnabledProviders(config.Get())
+		m.hScrollPossible = len(m.availableProviders) > 1
+		if idx := findProviderIndex(m.availableProviders, keep); idx >= 0 {
+			m.hScrollOffset = idx
+		} else {
+			m.hScrollOffset = 0
+			keep = m.availableProviders[0]
+		}
+		sel := m.selectedIdx
+		m.setupModelsForProvider(keep)
+		if sel < len(m.models) {
+			m.selectedIdx = sel
+		}
+	}
+	if on {
+		util.ReportInfo("bookmarked — press b to see your list")
+	} else {
+		util.ReportInfo("removed from bookmarks")
+	}
+	return m, nil
+}
+
+// openSearch snapshots every enabled provider's models as the search domain.
+// The bookmarks column is skipped: its entries are the same models again, and
+// a search that returns the same row twice reads as a bug.
+func (m *modelDialogCmp) openSearch() {
+	m.searchDomain = nil
+	for _, p := range m.availableProviders {
+		if p == ProviderBookmarks {
+			continue
+		}
+		m.searchDomain = append(m.searchDomain, getModelsForProvider(p)...)
+	}
+	m.savedIdx, m.savedScroll = m.selectedIdx, m.scrollOffset
+	m.searchActive = true
+	m.query = ""
+	m.applyFilter()
+}
+
+// closeSearch returns to the provider column the search was opened from, with
+// the selection where it was. The column set is rebuilt because a bookmark may
+// have been toggled from a detail page while the search was open.
+func (m *modelDialogCmp) closeSearch() {
+	m.searchActive = false
+	m.query = ""
+	m.searchDomain = nil
+	m.availableProviders = getEnabledProviders(config.Get())
+	m.hScrollPossible = len(m.availableProviders) > 1
+	if idx := findProviderIndex(m.availableProviders, m.provider); idx >= 0 {
+		m.hScrollOffset = idx
+	} else if len(m.availableProviders) > 0 {
+		m.hScrollOffset = 0
+		m.provider = m.availableProviders[0]
+	}
+	m.setupModelsForProvider(m.provider)
+	if m.savedIdx < len(m.models) {
+		m.selectedIdx = m.savedIdx
+		m.scrollOffset = m.savedScroll
+	}
+}
+
+// applyFilter recomputes the visible list from the query. Every space-separated
+// term must appear somewhere in the model's name, description, detail text,
+// provider or id — so "free coding" works, and so does "nvidia 1m".
+func (m *modelDialogCmp) applyFilter() {
+	terms := strings.Fields(strings.ToLower(m.query))
+	var out []models.Model
+	for _, mod := range m.searchDomain {
+		if modelMatches(mod, terms) {
+			out = append(out, mod)
+		}
+	}
+	m.models = out
+	m.selectedIdx, m.scrollOffset = 0, 0
+}
+
+func modelMatches(mod models.Model, terms []string) bool {
+	if len(terms) == 0 {
+		return true
+	}
+	hay := strings.ToLower(strings.Join([]string{
+		mod.Name, mod.Description, mod.Detail,
+		string(mod.Provider), string(mod.ID), models.LocalEndpointFor(mod.ID),
+	}, " "))
+	for _, t := range terms {
+		if !strings.Contains(hay, t) {
+			return false
+		}
+	}
+	return true
+}
+
+// openDetail shows the full page for the highlighted model.
+func (m *modelDialogCmp) openDetail() {
+	if len(m.models) == 0 {
+		return
+	}
+	mod := m.models[m.selectedIdx]
+	m.detail = &mod
+}
+
+// updateSearch owns the keys while the search prompt is live. Only the arrows,
+// enter, tab and esc keep their list meaning; every printable character —
+// including space and the letters j/k/h/l/b that navigate the list — is text.
+func (m *modelDialogCmp) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, modelKeys.Up):
+		m.moveSelectionUp()
+	case key.Matches(msg, modelKeys.Down):
+		m.moveSelectionDown()
+	case key.Matches(msg, modelKeys.Enter):
+		return m.selectCurrent()
+	case key.Matches(msg, modelKeys.Details):
+		m.openDetail()
+	case key.Matches(msg, modelKeys.Escape):
+		m.closeSearch()
+	default:
+		switch msg.Type {
+		case tea.KeyRunes:
+			m.query += string(msg.Runes)
+			m.applyFilter()
+		case tea.KeySpace:
+			m.query += " "
+			m.applyFilter()
+		case tea.KeyBackspace:
+			if r := []rune(m.query); len(r) > 0 {
+				m.query = string(r[:len(r)-1])
+				m.applyFilter()
+			}
+		}
+	}
+	return m, nil
+}
+
+// updateDetail owns the keys while the detail page is showing.
+func (m *modelDialogCmp) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, modelKeys.Enter):
+		return m.selectCurrent()
+	case key.Matches(msg, modelKeys.Bookmark):
+		return m.toggleBookmarkCurrent()
+	case key.Matches(msg, modelKeys.Escape), key.Matches(msg, modelKeys.Details):
+		m.detail = nil
+	}
 	return m, nil
 }
 
@@ -318,6 +523,10 @@ func (m *modelDialogCmp) SwitchToProvider(p models.ModelProvider) {
 	cfg := config.Get()
 	m.availableProviders = getEnabledProviders(cfg)
 	m.hScrollPossible = len(m.availableProviders) > 1
+	m.searchActive = false
+	m.query = ""
+	m.searchDomain = nil
+	m.detail = nil
 	if len(m.availableProviders) == 0 {
 		return
 	}
@@ -342,32 +551,75 @@ func (m *modelDialogCmp) View() string {
 	if m.width > 0 && m.width-8 > w {
 		w = m.width - 8
 	}
+	// GORILLA OVERRIDE: … and never wider than the terminal. maxDialogWidth
+	// acted as a floor, so on anything narrower than 68 columns the frame was
+	// clipped at the screen edge. Chrome is subtracted from the terminal
+	// (border 2 + padding 4), never added to content. 24 is the last-resort
+	// floor at which anything is still legible.
+	if m.width > 0 && w > m.width-6 {
+		w = m.width - 6
+		if w < 24 {
+			w = 24
+		}
+	}
+
+	// GORILLA OVERRIDE: the detail page replaces the list entirely — one
+	// model, everything known about it, because one row cannot hold an
+	// informed decision.
+	if m.detail != nil {
+		return m.renderDetail(w)
+	}
 
 	// Capitalize first letter of provider name (with friendly overrides)
-	providerName := providerDisplayName(m.provider)
+	titleText := fmt.Sprintf("Select %s Model", providerDisplayName(m.provider))
+	if m.searchActive {
+		titleText = "Search Models — every provider at once"
+	}
 	title := baseStyle.
 		Foreground(t.Primary()).
 		Bold(true).
 		Width(w).
-		Render(fmt.Sprintf("Select %s Model", providerName))
+		Render(titleText)
 
-	// GORILLA OVERRIDE: for a curated provider, tell the user the top of the
-	// list is the probe-verified coding ranking (1 = best), and that the
-	// rest of the provider's catalog follows below — nothing is hidden.
-	subtitle := ""
-	if len(m.models) > 0 && m.models[0].Rank > 0 {
-		ranked := 0
-		for _, mm := range m.models {
-			if mm.Rank > 0 {
-				ranked++
-			}
+	// The lines between the title and the list: what this column is (ranked
+	// or not), and WHICH credential serves it — then one blank spacer.
+	var infoLines []string
+	if m.searchActive {
+		// The query line doubles as the match counter, so narrowing the words
+		// visibly narrows the number.
+		qline := fmt.Sprintf("/ %s▌  — %d of %d models match name or description",
+			m.query, len(m.models), len(m.searchDomain))
+		if r := []rune(qline); len(r) > w {
+			qline = string(r[:w-1]) + "…"
 		}
-		subtitle = baseStyle.Foreground(t.TextMuted()).Width(w).Padding(0, 0, 1).
-			Render(fmt.Sprintf("%d ranked best-first (1=best); %d more below — full catalog, your call", ranked, len(m.models)-ranked))
+		infoLines = append(infoLines, baseStyle.Foreground(t.Accent()).Width(w).Render(qline))
 	} else {
-		title = baseStyle.Foreground(t.Primary()).Bold(true).Width(w).Padding(0, 0, 1).
-			Render(fmt.Sprintf("Select %s Model", providerName))
+		// GORILLA OVERRIDE: for a curated provider, tell the user the top of
+		// the list is the probe-verified coding ranking (1 = best), and that
+		// the rest of the provider's catalog follows below — nothing is hidden.
+		if len(m.models) > 0 && m.models[0].Rank > 0 {
+			ranked := 0
+			for _, mm := range m.models {
+				if mm.Rank > 0 {
+					ranked++
+				}
+			}
+			infoLines = append(infoLines, baseStyle.Foreground(t.TextMuted()).Width(w).
+				Render(fmt.Sprintf("%d ranked best-first (1=best); %d more below — full catalog, your call", ranked, len(m.models)-ranked)))
+		}
+		// GORILLA OVERRIDE: name the credential behind the column. A row
+		// reading "MoonshotAI: Kimi K2" LOOKS like it comes from Moonshot,
+		// but the request is billed to whichever key this provider column
+		// holds — and someone rotating free keys to spread quota cannot make
+		// an informed pick without knowing which key is live right now.
+		if cl := m.connectionLine(); cl != "" {
+			if r := []rune(cl); len(r) > w {
+				cl = string(r[:w-1]) + "…"
+			}
+			infoLines = append(infoLines, baseStyle.Foreground(t.TextMuted()).Width(w).Render(cl))
+		}
 	}
+	infoLines = append(infoLines, baseStyle.Width(w).Render(""))
 
 	// Render visible models
 	endIdx := min(m.scrollOffset+m.visibleRows(), len(m.models))
@@ -388,21 +640,22 @@ func (m *modelDialogCmp) View() string {
 		// the machine in the room.
 		if ep := models.LocalEndpointFor(m.models[i].ID); ep != "" {
 			label = fmt.Sprintf("[%s] %s", ep, label)
-		} else if m.provider == ProviderBookmarks {
-			// GORILLA OVERRIDE: name the provider inside the shortlist.
-			//
-			// It is the one list that mixes them, so "Gemini 3.6 Flash" can
-			// appear twice — once via Antigravity, once via a Gemini API key —
-			// and with nothing to tell them apart they read as duplicates. The
-			// reported instinct was to delete one, which would silently remove
-			// a different route to the same model, on a different quota.
-			// Local models already carry their endpoint name from the branch
-			// above; everything else needs its provider.
+		} else if m.provider == ProviderBookmarks || m.searchActive {
+			// GORILLA OVERRIDE: name the provider inside every list that mixes
+			// providers — the shortlist and the search results. "Gemini 3.6
+			// Flash" can appear twice, once via Antigravity and once via a
+			// Gemini API key, and with nothing to tell them apart they read as
+			// duplicates. The reported instinct was to delete one, which would
+			// silently remove a different route to the same model, on a
+			// different quota. Local models already carry their endpoint name
+			// from the branch above; everything else needs its provider.
 			if home := models.SupportedModels[m.models[i].ID].Provider; home != "" {
 				label = fmt.Sprintf("[%s] %s", home, label)
 			}
 		}
-		if r := m.models[i].Rank; r > 0 {
+		// Ranks are per-provider judgements; in a cross-provider search they
+		// would collide ("1." three times) and imply an ordering nobody made.
+		if r := m.models[i].Rank; r > 0 && !m.searchActive {
 			label = fmt.Sprintf("%2d. %s", r, label)
 		}
 		// GORILLA OVERRIDE: mark what is already on the shortlist, everywhere it
@@ -422,6 +675,10 @@ func (m *modelDialogCmp) View() string {
 		}
 		modelItems = append(modelItems, itemStyle.Render(label))
 	}
+	if m.searchActive && len(m.models) == 0 {
+		modelItems = append(modelItems, baseStyle.Foreground(t.TextMuted()).Width(w).
+			Render("nothing matches — try fewer or different words; esc goes back"))
+	}
 
 	scrollIndicator := m.getScrollIndicators(w)
 
@@ -434,47 +691,41 @@ func (m *modelDialogCmp) View() string {
 	// your models and bookmark them".
 	//
 	// One line, on every column, in the frame the user is already reading.
-	hint := "space ★ bookmark   b YOUR LIST"
-	if m.provider == ProviderBookmarks {
-		hint = "space remove from bookmarks"
+	var segs []hintSeg
+	switch {
+	case m.searchActive:
+		segs = []hintSeg{
+			{"type to filter   ↑/↓ move   ", false},
+			{"tab details", true},
+			{"   enter use   esc back to columns", false},
+		}
+	case m.provider == ProviderBookmarks:
+		segs = []hintSeg{
+			{"space remove from bookmarks   ", false},
+			{"/ search", true},
+			{"   ", false},
+			{"tab details", true},
+		}
+	default:
+		segs = []hintSeg{
+			{"space ★ bookmark   ", false},
+			{"b YOUR LIST", true},
+			{"   ", false},
+			{"/ search", true},
+			{"   ", false},
+			{"tab details", true},
+		}
 	}
-	if m.hScrollPossible {
-		hint += "   ←/→ other providers"
+	if !m.searchActive {
+		if m.hScrollPossible {
+			segs = append(segs, hintSeg{"   ←/→ other providers", false})
+		}
+		segs = append(segs, hintSeg{"   enter use   esc close", false})
 	}
-	hint += "   enter use   esc close"
-	// Never wider than the frame: an over-wide line makes bubbletea's erase
-	// under-reach and the footer marches down the screen (see clampToWidth).
-	if r := []rune(hint); len(r) > w {
-		hint = string(r[:w])
-	}
-	// GORILLA OVERRIDE: "b" is the only way to reach the shortlist from a
-	// distant column, so it must not be the same grey as the rest of the hint.
-	// t.Accent() is a lipgloss.AdaptiveColor, so it resolves separately for
-	// light and dark terminals rather than being a fixed value that vanishes
-	// on one of them.
-	key := lipgloss.NewStyle().Foreground(t.Accent()).Bold(true)
-	muted := lipgloss.NewStyle().Foreground(t.TextMuted())
-	hintLine := baseStyle.Width(w).Render(
-		muted.Render(strings.Split(hint, "b YOUR LIST")[0]) +
-			func() string {
-				if strings.Contains(hint, "b YOUR LIST") {
-					return key.Render("b YOUR LIST")
-				}
-				return ""
-			}() +
-			muted.Render(func() string {
-				parts := strings.SplitN(hint, "b YOUR LIST", 2)
-				if len(parts) == 2 {
-					return parts[1]
-				}
-				return ""
-			}()),
-	)
+	hintLine := renderHint(w, segs)
 
 	parts := []string{title}
-	if subtitle != "" {
-		parts = append(parts, subtitle)
-	}
+	parts = append(parts, infoLines...)
 	parts = append(parts,
 		baseStyle.Width(w).Render(lipgloss.JoinVertical(lipgloss.Left, modelItems...)),
 		scrollIndicator,
@@ -488,6 +739,195 @@ func (m *modelDialogCmp) View() string {
 		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)
+}
+
+// connectionLine says which credential serves the CURRENT column, in the
+// frame, above the rows it applies to.
+func (m *modelDialogCmp) connectionLine() string {
+	switch m.provider {
+	case ProviderBookmarks:
+		return "each row is tagged [connection] — the same model can arrive via two keys, on two quotas"
+	case models.ProviderLocal:
+		return "served by your configured endpoints — each row names the one that owns it"
+	case models.ProviderGeminiCA:
+		return "served through your Google login (Code Assist quota)"
+	case models.ProviderAntigravity:
+		return "served through your Google login (Antigravity quota)"
+	case models.ProviderCopilot:
+		return "served through your GitHub Copilot login"
+	}
+	if fp := config.ProviderKeyFingerprint(m.provider); fp != "" {
+		line := fmt.Sprintf("every request below is billed to your %s key %s", m.provider, fp)
+		if m.provider == models.ProviderOpenRouter {
+			line += " — the vendor name says who MADE the model, this key is who serves it"
+		}
+		return line
+	}
+	return ""
+}
+
+// connectionFor is the per-model version of connectionLine, for lists that mix
+// providers (search, bookmarks) and for the detail page.
+func connectionFor(mod models.Model) string {
+	if ep := models.LocalEndpointFor(mod.ID); ep != "" {
+		return fmt.Sprintf("your local endpoint %q", ep)
+	}
+	switch mod.Provider {
+	case models.ProviderGeminiCA:
+		return "your Google login (Code Assist quota)"
+	case models.ProviderAntigravity:
+		return "your Google login (Antigravity quota)"
+	case models.ProviderCopilot:
+		return "your GitHub Copilot login"
+	}
+	if fp := config.ProviderKeyFingerprint(mod.Provider); fp != "" {
+		return fmt.Sprintf("your %s key %s", mod.Provider, fp)
+	}
+	return fmt.Sprintf("%s (no credential on file)", mod.Provider)
+}
+
+// renderDetail is the full page for one model: everything a row could not
+// hold, so the decision can be made here instead of on a vendor website that
+// this audience may not be able to afford to load.
+func (m *modelDialogCmp) renderDetail(w int) string {
+	t := theme.CurrentTheme()
+	baseStyle := styles.BaseStyle()
+	mod := *m.detail
+
+	clamp := func(s string) string {
+		if r := []rune(s); len(r) > w {
+			return string(r[:w-1]) + "…"
+		}
+		return s
+	}
+	norm := baseStyle.Width(w)
+	muted := baseStyle.Foreground(t.TextMuted()).Width(w)
+
+	var rows []string
+	rows = append(rows, baseStyle.Foreground(t.Primary()).Bold(true).Width(w).Render(clamp(mod.Name)))
+	rows = append(rows, muted.Render(clamp("id: "+string(mod.ID))))
+	rows = append(rows, norm.Render(""))
+
+	fact := func(label, value string) {
+		rows = append(rows, norm.Render(clamp(fmt.Sprintf("%-13s %s", label, value))))
+	}
+	// The connection leads: it is the fact the list could not show, and the
+	// one that decides whose quota the next million tokens land on.
+	fact("served via", connectionFor(mod))
+	if i := strings.Index(mod.APIModel, "/"); i > 0 {
+		fact("made by", mod.APIModel[:i]+" (the vendor — they do not bill you here)")
+	}
+	price := "FREE"
+	if mod.CostPer1MIn != 0 || mod.CostPer1MOut != 0 {
+		price = fmt.Sprintf("$%.2f in / $%.2f out per 1M tokens", mod.CostPer1MIn, mod.CostPer1MOut)
+		if mod.CostPer1MInCached > 0 {
+			price += fmt.Sprintf(", cached reads $%.2f", mod.CostPer1MInCached)
+		}
+	}
+	fact("price", price)
+	if mod.ContextWindow > 0 {
+		fact("context", fmt.Sprintf("%dK tokens, max output %dK", mod.ContextWindow/1000, mod.DefaultMaxTokens/1000))
+	}
+	caps := []string{"tool calls"}
+	if mod.CanReason {
+		caps = append(caps, "extended reasoning")
+	}
+	if mod.SupportsAttachments {
+		caps = append(caps, "image input")
+	}
+	fact("capabilities", strings.Join(caps, ", "))
+	if mod.Rank > 0 {
+		fact("rank", fmt.Sprintf("#%d on this provider's ranked list (1 = best)", mod.Rank))
+	}
+	if config.IsBookmarked(string(mod.ID)) {
+		fact("bookmarked", "★ yes — space removes it")
+	} else {
+		fact("bookmarked", "no — space adds it")
+	}
+
+	// The long text, wrapped. Cut to the window with an honest marker — a
+	// silently missing tail reads as the whole text.
+	body := mod.Description
+	if mod.Detail != "" {
+		body += "\n\n" + mod.Detail
+	}
+	// Models truncated at the source carry their own apology inside Detail
+	// (see DetailForPicker) — the data says whose cut it is, so nothing needs
+	// guessing here at render time.
+	if strings.TrimSpace(body) != "" {
+		rows = append(rows, norm.Render(""))
+		// frame chrome: padding+border+hint ≈ 7 rows; never render past the
+		// window (a frame taller than its window is the marching-footer bug).
+		budget := m.height - len(rows) - 8
+		if budget < 4 {
+			budget = 4
+		}
+		wrapped := strings.Split(lipgloss.NewStyle().Width(w).Render(body), "\n")
+		if len(wrapped) > budget {
+			wrapped = append(wrapped[:budget], clamp("… (window too small for the rest — resize to read it all)"))
+		}
+		for _, ln := range wrapped {
+			rows = append(rows, norm.Render(ln))
+		}
+	}
+
+	// A frame taller than the window is the marching-footer bug. Even the
+	// facts block alone can exceed a tiny terminal, so the whole page is
+	// cut to fit — with a marker, never silently.
+	if maxRows := m.height - 7; m.height > 0 && len(rows) > maxRows {
+		if maxRows < 3 {
+			maxRows = 3
+		}
+		rows = append(rows[:maxRows], clamp("… (terminal too small — resize to see the rest)"))
+	}
+
+	rows = append(rows, norm.Render(""))
+	rows = append(rows, renderHint(w, []hintSeg{
+		{"space ★ bookmark   enter use this model   ", false},
+		{"tab/esc back", true},
+	}))
+
+	content := lipgloss.JoinVertical(lipgloss.Left, rows...)
+	return baseStyle.Padding(1, 2).
+		Border(lipgloss.RoundedBorder()).
+		BorderBackground(styles.PanelBackground()).
+		BorderForeground(t.TextMuted()).
+		Width(lipgloss.Width(content) + 4).
+		Render(content)
+}
+
+// hintSeg is one run of the hint line; hot segments render in the accent
+// colour. Replaces a string-split hack that could only highlight one literal.
+type hintSeg struct {
+	text string
+	hot  bool
+}
+
+// renderHint joins the segments, dropping whole trailing segments that would
+// not fit. Never wider than the frame: an over-wide line makes bubbletea's
+// erase under-reach and the footer marches down the screen (see clampToWidth).
+// GORILLA OVERRIDE: the hot colour is t.Accent(), a lipgloss.AdaptiveColor, so
+// it resolves separately for light and dark terminals rather than being a
+// fixed value that vanishes on one of them.
+func renderHint(w int, segs []hintSeg) string {
+	t := theme.CurrentTheme()
+	hot := lipgloss.NewStyle().Foreground(t.Accent()).Bold(true)
+	muted := lipgloss.NewStyle().Foreground(t.TextMuted())
+	var parts []string
+	used := 0
+	for _, s := range segs {
+		n := len([]rune(s.text))
+		if used+n > w {
+			break
+		}
+		used += n
+		if s.hot {
+			parts = append(parts, hot.Render(s.text))
+		} else {
+			parts = append(parts, muted.Render(s.text))
+		}
+	}
+	return styles.BaseStyle().Width(w).Render(strings.Join(parts, ""))
 }
 
 func (m *modelDialogCmp) getScrollIndicators(maxWidth int) string {
@@ -515,6 +955,9 @@ func (m *modelDialogCmp) getScrollIndicators(maxWidth int) string {
 	// where they are in a long list and when they've reached the end,
 	// instead of an unbounded scroll with no reference point.
 	pos := fmt.Sprintf("%d/%d", m.selectedIdx+1, len(m.models))
+	if len(m.models) == 0 {
+		pos = "0/0" // an empty search result is position nowhere, not 1 of 0
+	}
 	if indicator != "" {
 		indicator = pos + "  " + indicator
 	} else {
@@ -541,6 +984,12 @@ func (m *modelDialogCmp) setupModels() {
 	modelInfo := GetSelectedModel(cfg)
 	m.availableProviders = getEnabledProviders(cfg)
 	m.hScrollPossible = len(m.availableProviders) > 1
+	// This object is reused between opens: a search or detail page left on
+	// screen at the last close must not be what the next open shows.
+	m.searchActive = false
+	m.query = ""
+	m.searchDomain = nil
+	m.detail = nil
 
 	m.provider = modelInfo.Provider
 	m.hScrollOffset = findProviderIndex(m.availableProviders, m.provider)
