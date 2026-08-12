@@ -1,3 +1,38 @@
+## v0.1.81 — 2026-08-12 — the picker answers questions; the gorilla speaks up
+
+Full dual-track document: [v0.1.81-release-notes.md](v0.1.81-release-notes.md).
+
+**Plain-language version:** The model picker learned three things. Press `/`
+and type what you want — `free coding`, `advanced reasoning` — and it searches
+every connected provider's names *and* descriptions at once. Press `tab` on
+any model and you get its full page: the complete description, exact prices,
+context window, capabilities, and which of YOUR keys pays for it ("billed to
+your openrouter key sk-or-…#8f46" — a fingerprint that tells rotated keys
+apart but can never reveal one). And the descriptions are finally whole:
+OpenRouter's own API cuts every one off at ~215 characters, so the release
+build now fetches each model's public page for the full text — 264 of 279
+models complete, and the 15 that OpenRouter publishes nothing more for say
+plainly: "sorry lads — not our fault: that is ALL OpenRouter provides as a
+description for this model." Meanwhile the banana ladder grew to nine rungs
+with escalating gorilla bulletins below 20%, and quota is re-checked after
+each response — cross a rung mid-session and it is announced as it happens,
+instead of burning half a week invisibly between `/usage` calls.
+
+**Technical:** Search domain snapshots all enabled providers, terms AND over
+name/description/detail/provider/id, `[connection]` tags on mixed lists, state
+restored on esc. Detail page renders from the Model struct plus
+`connectionFor()`; width and height both clamped. `config.ProviderKeyFingerprint`
+= 6-char prefix + 2 bytes of SHA-256 + length, mutation-tested against leaks.
+`Model.Detail` (cap 2400) filled by the generator from each model's public
+page (the list API truncates server-side, measured 354/406); runtime refresh
+never scrapes — `PreferFullerDetail` keeps the fuller bundled text, stripping
+the baked-in apology before its prefix comparison. Catalogue cache schema
+5→7; catalogue regenerated (279 models, prices refreshed, one retired). The
+banana ladder is one `bananaTier` switch (8..0) shared by panel wording and
+crossing alerts; post-response checks throttle to 30s, fail silent, and the
+footer echo strips emoji (inline-frame width traps). Picker width now clamps
+to the terminal — the old 62-column floor clipped narrow windows.
+
 ## v0.1.80 — 2026-08-11 — /usage draws a real meter, with bananas
 
 Full dual-track document: [v0.1.80-release-notes.md](v0.1.80-release-notes.md).
