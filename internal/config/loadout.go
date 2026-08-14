@@ -11,6 +11,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -46,6 +47,18 @@ var LoadoutComponents = []LoadoutComponent{
 	{"tool.websearch", "Find sources + web search", "agent can't look anything up — only what you paste in", 300, true, false},
 	{"tool.diagnostics", "Diagnostics tool", "agent can't read LSP errors/warnings", 400, true, false},
 	{"tool.agent", "Sub-agent tool", "agent can't spawn read-only search sub-agents", 200, true, false},
+	// GORILLA OVERRIDE: multi-role research (4-10 helpers in fixed lanes).
+	// Default ON but it is the first thing to drop on a metered link: helpers
+	// run sequentially, so a run is several LLM sessions and real money. Its
+	// own schema is ~450 tokens a turn; the run itself costs far more.
+	//
+	// This 450 is deliberately a GUESS and must stay one. CalibrateLoadout
+	// measures the real figure at startup (622 when measured 2026-08-14) and
+	// overwrites it; TestCalibrationCoversEveryComponentWithNoLSPClients proves
+	// calibration ran by asserting the displayed value DIFFERS from the number
+	// written here. Set this to the measured value and that test can no longer
+	// tell a calibrated figure from an uncalibrated one.
+	{"tool.research", "Research (multi-agent)", "agent can't run multi-role research — it investigates alone, which is how two days went into the wrong fix", 450, true, false},
 	// GORILLA OVERRIDE: default OFF. sparse is the kernel's own semantic checker
 	// (__user/__kernel pointers, endianness, lock imbalance) — invaluable on
 	// kernel work, meaningless everywhere else, so its schema should not ride
@@ -149,6 +162,7 @@ var lowBandwidthOff = map[string]bool{
 	"tool.websearch":   true,
 	"tool.diagnostics": true,
 	"tool.agent":       true,
+	"tool.research":    true,
 	"prompt.lsp":       true,
 }
 
@@ -428,4 +442,384 @@ func LoadoutCost() (dollars, per1MIn float64, modelName string, priced bool) {
 		name = string(m.ID)
 	}
 	return float64(tokens) / 1e6 * m.CostPer1MIn, m.CostPer1MIn, name, true
+}
+
+// ResearchCost prices research helpers, and reports the BURN RATE.
+//
+// GORILLA OVERRIDE, third revision. The wording history matters because each
+// version was rejected for a reason worth keeping:
+//
+//	v1  "20 model sessions. Not one answer — 20."   -> meaningless
+//	v2  "20 separate conversations with the AI"     -> "tells a non-technical
+//	                                                   user sweet fuck all"
+//	v3  "23% of a $2 day"                           -> "disingenuous and a bit
+//	                                                   evasive". Also wrong in
+//	    its assumption: not everyone in these places is dirt poor, some have a
+//	    parent paying for a subscription. Inventing a poverty line for the
+//	    reader is patronising AND imprecise.
+//
+// What the author asked for instead, and he is right: COST PER MINUTE. "The
+// biggest slap in the face, the coldest bucket of water" — so nobody can say
+// they were not warned, and so the support mail does not read "sir, your tool
+// ruined me".
+//
+// Returns:
+//   - perHelper: estimated cost of one helper, USD
+//   - perMinute: estimated PEAK burn while the run is going, USD/minute
+//   - per1MIn:   model input price (0 = free tier / OAuth / flat)
+//   - modelName: the model HELPERS run on — often NOT the chat model
+//   - priced:    false when there is no price entry, so the UI says so rather
+//     than showing a confident and wrong $0.00
+//
+// The estimate's ASSUMPTIONS, named so they can be quoted on screen and
+// argued with. Everything else in the arithmetic is measured or published.
+//
+// NONE of these three is measured. They were invented, and on 2026-08-14 the
+// author audited the dialog and correctly found that the per-minute figure
+// rests entirely on ResearchSecondsPerStep — a number with no evidence behind
+// it. They are surfaced in the UI rather than buried so the reader can judge
+// the forecast instead of trusting it.
+//
+// TO REPLACE THEM PROPERLY: record each helper's real duration and token usage
+// when a run finishes, and average over past runs. Until that exists these stay
+// labelled as assumptions.
+const (
+	ResearchStepsPerHelper = 3
+	ResearchOutputPerStep  = 700
+	ResearchSecondsPerStep = 15.0
+)
+
+func ResearchCost(inFlight int) (perHelper, perMinute, per1MIn float64, modelName string, priced bool) {
+	if cfg == nil {
+		return 0, 0, 0, "", false
+	}
+	name := AgentResearch
+	if _, ok := cfg.Agents[AgentResearch]; !ok {
+		name = AgentTask
+	}
+	agent, ok := cfg.Agents[name]
+	if !ok {
+		return 0, 0, 0, "", false
+	}
+	m, ok := models.SupportedModels[agent.Model]
+	if !ok {
+		return 0, 0, 0, string(agent.Model), false
+	}
+	label := m.Name
+	if label == "" {
+		label = string(m.ID)
+	}
+
+	// Per-STEP shape. The input floor is measured for this install
+	// (LoadoutActiveTokens + base prompt); the rest is the estimate, and the UI
+	// prints the assumptions next to the number.
+	// One source of truth for the basis, and NOT LoadoutActiveTokens() +
+	// LoadoutBaseTokens() — that double-counted the base prompt. See the note on
+	// ResearchBasisTokens.
+	base := ResearchBasisTokens()
+	costPerStep := float64(base)/1e6*m.CostPer1MIn + float64(ResearchOutputPerStep)/1e6*m.CostPer1MOut
+	perHelper = costPerStep * ResearchStepsPerHelper
+
+	// Peak burn: every in-flight helper completing a step every secondsPerStep.
+	if inFlight < 1 {
+		inFlight = 1
+	}
+	perMinute = costPerStep * float64(inFlight) * (60.0 / ResearchSecondsPerStep)
+
+	return perHelper, perMinute, m.CostPer1MIn, label, true
+}
+
+// ResearchHelperModel reports which model helpers run on, and whether that is
+// on a DIFFERENT PROVIDER from the chat model.
+//
+// GORILLA OVERRIDE: this used to flag any difference in model NAME, which fired
+// for two near-identical Gemini free-tier models and read as confusing trivia —
+// "helpers run on 3.6, not 3.7, which you are chatting with". So what? The user
+// could not act on it and it did not mean anything.
+//
+// A different PROVIDER is the case that actually matters: different billing,
+// different quota, possibly a local server. That is the shape of the real bug
+// this was written for, where research helpers were silently pointed at a local
+// Llama while the user was signed in to Antigravity. Name-only differences
+// within one provider are noise and are no longer reported.
+func ResearchHelperModel() (helper, chat string, differentProvider bool) {
+	if cfg == nil {
+		return "", "", false
+	}
+	lookup := func(a AgentName) (models.Model, bool) {
+		ag, ok := cfg.Agents[a]
+		if !ok {
+			return models.Model{}, false
+		}
+		m, ok := models.SupportedModels[ag.Model]
+		return m, ok
+	}
+	hm, hok := lookup(AgentResearch)
+	if !hok {
+		hm, hok = lookup(AgentTask)
+	}
+	cm, cok := lookup(AgentCoder)
+	if !hok || !cok {
+		return "", "", false
+	}
+	name := func(m models.Model) string {
+		if m.Name != "" {
+			return m.Name
+		}
+		return string(m.ID)
+	}
+	return name(hm), name(cm), hm.Provider != cm.Provider
+}
+
+// ResearchModelChoice reports the two models research could run on: the one it
+// WILL use, and the one the user is actually chatting with.
+//
+// GORILLA FIX 2026-08-14: the screen was blind to the chat model unless the two
+// were on different PROVIDERS. That gate was chosen to suppress noise about
+// billing — same provider, same bill, nothing to warn about — and it was the
+// wrong axis entirely.
+//
+// Reported the same day: the user switched to Claude Opus 4.6 (Thinking) and the
+// research screen carried on pricing Gemini 2.0 Flash without a word, because
+// both are Antigravity. Nobody selects Opus for billing reasons. They select it
+// because the work is hard, and the whole point of research is to do the hard
+// part — so silently running it on Flash caps the answer at Flash while the
+// status bar says Opus.
+//
+// So the comparison is now on the MODEL, and the thing reported is CAPABILITY,
+// not just cost. Provider difference is still called out separately, because a
+// different bill is a different harm from a weaker answer.
+func ResearchModelChoice() (helper, chat models.Model, ok bool) {
+	if cfg == nil {
+		return models.Model{}, models.Model{}, false
+	}
+	lookup := func(a AgentName) (models.Model, bool) {
+		ag, found := cfg.Agents[a]
+		if !found {
+			return models.Model{}, false
+		}
+		m, found := models.SupportedModels[ag.Model]
+		return m, found
+	}
+	h, hok := lookup(AgentResearch)
+	if !hok {
+		h, hok = lookup(AgentTask)
+	}
+	c, cok := lookup(AgentCoder)
+	if !hok || !cok {
+		return models.Model{}, models.Model{}, false
+	}
+	return h, c, true
+}
+
+// ModelLabel is a model's human name, falling back to its id.
+func ModelLabel(m models.Model) string {
+	if m.Name != "" {
+		return m.Name
+	}
+	return string(m.ID)
+}
+
+// UseChatModelForResearch pins the research agent to the coder's model, so
+// helpers run on whatever the user actually selected.
+//
+// This also CREATES the "research" agent entry, which most configs lack — the
+// reason researchAgentName() has to fall back to AgentTask, and the reason the
+// old dialog could tell the user to "set a research agent" while offering no way
+// to do it.
+func UseChatModelForResearch() error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	coder, ok := cfg.Agents[AgentCoder]
+	if !ok {
+		return fmt.Errorf("no coder agent configured")
+	}
+	return UpdateAgentModel(AgentResearch, coder.Model)
+}
+
+// ResearchHelperModelInfo returns the actual model helpers will run on.
+func ResearchHelperModelInfo() (models.Model, bool) {
+	if cfg == nil {
+		return models.Model{}, false
+	}
+	name := AgentResearch
+	if _, ok := cfg.Agents[AgentResearch]; !ok {
+		name = AgentTask
+	}
+	ag, ok := cfg.Agents[name]
+	if !ok {
+		return models.Model{}, false
+	}
+	m, ok := models.SupportedModels[ag.Model]
+	return m, ok
+}
+
+// ResearchPaidEquivalent prices the run for the MODEL THE USER IS ACTUALLY ON,
+// at its paid-API rate, when their own tier is flat or free.
+//
+// GORILLA OVERRIDE: this replaces a cheapest/most-expensive RANGE across the
+// whole catalogue, which was rejected — correctly — as "generic crap displaying
+// not so relevant information". It offered BGE-M3 (an embedding model) as the
+// cheap end and o1 pro as the dear end, neither of which the user had selected
+// or would ever run. Someone on Muse Glimmer wants to know what Muse Glimmer
+// costs, not trivia about two models they have never heard of.
+//
+// Method: find a METERED entry for the same model family — the same model sold
+// through a paid API rather than a free tier — and price the identical token
+// volume against it. If no sibling exists, say so. Never substitute an
+// unrelated model.
+func ResearchPaidEquivalent(helperModel models.Model, inFlight int) (perMin, perHelper float64, viaName string, ok bool) {
+	if inFlight < 1 {
+		inFlight = 1
+	}
+	base := ResearchBasisTokens()
+
+	price := func(m models.Model) (float64, float64) {
+		perStep := float64(base)/1e6*m.CostPer1MIn + float64(ResearchOutputPerStep)/1e6*m.CostPer1MOut
+		return perStep * float64(inFlight) * (60.0 / ResearchSecondsPerStep), perStep * ResearchStepsPerHelper
+	}
+
+	// Already metered: the real rate IS the answer, no equivalent needed.
+	if helperModel.CostPer1MIn > 0 {
+		pm, ph := price(helperModel)
+		return pm, ph, "", true
+	}
+
+	want := familyTokens(string(helperModel.ID) + " " + helperModel.Name)
+	var best models.Model
+	bestScore := 0
+	var bestID models.ModelID
+	for id, m := range models.SupportedModels {
+		if m.CostPer1MIn <= 0 || m.DefaultMaxTokens <= 0 {
+			continue
+		}
+		score := 0
+		for tok := range familyTokens(string(id) + " " + m.Name) {
+			if want[tok] {
+				score++
+			}
+		}
+		// Deterministic: on a tie, the lexicographically smaller id wins, so
+		// this cannot flicker between renders.
+		if score > bestScore || (score == bestScore && score > 0 && id < bestID) {
+			best, bestScore, bestID = m, score, id
+		}
+	}
+	// Two shared family tokens is the floor, AND at least one must be a real
+	// name rather than a qualifier. "gemini"+"flash" is a family; "mini"+"code"
+	// is two coincidences stacked.
+	if bestScore < 2 || !sharesASubstantiveToken(want, familyTokens(string(bestID)+" "+best.Name)) {
+		return 0, 0, "", false
+	}
+	name := best.Name
+	if name == "" {
+		name = string(best.ID)
+	}
+	pm, ph := price(best)
+	return pm, ph, name, true
+}
+
+// familyTokens reduces a model id/name to comparable words: "gemini-3.6-flash"
+// and "Gemini 3.5 Flash" share {gemini, flash}. Version numbers are kept as
+// their own tokens so 3.6 does not silently match 2.0.
+func familyTokens(s string) map[string]bool {
+	out := map[string]bool{}
+	cur := strings.Builder{}
+	flush := func() {
+		if cur.Len() >= 2 {
+			out[strings.ToLower(cur.String())] = true
+		}
+		cur.Reset()
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			cur.WriteRune(r)
+		default:
+			flush()
+		}
+	}
+	flush()
+	// Words that appear across half the catalogue carry no family information.
+	// Matching on these produced nonsense: "Cohere North Mini Code" was priced
+	// via "AionLabs Aion-3.0-Mini" because both contain "mini".
+	for _, noise := range []string{
+		"free", "medium", "high", "low", "tiered", "thinking", "preview", "latest",
+		"antigravity", "mini", "small", "large", "nano", "micro", "turbo", "lite",
+		"base", "chat", "instruct", "code", "coder", "plus", "max", "ultra", "pro",
+		"exp", "experimental", "beta", "alpha", "vision", "text", "openrouter",
+	} {
+		delete(out, noise)
+	}
+	// Bare numbers are version noise on their own — "3" matches half the
+	// catalogue. They only count attached to a name, which the tokeniser
+	// already keeps ("gemini25" stays whole where the source has no separator).
+	for tok := range out {
+		allDigits := true
+		for _, r := range tok {
+			if r < '0' || r > '9' {
+				allDigits = false
+				break
+			}
+		}
+		if allDigits {
+			delete(out, tok)
+		}
+	}
+	return out
+}
+
+// ResearchBasisTokens reports the measured per-step input size, so the UI can
+// show where the arithmetic starts instead of asserting a total.
+// GORILLA FIX 2026-08-14: THE BASE PROMPT WAS COUNTED TWICE.
+//
+// LoadoutActiveTokens() ALREADY opens with `total := basePromptTokens` (see
+// :395). Adding LoadoutBaseTokens() on top added the same figure a second time,
+// so the research basis carried a phantom copy of the system prompt — 3,000
+// tokens at shipped defaults, 28% over — and it fed straight into costPerStep.
+// EVERY dollar figure on the /research screen was inflated by it, and the
+// "MEASURED: N tokens of context per step (this machine)" line disagreed with
+// what /context prints for the same quantity.
+//
+// Found by an independent audit on 2026-08-14 after three failed attempts to
+// fix this screen by hand. "Measured" has to mean measured; a figure labelled
+// as such and then quietly doubled is worse than an honest estimate.
+func ResearchBasisTokens() int {
+	base := LoadoutActiveTokens()
+	if base <= 0 {
+		base = 8000
+	}
+	return base
+}
+
+// ResearchQuotaMultiple is how many ORDINARY questions this run is worth in
+// tokens. Derived, not the helper count — see the note in research_agent_test.go.
+func ResearchQuotaMultiple(helpers int) int {
+	if helpers < 1 {
+		return 0
+	}
+	return helpers * ResearchStepsPerHelper
+}
+
+// sharesASubstantiveToken requires a shared word long enough to identify a
+// model family, rather than two generic qualifiers coinciding.
+func sharesASubstantiveToken(a, b map[string]bool) bool {
+	for tok := range b {
+		if len(tok) >= 5 && a[tok] {
+			return true
+		}
+	}
+	return false
+}
+
+// AgentModel reports an agent's currently configured model id, or "" if that
+// agent is not configured. A small accessor, but it means callers (and tests
+// asserting that a revert really landed) read the same place the app does
+// rather than reaching into cfg.
+func AgentModel(name AgentName) models.ModelID {
+	if cfg == nil {
+		return ""
+	}
+	return cfg.Agents[name].Model
 }

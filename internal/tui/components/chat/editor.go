@@ -293,9 +293,37 @@ func (m *editorCmp) Init() tea.Cmd {
 	return textarea.Blink
 }
 
+// controlCommands are slash commands that MUST work while the agent is busy.
+//
+// GORILLA OVERRIDE: /tasks was refused with "Agent is working, please wait..."
+// — the one moment it exists for. Its entire job is to show the helpers running
+// right now and stop them, so gating it behind "not busy" made the kill switch
+// unreachable exactly when a run was spending money. Reported 2026-08-14 with
+// a research run looping and no way to see or stop it.
+//
+// These open a local dialog and send nothing to the model, so letting them
+// through cannot interleave with a request in flight.
+var controlCommands = map[string]bool{
+	"tasks": true, "task": true, "agents": true, "kill": true,
+	"help": true, "commands": true,
+}
+
 func (m *editorCmp) send() tea.Cmd {
+	// Read the command word BEFORE the busy check, so a control command is not
+	// refused by it.
+	raw := strings.TrimSpace(m.textarea.Value())
+	if strings.HasPrefix(raw, "/") {
+		word, args, _ := strings.Cut(strings.TrimPrefix(raw, "/"), " ")
+		word = strings.ToLower(strings.TrimSpace(word))
+		if controlCommands[word] {
+			m.textarea.Reset()
+			m.rememberSent(raw)
+			return util.CmdHandler(SlashCommandMsg{Name: word, Args: strings.TrimSpace(args)})
+		}
+	}
+
 	if m.app.CoderAgent.IsSessionBusy(m.session.ID) {
-		return util.ReportWarn("Agent is working, please wait...")
+		return util.ReportWarn("Agent is working, please wait... (/tasks still works — it is how you stop helpers)")
 	}
 
 	value := m.textarea.Value()

@@ -56,6 +56,21 @@ type Command struct {
 var All = []Command{
 	// ─── Your conversation ───────────────────────────────────────────
 	{
+		Name:    "research",
+		Group:   GroupHelpers,
+		Args:    "<question>",
+		Summary: "Send helper agents to investigate, each on one angle.",
+		Detail: "Four to ten helpers, each given ONE angle: what already exists on this " +
+			"machine, whether anyone else has solved it, what the authoritative documents " +
+			"say, and what the target actually requires. A verifier then attacks their " +
+			"conclusions.\n\n" +
+			"You choose how it runs, because the choice multiplies the bill: sequential " +
+			"(one at a time), parallel (all at once — SAME cost, much less waiting) or " +
+			"supervised (parallel plus a second agent auditing every lane — DOUBLE). " +
+			"Each helper is a full model session, so four helpers is four sessions.\n\n" +
+			"Worth it when being wrong is expensive. Waste when a single grep would answer.",
+	},
+	{
 		Name:    "clear",
 		Aliases: []string{"new"},
 		Group:   GroupSession,

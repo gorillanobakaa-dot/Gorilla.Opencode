@@ -20,15 +20,93 @@ import (
 	"github.com/opencode-ai/opencode/internal/pubsub"
 )
 
+// SubAgentState is where a helper is in its life.
+//
+// GORILLA OVERRIDE 2026-08-14: the registry used to have no state at all —
+// being IN it meant "running", and a helper waiting for a concurrency slot was
+// simply not in it yet. That is how a user who asked for 10 helpers saw four in
+// /tasks and reasonably concluded the feature was broken. Six were alive and
+// queued, and nothing in the app could see them.
+//
+// Worse, they could not be killed. KillAllSubAgents walks the registry, so the
+// Nuclear Option cancelled the four holding slots, which released those slots,
+// which let the next four start. Pressing it did not stop a research run.
+//
+// A helper is now registered the moment it EXISTS, carrying its state, so the
+// list always shows the whole run and every row is killable whether or not it
+// has started.
+type SubAgentState int
+
+const (
+	SubAgentQueued  SubAgentState = iota // alive, waiting for a concurrency slot
+	SubAgentRunning                      // holding a slot, model working
+	SubAgentDone                         // finished and returned a result
+	SubAgentFailed                       // errored out (rate limit, provider, timeout)
+	SubAgentKilled                       // cancelled by the user
+)
+
+// Marker is the two-glyph status badge: a gorilla plus a signal.
+//
+// The gorilla is the constant that makes a helper row scannable at a glance;
+// the second glyph carries the state. Both are exactly two cells wide, so every
+// marker is four cells and rows stay aligned — a variable-width badge would put
+// a line over the terminal width, which is the documented root cause of the
+// footer-drift bug in CLAUDE.md.
+//
+// The glyph is NEVER the only carrier. Label() ships beside it in every render,
+// because the reference machine is a 2012 laptop on Debian whose terminal font
+// may have no emoji coverage at all — and a user who sees four identical boxes
+// must still be able to read what is happening.
+func (s SubAgentState) Marker() string {
+	switch s {
+	case SubAgentQueued:
+		return "\U0001F98D\U0001F7E1" // gorilla + yellow circle: waiting its turn
+	case SubAgentRunning:
+		return "\U0001F98D\U0001F7E2" // gorilla + green circle: working now
+	case SubAgentDone:
+		return "\U0001F98D\U0001F535" // gorilla + blue circle: finished, result in
+	case SubAgentFailed:
+		return "\U0001F98D\U0001F534" // gorilla + red circle: it broke
+	case SubAgentKilled:
+		return "\U0001F98D\U0001F6D1" // gorilla + stop sign: you stopped it
+	}
+	return "\U0001F98D\U000026AA"
+}
+
+// Label is the word for the state. Always rendered next to Marker.
+func (s SubAgentState) Label() string {
+	switch s {
+	case SubAgentQueued:
+		return "QUEUED"
+	case SubAgentRunning:
+		return "RUNNING"
+	case SubAgentDone:
+		return "DONE"
+	case SubAgentFailed:
+		return "FAILED"
+	case SubAgentKilled:
+		return "KILLED"
+	}
+	return "UNKNOWN"
+}
+
+// Live reports whether this helper is still consuming or about to consume
+// quota. Only live helpers count toward the status-bar total and only they are
+// worth killing.
+func (s SubAgentState) Live() bool {
+	return s == SubAgentQueued || s == SubAgentRunning
+}
+
 // SubAgentInfo is a snapshot of one live helper agent. Safe to copy/share with
 // the UI (carries no cancel func or locks).
 type SubAgentInfo struct {
-	ID              string    // short, stable handle shown in /tasks (e.g. "a3")
-	SessionID       string    // the helper's own task session
-	ParentSessionID string    // the coder session that spawned it
-	ToolCallID      string    // the agent tool call that created it
-	Prompt          string    // the task the helper was given
-	StartedAt       time.Time // spawn time, for elapsed display
+	ID              string        // short, stable handle shown in /tasks (e.g. "a3")
+	SessionID       string        // the helper's own task session
+	ParentSessionID string        // the coder session that spawned it
+	ToolCallID      string        // the agent tool call that created it
+	Prompt          string        // the task the helper was given
+	StartedAt       time.Time     // spawn time, for elapsed display
+	State           SubAgentState // queued / running / done / failed / killed
 }
 
 type subAgentEntry struct {
@@ -55,6 +133,14 @@ func SubAgentSubscribe(ctx context.Context) <-chan pubsub.Event[SubAgentInfo] {
 // cancel func that also removes it from the registry. Call UnregisterSubAgent
 // (or the returned func) when the helper finishes.
 func RegisterSubAgent(sessionID, parentSessionID, toolCallID, prompt string, cancel context.CancelFunc) SubAgentInfo {
+	return RegisterSubAgentState(sessionID, parentSessionID, toolCallID, prompt, SubAgentRunning, cancel)
+}
+
+// RegisterSubAgentState is RegisterSubAgent with the starting state named.
+// Research helpers register as SubAgentQueued BEFORE they wait on the
+// concurrency semaphore, so the whole run is visible and killable from the
+// instant it is scheduled rather than only once it starts.
+func RegisterSubAgentState(sessionID, parentSessionID, toolCallID, prompt string, state SubAgentState, cancel context.CancelFunc) SubAgentInfo {
 	subAgentRegMu.Lock()
 	subAgentSeq++
 	id := shortHandle(subAgentSeq)
@@ -65,12 +151,32 @@ func RegisterSubAgent(sessionID, parentSessionID, toolCallID, prompt string, can
 		ToolCallID:      toolCallID,
 		Prompt:          prompt,
 		StartedAt:       time.Now(),
+		State:           state,
 	}
 	subAgentReg[id] = &subAgentEntry{info: info, cancel: cancel}
 	subAgentRegMu.Unlock()
 
 	subAgentBroker.Publish(pubsub.CreatedEvent, info)
 	return info
+}
+
+// SetSubAgentState moves a helper to a new state and tells the UI.
+//
+// Kept separate from Unregister so a finished helper can be SHOWN as finished
+// instead of vanishing: a row that disappears the moment it completes gives the
+// user no way to tell "it answered" from "it was never there", which is exactly
+// the ambiguity that made a 10-helper run look like a 4-helper one.
+func SetSubAgentState(id string, state SubAgentState) {
+	subAgentRegMu.Lock()
+	entry, ok := subAgentReg[id]
+	if ok {
+		entry.info.State = state
+	}
+	subAgentRegMu.Unlock()
+
+	if ok {
+		subAgentBroker.Publish(pubsub.UpdatedEvent, entry.info)
+	}
 }
 
 // UnregisterSubAgent removes a helper from the registry (called when it exits
@@ -102,11 +208,31 @@ func ListSubAgents() []SubAgentInfo {
 }
 
 // ActiveSubAgentCount is the cheap read used by the status bar every frame.
+// Counts LIVE helpers only — queued and running. A finished row lingers in
+// /tasks so the user can see it landed, but it is not still costing them
+// anything and must not be counted as if it were.
 func ActiveSubAgentCount() int {
 	subAgentRegMu.Lock()
-	n := len(subAgentReg)
+	n := 0
+	for _, e := range subAgentReg {
+		if e.info.State.Live() {
+			n++
+		}
+	}
 	subAgentRegMu.Unlock()
 	return n
+}
+
+// SubAgentStateCounts breaks the registry down by state, for a status line that
+// can say "4 running, 6 queued" instead of a single ambiguous number.
+func SubAgentStateCounts() map[SubAgentState]int {
+	subAgentRegMu.Lock()
+	out := map[SubAgentState]int{}
+	for _, e := range subAgentReg {
+		out[e.info.State]++
+	}
+	subAgentRegMu.Unlock()
+	return out
 }
 
 // KillSubAgent cancels a single helper by its handle. Returns false if the
@@ -123,6 +249,7 @@ func KillSubAgent(id string) (SubAgentInfo, bool) {
 	if !ok {
 		return SubAgentInfo{}, false
 	}
+	entry.info.State = SubAgentKilled
 	entry.cancel()
 	subAgentBroker.Publish(pubsub.DeletedEvent, entry.info)
 	return entry.info, true
@@ -140,6 +267,7 @@ func KillAllSubAgents() int {
 	subAgentRegMu.Unlock()
 
 	for _, e := range entries {
+		e.info.State = SubAgentKilled
 		e.cancel()
 		subAgentBroker.Publish(pubsub.DeletedEvent, e.info)
 	}

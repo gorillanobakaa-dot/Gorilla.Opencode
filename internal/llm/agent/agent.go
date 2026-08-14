@@ -485,28 +485,41 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 			goto out
 		default:
 			// Continue processing
-			var tool tools.BaseTool
-			for _, availableTool := range a.getTools() {
-				if availableTool.Info().Name == toolCall.Name {
-					tool = availableTool
-					break
-				}
-				// Monkey patch for Copilot Sonnet-4 tool repetition obfuscation
-				// if strings.HasPrefix(toolCall.Name, availableTool.Info().Name) &&
-				// 	strings.HasPrefix(toolCall.Name, availableTool.Info().Name+availableTool.Info().Name) {
-				// 	tool = availableTool
-				// 	break
-				// }
+			// GORILLA OVERRIDE: exact match, then ONE control-token cleaning
+			// pass, then exact match again. Nothing else. The rules and the
+			// reasons live in toolname.go — read them before changing this.
+			//
+			// The commented-out strings.HasPrefix "monkey patch" that used to
+			// sit here is deleted rather than left as a temptation: prefix
+			// matching lets `bash_readonly` resolve to `bash`, which turns a
+			// typo-fix into a privilege-escalation primitive.
+			available := a.getTools()
+			namers := make([]toolNamer, len(available))
+			for j, t := range available {
+				namers[j] = toolInfoNamer{t}
 			}
+			idx, resolved, cleaned := findTool(namers, toolCall.Name)
 
 			// Tool not found
-			if tool == nil {
+			if idx < 0 {
+				// Report BOTH names. The model that emitted "ls<|message|>" and
+				// the human reading the transcript both need to see what was
+				// actually sent — diagnosing this the first time took a dig
+				// through the session database.
 				toolResults[i] = message.ToolResult{
 					ToolCallID: toolCall.ID,
-					Content:    fmt.Sprintf("Tool not found: %s", toolCall.Name),
+					Content:    fmt.Sprintf("Tool not found: %q. Call the tool by its exact name, with no extra characters.", toolCall.Name),
 					IsError:    true,
 				}
 				continue
+			}
+			tool := available[idx]
+			if cleaned {
+				// Never silently. A name that had to be repaired is recorded,
+				// so a strange name can never quietly become a powerful tool
+				// with nobody able to see that it happened.
+				logging.Warn("repaired a malformed tool name from the model",
+					"sent", toolCall.Name, "resolved", resolved, "agent", string(a.agentName))
 			}
 			toolResult, toolErr := tool.Run(ctx, tools.ToolCall{
 				ID:    toolCall.ID,

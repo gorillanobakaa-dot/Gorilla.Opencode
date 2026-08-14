@@ -7,6 +7,7 @@ package dialog
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -117,8 +118,13 @@ func (m *tasksDialogCmp) View() string {
 		m.selectedIdx = max(0, len(tasks)-1)
 	}
 
+	// GORILLA FIX 2026-08-14: the header used to say "Running helper agents"
+	// while the list could only ever contain running ones — a queued helper was
+	// not registered at all. A user who asked for 10 saw 4 and concluded the
+	// feature was broken. The count is now itemised so the list can never imply
+	// a number the run does not have.
 	header := base.Foreground(t.Primary()).Bold(true).Width(w).
-		Render("🦍 Running helper agents — full transparency")
+		Render("🦍 Helper agents — " + taskCountSummary(tasks))
 	sub := base.Foreground(t.TextMuted()).Width(w).
 		Render("Every sub-agent the main agent spawned on your behalf. You are in control.")
 
@@ -129,10 +135,29 @@ func (m *tasksDialogCmp) View() string {
 	} else {
 		for i, tk := range tasks {
 			elapsed := time.Since(tk.StartedAt).Truncate(time.Second)
-			line := fmt.Sprintf(" %-4s  %6s  %s", tk.ID, elapsed.String(), truncate(tk.Prompt, w-18))
+			// GORILLA OVERRIDE: state marker + state WORD. The gorilla is the
+			// constant; the coloured signal beside it carries the state. The
+			// word is not decoration and must never be dropped to save room —
+			// the reference machine is a 2012 laptop whose terminal font may
+			// render every emoji as an identical box, and this list is how the
+			// user decides what to kill.
+			line := fmt.Sprintf(" %-4s %s %-7s %6s  %s",
+				tk.ID, tk.State.Marker(), tk.State.Label(), elapsed.String(),
+				truncate(tk.Prompt, w-taskRowPrefixCells))
 			style := base.Width(w)
 			if i == m.selectedIdx {
 				style = style.Background(t.Primary()).Foreground(t.Background()).Bold(true)
+			} else {
+				switch tk.State {
+				case agent.SubAgentRunning:
+					style = style.Foreground(t.Success())
+				case agent.SubAgentQueued:
+					style = style.Foreground(t.Warning())
+				case agent.SubAgentFailed, agent.SubAgentKilled:
+					style = style.Foreground(t.Error())
+				case agent.SubAgentDone:
+					style = style.Foreground(t.TextMuted())
+				}
 			}
 			rows = append(rows, style.Render(line))
 		}
@@ -170,4 +195,50 @@ func truncate(s string, max int) string {
 		return "…"
 	}
 	return string(r[:max-1]) + "…"
+}
+
+// taskRowPrefixCells is the display width of everything a row prints before the
+// prompt: leading space, 4-cell id, space, 4-cell marker, space, 7-cell label,
+// space, 6-cell elapsed, two spaces. Kept as a named constant because the
+// marker is EMOJI — two cells each, four for the pair — and getting this wrong
+// puts the line over the terminal width, which is the documented root cause of
+// the footer-drift bug (CLAUDE.md). TestTaskRowsNeverExceedTheWidth holds it
+// honest.
+const taskRowPrefixCells = 1 + 4 + 1 + 4 + 1 + 7 + 1 + 6 + 2
+
+// taskCountSummary describes the run in its own terms: "4 running, 6 queued"
+// rather than a single number that cannot distinguish a small run from a
+// throttled one.
+func taskCountSummary(tasks []agent.SubAgentInfo) string {
+	if len(tasks) == 0 {
+		return "none right now"
+	}
+	var running, queued, done, failed, killed int
+	for _, tk := range tasks {
+		switch tk.State {
+		case agent.SubAgentRunning:
+			running++
+		case agent.SubAgentQueued:
+			queued++
+		case agent.SubAgentDone:
+			done++
+		case agent.SubAgentFailed:
+			failed++
+		case agent.SubAgentKilled:
+			killed++
+		}
+	}
+	parts := []string{}
+	for _, p := range []struct {
+		n    int
+		word string
+	}{
+		{running, "running"}, {queued, "queued"}, {done, "done"},
+		{failed, "failed"}, {killed, "killed"},
+	} {
+		if p.n > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", p.n, p.word))
+		}
+	}
+	return strings.Join(parts, ", ")
 }

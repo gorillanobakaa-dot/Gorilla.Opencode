@@ -65,12 +65,12 @@ func TestHelpersFollowTheCoderWhenTheyWereShadowingIt(t *testing.T) {
 	setAgents(t, old, old, old, old)
 	registerModel(t, new_)
 
-	moved, err := FollowCoderModel(old, new_)
+	moves, err := FollowCoderModel(old, new_)
 	if err != nil {
 		t.Fatalf("FollowCoderModel: %v", err)
 	}
-	if moved != 3 {
-		t.Errorf("moved %d helpers, want 3", moved)
+	if len(moves) != 3 {
+		t.Errorf("moved %d helpers, want 3", len(moves))
 	}
 	for _, name := range []AgentName{AgentSummarizer, AgentTask, AgentTitle} {
 		if got := modelOf(t, name); got != new_ {
@@ -79,24 +79,57 @@ func TestHelpersFollowTheCoderWhenTheyWereShadowingIt(t *testing.T) {
 	}
 }
 
-// A helper deliberately set to something else must NOT be dragged along — a
-// cheap fast model for titles is a legitimate, common choice.
-func TestADeliberatelyDifferentHelperIsLeftAlone(t *testing.T) {
+// SUPERSEDED 2026-08-14. The original requirement, kept verbatim because the
+// reasoning behind it is still sound and still has to be honoured — just by a
+// different mechanism:
+//
+//	"A helper deliberately set to something else must NOT be dragged along — a
+//	 cheap fast model for titles is a legitimate, common choice."
+//
+// That was right about the CHOICE and wrong about the DEFENCE. Leaving a helper
+// alone protected a hand-picked cheap title model, and it also left research on
+// Gemini Flash while the user chatted to Claude Opus 4.6 — same provider, same
+// bill, silently worse answers. Nobody picks Opus to save money.
+//
+// The choice is now defended by CONSENT rather than by inaction: everything
+// follows, the user is shown exactly what moved and what it costs, and
+// RevertAgentModels puts it back exactly. A deliberate cheap title survives —
+// it just survives by the user pressing "r", having been told, instead of by
+// the code deciding on their behalf and never mentioning it.
+//
+// This test now pins the new contract: the drag happens, AND it is perfectly
+// reversible. If revert were ever lossy, the old objection would apply again in
+// full and this is where it must fail.
+func TestADeliberatelyDifferentHelperIsDraggedButFullyRestorable(t *testing.T) {
 	const old = models.ModelID("local.01-ai/yi-large")
 	const new_ = models.ModelID("local.meta/llama-3.3-70b-instruct")
 	const cheapTitle = models.ModelID("local.meta/llama-3.1-8b-instruct")
 	setAgents(t, old, old, old, cheapTitle)
 	registerModel(t, new_)
 
-	moved, err := FollowCoderModel(old, new_)
+	moves, err := FollowCoderModel(old, new_)
 	if err != nil {
 		t.Fatalf("FollowCoderModel: %v", err)
 	}
-	if moved != 2 {
-		t.Errorf("moved %d helpers, want 2 (title was set deliberately)", moved)
+	if len(moves) != 3 {
+		t.Fatalf("moved %d agents, want 3 — everything follows now", len(moves))
+	}
+	if got := modelOf(t, AgentTitle); got != new_ {
+		t.Errorf("title is on %q, want %q — it should have followed", got, new_)
+	}
+
+	// The whole justification for dragging a deliberate choice is that it can be
+	// undone EXACTLY. If this fails, the feature is not safe to ship.
+	if err := RevertAgentModels(moves); err != nil {
+		t.Fatalf("RevertAgentModels: %v", err)
 	}
 	if got := modelOf(t, AgentTitle); got != cheapTitle {
-		t.Errorf("title was overwritten with %q, discarding a deliberate choice", got)
+		t.Errorf("after revert, title is %q — the deliberate cheap model was NOT restored, want %q", got, cheapTitle)
+	}
+	for _, name := range []AgentName{AgentSummarizer, AgentTask} {
+		if got := modelOf(t, name); got != old {
+			t.Errorf("after revert, %s is %q, want %q", name, got, old)
+		}
 	}
 }
 
@@ -107,11 +140,11 @@ func TestNoOpCases(t *testing.T) {
 	const other = models.ModelID("local.01-ai/yi-large")
 	setAgents(t, same, other, other, other)
 
-	if moved, err := FollowCoderModel(same, same); err != nil || moved != 0 {
-		t.Errorf("same model in and out: moved=%d err=%v, want 0/nil", moved, err)
+	if moves, err := FollowCoderModel(same, same); err != nil || len(moves) != 0 {
+		t.Errorf("same model in and out: moved=%d err=%v, want 0/nil", len(moves), err)
 	}
-	if moved, err := FollowCoderModel("", same); err != nil || moved != 0 {
-		t.Errorf("empty previous model: moved=%d err=%v, want 0/nil", moved, err)
+	if moves, err := FollowCoderModel("", same); err != nil || len(moves) != 0 {
+		t.Errorf("empty previous model: moved=%d err=%v, want 0/nil", len(moves), err)
 	}
 	if got := modelOf(t, AgentSummarizer); got != other {
 		t.Errorf("a no-op case still modified the summarizer: %q", got)

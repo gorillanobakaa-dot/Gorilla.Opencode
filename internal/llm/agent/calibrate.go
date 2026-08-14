@@ -61,6 +61,7 @@ func CalibrateLoadout(
 	set("tool.patch", tools.NewPatchTool(lspClients, permissions, history))
 	set("tool.write", tools.NewWriteTool(lspClients, permissions, history))
 	set("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions))
+	set("tool.research", NewResearchTool(sessions, messages, lspClients, permissions))
 	set("tool.sparse", tools.NewSparseTool(permissions))
 	// GORILLA OVERRIDE: measure diagnostics unconditionally. This was guarded on
 	// having LSP clients, but the tool's SCHEMA is static — the clients only affect

@@ -220,7 +220,16 @@ type appModel struct {
 	settingsDialog     dialog.SettingsDialog
 
 	showInitDialog bool
-	initDialog     dialog.InitDialogCmp
+
+	// GORILLA OVERRIDE: /research mode chooser.
+	researchDialog     dialog.ResearchDialogCmp
+	showResearchDialog bool
+
+	// GORILLA OVERRIDE: "your background helpers moved too" — shown after a
+	// model switch drags summarizer/task/title/research along, with a revert.
+	modelFollowDialog     dialog.ModelFollowDialogCmp
+	showModelFollowDialog bool
+	initDialog            dialog.InitDialogCmp
 
 	showFilepicker bool
 	filepicker     dialog.FilepickerCmp
@@ -861,18 +870,51 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// leave summarizer/task/title on the old model — invisible until a title
 		// failed, or worse, until summarisation was needed mid-session.
 		note := fmt.Sprintf("Model changed to %s", model.Name)
-		if moved, ferr := config.FollowCoderModel(prevCoder, msg.Model.ID); ferr != nil {
+		moves, ferr := config.FollowCoderModel(prevCoder, msg.Model.ID)
+		if ferr != nil {
 			// Not fatal: the coder switch already succeeded and is what was asked
 			// for. Say so rather than failing the whole action silently.
-			note += fmt.Sprintf(" — but the helper agents could not be moved: %v", ferr)
-		} else if moved > 0 {
-			note += fmt.Sprintf(" (%d helper agent(s) moved with it)", moved)
+			return a, util.ReportInfo(note + fmt.Sprintf(" — but the background agents could not be moved: %v", ferr))
 		}
+		if len(moves) == 0 {
+			return a, util.ReportInfo(note)
+		}
+		// GORILLA FIX: a status note cannot carry this. Four agents just changed
+		// model, which changes what they cost, which quota they draw and how
+		// good the research will be. Show it, itemised, with a way back.
+		d, _ := dialog.NewModelFollowDialogCmp(moves).
+			Update(tea.WindowSizeMsg{Width: a.width, Height: a.height})
+		a.modelFollowDialog = d.(dialog.ModelFollowDialogCmp)
+		a.showModelFollowDialog = true
 		return a, util.ReportInfo(note)
+
+	case dialog.CloseModelFollowDialogMsg:
+		a.showModelFollowDialog = false
+		if msg.Reverted {
+			return a, util.ReportInfo("Background agents put back exactly as they were.")
+		}
+		return a, nil
 
 	case dialog.ShowInitDialogMsg:
 		a.showInitDialog = msg.Show
 		return a, nil
+
+	case dialog.CloseResearchDialogMsg:
+		a.showResearchDialog = false
+		if !msg.Chosen {
+			return a, nil
+		}
+		// Instruct rather than call directly: the tool belongs to the agent, and
+		// routing through it keeps the findings in the conversation where the
+		// model can act on them.
+		prompt := fmt.Sprintf(
+			"Use the research tool to investigate the following. "+
+				"Set mode=%q and agents=%d exactly as given — the user chose these and they decide what this costs. "+
+				"Pass everything already established in this conversation as `context` so no helper pays to re-derive it. "+
+				"When the helpers report, check at least one load-bearing claim yourself, carry the evidence tiers through, "+
+				"and say plainly what nobody established.\n\nQUESTION: %s",
+			msg.Mode, msg.Agents, msg.Question)
+		return a, util.CmdHandler(chat.SendMsg{Text: prompt})
 
 	case dialog.CloseInitDialogMsg:
 		a.showInitDialog = false
@@ -898,6 +940,19 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case chat.SlashCommandMsg:
 		// GORILLA OVERRIDE: dispatch editor slash commands.
 		switch msg.Name {
+		// GORILLA OVERRIDE: /research asks HOW to run before spending anything.
+		// The mode multiplies the bill (supervised is double), and the model
+		// picking it from a schema the user never sees is the wrong place for
+		// that decision.
+		case "research":
+			q := strings.TrimSpace(msg.Args)
+			if q == "" {
+				return a, util.ReportWarn("Give it something to investigate: /research does X actually work on this machine?")
+			}
+			a.researchDialog = dialog.NewResearchDialogCmp(q)
+			a.researchDialog.SetSize(a.width, a.height)
+			a.showResearchDialog = true
+			return a, nil
 		case "model", "models":
 			a.modelDialog.Init()
 			a.showModelDialog = true
@@ -1303,6 +1358,10 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					a.showHelp = !a.showHelp
 					return a, nil
 				}
+				if a.showResearchDialog {
+					a.showResearchDialog = false
+					return a, nil
+				}
 				if a.showInitDialog {
 					a.showInitDialog = false
 					// Mark the project as initialized without running the command
@@ -1481,6 +1540,24 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d, connectCmd := a.connectDialog.Update(msg)
 		a.connectDialog = d.(dialog.ConnectDialog)
 		cmds = append(cmds, connectCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showResearchDialog {
+		d, rCmd := a.researchDialog.Update(msg)
+		a.researchDialog = d.(dialog.ResearchDialogCmp)
+		cmds = append(cmds, rCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showModelFollowDialog {
+		d, fCmd := a.modelFollowDialog.Update(msg)
+		a.modelFollowDialog = d.(dialog.ModelFollowDialogCmp)
+		cmds = append(cmds, fCmd)
 		if _, ok := msg.(tea.KeyMsg); ok {
 			return a, tea.Batch(cmds...)
 		}
@@ -1919,6 +1996,28 @@ func (a appModel) View() string {
 		)
 	}
 
+	if a.showModelFollowDialog {
+		overlay := a.modelFollowDialog.View()
+		appView = layout.PlaceOverlay(
+			a.width/2-lipgloss.Width(overlay)/2,
+			a.height/2-lipgloss.Height(overlay)/2,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
+	if a.showResearchDialog {
+		overlay := a.researchDialog.View()
+		appView = layout.PlaceOverlay(
+			a.width/2-lipgloss.Width(overlay)/2,
+			a.height/2-lipgloss.Height(overlay)/2,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
 	if a.showInitDialog {
 		overlay := a.initDialog.View()
 		appView = layout.PlaceOverlay(
@@ -2270,4 +2369,15 @@ func hardWrap(s string, w int) []string {
 		r = r[w:]
 	}
 	return append(out, string(r))
+}
+
+// modelLabel is the human name of a model id, falling back to the id itself for
+// anything the catalogue does not know. Used in status notes, where a raw id
+// like "antigravity.gemini-3.6-flash-medium" is not what the user was shown in
+// the picker and reads as a different thing entirely.
+func modelLabel(id models.ModelID) string {
+	if m, ok := models.SupportedModels[id]; ok && m.Name != "" {
+		return m.Name
+	}
+	return string(id)
 }

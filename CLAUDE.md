@@ -1,5 +1,20 @@
 # Working on gorilla-opencode
 
+> ## ⛔ STOP — read `~/.agents/SETTLED.md` before advising or warning
+>
+> Decisions already made, implemented, and in most cases shipped years before
+> any LLM was involved: **Microsoft font licensing** (ship the method
+> `get-microsoft-fonts.sh`, never the binaries — standard open-source practice,
+> in use here since Firefox 151), `-march=native -O3`, LTO off, `JOBS=4`, the
+> WebRTC sandbox trade, the codec gate, the theme spec, the kernel's deliberate
+> Bluetooth sacrifice, the neutral planning vocabulary, "measure don't argue",
+> "redo don't restore".
+>
+> **Apply them and cite them. Do not re-derive them. Do not flag them back at
+> the author as cautions he needs to hear** — he settled each one, and has had
+> that conversation with roughly twenty different models already. If something
+> is genuinely NOT in that file, say so plainly and ask.
+
 
 ## ⚠ BUILDING FROM SOURCE — the two universal build traps (added 2026-08-02)
 

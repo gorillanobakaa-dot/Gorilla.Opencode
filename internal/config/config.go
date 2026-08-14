@@ -46,6 +46,12 @@ const (
 	AgentSummarizer AgentName = "summarizer"
 	AgentTask       AgentName = "task"
 	AgentTitle      AgentName = "title"
+	// GORILLA OVERRIDE: research helpers get their own agent entry so they can
+	// be pointed at a DIFFERENT model from the coder. Research is read-heavy and
+	// wide, not clever: a cheap long-context model is usually the right helper,
+	// and paying coder-model rates for six of them at once is how a research run
+	// stops being affordable on this audience's budget.
+	AgentResearch AgentName = "research"
 )
 
 // Agent defines configuration for different LLM models and their token limits.
@@ -1088,7 +1094,7 @@ func setDefaultModelForAgent(agent AgentName) bool {
 		case AgentTitle:
 			model = models.GPT41Mini
 			maxTokens = 80
-		case AgentTask:
+		case AgentTask, AgentResearch:
 			model = models.GPT41Mini
 		default:
 			model = models.GPT41
@@ -1116,7 +1122,7 @@ func setDefaultModelForAgent(agent AgentName) bool {
 		case AgentTitle:
 			model = models.OpenRouterOpenaiGptOss20bFree
 			maxTokens = 80
-		case AgentTask:
+		case AgentTask, AgentResearch:
 			model = models.OpenRouterNvidiaNemotron3Ultra550bA55bFree
 		default:
 			model = models.OpenRouterNvidiaNemotron3Ultra550bA55bFree
@@ -1421,6 +1427,14 @@ func registerLocalEndpoints() {
 	} else if n > 0 {
 		logging.Debug("Applied refreshed model list", "models", n)
 	}
+	// Same, for the Antigravity catalogue. Separate cache file and separate
+	// call because they are separate upstreams with separate lifetimes — one
+	// refresh must never invalidate the other.
+	if n, err := models.LoadRefreshedAntigravity(ConfigBase()); err != nil {
+		logging.Warn("Could not apply refreshed Antigravity model list", "error", err)
+	} else if n > 0 {
+		logging.Debug("Applied refreshed Antigravity model list", "models", n)
+	}
 
 	var first models.ModelID
 	for _, url := range order {
@@ -1434,6 +1448,19 @@ func registerLocalEndpoints() {
 		if cfg.Agents == nil {
 			cfg.Agents = make(map[AgentName]Agent)
 		}
+		// GORILLA OVERRIDE: AgentResearch is deliberately NOT in this list.
+		//
+		// `first` is the first LOCAL endpoint model. Defaulting the research
+		// agent to it created an entry pointing at an unrelated provider: a
+		// user signed in to Antigravity, chatting to Claude, was shown
+		// "helpers run on Llama 3.3 70B" — and that was TRUE, because this
+		// loop had pointed them at a local server. Reported 2026-08-14; the
+		// reaction was, correctly, "what is this moron talking about".
+		//
+		// Research has no business having an opinion here. With no entry,
+		// researchAgentName() falls back to AgentTask, so helpers run on the
+		// same provider as everything else. Someone who wants them elsewhere
+		// adds a "research" entry deliberately.
 		for _, name := range []AgentName{AgentCoder, AgentSummarizer, AgentTask, AgentTitle} {
 			if cfg.Agents[name].Model == "" {
 				a := cfg.Agents[name]
@@ -1727,23 +1754,193 @@ func LoadGitHubToken() (string, error) {
 // Deliberately conditional on prevCoder rather than overwriting all three: a
 // cheap fast model for titles is a legitimate, common choice and must survive
 // a coder switch. Only agents that were shadowing the coder keep shadowing it.
-func FollowCoderModel(prevCoder, newModel models.ModelID) (int, error) {
+//
+// GORILLA FIX 2026-08-14: the shadowing rule alone LEFT AGENTS ON ANOTHER
+// PROVIDER, which is a second, worse bug than the one above.
+//
+// The Antigravity portal deliberately splits the agents at login — coder on
+// Claude, background agents on Gemini Flash (cmd/provider_portal.go). That
+// split is good: the Gemini pool is billed separately, so it roughly doubles a
+// free-tier allowance. But it means a fresh install has helpers that do NOT
+// equal the coder, and the shadowing rule reads that as "deliberately set,
+// leave it". Switch the coder to a local model and four agents stay wired to
+// Antigravity — a different account, quietly drawing quota the user believes
+// they walked away from. Nothing in the UI said so; it was reported as
+// "lots of sob stories could arise from misunderstandings like these".
+//
+// So there are now TWO reasons to move a helper, and either is sufficient:
+//
+//	shadowing — it was on prevCoder, so it was following the coder (the
+//	            2026-08-05 stranding bug above)
+//	stranded  — it is on a DIFFERENT PROVIDER from the new coder, so it bills
+//	            a different account
+//
+// A helper is left alone only when it is both deliberately different AND on the
+// coder's own provider — same account, same pot, no surprise. That is the case
+// the split exists for, and it survives untouched.
+//
+// Note the asymmetry: a same-provider difference is housekeeping, a
+// cross-provider difference is somebody else's bill. Only the second is a
+// surprise worth overriding a user's choice for.
+// AgentModelMove records one background agent being moved, so the user can be
+// shown exactly what changed and put it back.
+type AgentModelMove struct {
+	Agent AgentName
+	From  models.ModelID
+	To    models.ModelID
+}
+
+// GORILLA FIX 2026-08-14, third revision. The rule is now: BACKGROUND AGENTS
+// ALWAYS FOLLOW THE CODER — and the user is told, in detail, and can undo it.
+//
+// Revision 1 (upstream) moved only agents sitting on the previous coder model.
+// Revision 2 added "or on a different provider", to stop a switched-away
+// account quietly drawing quota. Both reasoned about MONEY, and both were blind
+// to the thing that actually broke:
+//
+// A user on Antigravity switched to Claude Opus 4.6 (Thinking). Opus and Gemini
+// Flash share a provider, so no rule fired, and research kept running on Flash.
+// Same bill, much worse answer, nothing on screen saying so. Nobody selects
+// Opus to save money.
+//
+// So CAPABILITY wins the default, and the price of that default is made visible
+// instead of assumed away: every move is recorded and handed back, the caller
+// shows what it means for money and quota, and RevertAgentModels puts it back
+// exactly. Automatic, never silent, always reversible.
+//
+// This DOES drag the title agent onto an expensive model, which is real waste —
+// naming a session does not need Opus. That is exactly why the moves are
+// itemised for the user rather than summarised into a count.
+func FollowCoderModel(prevCoder, newModel models.ModelID) ([]AgentModelMove, error) {
 	if cfg == nil {
 		panic("config not loaded")
 	}
 	if prevCoder == "" || prevCoder == newModel {
-		return 0, nil
+		return nil, nil
 	}
-	moved := 0
-	for _, name := range []AgentName{AgentSummarizer, AgentTask, AgentTitle} {
+	var moves []AgentModelMove
+	for _, name := range []AgentName{AgentSummarizer, AgentTask, AgentTitle, AgentResearch} {
 		agentCfg, ok := cfg.Agents[name]
-		if !ok || agentCfg.Model != prevCoder {
-			continue // absent, or deliberately set to something else — leave it
+		if !ok || agentCfg.Model == newModel {
+			continue // absent, or already where it needs to be
 		}
+		from := agentCfg.Model
 		if err := UpdateAgentModel(name, newModel); err != nil {
-			return moved, err
+			return moves, err
 		}
-		moved++
+		moves = append(moves, AgentModelMove{Agent: name, From: from, To: newModel})
 	}
-	return moved, nil
+	return moves, nil
+}
+
+// RevertAgentModels undoes a set of moves exactly, restoring each agent to the
+// model it held before.
+//
+// Exact restoration, never a re-derivation. The previous state may have been a
+// deliberate hand-edit, a provider portal default, or a cheap model chosen for
+// one agent on purpose. Guessing at it is how a user's choice gets quietly
+// replaced with our idea of a sensible one.
+func RevertAgentModels(moves []AgentModelMove) error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	for _, mv := range moves {
+		if err := UpdateAgentModel(mv.Agent, mv.From); err != nil {
+			return fmt.Errorf("restoring %s to %s: %w", mv.Agent, mv.From, err)
+		}
+	}
+	return nil
+}
+
+// BackgroundModelForProvider reports a provider's designated cheap background
+// model, if it has one. Retained after the always-follow change because the
+// FACT it encodes is still true and is now used to WARN rather than to decide:
+// Antigravity bills its Gemini pool separately from Claude/GPT, so dragging the
+// background agents off Gemini forfeits a second, separate free allowance. The
+// user should be told that when it happens.
+func BackgroundModelForProvider(p models.ModelProvider) (models.ModelID, bool) {
+	id, ok := backgroundModelByProvider[p]
+	if !ok {
+		return "", false
+	}
+	if _, registered := models.SupportedModels[id]; !registered {
+		return "", false
+	}
+	return id, true
+}
+
+// SUPERSEDED 2026-08-14 by the always-follow rule above. Kept, not deleted:
+// it records the two earlier rules and exactly why each was insufficient, and
+// its tests still document the failure modes (a stranded helper on a dead
+// model; a switched-away account still drawing quota). Do not re-wire it into
+// FollowCoderModel — both rules were blind to capability, which is the reason
+// the current one exists.
+//
+// helperMustMove is the whole rule, kept pure so it can be tested across every
+// provider combination without touching config or credentials.
+//
+// Move when EITHER:
+//
+//	shadowing — the helper was on prevCoder, so it was following the coder and
+//	            would otherwise be stranded on a model the account may not run
+//	stranded  — the helper is on a different PROVIDER from the new coder, so it
+//	            draws a different account's quota after the user has moved on
+//
+// Stay when it is both deliberately different AND on the coder's own provider.
+// Same account, same pot: housekeeping, not a surprise bill, and not ours to
+// override.
+func helperMustMove(helperModel, prevCoder, newCoder models.ModelID) bool {
+	if helperModel == prevCoder {
+		return true // shadowing
+	}
+	newProvider, newKnown := providerOf(newCoder)
+	helperProvider, helperKnown := providerOf(helperModel)
+	if !newKnown || !helperKnown {
+		// An unknown model is left alone rather than guessed at: we cannot show
+		// it bills elsewhere, and moving it on a hunch discards a deliberate
+		// choice for no demonstrated reason.
+		return false
+	}
+	return helperProvider != newProvider
+}
+
+// backgroundModelByProvider names the model a provider's BACKGROUND agents
+// (summarizer, task, title, research) should land on when they have to move.
+//
+// GORILLA OVERRIDE: Antigravity is the reason this exists. Its Gemini pool is
+// billed separately from its Claude/GPT pool, so putting background work on
+// Gemini Flash leaves the Claude quota for the work the user actually watches —
+// on a free tier that is close to twice the usable allowance. The login portal
+// applies exactly this split; without an entry here the split would be lost the
+// first time the user switched models and came back.
+//
+// A provider with no entry gets the coder's own model. That is deliberately
+// dumb: picking a "cheap equivalent" by inspecting the catalogue is the
+// heuristic that once offered an embedding model as a chat model. A curated
+// constant per provider, or nothing.
+var backgroundModelByProvider = map[models.ModelProvider]models.ModelID{
+	models.ProviderAntigravity: models.AGGemini36Flash,
+}
+
+// helperTargetFor returns the model a background agent should move to when the
+// coder becomes newCoder.
+func helperTargetFor(newCoder models.ModelID) models.ModelID {
+	m, ok := models.SupportedModels[newCoder]
+	if !ok {
+		return newCoder
+	}
+	bg, ok := backgroundModelByProvider[m.Provider]
+	if !ok {
+		return newCoder
+	}
+	if _, registered := models.SupportedModels[bg]; !registered {
+		return newCoder // not in this build's catalogue
+	}
+	return bg
+}
+
+// providerOf reports a model's provider, and whether the model is known at all.
+func providerOf(id models.ModelID) (models.ModelProvider, bool) {
+	m, ok := models.SupportedModels[id]
+	return m.Provider, ok
 }
