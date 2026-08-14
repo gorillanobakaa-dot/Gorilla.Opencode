@@ -1,3 +1,53 @@
+## v0.1.82 — 2026-08-14 — it investigates, and it tells you what that costs
+
+Full dual-track document: [v0.1.82-release-notes.md](v0.1.82-release-notes.md).
+Where this goes next: [ROADMAP.md](../ROADMAP.md).
+
+**Plain-language version:** There is a new `/research` command. Ask it a
+question and it sends out up to ten helpers, each with a different job — one
+searches your own machine first, one looks for people who already solved it,
+one reads the official documents, one checks what the thing you are targeting
+*actually* demands. They come back with evidence, and each claim says how it is
+known, so a random forum comment cannot arrive dressed as a fact. You choose how
+they run: one at a time, all at once, or all at once with a second agent
+checking each one's homework. Before anything runs you are shown what it costs —
+per minute, per hour, and for this run — and every one of those numbers can be
+checked with a calculator, because several of them previously could not. One
+version told you an hour of a billed model cost `$0`. That is fixed, along with
+a double-counted prompt that had been inflating every price by about 28%.
+`/tasks` now shows every helper, including the ones still waiting their turn,
+each marked 🦍🟡 queued, 🦍🟢 running, 🦍🔵 done, 🦍🔴 failed or 🦍🛑 killed —
+and you can kill one before it spends anything. Previously waiting helpers were
+invisible *and* unkillable, so "kill 'em all" only made room for the next batch.
+Finally, when you change the model you chat with, the background jobs follow you
+— and a screen tells you exactly what moved, what it costs, what you gained, and
+lets you put it all back with one key.
+
+**Technical:** New `research` tool: 10 fixed roles with non-overlapping lanes,
+four mandatory; enforced `ANSWER/FINDINGS/CONFIDENCE/NOT ESTABLISHED` contract
+with evidence tiers; three modes sharing one scheduler (sequential is
+concurrency of 1). `ResearchMaxInFlight` 4→11 so a full run never queues. Helpers
+register *before* queueing with an explicit `SubAgentState`, each owning a
+cancellable context, so a QUEUED helper is visible and killable — previously
+registration happened after winning a semaphore slot, hiding six of ten helpers
+from `/tasks`, the status count and the kill switch. `FollowCoderModel` now
+always follows and returns `[]AgentModelMove`; `RevertAgentModels` restores each
+agent to its own prior model. Tool dispatch strips one trailing `<|…|>` control
+token then demands a plain identifier and an *exact* match against that agent's
+own tool list — no prefix, no fuzzy, no fallback (30 of 44 calls in a measured
+run failed as `Tool not found: ls<|message|>`); guarded by attack-shaped tests
+plus AST checks that permission requests use tool constants. Cost screen: base
+prompt was counted twice (`LoadoutActiveTokens` already includes it), supervised
+session counts were `agents*2` where supervision skips peeking lanes (real: 8,
+9, 11, 13, 15, 17, 18 for 4..10), `%.0f` on the hourly figure, and independent
+rounding of rate vs total. Antigravity live model refresh (5→20 models).
+
+**Not fixed, tracked in ROADMAP.md:** `esc` does not close `/tasks` while a
+permission prompt is open — the permission dialog owns the keyboard but renders
+*underneath*, so focus and z-order are inverted. DONE rows still vanish because
+`runWave` unregisters on completion. `ResearchSecondsPerStep = 15.0` is an
+assumption, labelled as one on screen, and every per-minute figure rests on it.
+
 ## v0.1.81 — 2026-08-12 — the picker answers questions; the gorilla speaks up
 
 Full dual-track document: [v0.1.81-release-notes.md](v0.1.81-release-notes.md).
