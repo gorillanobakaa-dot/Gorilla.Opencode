@@ -10,12 +10,12 @@
 #        makepkg -si
 #
 #   2. PRE-BUILT binary package (no Go toolchain required):
-#        Download gorilla-opencode-0.1.83-1-x86_64.pkg.tar.zst from the
+#        Download gorilla-opencode-0.1.84-1-x86_64.pkg.tar.zst from the
 #        GitHub release page, then:
-#        sudo pacman -U gorilla-opencode-0.1.83-1-x86_64.pkg.tar.zst
+#        sudo pacman -U gorilla-opencode-0.1.84-1-x86_64.pkg.tar.zst
 
 pkgname=gorilla-opencode
-pkgver=0.1.83
+pkgver=0.1.84
 pkgrel=1
 pkgdesc="Terminal AI coding agent (revived original OpenCode) — bring your own API keys"
 arch=('x86_64')
