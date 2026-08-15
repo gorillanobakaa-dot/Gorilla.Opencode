@@ -15,4 +15,4 @@ Selecting the row with the cursor highlights it in the normal way. No other tool
 row is affected.
 
 Full release notes (dual-track, with evidence tiers):
-[Changelogs/v0.1.83-release-notes.md](blob/v0.1.83/Changelogs/v0.1.83-release-notes.md)
+[Changelogs/v0.1.83-release-notes.md](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.1.83/Changelogs/v0.1.83-release-notes.md)
