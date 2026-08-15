@@ -1,3 +1,24 @@
+## v0.1.83 — 2026-08-15 — research tool painted bright red in /context
+
+Full dual-track document: [v0.1.83-release-notes.md](v0.1.83-release-notes.md).
+
+**Plain-language version:** The research tool row in the `/context` menu is
+now bright red and bold. It was sitting in the list looking the same as every
+other tool, which is wrong — turning it on and forgetting about it can silently
+run several full AI sessions every time you ask a question. The red makes it
+impossible to miss: you know it is there, you know it is on, and you know what
+that means before you close the menu. Selecting it with the cursor still
+highlights it in the normal way (inverted colours) so keyboard navigation is
+unchanged.
+
+**Technical:** `renderAt()` in `internal/tui/components/dialog/loadout.go` now
+branches on `c.ID == "tool.research"` before applying `rowStyle`. When that row
+is not cursor-selected it receives `lipgloss.Color("#FF0000")` foreground with
+`Bold(true)` instead of the shared muted/normal style. The selected path falls
+through to the existing `rowStyle` so selection highlight is unaffected.
+
+---
+
 ## v0.1.82 — 2026-08-14 — it investigates, and it tells you what that costs
 
 Full dual-track document: [v0.1.82-release-notes.md](v0.1.82-release-notes.md).

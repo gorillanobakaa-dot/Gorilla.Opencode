@@ -328,7 +328,14 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 		}
 		// GORILLA OVERRIDE: real measured cost via ComponentTokens.
 		line := fitLine(fmt.Sprintf("%s %-18s ~%-6s  %s%s", box, c.Name, commaInt(config.ComponentTokens(c)), tradeoffText(on, c.Tradeoff), mark))
-		rows = append(rows, rowStyle(m.selectedIdx == i+numDials, !on).Render(line))
+		// GORILLA OVERRIDE: research row is highlighted in bright red — it is the
+		// most expensive tool (several full LLM sessions per use) and the user must
+		// never lose sight of it in the list.
+		if c.ID == "tool.research" && m.selectedIdx != i+numDials {
+			rows = append(rows, base.Width(w).Foreground(lipgloss.Color("#FF0000")).Bold(true).Render(line))
+		} else {
+			rows = append(rows, rowStyle(m.selectedIdx == i+numDials, !on).Render(line))
+		}
 	}
 
 	// --- Section 3: show me the working ---
