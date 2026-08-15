@@ -304,8 +304,14 @@ func (a appModel) Init() tea.Cmd {
 // refactor away from being silently emptied. The timestamp is mandatory - a
 // quota figure without a time is not a measurement, and two dated readings are
 // what give you a burn rate.
+// GORILLA OVERRIDE: quota alert lines are rendered bold + bright red (#FF0000)
+// so they stand out in the scrollback. Plain text is invisible against normal
+// terminal output; the intent of the warn-colour change (0787f7b) was that
+// these messages scream, not whisper.
+var quotaAlertStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF0000"))
+
 func formatQuotaScrollbackLine(at time.Time, line string) string {
-	return "  " + at.Format("15:04:05") + "  quota · " + line
+	return quotaAlertStyle.Render("  " + at.Format("15:04:05") + "  quota · " + line)
 }
 
 // quotaLineMsg carries a fetched quota reading.

@@ -1,3 +1,28 @@
+## v0.1.84 — 2026-08-15 — quota warning messages now scream in bright red
+
+Full dual-track document: [v0.1.84-release-notes.md](v0.1.84-release-notes.md).
+
+**Plain-language version:** When your quota drops to a lower tier — say from
+"halfway" to "running low" — the program prints a timestamped warning line in
+the scrollback, like `10:27:38  quota · 🍌🍌 Running low on bananas... —
+Claude and GPT models: 47% left`. That line was showing up in plain terminal
+white, indistinguishable from any other output. It now appears bold and bright
+red (`#FF0000`) — the same warning red established in v0.1.83 — so it is
+impossible to miss. Both types of quota message are affected: the automatic
+tier-crossing alerts that fire after each response, and the manual `/usage`
+reading line at the top of the full panel.
+
+**Technical:** `formatQuotaScrollbackLine` in `internal/tui/tui.go`
+(modified 26-08-15-10-27) now wraps its output in
+`lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF0000"))` before
+handing the string to `tea.Println`. Both call sites — `quotaLineMsg` and
+`quotaAlertMsg` — route through this function, so a single change covers both.
+The prior commit (0787f7b) changed `WarningColor` in the theme struct, which
+only reaches the footer status bar via `t.Warning()`; `tea.Println` bypasses
+the theme entirely and requires the style to be applied to the string itself.
+
+---
+
 ## v0.1.83 — 2026-08-15 — research tool painted bright red in /context
 
 Full dual-track document: [v0.1.83-release-notes.md](v0.1.83-release-notes.md).
