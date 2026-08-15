@@ -23,7 +23,6 @@ func NewOpenCodeTheme() *OpenCodeTheme {
 	darkSecondary := "#5c9cf5" // Secondary blue
 	darkAccent := "#9d7cd8"    // Accent purple
 	darkRed := "#e06c75"       // Error red
-	darkOrange := "#f5a742"    // Warning orange
 	darkGreen := "#7fd88f"     // Success green
 	darkCyan := "#56b6c2"      // Info cyan
 	darkYellow := "#e5c07b"    // Emphasized text
@@ -39,7 +38,6 @@ func NewOpenCodeTheme() *OpenCodeTheme {
 	lightSecondary := "#7b5bb6" // Secondary purple
 	lightAccent := "#d68c27"    // Accent orange/gold
 	lightRed := "#d1383d"       // Error red
-	lightOrange := "#d68c27"    // Warning orange
 	lightGreen := "#3d9a57"     // Success green
 	lightCyan := "#318795"      // Info cyan
 	lightYellow := "#b0851f"    // Emphasized text
@@ -66,9 +64,9 @@ func NewOpenCodeTheme() *OpenCodeTheme {
 		Dark:  darkRed,
 		Light: lightRed,
 	}
-	theme.WarningColor = lipgloss.AdaptiveColor{
-		Dark:  darkOrange,
-		Light: lightOrange,
+theme.WarningColor = lipgloss.AdaptiveColor{
+		Dark:  "#FF0000",
+		Light: "#FF0000",
 	}
 	theme.SuccessColor = lipgloss.AdaptiveColor{
 		Dark:  darkGreen,
