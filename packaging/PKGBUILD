@@ -1,0 +1,90 @@
+# Maintainer: gorillanobakaa <gorillanobakaa@gmail.com>
+# GORILLA OVERRIDE: this PKGBUILD builds gorilla-opencode from source using the
+# Go toolchain. It produces the same binary the Debian package ships: stripped
+# (-s -w), version-stamped, no CGO.
+#
+# Two ways to install on Arch / CachyOS:
+#   1. FROM SOURCE (this file):
+#        git clone https://github.com/gorillanobakaa-dot/Gorilla.Opencode
+#        cd Gorilla.Opencode/packaging
+#        makepkg -si
+#
+#   2. PRE-BUILT binary package (no Go toolchain required):
+#        Download gorilla-opencode-0.1.83-1-x86_64.pkg.tar.zst from the
+#        GitHub release page, then:
+#        sudo pacman -U gorilla-opencode-0.1.83-1-x86_64.pkg.tar.zst
+
+pkgname=gorilla-opencode
+pkgver=0.1.83
+pkgrel=1
+pkgdesc="Terminal AI coding agent (revived original OpenCode) — bring your own API keys"
+arch=('x86_64')
+url="https://github.com/gorillanobakaa-dot/Gorilla.Opencode"
+license=('MIT')
+depends=('lynx')
+makedepends=('go>=1.21')
+# GORILLA: source is the tagged tarball from GitHub. The sha256sum covers the
+# archive as downloaded; regenerate with `makepkg -g` after a version bump.
+source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gorillanobakaa-dot/Gorilla.Opencode/archive/refs/tags/v${pkgver}.tar.gz")
+# Update this with: makepkg -g
+sha256sums=('SKIP')
+
+build() {
+    cd "Gorilla.Opencode-${pkgver}"
+    # GORILLA OVERRIDE: -s -w strips symbol table and DWARF debug info.
+    # On this project that shrinks the binary from ~66 MB to ~50 MB — roughly
+    # 40 minutes on a single-digit-KB/s link at 50 MB vs 90 minutes at 66 MB.
+    # Never drop this from a release build.
+    CGO_ENABLED=0 go build \
+        -ldflags "-s -w -X github.com/opencode-ai/opencode/internal/version.Version=v${pkgver}" \
+        -o "${pkgname}" \
+        .
+}
+
+package() {
+    cd "Gorilla.Opencode-${pkgver}"
+
+    # Binary
+    install -Dm755 "${pkgname}" "${pkgdir}/usr/bin/${pkgname}"
+
+    # Icons — hicolor sizes shipped in the repo
+    for size in 128 256 512 1024; do
+        install -Dm644 \
+            "internal/assets/icons/${pkgname}-${size}.png" \
+            "${pkgdir}/usr/share/icons/hicolor/${size}x${size}/apps/${pkgname}.png"
+    done
+    install -Dm644 \
+        "internal/assets/icons/${pkgname}.svg" \
+        "${pkgdir}/usr/share/icons/hicolor/scalable/apps/${pkgname}.svg"
+
+    # Desktop entry — plain and plain-mode right-click action
+    install -Dm644 \
+        "packaging/gorilla-opencode.desktop" \
+        "${pkgdir}/usr/share/applications/${pkgname}.desktop"
+
+    # SearXNG setup helper (makes web search work out of the box)
+    install -Dm755 \
+        "packaging/setup-searxng.sh" \
+        "${pkgdir}/usr/share/${pkgname}/setup-searxng.sh"
+
+    # Documentation
+    install -Dm644 README.md       "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+    install -Dm644 LICENSE         "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+    install -Dm644 PHILOSOPHY.md   "${pkgdir}/usr/share/doc/${pkgname}/PHILOSOPHY.md"
+
+    [ -f docs/CONTROL-AND-COST.md ] && install -Dm644 \
+        docs/CONTROL-AND-COST.md \
+        "${pkgdir}/usr/share/doc/${pkgname}/CONTROL-AND-COST.md"
+    [ -f docs/SETTINGS.md ] && install -Dm644 \
+        docs/SETTINGS.md \
+        "${pkgdir}/usr/share/doc/${pkgname}/SETTINGS.md"
+
+    for cl in Changelogs/CHANGELOG*.md; do
+        [ -f "$cl" ] && install -Dm644 "$cl" \
+            "${pkgdir}/usr/share/doc/${pkgname}/$(basename "$cl")"
+    done
+    for rn in Changelogs/*release-notes.md; do
+        [ -f "$rn" ] && install -Dm644 "$rn" \
+            "${pkgdir}/usr/share/doc/${pkgname}/$(basename "$rn")"
+    done
+}
