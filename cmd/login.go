@@ -18,7 +18,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var loginProject string
+var (
+	loginProject string
+	loginChatGPT bool
+)
 
 // loginOption is one row in the interactive menu.
 //
@@ -64,6 +67,11 @@ without any /connect ceremony.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
+		// Scripted path: --chatgpt skips the menu entirely.
+		if loginChatGPT {
+			return runChatGPTLogin(ctx)
+		}
+
 		// Scripted path: --project skips the menu entirely.
 		if cmd.Flags().Changed("project") && loginProject != "" {
 			return runGoogleLogin(ctx, loginProject)
@@ -83,6 +91,71 @@ without any /connect ceremony.`,
 			return runAPIKeyLogin(chosen, stdin)
 		}
 	},
+}
+
+// runChatGPTLogin signs in with a ChatGPT account and then MEASURES whether the
+// resulting token is usable from this client.
+//
+// OpenAI states that Codex is included across ChatGPT plans "including Free and
+// Go", which is the access this project exists to reach. What OpenAI does not
+// state, anywhere, is whether a client other than their own may present that
+// token. So this does not assume an answer in either direction: it signs in,
+// asks the backend one read-only question, and prints exactly what came back.
+func runChatGPTLogin(ctx context.Context) error {
+	fmt.Println("\nStarting ChatGPT sign-in...")
+	fmt.Printf("A browser window will open. This uses port %d, which OpenAI\n"+
+		"registered for this sign-in — it cannot use any other port.\n", 1455)
+
+	creds, err := auth.ChatGPTLogin(ctx)
+	if err != nil {
+		return fmt.Errorf("sign-in failed: %w", err)
+	}
+	if err := creds.Save(); err != nil {
+		return fmt.Errorf("could not save credentials: %w", err)
+	}
+
+	who := creds.Email
+	if who == "" {
+		who = "your ChatGPT account"
+	}
+	fmt.Printf("\nSigned in as %s.\n", who)
+	if creds.PlanType != "" {
+		fmt.Printf("Plan: %s\n", creds.PlanType)
+	}
+	fmt.Printf("Token saved (0600) at %s\n", auth.ChatGPTCredsPath())
+
+	fmt.Println("\nChecking whether this client may use that sign-in...")
+	fmt.Printf("  asking:     GET %s/models\n", auth.ChatGPTBackend)
+	fmt.Printf("  identifying as: originator=%s\n", auth.ChatGPTOriginator)
+
+	status, body, err := creds.ProbeBackend(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "\nCould not complete the check: %v\n", err)
+		fmt.Fprintln(os.Stderr, "The sign-in itself worked and your token is saved.")
+		return nil
+	}
+
+	if len(body) > 600 {
+		body = body[:600] + " …(truncated)"
+	}
+	fmt.Printf("\n  HTTP %d\n", status)
+	if body != "" {
+		fmt.Printf("  %s\n", body)
+	}
+
+	switch {
+	case status >= 200 && status < 300:
+		fmt.Println("\nAccepted. The ChatGPT plan is reachable from this client.")
+	case status == 401 || status == 403:
+		fmt.Println("\nRefused. The token is valid but this client is not accepted at that")
+		fmt.Println("endpoint. Nothing further will be attempted: making this work would mean")
+		fmt.Println("presenting ourselves as a different client, and that is a decision for the")
+		fmt.Println("project owner to make deliberately, not something to slip into a release.")
+	default:
+		fmt.Println("\nUnexpected reply — read the status and body above before drawing a")
+		fmt.Println("conclusion. Neither 'it works' nor 'it is blocked' is established by this.")
+	}
+	return nil
 }
 
 // runGoogleLogin runs OAuth + Code Assist onboarding. Empty project = free tier.
@@ -196,6 +269,8 @@ func selectedIndex(raw string, n int) int {
 }
 
 func init() {
+	loginCmd.Flags().BoolVar(&loginChatGPT, "chatgpt", false,
+		"sign in with a ChatGPT account (Codex is included on ChatGPT plans, including Free)")
 	loginCmd.Flags().StringVar(&loginProject, "project", "",
 		"Google Cloud project id (Google OAuth with your own project; omit for the free tier or the interactive menu)")
 	rootCmd.AddCommand(loginCmd)
