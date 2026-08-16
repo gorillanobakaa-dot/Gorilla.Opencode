@@ -16,10 +16,12 @@ exists yet.
 
 ### What's fixed
 
-- **The one-line install works.** It never did — it asked for a file this project had never
-  published. That file now exists, and the script that fetches it was rewritten: it used to
-  install a binary under the wrong name, check the version of a *different* program, and
-  treat a "not found" web page as if it were the download.
+- **The one-line install works.** It never has, in any release — the advertised
+  `install.sh` asked for two assets this project has never published. It now fetches the
+  assets that exist, refuses to install anything whose checksum it cannot verify, and hands
+  off to the app's own installer for the desktop entry and icons. A second, unadvertised
+  installer that did no verification at all has been removed: one installer, one checksum
+  file, both tested end-to-end against the live release.
 - **A third download for everyone else.** Alongside the `.deb` and the Arch package there is
   now a plain `.tar.gz` — one binary, no sudo, any distro.
 - **The Arch instructions stopped contradicting themselves** — they said download 0.1.86,
@@ -61,10 +63,17 @@ gorilla-opencode --version
 | `gorilla-opencode_0.1.86_amd64.deb` | Debian / Ubuntu / Mint |
 | `gorilla-opencode-0.1.86-1-x86_64.pkg.tar.zst` | Arch / CachyOS |
 | `gorilla-opencode-linux-x86_64.tar.gz` | Any distro — just the binary |
-| `SHA256SUMS-v0.1.86.txt` | Checksums |
+| `checksums.sha256` | Checksums for all three |
 
 ```bash
-sha256sum -c SHA256SUMS-v0.1.86.txt
+sha256sum -c checksums.sha256
+```
+
+Or install in one command — it downloads, **verifies the checksum**, and sets up the
+desktop launcher and icons for you:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/install.sh | sh
 ```
 
 ### Read more
