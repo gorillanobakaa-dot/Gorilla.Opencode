@@ -67,11 +67,17 @@ mkdir -p "$INSTALL_DIR"
 
 if [ -z "$requested_version" ]; then
     url="https://github.com/$REPO/releases/latest/download/$filename"
-    if ! specific_version=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
-        | awk -F'"' '/"tag_name": "/ {gsub(/^v/, "", $4); print $4; exit}'); then
+    # Fetch first, parse second. Piping curl into `awk ... exit` closes the pipe
+    # early, curl dies with code 23 ("Failure writing output to destination"),
+    # and the network looks broken when it was fine — the SIGPIPE trap this
+    # estate has already paid for once in toolchain-preflight.sh. Separating the
+    # two also means a network failure and a parse failure report differently.
+    if ! releases_json=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest"); then
         print_message error "Failed to fetch version information from GitHub."
         exit 1
     fi
+    specific_version=$(printf '%s\n' "$releases_json" \
+        | awk -F'"' '/"tag_name": "/ {gsub(/^v/, "", $4); print $4; exit}')
     if [ -z "$specific_version" ]; then
         print_message error "GitHub returned no tag name; cannot determine the latest version."
         exit 1
