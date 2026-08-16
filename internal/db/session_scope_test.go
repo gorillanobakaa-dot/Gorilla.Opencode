@@ -67,7 +67,7 @@ func ids(sessions []Session) map[string]bool {
 }
 
 // TestListSessionsByDirScopes is the non-vacuous one: delete the
-// "AND (started_in = ? OR started_in = '')" clause and it fails.
+// "AND (started_in = ? OR started_in = ”)" clause and it fails.
 func TestListSessionsByDirScopes(t *testing.T) {
 	q := newTestDB(t)
 	ctx := context.Background()
