@@ -1,3 +1,77 @@
+## v0.1.86 — 2026-08-16 — the repairs v0.1.85 needed, and history that knows which folder it came from
+
+Full dual-track document: [v0.1.86-release-notes.md](v0.1.86-release-notes.md).
+
+**Plain-language version:** The one-line install has never worked in any
+release — it asked the download page for a file this project has never
+published, so anyone who tried it got an error. That file now exists (a plain
+`.tar.gz`, which also gives Fedora, openSUSE, Alpine and anyone without sudo a
+way in for the first time), and the script that fetches it was rewritten: it
+used to install the binary under the wrong name, check the version of a
+*different* program, and treat a "file not found" web page as if it were the
+download. Your conversation history now knows which folder it belongs to, so
+opening the tool in your kernel folder shows your kernel conversations instead
+of all of them at once — `ctrl+a` shows everything when you want to search
+across projects. This adds no new files or folders anywhere; it is one column
+in the database you already have. The startup screen now shouts in red capitals
+when your model list has gone stale, and checks weekly instead of monthly,
+because the lists rot in about a week and a monthly warning arrives after you
+have already hit a dead model. Also fixed: the Arch instructions told you to
+download this version and install the previous one, both packages shipped every
+release's notes *except* their own, the settings screen claimed your data lives
+"inside your project" when it has been machine-wide since v0.1.85, our docs
+named `OPENCODE_…` options the program stopped reading, file search was walking
+into abandoned conversation folders, and the published settings reference
+contained the build machine's username.
+
+**Technical:** `sessions` gains `started_in` (migration
+`20260816230000`), stamped from `config.WorkingDirectory()` at create and
+filtered by `ListSessionsByDir`, which also returns rows with an empty value so
+pre-column sessions can never become unfindable. The picker holds both lists and
+toggles locally. Generated code was regenerated with sqlc v1.29.0 rather than
+hand-edited across five files. `models.StaleAfter` 30d → 7d;
+`staleModelsNotice` renders `#FF0000` bold capitals behind the lone constant
+`staleModelsHeadline`. `config.TildeHome` rewrites `$HOME` to `~` and is shared
+by the doc generator and `TestSettingsDocIsCurrent`, which previously disagreed
+about how a path renders. `install` verifies the archive with `gzip -t` and
+re-reads `--version` after installing. `fileutil.commonIgnoredDirs` regains
+`.opencode`. First database tests in the project; `TestListSessionsByDirScopes`
+was confirmed to FAIL with its `WHERE` clause removed.
+
+---
+
+## v0.1.85 — 2026-08-16 — the fork takes its own name, and the prompt stops hiding your words
+
+Full dual-track document: [v0.1.85-release-notes.md](v0.1.85-release-notes.md).
+
+**Plain-language version:** Two things. Typing a long sentence used to make the
+start of it slide off the left edge of the screen and vanish — the words were
+never lost, but you could not read back what you had written before sending it.
+The box now grows downwards and keeps everything visible. Separately, this
+program is a fork of another project called OpenCode, and it had inherited that
+project's habit of naming everything it saved after *them* — so on a machine
+running both, two different programs were writing folders with the same name.
+During development that very nearly got this project's work thrown out with the
+other one's leftovers. Everything is now named `gorilla-opencode` and lives in
+the four standard Linux locations instead of dropping a folder into every
+project you open. **Upgrading loses sight of your old conversations** — they are
+safe, in the old folder, but this version does not read them and nothing on
+screen says so. No migration exists.
+
+**Technical:** `appName` → `gorilla-opencode`, `defaultDataDirectory` deleted,
+`ConfigBase`/`DataBase`/`CacheBase`/`StateBase` added in `store.go`, env prefix
+→ `GORILLA_OPENCODE`, database renamed, both legacy migrations removed as a
+deliberate clean break. The wrapping defect was stale cached state, not layout:
+`editor.go` measured its height against the live bubbles textarea whose viewport
+was still one row, and bubbles caches its wrapped-line layout against the height
+it was last configured with, so a one-row object answered "one row" regardless
+of content. `measuredRows()` probes a copy at full buffer height and re-applies
+the value to force a cache rebuild. Note the accompanying regression test is
+vacuous with respect to that fix — it passes with the fix removed, because a
+textarea built inside a test has no stale viewport to reuse.
+
+---
+
 ## v0.1.84 — 2026-08-15 — quota warning messages now scream in bright red
 
 Full dual-track document: [v0.1.84-release-notes.md](v0.1.84-release-notes.md).
