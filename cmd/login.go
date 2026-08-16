@@ -8,6 +8,7 @@ package cmd
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -150,11 +151,20 @@ func runChatGPTLogin(ctx context.Context) error {
 		return nil
 	}
 
-	if len(body) > 600 {
-		body = body[:600] + " …(truncated)"
-	}
 	fmt.Printf("\n  HTTP %d\n", status)
-	if body != "" {
+	// On success the useful part is WHICH models the plan actually offers, not
+	// 8 KB of per-model feature flags. Print the list; fall back to the raw body
+	// if it does not parse, because an unexpected shape is exactly when the raw
+	// text matters most.
+	if models, ok := chatgptModelSlugs(body); ok {
+		fmt.Printf("\n  %d models available on this plan:\n", len(models))
+		for _, m := range models {
+			fmt.Printf("    %s\n", m)
+		}
+	} else if body != "" {
+		if len(body) > 600 {
+			body = body[:600] + " …(truncated)"
+		}
 		fmt.Printf("  %s\n", body)
 	}
 
@@ -171,6 +181,30 @@ func runChatGPTLogin(ctx context.Context) error {
 		fmt.Println("conclusion. Neither 'it works' nor 'it is blocked' is established by this.")
 	}
 	return nil
+}
+
+// chatgptModelSlugs pulls the model names out of the backend's reply. Returns
+// ok=false when the body is not the expected shape, so the caller can show the
+// raw text rather than silently reporting "0 models".
+func chatgptModelSlugs(body string) ([]string, bool) {
+	var payload struct {
+		Models []struct {
+			Slug     string `json:"slug"`
+			ToolMode string `json:"tool_mode"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal([]byte(body), &payload); err != nil || len(payload.Models) == 0 {
+		return nil, false
+	}
+	out := make([]string, 0, len(payload.Models))
+	for _, m := range payload.Models {
+		if m.ToolMode != "" {
+			out = append(out, fmt.Sprintf("%-26s (tool mode: %s)", m.Slug, m.ToolMode))
+			continue
+		}
+		out = append(out, m.Slug)
+	}
+	return out, true
 }
 
 // runGoogleLogin runs OAuth + Code Assist onboarding. Empty project = free tier.

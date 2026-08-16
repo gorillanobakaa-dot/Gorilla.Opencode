@@ -413,7 +413,12 @@ func (c *ChatGPTCreds) ProbeBackend(ctx context.Context) (status int, body strin
 	}
 	defer resp.Body.Close()
 
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	// 1 MB, not 64 KB: the model list carries a large per-model feature block and
+	// overran the smaller cap, which truncated the JSON mid-object. A truncated
+	// body still parses as "not the expected shape", so the failure looked like a
+	// protocol mismatch rather than a read limit — the cap must exceed the real
+	// payload or it silently changes what the caller concludes.
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return resp.StatusCode, "", err
 	}
