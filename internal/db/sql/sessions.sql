@@ -7,10 +7,12 @@ INSERT INTO sessions (
     prompt_tokens,
     completion_tokens,
     cost,
+    started_in,
     summary_message_id,
     updated_at,
     created_at
 ) VALUES (
+    ?,
     ?,
     ?,
     ?,
@@ -32,6 +34,13 @@ WHERE id = ? LIMIT 1;
 SELECT *
 FROM sessions
 WHERE parent_session_id is NULL
+ORDER BY created_at DESC;
+
+-- name: ListSessionsByDir :many
+SELECT *
+FROM sessions
+WHERE parent_session_id is NULL
+  AND (started_in = ? OR started_in = '')
 ORDER BY created_at DESC;
 
 -- name: UpdateSession :one

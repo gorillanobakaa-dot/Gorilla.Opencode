@@ -78,6 +78,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.listSessionsStmt, err = db.PrepareContext(ctx, listSessions); err != nil {
 		return nil, fmt.Errorf("error preparing query ListSessions: %w", err)
 	}
+	if q.listSessionsByDirStmt, err = db.PrepareContext(ctx, listSessionsByDir); err != nil {
+		return nil, fmt.Errorf("error preparing query ListSessionsByDir: %w", err)
+	}
 	if q.updateFileStmt, err = db.PrepareContext(ctx, updateFile); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateFile: %w", err)
 	}
@@ -182,6 +185,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing listSessionsStmt: %w", cerr)
 		}
 	}
+	if q.listSessionsByDirStmt != nil {
+		if cerr := q.listSessionsByDirStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listSessionsByDirStmt: %w", cerr)
+		}
+	}
 	if q.updateFileStmt != nil {
 		if cerr := q.updateFileStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateFileStmt: %w", cerr)
@@ -254,6 +262,7 @@ type Queries struct {
 	listMessagesBySessionStmt   *sql.Stmt
 	listNewFilesStmt            *sql.Stmt
 	listSessionsStmt            *sql.Stmt
+	listSessionsByDirStmt       *sql.Stmt
 	updateFileStmt              *sql.Stmt
 	updateMessageStmt           *sql.Stmt
 	updateSessionStmt           *sql.Stmt
@@ -281,6 +290,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		listMessagesBySessionStmt:   q.listMessagesBySessionStmt,
 		listNewFilesStmt:            q.listNewFilesStmt,
 		listSessionsStmt:            q.listSessionsStmt,
+		listSessionsByDirStmt:       q.listSessionsByDirStmt,
 		updateFileStmt:              q.updateFileStmt,
 		updateMessageStmt:           q.updateMessageStmt,
 		updateSessionStmt:           q.updateSessionStmt,

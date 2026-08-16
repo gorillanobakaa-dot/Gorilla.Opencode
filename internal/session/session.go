@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/db"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 )
@@ -20,6 +21,9 @@ type Session struct {
 	Cost             float64
 	CreatedAt        int64
 	UpdatedAt        int64
+	// StartedIn is the primary working directory the session was created in.
+	// Empty means unknown — a row written before this column existed.
+	StartedIn string
 }
 
 type Service interface {
@@ -29,6 +33,10 @@ type Service interface {
 	CreateTaskSession(ctx context.Context, toolCallID, parentSessionID, title string) (Session, error)
 	Get(ctx context.Context, id string) (Session, error)
 	List(ctx context.Context) ([]Session, error)
+	// ListByDir returns sessions started in dir, plus any whose origin is
+	// unknown. See the comment on ListByDir's implementation for why unknown
+	// rows are included rather than hidden.
+	ListByDir(ctx context.Context, dir string) ([]Session, error)
 	Save(ctx context.Context, session Session) (Session, error)
 	Delete(ctx context.Context, id string) error
 }
@@ -40,8 +48,9 @@ type service struct {
 
 func (s *service) Create(ctx context.Context, title string) (Session, error) {
 	dbSession, err := s.q.CreateSession(ctx, db.CreateSessionParams{
-		ID:    uuid.New().String(),
-		Title: title,
+		ID:        uuid.New().String(),
+		Title:     title,
+		StartedIn: config.WorkingDirectory(),
 	})
 	if err != nil {
 		return Session{}, err
@@ -56,6 +65,7 @@ func (s *service) CreateTaskSession(ctx context.Context, toolCallID, parentSessi
 		ID:              toolCallID,
 		ParentSessionID: sql.NullString{String: parentSessionID, Valid: true},
 		Title:           title,
+		StartedIn:       config.WorkingDirectory(),
 	})
 	if err != nil {
 		return Session{}, err
@@ -70,6 +80,7 @@ func (s *service) CreateTitleSession(ctx context.Context, parentSessionID string
 		ID:              "title-" + parentSessionID,
 		ParentSessionID: sql.NullString{String: parentSessionID, Valid: true},
 		Title:           "Generate a title",
+		StartedIn:       config.WorkingDirectory(),
 	})
 	if err != nil {
 		return Session{}, err
@@ -132,6 +143,25 @@ func (s *service) List(ctx context.Context) ([]Session, error) {
 	return sessions, nil
 }
 
+// ListByDir returns the sessions started in dir.
+//
+// GORILLA OVERRIDE: rows with an empty started_in are returned for EVERY dir,
+// not hidden. Those are sessions written before the column existed. A session
+// the user cannot find is indistinguishable from one that was deleted, and this
+// project has already paid once for storage changes that made history vanish
+// with no explanation (v0.1.85). Showing a few extra rows is the cheap failure.
+func (s *service) ListByDir(ctx context.Context, dir string) ([]Session, error) {
+	dbSessions, err := s.q.ListSessionsByDir(ctx, dir)
+	if err != nil {
+		return nil, err
+	}
+	sessions := make([]Session, len(dbSessions))
+	for i, dbSession := range dbSessions {
+		sessions[i] = s.fromDBItem(dbSession)
+	}
+	return sessions, nil
+}
+
 func (s service) fromDBItem(item db.Session) Session {
 	return Session{
 		ID:               item.ID,
@@ -144,6 +174,7 @@ func (s service) fromDBItem(item db.Session) Session {
 		Cost:             item.Cost,
 		CreatedAt:        item.CreatedAt,
 		UpdatedAt:        item.UpdatedAt,
+		StartedIn:        item.StartedIn,
 	}
 }
 

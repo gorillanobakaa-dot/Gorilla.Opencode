@@ -1301,14 +1301,24 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.SwitchSession):
 			if a.currentPage == page.ChatPage && !a.showQuit && !a.showPermissions && !a.showCommandDialog {
 				// Load sessions and show the dialog
-				sessions, err := a.app.Sessions.List(context.Background())
+				// Load both views: the sessions started in this folder, and
+				// every session. The dialog opens scoped to the current folder
+				// and toggles locally, so one keypress switches without a
+				// second query.
+				ctx := context.Background()
+				cwd := config.WorkingDirectory()
+				all, err := a.app.Sessions.List(ctx)
 				if err != nil {
 					return a, util.ReportError(err)
 				}
-				if len(sessions) == 0 {
+				scoped, err := a.app.Sessions.ListByDir(ctx, cwd)
+				if err != nil {
+					return a, util.ReportError(err)
+				}
+				if len(all) == 0 {
 					return a, util.ReportWarn("No sessions available")
 				}
-				a.sessionDialog.SetSessions(sessions)
+				a.sessionDialog.SetSessions(scoped, all, cwd)
 				a.showSessionDialog = true
 				return a, nil
 			}

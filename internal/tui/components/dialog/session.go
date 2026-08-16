@@ -1,6 +1,8 @@
 package dialog
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -23,12 +25,19 @@ type CloseSessionDialogMsg struct{}
 type SessionDialog interface {
 	tea.Model
 	layout.Bindings
-	SetSessions(sessions []session.Session)
+	// SetSessions supplies both views of the history: the sessions started in
+	// scopeDir, and every session. The dialog holds both and toggles locally,
+	// so switching scope costs no query and no round-trip through the app.
+	SetSessions(scoped, all []session.Session, scopeDir string)
 	SetSelectedSession(sessionID string)
 }
 
 type sessionDialogCmp struct {
-	sessions          []session.Session
+	sessions          []session.Session // the list currently on screen
+	scoped            []session.Session // started in scopeDir (plus unknown-origin rows)
+	all               []session.Session // every session, all folders
+	scopeDir          string
+	showAll           bool
 	selectedIdx       int
 	width             int
 	height            int
@@ -36,12 +45,13 @@ type sessionDialogCmp struct {
 }
 
 type sessionKeyMap struct {
-	Up     key.Binding
-	Down   key.Binding
-	Enter  key.Binding
-	Escape key.Binding
-	J      key.Binding
-	K      key.Binding
+	Up      key.Binding
+	Down    key.Binding
+	Enter   key.Binding
+	Escape  key.Binding
+	J       key.Binding
+	K       key.Binding
+	ShowAll key.Binding
 }
 
 var sessionKeys = sessionKeyMap{
@@ -69,6 +79,10 @@ var sessionKeys = sessionKeyMap{
 		key.WithKeys("k"),
 		key.WithHelp("k", "previous session"),
 	),
+	ShowAll: key.NewBinding(
+		key.WithKeys("ctrl+a"),
+		key.WithHelp("ctrl+a", "this folder / all folders"),
+	),
 }
 
 func (s *sessionDialogCmp) Init() tea.Cmd {
@@ -95,6 +109,10 @@ func (s *sessionDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					Session: s.sessions[s.selectedIdx],
 				})
 			}
+		case key.Matches(msg, sessionKeys.ShowAll):
+			s.showAll = !s.showAll
+			s.applyScope()
+			return s, nil
 		case key.Matches(msg, sessionKeys.Escape):
 			return s, util.CmdHandler(CloseSessionDialogMsg{})
 		}
@@ -169,9 +187,23 @@ func (s *sessionDialogCmp) View() string {
 		Padding(0, 1).
 		Render("Switch Session")
 
+	// Say which slice of the history is on screen. Without this the filter is
+	// invisible, and an invisible filter reads as missing data — the mistake
+	// v0.1.85 made when it moved the store without saying so.
+	scopeLabel := "this folder"
+	if s.showAll {
+		scopeLabel = "all folders"
+	}
+	scope := baseStyle.
+		Foreground(t.TextMuted()).
+		Width(maxWidth).
+		Padding(0, 1).
+		Render(fmt.Sprintf("%s (%d) · ctrl+a to switch", scopeLabel, len(s.sessions)))
+
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
 		title,
+		scope,
 		baseStyle.Width(maxWidth).Render(""),
 		baseStyle.Width(maxWidth).Render(lipgloss.JoinVertical(lipgloss.Left, sessionItems...)),
 		baseStyle.Width(maxWidth).Render(""),
@@ -189,8 +221,22 @@ func (s *sessionDialogCmp) BindingKeys() []key.Binding {
 	return layout.KeyMapToSlice(sessionKeys)
 }
 
-func (s *sessionDialogCmp) SetSessions(sessions []session.Session) {
+func (s *sessionDialogCmp) SetSessions(scoped, all []session.Session, scopeDir string) {
+	s.scoped, s.all, s.scopeDir = scoped, all, scopeDir
+	// Open on the folder you are in — unless it has nothing, in which case an
+	// empty box would be a dead end. Fall back to everything instead.
+	s.showAll = len(scoped) == 0 && len(all) > 0
+	s.applyScope()
+}
+
+// applyScope swaps the visible list and re-finds the selected session in it.
+func (s *sessionDialogCmp) applyScope() {
+	sessions := s.scoped
+	if s.showAll {
+		sessions = s.all
+	}
 	s.sessions = sessions
+	s.selectedIdx = 0
 
 	// If we have a selected session ID, find its index
 	if s.selectedSessionID != "" {
