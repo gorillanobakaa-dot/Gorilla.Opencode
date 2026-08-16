@@ -489,7 +489,7 @@ func (s *Session) export(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	name := fmt.Sprintf("opencode-plain-%s.md", time.Now().Format("20060102-150405"))
+	name := fmt.Sprintf("gorilla-opencode-plain-%s.md", time.Now().Format("20060102-150405"))
 	dst := filepath.Join(dir, name)
 
 	if _, err := os.Stat(dst); err == nil {

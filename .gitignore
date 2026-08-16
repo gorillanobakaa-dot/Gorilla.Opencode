@@ -93,3 +93,25 @@ TO.DO.TO.FIX/
 
 # GORILLA: built packages (see scripts/build-deb.sh)
 Compiled.Builds/
+
+# GORILLA: the project's own memory — NONE of it is published.
+#
+# Corrected 2026-08-14 by the owner. This rule first covered only
+# LESSONS/chroma_opencode/ (the binary vector store), on the reasoning that the
+# XML atoms were "tracked knowledge" and should be committed. That was wrong and
+# the original line is replaced rather than kept, because two contradictory
+# rules in a .gitignore is how something gets published by accident.
+#
+# LESSONS/ is written for US and for the models working here. The atoms name
+# real failures, real hours lost, internal paths and how this machine is set up.
+# That is working material, not documentation for strangers, and it goes in the
+# same category as /scripts/ and /Documentation.Scripts/ above — deliberately
+# untracked by an earlier security decision.
+#
+# The whole directory, not a file list: the release pipeline runs `git add -A`,
+# so anything added under LESSONS/ later would be swept in silently. Same reason
+# TO.DO.TO.FIX/ is named above.
+#
+# The store is rebuildable from the atoms at any time:
+#   SECOND.BRAIN/vector_env/bin/python3 LESSONS/ingest_lessons.py
+LESSONS/

@@ -7,7 +7,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/opencode-ai/opencode/internal/tui/components/chat"
 	"github.com/opencode-ai/opencode/internal/tui/page"
 )
 
@@ -241,15 +240,10 @@ func cmdKind(cmd tea.Cmd) string {
 	return "other"
 }
 
-// The footer frame must be STABLE — always the same height regardless of whether a
-// reply is streaming. The old contract was "at most half the window"; the new
-// contract is "exactly the reserved rows, always", because a frame that shrinks when
-// streaming ends causes bubbletea's cursor-up erase to over-reach and wipe the
-// scrollback.
-//
-// The floor is chat.FooterReservedRows (transcript block) + 1 (status). The page
-// clips whatever it would show to the budget, so no single component grows past
-// the reserved allocation.
+// The footer frame must stay inside the terminal while giving the prompt every
+// available row. The old contract capped it at half the window, which made long
+// messages scroll out of sight even when the terminal had unused space. The
+// status row remains outside the page budget and is always retained.
 func TestFooterIsGivenAHardRowBudget(t *testing.T) {
 	for _, height := range []int{6, 10, 24, 40} {
 		a := appModel{
@@ -263,19 +257,11 @@ func TestFooterIsGivenAHardRowBudget(t *testing.T) {
 		view := a.View()
 		rows := lipgloss.Height(view)
 
-		// The hard maximum: the budget is half the window OR the reserved rows
-		// floor, whichever is larger, plus the status line. This is exact because
-		// tallPage.FooterView clips to its budget and we add exactly 1 for status.
-		budget := height / 2
-		minBudget := chat.FooterReservedRows + 2
-		if budget < minBudget {
-			budget = minBudget
-		}
-		limit := budget + 1 // +1 for the status line
-		if rows > limit {
-			t.Errorf("height %d: frame is %d rows, limit %d. The footer overflowed its "+
-				"budget, which breaks the renderer's line-erase arithmetic",
-				height, rows, limit)
+		// The page receives every row above the status bar. tallPage is deliberately
+		// overlarge, so a correctly sized footer fills the available window exactly.
+		if rows != height {
+			t.Errorf("height %d: frame is %d rows, want the full available window; "+
+				"the prompt budget is being capped too aggressively", height, rows)
 		}
 		if !strings.Contains(view, "status") {
 			t.Errorf("height %d: the status line was shed; it is not optional", height)

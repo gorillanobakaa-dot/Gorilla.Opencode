@@ -179,9 +179,8 @@ type Config struct {
 
 // Application constants
 const (
-	defaultDataDirectory = ".opencode"
-	defaultLogLevel      = "info"
-	appName              = "opencode"
+	defaultLogLevel = "info"
+	appName         = "gorilla-opencode"
 
 	MaxTokensFallbackDefault = 4096
 )
@@ -312,56 +311,18 @@ func GorillaConfigFile() string {
 // used to be duplicated byte-for-byte as loadoutConfigBase() in loadout.go.
 func gorillaConfigBase() string { return ConfigBase() }
 
-// migrateLegacyConfig moves an old ~/.opencode.json (or the opencode
-// XDG dir) into the unified gorilla-opencode/config.json, once.
-func migrateLegacyConfig() {
-	dst := GorillaConfigFile()
-	if _, err := os.Stat(dst); err == nil {
-		return // already unified
-	}
-	home, _ := os.UserHomeDir()
-	candidates := []string{
-		filepath.Join(home, fmt.Sprintf(".%s.json", appName)),
-		filepath.Join(home, ".config", appName, fmt.Sprintf(".%s.json", appName)),
-	}
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		candidates = append(candidates, filepath.Join(xdg, appName, fmt.Sprintf(".%s.json", appName)))
-	}
-	for _, src := range candidates {
-		if data, err := os.ReadFile(src); err == nil {
-			// GORILLA OVERRIDE: 0o600, not 0o644. The migrated file is a
-			// config.json and carries the provider apiKey fields with it, so
-			// migrating a legacy config used to publish those keys to every
-			// account on the machine.
-			if writeSecretFile(dst, data) == nil {
-				_ = os.Remove(src)
-				return
-			}
-		}
-	}
-}
-
 // configureViper sets up viper's configuration paths and environment variables.
 func configureViper() {
-	// GORILLA OVERRIDE: read the unified config first; fall back to the
-	// legacy locations for anyone who hasn't migrated.
-	migrateLegacyConfig()
-	if _, err := os.Stat(GorillaConfigFile()); err == nil {
-		viper.SetConfigFile(GorillaConfigFile())
-	} else {
-		viper.SetConfigName(fmt.Sprintf(".%s", appName))
-		viper.AddConfigPath("$HOME")
-		viper.AddConfigPath(fmt.Sprintf("$XDG_CONFIG_HOME/%s", appName))
-		viper.AddConfigPath(fmt.Sprintf("$HOME/.config/%s", appName))
-	}
+	// Clean-break build: the only global config is the branded XDG path.
+	viper.SetConfigFile(GorillaConfigFile())
 	viper.SetConfigType("json")
-	viper.SetEnvPrefix(strings.ToUpper(appName))
+	viper.SetEnvPrefix("GORILLA_OPENCODE")
 	viper.AutomaticEnv()
 }
 
 // setDefaults configures default values for configuration options.
 func setDefaults(debug bool) {
-	viper.SetDefault("data.directory", defaultDataDirectory)
+	viper.SetDefault("data.directory", DataBase())
 	viper.SetDefault("contextPaths", defaultContextPaths)
 	viper.SetDefault("tui.theme", "opencode")
 	viper.SetDefault("autoCompact", true)
@@ -601,7 +562,7 @@ func readConfig(err error) error {
 	}
 
 	// It's okay if the config file doesn't exist
-	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+	if _, ok := err.(viper.ConfigFileNotFoundError); ok || os.IsNotExist(err) {
 		return nil
 	}
 
@@ -1325,13 +1286,13 @@ func configureLogging() error {
 	}
 
 	dest := io.Writer(logging.NewWriter())
-	if os.Getenv("OPENCODE_DEV_DEBUG") == "true" {
-		loggingFile := fmt.Sprintf("%s/%s", cfg.Data.Directory, "debug.log")
-		messagesPath := fmt.Sprintf("%s/%s", cfg.Data.Directory, "messages")
+	if os.Getenv("GORILLA_OPENCODE_DEV_DEBUG") == "true" {
+		loggingFile := filepath.Join(StateBase(), "debug.log")
+		messagesPath := filepath.Join(StateBase(), "messages")
 
 		// if file does not exist create it
 		if _, err := os.Stat(loggingFile); os.IsNotExist(err) {
-			if err := os.MkdirAll(cfg.Data.Directory, 0o755); err != nil {
+			if err := os.MkdirAll(StateBase(), 0o755); err != nil {
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
 			if _, err := os.Create(loggingFile); err != nil {
@@ -1422,7 +1383,7 @@ func registerLocalEndpoints() {
 	// absent connection cannot delay startup. Any problem with the file is
 	// logged and the built-in list stands, because a corrupt cache must not
 	// leave someone with no models at all.
-	if n, err := models.LoadRefreshedCatalogue(ConfigBase()); err != nil {
+	if n, err := models.LoadRefreshedCatalogue(CacheBase()); err != nil {
 		logging.Warn("Could not apply refreshed model list", "error", err)
 	} else if n > 0 {
 		logging.Debug("Applied refreshed model list", "models", n)
@@ -1430,7 +1391,7 @@ func registerLocalEndpoints() {
 	// Same, for the Antigravity catalogue. Separate cache file and separate
 	// call because they are separate upstreams with separate lifetimes — one
 	// refresh must never invalidate the other.
-	if n, err := models.LoadRefreshedAntigravity(ConfigBase()); err != nil {
+	if n, err := models.LoadRefreshedAntigravity(CacheBase()); err != nil {
 		logging.Warn("Could not apply refreshed Antigravity model list", "error", err)
 	} else if n > 0 {
 		logging.Debug("Applied refreshed Antigravity model list", "models", n)

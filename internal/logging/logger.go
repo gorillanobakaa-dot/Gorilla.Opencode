@@ -1,11 +1,11 @@
 package logging
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
-	// "path/filepath"
-	"encoding/json"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"sync"
@@ -21,6 +21,14 @@ func getCaller() string {
 		caller = "unknown"
 	}
 	return caller
+}
+
+func stateBase() string {
+	if xdg := os.Getenv("XDG_STATE_HOME"); xdg != "" {
+		return filepath.Join(xdg, "gorilla-opencode")
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".local", "state", "gorilla-opencode")
 }
 func Info(msg string, args ...any) {
 	source := getCaller()
@@ -71,7 +79,10 @@ func RecoverPanic(name string, cleanup func()) {
 
 		// Create a timestamped panic log file
 		timestamp := time.Now().Format("20060102-150405")
-		filename := fmt.Sprintf("opencode-panic-%s-%s.log", name, timestamp)
+		if err := os.MkdirAll(stateBase(), 0o755); err != nil {
+			ErrorPersist(fmt.Sprintf("Failed to create state directory: %v", err))
+		}
+		filename := filepath.Join(stateBase(), fmt.Sprintf("gorilla-opencode-panic-%s-%s.log", name, timestamp))
 
 		file, err := os.Create(filename)
 		if err != nil {

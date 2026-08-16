@@ -453,7 +453,7 @@ var Settings = []Setting{
 		Name:    "Program data folder",
 		Layman:  "Folder inside your project where this program keeps its database and logs.",
 		Kind:    KindString,
-		Default: defaultDataDirectory,
+		Default: DataBase(),
 		Restart: true,
 		Get: func() any {
 			if cfg == nil {

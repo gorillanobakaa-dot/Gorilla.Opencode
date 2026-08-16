@@ -500,8 +500,8 @@ answers, that section is the first suspect and `/context` turns it off.*
 
 ## Provenance of the code itself
 
-- Original OpenCode (MIT), Kujtim Hoxha —
-  https://github.com/opencode-ai/opencode
+- Gorilla OpenCode (this fork) —
+  https://github.com/gorillanobakaa-dot/Gorilla.Opencode
 - Crush (Charm, FSL) — https://github.com/charmbracelet/crush
 - SST opencode (unrelated project, same name) —
   https://github.com/sst/opencode

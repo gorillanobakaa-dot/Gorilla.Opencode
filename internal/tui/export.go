@@ -98,5 +98,5 @@ func suggestedExportName(title string, now time.Time) string {
 	if len([]rune(slug)) > maxSlug {
 		slug = strings.Trim(string([]rune(slug)[:maxSlug]), "-")
 	}
-	return fmt.Sprintf("opencode-%s-%s.md", slug, now.Format("20060102-150405"))
+	return fmt.Sprintf("gorilla-opencode-%s-%s.md", slug, now.Format("20060102-150405"))
 }

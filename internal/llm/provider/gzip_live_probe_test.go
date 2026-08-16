@@ -75,7 +75,7 @@ func TestLiveGzipProbe(t *testing.T) {
 			tr := newGzipRequestTransport(http.DefaultTransport)
 			gt, ok := tr.(*gzipRequestTransport)
 			if !ok {
-				t.Fatal("transport is disabled by OPENCODE_NO_REQUEST_GZIP; unset it to probe")
+				t.Fatal("transport is disabled by GORILLA_OPENCODE_NO_REQUEST_GZIP; unset it to probe")
 			}
 			client := &http.Client{Transport: tr, Timeout: 90 * time.Second}
 

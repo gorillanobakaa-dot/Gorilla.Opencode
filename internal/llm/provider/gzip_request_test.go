@@ -200,7 +200,7 @@ func TestRequestGzipSkipsSmallBodies(t *testing.T) {
 
 // The opt-out must actually opt out.
 func TestRequestGzipRespectsOptOut(t *testing.T) {
-	t.Setenv("OPENCODE_NO_REQUEST_GZIP", "1")
+	t.Setenv("GORILLA_OPENCODE_NO_REQUEST_GZIP", "1")
 
 	var gotEncoding string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -215,7 +215,7 @@ func TestRequestGzipRespectsOptOut(t *testing.T) {
 	resp.Body.Close()
 
 	if gotEncoding != "" {
-		t.Errorf("Content-Encoding = %q with OPENCODE_NO_REQUEST_GZIP=1, want none", gotEncoding)
+		t.Errorf("Content-Encoding = %q with GORILLA_OPENCODE_NO_REQUEST_GZIP=1, want none", gotEncoding)
 	}
 }
 

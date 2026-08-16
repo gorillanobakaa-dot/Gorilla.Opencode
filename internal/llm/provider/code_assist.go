@@ -59,9 +59,23 @@ type caFunctionCall struct {
 	// REQUIRE a tool-call id (Claude 400s with "tool_use.id: Field required"
 	// without it). Gemini Code Assist matches by name and never sends one, so it
 	// stays omitempty and the Gemini path leaves it empty. Measured 2026-08-03.
-	ID   string         `json:"id,omitempty"`
-	Name string         `json:"name"`
-	Args map[string]any `json:"args,omitempty"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name"`
+	// Args is ALWAYS emitted, even when empty. GORILLA OVERRIDE: it was
+	// `omitempty`, and omitempty drops a map when len == 0 — so a tool call
+	// with no arguments went out with no `args` key at all. Antigravity
+	// translates the envelope into the native Anthropic shape, where input is
+	// required, and the request was rejected with
+	// "tool_use.input: Field required" before any model saw it. Because the
+	// offending call sits in the session history, EVERY later turn replayed it
+	// and failed identically, on every Anthropic-family model — the session was
+	// dead for good. Measured 2026-08-14.
+	//
+	// Emitting `"args":{}` is the correct shape for a no-argument call on both
+	// backends. Keep it non-nil at every construction site: with this tag a nil
+	// map marshals to `"args":null`, which fails the required check exactly as
+	// hard as omitting it. toolargs_test.go holds both halves.
+	Args map[string]any `json:"args"`
 }
 
 type caFunctionResp struct {
@@ -158,7 +172,17 @@ func caConvertMessages(messages []message.Message, withToolIDs bool) []caContent
 				parts = append(parts, caPart{Text: txt})
 			}
 			for _, call := range msg.ToolCalls() {
-				args, _ := parseJsonToMap(call.Input)
+				// GORILLA OVERRIDE: this is the REPAIR path, and it is not
+				// redundant with the fix at capture. Sessions poisoned before
+				// that fix still hold Input == "null", which parses without
+				// error straight to a nil map — so without this, every
+				// already-broken session stays 400-dead forever. A parse
+				// failure lands here too, and an unreadable argument set is
+				// still no reason to send a malformed envelope.
+				args, err := parseJsonToMap(call.Input)
+				if err != nil || args == nil {
+					args = map[string]any{}
+				}
 				fc := &caFunctionCall{Name: call.Name, Args: args}
 				if withToolIDs {
 					fc.ID = call.ID
@@ -305,7 +329,17 @@ func collectParts(parts []caPart) (string, []message.ToolCall) {
 			sb.WriteString(p.Text)
 		}
 		if p.FunctionCall != nil {
-			input, _ := json.Marshal(p.FunctionCall.Args)
+			// GORILLA OVERRIDE: a nil map marshals to the four bytes `null`,
+			// and that string was being stored as ToolCall.Input and replayed
+			// forever after. A model calling a tool with no arguments poisoned
+			// its own session on the spot. Normalise to an empty object at the
+			// point of capture so `null` can never enter the history at all.
+			// See caFunctionCall.Args and toolargs_test.go. Measured 2026-08-14.
+			args := p.FunctionCall.Args
+			if args == nil {
+				args = map[string]any{}
+			}
+			input, _ := json.Marshal(args)
 			// GORILLA OVERRIDE: preserve the backend's own tool-call id when it
 			// sends one (Antigravity/Claude does — "toolu_vrtx_…"), so replaying
 			// it in history satisfies the native format. Gemini sends none, so

@@ -350,7 +350,10 @@ func (m *model) View() string {
 	// waiting actually feels.
 	if note := staleModelsNotice(); note != "" {
 		b.WriteString("\n\n")
-		b.WriteString(note)
+		// The notice is multiline and can be wider than a narrow terminal. Route
+		// it through the same width-constrained renderer as every other row so
+		// the border never expands beyond the terminal.
+		b.WriteString(line(note))
 	}
 
 	return lipgloss.NewStyle().
@@ -415,7 +418,7 @@ func AnswerLine(dir string, remembered bool) string {
 
 // staleModelsNotice returns the refresh prompt, or "" when the list is current.
 func staleModelsNotice() string {
-	age, refreshed := models.CatalogueAge(config.ConfigBase())
+	age, refreshed := models.CatalogueAge(config.CacheBase())
 	switch {
 	case !refreshed:
 		// Never refreshed: they are running whatever shipped with the build.

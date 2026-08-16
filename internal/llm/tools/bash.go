@@ -238,7 +238,7 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 // build/compile log, we keep only the lines that carry signal — errors,
 // warnings, linker failures, and the file:line they point at — plus a
 // little context, and note how much was dropped. Opt out with
-// OPENCODE_NO_LOG_FILTER=1. This is the SWE-agent finding: bounded,
+// GORILLA_OPENCODE_NO_LOG_FILTER=1. This is the SWE-agent finding: bounded,
 // filtered tool output is the single biggest lever for build agents.
 var (
 	buildSignalRe = regexp.MustCompile(`(?i)(\berror\b:|fatal error:|undefined reference|undefined symbol|multiple definition|recipe for target .* failed|make(\[\d+\])?: \*\*\*|ld: |ld\.lld: |collect2:|linker command failed|cannot find|no such file|: warning:|warning generated|note: |panic:|Segmentation fault|failed with exit|Error \d)`)
@@ -254,7 +254,7 @@ var (
 )
 
 func filterBuildLog(content string) string {
-	if on, _ := strconv.ParseBool(os.Getenv("OPENCODE_NO_LOG_FILTER")); on {
+	if on, _ := strconv.ParseBool(os.Getenv("GORILLA_OPENCODE_NO_LOG_FILTER")); on {
 		return content
 	}
 	lines := strings.Split(content, "\n")
@@ -308,7 +308,7 @@ func filterBuildLog(content string) string {
 			len(lines), len(tail), strings.Join(tail, "\n"))
 	}
 	dropped := len(lines) - len(kept)
-	return fmt.Sprintf("[build log filtered: %d of %d lines were compile/progress noise; showing the %d signal lines. Set OPENCODE_NO_LOG_FILTER=1 for raw output.]\n%s",
+	return fmt.Sprintf("[build log filtered: %d of %d lines were compile/progress noise; showing the %d signal lines. Set GORILLA_OPENCODE_NO_LOG_FILTER=1 for raw output.]\n%s",
 		dropped, len(lines), len(kept), strings.Join(kept, "\n"))
 }
 

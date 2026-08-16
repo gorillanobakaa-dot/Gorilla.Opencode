@@ -27,7 +27,10 @@ func TestMain(m *testing.M) {
 	}
 	defer os.RemoveAll(tmp)
 
-	os.Setenv("XDG_CONFIG_HOME", tmp)
+	os.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	os.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "data"))
+	os.Setenv("XDG_CACHE_HOME", filepath.Join(tmp, "cache"))
+	os.Setenv("XDG_STATE_HOME", filepath.Join(tmp, "state"))
 
 	// Guard the guard: if the resolved path is not inside the temp dir, the
 	// isolation assumption has broken and tests must not run.

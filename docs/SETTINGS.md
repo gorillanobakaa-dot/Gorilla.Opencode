@@ -217,7 +217,7 @@ Folder inside your project where this program keeps its database and logs.
 - **Setting:** `data.directory`
 - **Type:** text
 - **Accepts:** text
-- **Default:** `.opencode`
+- **Default:** `/home/gorilla/.local/share/gorilla-opencode`
 - **Takes effect:** next launch
 
 ## Appearance

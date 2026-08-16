@@ -1,6 +1,7 @@
+<!-- Version: 1.0.0 · updated 26-08-14-21-09 -->
 # Roadmap — where this is, and what is left
 
-**Version: 1.0.0 · updated 26-08-14-16-05**
+**Version: 1.1.0 · updated 26-08-14-21-09**
 
 Written for the next instance. Read this before starting work, then read
 `CLAUDE.md` (traps and release checklist) and `~/.agents/SETTLED.md` (decisions
@@ -9,6 +10,12 @@ already made — apply them, do not re-derive them).
 ---
 
 ## Where we are
+
+**Updated 2026-08-14 (later session): `v0.1.83` is built and installed locally,
+but is NOT released.** No commit, no tag, no changelog, no dual-track docs, no
+`GITHUB-RELEASE-NOTES-0.1.83.md`, no GitHub release. `dpkg -l` and
+`--version` both say 0.1.83 and agree. The section below describing v0.1.82
+is left exactly as written — see "Fixed after v0.1.82" for what changed since.
 
 `v0.1.82`. The session that produced it started as "get WhatsApp video calling
 working" and ended up building the research tool, because the WhatsApp failure
@@ -106,6 +113,63 @@ out with a calculator. Bugs fixed:
 - `$0.01 PER MINUTE / PER HOUR: $0` — `%.0f` on the hour
 - rate and total rounded independently, so they disagreed on screen
 - `8 helpers` printed under a selector reading `Helpers: 4`
+
+---
+
+## Fixed after v0.1.82 — session of 2026-08-14 (later)
+
+**None of items 1–7 below were touched.** They are all still open. This session
+fixed a bug that was never on this roadmap, because it was found by reading a
+failing transcript rather than from the v0.1.82 notes.
+
+### A. No-argument tool calls killed the session permanently — FIXED (v0.1.83)
+
+Every turn returned `messages.N.content.0.tool_use.input: Field required`, same
+message index, on every Anthropic-family model. Not a provider outage: a tool
+call with **no arguments** was persisted as the literal string `null` and
+replayed on every subsequent request forever.
+
+Two defects had to line up, and both are fixed:
+
+- **Capture** — `collectParts` marshalled a nil `Args` map to `null` and stored
+  it (`code_assist.go`).
+- **Replay** — `caFunctionCall.Args` was `json:"args,omitempty"`, and omitempty
+  drops a map at len==0, so nil *and* empty both vanished from the wire. The
+  unfixed envelope was literally `{"functionCall":{"id":…,"name":"bash"}}`.
+
+The replay-path repair is what revives **already-poisoned sessions** — fixing
+only capture would have left every existing broken session dead. Same class
+fixed in `anthropic.go` (SDK tags Input `omitzero,required`), where the old
+`continue` on a parse failure also orphaned the matching `tool_result`.
+
+Six tests in `internal/llm/provider/toolargs_test.go`, each observed to FAIL
+against the unfixed code first. Full suite: 25 packages ok.
+
+### B. The v0.1.82 tool-name repair had never reached the machine
+
+`internal/llm/agent/toolname.go` shipped in v0.1.82 and is described under "What
+was built" above — correctly. But `/usr/bin/gorilla-opencode` was still
+**v0.1.81**, so on this machine the repair did not exist and
+`Tool not found: ls<|message|>` was still live. A whole session was spent
+blaming the model.
+
+Nothing in this roadmap distinguishes *written* from *installed*. New tool:
+`Scripts.For.Work/install-audit/install_audit.py` — every copy on disk with its
+version, which one the PATH resolves to, whether dpkg agrees, whether a process
+holds a deleted binary, and whether a build came from a dirty tree.
+
+### C. The project now has its own lessons vector store
+
+`LESSONS/` — collection `opencode`, store `LESSONS/chroma_opencode/`
+(git-ignored; atoms are tracked). Same pattern as the kernel, Firefox and
+WebKit. Recall before working; write an atom when you finish. See
+`LESSONS/README.md`.
+
+### Not done, deliberately
+
+`v0.1.83` is **built and installed locally only**: no commit, no tag, no
+changelog, no dual-track docs, no `GITHUB-RELEASE-NOTES-0.1.83.md`, no GitHub
+release. The release checklist in `CLAUDE.md` still applies in full.
 
 ---
 

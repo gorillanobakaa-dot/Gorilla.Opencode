@@ -220,24 +220,7 @@ const gorillaConfigDir = "gorilla-opencode"
 // single owner of this directory.
 
 func loadoutPath() string {
-	// One-time migration: move a loadout.json left in the old
-	// (~/.config/opencode) location into the correct dir.
-	newPath := filepath.Join(ConfigBase(), loadoutFileName)
-	if _, err := os.Stat(newPath); os.IsNotExist(err) {
-		var oldPath string
-		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-			oldPath = filepath.Join(xdg, appName, loadoutFileName)
-		} else {
-			home, _ := os.UserHomeDir()
-			oldPath = filepath.Join(home, ".config", appName, loadoutFileName)
-		}
-		if data, err := os.ReadFile(oldPath); err == nil {
-			if writeSecretFile(newPath, data) == nil {
-				_ = os.Remove(oldPath)
-			}
-		}
-	}
-	return newPath
+	return filepath.Join(ConfigBase(), loadoutFileName)
 }
 
 func initLoadout() {

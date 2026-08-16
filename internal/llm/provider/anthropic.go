@@ -95,10 +95,22 @@ func (a *anthropicClient) convertMessages(messages []message.Message) (anthropic
 			}
 
 			for _, toolCall := range msg.ToolCalls() {
+				// GORILLA OVERRIDE: the same nil-args defect as the Antigravity
+				// path, reached directly. The SDK tags Input as
+				// `json:"input,omitzero,required"`, so a nil map is dropped from
+				// the request and the API answers "tool_use.input: Field
+				// required"; the literal `null` is rejected just as hard.
+				//
+				// The old `continue` on a parse failure was its own hazard: it
+				// dropped the tool_use block while the matching tool_result
+				// stayed in the next message, and an orphaned tool_result is a
+				// 400 of its own. Send a well-formed empty object instead —
+				// history stays paired, and the model is told the arguments
+				// were empty rather than the turn silently vanishing.
+				// Measured 2026-08-14. See toolargs_test.go.
 				var inputMap map[string]any
-				err := json.Unmarshal([]byte(toolCall.Input), &inputMap)
-				if err != nil {
-					continue
+				if err := json.Unmarshal([]byte(toolCall.Input), &inputMap); err != nil || inputMap == nil {
+					inputMap = map[string]any{}
 				}
 				blocks = append(blocks, anthropic.NewToolUseBlock(toolCall.ID, inputMap, toolCall.Name))
 			}

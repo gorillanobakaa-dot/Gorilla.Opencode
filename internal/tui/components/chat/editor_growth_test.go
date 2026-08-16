@@ -42,6 +42,27 @@ func TestInputSizesItselfWithoutWaitingForTheLayout(t *testing.T) {
 	}
 }
 
+func TestExactLongPromptWrapsAtTerminalWidth(t *testing.T) {
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	const value = "lalala lalalal lalala lalala lalala lalalalalalal lalalalala f f f f fhjakal  alallalal ghhghhhf dhshshshshe ehekdkdn  askdjd djnjnjdn iwidnidisn hhshshshhs hs here we gon"
+	m := &editorCmp{}
+	m.textarea = CreateTextArea(nil)
+	// The terminal is 176 columns, but the prompt and border leave 172 columns
+	// for text. Use 170 to exercise the first actual soft-wrap boundary.
+	m.SetSize(174, 1)
+	m.textarea.SetValue(value)
+
+	if got := wrappedRows(value, m.textarea.Width()); got < 2 {
+		t.Fatalf("wrappedRows measured %d rows at textarea width %d for %d characters", got, m.textarea.Width(), len(value))
+	}
+	if got := lipgloss.Height(m.View()); got < 2 {
+		t.Fatalf("exact prompt rendered as %d row at 176 columns; earlier text would scroll out of sight", got)
+	}
+}
+
 // 300 words must be visible at once, which is what was asked for. Asserted against
 // the measurement rather than the constant, so raising the cap without checking the
 // arithmetic cannot quietly fail it.

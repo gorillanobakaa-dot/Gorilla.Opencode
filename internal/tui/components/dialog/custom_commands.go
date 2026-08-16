@@ -31,43 +31,16 @@ func LoadCustomCommands() ([]Command, error) {
 
 	var commands []Command
 
-	// Load user commands from XDG_CONFIG_HOME/opencode/commands
-	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	if xdgConfigHome == "" {
-		// Default to ~/.config if XDG_CONFIG_HOME is not set
-		home, err := os.UserHomeDir()
-		if err == nil {
-			xdgConfigHome = filepath.Join(home, ".config")
-		}
+	// Load user commands from the unified Gorilla OpenCode config directory.
+	userCommandsDir := filepath.Join(config.ConfigBase(), "commands")
+	userCommands, err := loadCommandsFromDir(userCommandsDir, UserCommandPrefix)
+	if err != nil {
+		logging.Warn("failed to load user commands", "error", err)
+	} else {
+		commands = append(commands, userCommands...)
 	}
 
-	if xdgConfigHome != "" {
-		userCommandsDir := filepath.Join(xdgConfigHome, "opencode", "commands")
-		userCommands, err := loadCommandsFromDir(userCommandsDir, UserCommandPrefix)
-		if err != nil {
-			// GORILLA OVERRIDE: log, do not print. This runs while the TUI owns
-			// the screen, so a stdout write lands on top of the interface with no
-			// record in Bubble Tea's frame — nothing can ever clear it. Same
-			// failure as the sign-in URL that stayed burned across the session.
-			logging.Warn("failed to load user commands from XDG_CONFIG_HOME", "error", err)
-		} else {
-			commands = append(commands, userCommands...)
-		}
-	}
-
-	// Load commands from $HOME/.opencode/commands
-	home, err := os.UserHomeDir()
-	if err == nil {
-		homeCommandsDir := filepath.Join(home, ".opencode", "commands")
-		homeCommands, err := loadCommandsFromDir(homeCommandsDir, UserCommandPrefix)
-		if err != nil {
-			logging.Warn("failed to load home commands", "error", err)
-		} else {
-			commands = append(commands, homeCommands...)
-		}
-	}
-
-	// Load project commands from data directory
+	// Load project commands from the durable data directory.
 	projectCommandsDir := filepath.Join(cfg.Data.Directory, "commands")
 	projectCommands, err := loadCommandsFromDir(projectCommandsDir, ProjectCommandPrefix)
 	if err != nil {
@@ -83,11 +56,7 @@ func LoadCustomCommands() ([]Command, error) {
 func loadCommandsFromDir(commandsDir string, prefix string) ([]Command, error) {
 	// Check if the commands directory exists
 	if _, err := os.Stat(commandsDir); os.IsNotExist(err) {
-		// Create the commands directory if it doesn't exist
-		if err := os.MkdirAll(commandsDir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to create commands directory %s: %w", commandsDir, err)
-		}
-		// Return empty list since we just created the directory
+		// A read must not create application state.
 		return []Command{}, nil
 	}
 

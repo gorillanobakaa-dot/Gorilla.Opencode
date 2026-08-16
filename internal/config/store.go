@@ -42,6 +42,34 @@ func ConfigBase() string {
 	return filepath.Join(home, ".config", gorillaConfigDir)
 }
 
+// DataBase is the XDG data root for durable application data such as sessions
+// and the SQLite database.
+func DataBase() string {
+	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+		return filepath.Join(xdg, gorillaConfigDir)
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".local", "share", gorillaConfigDir)
+}
+
+// CacheBase is the XDG cache root for rebuildable catalogues and other caches.
+func CacheBase() string {
+	if xdg := os.Getenv("XDG_CACHE_HOME"); xdg != "" {
+		return filepath.Join(xdg, gorillaConfigDir)
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".cache", gorillaConfigDir)
+}
+
+// StateBase is the XDG state root for logs and other non-cache history.
+func StateBase() string {
+	if xdg := os.Getenv("XDG_STATE_HOME"); xdg != "" {
+		return filepath.Join(xdg, gorillaConfigDir)
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".local", "state", gorillaConfigDir)
+}
+
 // PromptsDir is ConfigBase()/prompts, holding user overrides of the system
 // prompts. A prompt is not a credential, but it lives under the same roof and is
 // written with the same mode for consistency.

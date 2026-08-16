@@ -50,9 +50,19 @@ func (c *container) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (c *container) View() string {
 	t := theme.CurrentTheme()
+	contentView := c.content.View()
+	// Inline editors can measure a newly wrapped row while the parent still has
+	// the previous frame's one-row allocation. Preserve that child height for
+	// this render instead of clipping the first wrapped line and making it look
+	// like horizontal scrolling. Fixed layouts still win when the child fits;
+	// this only expands to the content that was actually rendered.
+	contentHeight := lipgloss.Height(contentView)
 	style := lipgloss.NewStyle()
 	width := c.width
 	height := c.height
+	if needed := contentHeight + c.VerticalChrome(); needed > height {
+		height = needed
+	}
 
 	style = style.Background(styles.PanelBackground())
 
@@ -82,7 +92,7 @@ func (c *container) View() string {
 		PaddingBottom(c.paddingBottom).
 		PaddingLeft(c.paddingLeft)
 
-	return style.Render(c.content.View())
+	return style.Render(contentView)
 }
 
 // VerticalChrome implements Container. Kept in sync with the verticalSpace

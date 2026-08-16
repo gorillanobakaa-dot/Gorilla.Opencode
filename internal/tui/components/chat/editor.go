@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/opencode-ai/opencode/internal/app"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/logging"
@@ -176,7 +177,7 @@ func wrappedRows(value string, width int) int {
 // desiredHeight is the row count the editor wants for its current content,
 // clamped so it never collapses or eats the whole window.
 func (m *editorCmp) desiredHeight() int {
-	rows := wrappedRows(m.textarea.Value(), m.textarea.Width())
+	rows := m.measuredRows()
 	if len(m.attachments) > 0 {
 		rows++ // the attachments line sits above the input
 	}
@@ -194,6 +195,34 @@ func (m *editorCmp) desiredHeight() int {
 		return ceiling - 1
 	}
 	return max(minEditorHeight, min(ceiling, rows))
+}
+
+// measuredRows asks bubbles to render the complete value in a probe textarea.
+// The previous lipgloss-only estimate could undercount bubbles' visual rows
+// (prompt width, word breaks, and cursor placement differ), leaving the cursor
+// on a visible tail while earlier wrapped rows stayed outside the viewport.
+func (m *editorCmp) measuredRows() int {
+	originalHeight := m.textarea.Height()
+	probe := m.textarea
+	probe.SetHeight(editorBufferLines)
+	// Re-apply the value so the probe rebuilds bubbles' wrapped-line cache and
+	// viewport content at the probe height rather than reusing the live one-row
+	// viewport snapshot.
+	probe.SetValue(m.textarea.Value())
+	// A textarea renders its configured height even when the value is short, so
+	// trim the probe's trailing blank rows before counting its actual content.
+	lines := strings.Split(ansi.Strip(probe.View()), "\n")
+	for len(lines) > 1 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
+	}
+	// bubbles' model contains shared internal state; restore the live viewport
+	// after probing so measurement cannot itself expand the visible editor.
+	m.textarea.SetHeight(originalHeight)
+	rows := len(lines)
+	if rows < minEditorHeight {
+		return minEditorHeight
+	}
+	return rows
 }
 
 // SetHeightCeiling tells the field the most rows it may occupy. The frame owner
@@ -259,7 +288,7 @@ func (m *editorCmp) openEditor() tea.Cmd {
 		editor = "nvim"
 	}
 
-	tmpfile, err := os.CreateTemp("", "msg_*.md")
+	tmpfile, err := os.CreateTemp("", "gorilla-opencode-msg-*.md")
 	if err != nil {
 		return util.ReportError(err)
 	}
@@ -478,7 +507,7 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // hiddenLines is how many wrapped rows of the current input are scrolled out of
 // sight above the visible field, or 0 if all of it fits.
 func (m *editorCmp) hiddenLines() int {
-	wanted := wrappedRows(m.textarea.Value(), m.textarea.Width())
+	wanted := m.measuredRows()
 	if shown := m.textarea.Height(); wanted > shown {
 		return wanted - shown
 	}

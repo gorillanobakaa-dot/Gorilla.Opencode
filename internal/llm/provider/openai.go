@@ -238,11 +238,11 @@ func (o *openaiClient) preparedParams(messages []openai.ChatCompletionMessagePar
 // built for — REJECTS it with HTTP 400 "Unsupported parameter" (verified
 // 2026-07-20) and reports no cache metrics at all, i.e. NIM offers no
 // prompt caching to enable. Sending the key by default would BREAK every
-// NIM request. So it is off unless you opt in with OPENCODE_PROMPT_CACHE=1,
+// NIM request. So it is off unless you opt in with GORILLA_OPENCODE_PROMPT_CACHE=1,
 // for endpoints known to support it (OpenAI, DeepSeek's direct API, …).
 // Anthropic caching is separate and always on (see anthropic.go).
 func (o *openaiClient) cacheOptions() []option.RequestOption {
-	if on, _ := strconv.ParseBool(os.Getenv("OPENCODE_PROMPT_CACHE")); !on {
+	if on, _ := strconv.ParseBool(os.Getenv("GORILLA_OPENCODE_PROMPT_CACHE")); !on {
 		return nil
 	}
 	sum := sha256.Sum256([]byte(o.providerOptions.model.APIModel + "\x00" + o.providerOptions.systemMessage))

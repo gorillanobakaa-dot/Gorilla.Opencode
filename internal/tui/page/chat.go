@@ -56,6 +56,23 @@ type chatPage struct {
 // so what remains is bounded by the prompt.
 func (p *chatPage) FooterView(maxRows int) string {
 	width, _ := p.layout.GetSize()
+	// In scrollback mode the layout itself is not rendered, so its child can
+	// retain the one-row/zero-width dimensions from startup while the footer is
+	// already being drawn at the real terminal size. Synchronize the editor's
+	// width before it measures soft-wrapped rows; otherwise bubbles scrolls a
+	// long line horizontally until a later resize happens, hiding the earlier
+	// text instead of growing the field immediately.
+	if width > 3 {
+		// Always propagate the width. The container's outer width can already
+		// match the terminal while its bordered child still has the old content
+		// width; comparing only the container therefore misses the stale textarea
+		// geometry that causes horizontal scrolling.
+		_, editorHeight := p.editor.GetSize()
+		if editorHeight < 1 {
+			editorHeight = 1
+		}
+		p.editor.SetSize(width, editorHeight)
+	}
 
 	// The prompt is not optional; everything else is shed to fit, least important
 	// first. Order matters and is deliberate: the session numbers are reference

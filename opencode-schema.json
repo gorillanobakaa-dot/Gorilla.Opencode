@@ -255,7 +255,7 @@
       "description": "Storage configuration",
       "properties": {
         "directory": {
-          "default": ".opencode",
+          "default": "~/.local/share/gorilla-opencode",
           "description": "Directory where application data is stored",
           "type": "string"
         }

@@ -52,7 +52,7 @@ func generateSchema() map[string]any {
 			"directory": map[string]any{
 				"type":        "string",
 				"description": "Directory where application data is stored",
-				"default":     ".opencode",
+				"default":     "~/.local/share/gorilla-opencode",
 			},
 		},
 		"required": []string{"directory"},

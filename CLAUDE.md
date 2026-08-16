@@ -139,9 +139,7 @@ The cause was a silent fallback chain, not the flag it looked like:
 - `--dual-track-path` is the path to **`dual_track.py`**, the docs generator. It has
   nothing to do with the release body. Passing it changes nothing here.
 - The body comes from the profile's `release_notes_template`, which for `go_gorilla`
-  is `GITHUB-RELEASE-NOTES-{version}.md` at the repo root. **That file has never
-  existed** — every release up to that point had its body written by hand afterwards,
-  which is why the bug stayed hidden.
+  is `ReleaseNotes/GITHUB-RELEASE-NOTES-{version}.md`.
 - When the template is missing the script fell back to
   `doc_output_dir/doc_output_base`, and `doc_output_base` is
   `"DOCUMENTATION.dual-track"` — **no `{version}` in it**, so it is the same file for
@@ -150,7 +148,7 @@ The cause was a silent fallback chain, not the flag it looked like:
 Fixed in the script on 2026-07-29: the fallback is now refused unless the filename
 is release-specific, and it logs why and falls through to `--generate-notes`. Both
 branches were verified with dry runs. **So: write
-`GITHUB-RELEASE-NOTES-X.Y.Z.md` at the repo root before releasing.** Keep it short —
+`ReleaseNotes/GITHUB-RELEASE-NOTES-X.Y.Z.md` before releasing.** Keep it short —
 per item 10 below it is a different document from
 `Changelogs/vX.Y.Z-release-notes.md` and must not be a copy of it.
 
@@ -412,7 +410,8 @@ so build output consumed every slot and the model was never shown `cmd/`,
 `internal/` or `go.mod` at all. Worse, thirteen `GITHUB-RELEASE-NOTES-0.1.65…77`
 lines read as a counter: on 2026-08-09 a model sent the single word "oi", with no
 instruction, continued the sequence and ran `git tag -a v0.1.78`. The tag was
-really created. Anything generated per-release belongs outside the root.
+really created. Anything generated per-release belongs outside the root (into
+`Compiled.Builds/` or `ReleaseNotes/`).
 
 `gorilla-opencode` (the built binary) and `*.deb` are also ignored; they are build
 outputs and must never be committed.

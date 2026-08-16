@@ -1682,13 +1682,18 @@ func (a appModel) footerView() string {
 		return status
 	}
 
-	// Budget is half the window, but never less than FooterReservedRows+2
-	// (transcript block + prompt + status). Matches the padding in printer.go
-	// so the frame height stays constant and bubbletea's cursor-up erase
-	// always lands in the right place.
-	budget := a.height / 2
-	if budget < chat.FooterReservedRows+2 {
-		budget = chat.FooterReservedRows + 2
+	// Give the prompt every row available above the status bar. The old policy
+	// used half the window as a fixed budget, which made a long message scroll
+	// out of sight even when the terminal had plenty of unused rows. The editor
+	// already clamps itself to this budget and the final frame is still bounded
+	// by the terminal height, so an arbitrary half-window ceiling is unnecessary.
+	statusRows := lipgloss.Height(status)
+	if statusRows < 1 {
+		statusRows = 1
+	}
+	budget := a.height - statusRows
+	if budget < chat.FooterReservedRows+1 {
+		budget = chat.FooterReservedRows + 1
 	}
 	return clampToWidth(
 		lipgloss.JoinVertical(lipgloss.Top, page.FooterView(budget), status),

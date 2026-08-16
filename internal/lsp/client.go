@@ -117,7 +117,7 @@ func NewClient(ctx context.Context, command string, args ...string) (*Client, er
 	// configured at once.
 	//
 	// Server stderr now goes to the app's own logger, which writes to
-	// .opencode/debug.log rather than the screen. Set debugLSP: true in config
+	// the Gorilla OpenCode state log rather than the screen. Set debugLSP: true in config
 	// (or DEBUG_LSP=true) to also see it live; that is an explicit opt-in for
 	// someone debugging a server, and it will still interleave with the TUI
 	// because there is nowhere else for a live stream to go.

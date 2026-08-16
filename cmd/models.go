@@ -190,7 +190,7 @@ This downloads roughly 650 KB (about 80 seconds on a very slow connection) and
 stores it next to your config. Nothing is sent about you, no account is needed,
 and if the download fails the list you already have keeps working.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		dir := config.ConfigBase()
+		dir := config.CacheBase()
 
 		fmt.Println()
 		fmt.Println("  Refreshing the model list from openrouter.ai")

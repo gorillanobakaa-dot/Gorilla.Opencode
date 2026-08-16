@@ -21,7 +21,7 @@
 // was a genuine bad request and has nothing to do with the encoding, and
 // giving up on gzip for the rest of the session would be the wrong lesson.
 //
-// Opt out entirely with OPENCODE_NO_REQUEST_GZIP=1.
+// Opt out entirely with GORILLA_OPENCODE_NO_REQUEST_GZIP=1.
 package provider
 
 import (
@@ -60,7 +60,7 @@ type gzipRequestTransport struct {
 }
 
 func newGzipRequestTransport(base http.RoundTripper) http.RoundTripper {
-	if off, _ := strconv.ParseBool(os.Getenv("OPENCODE_NO_REQUEST_GZIP")); off {
+	if off, _ := strconv.ParseBool(os.Getenv("GORILLA_OPENCODE_NO_REQUEST_GZIP")); off {
 		return base
 	}
 	return &gzipRequestTransport{base: base, state: map[string]gzipState{}}

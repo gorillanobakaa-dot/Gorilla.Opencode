@@ -74,7 +74,7 @@ the ids it actually honours.`,
 			})
 		}
 
-		res, err := models.RefreshAntigravity(config.ConfigBase(), rows)
+		res, err := models.RefreshAntigravity(config.CacheBase(), rows)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "\n  Refresh failed: %v\n", err)
 			fmt.Fprintln(os.Stderr, "  Your existing model list is untouched and still works.")
