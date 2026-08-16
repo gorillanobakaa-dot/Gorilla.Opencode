@@ -1,4 +1,2 @@
 9852f7a0f38dfcf43d4f80c3fba8f57aed262c073a3bc91469bf4e896ef2a3db  gorilla-opencode_0.1.85_amd64.deb
 60a0c5aec165e0d0142ef8c11bd2be9bccf951c1dacb235eb87d4b5279169736  gorilla-opencode-0.1.85-1-x86_64.pkg.tar.zst
-25698b6939320e7f8825f5aec007a20ddebc2eda7e07b535114fe7bb9b865a4c  gorilla-opencode_session_layman.md
-bda4333b913a43c449c96cdaf2b402a2c74ccddec52c3e37040993b41e07b556  gorilla-opencode_session_developer.md
