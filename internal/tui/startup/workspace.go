@@ -416,6 +416,13 @@ func AnswerLine(dir string, remembered bool) string {
 	return "folder: " + dir
 }
 
+// staleModelsHeadline is the shouted first line of the stale-model warning.
+//
+// Kept as a lone constant on purpose: it is the one string in this program that
+// swears at the reader, and it should take exactly one edit to soften before the
+// v1 release reaches people who did not choose the joke.
+const staleModelsHeadline = "BITCH, REMEMBER TO REFRESH YOUR MODELS!"
+
 // staleModelsNotice returns the refresh prompt, or "" when the list is current.
 func staleModelsNotice() string {
 	age, refreshed := models.CatalogueAge(config.CacheBase())
@@ -426,16 +433,28 @@ func staleModelsNotice() string {
 		return ""
 	}
 
+	// GORILLA OVERRIDE: the headline shouts. Bright red, bold, capitals, at the
+	// one moment the user is definitely looking at the screen — the folder
+	// picker, before any work starts. The old notice was polite grey-and-salmon
+	// and got skimmed past, which meant people met a retired model mid-task
+	// instead of reading a warning at startup. #FF0000 is the same alert red the
+	// quota warnings use, so "something needs doing" looks the same everywhere.
+	//
+	// The wording lives in staleModelsHeadline, one line, deliberately easy to
+	// change before this ships to strangers.
+	shout := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Bold(true)
 	warn := lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
 	body := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 
-	when := "never been updated"
+	when := "NEVER BEEN UPDATED"
 	if refreshed {
-		when = fmt.Sprintf("last updated %d days ago", int(age.Hours()/24))
+		when = fmt.Sprintf("NOT BEEN UPDATED FOR %d DAYS", int(age.Hours()/24))
 	}
 
 	var b strings.Builder
-	b.WriteString(warn.Render(fmt.Sprintf("  🦍  Your AI model list has %s.", when)))
+	b.WriteString(shout.Render("  🦍  " + staleModelsHeadline))
+	b.WriteString("\n")
+	b.WriteString(shout.Render(fmt.Sprintf("      YOUR MODEL LIST HAS %s — IT GOES OFF WEEKLY.", when)))
 	b.WriteString("\n")
 	b.WriteString(body.Render("      Providers retire models all the time, and a retired one just errors"))
 	b.WriteString("\n")

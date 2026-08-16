@@ -347,6 +347,12 @@ func CatalogueAge(configDir string) (age time.Duration, ok bool) {
 
 // StaleAfter is how old a refreshed list gets before the startup screen
 // mentions it. Providers retire models continuously, and a retired model does
-// not fail politely - it errors when picked. A month is long enough that the
-// notice stays rare and short enough that it appears before the list rots.
-const StaleAfter = 30 * 24 * time.Hour
+// not fail politely - it errors when picked.
+//
+// GORILLA OVERRIDE 2026-08-16: cut from 30 days to 7. A month was chosen to
+// keep the notice rare, but it was set from taste rather than measurement, and
+// observation since says the free-tier lists churn roughly WEEKLY — models
+// appear, get renamed and get retired inside a single month, so a 30-day
+// threshold means most people meet a dead model before the notice ever fires.
+// The point of the warning is to arrive BEFORE the failure, not after it.
+const StaleAfter = 7 * 24 * time.Hour
