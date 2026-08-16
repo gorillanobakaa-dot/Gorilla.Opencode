@@ -164,6 +164,7 @@ func TestEveryPortalRowIsHandled(t *testing.T) {
 	loadCfg(t)
 	handled := map[string]bool{
 		"antigravity":  true,
+		"chatgpt":      true,
 		"google-oauth": true,
 		"gcp-custom":   true,
 		"nvidia-nim":   true,

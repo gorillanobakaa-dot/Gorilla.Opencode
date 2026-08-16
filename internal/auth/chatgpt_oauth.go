@@ -93,6 +93,11 @@ const (
 	// a "minimal_client_version" in its own payload, see
 	// codex-api/src/endpoint/models.rs:207).
 	chatgptClientVersion = "0.147.0"
+
+	// ChatGPTClientVersion is the same value, exported for the provider
+	// transport, which must append it to /responses as well. One constant so the
+	// probe and the generation path can never claim to be different clients.
+	ChatGPTClientVersion = chatgptClientVersion
 )
 
 // chatgptScopes are the scopes Codex requests, verbatim. offline_access is what

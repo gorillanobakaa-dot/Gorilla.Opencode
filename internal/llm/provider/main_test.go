@@ -19,6 +19,16 @@ import (
 // clobbered by tests twice before in this project. Hence the guard, copied from
 // internal/config/main_test.go: if the resolved path is not inside the temp dir,
 // refuse to run at all rather than risk it.
+// realConfigHome is the developer's actual XDG_CONFIG_HOME, captured before the
+// isolation below replaces it.
+//
+// It exists for exactly one caller: the opt-in live backend probes, which must
+// READ a real OAuth credential to talk to a real server. The isolation above
+// exists to stop tests WRITING the developer's config; reading one token file
+// does not weaken that, and the alternative — skipping the only test that can
+// verify an undocumented wire format — is worse. Nothing may write through this.
+var realConfigHome = os.Getenv("XDG_CONFIG_HOME")
+
 func TestMain(m *testing.M) {
 	tmp, err := os.MkdirTemp("", "gorilla-provider-test-*")
 	if err != nil {

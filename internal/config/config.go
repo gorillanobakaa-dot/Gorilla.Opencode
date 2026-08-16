@@ -378,6 +378,13 @@ func setProviderDefaults() {
 	if creds, _ := auth.LoadAntigravityCreds(); creds != nil && creds.AccessToken != "" {
 		viper.SetDefault("providers.antigravity.apiKey", "oauth-login")
 	}
+	// GORILLA OVERRIDE: same again for a ChatGPT sign-in. Without this the
+	// provider is disabled on every start AFTER the login, so the models would
+	// appear in the picker once and then silently revert on the next launch.
+	// See internal/auth/chatgpt_oauth.go.
+	if creds, _ := auth.LoadChatGPTCreds(); creds != nil && creds.AccessToken != "" {
+		viper.SetDefault("providers.chatgpt.apiKey", "oauth-login")
+	}
 	if apiKey := os.Getenv("OPENROUTER_API_KEY"); apiKey != "" {
 		viper.SetDefault("providers.openrouter.apiKey", apiKey)
 	}
@@ -1881,6 +1888,11 @@ func helperMustMove(helperModel, prevCoder, newCoder models.ModelID) bool {
 // constant per provider, or nothing.
 var backgroundModelByProvider = map[models.ModelProvider]models.ModelID{
 	models.ProviderAntigravity: models.AGGemini36Flash,
+	// A ChatGPT plan has ONE pool, so this is not a separate-quota split like
+	// Antigravity's: it is simply the cheaper model against the same limit.
+	// On a free plan the cooldown is the scarce resource, and spending GPT-5.5
+	// on conversation titles brings it forward for no benefit the user sees.
+	models.ProviderChatGPT: models.ChatGPT54Mini,
 }
 
 // helperTargetFor returns the model a background agent should move to when the

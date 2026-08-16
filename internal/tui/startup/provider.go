@@ -347,13 +347,17 @@ func (m *providerModel) echo(val []rune, secret bool, w int) string {
 	return shown + suffix
 }
 
-// AskProviders shows the portal and returns the answer. canKeep must be true
-// only when the session already has a working provider — it is what makes Esc
-// mean "keep" rather than "quit".
-func AskProviders(rows []ProviderRow, canKeep bool) (ProviderChoice, error) {
-	if len(rows) == 0 {
-		return ProviderChoice{Keep: true}, nil
-	}
+// ProviderModel is the portal's bubbletea model.
+//
+// GORILLA OVERRIDE: exported so callers outside this package can render the
+// portal headlessly and assert what is actually on the screen. The row list is
+// assembled in cmd/, so a test that a given provider is VISIBLE can only live
+// there — and "the row exists in a slice" is not the same claim as "the user can
+// see it". Behaviour is unchanged; AskProviders builds this same value.
+type ProviderModel = providerModel
+
+// NewProviderModel builds the portal model with the cursor on the active row.
+func NewProviderModel(rows []ProviderRow, canKeep bool) *ProviderModel {
 	sel := 0
 	for i, r := range rows {
 		if r.Active {
@@ -361,7 +365,17 @@ func AskProviders(rows []ProviderRow, canKeep bool) (ProviderChoice, error) {
 			break
 		}
 	}
-	m := &providerModel{rows: rows, canKeep: canKeep, sel: sel}
+	return &providerModel{rows: rows, canKeep: canKeep, sel: sel}
+}
+
+// AskProviders shows the portal and returns the answer. canKeep must be true
+// only when the session already has a working provider — it is what makes Esc
+// mean "keep" rather than "quit".
+func AskProviders(rows []ProviderRow, canKeep bool) (ProviderChoice, error) {
+	if len(rows) == 0 {
+		return ProviderChoice{Keep: true}, nil
+	}
+	m := NewProviderModel(rows, canKeep)
 	// Alternate screen for the same reason as the workspace picker and the
 	// extras screen: the inline renderer strands a stale half-frame per resize
 	// step. See the comment on Ask in workspace.go.

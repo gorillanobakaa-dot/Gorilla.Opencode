@@ -753,6 +753,8 @@ func (m *modelDialogCmp) connectionLine() string {
 		return "served through your Google login (Code Assist quota)"
 	case models.ProviderAntigravity:
 		return "served through your Google login (Antigravity quota)"
+	case models.ProviderChatGPT:
+		return "served through your ChatGPT login (your plan's limits, not a bill)"
 	case models.ProviderCopilot:
 		return "served through your GitHub Copilot login"
 	}
@@ -777,6 +779,8 @@ func connectionFor(mod models.Model) string {
 		return "your Google login (Code Assist quota)"
 	case models.ProviderAntigravity:
 		return "your Google login (Antigravity quota)"
+	case models.ProviderChatGPT:
+		return "your ChatGPT login (your plan's limits, not a bill)"
 	case models.ProviderCopilot:
 		return "your GitHub Copilot login"
 	}
@@ -1257,6 +1261,8 @@ func providerDisplayName(p models.ModelProvider) string {
 		return "Gemini (Google login)"
 	case models.ProviderAntigravity:
 		return "Antigravity (Google login — Claude/GPT/Gemini)"
+	case models.ProviderChatGPT:
+		return "ChatGPT (OpenAI login — free plan works)"
 	case ProviderBookmarks:
 		// "★ bookmarks" was accurate and told nobody anything. Someone landing
 		// here has to work out that this is THEIR list, assembled by them —

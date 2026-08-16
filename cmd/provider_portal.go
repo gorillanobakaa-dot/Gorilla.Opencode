@@ -120,6 +120,8 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 	oauthReady := creds != nil && creds.AccessToken != ""
 	agCreds, _ := auth.LoadAntigravityCreds()
 	agReady := agCreds != nil && agCreds.AccessToken != ""
+	cgCreds, _ := auth.LoadChatGPTCreds()
+	cgReady := cgCreds != nil && cgCreds.AccessToken != ""
 	// Cloudflare's baseURL contains the account id, so it cannot be matched by a
 	// fixed constant the way NIM and Ollama are.
 	var cfEp config.LocalEndpoint
@@ -165,6 +167,20 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 				"a Google-side change could break it without notice.",
 			Configured: agReady,
 			Active:     curProv == models.ProviderAntigravity,
+		},
+		{
+			ID:   "chatgpt",
+			Free: true,
+			Name: "ChatGPT sign-in - GPT-5.5 (works on the FREE plan, no API key)",
+			What: "Signs in with your ChatGPT account and uses OpenAI models through " +
+				"the Codex backend. No API key and no credit card: a free ChatGPT " +
+				"account is enough. GPT-5.5 and GPT-5.4 Mini.",
+			Warning: "Usage counts against your ChatGPT plan's limits, so a free plan " +
+				"will hit a cooldown rather than a bill. GPT-5.6 is not offered here: " +
+				"it needs a tool format this program does not speak yet. GPT-5.4 Mini " +
+				"is retired by OpenAI on 31 Aug 2026.",
+			Configured: cgReady,
+			Active:     curProv == models.ProviderChatGPT,
 		},
 		{
 			ID:   "google-oauth",
@@ -402,6 +418,23 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 		}
 		return nil
 
+	case "chatgpt":
+		if err := runChatGPTPortalLogin(ctx); err != nil {
+			return err
+		}
+		// Same in-session registration as antigravity above: config.Load read
+		// the creds file before this login existed, so without this the provider
+		// is disabled for the rest of the session and every agent silently
+		// reverts to Gemini.
+		if err := config.UpsertProviderKey(models.ProviderChatGPT, oauthLoginPlaceholder); err != nil {
+			return err
+		}
+		// Coder on GPT-5.5; the background agents (title/summarizer/task) on
+		// 5.4 Mini, which is cheaper against the same plan limit — on a free
+		// plan the cooldown is the scarce resource, so do not spend the strong
+		// model on generating conversation titles.
+		return applyAgentModels(models.ChatGPT55, models.ChatGPT54Mini)
+
 	case "google-oauth":
 		if err := runGoogleLogin(ctx, ""); err != nil {
 			return err
@@ -613,6 +646,36 @@ func runAntigravityLogin(ctx context.Context) error {
 	}
 	fmt.Printf("Ready. Project: %s\n", creds.ProjectID)
 	fmt.Println("\nStart chatting — pick a Claude / GPT-OSS / Gemini model from /model.")
+	return nil
+}
+
+// runChatGPTPortalLogin runs the ChatGPT OAuth flow from the provider portal.
+// Prints plainly because the portal runs before the TUI owns the screen (same
+// as runGoogleLogin and runAntigravityLogin).
+//
+// Separate from cmd/login.go's runChatGPTLogin, which is the standalone
+// `login --chatgpt` command: that one reuses existing credentials and prints the
+// model list, which is the right behaviour at a prompt and the wrong behaviour
+// mid-portal, where the user has just chosen to set this provider up.
+func runChatGPTPortalLogin(ctx context.Context) error {
+	fmt.Println("\nStarting ChatGPT sign-in...")
+	creds, err := auth.ChatGPTLogin(ctx)
+	if err != nil {
+		return fmt.Errorf("sign-in failed: %w", err)
+	}
+	if err := creds.Save(); err != nil {
+		return fmt.Errorf("could not save credentials: %w", err)
+	}
+	who := creds.Email
+	if who == "" {
+		who = "your ChatGPT account"
+	}
+	plan := creds.PlanType
+	if plan == "" {
+		plan = "unknown"
+	}
+	fmt.Printf("\nSigned in as %s (plan: %s).\n", who, plan)
+	fmt.Println("\nStart chatting — GPT-5.5 is selected; /model to switch.")
 	return nil
 }
 

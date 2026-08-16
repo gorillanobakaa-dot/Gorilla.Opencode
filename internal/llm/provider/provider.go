@@ -144,6 +144,15 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 			options: clientOptions,
 			client:  newAntigravityClient(clientOptions),
 		}, nil
+	// GORILLA OVERRIDE: OpenAI models via a personal ChatGPT sign-in — free
+	// plan included, no API key. Speaks the Responses API, not Chat
+	// Completions, so it cannot reuse OpenAIClient with a base URL the way
+	// GROQ/xAI/DeepSeek do. See internal/llm/provider/chatgpt.go.
+	case models.ProviderChatGPT:
+		return &baseProvider[ChatGPTClient]{
+			options: clientOptions,
+			client:  newChatGPTClient(clientOptions),
+		}, nil
 	case models.ProviderAzure:
 		return &baseProvider[AzureClient]{
 			options: clientOptions,
