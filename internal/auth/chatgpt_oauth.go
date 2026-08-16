@@ -1,14 +1,14 @@
 // GORILLA OVERRIDE: this file did not exist upstream. It is the OAuth layer for
 // "Sign in with ChatGPT", the sibling of gemini_oauth.go and antigravity_oauth.go.
 //
-// WHY IT MATTERS FOR THIS PROJECT
+// # WHY IT MATTERS FOR THIS PROJECT
 //
 // OpenAI's own help centre states: "Codex is included across ChatGPT plans,
 // including Free and Go. Usage limits vary by plan." A free tier with no card is
 // exactly the access this project exists to reach — the same reason the
 // Antigravity and Code Assist free tiers are wired up above.
 //
-// WHERE THE CONSTANTS COME FROM
+// # WHERE THE CONSTANTS COME FROM
 //
 // Read out of the Codex CLI's own Rust source, codex-rust-v0.147.0, on
 // 2026-08-16 — not guessed, and not captured from traffic:
@@ -24,7 +24,7 @@
 // download was never confidential, and nothing here can be done with it alone.
 // There is no client secret in this flow at all — that is what PKCE replaces.
 //
-// THE ORIGINATOR QUESTION, STATED HONESTLY
+// # THE ORIGINATOR QUESTION, STATED HONESTLY
 //
 // Codex sends `originator: codex_cli_rs` on its requests. We send
 // `gorilla_opencode`. If OpenAI's backend accepts that, this works and the free
@@ -82,6 +82,17 @@ const (
 	// ChatGPTOriginator identifies this client on every request. See the file
 	// header before changing it.
 	ChatGPTOriginator = "gorilla_opencode"
+
+	// chatgptClientVersion is sent as the REQUIRED client_version query
+	// parameter. It is not optional: omitting it returns
+	// 400 invalid_request_error naming ('query', 'client_version').
+	//
+	// The value is the Codex release these constants were read from. It states
+	// which version of the backend's contract this client was written against —
+	// the backend uses it to decide whether the client is new enough (it returns
+	// a "minimal_client_version" in its own payload, see
+	// codex-api/src/endpoint/models.rs:207).
+	chatgptClientVersion = "0.147.0"
 )
 
 // chatgptScopes are the scopes Codex requests, verbatim. offline_access is what
@@ -381,7 +392,13 @@ func (c *ChatGPTCreds) ProbeBackend(ctx context.Context) (status int, body strin
 	if err != nil {
 		return 0, "", err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ChatGPTBackend+"/models", nil)
+	// client_version is a REQUIRED query parameter, not a header. Omitting it
+	// gets a 400 "Field required" naming ('query', 'client_version') — which is
+	// itself informative: that check runs after authentication, so reaching it
+	// proves the token and the client identifier were both accepted.
+	// Codex appends it the same way (codex-api/src/endpoint/models.rs:35-42).
+	u := fmt.Sprintf("%s/models?client_version=%s", ChatGPTBackend, url.QueryEscape(chatgptClientVersion))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return 0, "", err
 	}

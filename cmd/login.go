@@ -21,6 +21,7 @@ import (
 var (
 	loginProject string
 	loginChatGPT bool
+	loginRelogin bool
 )
 
 // loginOption is one row in the interactive menu.
@@ -69,6 +70,9 @@ without any /connect ceremony.`,
 
 		// Scripted path: --chatgpt skips the menu entirely.
 		if loginChatGPT {
+			if loginRelogin {
+				_ = auth.LogoutChatGPT()
+			}
 			return runChatGPTLogin(ctx)
 		}
 
@@ -102,16 +106,27 @@ without any /connect ceremony.`,
 // token. So this does not assume an answer in either direction: it signs in,
 // asks the backend one read-only question, and prints exactly what came back.
 func runChatGPTLogin(ctx context.Context) error {
-	fmt.Println("\nStarting ChatGPT sign-in...")
-	fmt.Printf("A browser window will open. This uses port %d, which OpenAI\n"+
-		"registered for this sign-in — it cannot use any other port.\n", 1455)
+	// Reuse a stored sign-in rather than sending someone back to the browser to
+	// re-answer a question they already answered. Re-running this command is the
+	// natural way to re-check the backend, and a browser round-trip per check
+	// makes that needlessly expensive.
+	creds, _ := auth.LoadChatGPTCreds()
+	if creds != nil && creds.RefreshToken != "" {
+		fmt.Printf("\nUsing the ChatGPT sign-in already stored at %s\n", auth.ChatGPTCredsPath())
+		fmt.Println("(delete that file, or run with --relogin, to sign in as someone else)")
+	} else {
+		fmt.Println("\nStarting ChatGPT sign-in...")
+		fmt.Printf("A browser window will open. This uses port %d, which OpenAI\n"+
+			"registered for this sign-in — it cannot use any other port.\n", 1455)
 
-	creds, err := auth.ChatGPTLogin(ctx)
-	if err != nil {
-		return fmt.Errorf("sign-in failed: %w", err)
-	}
-	if err := creds.Save(); err != nil {
-		return fmt.Errorf("could not save credentials: %w", err)
+		var err error
+		creds, err = auth.ChatGPTLogin(ctx)
+		if err != nil {
+			return fmt.Errorf("sign-in failed: %w", err)
+		}
+		if err := creds.Save(); err != nil {
+			return fmt.Errorf("could not save credentials: %w", err)
+		}
 	}
 
 	who := creds.Email
@@ -271,6 +286,8 @@ func selectedIndex(raw string, n int) int {
 func init() {
 	loginCmd.Flags().BoolVar(&loginChatGPT, "chatgpt", false,
 		"sign in with a ChatGPT account (Codex is included on ChatGPT plans, including Free)")
+	loginCmd.Flags().BoolVar(&loginRelogin, "relogin", false,
+		"discard the stored ChatGPT sign-in and authenticate again")
 	loginCmd.Flags().StringVar(&loginProject, "project", "",
 		"Google Cloud project id (Google OAuth with your own project; omit for the free tier or the interactive menu)")
 	rootCmd.AddCommand(loginCmd)
