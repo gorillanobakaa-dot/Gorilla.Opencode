@@ -1,12 +1,43 @@
 #!/usr/bin/env bash
+# GORILLA OVERRIDE: rewritten 2026-08-16. The inherited upstream script was
+# broken in five separate ways after the v0.1.85 rename, and none of them was
+# visible without running it:
+#   1. it downloaded "$APP-linux-x86_64.tar.gz", which this project did not
+#      publish at all — so the documented one-line install could never succeed;
+#   2. it then ran `mv opencode "$INSTALL_DIR"`, the UPSTREAM binary name, so
+#      even a correct download would have failed to install;
+#   3. `check_version` probed `command -v opencode` — the other program — so a
+#      machine with upstream OpenCode installed compared against the wrong
+#      binary entirely;
+#   4. the installed version was hardcoded to "0.0.1" behind a TODO, making the
+#      "already installed" branch permanently wrong;
+#   5. `curl ... | tar xz` treated a 404 page as an archive: GitHub answers a
+#      missing asset with HTML, tar fails mid-pipe, and with the old script's
+#      pipeline the failure could still be reported as success.
+# The asset it wants is now built by scripts/build-tarball.sh and published with
+# the release. Everything below verifies what it got before acting on it.
 set -euo pipefail
+
 APP=gorilla-opencode
+REPO=gorillanobakaa-dot/Gorilla.Opencode
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 ORANGE='\033[38;2;255;140;0m'
 NC='\033[0m' # No Color
+
+print_message() {
+    local level=$1
+    local message=$2
+    local color=""
+    case $level in
+        info) color="${GREEN}" ;;
+        warning) color="${YELLOW}" ;;
+        error) color="${RED}" ;;
+    esac
+    echo -e "${color}${message}${NC}"
+}
 
 requested_version=${VERSION:-}
 
@@ -15,96 +46,102 @@ if [[ "$os" == "darwin" ]]; then
     os="mac"
 fi
 arch=$(uname -m)
-
 if [[ "$arch" == "aarch64" ]]; then
-  arch="arm64"
+    arch="arm64"
+fi
+
+if [[ "$os" != "linux" ]]; then
+    print_message error "This build is Linux-only. Detected: $os/$arch"
+    exit 1
+fi
+if [[ "$arch" != "x86_64" ]]; then
+    print_message error "No published build for $arch. Only x86_64 is released."
+    print_message info  "You can build from source instead: go build -o $APP ."
+    exit 1
 fi
 
 filename="$APP-$os-$arch.tar.gz"
-
-
-case "$filename" in
-    *"-linux-"*)
-        [[ "$arch" == "x86_64" || "$arch" == "arm64" || "$arch" == "i386" ]] || exit 1
-    ;;
-    *"-mac-"*)
-        [[ "$arch" == "x86_64" || "$arch" == "arm64" ]] || exit 1
-    ;;
-    *)
-        echo "${RED}Unsupported OS/Arch: $os/$arch${NC}"
-        exit 1
-    ;;
-esac
 
 INSTALL_DIR=$HOME/.local/bin
 mkdir -p "$INSTALL_DIR"
 
 if [ -z "$requested_version" ]; then
-    url="https://github.com/gorillanobakaa-dot/Gorilla.Opencode/releases/latest/download/$filename"
-    specific_version=$(curl -s https://api.github.com/repos/gorillanobakaa-dot/Gorilla.Opencode/releases/latest | awk -F'"' '/"tag_name": "/ {gsub(/^v/, "", $4); print $4}')
-
-    if [[ $? -ne 0 ]]; then
-        echo "${RED}Failed to fetch version information${NC}"
+    url="https://github.com/$REPO/releases/latest/download/$filename"
+    if ! specific_version=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
+        | awk -F'"' '/"tag_name": "/ {gsub(/^v/, "", $4); print $4; exit}'); then
+        print_message error "Failed to fetch version information from GitHub."
+        exit 1
+    fi
+    if [ -z "$specific_version" ]; then
+        print_message error "GitHub returned no tag name; cannot determine the latest version."
         exit 1
     fi
 else
-    url="https://github.com/gorillanobakaa-dot/Gorilla.Opencode/releases/download/v${requested_version}/$filename"
+    url="https://github.com/$REPO/releases/download/v${requested_version}/$filename"
     specific_version=$requested_version
 fi
 
-print_message() {
-    local level=$1
-    local message=$2
-    local color=""
-
-    case $level in
-        info) color="${GREEN}" ;;
-        warning) color="${YELLOW}" ;;
-        error) color="${RED}" ;;
-    esac
-
-    echo -e "${color}${message}${NC}"
-}
-
+# Compare against OUR binary, by asking it. Never against `opencode`, which is a
+# different program that may legitimately be installed alongside this one.
 check_version() {
-    if command -v opencode >/dev/null 2>&1; then
-        opencode_path=$(which opencode)
-
-
-        ## TODO: check if version is installed
-        # installed_version=$(opencode version)
-        installed_version="0.0.1"
-        installed_version=$(echo $installed_version | awk '{print $2}')
-
-        if [[ "$installed_version" != "$specific_version" ]]; then
-            print_message info "Installed version: ${YELLOW}$installed_version."
-        else
-            print_message info "Version ${YELLOW}$specific_version${GREEN} already installed"
+    if command -v "$APP" >/dev/null 2>&1; then
+        local installed_version
+        installed_version=$("$APP" --version 2>/dev/null | tr -d 'v' | awk '{print $NF}') || installed_version=""
+        if [ -n "$installed_version" ] && [ "$installed_version" = "$specific_version" ]; then
+            print_message info "Version ${YELLOW}$specific_version${GREEN} already installed at $(command -v "$APP")"
             exit 0
         fi
+        [ -n "$installed_version" ] && print_message info "Installed version: ${YELLOW}$installed_version${GREEN}, updating to ${YELLOW}$specific_version"
     fi
 }
 
 download_and_install() {
-    print_message info "Downloading ${ORANGE}opencode ${GREEN}version: ${YELLOW}$specific_version ${GREEN}..."
-    mkdir -p gorilla-opencode-tmp && cd gorilla-opencode-tmp
-    curl -# -L $url | tar xz
-    mv opencode $INSTALL_DIR
-    cd .. && rm -rf gorilla-opencode-tmp
+    print_message info "Downloading ${ORANGE}$APP ${GREEN}version: ${YELLOW}$specific_version ${GREEN}..."
+    local tmp
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' RETURN
+
+    # Download to a file first. A piped download cannot be inspected before it is
+    # extracted, and GitHub serves HTML — not an error — for a missing asset.
+    if ! curl -# -fL "$url" -o "$tmp/$filename"; then
+        print_message error "Download failed: $url"
+        print_message info  "Check that release v$specific_version publishes $filename."
+        exit 1
+    fi
+    if ! gzip -t "$tmp/$filename" 2>/dev/null; then
+        print_message error "The downloaded file is not a gzip archive — the release asset is probably missing."
+        print_message info  "Install the .deb or .pkg.tar.zst from https://github.com/$REPO/releases instead."
+        exit 1
+    fi
+
+    tar -xzf "$tmp/$filename" -C "$tmp"
+    if [ ! -f "$tmp/$APP" ]; then
+        print_message error "Archive did not contain a '$APP' binary."
+        exit 1
+    fi
+
+    install -Dm755 "$tmp/$APP" "$INSTALL_DIR/$APP"
+
+    # Verify the artifact, never the exit code: confirm what actually landed.
+    local got
+    got=$("$INSTALL_DIR/$APP" --version 2>/dev/null | tr -d 'v' | awk '{print $NF}') || got=""
+    if [ "$got" != "$specific_version" ]; then
+        print_message error "Installed binary reports '${got:-nothing}', expected '$specific_version'."
+        exit 1
+    fi
+    print_message info "Installed ${ORANGE}$APP ${GREEN}v$specific_version to $INSTALL_DIR"
 }
 
 check_version
 download_and_install
 
-
 add_to_path() {
     local config_file=$1
     local command=$2
-
     if [[ -w $config_file ]]; then
-        echo -e "\n# opencode" >> "$config_file"
+        echo -e "\n# $APP" >> "$config_file"
         echo "$command" >> "$config_file"
-        print_message info "Successfully added ${ORANGE}opencode ${GREEN}to \$PATH in $config_file"
+        print_message info "Successfully added ${ORANGE}$APP ${GREEN}to \$PATH in $config_file"
     else
         print_message warning "Manually add the directory to $config_file (or similar):"
         print_message info "  $command"
@@ -124,14 +161,10 @@ case $current_shell in
     bash)
         config_files="$HOME/.bashrc $HOME/.bash_profile $HOME/.profile $XDG_CONFIG_HOME/bash/.bashrc $XDG_CONFIG_HOME/bash/.bash_profile"
     ;;
-    ash)
-        config_files="$HOME/.ashrc $HOME/.profile /etc/profile"
-    ;;
-    sh)
+    ash|sh)
         config_files="$HOME/.ashrc $HOME/.profile /etc/profile"
     ;;
     *)
-        # Default case if none of the above matches
         config_files="$HOME/.bashrc $HOME/.bash_profile $XDG_CONFIG_HOME/bash/.bashrc $XDG_CONFIG_HOME/bash/.bash_profile"
     ;;
 esac
@@ -144,36 +177,25 @@ for file in $config_files; do
     fi
 done
 
-if [[ -z $config_file ]]; then
-    print_message error "No config file found for $current_shell. Checked files: ${config_files[@]}"
-    exit 1
-fi
-
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-    case $current_shell in
-        fish)
-            add_to_path "$config_file" "fish_add_path $INSTALL_DIR"
-        ;;
-        zsh)
-            add_to_path "$config_file" "export PATH=$INSTALL_DIR:\$PATH"
-        ;;
-        bash)
-            add_to_path "$config_file" "export PATH=$INSTALL_DIR:\$PATH"
-        ;;
-        ash)
-            add_to_path "$config_file" "export PATH=$INSTALL_DIR:\$PATH"
-        ;;
-        sh)
-            add_to_path "$config_file" "export PATH=$INSTALL_DIR:\$PATH"
-        ;;
-        *)
-            print_message warning "Manually add the directory to $config_file (or similar):"
-            print_message info "  export PATH=$INSTALL_DIR:\$PATH"
-        ;;
-    esac
+    if [[ -z $config_file ]]; then
+        print_message warning "No shell config file found for $current_shell. Add this line to yours:"
+        print_message info "  export PATH=$INSTALL_DIR:\$PATH"
+    else
+        case $current_shell in
+            fish) add_to_path "$config_file" "fish_add_path $INSTALL_DIR" ;;
+            zsh|bash|ash|sh) add_to_path "$config_file" "export PATH=$INSTALL_DIR:\$PATH" ;;
+            *)
+                print_message warning "Manually add the directory to $config_file (or similar):"
+                print_message info "  export PATH=$INSTALL_DIR:\$PATH"
+            ;;
+        esac
+    fi
 fi
 
 if [ -n "${GITHUB_ACTIONS-}" ] && [ "${GITHUB_ACTIONS}" == "true" ]; then
-    echo "$INSTALL_DIR" >> $GITHUB_PATH
+    echo "$INSTALL_DIR" >> "$GITHUB_PATH"
     print_message info "Added $INSTALL_DIR to \$GITHUB_PATH"
 fi
+
+print_message info "Done. Run '${ORANGE}$APP${GREEN}' to start, or '${ORANGE}$APP install${GREEN}' to add the desktop launcher and icons."

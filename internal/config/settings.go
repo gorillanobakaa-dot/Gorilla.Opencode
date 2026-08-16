@@ -451,7 +451,7 @@ var Settings = []Setting{
 		ID:      "data.directory",
 		Group:   GroupFiles,
 		Name:    "Program data folder",
-		Layman:  "Folder inside your project where this program keeps its database and logs.",
+		Layman:  "Where this program keeps its database and logs. One folder for the whole machine, not one per project.",
 		Kind:    KindString,
 		Default: DataBase(),
 		Restart: true,
@@ -620,6 +620,26 @@ func sameSettingValue(a, b any) bool {
 
 // FormatSettingValue renders a value for display. Exported so the dialog and the
 // generated docs agree on how a value looks.
+// TildeHome rewrites the current user's home directory to "~".
+//
+// GORILLA OVERRIDE: v0.1.85 published `/home/gorilla/.local/share/gorilla-opencode`
+// as the documented default for data.directory. That value is computed at
+// package-init from whoever is running, so the generated docs bake in the build
+// machine's username — a leak of the build environment, and wrong for every
+// reader of the shipped file.
+//
+// It lives here, next to FormatSettingValue, so the doc generator and the
+// staleness test share ONE owner for the rule. When they each had their own
+// idea of how a path is displayed, the test asserted the raw path and the
+// generator wrote the tilde form, and the doc could never satisfy both.
+func TildeHome(s string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" || home == "/" {
+		return s
+	}
+	return strings.ReplaceAll(s, home, "~")
+}
+
 func FormatSettingValue(v any) string {
 	switch t := v.(type) {
 	case nil:

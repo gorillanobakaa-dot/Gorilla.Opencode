@@ -109,7 +109,15 @@ func SkipHidden(path string) bool {
 
 	commonIgnoredDirs := map[string]bool{
 		".gorilla-opencode": true,
-		"node_modules":      true,
+		// GORILLA OVERRIDE: keep ".opencode" ignored too. v0.1.85 moved this
+		// program's data out of the per-project ".opencode" folder without
+		// migrating it, so those folders survive in users' projects holding an
+		// old SQLite database, debug.log and messages/. Dropping the entry from
+		// this list would make file search and @-completion walk straight into
+		// abandoned conversation history — un-ignoring data in the same release
+		// that orphans it.
+		".opencode":    true,
+		"node_modules": true,
 		"vendor":            true,
 		"dist":              true,
 		"build":             true,

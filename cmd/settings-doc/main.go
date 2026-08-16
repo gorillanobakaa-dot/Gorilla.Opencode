@@ -44,7 +44,7 @@ func main() {
 			fmt.Fprintf(&b, "- **Setting:** `%s`\n", s.ID)
 			fmt.Fprintf(&b, "- **Type:** %s\n", s.Kind)
 			fmt.Fprintf(&b, "- **Accepts:** %s\n", config.SettingRange(s))
-			fmt.Fprintf(&b, "- **Default:** `%s`\n", config.FormatSettingValue(s.Default))
+			fmt.Fprintf(&b, "- **Default:** `%s`\n", config.TildeHome(config.FormatSettingValue(s.Default)))
 			if s.Unit != "" {
 				fmt.Fprintf(&b, "- **Unit:** %s\n", s.Unit)
 			}

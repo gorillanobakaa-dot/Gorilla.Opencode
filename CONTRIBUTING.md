@@ -44,4 +44,4 @@ Use the issue template. Include:
 - Gorilla version (`gorilla-opencode version`)
 - Provider + model
 - Minimal repro steps
-- Relevant logs (`OPENCODE_DEBUG=1`)
+- Relevant logs (`GORILLA_OPENCODE_DEBUG=1`)

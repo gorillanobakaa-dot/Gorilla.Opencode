@@ -291,7 +291,7 @@ func TestSettingsDocIsCurrent(t *testing.T) {
 		for _, want := range []string{
 			"`" + s.ID + "`",
 			SettingRange(s),
-			FormatSettingValue(s.Default),
+			TildeHome(FormatSettingValue(s.Default)),
 		} {
 			if want == "" {
 				continue

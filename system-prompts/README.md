@@ -298,7 +298,7 @@ unsupported **only when the uncompressed retry succeeds**. If both attempts
 fail it was a genuine error, gzip stays on, and an ordinary invalid-model
 typo does not silently disable compression for the rest of the session.
 
-Opt out with `OPENCODE_NO_REQUEST_GZIP=1`. Guarded by eight tests in
+Opt out with `GORILLA_OPENCODE_NO_REQUEST_GZIP=1`. Guarded by eight tests in
 `gzip_request_test.go`, plus a live probe (`gzip_live_probe_test.go`, gated
 behind `GORILLA_LIVE_GZIP_PROBE=1` because it spends real quota).
 

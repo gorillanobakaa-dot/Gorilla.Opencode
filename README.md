@@ -403,7 +403,7 @@ More full-resolution screenshots and captions:
   to glide under undocumented free-tier ceilings, and a cap on how many
   helper agents the main agent may spawn — down to the 🦍 Gorilla Nuclear
   Option (all agents/subagents off). Both persist and apply mid-session.
-- **Prompt caching** (opt-in, `OPENCODE_PROMPT_CACHE=1`) for endpoints
+- **Prompt caching** (opt-in, `GORILLA_OPENCODE_PROMPT_CACHE=1`) for endpoints
   that support it; Anthropic caching always on. See the changelog for
   the honest note on NIM.
 - **Desktop-native**: embedded icons, self-installer, `.deb`, one-line

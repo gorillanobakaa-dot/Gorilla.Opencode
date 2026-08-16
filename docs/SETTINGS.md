@@ -212,12 +212,12 @@ Whether the program asks you to pick a working folder each time it starts.
 
 ### Program data folder
 
-Folder inside your project where this program keeps its database and logs.
+Where this program keeps its database and logs. One folder for the whole machine, not one per project.
 
 - **Setting:** `data.directory`
 - **Type:** text
 - **Accepts:** text
-- **Default:** `/home/gorilla/.local/share/gorilla-opencode`
+- **Default:** `~/.local/share/gorilla-opencode`
 - **Takes effect:** next launch
 
 ## Appearance
