@@ -1,3 +1,89 @@
+## v0.1.90 — 2026-08-17 — all-source analysis, and four ways the program was lying about itself
+
+Full dual-track document: [v0.1.90-release-notes.md](v0.1.90-release-notes.md).
+
+**Plain-language version:** This release is mostly about honesty. Four things the
+program was quietly getting wrong, all found in one evening of real use.
+
+It was **burning a third of your processor doing nothing at all**. A little
+spinning animation kept ticking eight times a second forever, whether or not
+anything was happening, and every tick redrew the whole screen. On an idle,
+empty session that measured 35% of a processor core; in a long conversation, 59%.
+It also made the program feel frozen when it was busy, because your keypresses
+queued up behind all that pointless redrawing. It now animates only while
+something is actually working: **35% down to 9%**.
+
+It was **asking your permission over and over for the same thing**. When you send
+ten helpers to research something, each one is its own little session, and
+"allow for this session" was being remembered against whichever helper happened
+to ask. So the other nine asked again. Now one approval covers the whole run.
+And if you would rather not be asked at all, the new **`/yolo`** command (or
+`/goal <your task>`) approves everything for the current conversation and runs
+unattended — with a red warning in the status bar the whole time, so you cannot
+forget it is on.
+
+It could **wait forever**. If a permission question never got answered, the
+helper waiting on it hung — silently, while the screen cheerfully reported it as
+running. Three helpers sat like that for sixteen minutes doing nothing. There is
+now a time limit, and killing a helper releases it immediately.
+
+And it was **under-reporting what you spent by a factor of twenty**. Eight
+helpers burned 280,744 tokens; the counter said 13,300 and the cost said $0.00.
+Helper usage was never added up at all, and on a free plan the cost is always
+zero however much you burn — so the one number that could have warned you was
+incapable of changing. Now the tokens are counted, and the warning screen before
+an expensive run tells you the real size: **about 2.9 million tokens per hour**
+for a full ten-helper supervised run, measured from an actual run rather than
+guessed. Because "$0.03 a minute" is true and sounds reassuring, and most people
+will not do the multiplication.
+
+Also: the serious research command is now called **OSINT All-Source Intelligence
+Analysis**, which is the correct name for what it does — combining many
+different kinds of source and weighing them against each other. It now follows
+the UK government's published standard for intelligence assessment, which
+attacks the characteristic weakness of an AI answer: everything sounding equally
+certain. Likelihood is stated in seven fixed words with no invented percentages,
+and how solid the basis is gets rated separately, so "highly likely, but on a
+weak basis" is something the tool can now actually say. Every line is marked as
+fact, inference or assumption. Credited to its authors under their open licence.
+
+Two commands existed but could not be typed: **`/compact`** (shorten a long
+conversation so it keeps working — vital on the small free models) and
+**`/init`**. Both worked; both answered "Unknown command". Fixed, with a test so
+it cannot happen a fourth time. arXiv, bioRxiv and medRxiv were added to the map
+of sources the helpers carry. And when helpers are working, the program now says
+so every ninety seconds, because on a slow model over a slow connection a
+working program and a crashed one look identical — one lane went quiet for 23
+minutes and came back with 19,118 tokens of real work.
+
+**One important limit:** installing a new version does not change a copy that is
+already running. Quit and restart the program, or you will be testing yesterday's
+build.
+
+**Technical:** Spinner tick chain now bounded to when it is drawn (`Init` no
+longer starts it; declining to forward a `TickMsg` lets it lapse). Permission
+grants resolve to the root of the session tree via `RegisterChildSession`,
+called by both the research and sub-agent tools; scope is unchanged (tool,
+action and path still match exactly, and grants cannot cross conversations —
+both pinned by tests). `permission.Request` gains a bounded wait
+(`PermissionWait`, 10m) which denies and logs on expiry, and `CancelSession`
+releases waiters scoped to one conversation when a helper is killed —
+cancelling ctx was insufficient because a goroutine parked on a channel does not
+watch it. `helperSpend` carries cost plus prompt and completion tokens together
+and rolls all three into the parent session, with the `if total > 0` guard
+removed (on free tiers cost is always 0.00). The `/osint` gate renders full
+width and states run size in tokens/hour from a measured 21,596 tok/min across 8
+helpers. `doctrine=dossier` prompts carry the PHIA Probability Yardstick and
+Analytical Confidence Rating verbatim, kept as separate axes, plus
+fact/inference/assumption labelling and falsifiable alternatives. `/yolo`
+(`/auto`, `/autopilot`, `/goal`) toggles `AutoApproveSession` for the
+conversation, never persisted. `/compact` and `/init` joined the typed dispatch;
+`TestEveryPaletteCommandIsAlsoTypeable` fails if a palette entry is not typeable
+and documented. Dialog frames may no longer exceed the terminal in either
+dimension (`dialogWidth` caps rather than floors); `internal/llm/agent` gained
+`configtest.Isolate` after its tests wrote to the developer's real
+`loadout.json`. 26 test packages green.
+
 ## v0.1.89 — 2026-08-17 — no window draws outside the window
 
 Full dual-track document: [v0.1.89-release-notes.md](v0.1.89-release-notes.md).

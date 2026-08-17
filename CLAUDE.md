@@ -159,6 +159,40 @@ Two more guards were added the same day, both from real incidents:
 - **It fast-forwards `main` to the tag**, only ever as a fast-forward. It previously
   pushed just the current branch, which is how `main` sat 43 commits behind.
 
+## Documenting — do it as you go, not at the end
+
+**Machine-wide directive §14 applies here and this is its checklist.** On
+2026-08-17 a day of work — eight commits, nine bugs, a new command set, several
+measurements — reached the evening with no brain lessons and no dual-track
+notes. The knowledge existed only in a context window that was one compaction
+from losing it.
+
+At the moment a bug is UNDERSTOOD (not when the release ships):
+
+```sh
+B=/home/gorilla/Documents/Scripts.For.Work/brain-management
+python3 $B/brain_scribe.py lesson --payload /tmp/brain_payload.json   # see §14 for the shape
+python3 $B/brain_reader.py "<a phrase from it>"                        # prove it comes back
+```
+
+Before any release, these must exist:
+
+- [ ] `Changelogs/vX.Y.Z-release-notes.md` — dual track, both complete, claim
+      table marking every statement `stated in input` or `model inference`.
+- [ ] `Changelogs/CHANGELOG.md` entry, newest first, with the
+      `**Plain-language version:**` paragraph.
+- [ ] `ReleaseNotes/GITHUB-RELEASE-NOTES-vX.Y.Z.md` — and per the 2026-08-17
+      decision it carries the FULL documentation inline, not links to it. A
+      release page that says "see the docs" is the closed door PHILOSOPHY.md
+      argues against.
+- [ ] Screenshots at full capture resolution in `docs/screenshots/gallery/`,
+      written up in `docs/SCREENSHOTS.md`, clickable to the original, never
+      thumbnailed (directive §13). **Ask for them.**
+- [ ] A brain lesson for every non-obvious bug fixed in the cycle, each with its
+      `generalisation`, so the next instance is recognised as a repeat.
+- [ ] Every measurement taken during the cycle written into a doc. Measurements
+      are the most expensive thing to reproduce and the first thing forgotten.
+
 ## Releasing — the checklist
 
 The script covers much of this. Follow it in order when working by hand, and use it
