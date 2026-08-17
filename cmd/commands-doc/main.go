@@ -50,6 +50,13 @@ func main() {
 			if c.Args != "" {
 				name = "`/" + c.Name + " " + c.Args + "`"
 			}
+			// Aliases belong in the table, not only in the entry below it.
+			// /goal is an alias of /yolo and a headline feature in its own
+			// right; someone scanning the table for "what can I type" would
+			// never have found it.
+			if len(c.Aliases) > 0 {
+				name += " · `/" + strings.Join(c.Aliases, "` `/") + "`"
+			}
 			b.WriteString(fmt.Sprintf("| %s | %s |\n", name, c.Summary))
 		}
 	}

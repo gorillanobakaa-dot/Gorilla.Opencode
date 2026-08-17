@@ -16,28 +16,28 @@ cost before they start. Everything else is local.
 
 | Type this | What happens |
 |---|---|
-| `/clear` | Start a fresh conversation. |
-| `/plain` | Switch to the interface you can select and copy. |
+| `/clear` · `/new` | Start a fresh conversation. |
+| `/plain` · `/copy` `/copyable` | Switch to the interface you can select and copy. |
 | `/export` | Save this conversation to a file. |
-| `/compact` | Squeeze the conversation down so it keeps working. |
+| `/compact` · `/summarize` `/summarise` | Squeeze the conversation down so it keeps working. |
 | `/cd [folder]` | Switch to working in one folder. |
-| `/add-dir` | Work in more than one folder at once. |
+| `/add-dir` · `/adddir` `/dirs` `/roots` | Work in more than one folder at once. |
 | `/init` | Write the project notes file the AI reads first. |
-| `/model` | Choose which AI answers you. |
-| `/connect` | Add or manage your AI accounts and keys. |
-| `/providers` | Switch to a different AI provider. |
+| `/model` · `/models` | Choose which AI answers you. |
+| `/connect` · `/connections` | Add or manage your AI accounts and keys. |
+| `/providers` · `/provider` `/switch` | Switch to a different AI provider. |
 | `/login` | Sign in with your Google account. |
 | `/logout` | Sign out of your Google account. |
 | `/usage` | Show your quota and balances — how many bananas are left. |
-| `/context` | Turn features off to spend less. |
-| `/settings` | Every option, what it accepts, and its default. |
-| `/prompts` | Read or change the AI's standing instructions. |
-| `/reset` | Put things back the way they shipped. |
+| `/context` · `/loadout` `/tokens` | Turn features off to spend less. |
+| `/settings` · `/config` `/prefs` | Every option, what it accepts, and its default. |
+| `/prompts` · `/prompt` | Read or change the AI's standing instructions. |
+| `/reset` · `/defaults` | Put things back the way they shipped. |
 | `/research <question>` | Send helper agents to investigate, each on one angle. |
-| `/osint <question>` | The serious one. Professional dossier. Burns real money. |
-| `/yolo` | Approve everything for this conversation. No more prompts. |
-| `/tasks` | See and stop background helpers. |
-| `/help` | This list. |
+| `/osint <question>` · `/dossier` | The serious one. Professional dossier. Burns real money. |
+| `/yolo` · `/auto` `/autopilot` `/goal` | Approve everything for this conversation. No more prompts. |
+| `/tasks` · `/task` `/agents` `/kill` | See and stop background helpers. |
+| `/help` · `/commands` `/?` | This list. |
 
 ## Your conversation
 
