@@ -168,3 +168,49 @@ func TestSuggest(t *testing.T) {
 		t.Errorf("Suggest ignored its limit: %d results", len(got))
 	}
 }
+
+// paletteCommandIDs extracts the commands registered in the ctrl+k palette.
+func paletteCommandIDs(t *testing.T) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "tui", "tui.go"))
+	if err != nil {
+		t.Skipf("cannot read tui.go: %v", err)
+	}
+	re := regexp.MustCompile(`RegisterCommand\(dialog\.Command\{\s*ID:\s*"([a-z0-9-]+)"`)
+	var ids []string
+	for _, m := range re.FindAllStringSubmatch(string(data), -1) {
+		ids = append(ids, m[1])
+	}
+	if len(ids) == 0 {
+		t.Fatal("found no palette commands; the parser no longer matches RegisterCommand")
+	}
+	return ids
+}
+
+// Anything reachable from the command palette must ALSO be typeable as a slash
+// command.
+//
+// GORILLA OVERRIDE (2026-08-17): this trap has now bitten three times. CLAUDE.md
+// records it for /usage — "typed commands dispatch through this switch, NOT the
+// command palette, so a palette RegisterCommand alone left /usage reported as
+// 'Unknown command'" — and an audit on 2026-08-17 found /compact and /init in
+// exactly the same state. /compact is the one that hurt: on a small-context
+// model it is the difference between a session that survives and one that
+// degrades, and the capability was fully built and simply unreachable by the
+// route this program teaches everywhere else.
+//
+// A palette entry is not a command. Typing it is.
+func TestEveryPaletteCommandIsAlsoTypeable(t *testing.T) {
+	typed := make(map[string]bool)
+	for _, n := range dispatchedNames(t) {
+		typed[n] = true
+	}
+	for _, id := range paletteCommandIDs(t) {
+		if !typed[id] {
+			t.Errorf("%q is in the command palette but typing /%s answers \"Unknown command\" — add it to the dispatch switch in tui.go and to All in registry.go", id, id)
+		}
+		if ByName(id) == nil {
+			t.Errorf("%q is in the command palette but absent from the reference; it cannot be discovered in /help", id)
+		}
+	}
+}

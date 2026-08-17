@@ -1115,18 +1115,49 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// every research helper and sub-agent too — which is the entire point,
 		// and was the reported problem: a 10-helper run asking the same
 		// question ten times.
-		case "yolo", "auto", "autopilot":
-			if a.selectedSession.ID == "" {
+		// /goal is the same switch with a job attached: arm it and go, which is
+		// the shape people know from other agents. Bare /yolo stays a toggle.
+		case "yolo", "auto", "autopilot", "goal":
+			if a.selectedSession.ID == "" && strings.TrimSpace(msg.Args) == "" {
 				return a, util.ReportWarn("Start a conversation first — YOLO applies to the session you are in.")
 			}
-			if a.app.Permissions.IsAutoApproved(a.selectedSession.ID) {
+			task := strings.TrimSpace(msg.Args)
+			// With no task, this toggles. Toggling OFF must never be mistaken
+			// for arming, so the off-branch comes first and only when bare.
+			if task == "" && a.app.Permissions.IsAutoApproved(a.selectedSession.ID) {
 				a.app.Permissions.RevokeAutoApprove(a.selectedSession.ID)
 				return a, util.ReportInfo("YOLO OFF — you will be asked again before tools touch anything.")
 			}
-			a.app.Permissions.AutoApproveSession(a.selectedSession.ID)
-			return a, util.ReportWarn("☢ YOLO ON for this conversation. Every tool call is approved automatically — " +
+			if a.selectedSession.ID != "" {
+				a.app.Permissions.AutoApproveSession(a.selectedSession.ID)
+			}
+			warning := "☢ YOLO ON for this conversation. Every tool call is approved automatically — " +
 				"file edits, shell commands, web access, and every research helper — with no further prompts. " +
-				"It ends when this conversation does, or type /yolo again. /tasks still kills helpers.")
+				"It ends when this conversation does, or type /yolo again. /tasks still kills helpers."
+			if task == "" {
+				return a, util.ReportWarn(warning)
+			}
+			// Armed AND tasked in one command. The warning still fires, because
+			// the point of the warning is that it is never skipped.
+			return a, tea.Batch(
+				util.ReportWarn(warning),
+				util.CmdHandler(chat.SendMsg{Text: task}),
+			)
+
+		// GORILLA OVERRIDE: /compact and /init existed ONLY in the ctrl+k
+		// palette, so typing them — which is how this program teaches every
+		// other command — answered "Unknown command". This is the same trap
+		// CLAUDE.md records for /usage: a palette RegisterCommand is not a
+		// typed command. /compact matters most on small-context models, where
+		// the window fills fast and the alternative is losing the thread.
+		case "compact", "summarize", "summarise":
+			if a.selectedSession.ID == "" {
+				return a, util.ReportWarn("Nothing to compact yet — this starts once a conversation exists.")
+			}
+			return a, util.CmdHandler(startCompactSessionMsg{})
+		case "init":
+			a.showInitDialog = true
+			return a, nil
 		case "task", "tasks", "agents", "kill":
 			// GORILLA OVERRIDE: /tasks — live monitor of running helper
 			// agents; kill one, or the Nuclear Option (kill 'em all).

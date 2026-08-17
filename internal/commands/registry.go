@@ -239,8 +239,34 @@ var All = []Command{
 
 	// ─── Background helpers ──────────────────────────────────────────
 	{
+		Name:    "compact",
+		Aliases: []string{"summarize", "summarise"},
+		Group:   GroupSession,
+		Summary: "Squeeze the conversation down so it keeps working.",
+		Detail: "Every message you send carries the whole conversation with it, and " +
+			"each model has a limit on how much it can hold. Approach that limit " +
+			"and answers get worse, then stop. This writes a summary of everything " +
+			"so far and continues from that instead, so the thread survives while " +
+			"the bulk goes.\n\n" +
+			"Use it when a long session starts to drift, or before starting a big " +
+			"job in an old conversation. It costs one model call to write the " +
+			"summary. Models with small windows need this often — the status bar " +
+			"shows how full you are. It also runs by itself at 95% full if you " +
+			"leave that setting on in /settings.",
+	},
+	{
+		Name:    "init",
+		Group:   GroupWhere,
+		Summary: "Write the project notes file the AI reads first.",
+		Detail: "Looks through the project and writes a short file describing how to " +
+			"build, test and work in it, in the house style of this codebase. Every " +
+			"future conversation in this folder reads that file before anything " +
+			"else, so the AI starts knowing your conventions instead of guessing " +
+			"at them. Run it once per project, and again after big changes.",
+	},
+	{
 		Name:    "yolo",
-		Aliases: []string{"auto", "autopilot"},
+		Aliases: []string{"auto", "autopilot", "goal"},
 		Group:   GroupHelpers,
 		Summary: "Approve everything for this conversation. No more prompts.",
 		Detail: "Normally the program stops and asks before it edits a file, runs a " +
