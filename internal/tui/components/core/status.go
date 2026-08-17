@@ -192,7 +192,13 @@ func (m statusCmp) View() string {
 
 	tokenInfoWidth := 0
 	if m.session.ID != "" {
-		totalTokens := m.session.PromptTokens + m.session.CompletionTokens
+		// GORILLA FIX (2026-08-17): count the helpers too. This read
+		// m.session.PromptTokens + CompletionTokens, which is the CONVERSATION
+		// alone — a run that burned 507,935 tokens across 17 helper sessions
+		// displayed 44,688 and the owner had to total the database by hand to
+		// discover it. TotalTokens() falls back to the same two fields when no
+		// helpers exist, so an ordinary chat is unaffected.
+		totalTokens := m.session.TotalTokens()
 		tokens := formatTokensAndCost(totalTokens, model.ContextWindow, m.session.Cost)
 		tokensStyle := styles.Padded().
 			Background(t.Text()).

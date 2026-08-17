@@ -24,6 +24,33 @@ type Session struct {
 	// StartedIn is the primary working directory the session was created in.
 	// Empty means unknown — a row written before this column existed.
 	StartedIn string
+
+	// TotalPromptTokens and TotalCompletionTokens include every helper session
+	// spawned from this conversation. They are COMPUTED on read and never
+	// persisted.
+	//
+	// GORILLA OVERRIDE (2026-08-17): helper spend was invisible — a run that
+	// burned 507,935 tokens across 17 sessions showed as 44,688 in the status
+	// bar. The first fix added those tokens into PromptTokens and was wiped
+	// seconds later, every turn, because the agent loop ASSIGNS that field
+	// (`sess.PromptTokens = usage.InputTokens`) rather than adding to it.
+	// Observed: 522,261 followed by 44,688 on the next turn.
+	//
+	// A field nothing writes cannot be overwritten. These are filled by the
+	// service on Get and before publishing an update, so the UI reads them
+	// without knowing anything about helpers.
+	TotalPromptTokens     int64
+	TotalCompletionTokens int64
+}
+
+// TotalTokens is what the run actually cost, helpers included. Falls back to
+// the session's own counters when the totals were not computed (a Session built
+// in a test, or a row read through a path that does not aggregate).
+func (s Session) TotalTokens() int64 {
+	if s.TotalPromptTokens > 0 || s.TotalCompletionTokens > 0 {
+		return s.TotalPromptTokens + s.TotalCompletionTokens
+	}
+	return s.PromptTokens + s.CompletionTokens
 }
 
 type Service interface {
@@ -108,7 +135,30 @@ func (s *service) Get(ctx context.Context, id string) (Session, error) {
 	if err != nil {
 		return Session{}, err
 	}
-	return s.fromDBItem(dbSession), nil
+	return s.withHelperTotals(ctx, s.fromDBItem(dbSession)), nil
+}
+
+// helperTotaler is satisfied by the generated *db.Queries via the hand-written
+// SumSessionTokens. Type-asserted rather than added to db.Querier so the
+// generated interface stays untouched by this feature.
+type helperTotaler interface {
+	SumSessionTokens(ctx context.Context, sessionID string) (int64, int64, error)
+}
+
+// withHelperTotals fills in what the conversation cost including its helpers.
+// A failure here must never break the caller: the totals are a display
+// improvement, and the session itself is still valid without them.
+func (s *service) withHelperTotals(ctx context.Context, sess Session) Session {
+	t, ok := s.q.(helperTotaler)
+	if !ok || sess.ID == "" {
+		return sess
+	}
+	prompt, completion, err := t.SumSessionTokens(ctx, sess.ID)
+	if err != nil {
+		return sess
+	}
+	sess.TotalPromptTokens, sess.TotalCompletionTokens = prompt, completion
+	return sess
 }
 
 func (s *service) Save(ctx context.Context, session Session) (Session, error) {
@@ -127,6 +177,10 @@ func (s *service) Save(ctx context.Context, session Session) (Session, error) {
 		return Session{}, err
 	}
 	session = s.fromDBItem(dbSession)
+	// Publish WITH the helper totals, so every UI subscribed to session
+	// updates sees the true cost of a run without asking for it. The saved row
+	// is unchanged: the totals are computed, never written.
+	session = s.withHelperTotals(ctx, session)
 	s.Publish(pubsub.UpdatedEvent, session)
 	return session, nil
 }

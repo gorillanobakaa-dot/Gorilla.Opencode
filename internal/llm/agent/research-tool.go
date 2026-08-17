@@ -1164,6 +1164,28 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 		"3. Say what nobody established. A gap reported is cheaper than a gap discovered later.\n" +
 		"4. If the honest answer is no, give it plainly rather than offering hope.\n")
 
+	// GORILLA OVERRIDE (2026-08-18): save the graded findings to disk NOW, from
+	// Go, before the model is asked to assemble anything. A run on 2026-08-17
+	// burned ~850,000 tokens, produced verified findings, announced "writing the
+	// dossier now" and died with the orchestrator's context at 145% — nothing
+	// was written. See research_salvage.go for the full account. The work must
+	// survive the write-up step failing, because on a slow link that failure is
+	// routine rather than exceptional.
+	replies := make([]string, len(results))
+	for i, o := range results {
+		replies[i] = o.reply
+	}
+	if saved := writeRawFindings(params.Question, roles, replies, audits, params.Doctrine); saved != "" {
+		fmt.Fprintf(&out, "\n## Findings already saved\n\n"+
+			"Every lane's graded report is on disk at:\n\n    %s\n\n"+
+			"That happened automatically, before you were asked to do anything, so this run "+
+			"cannot be lost by a failure further down. If you run out of context while "+
+			"assembling the assessment, say so plainly and tell the user to run "+
+			"`/osint --recover` — the findings are safe and the write-up can be redone on a "+
+			"model with a larger window. Do NOT silently produce a shortened dossier instead.\n",
+			saved)
+	}
+
 	if params.Doctrine == "dossier" {
 		fmt.Fprintf(&out, dossierDutiesFooter, config.DossierDir())
 	}
