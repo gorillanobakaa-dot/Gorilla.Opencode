@@ -1,3 +1,43 @@
+## v0.1.89 — 2026-08-17 — no window draws outside the window
+
+Full dual-track document: [v0.1.89-release-notes.md](v0.1.89-release-notes.md).
+
+**Plain-language version:** A menu wider than your terminal is not just untidy.
+The program redraws its screen by rubbing out the last one, and it counts how much
+to rub out in lines it WROTE rather than rows your terminal USED. A line too wide
+to fit takes two rows on screen while counting as one, so every redraw leaves a row
+behind, and the leftovers pile up in your scrollback where nothing can clear them.
+Three screens had exactly that fault: `/context` asked for 106 columns no matter
+how wide your terminal really was, and the two `/osint` screens did the same at 80
+and 70 columns. The `/osint` warning screen also asked for 37 rows on a 24-row
+terminal, so the top of it scrolled away. Now every screen fits inside the terminal
+it is drawn into, long lines are cut with an "…" rather than spilling out, and the
+warning screen gives up its explanations in stages when space is short — but never
+the part that matters: what the run costs, the controls, and the keys. If you use a
+maximised window you probably never saw any of this; it bites on narrow windows,
+split panes, and phone or tablet sessions. Nothing else changed — the search tool,
+`/osint` and the 985-source catalogue are all as they were in v0.1.88.
+
+**Technical:** `loadoutDialogCmp.width()` floored the content width UP to
+`loadoutMinWidth` (100) and the render then added 6 columns of chrome, producing a
+106-column frame at any terminal size; both `/osint` screens repeated the shape as
+`min(110, max(80, w-8))` and `min(104, max(70, w-6))`. New
+`dialogWidth(termWidth, preferred, chrome)` subtracts chrome from the terminal and
+treats the preferred width as a CAP, with a 20-column absolute floor.
+`OsintDialogCmp.View()` gains the progressive-shedding pattern from `/help`: four
+leanness tiers measured with `lipgloss.Height`, dropping prose while always keeping
+the warning, the cost lines, the helper/mode controls and the key hints. Loadout
+headlines and hints now pass through `fitLine`, since a `.Width(w)` style wraps
+rather than overflowing and each wrap cost a row where there were none to spare —
+the `knownSmallOverflow` ratchet duly moved `/context` from 19 to 18 at 60x10 and
+40x8. Both `/osint` screens joined `sizedDialogs`, entering the ratchet with
+measured figures. The existing `TestNoDialogOverflowsTheWidth` could not have
+caught any of this: it renders through `screentest`, whose grid clips over-wide
+lines exactly as a terminal does, so `WidestRow()` can never exceed the terminal
+width — the new `frame_fits_test.go` measures `lipgloss.Width` on the string before
+it reaches a grid, and is proven non-vacuous against the restored floor. Binary
+52,125,988 -> 52,134,180 bytes stripped (+8,192). 26 test packages green.
+
 ## v0.1.88 — 2026-08-17 — one search tool, and research that cites its sources
 
 Full dual-track document: [v0.1.88-release-notes.md](v0.1.88-release-notes.md).
