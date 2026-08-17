@@ -1,11 +1,11 @@
 # Gorilla OpenCode v0.1.90 — OSINT All-Source Intelligence Analysis
 
-**Everything you need to judge this release is on this page.** Not behind a
-link, not in a wiki, not "see the docs" — the complete plain-language
-explanation and the complete technical one are printed below, in full, because
-[the philosophy this project is built on](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.1.90/PHILOSOPHY.md)
-holds that publishing something a reader cannot reach is transparency in theory
-and a closed door in practice.
+**Everything you need to judge this release is on this page.** Not behind a link,
+not in a wiki, not "see the docs" — the complete plain-language explanation and
+the complete technical one are printed below, in full, because
+[the philosophy this project is built on](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.1.90/PHILOSOPHY.md) holds that
+publishing something a reader cannot reach is transparency in theory and a
+closed door in practice.
 
 > *"Open source gave the world the recipe. It forgot to teach people how to cook."*
 
@@ -20,40 +20,51 @@ and a closed door in practice.
 | `gorilla-opencode-linux-x86_64.tar.gz` | Any Linux, no installer — unpack and run |
 | `SHA256SUMS-v0.1.90.txt` | Check what you downloaded is what we built: `sha256sum -c` |
 
-Use `apt`, not `dpkg -i` — the package depends on `lynx`, and `dpkg` resolves
-nothing.
+Use `apt`, not `dpkg -i` — the package depends on `lynx` and `dpkg` resolves
+nothing. **And if the program is already running, quit and restart it:** a
+running process keeps the binary it started with.
 
 ---
 
 ## What it looks like
 
-### The capability page — `/osint` with no question typed
+### The warning that stands between you and an expensive run
 
-[![The /osint capability page: status ARMED, and the five stages of a run explained in plain language](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-osint-page-armed.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-osint-page-armed.png)
+Full width, and it tells you the size of what you are about to spend in the only
+unit that stays honest on every tier. The figure is **measured from a real run**,
+not modelled — and it changes with the helper count and mode you choose.
 
-### The same page scrolled — the iron rules, where your assessment is saved, and the cost in red
+[![The /osint gate at ten helpers supervised: SIZE OF THIS RUN about 2,915,460 TOKENS PER HOUR, measured from a real run, with the privacy note and the walk-away key](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-gate-fullwidth-tokens-per-hour.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-gate-fullwidth-tokens-per-hour.png)
 
-[![Iron rules, the privacy design writing outside the working folder, and the cost warning in red](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-osint-page-cost-and-privacy.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-osint-page-cost-and-privacy.png)
+### `/context` — what every message costs, and which rows cost more to RUN
 
-### The model arguing with itself about whether your question is worth the money
+The ON/OFF state is a word that flips when you press space, not a tick box; the
+`+RUN` marker means a row is cheap to carry and expensive to use.
 
-Nothing staged. A frivolous question, an explicit demand for the most expensive
-run available, and the model's visible reasoning pushing back — *"Running a full
-10-agent dossier on this is a waste of money"* — while still honouring an
-instruction it was given plainly.
+[![The /context screen showing ON and OFF badges, the OSINT All-Source row in red with a +RUN marker, and the legend explaining that the number is per message only](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-context-allsource-row-and-run-marker.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-context-allsource-row-and-run-marker.png)
 
-[![The model's reasoning on screen, weighing an expensive ten-agent run against a frivolous question](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-osint-model-weighs-the-spend.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-osint-model-weighs-the-spend.png)
+### Helpers working, each in its own lane, all killable
 
-### Eight helpers, each in its own lane, all killable
-
-[![The /tasks monitor: eight helpers running, each labelled with the lane it owns, with kill and nuclear-kill keys](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-osint-eight-helpers-running.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-osint-eight-helpers-running.png)
+[![The /tasks monitor: eight research helpers running, each labelled with the lane it owns, with kill and nuclear-kill keys](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-tasks-eight-lanes-fresh-run.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-tasks-eight-lanes-fresh-run.png)
 
 ### It asks before it reaches the internet, and shows the exact query
 
-[![The permission dialog showing the full text of the medical search a helper wants to run](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-osint-permission-medical-search.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-osint-permission-medical-search.png)
+[![The permission dialog showing the full text of a medical search a helper wants to run, beside a system monitor showing the machine's real load](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-permission-web-search-with-cpu.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-permission-web-search-with-cpu.png)
 
-*(The two page screenshots were captured on the build immediately before this
-release's rename, so they show the previous title. The content is unchanged.)*
+[![A second permission dialog for web_fetch, showing the exact URL before it is opened](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-permission-web-fetch-shows-url.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-permission-web-fetch-shows-url.png)
+
+### The model weighing whether your question is worth the money
+
+Unstaged. A frivolous question, an explicit demand for the most expensive run
+available, and the model's visible reasoning pushing back — *"Running a full
+10-agent dossier on this is a waste of money"* — while still honouring the
+instruction it was given.
+
+[![The model's reasoning on screen, weighing an expensive ten-agent run against a frivolous question](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-osint-model-weighs-the-spend.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-osint-model-weighs-the-spend.png)
+
+### A live run, with the machine's real load beside it
+
+[![A dossier run in progress with GNOME System Monitor open, showing per-core CPU while eight helpers work](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-live-run-with-system-monitor.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.90/docs/screenshots/gallery/v0190-live-run-with-system-monitor.png)
 
 ---
 
@@ -758,20 +769,32 @@ own terms of use.
 
 ## Honest limits of this release
 
-- The download grows to about 52 MB. On a single-digit-KB/s connection that is
-  a long wait, once. The reasons are itemised in the metrics document shipped
-  in the package.
-- A tester on Arch/CachyOS reported leftover lines painted into his scrollback
-  on v0.1.87. A bug of the same class was found and fixed in v0.1.89, and it
-  may or may not have been his cause. **His report is still open**, and until he
-  can confirm it on this build, nobody should say it is fixed.
-- The `/osint` cost forecast is a calculation, not a measurement. It rests on
-  three assumptions printed on the warning screen beside the number, so you can
-  argue with them.
+- **A running program does not pick up a new binary.** Install, then quit and
+  restart. This cost real confusion during testing: fixes were verified as
+  installed and then tested against a process started minutes earlier.
+- **A long research run can still fail at the final write-up, and it gets more
+  likely the better the research went** — assembling the answer is the most
+  memory-hungry moment and the agent doing it is already full of the research.
+  The graded findings are now saved to disk automatically before that step, so
+  the work survives; re-assembling them from a clean context (`/osint --recover`)
+  is designed and not yet built.
+- **One stuck helper holds up the rest**: supervision only begins once every
+  first-wave lane has finished.
+- **Restart-on-death for a dead helper is not built**, deliberately. A fixed
+  inactivity threshold was designed and abandoned as unsafe: on a slow model a
+  healthy lane went silent for 23 minutes and then returned with 19,118 tokens
+  of real work. Any threshold that looked reasonable would have killed it.
+- **The `/osint` cost forecast is a calculation, not a measurement.** It rests on
+  three assumptions printed on the warning screen beside the number.
+- **An Arch/CachyOS tester's report of stranded lines on v0.1.87 remains open**
+  and unreproduced. A bug of the same class was found and fixed in v0.1.89; that
+  may or may not have been his cause, and nobody should tell him it is fixed.
 - The 985-source catalogue is too long to print here — it is
-  [in the repository](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.1.90/docs/OSINT-SOURCE-CATALOG.md)
-  and ships inside the package at
-  `/usr/share/doc/gorilla-opencode/OSINT-SOURCE-CATALOG.md`.
-- No telemetry, no accounts, no analytics. Nothing about your use of this
-  program reaches us, which also means we learn about faults only when someone
+  [in the repository](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.1.90/docs/OSINT-SOURCE-CATALOG.md) and ships inside the
+  package at `/usr/share/doc/gorilla-opencode/OSINT-SOURCE-CATALOG.md`.
+- **No telemetry, no accounts, no analytics.** Nothing about your use of this
+  program reaches us — which also means we learn about faults only when someone
   tells us.
+
+Full dual-track notes ship inside the package and are
+[in the repository](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.1.90/Changelogs/v0.1.90-release-notes.md).
