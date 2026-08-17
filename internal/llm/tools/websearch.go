@@ -144,6 +144,16 @@ source:
                      THIS?"); keywords go to DOAJ. Use it at any paywall.
   books              Project Gutenberg (full text), Open Library
   reference          Wikipedia
+  news               GDELT — global news coverage, all languages, updated every
+                     15 minutes. World events, conflicts, incidents.
+  worldbank          World Bank Documents & Reports — country analyses, project
+                     reports, development economics. All open access.
+  humanitarian       Humanitarian Data Exchange (UN OCHA) — datasets from the
+                     whole humanitarian cluster (IOM, UNHCR, WFP, ACLED), each
+                     with its owning organisation and update date. For prose
+                     situation reports, search reliefweb.int via source: web.
+  sec                SEC EDGAR full-text — what companies told their regulator
+                     under penalty, not what their press release said.
   all                scholar + medical + crossref, deduplicated by DOI
 
 Results tagged FREE LEGAL FULL TEXT cost nothing to read. Prefer them, and say
@@ -265,7 +275,7 @@ func (t *webSearchTool) Info() ToolInfo {
 			"source": map[string]any{
 				"type":        "string",
 				"description": "Which index to search. Defaults to scholar. 'web' needs a self-hosted SearXNG.",
-				"enum":        []string{"web", "scholar", "medical", "crossref", "openaccess", "books", "reference", "all"},
+				"enum":        []string{"web", "scholar", "medical", "crossref", "openaccess", "books", "reference", "news", "worldbank", "humanitarian", "sec", "all"},
 			},
 			"max_results": map[string]any{
 				"type":        "number",
@@ -277,11 +287,18 @@ func (t *webSearchTool) Info() ToolInfo {
 }
 
 func (t *webSearchTool) getJSON(ctx context.Context, raw string, into any) error {
+	return t.getJSONUA(ctx, raw, politeContact, into)
+}
+
+// getJSONUA is getJSON with an explicit User-Agent, for APIs whose fair-access
+// policy requires a specific identification format (SEC EDGAR wants an
+// email-form contact and 403s anything else — measured live 2026-08-17).
+func (t *webSearchTool) getJSONUA(ctx context.Context, raw, ua string, into any) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", raw, nil)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", politeContact)
+	req.Header.Set("User-Agent", ua)
 	req.Header.Set("Accept", "application/json")
 	resp, err := t.client.Do(req)
 	if err != nil {
@@ -912,11 +929,19 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		chosen = []backend{{"Gutenberg", t.searchGutendex}, {"Open Library", t.searchOpenLibrary}}
 	case "reference":
 		chosen = []backend{{"Wikipedia", t.searchWikipedia}}
+	case "news":
+		chosen = []backend{{"GDELT", t.searchGDELT}}
+	case "worldbank":
+		chosen = []backend{{"World Bank", t.searchWorldBank}}
+	case "humanitarian":
+		chosen = []backend{{"HDX", t.searchHDX}}
+	case "sec":
+		chosen = []backend{{"SEC EDGAR", t.searchSECEDGAR}}
 	case "all":
 		chosen = []backend{{"OpenAlex", t.searchOpenAlex}, {"Europe PMC", t.searchEuropePMC}, {"Crossref", t.searchCrossref}}
 	default:
 		return NewTextErrorResponse(
-			"source must be one of: web, scholar, medical, crossref, openaccess, books, reference, all"), nil
+			"source must be one of: web, scholar, medical, crossref, openaccess, books, reference, news, worldbank, humanitarian, sec, all"), nil
 	}
 
 	// Degradation short of failure is collected here and surfaced as PARTIAL

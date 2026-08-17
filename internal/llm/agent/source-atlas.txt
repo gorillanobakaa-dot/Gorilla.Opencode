@@ -1,0 +1,86 @@
+SOURCE ATLAS — free research sources by domain, strongest first.
+Reach: API = keyless HTTP API (web_fetch the endpoint). API-key = free after registration —
+say so if unavailable. SearXNG = web_search engine bang (e.g. !crossref, !openalex, !pubmed,
+!arxiv, "!google scholar"). SearXNG* = installed but off; note it for the user. Grade A/B is
+the source-reliability PRIOR; claims are still graded independently at vetting.
+This is the starting map, not the boundary — the full 900-source registry ships in docs/.
+
+Scholarly & scientific literature:
+  OpenAlex [A API] api.openalex.org
+  Crossref [A API] api.crossref.org
+  PsyArXiv [A API] api.osf.io/v2
+  Semantic Scholar [A SearXNG] www.semanticscholar.org
+  Google Scholar [B SearXNG] scholar.google.com
+
+Biomedical & life sciences:
+  Europe PMC [A API] www.ebi.ac.uk/europepmc/webservices/rest
+  PubMed [A API] eutils.ncbi.nlm.nih.gov/entrez/eutils
+  UniProt [A API] rest.uniprot.org
+  Protein Data Bank (PDB) [A API] data.rcsb.org
+  PubChem [A API] pubchem.ncbi.nlm.nih.gov/rest/pug
+  ClinVar [A API] eutils.ncbi.nlm.nih.gov/entrez/eutils
+  WHO Global Health Observatory [A API] ghoapi.azureedge.net/api
+
+Economics & finance:
+  World Bank Open Data [A API] api.worldbank.org/v2
+  IMF Data [A API] data.imf.org
+  OECD Data Explorer [A API] sdmx.oecd.org/public/rest
+  UN Comtrade [A API] comtradeapi.un.org
+  BIS Data Portal [A API] stats.bis.org
+  Eurostat Population [A API] ec.europa.eu/eurostat/api/dissemination
+
+Development & humanitarian:
+  Humanitarian Data Exchange (HDX) [A API] data.humdata.org/api — also web_search source: humanitarian
+  ReliefWeb [A web] reliefweb.int — situation reports; fetch pages or source: web (its API wants a registered appname)
+  UNHCR Refugee Data Finder [A API] api.unhcr.org/population/v1
+  UNICEF Data Warehouse [A API] sdmx.data.unicef.org
+  ILO Statistics [A API] ilostat.ilo.org
+  FAOSTAT Food and Agriculture [A API] fenixservices.fao.org/faostat/api/v1
+
+Governance, conflict & security:
+  Uppsala Conflict Data Program (UCDP) [A API] ucdpapi.pcr.uu.se
+  GDELT Event Database [C API] api.gdeltproject.org/api/v2
+  OpenSanctions [A API] api.opensanctions.org
+  US OFAC Sanctions List [A API] sanctionslistservice.ofac.treas.gov
+  V-Dem [A bulk] www.v-dem.net
+  Global Terrorism Database [A bulk] www.start.umd.edu/gtd
+
+Companies & corporate:
+  OpenCorporates [B API-key] api.opencorporates.com
+  SEC Company Facts [A API] data.sec.gov/api/xbrl/companyfacts
+  Global LEI Foundation [A API] api.gleif.org/api/v1
+  Companies House [A API-key] api.company-information.service.gov.uk
+  ICIJ Offshore Leaks Database [B bulk] offshoreleaks.icij.org
+
+News & current events:
+  GDELT Global Knowledge Graph [B API] api.gdeltproject.org
+  Reuters [B SearXNG] www.reuters.com
+  Google News [C SearXNG] news.google.com
+  Wayback Machine [B API] archive.org/wayback/available
+  Media Cloud [C API-key] www.mediacloud.org
+
+Earth, climate & environment:
+  NASA Earthdata [A API-key] www.earthdata.nasa.gov
+  NOAA Data [A API] www.ncei.noaa.gov/access/services/data/v1
+  Copernicus Climate Data Store [A API-key] cds.climate.copernicus.eu
+  USGS ScienceBase [A API] www.sciencebase.gov/catalog
+  ERA5 [A API-key] cds.climate.copernicus.eu
+
+Physics, space & materials:
+  CERN Open Data [A API] opendata.cern.ch
+  Materials Project [A API-key] api.materialsproject.org
+  NIST Chemistry WebBook [A web] webbook.nist.gov
+  JPL Horizons [A API] ssd.jpl.nasa.gov/api/horizons.api
+
+Standards, patents & law:
+  W3C [A web] www.w3.org
+  Google Patents [B web] patents.google.com
+  Espacenet [A API-key] ops.epo.org
+  EUR-Lex [A API] eur-lex.europa.eu
+  GovInfo [A API-key] api.govinfo.gov
+
+Official statistics:
+  UNdata [A API] data.un.org
+  US Census International Database [A API] api.census.gov/data/timeseries/idb
+  World Values Survey [A web] www.worldvaluessurvey.org
+  UNDP Human Development Data [A API] hdr.undp.org/data-center

@@ -48,6 +48,7 @@ package agent
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -364,6 +365,21 @@ verdict is REJECTED, write "nothing from this lane".`,
 		strings.TrimSpace(question), role.Title, role.Lane, strings.TrimSpace(report))
 }
 
+// sourceAtlas is the curated slice of the 900-source registry
+// (docs/source-registry.json) that rides in every helper prompt: the
+// strongest FREE, reachable source per research domain, anchor names first.
+//
+// GORILLA OVERRIDE (2026-08-17): ATP 2-22.9 requires every research plan to
+// contain "identification of information sources and HOW those sources will
+// be accessed" — until now helpers had working tools but no map, which is how
+// a lane ends up googling for what the World Bank serves as a keyless API.
+// ~950 tokens per helper, per run (not per turn); the owner chose reach over
+// minimalism for research runs, which are manually triggered and budgeted.
+// Regenerate from the registry when it changes; TestSourceAtlas guards shape.
+//
+//go:embed source-atlas.txt
+var sourceAtlas string
+
 // researchMethod is the collection cycle every helper works, injected into
 // every helper prompt.
 //
@@ -584,6 +600,8 @@ func buildPrompt(role researchRole, question, sharedContext, peerFindings string
 	}
 
 	b.WriteString(researchMethod(config.ResearchStepsPerHelper))
+	b.WriteString("\n")
+	b.WriteString(sourceAtlas)
 	b.WriteString(researchOutputContract)
 	return b.String()
 }

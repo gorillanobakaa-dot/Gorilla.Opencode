@@ -66,3 +66,22 @@ func TestResearchDescriptionScalesEffortToTheQuestion(t *testing.T) {
 		}
 	}
 }
+
+// TestSourceAtlasRidesInEveryHelperPrompt: ATP 2-22.9's research-plan rule —
+// named sources and how each is reached — satisfied with real names from the
+// 900-source registry. The size cap keeps regeneration honest: an atlas that
+// balloons past ~6KB is no longer a shortlist and starts taxing every helper.
+func TestSourceAtlasRidesInEveryHelperPrompt(t *testing.T) {
+	p := buildPrompt(researchRoles[2], "q", "", "", 2, 4)
+	for _, must := range []string{"SOURCE ATLAS", "OpenSanctions", "api.worldbank.org", "ReliefWeb", "!crossref"} {
+		if !strings.Contains(p, must) {
+			t.Errorf("helper prompt missing atlas element %q", must)
+		}
+	}
+	if len(sourceAtlas) > 6*1024 {
+		t.Errorf("source atlas is %d bytes — past a shortlist; prune it", len(sourceAtlas))
+	}
+	if len(sourceAtlas) < 1024 {
+		t.Errorf("source atlas is %d bytes — suspiciously empty; regeneration broke", len(sourceAtlas))
+	}
+}
