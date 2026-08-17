@@ -156,7 +156,7 @@ one-off download buys back a recurring per-message bill.
 
 **Where the growth comes from.** Retiring `ls`/`glob`/`grep` removed roughly
 10 KB of compiled code — but `find` carries the entire pfind search engine
-(139,343 bytes of Python) **inside the program itself**, via Go's `embed`.
+(140,327 bytes of Python) **inside the program itself**, via Go's `embed`.
 That is a deliberate portability decision: any bare downloaded binary can
 search on any machine that has python3 — no package to install, no path to
 configure, nothing that only exists on the developer's computer. Net result:
