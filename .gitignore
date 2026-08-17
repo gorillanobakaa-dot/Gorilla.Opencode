@@ -63,6 +63,10 @@ checksums.sha256
 /scripts/
 /Documentation.Scripts/
 *.py
+# GORILLA: exception — the vendored pfind engine is SOURCE, not a local script.
+# It is embedded into the binary (internal/llm/tools/find.go) and shipped in
+# the .deb; it must be in the repo on every machine that builds it.
+!internal/llm/tools/pfind.py
 *.sh
 
 # Third-party leaked prompts kept LOCAL for study, not redistributed

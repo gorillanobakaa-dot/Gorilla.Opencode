@@ -508,8 +508,11 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 				// through the session database.
 				toolResults[i] = message.ToolResult{
 					ToolCallID: toolCall.ID,
-					Content:    fmt.Sprintf("Tool not found: %q. Call the tool by its exact name, with no extra characters.", toolCall.Name),
-					IsError:    true,
+					// retiredToolHint teaches models that ask for grep/glob/ls
+					// by name — the call still fails; nothing is rerouted.
+					Content: fmt.Sprintf("Tool not found: %q. Call the tool by its exact name, with no extra characters.%s",
+						toolCall.Name, retiredToolHint(toolCall.Name)),
+					IsError: true,
 				}
 				continue
 			}

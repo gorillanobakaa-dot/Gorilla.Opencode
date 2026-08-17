@@ -393,11 +393,16 @@ func toolName(name string) string {
 		return "Edit"
 	case tools.FetchToolName:
 		return "Fetch"
-	case tools.GlobToolName:
+	case tools.FindToolName:
+		return "Find"
+	// GORILLA OVERRIDE: glob/grep/ls were replaced by the find tool. The
+	// literals stay so tool calls recorded in OLD sessions keep rendering
+	// with their proper labels; nothing registers these names any more.
+	case "glob":
 		return "Glob"
-	case tools.GrepToolName:
+	case "grep":
 		return "Grep"
-	case tools.LSToolName:
+	case "ls":
 		return "List"
 	case tools.ViewToolName:
 		return "View"
@@ -419,11 +424,13 @@ func getToolAction(name string) string {
 		return "Preparing edit..."
 	case tools.FetchToolName:
 		return "Writing fetch..."
-	case tools.GlobToolName:
+	case tools.FindToolName:
+		return "Searching..."
+	case "glob":
 		return "Finding files..."
-	case tools.GrepToolName:
+	case "grep":
 		return "Searching content..."
-	case tools.LSToolName:
+	case "ls":
 		return "Listing directory..."
 	case tools.ViewToolName:
 		return "Reading file..."
@@ -527,24 +534,65 @@ func renderToolParams(paramWidth int, toolCall message.ToolCall) string {
 			toolParams = append(toolParams, "timeout", (time.Duration(params.Timeout) * time.Second).String())
 		}
 		return renderParams(paramWidth, toolParams...)
-	case tools.GlobToolName:
-		var params tools.GlobParams
+	case tools.FindToolName:
+		var params tools.FindParams
 		json.Unmarshal([]byte(toolCall.Input), &params)
-		pattern := params.Pattern
-		toolParams := []string{
-			pattern,
+		first := params.Query
+		if first == "" {
+			first = params.Glob
 		}
+		if first == "" {
+			first = params.Path
+		}
+		toolParams := []string{first}
+		if params.Query != "" && params.Path != "" {
+			toolParams = append(toolParams, "path", removeWorkingDirPrefix(params.Path))
+		}
+		if params.Query != "" && params.Glob != "" {
+			toolParams = append(toolParams, "glob", params.Glob)
+		}
+		if params.Type != "" {
+			toolParams = append(toolParams, "type", params.Type)
+		}
+		if params.View != "" {
+			toolParams = append(toolParams, "view", params.View)
+		}
+		if params.Fuzzy {
+			toolParams = append(toolParams, "fuzzy", "true")
+		}
+		if params.Recent {
+			toolParams = append(toolParams, "recent", "true")
+		}
+		if params.ModifiedOnly {
+			toolParams = append(toolParams, "modified_only", "true")
+		}
+		if params.FilesOnly {
+			toolParams = append(toolParams, "files_only", "true")
+		}
+		return renderParams(paramWidth, toolParams...)
+	// GORILLA OVERRIDE: glob/grep/ls exist only in old session transcripts now.
+	// Their inputs are decoded into anonymous structs so history renders
+	// without keeping the retired tool implementations compiled.
+	case "glob":
+		var params struct {
+			Pattern string `json:"pattern"`
+			Path    string `json:"path"`
+		}
+		json.Unmarshal([]byte(toolCall.Input), &params)
+		toolParams := []string{params.Pattern}
 		if params.Path != "" {
 			toolParams = append(toolParams, "path", params.Path)
 		}
 		return renderParams(paramWidth, toolParams...)
-	case tools.GrepToolName:
-		var params tools.GrepParams
-		json.Unmarshal([]byte(toolCall.Input), &params)
-		pattern := params.Pattern
-		toolParams := []string{
-			pattern,
+	case "grep":
+		var params struct {
+			Pattern     string `json:"pattern"`
+			Path        string `json:"path"`
+			Include     string `json:"include"`
+			LiteralText bool   `json:"literal_text"`
 		}
+		json.Unmarshal([]byte(toolCall.Input), &params)
+		toolParams := []string{params.Pattern}
 		if params.Path != "" {
 			toolParams = append(toolParams, "path", params.Path)
 		}
@@ -555,8 +603,10 @@ func renderToolParams(paramWidth int, toolCall message.ToolCall) string {
 			toolParams = append(toolParams, "literal", "true")
 		}
 		return renderParams(paramWidth, toolParams...)
-	case tools.LSToolName:
-		var params tools.LSParams
+	case "ls":
+		var params struct {
+			Path string `json:"path"`
+		}
 		json.Unmarshal([]byte(toolCall.Input), &params)
 		path := params.Path
 		if path == "" {
@@ -635,11 +685,9 @@ func renderToolResponse(toolCall message.ToolCall, response message.ToolResult, 
 		}
 		resultContent = fmt.Sprintf("```%s\n%s\n```", mdFormat, resultContent)
 		return styles.ApplyPanelBackground(toMarkdown(resultContent, true, width))
-	case tools.GlobToolName:
+	case tools.FindToolName:
 		return baseStyle.Width(width).Foreground(t.TextMuted()).Render(resultContent)
-	case tools.GrepToolName:
-		return baseStyle.Width(width).Foreground(t.TextMuted()).Render(resultContent)
-	case tools.LSToolName:
+	case "glob", "grep", "ls": // retired tools, still present in old transcripts
 		return baseStyle.Width(width).Foreground(t.TextMuted()).Render(resultContent)
 	case tools.ViewToolName:
 		metadata := tools.ViewResponseMetadata{}

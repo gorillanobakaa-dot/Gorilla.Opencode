@@ -250,3 +250,22 @@ func TestPermissionRequestsUseTheToolsOwnConstantName(t *testing.T) {
 	}
 	t.Logf("checked %d permission ToolName assignments", checked)
 }
+
+// The hint is teaching, not resolution: it fires only on the exact retired or
+// foreign names, and never suggests anything for a name that is merely wrong.
+func TestRetiredToolHintFiresOnlyOnKnownNames(t *testing.T) {
+	for _, name := range []string{"grep", "glob", "ls", "search", "rg", "list_dir"} {
+		if hint := retiredToolHint(name); hint == "" {
+			t.Errorf("retiredToolHint(%q) = empty; a model asking for a retired tool must be pointed at find", name)
+		}
+	}
+	// The muse-glimmer shape: retired name plus a trailing control token.
+	if hint := retiredToolHint("grep<|message|>"); hint == "" {
+		t.Error("retiredToolHint must survive the one permitted control-token strip")
+	}
+	for _, name := range []string{"bash", "view", "find", "grepx", "ls2", "GREP", "bash_readonly", ""} {
+		if hint := retiredToolHint(name); hint != "" {
+			t.Errorf("retiredToolHint(%q) = %q; must stay exact-match only — no prefix, no case folding", name, hint)
+		}
+	}
+}

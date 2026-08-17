@@ -17,12 +17,12 @@ import (
 
 type BashParams struct {
 	Command string `json:"command"`
-	Timeout int    `json:"timeout"`
+	Timeout FlexInt `json:"timeout"`
 }
 
 type BashPermissionsParams struct {
 	Command string `json:"command"`
-	Timeout int    `json:"timeout"`
+	Timeout FlexInt `json:"timeout"`
 }
 
 type BashResponseMetadata struct {
@@ -64,12 +64,13 @@ func bashDescription() string {
 Before executing the command, please follow these steps:
 
 1. Directory Verification:
- - If the command will create new directories or files, first use the LS tool to verify the parent directory exists and is the correct location
- - For example, before running "mkdir foo/bar", first use LS to check that "foo" exists and is the intended parent directory
+ - If the command will create new directories or files, first use the find tool to verify the parent directory exists and is the correct location
+ - For example, before running "mkdir foo/bar", first use find (path="foo") to check that "foo" exists and is the intended parent directory
 
 2. Security Check:
  - For security and to limit the threat of a prompt injection attack, some commands are limited or banned. If you use a disallowed command, you will receive an error message explaining the restriction. Explain the error to the User.
  - Verify that the command is not one of the banned commands: %s.
+ - WHY those are banned, so you can explain it when asked: they are raw network fetchers and browsers. Run from a shell they bypass the audited, permission-gated web tools, which is exactly what a prompt-injection attack needs. Nothing is lost: use the websearch tool to search (it drives lynx + a private SearxNG under the hood) and the fetch tool to read a URL. Banned in the shell ≠ absent from the product.
 
 3. Command Execution:
  - After ensuring proper quoting, execute the command.
@@ -86,7 +87,7 @@ Before executing the command, please follow these steps:
 Usage notes:
 - The command argument is required.
 - You can specify an optional timeout in milliseconds (up to 600000ms / 10 minutes). If not specified, commands will timeout after 30 minutes.
-- VERY IMPORTANT: You MUST avoid using search commands like 'find' and 'grep'. Instead use Grep, Glob, or Agent tools to search. You MUST avoid read tools like 'cat', 'head', 'tail', and 'ls', and use FileRead and LS tools to read files.
+- VERY IMPORTANT: You MUST avoid running shell search/read commands ('grep', 'rg', 'cat', 'head', 'tail', 'ls', and the shell command 'find'). Use the find TOOL to search and list, and the view tool to read files — they are bounded and ranked; raw shell output is not.
 - When issuing multiple commands, use the ';' or '&&' operator to separate them. DO NOT use newlines (newlines are ok in quoted strings).
 - IMPORTANT: All commands share the same shell session. Shell state (environment variables, virtual environments, current directory, etc.) persist between commands. For example, if you set an environment variable as part of a command, the environment variable will persist for subsequent commands.
 - Try to maintain your current working directory throughout the session by using absolute paths and avoiding usage of 'cd'. You may use 'cd' if the User explicitly requests it.
@@ -133,9 +134,9 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	}
 
 	if params.Timeout > MaxTimeout {
-		params.Timeout = MaxTimeout
+		params.Timeout = FlexInt(MaxTimeout)
 	} else if params.Timeout <= 0 {
-		params.Timeout = DefaultTimeout
+		params.Timeout = FlexInt(DefaultTimeout)
 	}
 
 	if params.Command == "" {
@@ -184,7 +185,7 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	}
 	startTime := time.Now()
 	shell := shell.GetPersistentShell(config.WorkingDirectory())
-	stdout, stderr, exitCode, interrupted, err := shell.Exec(ctx, params.Command, params.Timeout)
+	stdout, stderr, exitCode, interrupted, err := shell.Exec(ctx, params.Command, params.Timeout.Int())
 	if err != nil {
 		return ToolResponse{}, fmt.Errorf("error executing command: %w", err)
 	}

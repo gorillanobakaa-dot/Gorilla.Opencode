@@ -66,7 +66,7 @@ import (
 //     fills in its own name badge AFTER dispatch has already resolved it.
 //     TestPermissionRequestsUseTheToolsOwnConstantName holds that.
 //   - TOOL LISTS ARE PER-AGENT. A research helper's entire toolbox is
-//     fetch/web_search/glob/grep/ls/view/diagnostics — no bash, no edit, no
+//     fetch/web_search/find/view/diagnostics — no bash, no edit, no
 //     write (ResearchAgentTools). No spelling of any name reaches a tool that
 //     is not in the calling agent's own list.
 
@@ -144,6 +144,29 @@ func findTool(available []toolNamer, raw string) (idx int, usedName string, clea
 		}
 	}
 	return -1, raw, false
+}
+
+// retiredToolHint returns extra guidance for the not-found ERROR when a model
+// asks for a search/list tool by a name other harnesses use. glob, grep and ls
+// were retired in favour of the find tool, and models are trained on harnesses
+// that have them — so the refusal teaches instead of just refusing.
+//
+// This is NOT a resolution mechanism and must never become one: the call still
+// fails, exactly as rule 4 requires. The comparison is EXACT string equality
+// against a fixed list of retired/foreign names (after the one permitted
+// control-token strip); nothing here routes a call to a tool. A model that
+// reads the error retries with find on its own.
+func retiredToolHint(raw string) string {
+	name := raw
+	if n, _, ok := normaliseToolName(raw); ok {
+		name = n
+	}
+	switch name {
+	case "glob", "grep", "ls", "list", "list_dir", "list_directory", "dir",
+		"search", "search_files", "file_search", "find_files", "rg", "ripgrep":
+		return ` Searching file contents, finding files by name, and listing directories are ALL done by the "find" tool here: find(query="text to search", glob="*.ext", path="directory"). Retry using find.`
+	}
+	return ""
 }
 
 // toolNamer is the minimum findTool needs, so it can be tested without

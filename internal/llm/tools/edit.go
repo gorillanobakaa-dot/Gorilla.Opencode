@@ -49,7 +49,7 @@ Before using this tool:
 1. Use the FileRead tool to understand the file's contents and context
 
 2. Verify the directory path is correct (only applicable when creating new files):
-   - Use the LS tool to verify the parent directory exists and is the correct location
+   - Use the find tool to verify the parent directory exists and is the correct location
 
 To make a file edit, provide the following:
 1. file_path: The absolute path to the file to modify (must be absolute, not relative)

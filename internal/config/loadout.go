@@ -39,9 +39,17 @@ var LoadoutComponents = []LoadoutComponent{
 	{"tool.edit", "Edit tool", "agent can't modify files in place", 1300, true, true},
 	{"tool.write", "Write tool", "agent can't create or overwrite files", 350, true, true},
 	{"tool.view", "View tool", "agent can't read file contents", 500, true, true},
-	{"tool.ls", "Ls tool", "agent can't list directories", 450, true, false},
-	{"tool.grep", "Grep tool", "agent can't search file contents", 600, true, false},
-	{"tool.glob", "Glob tool", "agent can't find files by name pattern", 400, true, false},
+	// GORILLA OVERRIDE: tool.ls, tool.grep and tool.glob (450+600+400 as
+	// estimated here, ~1,485 measured) are replaced by one find tool. Three
+	// descriptions repeating WHEN TO USE / HOW TO USE / LIMITATIONS / TIPS is
+	// three times the boilerplate for one job, and grep returned paths only —
+	// so the agent paid a second turn and a whole-file view to actually read
+	// anything. find is deliberately NOT as small as it could be: smaller
+	// models were failing to search big trees at all, so its description
+	// teaches the narrowing arguments (type, path, glob) with worked examples.
+	// It still costs roughly a third of the three it replaces. The old
+	// components are gone from this registry, not from the tree.
+	{"tool.find", "Find tool (search + list + glob)", "agent can't search code, find files, or list directories — it is blind to the tree", 520, true, true},
 	{"tool.patch", "Patch tool", "agent loses multi-hunk patch edits (edit/write still work)", 900, true, false},
 	{"tool.fetch", "Fetch a web page", "agent can't open a link you give it", 300, true, false},
 	{"tool.websearch", "Find sources + web search", "agent can't look anything up — only what you paste in", 300, true, false},

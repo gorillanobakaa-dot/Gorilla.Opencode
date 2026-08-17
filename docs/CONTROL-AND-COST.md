@@ -99,9 +99,16 @@ runs-it-for-you" tools that bill extra.
 
 ## Developer track
 
-Only `internal/llm/tools/fetch.go` opens sockets; the rest
-(`bash`, `edit`, `write`, `patch`, `view`, `ls`, `glob`, `grep`, `diagnostics`)
+`internal/llm/tools/fetch.go` and `websearch.go` open sockets; the rest
+(`bash`, `edit`, `write`, `patch`, `view`, `find`, `diagnostics`)
 run locally. Cost model = **100% tokens**; no provider-billed hosted tools ship.
+
+> **2026-08-17:** the `ls`, `glob` and `grep` tools named in earlier versions of
+> this section were retired and replaced by the single `find` tool
+> (`internal/llm/tools/find.go`, engine: embedded pfind). One description
+> (~740 tokens/turn) instead of three (~1,388), and it returns matching lines
+> with context rather than bare paths, so the follow-up whole-file `view` call
+> usually does not happen. The old sources remain as `*.go.retired`.
 `tool.agent` (sub-agent) isn't a network tool but a **token multiplier** — it
 runs a full nested request loop (see §3).
 

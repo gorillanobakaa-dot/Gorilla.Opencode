@@ -43,9 +43,16 @@ func CoderAgentTools(
 	// URLs for publisher sites, gets 403s, and has been observed fabricating
 	// citations rather than reporting the failure.
 	add("tool.websearch", tools.NewWebSearchTool(permissions))
-	add("tool.glob", tools.NewGlobTool())
-	add("tool.grep", tools.NewGrepTool())
-	add("tool.ls", tools.NewLsTool())
+	// GORILLA OVERRIDE: one find tool replaces glob + grep + ls. Those three
+	// carried ~1,485 tokens of description on EVERY turn, and grep could only
+	// return PATHS — so answering any question cost a second turn and a
+	// whole-file view (measured on this repo: a 16-token grep answer with an
+	// 1,829-token view behind it). find returns matching lines with context,
+	// so that second turn usually does not happen, and one tool instead of
+	// three removes the tool-choice mistake that smaller models kept making on
+	// large trees. The three tools still exist and still compile; restoring
+	// them is three lines here. See internal/llm/tools/find.go.
+	add("tool.find", tools.NewFindTool())
 	add("tool.view", tools.NewViewTool(lspClients))
 	add("tool.patch", tools.NewPatchTool(lspClients, permissions, history))
 	add("tool.write", tools.NewWriteTool(lspClients, permissions, history))
@@ -79,9 +86,7 @@ func ResearchAgentTools(lspClients map[string]*lsp.Client, permissions permissio
 	researchTools := []tools.BaseTool{
 		tools.NewFetchTool(permissions),
 		tools.NewWebSearchTool(permissions),
-		tools.NewGlobTool(),
-		tools.NewGrepTool(),
-		tools.NewLsTool(),
+		tools.NewFindTool(),
 		tools.NewViewTool(lspClients),
 	}
 	if len(lspClients) > 0 {
@@ -97,9 +102,7 @@ func TaskAgentTools(lspClients map[string]*lsp.Client, permissions permission.Se
 			taskTools = append(taskTools, t)
 		}
 	}
-	add("tool.glob", tools.NewGlobTool())
-	add("tool.grep", tools.NewGrepTool())
-	add("tool.ls", tools.NewLsTool())
+	add("tool.find", tools.NewFindTool())
 	add("tool.view", tools.NewViewTool(lspClients))
 	return taskTools
 }

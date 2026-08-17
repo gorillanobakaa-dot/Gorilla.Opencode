@@ -91,7 +91,7 @@ func CoderPrompt(provider models.ModelProvider) string {
 // On large trees (home dir, Firefox, kernel) that alone was ~10k–30k tokens
 // per turn — the dominant fixed overhead, and hostile to metered / satellite
 // links. Now: depth-1 listing (capped) + short git status. The agent still
-// has ls/glob/grep tools for deep exploration on demand.
+// has the find tool for deep exploration on demand.
 const (
 	maxTopLevelEntries = 25
 	maxGitStatusLines  = 10
@@ -152,7 +152,7 @@ func isGitRepo(dir string) bool {
 // status snippet (max maxGitStatusLines). No recursive walk.
 func projectSummary(cwd string, isGit bool) string {
 	var b strings.Builder
-	b.WriteString("Top-level (depth 1, not a full tree — use ls/glob/grep for deeper paths):\n")
+	b.WriteString("Top-level (depth 1, not a full tree — use the find tool for deeper paths):\n")
 	b.WriteString(listTopLevelBrief(cwd, maxTopLevelEntries))
 	if isGit {
 		if g := gitStatusBrief(cwd, maxGitStatusLines); g != "" {

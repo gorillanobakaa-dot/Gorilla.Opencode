@@ -17,8 +17,8 @@ import (
 
 type ViewParams struct {
 	FilePath string `json:"file_path"`
-	Offset   int    `json:"offset"`
-	Limit    int    `json:"limit"`
+	Offset   FlexInt `json:"offset"`
+	Limit    FlexInt `json:"limit"`
 }
 
 type viewTool struct {
@@ -55,15 +55,15 @@ FEATURES:
 - Suggests similar file names when the requested file isn't found
 
 LIMITATIONS:
-- Maximum file size is 250KB
+- Maximum file size is 5MB
 - Default reading limit is 2000 lines
 - Lines longer than 2000 characters are truncated
 - Cannot display binary files or images
 - Images can be identified but not displayed
 
 TIPS:
-- Use with Glob tool to first find files you want to view
-- For code exploration, first use Grep to find relevant files, then View to examine them
+- Use the find tool first to locate files, then View to examine them
+- find already returns matching lines with context, so View is only needed when you want MORE than the match window
 - When viewing large files, use the offset parameter to read specific sections`
 )
 
@@ -158,7 +158,7 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 
 	// Set default limit if not provided
 	if params.Limit <= 0 {
-		params.Limit = DefaultReadLimit
+		params.Limit = FlexInt(DefaultReadLimit)
 	}
 
 	// Check if it's an image file
@@ -169,7 +169,7 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	}
 
 	// Read the file content
-	content, lineCount, err := readTextFile(filePath, params.Offset, params.Limit)
+	content, lineCount, err := readTextFile(filePath, params.Offset.Int(), params.Limit.Int())
 	if err != nil {
 		return ToolResponse{}, fmt.Errorf("error reading file: %w", err)
 	}
@@ -177,12 +177,12 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	notifyLspOpenFile(ctx, filePath, v.lspClients)
 	output := "<file>\n"
 	// Format the output with line numbers
-	output += addLineNumbers(content, params.Offset+1)
+	output += addLineNumbers(content, params.Offset.Int()+1)
 
 	// Add a note if the content was truncated
-	if lineCount > params.Offset+len(strings.Split(content, "\n")) {
+	if lineCount > params.Offset.Int()+len(strings.Split(content, "\n")) {
 		output += fmt.Sprintf("\n\n(File has more lines. Use 'offset' parameter to read beyond line %d)",
-			params.Offset+len(strings.Split(content, "\n")))
+			params.Offset.Int()+len(strings.Split(content, "\n")))
 	}
 	output += "\n</file>\n"
 	output += getDiagnostics(filePath, v.lspClients)
