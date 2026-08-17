@@ -156,6 +156,12 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// 6862 -> 6845 on 2026-08-08: -17 bytes, " and web_fetch it" dropped from
 		// the "search off is an answer" line.
 		//
+		// 6845 -> 6941 on 2026-08-17: +96 bytes, the web_search line now names
+		// the coder triggers (unfamiliar error, exact flag, newer than
+		// training) instead of introducing source: web as probably absent.
+		// The session DB had TWO web searches ever recorded while a configured
+		// SearXNG sat idle; a tool the prompt undersells does not get called.
+		//
 		// Not cosmetic. Prompt lines now carry [[needs tool.x]] markers and are
 		// dropped when that tool is switched off; the markers themselves are
 		// stripped at assembly and never reach the model, which is why this
@@ -255,7 +261,7 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// "blast radius outranks brevity" line first. Probes P6-P8 are
 		// registered in EXPERIMENT-PREREG-2026-08-04.md, amendment 2.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 6845, "simple question gets direct sentence"},
+			BaseCoderPrompt(models.ProviderLocal), 6941, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {

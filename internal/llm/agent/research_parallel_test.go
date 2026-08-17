@@ -103,15 +103,15 @@ func TestResultsAreOrderedByRoleNotCompletion(t *testing.T) {
 }
 
 func TestContractCheckerFlagsMissingHeadings(t *testing.T) {
-	good := "## ANSWER\nx\n## FINDINGS\n- CLAIM: a | EVIDENCE: b | TIER: config\n## CONFIDENCE\nstrong\n## NOT ESTABLISHED\nnothing"
+	good := "## ANSWER\nx\n## FINDINGS\n- CLAIM: a | EVIDENCE: b | TIER: config\n## SOURCES TRIED\n- find 'a': 1 hit\n## CONFIDENCE\nstrong\n## NOT ESTABLISHED\nnothing"
 	if missing := checkContract(good); len(missing) != 0 {
 		t.Errorf("well-formed reply flagged: %v", missing)
 	}
 	// A reply that answers but carries no evidence tiers is exactly the kind
 	// that gets synthesised into a confident wrong answer.
 	bad := "## ANSWER\nIt is definitely X."
-	if missing := checkContract(bad); len(missing) != 3 {
-		t.Errorf("expected 3 missing headings, got %v", missing)
+	if missing := checkContract(bad); len(missing) != 4 {
+		t.Errorf("expected 4 missing headings (FINDINGS, SOURCES TRIED, CONFIDENCE, NOT ESTABLISHED), got %v", missing)
 	}
 }
 

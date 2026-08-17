@@ -364,8 +364,48 @@ verdict is REJECTED, write "nothing from this lane".`,
 		strings.TrimSpace(question), role.Title, role.Lane, strings.TrimSpace(report))
 }
 
+// researchMethod is the collection cycle every helper works, injected into
+// every helper prompt.
+//
+// GORILLA OVERRIDE (2026-08-17): ported from the owner's OSINT doctrine (the
+// intelligence cycle: direction -> collection -> vetting -> analysis ->
+// dissemination), fused with the two durable pieces of Anthropic's published
+// research prompts (claude-cookbooks patterns/agents/prompts): the
+// start-wide-then-narrow search strategy and an explicit stop condition.
+// Measured need, 2026-08-07: with working tools, models searched one keyword
+// ("deception"), never tried the synonym ("lie"), and padded results with
+// invented DOIs. Method failures, not capability failures — so the method is
+// imposed here. The audit of Anthropic's own prompts (2026-08-17) found the
+// same hole from the other side: vet: 0, credib: 0 occurrences — their
+// collector carries no vetting instructions at all.
+func researchMethod(steps int) string {
+	return fmt.Sprintf(`METHOD — work this cycle, in order:
+
+1. DIRECTION. From your lane, write down the two to four specific questions you
+   must answer. Every tool call serves one of them.
+2. COLLECTION. Your tools and what each is for:
+   - find: THIS machine — code, docs, configs, installed tools. Check here
+     before the web; the answer already being on disk is common.
+   - web_search: sources scholar / medical / crossref / openaccess / books /
+     reference work with no key. source web is the user's private search
+     engine; the tool says if it is missing. Start with one or two BROAD
+     queries to map the ground, then narrow. Short queries beat long ones.
+   - web_fetch: read a page you already have the address of.
+   If a term returns nothing, try its synonyms and neighbouring terms before
+   concluding absence — an index that misses one word often holds its twin.
+3. VETTING. Before a result enters FINDINGS, establish: who wrote it, when, and
+   which version or platform it applies to. A claim about a version the user
+   does not run is labelled as such or left out. A source that merely repeats
+   another source adds nothing to a claim's tier.
+4. STOP CONDITION. The user is shown a cost estimate assuming
+   about %d tool calls from you. When two consecutive calls add nothing new,
+   stop and write up — searching past that point is spend, not diligence.
+   Absence after an honest search is a reportable finding.
+`, steps)
+}
+
 const researchOutputContract = `
-OUTPUT — use EXACTLY these four headings, in this order, and nothing else at the
+OUTPUT — use EXACTLY these five headings, in this order, and nothing else at the
 top level. Your reply is parsed. A missing heading is reported as malformed.
 
 ## ANSWER
@@ -381,6 +421,12 @@ TIER must be one of, strongest first:
   multiple_reports  several independent reports naming a version
   single_claim      one README or one forum post. The WEAKEST. Label it honestly.
 
+## SOURCES TRIED
+One line per source or query consulted, INCLUDING the ones that returned
+nothing — "web_search scholar 'X': nothing relevant" is a finding about
+coverage. Every EVIDENCE entry above must trace to a line here; an
+investigation that lists only its hits cannot be audited.
+
 ## CONFIDENCE
 Exactly one word: proven | strong | plausible | speculative
 
@@ -390,6 +436,9 @@ What you could not determine, stated plainly. This section is not optional and
 
 RULES
 - Never present a single_claim as fact.
+- Never cite a source you did not open. A DOI or URL you constructed from
+  memory is an invention, not evidence — leave the claim in NOT ESTABLISHED
+  instead.
 - A well-supported NO is a complete answer. If nobody has ever done this, say so
   plainly rather than digging to avoid reporting failure.
 - Do not repeat another helper's claim to make it look stronger. A claim's tier
@@ -414,6 +463,14 @@ func (r *researchTool) Info() tools.ToolInfo {
 			"MODES. 'parallel' (default) runs helpers concurrently — 6 helpers take about as long as the " +
 			"slowest one. 'sequential' runs them one at a time. 'supervised' adds a second agent that audits " +
 			"each lane before you see it and returns APPROVED/WEAK/REJECTED.\n\n" +
+			"SCALE THE RUN TO THE QUESTION before choosing agents: a single factual question with one likely " +
+			"answer = 4 (the mandatory lanes); a comparison or 'which approach' question = 5-6, adding verifier " +
+			"and cost; an open-ended investigation or one where being wrong is expensive = 7+ and consider " +
+			"mode=supervised. Over-spawning is the main way this tool wastes the user's money.\n\n" +
+			"Helpers carry the find tool (local search: ranked, with context lines) and web_search " +
+			"(seven keyless scholarly sources, plus the user's private SearXNG when configured), and follow a " +
+			"collection method: direction, broad-then-narrow collection, source vetting, an explicit stop " +
+			"condition, and a SOURCES TRIED log including queries that returned nothing.\n\n" +
 			"COST. Parallel is faster, NOT cheaper: 6 helpers is still 6 LLM sessions and 6x the tokens, and " +
 			"'supervised' roughly doubles that again. Ask for 4 unless the question genuinely spans more " +
 			"ground. Helpers use the 'research' agent model from config, which you can point at a cheaper " +
@@ -526,6 +583,7 @@ func buildPrompt(role researchRole, question, sharedContext, peerFindings string
 		fmt.Fprintf(&b, "THE OTHER HELPERS REPORTED THE FOLLOWING. Your job is to test it, not to agree with it:\n%s\n\n", peerFindings)
 	}
 
+	b.WriteString(researchMethod(config.ResearchStepsPerHelper))
 	b.WriteString(researchOutputContract)
 	return b.String()
 }
@@ -536,7 +594,7 @@ func buildPrompt(role researchRole, question, sharedContext, peerFindings string
 // fact.
 func checkContract(reply string) []string {
 	var missing []string
-	for _, heading := range []string{"## ANSWER", "## FINDINGS", "## CONFIDENCE", "## NOT ESTABLISHED"} {
+	for _, heading := range []string{"## ANSWER", "## FINDINGS", "## SOURCES TRIED", "## CONFIDENCE", "## NOT ESTABLISHED"} {
 		if !strings.Contains(strings.ToUpper(reply), heading) {
 			missing = append(missing, heading)
 		}

@@ -127,10 +127,11 @@ you did not perform.
 Scholarly sources (scholar, medical, crossref, openaccess, books, reference) need
 none of this and still work.`
 
-	webSearchDescription = `Find papers, articles and references by keyword.
+	webSearchDescriptionBase = `Search the web and scholarly sources by keyword.
 
-Search here before guessing a URL. Do not hand-build search URLs for publisher
-sites; most block automated access and return 403.
+Search here before guessing a URL — and before guessing a FACT. Do not
+hand-build search URLs for publisher sites; most block automated access and
+return 403.
 
 source:
   web                the open web, via a self-hosted SearXNG. Only available if
@@ -149,10 +150,8 @@ Results tagged FREE LEGAL FULL TEXT cost nothing to read. Prefer them, and say
 when a paper is purchase-only — never leave someone assuming they must pay while
 an open copy exists.
 
-General web search (source: web) works ONLY when the user runs their own SearXNG.
-There is no built-in Google/Bing/DuckDuckGo and there never will be. If source:
-web reports that it is not configured, that is the end of it — ask the user for a
-URL. Do not invent a source, and do not fall back to remembered links.
+There is no built-in Google/Bing/DuckDuckGo and there never will be; source: web
+is the user's own private SearXNG.
 
 If a search fails or returns nothing, SAY SO. A plausible citation that turns
 out to be a different paper is worse than an empty result.
@@ -225,10 +224,39 @@ func searxngEndpoint() string {
 	return strings.TrimRight(strings.TrimSpace(os.Getenv(searxngEnvVar)), "/")
 }
 
+// webSearchDescription tells the model the truth about THIS machine.
+//
+// GORILLA OVERRIDE: the old static text spent two paragraphs warning that
+// source: web is probably not configured. A model that reads "probably
+// unavailable" on every turn learns not to reach for the tool at all —
+// measured 2026-08-17: TWO web searches in the entire session database, while
+// the user's SearXNG sat configured and answering in 0.7s. The description is
+// built at startup, so it can simply say which world it is in: when SearXNG
+// is configured, searching is free, private and encouraged; when it is not,
+// the honest refusal text stands.
+func webSearchDescription() string {
+	if searxngEndpoint() != "" {
+		return webSearchDescriptionBase + `
+
+source: web IS CONFIGURED on this machine (a private SearXNG). Searches are
+free, private, need no API key, and cost only their result tokens. USE THEM.
+Search instead of guessing whenever the answer could have changed since your
+training data or you are not certain: an unfamiliar error message, an exact
+CLI flag, a library or API you half-remember, version numbers, release notes,
+"what changed in X", current documentation. A wrong guess costs the user a
+full round trip; a search costs a fraction of one.`
+	}
+	return webSearchDescriptionBase + `
+
+source: web is NOT configured on this machine. If you need the open web, say
+so and ask the user — the scholarly sources above all still work. Do not
+invent a source, and do not fall back to remembered links.`
+}
+
 func (t *webSearchTool) Info() ToolInfo {
 	return ToolInfo{
 		Name:        WebSearchToolName,
-		Description: webSearchDescription,
+		Description: webSearchDescription(),
 		Parameters: map[string]any{
 			"query": map[string]any{
 				"type":        "string",
