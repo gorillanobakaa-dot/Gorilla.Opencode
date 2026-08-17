@@ -308,3 +308,36 @@ func itoa(n int) string {
 	}
 	return string(buf[i:])
 }
+
+// HeartbeatState summarises what the helpers are doing, for the "still alive"
+// notice. Returns how many are running, how long the longest has been at it,
+// and how long since ANY of them last changed state.
+//
+// GORILLA OVERRIDE (2026-08-17): built after a lane went silent for 23 minutes
+// and came back with 19,118 tokens. It was thinking the whole time. Even with
+// direct database access the difference between "grinding" and "hung" was not
+// visible; a user watching a still screen has no chance at all. On a slow model
+// over a slow link — a satellite uplink at single-digit KB/s, which is the
+// owner's actual field experience — a healthy run looks exactly like a crash.
+func HeartbeatState() (running int, longest time.Duration, quiet time.Duration) {
+	subAgentRegMu.Lock()
+	defer subAgentRegMu.Unlock()
+	now := time.Now()
+	newest := time.Time{}
+	for _, e := range subAgentReg {
+		if e.info.State != SubAgentRunning && e.info.State != SubAgentQueued {
+			continue
+		}
+		running++
+		if d := now.Sub(e.info.StartedAt); d > longest {
+			longest = d
+		}
+		if e.info.StartedAt.After(newest) {
+			newest = e.info.StartedAt
+		}
+	}
+	if !newest.IsZero() {
+		quiet = now.Sub(newest)
+	}
+	return running, longest, quiet
+}

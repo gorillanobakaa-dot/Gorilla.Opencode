@@ -8,6 +8,10 @@ This is the starting map, not the boundary — the full 985-source registry ship
 Scholarly & scientific literature:
   OpenAlex [A API] api.openalex.org
   Crossref [A API] api.crossref.org
+  arXiv [A API] export.arxiv.org/api/query — physics, maths, CS, quantitative biology;
+    full text free. The first place to look for anything computational or theoretical.
+  bioRxiv / medRxiv [A API] api.biorxiv.org — preprints, unreviewed BY DEFINITION: grade
+    the source accordingly and say it is a preprint in the finding.
   PsyArXiv [A API] api.osf.io/v2
   Semantic Scholar [A SearXNG] www.semanticscholar.org
   Google Scholar [B SearXNG] scholar.google.com

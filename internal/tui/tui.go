@@ -75,6 +75,37 @@ func (portalExec) SetStderr(io.Writer) {}
 
 type startCompactSessionMsg struct{}
 
+// helperHeartbeatMsg drives the "still alive" notice while helpers are working.
+//
+// GORILLA OVERRIDE (2026-08-17): a research lane went quiet for 23 minutes and
+// came back with 19,118 tokens — it had been thinking the entire time. On a
+// slow model over a slow link, a healthy run is indistinguishable from a hang:
+// the screen simply stops. The owner's field experience is the extreme case of
+// this — deployed, on a satellite uplink of a few KB/s, where everything looks
+// broken and almost nothing is. So the program says so, out loud, on a timer.
+//
+// It only ticks while helpers are actually running, so it costs nothing at
+// rest — the same rule the spinner now follows.
+type helperHeartbeatMsg struct{}
+
+// helperHeartbeatEvery is long enough not to nag and short enough that nobody
+// concludes the program is dead. Silence on these models routinely runs to
+// minutes; five would be too long, thirty seconds would be pestering.
+const helperHeartbeatEvery = 90 * time.Second
+
+func helperHeartbeatCmd() tea.Cmd {
+	return tea.Tick(helperHeartbeatEvery, func(time.Time) tea.Msg { return helperHeartbeatMsg{} })
+}
+
+// helperHeartbeatLines rotate so the notice does not read as a stuck string —
+// which would defeat the entire point of a liveness signal.
+var helperHeartbeatLines = []string{
+	"🦍 Still alive, bitch. %d helper(s) still working, longest %s. Nothing has crashed.",
+	"🦍 Still working — %d helper(s) out, longest %s. A slow model looks EXACTLY like a hang. It is not one.",
+	"🦍 %d helper(s) grinding, longest %s. Welcome to austere: slow model, slow line, quiet screen, real work.",
+	"🦍 Still here. %d helper(s), longest %s. /tasks to watch them or X to kill the lot.",
+}
+
 const (
 	quitKey = "q"
 )
@@ -224,6 +255,10 @@ type appModel struct {
 	// GORILLA OVERRIDE: /research mode chooser.
 	researchDialog     dialog.ResearchDialogCmp
 	showResearchDialog bool
+
+	// GORILLA OVERRIDE: the "still alive" heartbeat while helpers run.
+	heartbeatRunning bool
+	heartbeatBeat    int
 
 	// GORILLA OVERRIDE: /osint — the serious dossier gate and its capability page.
 	osintDialog     dialog.OsintDialogCmp
@@ -695,6 +730,20 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dialog.CloseSessionDialogMsg:
 		a.showSessionDialog = false
 		return a, nil
+
+	case helperHeartbeatMsg:
+		running, longest, _ := agent.HeartbeatState()
+		if running == 0 {
+			// Nothing running: let the chain lapse. It restarts on the next spawn.
+			a.heartbeatRunning = false
+			return a, nil
+		}
+		a.heartbeatBeat++
+		line := helperHeartbeatLines[a.heartbeatBeat%len(helperHeartbeatLines)]
+		return a, tea.Batch(
+			util.ReportInfo(fmt.Sprintf(line, running, longest.Round(time.Second))),
+			helperHeartbeatCmd(),
+		)
 
 	case dialog.CloseCommandDialogMsg:
 		a.showCommandDialog = false
@@ -1240,7 +1289,13 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// event itself also triggers a re-render, keeping the /tasks list and
 		// status-bar count live while they're on screen.
 		if msg.Type == pubsub.CreatedEvent {
-			return a, util.ReportInfo(fmt.Sprintf("🦍 helper %s spawned — %s  (/tasks to view or kill)", msg.Payload.ID, truncatePrompt(msg.Payload.Prompt, 40)))
+			cmds := []tea.Cmd{util.ReportInfo(fmt.Sprintf("🦍 helper %s spawned — %s  (/tasks to view or kill)", msg.Payload.ID, truncatePrompt(msg.Payload.Prompt, 40)))}
+			// Start the "still alive" heartbeat if it is not already ticking.
+			if !a.heartbeatRunning {
+				a.heartbeatRunning = true
+				cmds = append(cmds, helperHeartbeatCmd())
+			}
+			return a, tea.Batch(cmds...)
 		}
 		return a, nil
 
