@@ -35,6 +35,31 @@ type CloseOsintDialogMsg struct {
 // CloseOsintPageMsg closes the capability page.
 type CloseOsintPageMsg struct{}
 
+// dialogWidth returns a content width that ALWAYS fits: the terminal minus this
+// dialog's chrome, capped at a preferred maximum so it does not sprawl on an
+// ultrawide screen, with a small absolute floor.
+//
+// GORILLA OVERRIDE (2026-08-17): written after a probe found three dialogs
+// flooring their width UP — /context asked for 106 columns on an 80-column
+// terminal. A frame wider than the window is the documented cause of rows
+// stranded in the scrollback (CLAUDE.md: "NO LINE IN THE FRAME MAY BE WIDER
+// THAN THE TERMINAL"), because the inline renderer counts logical lines when it
+// erases and a wrapped line occupies two physical rows. termWidth <= 0 means
+// "size not known yet", where the preferred width is the only sane answer.
+func dialogWidth(termWidth, preferred, chrome int) int {
+	if termWidth <= 0 {
+		return preferred
+	}
+	w := termWidth - chrome
+	if w > preferred {
+		w = preferred
+	}
+	if w < 20 {
+		w = 20
+	}
+	return w
+}
+
 // osintModes reuses the run shapes the research engine actually implements.
 // Parallel is FIRST and default: the whole point of paying for ten helpers is
 // not waiting for them one at a time.
@@ -144,9 +169,14 @@ func (m OsintDialogCmp) moneyLines() []string {
 		out = append(out, fmt.Sprintf("PEAK BURN: ≈ %s per MINUTE while it runs (%s @ $%.2f/1M in). ≈ %s per helper, %d sessions total.",
 			formatUSD(perMinute), name, per1M, formatUSD(perHelper), sessions))
 	}
-	out = append(out, fmt.Sprintf("Assumptions on screen, arguable: %d steps/helper, ~%d tokens out/step, ~%.0fs/step. Dossiers add a gap round on top.",
-		config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep))
 	return out
+}
+
+// assumptionsLine names the three figures the forecast rests on, so the number
+// above can be argued with rather than trusted.
+func assumptionsLine() string {
+	return fmt.Sprintf("Assumptions on screen, arguable: %d steps/helper, ~%d tokens out/step, ~%.0fs/step. Dossiers add a gap round on top.",
+		config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep)
 }
 
 func helperModel() models.Model {
@@ -154,10 +184,33 @@ func helperModel() models.Model {
 	return hm
 }
 
+// View renders at a height MEASURED to fit, shedding prose in priority order.
+//
+// GORILLA FIX (2026-08-17): this used to render every line unconditionally and
+// asked for 37 rows in a 24-row terminal — a frame taller than the window
+// scrolls the terminal and destroys the layout. What can never be dropped is
+// the decision itself: the warning headline, what it costs, the helper and mode
+// controls, and the keys. The explanatory prose goes first, the privacy note
+// and the opening line after it. Same approach as /help and /context.
 func (m OsintDialogCmp) View() string {
+	for lean := 0; lean < 4; lean++ {
+		v := m.renderAt(lean)
+		if m.height <= 0 || lipgloss.Height(v) <= m.height {
+			return v
+		}
+	}
+	return m.renderAt(3)
+}
+
+// renderAt draws the gate at a leanness level: 0 is everything, 3 is the
+// decision and nothing else.
+func (m OsintDialogCmp) renderAt(lean int) string {
 	t := theme.CurrentTheme()
 	base := styles.BaseStyle()
-	w := min(110, max(80, m.width-8))
+	// GORILLA FIX (2026-08-17): never floor UP past what the terminal has —
+	// max(80, …) drew an 84-column frame into an 80-column window. Chrome is
+	// subtracted, never added. See the note on loadoutDialogCmp.width().
+	w := dialogWidth(m.width, 110, 8)
 
 	red := base.Foreground(lipgloss.Color("#FF0000")).Bold(true).Width(w)
 	head := base.Foreground(t.Primary()).Bold(true).Width(w)
@@ -165,26 +218,48 @@ func (m OsintDialogCmp) View() string {
 	mute := base.Foreground(t.TextMuted()).Width(w)
 
 	var b []string
-	b = append(b,
-		red.Render("⚠ GORILLA OSINT — THE SERIOUS ONE"),
-		body.Render(""),
-		body.Render("Well done, bitch — you found the professional tool. Read this once, because it is not bluffing:"),
-		body.Render(""),
-		body.Render(fmt.Sprintf("It will spin up %d helper agents. Every one is a FULL model session working a lane of your", m.agents)),
-		body.Render("question against hundreds of real sources, then a gap round hunts what they missed. This is"),
-		body.Render("the most expensive thing this program can do, and it does it on purpose."),
-		body.Render(""),
-	)
+	b = append(b, red.Render("⚠ GORILLA OSINT — THE SERIOUS ONE"))
+	if lean < 3 {
+		// The opening line is the owner-specified voice. It survives everything
+		// except the leanest form, where only the decision remains.
+		b = append(b,
+			body.Render(""),
+			body.Render("Well done, bitch — you found the professional tool. Read this once, because it is not bluffing:"),
+		)
+	}
+	if lean < 2 {
+		b = append(b,
+			body.Render(""),
+			body.Render(fmt.Sprintf("It will spin up %d helper agents. Every one is a FULL model session working a lane of your", m.agents)),
+			body.Render("question against hundreds of real sources, then a gap round hunts what they missed. This is"),
+			body.Render("the most expensive thing this program can do, and it does it on purpose."),
+		)
+	}
+	b = append(b, body.Render(""))
+	// The money NEVER goes. It is the entire reason this screen exists.
 	for _, line := range m.moneyLines() {
 		b = append(b, red.Render(line))
 	}
+	if lean < 3 {
+		// The styles carry .Width(w), which WRAPS rather than overflowing — so a
+		// long line costs rows, never columns, and View() measures those rows.
+		b = append(b, red.Render(assumptionsLine()))
+	}
+	if lean < 1 {
+		b = append(b,
+			body.Render(""),
+			body.Render("It is your wallet and it is your funeral. If you are in a crunch and need ten agents in full"),
+			body.Render("parallel to get an answer you can stand behind — that is exactly what this exists for. Your call."),
+		)
+	}
+	if lean < 2 {
+		b = append(b,
+			body.Render(""),
+			mute.Render(fmt.Sprintf("The finished dossier is saved OUTSIDE your working folder (%s),", config.DossierDir())),
+			mute.Render("so a private question can never end up in a git repository."),
+		)
+	}
 	b = append(b,
-		body.Render(""),
-		body.Render("It is your wallet and it is your funeral. If you are in a crunch and need ten agents in full"),
-		body.Render("parallel to get an answer you can stand behind — that is exactly what this exists for. Your call."),
-		body.Render(""),
-		mute.Render(fmt.Sprintf("The finished dossier is saved OUTSIDE your working folder (%s),", config.DossierDir())),
-		mute.Render("so a private question can never end up in a git repository."),
 		body.Render(""),
 		head.Render(fmt.Sprintf("Helpers: ‹ %d ›  (←/→, %d–%d)", m.agents, agent.ResearchMinAgents, agent.ResearchMaxAgents)),
 	)

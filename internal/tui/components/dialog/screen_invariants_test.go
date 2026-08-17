@@ -77,8 +77,19 @@ var knownSmallOverflow = map[string]int{
 	"/settings 40x8": 11,
 	"/connect 60x10": 17,
 	"/connect 40x8":  17,
-	"/context 60x10": 19,
-	"/context 40x8":  19,
+	// GORILLA (2026-08-17): 19 -> 18. The width fix stopped /context drawing a
+	// 106-column frame into a narrow terminal, and every headline and hint now
+	// truncates instead of being handed raw to a wrapping style. Both changes
+	// pull rows out of the tightest terminals.
+	"/context 60x10": 18,
+	"/context 40x8":  18,
+	// The two /osint screens, entering the ratchet with measured figures rather
+	// than silently. The gate is prose-heavy by design — it is the one screen
+	// that must state what a run costs before it starts — and sheds that prose
+	// in tiers, which is why it still wants 20 rows in a 10-row terminal.
+	"/osint 60x10":     20,
+	"/osint 40x8":      26,
+	"/osint-page 40x8": 11,
 }
 
 // No dialog may ask for more rows than the terminal has, at any terminal 24 rows or
@@ -273,6 +284,18 @@ func sizedDialogs(t *testing.T) map[string]func() sizedDialog {
 			m := NewPromptsDialogCmp()
 			m.Init()
 			return viaWindowSize{m}
+		},
+		// GORILLA OVERRIDE (2026-08-17): the two /osint screens join the harness
+		// so they are ratcheted like everything else. Both shipped in v0.1.88
+		// outside it, and both were broken — the gate asked for 37 rows in a
+		// 24-row terminal and drew wider than an 80-column one.
+		"/osint": func() sizedDialog {
+			m := NewOsintDialogCmp("does this fit")
+			return &m
+		},
+		"/osint-page": func() sizedDialog {
+			m := NewOsintPageCmp()
+			return &m
 		},
 	}
 }

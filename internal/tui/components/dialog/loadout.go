@@ -22,8 +22,10 @@ import (
 // GORILLA OVERRIDE: use nearly the full terminal width so no message or
 // tradeoff line ever wraps or truncates.
 const (
-	loadoutMinWidth    = 100
-	loadoutSidePadding = 6 // border + breathing room on each side
+	loadoutMinWidth     = 100 // fallback when the terminal size is not yet known
+	loadoutMaxWidth     = 140 // cap: readable line length on an ultrawide screen
+	loadoutHardMinWidth = 20  // below this nothing is legible anyway
+	loadoutSidePadding  = 6   // border + breathing room on each side
 )
 
 // CloseLoadoutDialogMsg closes the loadout menu.
@@ -55,13 +57,31 @@ type loadoutDialogCmp struct {
 
 // width returns the dialog inner width — as wide as the terminal allows,
 // so the full messages are always readable.
+//
+// GORILLA FIX (2026-08-17): this used to floor the width UP to loadoutMinWidth
+// (100), so on an 80-column terminal it asked for 100 columns of content plus 6
+// of chrome and drew a 106-column frame into an 80-column window. That breaks
+// the invariant CLAUDE.md puts in capitals: NO LINE IN THE FRAME MAY BE WIDER
+// THAN THE TERMINAL. Bubbletea's inline renderer erases its last frame by
+// moving the cursor up by the number of LOGICAL lines it drew, so a line that
+// wraps to two physical rows makes the erase under-reach by a row per render —
+// which is how rows get stranded in the scrollback.
+//
+// Chrome is SUBTRACTED from the terminal, never added to a content size. The
+// 100 is now a PREFERRED width (a cap, so the dialog does not sprawl across an
+// ultrawide screen), not a floor. On a terminal too narrow for comfort the rows
+// truncate with an ellipsis, which is ugly and correct; drawing outside the
+// window is neither.
 func (m *loadoutDialogCmp) width() int {
 	if m.termWidth <= 0 {
 		return loadoutMinWidth
 	}
 	w := m.termWidth - loadoutSidePadding
-	if w < loadoutMinWidth {
-		w = loadoutMinWidth
+	if w > loadoutMaxWidth {
+		w = loadoutMaxWidth
+	}
+	if w < loadoutHardMinWidth {
+		w = loadoutHardMinWidth
 	}
 	return w
 }
@@ -299,13 +319,29 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	base := styles.BaseStyle()
 	w := m.width()
 
+	// Truncation helpers, declared before anything that renders text.
+	//
+	// GORILLA FIX (2026-08-17): every headline, subtitle and hint now passes
+	// through fitLine. They used to be handed to a .Width(w) style raw, and
+	// lipgloss WRAPS rather than overflowing — so on a narrow terminal each one
+	// silently became two or three rows and the dialog grew taller exactly where
+	// there was least room. Truncating with an ellipsis costs a few words; the
+	// alternative cost rows.
+	fitTo := func(line string, width int) string {
+		if r := []rune(line); len(r) > width-1 {
+			return string(r[:width-2]) + "…"
+		}
+		return line
+	}
+	fitLine := func(line string) string { return fitTo(line, w) }
+
 	total := config.LoadoutActiveTokens()
 	header := base.Foreground(t.Primary()).Bold(true).Width(w).
-		Render("Context loadout — what every turn costs")
+		Render(fitLine("Context loadout — what every turn costs"))
 	sub := base.Foreground(t.TextMuted()).Width(w).
-		Render(fmt.Sprintf("~%s tokens sent on EVERY turn, even to say \"yo\"%s.", commaInt(total), loadoutCostSuffix()))
+		Render(fitLine(fmt.Sprintf("~%s tokens sent on EVERY turn, even to say \"yo\"%s.", commaInt(total), loadoutCostSuffix())))
 	fixed := base.Foreground(t.TextMuted()).Width(w).
-		Render(fmt.Sprintf("(base system prompt ~%s is always on; the rest is yours to cut)", commaInt(config.LoadoutBaseTokens())))
+		Render(fitLine(fmt.Sprintf("(base system prompt ~%s is always on; the rest is yours to cut)", commaInt(config.LoadoutBaseTokens()))))
 	// rowStyle applies the shared selected / disabled styling to any row.
 	rowStyle := func(selected, muted bool) lipgloss.Style {
 		s := base.Width(w)
@@ -317,14 +353,6 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 		}
 		return s
 	}
-	fitTo := func(line string, width int) string {
-		if r := []rune(line); len(r) > width-1 {
-			return string(r[:width-2]) + "…"
-		}
-		return line
-	}
-	fitLine := func(line string) string { return fitTo(line, w) }
-
 	// GORILLA OVERRIDE (2026-08-17): state is shown by a WORD that flips, not a
 	// checkbox. Real-user feedback on v0.1.87: "Which is off/on, is it x'ed or
 	// unx'ed and greyed out, regardless the description still shows off". The
@@ -369,7 +397,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 
 	// --- Section 1: the two Gorilla control dials (arrow-key adjustable) ---
 	dialHeader := base.Foreground(t.Primary()).Bold(true).Width(w).
-		Render("🦍 GORILLA CONTROLS — tune for your connection / free tier  (↑↓ pick a line · ←→ change it):")
+		Render(fitLine("🦍 GORILLA CONTROLS — tune for your connection / free tier  (↑↓ pick a line · ←→ change it):"))
 	// Dial rows carry the same "> " selection pointer as the toggle rows, so
 	// "where am I" reads the same way everywhere in the dialog.
 	dialRow := func(selected bool, label, desc string) string {
@@ -386,7 +414,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 
 	// --- Section 2: switch features on/off ---
 	featHeader := base.Foreground(t.Primary()).Bold(true).Width(w).
-		Render("Turn features ON/OFF  (> marks where you are · space flips it):")
+		Render(fitLine("Turn features ON/OFF  (> marks where you are · space flips it):"))
 	for i, c := range sortedLoadout() {
 		on := config.LoadoutEnabled(c.ID)
 		mark := ""
@@ -413,7 +441,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	// matters — a user told "extras cost money" would reasonably switch all of them
 	// off and lose the forensic record for no saving at all.
 	extrasHeader := base.Foreground(t.Primary()).Bold(true).Width(w).
-		Render("Show me the working  (space):")
+		Render(fitLine("Show me the working  (space):"))
 	var extraRows []string
 	for i, e := range config.Extras {
 		on := config.ExtraEnabled(e.ID)
@@ -429,7 +457,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 		Render(fitLine("  \"free\" = already generated and paid for; hiding it saves nothing. \"COSTS EXTRA\" = the model writes more."))
 
 	help := base.Foreground(t.TextMuted()).Width(w).
-		Render("↑↓ pick · ←→ dial · space flips ON/OFF · L all LSPs · l low-bw · r reset · esc close   ⚠ = disabling cripples the agent")
+		Render(fitLine("↑↓ pick · ←→ dial · space flips ON/OFF · L all LSPs · l low-bw · r reset · esc close   ⚠ = disabling cripples the agent"))
 
 	// Window the feature rows rather than rendering all of them. featureRows is
 	// decided by measurement in View(), not by a guess at how much chrome the rest

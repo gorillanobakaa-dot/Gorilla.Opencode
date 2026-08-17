@@ -131,7 +131,9 @@ func osintContent() []osintLine {
 func (m OsintPageCmp) View() string {
 	t := theme.CurrentTheme()
 	base := styles.BaseStyle()
-	w := min(104, max(70, m.width-6))
+	// GORILLA FIX (2026-08-17): see dialogWidth — the old max(70, …) floor drew
+	// a frame wider than a narrow terminal, which strands rows in scrollback.
+	w := dialogWidth(m.width, 104, 6)
 
 	lines := osintContent()
 	// Window the content to the terminal: chrome is border(2)+padding(2).
