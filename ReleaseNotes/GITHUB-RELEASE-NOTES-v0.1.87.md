@@ -4,6 +4,10 @@
 account you already have, instead of an API key — and a **free** ChatGPT account is
 enough. No developer account, no payment method, no card.
 
+<a href="https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.87/docs/screenshots/gallery/v0187-chatgpt-signin-gpt55.png"><img src="https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.87/docs/screenshots/gallery/v0187-chatgpt-signin-gpt55.png" alt="Gorilla OpenCode v0.1.87 running GPT-5.5 through a free ChatGPT sign-in: the model label reads GPT-5.5 (ChatGPT sign-in) and the footer reads spent $0.00" width="100%"></a>
+
+<sub>GPT-5.5 answering through a **free** ChatGPT account. Note the footer: **`spent $0.00`** — there is no per-use charge on this route. Click the image for full resolution.</sub>
+
 ---
 
 ### Why this matters
