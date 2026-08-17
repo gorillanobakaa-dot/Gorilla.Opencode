@@ -36,7 +36,24 @@ type messagesCmp struct {
 	currentMsgID  string
 	cachedContent map[string]cacheItem
 	spinner       spinner.Model
-	rendering     bool
+	// spinning records whether a spinner tick chain is currently alive.
+	//
+	// GORILLA FIX (2026-08-17): the chain used to start at Init() and never
+	// stop. Bubbles' spinner schedules the next tick from inside Update, so a
+	// chain started once ticks for the life of the program — 8 times a second,
+	// forever, whether or not anything is working. Every one of those ticks is
+	// a tea.Msg, and every message re-runs View() for the whole UI. MEASURED on
+	// v0.1.89: a brand-new instance in an empty folder, no conversation, doing
+	// absolutely nothing, burned 35% of a CPU core; a session with a real
+	// transcript burned 59%, because the render cost scales with what is on
+	// screen. It also starves input — with helpers streaming on top, keystrokes
+	// queue behind the backlog and the TUI looks frozen, which is exactly what
+	// was reported (esc and the arrows "not working" while 8 helpers ran).
+	//
+	// The spinner is only VISIBLE while the agent is working (see working()),
+	// so the chain now lives exactly as long as it is drawn.
+	spinning  bool
+	rendering bool
 	attachments   viewport.Model
 	// GORILLA OVERRIDE: throttle streaming re-renders (see below).
 	lastStreamRender time.Time
@@ -86,8 +103,10 @@ var messageKeys = MessageKeys{
 	),
 }
 
+// Init deliberately does NOT start the spinner. Nothing is working at startup,
+// so nothing needs animating; the chain is started on demand in Update.
 func (m *messagesCmp) Init() tea.Cmd {
-	return tea.Batch(m.viewport.Init(), m.spinner.Tick)
+	return m.viewport.Init()
 }
 
 func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -223,9 +242,24 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	spinner, cmd := m.spinner.Update(msg)
-	m.spinner = spinner
-	cmds = append(cmds, cmd)
+	// GORILLA FIX (2026-08-17): tick only while the spinner is on screen.
+	// Forwarding a TickMsg is what schedules the NEXT tick, so declining to
+	// forward it lets the chain lapse; starting one when work begins brings it
+	// back. See the note on the `spinning` field for the measurement.
+	if m.IsAgentWorking() {
+		if !m.spinning {
+			m.spinning = true
+			cmds = append(cmds, m.spinner.Tick)
+		}
+		s, cmd := m.spinner.Update(msg)
+		m.spinner = s
+		cmds = append(cmds, cmd)
+	} else if m.spinning {
+		if _, isTick := msg.(spinner.TickMsg); isTick {
+			// Swallow this one: not forwarding it ends the chain.
+			m.spinning = false
+		}
+	}
 	return m, tea.Batch(cmds...)
 }
 

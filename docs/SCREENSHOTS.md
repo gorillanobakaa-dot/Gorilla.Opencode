@@ -1,3 +1,4 @@
+<!-- Version: 1.0.0 · updated 26-08-17-19-30 -->
 # Gorilla OpenCode — screenshots & proof
 
 Real screenshots from a Debian 13 / GNOME 48 machine running the revived
@@ -10,6 +11,68 @@ models.
 Every screenshot is unscaled, at whatever size the window was captured
 (1583–1600 px wide), so the terminal text stays readable — the complete
 set is in [`screenshots/gallery/`](screenshots/gallery/).
+
+## How these are published (the rule)
+
+**Full resolution, never thumbnails.** Every image below is uploaded at the size
+it was captured (~1595 px wide) and rendered as wide as the page allows, and
+every one is **clickable through to the full-resolution original**. Nothing is
+downscaled, cropped for tidiness, or re-encoded to save bytes. The reason is the
+philosophy, not vanity: this project's claim is that a non-technical reader can
+CHECK what was built, and a screenshot too small to read destroys exactly that.
+Nothing is staged — the numbers on screen are real runs.
+
+---
+
+## v0.1.90 — `/osint`, the all-source assessment
+
+Captured 2026-08-17 on Debian 13 / GNOME 48, model **DeepSeek V4 Flash**.
+
+### The capability page — `/osint` with no question
+
+Typing `/osint` on its own opens the full-screen explanation instead of
+starting anything. Status line first: armed or off, and how to change it.
+
+[![The /osint capability page, ARMED, explaining the five stages of a run: plan, collect from 985 sources, vet on two axes, gap round, product](screenshots/gallery/v0190-osint-page-armed.png)](screenshots/gallery/v0190-osint-page-armed.png)
+
+*(Captured on the build immediately before the rename to "All-Source
+Intelligence Analysis" — the page now carries the new title, the content is
+otherwise as shown.)*
+
+### The same page, scrolled: the iron rules, privacy, and the cost
+
+Where the finished assessment is written — **outside** the working folder,
+because working folders are git repositories and a private question must never
+land in a commit — and what a run actually costs, in red, unhedged.
+
+[![The lower half of the page: iron rules, the dossier written to ~/Documents/Gorilla-OSINT-Dossiers, and the cost warning in red](screenshots/gallery/v0190-osint-page-cost-and-privacy.png)](screenshots/gallery/v0190-osint-page-cost-and-privacy.png)
+
+### The model weighing whether the question is worth the money
+
+Unstaged, and the most revealing shot here. The user demanded a full 10-agent
+supervised run on a frivolous question; the model's own reasoning is visible,
+arguing with itself about waste — *"Running a full 10-agent dossier on this is a
+waste of money"* — while still respecting an explicit instruction. The cost
+discipline is not a slogan in a document; it is in the model's reasoning.
+
+[![The model's thinking, visible on screen, weighing an expensive run against a frivolous question](screenshots/gallery/v0190-osint-model-weighs-the-spend.png)](screenshots/gallery/v0190-osint-model-weighs-the-spend.png)
+
+### Eight helpers running, each in its own lane — and killable
+
+Every helper is named by the lane it owns: adversary, prior art, primary source,
+requirement, local, history, sidestep, cost. `X` kills all of them. You are
+never locked out of your own spending.
+
+[![The /tasks monitor: eight research helpers running, each labelled with its lane, with kill and nuclear-kill keys](screenshots/gallery/v0190-osint-eight-helpers-running.png)](screenshots/gallery/v0190-osint-eight-helpers-running.png)
+
+### Permission asked before a helper reaches the web
+
+A helper searching medical sources stops and asks first. The query it wants to
+send is shown in full, so you approve the actual text, not a category.
+
+[![The permission dialog showing the exact medical search query a helper wants to run, with allow / allow-for-session / deny](screenshots/gallery/v0190-osint-permission-medical-search.png)](screenshots/gallery/v0190-osint-permission-medical-search.png)
+
+---
 
 ## v0.1.80 — the banana meter, from full barrel to empty peel
 

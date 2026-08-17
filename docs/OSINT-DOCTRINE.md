@@ -285,3 +285,39 @@ iterative refinement — and the reference architecture sketch (overseer → tas
 decomposition → parallel research leads → evidence set → verification layer:
 fact check / red team / source check → supervisor QC → synthesis → final
 audit) that the lane-and-supervisor design implements.
+
+---
+
+## Sources and credits — where this method comes from
+
+Nothing in this tool's method was invented here. It is assembled from published
+doctrine, and the sources deserve naming rather than a footnote.
+
+**UK Government — Professional Head of Intelligence Assessment (PHIA).**
+The judgement standard: the Probability Yardstick's seven terms and their
+bands, the Analytical Confidence Rating and its three criteria, the separation
+of likelihood from confidence, and the competency framework's requirements for
+falsifiable hypotheses, challenged assumptions and articulated intelligence
+gaps.
+
+- [The Professional Development Framework for All-Source Intelligence Assessment](https://www.gov.uk/government/publications/intelligence-analysis-professional-development-framework/the-professional-development-framework-for-all-source-intelligence-assessment)
+- [Explaining Uncertainty in UK Intelligence Assessment](https://www.gov.uk/government/publications/explaining-uncertainty-in-uk-intelligence-assessment/explaining-uncertainty-in-uk-intelligence-assessment)
+
+> Contains public sector information licensed under the
+> [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+
+That licence permits copying, adapting and commercial use, and requires this
+acknowledgement. It also forbids implying official status or endorsement, so to
+be explicit: **this project is not endorsed by, affiliated with, or connected to
+the UK Government, PHIA, or any government body.** We adapted their published
+method; they have no idea we exist.
+
+**US Army — declassified intelligence doctrine**, public domain as US Government
+works: FM 2-0 *Intelligence* (2023) for the intelligence cycle and collection
+architecture; ADP 2-0 *Intelligence* (2019) for the analytic standards; ATP
+2-22.9 *Open-Source Intelligence* (2012) for source vetting, the Admiralty
+two-axis grading and circular-reporting detection.
+
+**The 985 sources themselves** are listed with their licences and access terms
+in [OSINT-SOURCE-CATALOG.md](OSINT-SOURCE-CATALOG.md). Each is queried under its
+own terms of use.
