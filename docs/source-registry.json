@@ -1,28 +1,29 @@
 {
  "_meta": {
-  "version": "1.0.1",
+  "version": "1.1.0",
   "generated": "2026-08-17",
   "counts": {
-   "total": 900,
-   "free": 785,
+   "total": 985,
+   "free": 866,
    "byAccess": {
-    "api_keyless": 340,
-    "fetch_pattern": 320,
-    "paid_only": 115,
-    "api_key": 66,
+    "api_keyless": 370,
+    "fetch_pattern": 346,
+    "paid_only": 118,
+    "api_key": 79,
+    "bulk_download": 62,
     "searxng_enabled": 6,
-    "bulk_download": 49,
     "unknown": 4
    },
    "byReliability": {
-    "A": 629,
-    "B": 228,
-    "C": 38,
+    "A": 671,
+    "B": 267,
+    "C": 42,
     "F": 5
    }
   },
   "note": "Source registry for the research/dossier tools: 900 sources from the owner's curated lists, classified by best FREE programmatic access. Tiers: api_keyless > searxng_enabled > searxng_available > api_key > fetch_pattern > bulk_download > paid_only. reliability is an Admiralty source-axis PRIOR (A authoritative primary/official, B established secondary, C aggregator, F cannot judge); the vetting stage grades claims independently. paid_only entries are kept ON PURPOSE so the tool can brief the user that the definitive source exists behind a subscription, instead of pretending it does not. 1.0.1: ReliefWeb reclassified api_key (v2 appname requirement) and GDELT throttle noted, both from live measurement.",
-  "schema_origin": "Serious.OSINT.txt header block (owner)"
+  "schema_origin": "Serious.OSINT.txt header block (owner)",
+  "reconciliation": "2026-08-17: the three curated source lists were re-checked line by line against this registry. 160 names had failed a fuzzy match; classification found 52 were section headings, 23 were variant spellings of entries already present (e.g. WORLD HEALTH ORGANIZATION = WHO), and 85 were genuine sources missing from the first pass — those were added here. Entries carry a best-known canonical URL or none; no URL was invented."
  },
  "sources": [
   {
@@ -266,7 +267,7 @@
    "free": true,
    "reliability": "C",
    "url": "https://developers.arcgis.com",
-   "note": "Free developer tier with API key; many public ArcGIS REST/feature services are keyless; hosted content is mixed quality \u2014 judge per layer."
+   "note": "Free developer tier with API key; many public ArcGIS REST/feature services are keyless; hosted content is mixed quality — judge per layer."
   },
   {
    "name": "Google Earth",
@@ -482,7 +483,7 @@
    "free": true,
    "reliability": "A",
    "url": "https://www.sentinel-hub.com",
-   "note": "account required; limited free tier \u2014 underlying Copernicus/Sentinel data itself is free"
+   "note": "account required; limited free tier — underlying Copernicus/Sentinel data itself is free"
   },
   {
    "name": "USGS EarthExplorer",
@@ -509,7 +510,7 @@
    "free": true,
    "reliability": "F",
    "url": "https://core.telegram.org/api",
-   "note": "Bot/MTProto APIs need free token registration; channel content is unvetted \u2014 grade per channel, not per platform"
+   "note": "Bot/MTProto APIs need free token registration; channel content is unvetted — grade per channel, not per platform"
   },
   {
    "name": "TikTok",
@@ -536,7 +537,7 @@
    "free": true,
    "reliability": "A",
    "url": "https://developer.ieee.org",
-   "note": "Metadata/abstract API free with key. Standards FULL TEXT is purchase/subscription only \u2014 the API will not deliver documents."
+   "note": "Metadata/abstract API free with key. Standards FULL TEXT is purchase/subscription only — the API will not deliver documents."
   },
   {
    "name": "Global Terrorism Trends and Analysis",
@@ -842,7 +843,7 @@
    "free": true,
    "reliability": "A",
    "url": "https://powo.science.kew.org",
-   "note": "POWO search API (\u2026/api/2), no key."
+   "note": "POWO search API (…/api/2), no key."
   },
   {
    "name": "Map of Life",
@@ -1831,7 +1832,7 @@
    "free": true,
    "reliability": "C",
    "url": "https://api.gdeltproject.org/api/v2",
-   "note": "DOC/GEO/TV APIs keyless plus raw file dumps; machine-coded \u2014 verify against primary sources NOTE: aggressive IP-level rate limiting measured 2026-08-17 (429 on lone requests); retry later, space calls well past 5s."
+   "note": "DOC/GEO/TV APIs keyless plus raw file dumps; machine-coded — verify against primary sources NOTE: aggressive IP-level rate limiting measured 2026-08-17 (429 on lone requests); retry later, space calls well past 5s."
   },
   {
    "name": "BIS Data Portal",
@@ -2398,7 +2399,7 @@
    "free": true,
    "reliability": "A",
    "url": "https://data.humdata.org",
-   "note": "CODs hosted on HDX; CKAN API keyless (\u2026/api/3/action/\u2026)."
+   "note": "CODs hosted on HDX; CKAN API keyless (…/api/3/action/…)."
   },
   {
    "name": "OCHA Situation Reports",
@@ -2506,7 +2507,7 @@
    "free": true,
    "reliability": "C",
    "url": "https://query.wikidata.org/sparql",
-   "note": "SPARQL endpoint and wbgetentities API keyless; SearXNG wikidata engine also enabled. Crowd-sourced \u2014 verify claims at the cited source."
+   "note": "SPARQL endpoint and wbgetentities API keyless; SearXNG wikidata engine also enabled. Crowd-sourced — verify claims at the cited source."
   },
   {
    "name": "ILO Data",
@@ -3972,7 +3973,7 @@
    "free": true,
    "reliability": "C",
    "url": "https://www.gu.se/en/quality-government",
-   "note": "Free CSV/Stata downloads (U. Gothenburg); itself an aggregation of hundreds of sources \u2014 cite the underlying source."
+   "note": "Free CSV/Stata downloads (U. Gothenburg); itself an aggregation of hundreds of sources — cite the underlying source."
   },
   {
    "name": "Comparative Political Data Set",
@@ -4008,7 +4009,7 @@
    "free": true,
    "reliability": "B",
    "url": "https://www.globalsanctionsdatabase.com",
-   "note": "Academic GSDB (Felbermayr et al.); dataset releases distributed free but typically on email request \u2014 no API."
+   "note": "Academic GSDB (Felbermayr et al.); dataset releases distributed free but typically on email request — no API."
   },
   {
    "name": "Landsat",
@@ -4034,7 +4035,7 @@
    "category": "scholarly",
    "free": true,
    "reliability": "A",
-   "note": "discontinued 2021; only legacy dumps remain \u2014 use OpenAlex successor (api_keyless)"
+   "note": "discontinued 2021; only legacy dumps remain — use OpenAlex successor (api_keyless)"
   },
   {
    "name": "Papers With Code",
@@ -4073,7 +4074,7 @@
    "note": "Merged-round datasets (SPSS/Stata) free to download; online data-analysis tool on site. No API."
   },
   {
-   "name": "Latinobar\u00f3metro",
+   "name": "Latinobarómetro",
    "access": "bulk_download",
    "category": "survey",
    "free": true,
@@ -4574,7 +4575,7 @@
    "free": true,
    "reliability": "A",
    "url": "https://www.nato.int",
-   "note": "Annual defence-expenditure communiqu\u00e9s (PDF/press releases); no data API."
+   "note": "Annual defence-expenditure communiqués (PDF/press releases); no data API."
   },
   {
    "name": "NATO Defense Expenditure",
@@ -5956,7 +5957,7 @@
    "note": "Free articles; no stable documented public API. Also reachable via enabled SearXNG news engines."
   },
   {
-   "name": "El Pa\u00eds",
+   "name": "El País",
    "access": "fetch_pattern",
    "category": "news",
    "free": true,
@@ -6032,7 +6033,7 @@
    "free": true,
    "reliability": "B",
    "url": "https://www.scmp.com",
-   "note": "Metered paywall, RSS feeds free; Alibaba-owned \u2014 weigh on China-sensitive stories."
+   "note": "Metered paywall, RSS feeds free; Alibaba-owned — weigh on China-sensitive stories."
   },
   {
    "name": "The Diplomat",
@@ -6102,7 +6103,7 @@
    "category": "parliament",
    "free": true,
    "reliability": "C",
-   "note": "Umbrella term, not one source: e.g. TheyWorkForYou (free key), abgeordnetenwatch.de (keyless API), OpenParliament.ca \u2014 classify individually when named"
+   "note": "Umbrella term, not one source: e.g. TheyWorkForYou (free key), abgeordnetenwatch.de (keyless API), OpenParliament.ca — classify individually when named"
   },
   {
    "name": "IPU Parline",
@@ -6552,7 +6553,7 @@
    "free": true,
    "reliability": "C",
    "url": "https://english.news.cn",
-   "note": "Free pages; official Chinese state outlet \u2014 authoritative for government statements as statements, corroborate factual claims."
+   "note": "Free pages; official Chinese state outlet — authoritative for government statements as statements, corroborate factual claims."
   },
   {
    "name": "ASEANstats",
@@ -6978,7 +6979,7 @@
    "category": "web",
    "free": true,
    "reliability": "F",
-   "note": "placeholder entry \u2014 generic arbitrary-URL fetch, not a named source"
+   "note": "placeholder entry — generic arbitrary-URL fetch, not a named source"
   },
   {
    "name": "Dimensions",
@@ -7807,7 +7808,7 @@
    "free": false,
    "reliability": "C",
    "url": "https://www.researchgate.net",
-   "note": "Not literally paid, but no API and scraping is ToS-banned behind anti-bot \u2014 no free programmatic path. Reach the same papers via OpenAlex/Unpaywall."
+   "note": "Not literally paid, but no API and scraping is ToS-banned behind anti-bot — no free programmatic path. Reach the same papers via OpenAlex/Unpaywall."
   },
   {
    "name": "SPIE Digital Library",
@@ -8086,7 +8087,7 @@
    "category": "trade",
    "free": true,
    "reliability": "C",
-   "note": "generic name; may denote UN Comtrade (keyless/free-key API) or a commercial provider \u2014 disambiguate before wiring"
+   "note": "generic name; may denote UN Comtrade (keyless/free-key API) or a commercial provider — disambiguate before wiring"
   },
   {
    "name": "API",
@@ -8095,6 +8096,771 @@
    "free": true,
    "reliability": "F",
    "note": "Ambiguous single-word entry 'API' - cannot identify the intended source; likely a placeholder or data-entry artifact in the list."
+  },
+  {
+   "name": "JSTOR",
+   "access": "paid_only",
+   "category": "scholarly-archive",
+   "free": false,
+   "reliability": "A",
+   "url": "https://www.jstor.org",
+   "note": "Digitized journal archive across humanities/social science; institutional subscription, limited free reads with account"
+  },
+  {
+   "name": "INSPIRE-HEP",
+   "access": "api_keyless",
+   "category": "physics",
+   "free": true,
+   "reliability": "A",
+   "url": "https://inspirehep.net",
+   "note": "High-energy physics literature database; open REST API at /api, no key"
+  },
+  {
+   "name": "SIMBAD",
+   "access": "api_keyless",
+   "category": "astronomy",
+   "free": true,
+   "reliability": "A",
+   "url": "https://simbad.cds.unistra.fr",
+   "note": "CDS astronomical object database; TAP/script queries, no key; complements VizieR already in registry"
+  },
+  {
+   "name": "OQMD",
+   "access": "api_keyless",
+   "category": "materials-science",
+   "free": true,
+   "reliability": "A",
+   "url": "https://oqmd.org",
+   "note": "Open Quantum Materials Database (DFT-computed properties); RESTful API without key; distinct from Materials Project and Open Materials Database"
+  },
+  {
+   "name": "STRING",
+   "access": "api_keyless",
+   "category": "bioinformatics",
+   "free": true,
+   "reliability": "A",
+   "url": "https://string-db.org",
+   "note": "Protein-protein interaction networks; free REST API; distinct from BioGRID/IntAct"
+  },
+  {
+   "name": "TCGA",
+   "access": "api_keyless",
+   "category": "genomics",
+   "free": true,
+   "reliability": "A",
+   "url": "https://portal.gdc.cancer.gov",
+   "note": "The Cancer Genome Atlas via NCI GDC portal; open-access tier queryable through keyless GDC API"
+  },
+  {
+   "name": "GNPS",
+   "access": "bulk_download",
+   "category": "metabolomics",
+   "free": true,
+   "reliability": "B",
+   "url": "https://gnps.ucsd.edu",
+   "note": "Mass-spectrometry molecular networking; public spectral libraries freely downloadable, analysis workflows need free account"
+  },
+  {
+   "name": "CEPII",
+   "access": "bulk_download",
+   "category": "trade-economics",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.cepii.fr",
+   "note": "French research centre datasets (BACI trade flows, Gravity, GeoDist); free bulk downloads"
+  },
+  {
+   "name": "PANGAEA",
+   "access": "api_keyless",
+   "category": "earth-science",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.pangaea.de",
+   "note": "Earth and environmental science data publisher; keyless search API and OAI-PMH harvesting"
+  },
+  {
+   "name": "NOAA CLASS",
+   "access": "fetch_pattern",
+   "category": "earth-observation",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.class.noaa.gov",
+   "note": "Satellite data archive/ordering system (order then FTP delivery); being migrated into NCEI, so weigh before adding"
+  },
+  {
+   "name": "NNDC",
+   "access": "api_keyless",
+   "category": "nuclear-physics",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.nndc.bnl.gov",
+   "note": "Brookhaven National Nuclear Data Center (NuDat, ENSDF); free web retrieval, no key; separate from IAEA NDS"
+  },
+  {
+   "name": "UNIDIR",
+   "access": "fetch_pattern",
+   "category": "disarmament",
+   "free": true,
+   "reliability": "B",
+   "url": "https://unidir.org",
+   "note": "UN Institute for Disarmament Research; free publications and arms-control research, no API"
+  },
+  {
+   "name": "RUSI",
+   "access": "fetch_pattern",
+   "category": "defence-thinktank",
+   "free": true,
+   "reliability": "B",
+   "url": "https://rusi.org",
+   "note": "Royal United Services Institute; free defence/security analysis and commentary, no API"
+  },
+  {
+   "name": "JODI",
+   "access": "bulk_download",
+   "category": "energy",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.jodidata.org",
+   "note": "Joint Organisations Data Initiative; free monthly oil and gas production/stock databases as downloads"
+  },
+  {
+   "name": "UNDRR",
+   "access": "fetch_pattern",
+   "category": "disaster-risk",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.undrr.org",
+   "note": "UN Office for Disaster Risk Reduction (PreventionWeb, Sendai monitoring); broader than DesInventar already in registry"
+  },
+  {
+   "name": "ICAO",
+   "access": "api_key",
+   "category": "aviation",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.icao.int",
+   "note": "Civil aviation statistics; API Data Service has a limited free tier with key, full ICAO Data+ is paid"
+  },
+  {
+   "name": "UNCDF",
+   "access": "fetch_pattern",
+   "category": "development-finance",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.uncdf.org",
+   "note": "UN Capital Development Fund; free LDC finance reports and data, no API"
+  },
+  {
+   "name": "DOAJ",
+   "access": "api_keyless",
+   "category": "scholarly",
+   "free": true,
+   "reliability": "A",
+   "url": "https://doaj.org",
+   "note": "Directory of Open Access Journals; keyless REST search API over OA journals and articles"
+  },
+  {
+   "name": "NASA ADS",
+   "access": "api_key",
+   "category": "astronomy",
+   "free": true,
+   "reliability": "A",
+   "url": "https://ui.adsabs.harvard.edu",
+   "note": "Astrophysics Data System bibliography; excellent API but requires a free API token"
+  },
+  {
+   "name": "MAST",
+   "access": "api_keyless",
+   "category": "astronomy",
+   "free": true,
+   "reliability": "A",
+   "url": "https://archive.stsci.edu",
+   "note": "Mikulski Archive for Space Telescopes (Hubble/JWST/TESS/Kepler); keyless API for public data"
+  },
+  {
+   "name": "ZINC",
+   "access": "api_keyless",
+   "category": "chemistry",
+   "free": true,
+   "reliability": "B",
+   "url": "https://zinc.docking.org",
+   "note": "Purchasable-compound library for virtual screening; free URL-based retrieval and downloads"
+  },
+  {
+   "name": "JARVIS",
+   "access": "api_keyless",
+   "category": "materials",
+   "free": true,
+   "reliability": "B",
+   "url": "https://jarvis.nist.gov",
+   "note": "NIST JARVIS materials/DFT/ML repository; open REST API and bulk figshare dumps; distinct from NIST Materials Data Repository"
+  },
+  {
+   "name": "BIOSIS",
+   "access": "paid_only",
+   "category": "life-sciences",
+   "free": false,
+   "reliability": "B",
+   "url": "",
+   "note": "Clarivate BIOSIS Previews/Citation Index (life-science bibliography); subscription only, sold on the Web of Science platform but distinct content"
+  },
+  {
+   "name": "PRIDE",
+   "access": "api_keyless",
+   "category": "proteomics",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.ebi.ac.uk/pride/",
+   "note": "EBI PRoteomics IDEntifications archive; keyless REST API and FTP bulk downloads"
+  },
+  {
+   "name": "ICGC",
+   "access": "api_keyless",
+   "category": "genomics",
+   "free": true,
+   "reliability": "C",
+   "url": "https://dcc.icgc.org",
+   "note": "International Cancer Genome Consortium; open-tier data via keyless portal API, controlled tier needs DACO approval; legacy DCC portal is migrating to ICGC ARGO"
+  },
+  {
+   "name": "EBRAINS",
+   "access": "api_key",
+   "category": "neuroscience",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.ebrains.eu",
+   "note": "EU brain-research infrastructure (Human Brain Project successor); Knowledge Graph API needs a free EBRAINS account token"
+  },
+  {
+   "name": "ICPSR",
+   "access": "bulk_download",
+   "category": "social-science",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.icpsr.umich.edu",
+   "note": "Largest social-science data archive; public-use studies downloadable after free login, much of the catalog needs institutional membership"
+  },
+  {
+   "name": "DBLP",
+   "access": "api_keyless",
+   "category": "computer-science",
+   "free": true,
+   "reliability": "A",
+   "url": "https://dblp.org",
+   "note": "Computer-science bibliography; keyless search API plus full XML dump"
+  },
+  {
+   "name": "GBIF",
+   "access": "api_keyless",
+   "category": "biodiversity",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.gbif.org",
+   "note": "Global Biodiversity Information Facility; keyless occurrence/species REST API (api.gbif.org)"
+  },
+  {
+   "name": "TAIR",
+   "access": "bulk_download",
+   "category": "plant-biology",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.arabidopsis.org",
+   "note": "The Arabidopsis Information Resource; bulk downloads of year-old-and-older data are free, current-year data is subscription"
+  },
+  {
+   "name": "GEBCO",
+   "access": "bulk_download",
+   "category": "oceanography",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.gebco.net",
+   "note": "Global bathymetric grid; free full-grid and tiled downloads plus WMS"
+  },
+  {
+   "name": "ENDF",
+   "access": "api_keyless",
+   "category": "nuclear-physics",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.nndc.bnl.gov/endf/",
+   "note": "Evaluated Nuclear Data File library at NNDC/Brookhaven; free keyless retrieval, complements the registry's IAEA Nuclear Data Services entry"
+  },
+  {
+   "name": "WIPO PATENTSCOPE",
+   "access": "fetch_pattern",
+   "category": "patents",
+   "free": true,
+   "reliability": "B",
+   "url": "https://patentscope.wipo.int",
+   "note": "WIPO's global patent (PCT) search; free web search with predictable result URLs, no keyless API (bulk feeds are paid)"
+  },
+  {
+   "name": "DARPA",
+   "access": "fetch_pattern",
+   "category": "defense-research",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.darpa.mil",
+   "note": "US defense research agency site; program pages, news and solicitations via plain fetch/RSS"
+  },
+  {
+   "name": "FEWS NET",
+   "access": "api_keyless",
+   "category": "food-security",
+   "free": true,
+   "reliability": "B",
+   "url": "https://fews.net",
+   "note": "Famine Early Warning Systems Network; open Data Warehouse API (fdw.fews.net) for food-security and price data"
+  },
+  {
+   "name": "CRSP",
+   "access": "paid_only",
+   "category": "finance",
+   "free": false,
+   "reliability": "B",
+   "url": "https://www.crsp.org",
+   "note": "Center for Research in Security Prices (historical US market data); subscription via WRDS, no free tier"
+  },
+  {
+   "name": "CEPII BACI",
+   "access": "bulk_download",
+   "category": "trade",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.cepii.fr/CEPII/en/bdd_modele/bdd_modele_item.asp?id=37",
+   "note": "CEPII BACI harmonized bilateral trade flows (HS product level); free full CSV downloads, no API"
+  },
+  {
+   "name": "INTERPOL",
+   "access": "api_keyless",
+   "category": "law-enforcement",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.interpol.int",
+   "note": "Red/Yellow notices exposed via a public keyless JSON API (ws-public.interpol.int/notices)"
+  },
+  {
+   "name": "UNFPA",
+   "access": "fetch_pattern",
+   "category": "demographics",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.unfpa.org/data",
+   "note": "UN Population Fund; World Population Dashboard and Population Data Portal (pdp.unfpa.org) with free CSV exports; distinct agency from UN Population Division"
+  },
+  {
+   "name": "WIPO",
+   "access": "fetch_pattern",
+   "category": "intellectual-property",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.wipo.int",
+   "note": "World Intellectual Property Organization; IP Statistics Data Center offers free query and CSV export; org-level source distinct from its PATENTSCOPE search"
+  },
+  {
+   "name": "OSCE",
+   "access": "fetch_pattern",
+   "category": "international-org",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.osce.org",
+   "note": "Organization for Security and Co-operation in Europe; election-observation (ODIHR) and monitoring reports via document fetch, no API"
+  },
+  {
+   "name": "SSRN",
+   "access": "fetch_pattern",
+   "category": "preprints",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.ssrn.com/",
+   "note": "Social Science Research Network (Elsevier); free abstracts and many free PDFs, no public API"
+  },
+  {
+   "name": "OSTI",
+   "access": "api_keyless",
+   "category": "government-research",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.osti.gov/",
+   "note": "DOE Office of Scientific and Technical Information; public records API at osti.gov/api/v1/records, distinct from the generic DOE entries"
+  },
+  {
+   "name": "HEASARC",
+   "access": "api_keyless",
+   "category": "astronomy",
+   "free": true,
+   "reliability": "A",
+   "url": "https://heasarc.gsfc.nasa.gov/",
+   "note": "NASA High Energy Astrophysics Science Archive; Xamin/Browse and VO services, no key"
+  },
+  {
+   "name": "MPDS",
+   "access": "api_key",
+   "category": "materials-science",
+   "free": false,
+   "reliability": "B",
+   "url": "https://mpds.io/",
+   "note": "Materials Platform for Data Science (Pauling File); commercial, limited open subset via keyed API"
+  },
+  {
+   "name": "EMBL-EBI",
+   "access": "api_keyless",
+   "category": "bioinformatics",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.ebi.ac.uk/",
+   "note": "Umbrella portal; EBI Search REST API spans child databases (UniProt, ENA, ChEMBL etc. are separate registry entries)"
+  },
+  {
+   "name": "COSMIC",
+   "access": "api_key",
+   "category": "genomics",
+   "free": true,
+   "reliability": "A",
+   "url": "https://cancer.sanger.ac.uk/cosmic",
+   "note": "Catalogue Of Somatic Mutations In Cancer (Sanger); free academic use but downloads need registered credentials, commercial use paid"
+  },
+  {
+   "name": "ADNI",
+   "access": "api_key",
+   "category": "neuroscience",
+   "free": true,
+   "reliability": "B",
+   "url": "https://adni.loni.usc.edu/",
+   "note": "Alzheimer's Disease Neuroimaging Initiative; free but gated behind an approved data-use application (LONI IDA credentials)"
+  },
+  {
+   "name": "CESSDA",
+   "access": "api_keyless",
+   "category": "social-science",
+   "free": true,
+   "reliability": "A",
+   "url": "https://datacatalogue.cessda.eu/",
+   "note": "Consortium of European Social Science Data Archives catalogue; public REST/OAI-PMH endpoints"
+  },
+  {
+   "name": "OEIS",
+   "access": "api_keyless",
+   "category": "mathematics",
+   "free": true,
+   "reliability": "A",
+   "url": "https://oeis.org/",
+   "note": "On-Line Encyclopedia of Integer Sequences; JSON search via oeis.org/search?fmt=json"
+  },
+  {
+   "name": "ICLR",
+   "access": "api_keyless",
+   "category": "cs-proceedings",
+   "free": true,
+   "reliability": "A",
+   "url": "https://iclr.cc/",
+   "note": "Conference proceedings live on OpenReview (api.openreview.net, keyless read); registry keeps NeurIPS/ICML proceedings as separate entries, same granularity here"
+  },
+  {
+   "name": "CHELSA",
+   "access": "bulk_download",
+   "category": "climate",
+   "free": true,
+   "reliability": "B",
+   "url": "https://chelsa-climate.org/",
+   "note": "High-resolution downscaled climatologies; direct file downloads, complements WorldClim"
+  },
+  {
+   "name": "PLAZA",
+   "access": "bulk_download",
+   "category": "plant-genomics",
+   "free": true,
+   "reliability": "B",
+   "url": "https://bioinformatics.psb.ugent.be/plaza/",
+   "note": "VIB/Ghent comparative plant genomics platform; free bulk data downloads, distinct from Phytozome/Ensembl Plants"
+  },
+  {
+   "name": "ENTSO-E",
+   "access": "api_key",
+   "category": "energy",
+   "free": true,
+   "reliability": "A",
+   "url": "https://transparency.entsoe.eu/",
+   "note": "European electricity transmission Transparency Platform; free registration issues an API security token"
+  },
+  {
+   "name": "JEFF",
+   "access": "bulk_download",
+   "category": "nuclear-data",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.oecd-nea.org/dbdata/jeff/",
+   "note": "OECD NEA Joint Evaluated Fission and Fusion nuclear data library; free library file downloads, distinct from IAEA Nuclear Data Services"
+  },
+  {
+   "name": "CNIPA",
+   "access": "fetch_pattern",
+   "category": "patents",
+   "free": true,
+   "reliability": "C",
+   "url": "https://english.cnipa.gov.cn/",
+   "note": "China National IP Administration; web search only, no open API — Chinese patents also reachable via Espacenet"
+  },
+  {
+   "name": "NASA NSPIRES",
+   "access": "fetch_pattern",
+   "category": "research-funding",
+   "free": true,
+   "reliability": "B",
+   "url": "https://nspires.nasaprs.com/",
+   "note": "NASA research solicitations and selected proposals; web interface only, complements NSF Award Search/NIH RePORTER"
+  },
+  {
+   "name": "TASS",
+   "access": "fetch_pattern",
+   "category": "news",
+   "free": true,
+   "reliability": "C",
+   "url": "https://tass.com/",
+   "note": "Russian state news agency; RSS feeds available — useful for OSINT monitoring, treat content as state media"
+  },
+  {
+   "name": "IFRC",
+   "access": "api_keyless",
+   "category": "humanitarian",
+   "free": true,
+   "reliability": "A",
+   "url": "https://go.ifrc.org/",
+   "note": "Red Cross/Red Crescent GO platform; public read API (goadmin.ifrc.org/api) for disaster and appeal data"
+  },
+  {
+   "name": "FATF",
+   "access": "fetch_pattern",
+   "category": "financial-crime",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.fatf-gafi.org/",
+   "note": "Financial Action Task Force; mutual evaluations and high-risk jurisdiction lists as web pages/PDFs, no API"
+  },
+  {
+   "name": "UNFCCC",
+   "access": "api_keyless",
+   "category": "climate",
+   "free": true,
+   "reliability": "A",
+   "url": "https://unfccc.int/",
+   "note": "UN climate convention; GHG inventory Data Interface at di.unfccc.int with public API, distinct from Climate Watch"
+  },
+  {
+   "name": "CNBC",
+   "access": "fetch_pattern",
+   "category": "news-finance",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.cnbc.com/",
+   "note": "Business/markets news; RSS feeds, no public API"
+  },
+  {
+   "name": "UNIDO",
+   "access": "fetch_pattern",
+   "category": "industrial-statistics",
+   "free": true,
+   "reliability": "A",
+   "url": "https://stat.unido.org/",
+   "note": "UN Industrial Development Organization INDSTAT/MVA statistics; free browsing, registration for full downloads"
+  },
+  {
+   "name": "OCCRP",
+   "access": "api_key",
+   "category": "investigative-osint",
+   "free": true,
+   "reliability": "A",
+   "url": "https://aleph.occrp.org/",
+   "note": "Organized Crime and Corruption Reporting Project Aleph data platform; free account issues an API key, some collections public"
+  },
+  {
+   "name": "CORE",
+   "access": "api_key",
+   "category": "scholarly_aggregator",
+   "free": true,
+   "reliability": "A",
+   "url": "https://core.ac.uk",
+   "note": "Aggregator of ~300M open-access papers with full text; free API key, also bulk dataset dumps."
+  },
+  {
+   "name": "IRSA",
+   "access": "api_keyless",
+   "category": "astronomy",
+   "free": true,
+   "reliability": "A",
+   "url": "https://irsa.ipac.caltech.edu",
+   "note": "NASA/IPAC Infrared Science Archive: WISE, Spitzer, 2MASS, IRAS catalogues via VO TAP/cone-search."
+  },
+  {
+   "name": "AFLOW",
+   "access": "api_keyless",
+   "category": "materials",
+   "free": true,
+   "reliability": "B",
+   "url": "https://aflow.org",
+   "note": "Computed materials properties (3M+ compounds) via the AFLUX REST search API."
+  },
+  {
+   "name": "KEGG",
+   "access": "api_keyless",
+   "category": "biology",
+   "free": true,
+   "reliability": "A",
+   "url": "https://rest.kegg.jp",
+   "note": "Pathways, genes, compounds, drugs; plain-text REST, free for academic non-bulk use."
+  },
+  {
+   "name": "DDBJ",
+   "access": "api_keyless",
+   "category": "genomics",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.ddbj.nig.ac.jp",
+   "note": "DNA Data Bank of Japan, the INSDC partner of GenBank/ENA; getentry + search APIs, FTP bulk."
+  },
+  {
+   "name": "HMDB",
+   "access": "bulk_download",
+   "category": "metabolomics",
+   "free": true,
+   "reliability": "A",
+   "url": "https://hmdb.ca",
+   "note": "Human Metabolome Database; full XML dumps free, no open REST API."
+  },
+  {
+   "name": "OASIS",
+   "access": "fetch_pattern",
+   "category": "standards",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.oasis-open.org",
+   "note": "OASIS Open standards body (STIX/TAXII, SAML, DocBook); specs fetched as static docs. Name is ambiguous — confirm against source list context."
+  },
+  {
+   "name": "AGRIS",
+   "access": "api_keyless",
+   "category": "agriculture",
+   "free": true,
+   "reliability": "B",
+   "url": "https://agris.fao.org",
+   "note": "FAO's international bibliographic index of agricultural research; OpenSearch/REST plus RDF dumps."
+  },
+  {
+   "name": "MODIS",
+   "access": "api_key",
+   "category": "earth_observation",
+   "free": true,
+   "reliability": "A",
+   "url": "https://lpdaac.usgs.gov/product_search/?collections=Combined+MODIS",
+   "note": "Daily global land/ocean/atmosphere products since 2000; free NASA Earthdata login, also AppEEARS and bulk HTTP/S3."
+  },
+  {
+   "name": "IAEA INIS",
+   "access": "fetch_pattern",
+   "category": "nuclear",
+   "free": true,
+   "reliability": "B",
+   "url": "https://inis.iaea.org",
+   "note": "IAEA's nuclear science bibliographic repository incl. hard-to-find grey literature; distinct from IAEA Nuclear Data Services."
+  },
+  {
+   "name": "JENDL",
+   "access": "bulk_download",
+   "category": "nuclear",
+   "free": true,
+   "reliability": "B",
+   "url": "https://wwwndc.jaea.go.jp/jendl/jendl.html",
+   "note": "Japanese Evaluated Nuclear Data Library; ENDF-format files by free download."
+  },
+  {
+   "name": "ORCID",
+   "access": "api_key",
+   "category": "research_identifiers",
+   "free": true,
+   "reliability": "A",
+   "url": "https://pub.orcid.org/v3.0",
+   "note": "Researcher identifiers linked to works/affiliations; free public API credentials, annual bulk dump too."
+  },
+  {
+   "name": "IETF RFC",
+   "access": "fetch_pattern",
+   "category": "standards",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.rfc-editor.org",
+   "note": "Full RFC/Internet-Draft corpus as plain text/XML at predictable URLs; rfc-index.xml for enumeration."
+  },
+  {
+   "name": "ICRC",
+   "access": "fetch_pattern",
+   "category": "humanitarian_law",
+   "free": true,
+   "reliability": "A",
+   "url": "https://ihl-databases.icrc.org",
+   "note": "International Committee of the Red Cross: IHL treaty/customary-law databases and field reports."
+  },
+  {
+   "name": "IPUMS",
+   "access": "api_key",
+   "category": "demography",
+   "free": true,
+   "reliability": "A",
+   "url": "https://www.ipums.org",
+   "note": "Harmonised census and survey microdata worldwide (IPUMS International, USA, DHS); free registration, extract API."
+  },
+  {
+   "name": "CSIS",
+   "access": "fetch_pattern",
+   "category": "think_tank",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.csis.org",
+   "note": "Center for Strategic and International Studies; reports plus datasets like ChinaPower and Missile Threat."
+  },
+  {
+   "name": "EM-DAT",
+   "access": "api_key",
+   "category": "disasters",
+   "free": true,
+   "reliability": "A",
+   "url": "https://public.emdat.be",
+   "note": "CRED International Disaster Database, 1900-present; free academic account, GraphQL/CSV export."
+  },
+  {
+   "name": "EUDA",
+   "access": "fetch_pattern",
+   "category": "drugs",
+   "free": true,
+   "reliability": "B",
+   "url": "https://www.euda.europa.eu/data",
+   "note": "EU Drugs Agency (ex-EMCDDA) statistical bulletin and country drug reports; registry only holds its European Drug Report publication."
+  },
+  {
+   "name": "UNOPS",
+   "access": "fetch_pattern",
+   "category": "un_procurement",
+   "free": true,
+   "reliability": "B",
+   "url": "https://data.unops.org",
+   "note": "UN Office for Project Services: project, contract and procurement award data (IATI-published)."
+  },
+  {
+   "name": "EURODAC",
+   "access": "fetch_pattern",
+   "category": "migration",
+   "free": true,
+   "reliability": "C",
+   "url": "https://www.eulisa.europa.eu/activities/large-scale-it-systems/eurodac",
+   "note": "EU asylum fingerprint system; only aggregate annual statistics are public — the database itself is not accessible."
+  },
+  {
+   "name": "GADM",
+   "access": "bulk_download",
+   "category": "geospatial",
+   "free": true,
+   "reliability": "A",
+   "url": "https://gadm.org",
+   "note": "Global administrative boundaries to level 3-5 as GeoPackage/shapefile; free for non-commercial use."
   }
  ]
 }

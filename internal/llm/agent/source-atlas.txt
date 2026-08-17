@@ -3,7 +3,7 @@ Reach: API = keyless HTTP API (web_fetch the endpoint). API-key = free after reg
 say so if unavailable. SearXNG = web_search engine bang (e.g. !crossref, !openalex, !pubmed,
 !arxiv, "!google scholar"). SearXNG* = installed but off; note it for the user. Grade A/B is
 the source-reliability PRIOR; claims are still graded independently at vetting.
-This is the starting map, not the boundary — the full 900-source registry ships in docs/.
+This is the starting map, not the boundary — the full 985-source registry ships in docs/.
 
 Scholarly & scientific literature:
   OpenAlex [A API] api.openalex.org

@@ -370,7 +370,7 @@ verdict is REJECTED, write "nothing from this lane".`,
 		strings.TrimSpace(question), role.Title, role.Lane, strings.TrimSpace(report))
 }
 
-// sourceAtlas is the curated slice of the 900-source registry
+// sourceAtlas is the curated slice of the 985-source registry
 // (docs/source-registry.json) that rides in every helper prompt: the
 // strongest FREE, reachable source per research domain, anchor names first.
 //

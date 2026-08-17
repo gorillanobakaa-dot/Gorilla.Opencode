@@ -1,3 +1,73 @@
+## v0.1.88 — 2026-08-17 — one search tool, and research that cites its sources
+
+Full dual-track document: [v0.1.88-release-notes.md](v0.1.88-release-notes.md).
+
+**Plain-language version:** Two things changed that you will actually feel. First,
+the three separate tools the AI used to look through your files — one to list, one
+to match filenames, one to search inside them — are now a single tool that does the
+whole job in one go and hands back the matching lines with the lines around them.
+That sounds like tidying up, and it is not: the old way of answering "where is this
+handled?" cost about 1,845 tokens across two turns, and roughly ten thousand more
+when the search failed and everything had to restart. The new way costs 132 tokens,
+once. Tokens are what you are billed in, so this is money, every message, for as
+long as you use the program. The description that rides along on every single
+message got smaller too, from 1,388 tokens to 1,279. And because search results are
+now capped by SIZE rather than by "number of results", a single search can no longer
+dump two megabytes into your conversation the way one once did — that incident took
+a conversation from 15.9K tokens to 675K in one turn.
+
+Second, there is a new command, `/osint`, and it is the serious one. It does not
+answer from memory; it investigates. It breaks your question into smaller ones,
+sends four to ten helpers to work through a catalogue of **985 real sources** — 866
+of them free, 370 needing no account at all — grades every claim it finds on two
+separate scales (how much the source can be trusted, and how well that specific
+claim is confirmed), notices when ten news sites are all repeating one press release
+rather than confirming each other, then goes back once for whatever it missed, and
+finally tells you plainly what it could **not** find out. The finished dossier is
+saved as a file outside your working folder, on purpose: working folders are often
+git repositories, and a private question should never end up in a public commit.
+It costs real money — every helper is a full AI session — so it ships switched OFF,
+you arm it yourself in `/context`, and before every single run a red screen shows
+you the burn rate in your own money for your own model. After that it is your call.
+Type `/osint` on its own to read the whole explanation first. The everyday
+`/research` command is unchanged and much cheaper.
+
+Also: `/context` now says **ON** or **OFF** in words that visibly flip when you press
+space, after a user reported he genuinely could not tell what was switched on —
+the old screen showed a checkbox and then opened every description with the word
+"off", whatever the state. The list is alphabetical now too. Web search stops
+claiming abilities it does not have when nothing is configured. Four new free
+sources were added (world news, World Bank, humanitarian data, US corporate
+filings). And four new documents ship inside the package, including a list of all
+985 sources, so "hundreds of sources" is something you can check rather than
+something you have to believe.
+
+Honest limits: the download grows by 252 KiB; a tester on Arch/CachyOS reported
+leftover lines on screen that could not be reproduced here and is **not** fixed in
+this release; and the `/osint` cost forecast rests on three assumptions that are
+printed on the warning screen so you can argue with them.
+
+**Technical:** `find` (pfind 3.2.0, `go:embed`ed and hash-verified on extraction)
+replaces `ls`/`glob`/`grep`, which are quarantined as `.go.retired`; results are
+byte-capped at 32 KB and announce truncation. New `/osint` command with its own
+gate dialog and full-screen capability page, gated on the `tool.dossier` loadout
+row (ships off, red); `doctrine=dossier` appears in the research tool's schema only
+while armed and is refused at Run when not, switching helpers to two-axis Admiralty
+grading (A–F × 1–6), ultimate-origin circular-report tracing and query hygiene, with
+a report footer imposing ONE bounded gap round, the product format, and a write path
+under the user's own home directory (`config.DossierDir()`, resolved at runtime — no
+machine-specific path is compiled in). Source registry reconciled against the three
+curated lists: 160 unmatched names classified as 52 headings, 23 variant spellings
+and 85 genuinely missing sources, which were added (900 → 985); `docs/OSINT-SOURCE-CATALOG.md`
+is generated from that registry, never hand-edited. Four keyless backends: GDELT,
+World Bank WDS, HDX (replacing ReliefWeb's appname-gated API after a coverage
+analysis) and SEC EDGAR full-text. `/context` rows sort at display time with the
+toggle resolving through the same sorted view. `FlexInt` accepts losslessly
+convertible string/float integers. `build-deb.sh` and `build-arch.sh` now refuse a
+binary whose `--version` stamp disagrees with the requested version — added after
+the packager silently wrapped a stale `~test8` binary as `~test9` and `~test10`.
+Binary 51,867,940 → 52,125,988 bytes stripped (+252 KiB). 26 test packages green.
+
 ## v0.1.87 — 2026-08-17 — sign in with ChatGPT (a free account is enough)
 
 Full dual-track document: [v0.1.87-release-notes.md](v0.1.87-release-notes.md).

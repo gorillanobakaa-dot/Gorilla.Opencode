@@ -1,5 +1,5 @@
 # The find tool — every measured number, and what each one costs a real person
-<!-- Version: 1.1.0 · updated 26-08-17-06-44 -->
+<!-- Version: 1.2.0 · updated 26-08-17-17-53 -->
 
 This file is the source of record for the release documentation, both tracks.
 Every figure below was **measured during the 2026-08-17 build session**, not
@@ -143,8 +143,16 @@ Measured, binary against binary, same build flags:
 | Build | Program size |
 |---|---|
 | 0.1.87 (the old three tools) | 51,867,940 bytes |
-| 0.1.88 (the find tool) | 51,999,012 bytes |
+| 0.1.88 (the find tool, measured at the swap) | 51,999,012 bytes |
 | **Growth** | **+131,072 bytes — exactly 128 KiB** |
+
+The **shipped** v0.1.88 binary is larger again — 52,125,988 bytes — because the
+release carries more than the find tool: the four data-source backends, the
+embedded source atlas, the `/osint` dossier command and its capability page all
+landed after the measurement above. Against v0.1.87's 51,867,940 bytes that is
+**+258,048 bytes (252 KiB) for the whole release**, which is the number to
+judge the download by. The paragraph below explains why a quarter-megabyte of
+one-off download buys back a recurring per-message bill.
 
 **Where the growth comes from.** Retiring `ls`/`glob`/`grep` removed roughly
 10 KB of compiled code — but `find` carries the entire pfind search engine

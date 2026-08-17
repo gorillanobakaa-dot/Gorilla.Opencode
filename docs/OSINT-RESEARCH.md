@@ -1,4 +1,4 @@
-<!-- Version: 1.0.0 · updated 26-08-17-17-30 -->
+<!-- Version: 1.1.0 · updated 26-08-17-17-45 -->
 # The Serious OSINT dossier — `/osint` explained for people who don't read code
 
 **One sentence:** `/osint <question>` runs a real intelligence cycle — the
@@ -99,18 +99,59 @@ stations, and the loop is the point:
 
 ---
 
+## The levels of research: lanes, helper counts, and modes
+
+The tool does not send ten identical agents to google the same thing ten ways.
+Each helper works one **lane** — a fixed, non-overlapping angle of attack — and
+the lanes exist because each one guards against a specific, named failure.
+There are ten:
+
+| # | Lane | The question it owns |
+|---|---|---|
+| 1 | **LOCAL** | What already exists on this machine? (The answer being on disk already is common.) |
+| 2 | **PRIOR ART** | Has someone, somewhere, already solved this? |
+| 3 | **PRIMARY SOURCE** | What do the authoritative documents actually say? |
+| 4 | **REQUIREMENT** | What does the target actually demand — as opposed to what everyone assumes? |
+| 5 | **VERIFIER** | Try to refute the other helpers. Attack, don't agree. |
+| 6 | **COST** | What would this actually cost the user? |
+| 7 | **HISTORY** | How did it get this way? (Decisions have reasons; some still apply.) |
+| 8 | **SIDESTEP** | Is the whole approach avoidable? |
+| 9 | **ADVERSARY** | What breaks, leaks, or is not permitted? |
+| 10 | **COMPLETENESS CRITIC** | What did nobody look at? |
+
+**Helper count is the depth dial.** Four helpers runs the mandatory first four
+lanes — the cheapest real investigation. Each helper you add switches on the
+next lane in the list. Ten runs them all.
+
+**Mode is the shape dial**, chosen on the warning screen:
+
+- **parallel** (the default) — all helpers at once. Same total cost as
+  sequential, a fraction of the waiting.
+- **sequential** — one at a time. Slowest; for hard-rate-limited providers.
+- **supervised** — parallel, plus an auditor agent that reviews each blind
+  lane's report before you see it and returns APPROVED / WEAK / REJECTED with
+  the problems named. The most rigorous and the most expensive: roughly
+  double the sessions.
+
+And the two commands are two levels of the same discipline: **`/research`**
+runs the lanes once with evidence tiers — the everyday level. **`/osint`**
+runs them under the full dossier doctrine: two-axis grading, circular-report
+tracing, one targeted gap round, and the formal dossier product.
+
+---
+
 ## Where it looks: the source atlas
 
-The tool ships with a built-in source atlas backed by a registry of **900
+The tool ships with a built-in source atlas backed by a registry of **985
 sources**, classified by how they can be reached for free. The real counts,
 from the registry file itself:
 
 | Count | What it means |
 |---|---|
-| **900** | total sources in the registry |
-| **785** | free to use |
-| **340** | keyless APIs — machine-readable services needing no account, no key, no card. (An API is a door a program can knock on directly instead of scraping a web page.) |
-| **115** | paid-only — kept in the registry **on purpose**, so the tool can tell you "the definitive source exists behind a subscription" instead of pretending it does not |
+| **985** | total sources in the registry |
+| **866** | free to use |
+| **370** | keyless APIs — machine-readable services needing no account, no key, no card. (An API is a door a program can knock on directly instead of scraping a web page.) |
+| **118** | paid-only — kept in the registry **on purpose**, so the tool can tell you "the definitive source exists behind a subscription" instead of pretending it does not |
 
 What lives in there, in plain terms: scholarly paper indexes (OpenAlex,
 Crossref, PubMed), World Bank statistics, full-text search of SEC corporate
@@ -209,6 +250,32 @@ papered over:
 | Grading | evidence tiers | two-axis A–F × 1–6 on every claim |
 | Ships | on | **off — armed manually in `/context`** |
 | For | ordinary questions | questions where being wrong costs more than the run |
+
+---
+
+## The doctrine behind it: three field manuals
+
+The method is not invented here and not improvised by an AI. It is ported from
+three **public, declassified US Army intelligence documents** — the procedures,
+not the military content:
+
+- **FM 2-0, Intelligence (2023)** — the intelligence cycle this tool runs
+  (plan → collect → produce → disseminate → assess) and the idea that the
+  architecture of sources is declared up front, not discovered mid-run.
+- **ADP 2-0, Intelligence (2019)** — the doctrinal foundation: intelligence
+  reduces uncertainty for a decision; it does not manufacture certainty.
+- **ATP 2-22.9, Open-Source Intelligence (2012)** — the OSINT tradecraft:
+  source vetting, circular-reporting detection, and the discipline of
+  recording what was searched and found nothing.
+
+Why military doctrine for a civilian tool: these procedures are decades of
+institutional learning about **being wrong expensively**, and the failure
+modes they guard against — single-source confidence, echo chambers mistaken
+for consensus, gaps quietly papered over — are precisely the failure modes of
+AI research. The full technical mapping of doctrine to code, including what
+was deliberately left behind and the research bibliography behind the
+multi-agent design, is in [OSINT-DOCTRINE.md](OSINT-DOCTRINE.md). The complete
+source listing is in [OSINT-SOURCE-CATALOG.md](OSINT-SOURCE-CATALOG.md).
 
 ---
 
