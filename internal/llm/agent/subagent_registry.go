@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 )
 
@@ -251,6 +252,11 @@ func KillSubAgent(id string) (SubAgentInfo, bool) {
 	}
 	entry.info.State = SubAgentKilled
 	entry.cancel()
+	// GORILLA FIX (2026-08-17): cancelling the context is not enough. A tool
+	// waiting on a permission prompt is parked on a channel and never looks at
+	// ctx, so a killed helper stayed parked until the wait expired. Release it
+	// here so "kill" means now.
+	permission.CancelForSession(entry.info.SessionID)
 	subAgentBroker.Publish(pubsub.DeletedEvent, entry.info)
 	return entry.info, true
 }
@@ -269,6 +275,7 @@ func KillAllSubAgents() int {
 	for _, e := range entries {
 		e.info.State = SubAgentKilled
 		e.cancel()
+		permission.CancelForSession(e.info.SessionID)
 		subAgentBroker.Publish(pubsub.DeletedEvent, e.info)
 	}
 	return len(entries)

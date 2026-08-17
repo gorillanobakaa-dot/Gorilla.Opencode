@@ -126,3 +126,60 @@ func TestRootSessionSurvivesACycle(t *testing.T) {
 		t.Errorf("rootSession hung on a cycle — a tool call waits on this")
 	}
 }
+
+// A prompt nobody answers must eventually release the tool, not park it
+// forever.
+//
+// GORILLA OVERRIDE (2026-08-17): the code carried the comment "Wait for the
+// response with a timeout" above a bare channel receive with no timeout at all.
+// Observed live: three helpers stopped mid-flow and were still reported as
+// "running" sixteen minutes later, with no network connections and nothing
+// written. This test drives the same path with a wait short enough to assert.
+func TestUnansweredRequestIsReleasedNotParked(t *testing.T) {
+	s := NewPermissionService().(*permissionService)
+
+	restore := PermissionWaitForTest(50 * time.Millisecond)
+	defer restore()
+
+	done := make(chan bool, 1)
+	go func() { done <- s.Request(req("conversation", "web_search")) }()
+
+	select {
+	case granted := <-done:
+		if granted {
+			t.Errorf("an unanswered request was APPROVED; it must be denied so the tool fails loudly")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("the request never returned — this is the hang that stranded three helpers")
+	}
+}
+
+// Killing a helper must release whatever it was blocked on immediately, rather
+// than leaving it to wait out the timeout.
+func TestCancelSessionReleasesOnlyThatConversation(t *testing.T) {
+	s := NewPermissionService().(*permissionService)
+	s.RegisterChildSession("helper-a1", "doomed")
+
+	mine := make(chan bool, 1)
+	other := make(chan bool, 1)
+	go func() { mine <- s.Request(req("helper-a1", "web_search")) }()
+	go func() { other <- s.Request(req("innocent", "web_search")) }()
+	time.Sleep(100 * time.Millisecond) // let both park
+
+	if n := s.CancelSession("doomed"); n != 1 {
+		t.Errorf("CancelSession released %d requests, want exactly 1 (its own)", n)
+	}
+	select {
+	case granted := <-mine:
+		if granted {
+			t.Errorf("a cancelled request came back approved")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("killing the helper did not release the tool waiting inside it")
+	}
+	select {
+	case <-other:
+		t.Errorf("cancelling one conversation released a DIFFERENT conversation's prompt")
+	case <-time.After(200 * time.Millisecond):
+	}
+}

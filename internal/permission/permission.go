@@ -4,13 +4,45 @@ import (
 	"errors"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 )
 
 var ErrorPermissionDenied = errors.New("permission denied")
+
+// PermissionWait is how long a tool waits for an answer before giving up.
+//
+// GORILLA FIX (2026-08-17): there was NO timeout. The line read
+//
+//	// Wait for the response with a timeout
+//	resp := <-respCh
+//
+// — a comment describing a feature that did not exist. A tool call that asked
+// for permission and never got an answer blocked on that channel forever.
+//
+// Observed on a real run: three research helpers stopped mid-flow at 19:43 and
+// 19:53 and were still reported as "running" at 20:09. The process held no
+// network connections and had written nothing for fifteen minutes. The user
+// was watching a counter that said 3 helpers and a footer that said "waiting
+// for tool response", both of which were true and neither of which was useful,
+// because nothing was ever going to arrive.
+//
+// Generous on purpose: someone may reasonably walk away mid-prompt and come
+// back. What must not happen is waiting forever. When it expires the request is
+// DENIED, which the tool reports as a failure — a lane that failed loudly is
+// recoverable; a lane that hangs silently poisons the whole run.
+var permissionWait = 10 * time.Minute
+
+// PermissionWait is the shipped value, for documentation and display.
+const PermissionWait = 10 * time.Minute
+
+// TimedOutError distinguishes "nobody answered" from "the user said no", so a
+// report can tell the difference between a refusal and an absence.
+var TimedOutError = errors.New("permission request timed out with no answer")
 
 type CreatePermissionRequest struct {
 	SessionID   string `json:"session_id"`
@@ -100,9 +132,10 @@ func (s *permissionService) RegisterChildSession(child, parent string) {
 }
 
 func (s *permissionService) GrantPersistant(permission PermissionRequest) {
-	respCh, ok := s.pendingRequests.Load(permission.ID)
-	if ok {
-		respCh.(chan bool) <- true
+	if v, ok := s.pendingRequests.Load(permission.ID); ok {
+		if p, ok := v.(pendingRequest); ok {
+			p.ch <- true
+		}
 	}
 	s.mu.Lock()
 	s.sessionPermissions = append(s.sessionPermissions, permission)
@@ -110,16 +143,18 @@ func (s *permissionService) GrantPersistant(permission PermissionRequest) {
 }
 
 func (s *permissionService) Grant(permission PermissionRequest) {
-	respCh, ok := s.pendingRequests.Load(permission.ID)
-	if ok {
-		respCh.(chan bool) <- true
+	if v, ok := s.pendingRequests.Load(permission.ID); ok {
+		if p, ok := v.(pendingRequest); ok {
+			p.ch <- true
+		}
 	}
 }
 
 func (s *permissionService) Deny(permission PermissionRequest) {
-	respCh, ok := s.pendingRequests.Load(permission.ID)
-	if ok {
-		respCh.(chan bool) <- false
+	if v, ok := s.pendingRequests.Load(permission.ID); ok {
+		if p, ok := v.(pendingRequest); ok {
+			p.ch <- false
+		}
 	}
 }
 
@@ -155,14 +190,57 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 
 	respCh := make(chan bool, 1)
 
-	s.pendingRequests.Store(permission.ID, respCh)
+	// The session travels with the waiter: a sweep that cannot tell whose
+	// request it is would cancel other conversations' prompts too.
+	s.pendingRequests.Store(permission.ID, pendingRequest{ch: respCh, sessionID: root})
 	defer s.pendingRequests.Delete(permission.ID)
 
 	s.Publish(pubsub.CreatedEvent, permission)
 
-	// Wait for the response with a timeout
-	resp := <-respCh
-	return resp
+	// Wait for an answer, but never forever. See PermissionWait.
+	timer := time.NewTimer(permissionWait)
+	defer timer.Stop()
+	select {
+	case resp := <-respCh:
+		return resp
+	case <-timer.C:
+		logging.Warn("permission request timed out with no answer — denying so the tool fails instead of hanging",
+			"tool", permission.ToolName, "action", permission.Action, "session", permission.SessionID,
+			"waited", permissionWait.String())
+		return false
+	}
+}
+
+// CancelSession denies every request still waiting for this session (or any
+// helper beneath it), so killing a run actually releases the tools blocked
+// inside it instead of leaving goroutines parked on a channel.
+func (s *permissionService) CancelSession(sessionID string) int {
+	s.mu.RLock()
+	root := s.rootSession(sessionID)
+	s.mu.RUnlock()
+
+	released := 0
+	s.pendingRequests.Range(func(key, value any) bool {
+		p, ok := value.(pendingRequest)
+		if !ok || p.sessionID != root {
+			return true
+		}
+		// Non-blocking: the waiter's channel is buffered, and a request that
+		// has already been answered must not deadlock the sweep.
+		select {
+		case p.ch <- false:
+			released++
+		default:
+		}
+		return true
+	})
+	return released
+}
+
+// pendingRequest is a waiter and the conversation it belongs to.
+type pendingRequest struct {
+	ch        chan bool
+	sessionID string
 }
 
 func (s *permissionService) AutoApproveSession(sessionID string) {
@@ -200,6 +278,19 @@ var active Service
 // SessionAutoApproved reports whether a session is running unattended. Safe
 // before the service exists (returns false), because the status bar renders
 // during startup.
+// CancelForSession releases every tool blocked on a permission prompt for this
+// session. Called when a helper is killed, so "kill" means released NOW rather
+// than "released in up to PermissionWait".
+func CancelForSession(sessionID string) int {
+	if active == nil || sessionID == "" {
+		return 0
+	}
+	if svc, ok := active.(*permissionService); ok {
+		return svc.CancelSession(sessionID)
+	}
+	return 0
+}
+
 func SessionAutoApproved(sessionID string) bool {
 	if active == nil || sessionID == "" {
 		return false
@@ -239,4 +330,13 @@ func normalisePermissionPath(p string) string {
 		return config.WorkingDirectory()
 	}
 	return p
+}
+
+// PermissionWaitForTest shortens the wait so the timeout path can be asserted
+// in under a second, and returns a function restoring it. Test-only seam: the
+// alternative is a test that takes ten minutes, which is a test nobody runs.
+func PermissionWaitForTest(d time.Duration) func() {
+	prev := permissionWait
+	permissionWait = d
+	return func() { permissionWait = prev }
 }
