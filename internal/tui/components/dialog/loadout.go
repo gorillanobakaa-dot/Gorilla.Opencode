@@ -396,11 +396,12 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 		// GORILLA OVERRIDE: real measured cost via ComponentTokens.
 		rest := fmt.Sprintf("%-32s ~%-6s  %s%s", c.Name, commaInt(config.ComponentTokens(c)), tradeoffText(on, c.Tradeoff), mark)
 		selected := m.selectedIdx == i+numDials
-		// GORILLA OVERRIDE: research row is highlighted in bright red — it is the
-		// most expensive tool (several full LLM sessions per use) and the user must
-		// never lose sight of it in the list.
+		// GORILLA OVERRIDE: the two money-burners render bright red — several
+		// full LLM sessions per use — and the user must never lose sight of
+		// them in the list, on any theme. #FF0000 bold survives white, grey,
+		// green and black backgrounds alike.
 		style := restStyle(selected, !on)
-		if c.ID == "tool.research" && !selected {
+		if (c.ID == "tool.research" || c.ID == config.DossierComponentID) && !selected {
 			style = base.Foreground(lipgloss.Color("#FF0000")).Bold(true)
 		}
 		rows = append(rows, toggleRow(selected, on, rest, style))

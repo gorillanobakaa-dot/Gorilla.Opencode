@@ -225,6 +225,12 @@ type appModel struct {
 	researchDialog     dialog.ResearchDialogCmp
 	showResearchDialog bool
 
+	// GORILLA OVERRIDE: /osint — the serious dossier gate and its capability page.
+	osintDialog     dialog.OsintDialogCmp
+	showOsintDialog bool
+	osintPage       dialog.OsintPageCmp
+	showOsintPage   bool
+
 	// GORILLA OVERRIDE: "your background helpers moved too" — shown after a
 	// model switch drags summarizer/task/title/research along, with a revert.
 	modelFollowDialog     dialog.ModelFollowDialogCmp
@@ -922,6 +928,33 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			msg.Mode, msg.Agents, msg.Question)
 		return a, util.CmdHandler(chat.SendMsg{Text: prompt})
 
+	case dialog.CloseOsintDialogMsg:
+		a.showOsintDialog = false
+		if !msg.Chosen {
+			return a, nil
+		}
+		// GORILLA OVERRIDE: the dossier product is WRITTEN OUTSIDE the working
+		// folder, always. A working folder is often a git repo; a personal
+		// question swept into a commit and pushed is the worst failure this
+		// feature could have. ~/Documents/gorilla-dossiers is nobody's repo.
+		prompt := fmt.Sprintf(
+			"Use the research tool with doctrine=%q, mode=%q and agents=%d exactly as given — "+
+				"the user chose these on the warning screen and they decide what this costs. "+
+				"Pass everything already established in this conversation as `context` so no helper pays to re-derive it. "+
+				"When the helpers report: run the gap check the tool's report demands, verify at least one load-bearing claim "+
+				"yourself, carry every two-axis grade through unchanged, and assemble the dossier product "+
+				"(BLUF first, graded claims, SOURCES TRIED, NOT ESTABLISHED, recommended action). "+
+				"Then write the complete dossier as markdown to a NEW timestamped file under %q using the write tool "+
+				"(create the folder if it is missing), tell the user the exact path, and give them the BLUF and key "+
+				"findings in the conversation. Never write the dossier into the working folder: it may be a git "+
+				"repository, and a private question must never end up in a commit.\n\nQUESTION: %s",
+			"dossier", msg.Mode, msg.Agents, config.DossierDir(), msg.Question)
+		return a, util.CmdHandler(chat.SendMsg{Text: prompt})
+
+	case dialog.CloseOsintPageMsg:
+		a.showOsintPage = false
+		return a, nil
+
 	case dialog.CloseInitDialogMsg:
 		a.showInitDialog = false
 		if msg.Initialize {
@@ -950,7 +983,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The mode multiplies the bill (supervised is double), and the model
 		// picking it from a schema the user never sees is the wrong place for
 		// that decision.
-		case "research", "osint":
+		case "research":
 			q := strings.TrimSpace(msg.Args)
 			if q == "" {
 				return a, util.ReportWarn("Give it something to investigate: /research does X actually work on this machine?")
@@ -958,6 +991,28 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.researchDialog = dialog.NewResearchDialogCmp(q)
 			a.researchDialog.SetSize(a.width, a.height)
 			a.showResearchDialog = true
+			return a, nil
+		// GORILLA OVERRIDE: /osint is the SERIOUS research command — the full
+		// dossier. Deliberately not an alias of /research: it is armed manually
+		// in /context (ships off), warns with the computed burn rate before every
+		// run, and writes its product OUTSIDE the working folder so a personal
+		// question can never be swept into someone's git repo and pushed to the
+		// internet. Bare /osint opens the capability page instead of a warning
+		// toast — this command is the one that earns a full explanation.
+		case "osint", "dossier":
+			q := strings.TrimSpace(msg.Args)
+			if q == "" {
+				a.osintPage = dialog.NewOsintPageCmp()
+				a.osintPage.SetSize(a.width, a.height)
+				a.showOsintPage = true
+				return a, nil
+			}
+			if !config.LoadoutEnabled(config.DossierComponentID) {
+				return a, util.ReportWarn("The serious OSINT dossier is switched OFF (it burns real money, so it ships that way). Arm it: /context → \"" + config.DossierRowName + "\" → space. Or type /osint alone to read what it does first.")
+			}
+			a.osintDialog = dialog.NewOsintDialogCmp(q)
+			a.osintDialog.SetSize(a.width, a.height)
+			a.showOsintDialog = true
 			return a, nil
 		case "model", "models":
 			a.modelDialog.Init()
@@ -1378,6 +1433,14 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					a.showResearchDialog = false
 					return a, nil
 				}
+				if a.showOsintDialog {
+					a.showOsintDialog = false
+					return a, nil
+				}
+				if a.showOsintPage {
+					a.showOsintPage = false
+					return a, nil
+				}
 				if a.showInitDialog {
 					a.showInitDialog = false
 					// Mark the project as initialized without running the command
@@ -1565,6 +1628,24 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d, rCmd := a.researchDialog.Update(msg)
 		a.researchDialog = d.(dialog.ResearchDialogCmp)
 		cmds = append(cmds, rCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showOsintDialog {
+		d, oCmd := a.osintDialog.Update(msg)
+		a.osintDialog = d.(dialog.OsintDialogCmp)
+		cmds = append(cmds, oCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showOsintPage {
+		d, pCmd := a.osintPage.Update(msg)
+		a.osintPage = d.(dialog.OsintPageCmp)
+		cmds = append(cmds, pCmd)
 		if _, ok := msg.(tea.KeyMsg); ok {
 			return a, tea.Batch(cmds...)
 		}
@@ -2030,6 +2111,28 @@ func (a appModel) View() string {
 
 	if a.showResearchDialog {
 		overlay := a.researchDialog.View()
+		appView = layout.PlaceOverlay(
+			a.width/2-lipgloss.Width(overlay)/2,
+			a.height/2-lipgloss.Height(overlay)/2,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
+	if a.showOsintDialog {
+		overlay := a.osintDialog.View()
+		appView = layout.PlaceOverlay(
+			a.width/2-lipgloss.Width(overlay)/2,
+			a.height/2-lipgloss.Height(overlay)/2,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
+	if a.showOsintPage {
+		overlay := a.osintPage.View()
 		appView = layout.PlaceOverlay(
 			a.width/2-lipgloss.Width(overlay)/2,
 			a.height/2-lipgloss.Height(overlay)/2,

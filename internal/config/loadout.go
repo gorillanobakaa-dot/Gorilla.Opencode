@@ -67,6 +67,11 @@ var LoadoutComponents = []LoadoutComponent{
 	// written here. Set this to the measured value and that test can no longer
 	// tell a calibrated figure from an uncalibrated one.
 	{"tool.research", "OSINT research (multi-agent)", "agent can't run multi-helper OSINT research over hundreds of sources — it investigates alone, which is how two days went into the wrong fix", 450, true, false},
+	// GORILLA OVERRIDE: the serious dossier ships OFF and is armed here by hand.
+	// That is the whole design: a run is 4-10 full model sessions plus a gap
+	// round, so nobody meets it by accident — /osint refuses until this row is
+	// on, and every run still starts with the burn-rate warning screen.
+	{DossierComponentID, DossierRowName, "the /osint professional dossier refuses to run. Arm it only if you accept a run costs real money — a warning with the exact burn rate appears before each one", 120, false, false},
 	// GORILLA OVERRIDE: default OFF. sparse is the kernel's own semantic checker
 	// (__user/__kernel pointers, endianness, lock imbalance) — invaluable on
 	// kernel work, meaningless everywhere else, so its schema should not ride
@@ -106,6 +111,39 @@ func RegisterLoadoutComponents(extra []LoadoutComponent) {
 		LoadoutComponents = append(LoadoutComponents, c)
 		existing[c.ID] = true
 	}
+}
+
+// DossierComponentID gates the /osint professional dossier; DossierRowName is
+// its label in /context (referenced by the /osint refusal message, so the two
+// can never drift apart).
+const (
+	DossierComponentID = "tool.dossier"
+	DossierRowName     = "Serious OSINT dossier — EXPENSIVE"
+)
+
+// DossierDir is where /osint writes its finished dossiers.
+//
+// GORILLA OVERRIDE: deliberately OUTSIDE the working folder, always. The
+// working folder is often a git repository; a dossier answering someone's
+// private question must never be swept into a commit and pushed. And nothing
+// here is hardcoded to any particular machine: the path is derived from the
+// USER'S OWN home directory at runtime — their Documents folder when they have
+// one, their home when they don't, the app's config directory as the last
+// resort when even home is unknowable.
+func DossierDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return filepath.Join(ConfigBase(), "dossiers")
+	}
+	if docs := filepath.Join(home, "Documents"); dirExists(docs) {
+		return filepath.Join(docs, "Gorilla-OSINT-Dossiers")
+	}
+	return filepath.Join(home, "Gorilla-OSINT-Dossiers")
+}
+
+func dirExists(p string) bool {
+	st, err := os.Stat(p)
+	return err == nil && st.IsDir()
 }
 
 // LSPComponentID is the loadout id for one configured language server.

@@ -57,17 +57,31 @@ var All = []Command{
 	// ─── Your conversation ───────────────────────────────────────────
 	{
 		Name:    "research",
-		Aliases: []string{"osint"},
 		Group:   GroupHelpers,
 		Args:    "<question>",
-		Summary: "OSINT research: hundreds of sources, vetted and cited.",
-		Detail: "A real intelligence cycle, not a one-shot answer: helpers plan the " +
-			"question, collect from hundreds of free sources — scholarly APIs, World " +
-			"Bank, SEC filings, humanitarian data, global news — and a verifier attacks " +
-			"their findings. It cites only sources it actually opened and says plainly " +
-			"what it could NOT establish. Each helper is a full model session; the " +
-			"dialog shows the cost before anything starts. Worth it when being wrong " +
-			"is expensive, waste when a single search would answer.",
+		Summary: "Send helper agents to investigate, each on one angle.",
+		Detail: "The everyday investigation tool: four to ten helpers, each given ONE " +
+			"angle, collecting with the same intelligence-cycle discipline as /osint " +
+			"but in a single pass. A verifier attacks their conclusions. Each helper " +
+			"is a full model session, so the dialog shows the cost before anything " +
+			"starts. Worth it when being wrong is expensive; waste when a single " +
+			"search would answer. For the full professional dossier — rounds, graded " +
+			"sources, the works — see /osint.",
+	},
+	{
+		Name:    "osint",
+		Aliases: []string{"dossier"},
+		Group:   GroupHelpers,
+		Args:    "<question>",
+		Summary: "The serious one. Professional dossier. Burns real money.",
+		Detail: "A professional intelligence assessment, not a chat answer: plans your " +
+			"question into sub-questions, collects from hundreds of free primary " +
+			"sources (scholarly APIs, SEC filings, World Bank, humanitarian data, " +
+			"global news), grades every claim on two axes like a real intelligence " +
+			"shop, hunts its own gaps, and tells you plainly what it could NOT " +
+			"establish. OFF by default — arm it in /context. Every run starts with a " +
+			"warning showing the burn rate in money, because 4-10 helpers is 4-10 " +
+			"full model sessions. Type /osint alone for the full explanation page.",
 	},
 	{
 		Name:    "clear",

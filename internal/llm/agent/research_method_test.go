@@ -13,7 +13,7 @@ import (
 // helper prompt and the contract makes fabrication auditable.
 
 func TestHelperPromptCarriesTheCollectionMethod(t *testing.T) {
-	p := buildPrompt(researchRoles[1], "why does X fail", "ctx", "", 1, 4)
+	p := buildPrompt(researchRoles[1], "why does X fail", "ctx", "", 1, 4, "")
 
 	for _, must := range []string{
 		"DIRECTION",      // requirements before collection
@@ -72,7 +72,7 @@ func TestResearchDescriptionScalesEffortToTheQuestion(t *testing.T) {
 // 900-source registry. The size cap keeps regeneration honest: an atlas that
 // balloons past ~6KB is no longer a shortlist and starts taxing every helper.
 func TestSourceAtlasRidesInEveryHelperPrompt(t *testing.T) {
-	p := buildPrompt(researchRoles[2], "q", "", "", 2, 4)
+	p := buildPrompt(researchRoles[2], "q", "", "", 2, 4, "")
 	for _, must := range []string{"SOURCE ATLAS", "OpenSanctions", "api.worldbank.org", "ReliefWeb", "!crossref"} {
 		if !strings.Contains(p, must) {
 			t.Errorf("helper prompt missing atlas element %q", must)

@@ -122,6 +122,11 @@ type ResearchParams struct {
 	Agents   int    `json:"agents"`
 	Roles    string `json:"roles"`
 	Mode     string `json:"mode"`
+	// Doctrine selects the discipline: "" / "standard" is the everyday run;
+	// "dossier" is the professional product — two-axis grading, a gap round,
+	// the assessment format. Gated on the /context dossier row: the schema
+	// only offers it when armed, and Run refuses it when not.
+	Doctrine string `json:"doctrine"`
 }
 
 // researchRole is one investigator's lane. Lane is what it must cover;
@@ -464,7 +469,7 @@ RULES
 `
 
 func (r *researchTool) Info() tools.ToolInfo {
-	return tools.ToolInfo{
+	info := tools.ToolInfo{
 		Name: ResearchToolName,
 		Description: "Investigate a question with several helper agents in fixed, non-overlapping roles, " +
 			"then report their findings for you to synthesise.\n\n" +
@@ -532,6 +537,18 @@ func (r *researchTool) Info() tools.ToolInfo {
 		},
 		Required: []string{"question"},
 	}
+	return r.infoWithDoctrine(info)
+}
+
+// info wraps the static schema with the dossier addition when — and only
+// when — the /context row is armed. The everyday loadout never pays for it.
+func (r *researchTool) infoWithDoctrine(base tools.ToolInfo) tools.ToolInfo {
+	if !config.LoadoutEnabled(config.DossierComponentID) {
+		return base
+	}
+	base.Description += dossierSchemaBlurb
+	base.Parameters["doctrine"] = dossierParamSchema()
+	return base
 }
 
 // selectRoles picks the roles to run. Explicit IDs win; otherwise the library
@@ -583,7 +600,7 @@ func selectRoles(spec string, want int) ([]researchRole, string) {
 
 // buildPrompt assembles one helper's instructions. Everything the helper knows
 // is here: it cannot see the conversation or the other helpers.
-func buildPrompt(role researchRole, question, sharedContext, peerFindings string, index, total int) string {
+func buildPrompt(role researchRole, question, sharedContext, peerFindings string, index, total int, doctrine string) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "You are helper %d of %d in a research investigation. Your role is:\n\n%s\n\n",
@@ -600,11 +617,117 @@ func buildPrompt(role researchRole, question, sharedContext, peerFindings string
 	}
 
 	b.WriteString(researchMethod(config.ResearchStepsPerHelper))
+	if doctrine == "dossier" {
+		b.WriteString(dossierMethodAddendum)
+	}
 	b.WriteString("\n")
 	b.WriteString(sourceAtlas)
-	b.WriteString(researchOutputContract)
+	if doctrine == "dossier" {
+		b.WriteString(dossierOutputContract)
+	} else {
+		b.WriteString(researchOutputContract)
+	}
 	return b.String()
 }
+
+// dossierSchemaBlurb and dossierParamSchema are the marginal schema the model
+// sees ONLY while the /context dossier row is armed — the everyday loadout
+// does not pay for a feature that is switched off.
+const dossierSchemaBlurb = "\n\nDOSSIER DOCTRINE (armed on this install). Pass doctrine=\"dossier\" ONLY when the user " +
+	"chose it through /osint — never volunteer it, the run costs several times an ordinary question. " +
+	"It switches helpers to two-axis intelligence grading (source reliability A-F x information " +
+	"credibility 1-6), adds a bounded gap round, and your synthesis must follow the dossier product " +
+	"format the tool's report will spell out."
+
+func dossierParamSchema() map[string]any {
+	return map[string]any{
+		"type": "string",
+		"enum": []string{"standard", "dossier"},
+		"description": "Investigation discipline. \"standard\" (default): the everyday run. \"dossier\": the " +
+			"professional product — ONLY when the user explicitly chose it via /osint; it multiplies cost.",
+	}
+}
+
+// DossierSchemaTokens is the measured per-turn cost of arming the dossier row:
+// the marginal schema above, at the same ~4 chars/token rule calibration uses
+// everywhere else.
+func DossierSchemaTokens() int {
+	b, _ := json.Marshal(dossierParamSchema())
+	return (len(dossierSchemaBlurb) + len(b)) / 4
+}
+
+// dossierMethodAddendum upgrades a helper's vetting to the two-axis discipline.
+// Injected AFTER the standard method so the cycle stays; only the grading
+// vocabulary deepens.
+const dossierMethodAddendum = `
+DOSSIER DISCIPLINE — this run produces a professional assessment. Two additions:
+
+GRADING, two axes, every claim. Replace the TIER vocabulary with GRADE: a
+letter for the SOURCE and a digit for the INFORMATION, judged separately.
+  Source reliability:  A reliable (official/primary, track record) · B usually
+  reliable · C fairly reliable · D not usually reliable · E unreliable ·
+  F cannot be judged (new or unknown source).
+  Information credibility: 1 confirmed by other INDEPENDENT sources · 2 probably
+  true · 3 possibly true · 4 doubtful · 5 improbable · 6 cannot be judged.
+  A1 = official and independently confirmed. F6 = honest ignorance. B2 is a
+  perfectly respectable grade — most solid reporting lives there. Grade
+  honestly: an inflated grade is a lie with a letter on it.
+
+CIRCULAR REPORTING. Before counting a second source as confirmation, establish
+its ULTIMATE ORIGIN. Ten outlets quoting one press release are ONE source at
+one remove. Independence means different original observers, not different URLs.
+
+QUERY HYGIENE. Web queries travel to the sites they reach and into their logs.
+Never put the user's personal identifiers — name, email, exact location, or
+anything that singles them out — into a query. Generalize the question first:
+the medical pattern, not the person; the company class, not the account.
+`
+
+// dossierOutputContract replaces the standard contract's FINDINGS shape for
+// dossier runs: same five headings (the parser stays one parser), GRADE
+// replacing TIER.
+var dossierOutputContract = strings.NewReplacer(
+	"| TIER: <tier>", "| GRADE: <A-F><1-6>",
+	`TIER must be one of, strongest first:
+  primary_source    a commit, spec, source file, release note, or official doc
+  config            a distro build file, package spec, or actual setting on disk
+  multiple_reports  several independent reports naming a version
+  single_claim      one README or one forum post. The WEAKEST. Label it honestly.`,
+	`GRADE is two characters: source reliability A-F, then information
+credibility 1-6, as defined in DOSSIER DISCIPLINE above. Grade every claim;
+a claim you cannot grade is F6 and belongs in NOT ESTABLISHED.`,
+	"- Never present a single_claim as fact.",
+	"- Never present anything below grade 2 as fact; C3 and weaker are leads, not findings.",
+).Replace(researchOutputContract)
+
+// dossierDutiesFooter is appended to the tool's report on dossier runs: the
+// gap round (bounded, so the loop cannot run away with the user's money) and
+// the product format the synthesis must follow. %s is the dossier directory.
+const dossierDutiesFooter = `
+## DOSSIER DUTIES — this was a dossier run, three more obligations
+
+1. GAP ROUND (bounded). Collect every NOT ESTABLISHED entry above. If any of
+   them is LOAD-BEARING for the answer, you may call the research tool ONCE
+   more: doctrine="dossier", agents=4 or fewer, roles chosen to target the
+   named gaps, and the gaps pasted into context. ONE follow-up call is the
+   ceiling — the user priced this run at the warning screen, not an open loop.
+   If the gaps are not load-bearing, say so and skip the round.
+
+2. THE PRODUCT. Assemble the dossier in exactly this shape:
+   # Dossier: <the question>
+   ## Bottom line — the direct answer first, three sentences or fewer
+   ## Findings — every claim with its two-axis GRADE carried through unchanged
+   ## Sources tried — including the ones that returned nothing
+   ## Not established — stated plainly, never papered over
+   ## Recommended action — what the user should do next, one paragraph
+
+3. THE FILE. Write the complete dossier as markdown into a NEW file under
+   %s (create the folder if missing), filename
+   dossier-<YY-MM-DD-HH-MM>-<three-word-slug>.md, and tell the user the exact
+   path. NEVER write it into the working folder: working folders end up in git
+   repositories, and a private question must never end up in a public commit.
+   In the conversation, give the bottom line and key findings only.
+`
 
 // checkContract reports which required headings a reply is missing. A helper
 // that ignored the contract is reported as such rather than quietly folded into
@@ -627,6 +750,21 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	}
 	if strings.TrimSpace(params.Question) == "" {
 		return tools.NewTextErrorResponse("question is required"), nil
+	}
+
+	// GORILLA OVERRIDE: the dossier is user-armed, never model-volunteered.
+	// The schema only offers it when the /context row is on, but a model can
+	// pass any string — so the gate is enforced here too, with the fix named.
+	params.Doctrine = strings.ToLower(strings.TrimSpace(params.Doctrine))
+	if params.Doctrine == "standard" {
+		params.Doctrine = ""
+	}
+	if params.Doctrine != "" && params.Doctrine != "dossier" {
+		return tools.NewTextErrorResponse(fmt.Sprintf("unknown doctrine %q — use \"standard\" or \"dossier\"", params.Doctrine)), nil
+	}
+	if params.Doctrine == "dossier" && !config.LoadoutEnabled(config.DossierComponentID) {
+		return tools.NewTextErrorResponse("the dossier doctrine is not armed on this install. The USER must switch on \"" +
+			config.DossierRowName + "\" in /context (it costs real money, so it ships off). Run standard research instead, or tell the user how to arm it."), nil
 	}
 
 	want := params.Agents
@@ -764,7 +902,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 				defer func() { <-sem }()
 
 				SetSubAgentState(entry.ID, SubAgentRunning)
-				prompt := buildPrompt(roles[i], params.Question, params.Context, peers, i, len(roles))
+				prompt := buildPrompt(roles[i], params.Question, params.Context, peers, i, len(roles), params.Doctrine)
 				reply, cost, err := r.runHelper(hctx, sessionID, call.ID, roles[i], prompt, entry.ID)
 				switch {
 				case err != nil && hctx.Err() != nil:
@@ -911,6 +1049,10 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 		"2. Carry evidence tiers through. A `single_claim` stays a single claim when you repeat it.\n" +
 		"3. Say what nobody established. A gap reported is cheaper than a gap discovered later.\n" +
 		"4. If the honest answer is no, give it plainly rather than offering hope.\n")
+
+	if params.Doctrine == "dossier" {
+		fmt.Fprintf(&out, dossierDutiesFooter, config.DossierDir())
+	}
 
 	return tools.NewTextResponse(out.String()), nil
 }

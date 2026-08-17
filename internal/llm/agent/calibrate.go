@@ -60,6 +60,9 @@ func CalibrateLoadout(
 	set("tool.write", tools.NewWriteTool(lspClients, permissions, history))
 	set("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions))
 	set("tool.research", NewResearchTool(sessions, messages, lspClients, permissions))
+	// The dossier row's cost is the MARGINAL schema the research tool gains
+	// when it is armed — measured from the actual strings, not guessed.
+	config.SetLoadoutTokens(config.DossierComponentID, DossierSchemaTokens())
 	set("tool.sparse", tools.NewSparseTool(permissions))
 	// GORILLA OVERRIDE: measure diagnostics unconditionally. This was guarded on
 	// having LSP clients, but the tool's SCHEMA is static — the clients only affect

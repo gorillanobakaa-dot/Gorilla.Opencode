@@ -1,0 +1,226 @@
+<!-- Version: 1.0.0 · updated 26-08-17-17-30 -->
+# The Serious OSINT dossier — `/osint` explained for people who don't read code
+
+**One sentence:** `/osint <question>` runs a real intelligence cycle — the
+method a professional analyst shop uses — against hundreds of free public
+sources, and hands you a graded, sourced dossier instead of a chat answer.
+
+"OSINT" means **open-source intelligence**: answering a question using only
+material anyone can legally access — public databases, official filings,
+scientific papers, news wires. No hacking, no secrets. The method comes from
+declassified US Army intelligence doctrine (FM 2-0 and its companions),
+translated for civilian use: the military jargon is stripped out, the
+procedures — the part that actually took decades to get right — are kept.
+
+This is a **separate command from `/research`**. `/research` is the everyday
+tool: one pass, modest cost. `/osint` is the heavy machine you bring out when
+the answer genuinely matters and you are willing to pay for it.
+
+---
+
+## Read this before anything else: it costs real money
+
+An `/osint` run spawns **4 to 10 helper agents**. A helper agent is a complete,
+separate AI session — each one has its own conversation with the model, and
+every message in every one of those conversations is billed to **your**
+account, in tokens. (A token is the unit AI companies charge by — roughly
+three-quarters of a word. Tokens are the meter that runs while AI works.)
+
+Because of that, three protections are built in:
+
+1. **It ships OFF.** The command does not exist until you arm it yourself in
+   the `/context` menu (the screen where you switch program features on and
+   off and see what each one costs). Nobody trips over this by accident.
+2. **A warning screen before every run** shows the computed burn rate in
+   dollars per minute for your current model and settings, plus your choice
+   of helper count and mode. The figure is computed live for YOUR model at
+   that moment — there is no generic number to quote here, which is the point.
+3. **You choose the shape of the run**: how many helpers, and whether they run
+   in **parallel** (fastest, most expensive per minute), **sequential** (one
+   at a time, slower, cheaper per minute), or **supervised** (an extra agent
+   double-checks the others' work — the most thorough and the most expensive).
+
+After the warning, the tool respects your decision. It will not nag, and it
+will not secretly throttle. It is your wallet and your call — the tool's job
+is to make sure it was an *informed* call, then get out of the way.
+
+If you are on a free-tier model or a small local one, `/research` is probably
+the right tool. `/osint` exists for the questions where being wrong costs more
+than the run does.
+
+---
+
+## Why this exists: confident and wrong is the default failure
+
+Ask a chat AI a hard factual question and you get a fluent, confident answer —
+frequently a wrong one. The model writes from memory, its memory has a cutoff
+date and gaps, and nothing in a chat answer tells you *which parts* to trust.
+The confidence is uniform; the accuracy is not.
+
+The fix is not a smarter model. The fix is the same one journalism, science,
+and intelligence analysis all converged on independently: **go to sources,
+say which source said what, and grade how much each source can be trusted.**
+Then a reader can check any claim without taking anyone's word for it —
+including the AI's.
+
+That is the entire design. Everything below is machinery for doing that
+honestly at scale.
+
+---
+
+## What a run actually does
+
+A chat answer is one step: generate text. An `/osint` run is a loop with five
+stations, and the loop is the point:
+
+**Plan → Collect → Vet → Assess gaps → (one bounded gap round) → Report**
+
+1. **Plan.** Before touching a single source, the orchestrator (the agent in
+   charge) breaks your question into 3–7 ranked sub-questions, each specific
+   enough to be answered by one short sourced statement. For competing
+   possible answers it writes down **indicators** in advance — the concrete
+   evidence that would confirm or kill each candidate. Searching without this
+   step is how you get an answer shaped by whatever turned up first.
+2. **Collect.** Helper agents each take assigned sub-questions and work
+   through real sources (next section) — cheap, broad searches first, and only
+   then the expensive, narrow digging on whatever the broad pass surfaced.
+3. **Vet.** Every claim found is graded on two axes (section after next),
+   checked for circular reporting, and tagged with where it ultimately came
+   from. **A source that was not actually opened and read is never cited.**
+   No decorative footnotes.
+4. **Report.** Findings are assembled into the dossier format described below.
+5. **Assess gaps.** Whatever the first pass could not establish is collected,
+   and if any of it is load-bearing for the answer, **one** follow-up round —
+   smaller, targeted at the named gaps, with a changed approach — is allowed.
+   One, by design: you priced this run at the warning screen, and a loop that
+   decides for itself how long to keep spending would make that warning a lie.
+   A timely answer that meets the need beats a perfect one that arrives late —
+   that rule is doctrine, not laziness.
+
+---
+
+## Where it looks: the source atlas
+
+The tool ships with a built-in source atlas backed by a registry of **900
+sources**, classified by how they can be reached for free. The real counts,
+from the registry file itself:
+
+| Count | What it means |
+|---|---|
+| **900** | total sources in the registry |
+| **785** | free to use |
+| **340** | keyless APIs — machine-readable services needing no account, no key, no card. (An API is a door a program can knock on directly instead of scraping a web page.) |
+| **115** | paid-only — kept in the registry **on purpose**, so the tool can tell you "the definitive source exists behind a subscription" instead of pretending it does not |
+
+What lives in there, in plain terms: scholarly paper indexes (OpenAlex,
+Crossref, PubMed), World Bank statistics, full-text search of SEC corporate
+filings (the documents US companies must file by law), humanitarian data
+(HDX, UNHCR), GDELT — a global news event database updated every 15 minutes —
+plus sanctions lists, patents, technical standards, and climate data.
+
+The free, no-card paths are the default, not the fallback — same as every
+other part of this project. A source that fails or returns nothing during a
+run is reported by name in the dossier's SOURCES TRIED section, not silently
+skipped.
+
+---
+
+## How claims are graded: two axes, like a real intelligence shop
+
+Every claim in the dossier carries a two-part grade, the same scheme
+(sometimes called the Admiralty system) intelligence services use:
+
+- **Source reliability, A–F** — how trustworthy is the *outlet*? A = a
+  reliable official or primary source; F = no basis to judge.
+- **Information credibility, 1–6** — how solid is *this particular claim*?
+  1 = confirmed by other independent sources; 5 = improbable; 6 = cannot be
+  judged.
+
+So **A1** means "official source, independently confirmed" and **F6** means
+"cannot judge the source, cannot judge the claim" — honest ignorance, recorded
+as such. The two axes are
+graded separately because they fail separately: a normally reliable outlet
+can carry a wrong claim, and an unknown blogger can carry a claim that checks
+out. One combined "trust score" hides exactly that distinction.
+
+Two rules worth knowing:
+
+- **A first-time, unknown source enters at F — never at A.** Trust is earned
+  by track record, not by a professional-looking website.
+- The grade travels with the claim into the final report, so you can see at a
+  glance which parts of the answer are load-bearing and which are thin.
+
+---
+
+## Circular reporting: ten echoes are one voice
+
+The web's defining disease: one press release goes out, ten outlets rewrite
+it, and a naive search sees "ten sources agree." That is not corroboration —
+it is one source, amplified.
+
+The tool records each claim's **ultimate origin**. Two articles tracing back
+to the same press release count as ONE source, and a claim is only promoted
+to "confirmed" when genuinely **independent** sources — different origins,
+different source families — say the same thing.
+
+---
+
+## What the dossier looks like
+
+The report is built so the most important thing comes first and nothing is
+papered over:
+
+1. **BLUF — bottom line up front.** The direct answer to your question, first,
+   in plain language, with its overall confidence. No throat-clearing.
+2. **Findings per sub-question**, each claim carrying its two-axis grade and a
+   "so what" — why it matters for the decision you are trying to make.
+3. **SOURCES TRIED.** Every source consulted — *including the ones that
+   returned nothing or failed*, with the reason where known. A search that
+   found nothing across multiple engines is a finding with a method behind
+   it, not a shrug.
+4. **NOT ESTABLISHED.** What the run could **not** find out, stated plainly,
+   with the searches that proved the absence. This section is the one most
+   research products quietly omit. An honest "unknown" is worth more than a
+   confident guess, and here it is a first-class part of the product.
+
+---
+
+## What it will not do
+
+- It will not cite a source it did not actually open.
+- It will not present one echoed press release as consensus.
+- It will not manufacture certainty. Research reduces uncertainty; it does
+  not eliminate it. The leftover risk is stated and left with you.
+- Its helpers are under standing orders to keep your private details out of
+  search queries. Queries travel to the sites they reach, so the discipline is
+  to generalize first: the medical pattern, not the person; the company class,
+  not your account.
+- It will not run, or cost you anything, unless you armed it and accepted the
+  warning screen.
+
+---
+
+## `/research` vs `/osint` at a glance
+
+| | `/research` | `/osint` |
+|---|---|---|
+| Cost | modest, everyday | **real money — warned in $/minute up front** |
+| Passes | one cycle | full cycle plus one bounded, targeted gap round |
+| Grading | evidence tiers | two-axis A–F × 1–6 on every claim |
+| Ships | on | **off — armed manually in `/context`** |
+| For | ordinary questions | questions where being wrong costs more than the run |
+
+---
+
+## Who this is for
+
+Academic research is written for peer reviewers. Intelligence assessments are
+written for commanders. Nobody writes serious, sourced assessments for a
+scared fifteen-year-old on an 8 KB/s connection with an honest question he
+cannot ask anyone else.
+
+That is the person this format is built for. When that question comes in, the
+answer arrives the way an analyst briefs a principal: the direct answer
+first, every claim graded, what could not be established stated plainly — and
+with the dignity the format itself enforces. Not a lecture, not a brush-off,
+and never a confident guess dressed up as knowledge.
