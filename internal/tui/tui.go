@@ -1103,6 +1103,30 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "context", "loadout", "tokens":
 			a.showLoadoutDialog = true
 			return a, nil
+		// GORILLA OVERRIDE: /yolo — grant once, then let the helpers run.
+		//
+		// The permission prompt exists for a good reason and this switches it
+		// off, so the message says exactly what is being handed over and the
+		// footer keeps saying it for as long as it lasts. Scoped to THIS
+		// conversation and gone when it ends: nothing is written to disk, so a
+		// moment of impatience cannot become a permanent standing grant.
+		//
+		// Because grants resolve through the session tree, one toggle covers
+		// every research helper and sub-agent too — which is the entire point,
+		// and was the reported problem: a 10-helper run asking the same
+		// question ten times.
+		case "yolo", "auto", "autopilot":
+			if a.selectedSession.ID == "" {
+				return a, util.ReportWarn("Start a conversation first — YOLO applies to the session you are in.")
+			}
+			if a.app.Permissions.IsAutoApproved(a.selectedSession.ID) {
+				a.app.Permissions.RevokeAutoApprove(a.selectedSession.ID)
+				return a, util.ReportInfo("YOLO OFF — you will be asked again before tools touch anything.")
+			}
+			a.app.Permissions.AutoApproveSession(a.selectedSession.ID)
+			return a, util.ReportWarn("☢ YOLO ON for this conversation. Every tool call is approved automatically — " +
+				"file edits, shell commands, web access, and every research helper — with no further prompts. " +
+				"It ends when this conversation does, or type /yolo again. /tasks still kills helpers.")
 		case "task", "tasks", "agents", "kill":
 			// GORILLA OVERRIDE: /tasks — live monitor of running helper
 			// agents; kill one, or the Nuclear Option (kill 'em all).

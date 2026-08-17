@@ -239,6 +239,24 @@ var All = []Command{
 
 	// ─── Background helpers ──────────────────────────────────────────
 	{
+		Name:    "yolo",
+		Aliases: []string{"auto", "autopilot"},
+		Group:   GroupHelpers,
+		Summary: "Approve everything for this conversation. No more prompts.",
+		Detail: "Normally the program stops and asks before it edits a file, runs a " +
+			"command, or reaches the internet. This turns that off for the " +
+			"conversation you are in: every tool call is approved automatically, " +
+			"including every research helper — which is the point, because a " +
+			"ten-helper run otherwise asks you the same question ten times.\n\n" +
+			"What you are handing over: file edits, shell commands and web access, " +
+			"unattended. Use it when you have told the agent to get on with a job " +
+			"and you do not want to babysit it. Do not use it in a folder you " +
+			"cannot afford to have changed.\n\n" +
+			"It lasts only as long as this conversation and is never written to " +
+			"disk, so it cannot silently follow you into tomorrow. Type /yolo again " +
+			"to turn it off. /tasks still stops helpers at any time.",
+	},
+	{
 		Name:    "tasks",
 		Aliases: []string{"task", "agents", "kill"},
 		Group:   GroupHelpers,

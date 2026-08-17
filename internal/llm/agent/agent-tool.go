@@ -74,6 +74,11 @@ func (b *agentTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolRes
 	}
 
 	session, err := b.sessions.CreateTaskSession(ctx, call.ID, sessionID, "New Agent Session")
+	// Same reason as the research helpers: a sub-agent's approvals belong to
+	// the conversation that spawned it, not to a session the user cannot see.
+	if err == nil {
+		b.permissions.RegisterChildSession(session.ID, sessionID)
+	}
 	if err != nil {
 		return tools.ToolResponse{}, fmt.Errorf("error creating session: %s", err)
 	}

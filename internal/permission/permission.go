@@ -38,14 +38,65 @@ type Service interface {
 	Deny(permission PermissionRequest)
 	Request(opts CreatePermissionRequest) bool
 	AutoApproveSession(sessionID string)
+	// RevokeAutoApprove turns YOLO mode back off for a session.
+	RevokeAutoApprove(sessionID string)
+	// IsAutoApproved reports whether a session (or its root) is running
+	// unattended, so the UI can keep saying so.
+	IsAutoApproved(sessionID string) bool
+	// RegisterChildSession records that child belongs to parent, so a grant
+	// made in the conversation the USER can see also covers the helper
+	// sessions spawned underneath it. See rootSession.
+	RegisterChildSession(child, parent string)
 }
 
 type permissionService struct {
 	*pubsub.Broker[PermissionRequest]
 
+	mu                  sync.RWMutex
 	sessionPermissions  []PermissionRequest
 	pendingRequests     sync.Map
 	autoApproveSessions []string
+	// childToParent maps a helper session to the session that spawned it.
+	//
+	// GORILLA FIX (2026-08-17): "Allow for session" was stored against the
+	// session that happened to ask, and every research helper runs in its OWN
+	// session (CreateTaskSession, one per lane). So approving a web search in
+	// helper a3 did nothing for a1, a2 or a4 — a 10-helper run asked the same
+	// question up to ten times, and again on the next run because new helpers
+	// mean new session ids. Reported from a live run: the same `web_search` for
+	// the same term prompted at 19:43, 19:45 and again at 19:49.
+	//
+	// A grant now applies to the whole tree under the session the user is
+	// actually looking at. This does NOT widen what was approved — tool, action
+	// and path still have to match exactly — it only stops the same approval
+	// being re-asked by each sibling helper.
+	childToParent map[string]string
+}
+
+// rootSession walks a helper session up to the conversation it belongs to.
+// Depth-limited so a malformed cycle degrades to "treat it as its own root"
+// instead of hanging the tool call that is waiting on this answer.
+func (s *permissionService) rootSession(id string) string {
+	for i := 0; i < 32; i++ {
+		parent, ok := s.childToParent[id]
+		if !ok || parent == "" || parent == id {
+			return id
+		}
+		id = parent
+	}
+	return id
+}
+
+func (s *permissionService) RegisterChildSession(child, parent string) {
+	if child == "" || parent == "" || child == parent {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.childToParent == nil {
+		s.childToParent = make(map[string]string)
+	}
+	s.childToParent[child] = parent
 }
 
 func (s *permissionService) GrantPersistant(permission PermissionRequest) {
@@ -53,7 +104,9 @@ func (s *permissionService) GrantPersistant(permission PermissionRequest) {
 	if ok {
 		respCh.(chan bool) <- true
 	}
+	s.mu.Lock()
 	s.sessionPermissions = append(s.sessionPermissions, permission)
+	s.mu.Unlock()
 }
 
 func (s *permissionService) Grant(permission PermissionRequest) {
@@ -71,21 +124,30 @@ func (s *permissionService) Deny(permission PermissionRequest) {
 }
 
 func (s *permissionService) Request(opts CreatePermissionRequest) bool {
-	if slices.Contains(s.autoApproveSessions, opts.SessionID) {
+	// Grants belong to the conversation, not to whichever helper happened to
+	// ask, so both the auto-approve list and the remembered grants are checked
+	// against the root of the session tree.
+	s.mu.RLock()
+	root := s.rootSession(opts.SessionID)
+	grants := slices.Clone(s.sessionPermissions)
+	autoApproved := slices.Contains(s.autoApproveSessions, root) || slices.Contains(s.autoApproveSessions, opts.SessionID)
+	s.mu.RUnlock()
+
+	if autoApproved {
 		return true
 	}
 	dir := normalisePermissionPath(opts.Path)
 	permission := PermissionRequest{
 		ID:          uuid.New().String(),
 		Path:        dir,
-		SessionID:   opts.SessionID,
+		SessionID:   root,
 		ToolName:    opts.ToolName,
 		Description: opts.Description,
 		Action:      opts.Action,
 		Params:      opts.Params,
 	}
 
-	for _, p := range s.sessionPermissions {
+	for _, p := range grants {
 		if p.ToolName == permission.ToolName && p.Action == permission.Action && p.SessionID == permission.SessionID && p.Path == permission.Path {
 			return true
 		}
@@ -104,14 +166,55 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 }
 
 func (s *permissionService) AutoApproveSession(sessionID string) {
+	s.mu.Lock()
 	s.autoApproveSessions = append(s.autoApproveSessions, sessionID)
+	s.mu.Unlock()
+}
+
+// RevokeAutoApprove ends YOLO mode. Kept separate from Grant/Deny because it
+// is a standing stance, not an answer to one request.
+func (s *permissionService) RevokeAutoApprove(sessionID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	root := s.rootSession(sessionID)
+	s.autoApproveSessions = slices.DeleteFunc(s.autoApproveSessions, func(id string) bool {
+		return id == sessionID || id == root
+	})
+}
+
+// IsAutoApproved answers for the whole session tree, so a helper cannot report
+// a different stance from the conversation it belongs to.
+func (s *permissionService) IsAutoApproved(sessionID string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return slices.Contains(s.autoApproveSessions, s.rootSession(sessionID)) ||
+		slices.Contains(s.autoApproveSessions, sessionID)
+}
+
+// active is the process's permission service, so display code can ask about
+// YOLO state without threading the service through every component. Mirrors
+// agent.ActiveSubAgentCount(), which the status bar already uses for helpers.
+// One service exists per process; NewPermissionService sets it.
+var active Service
+
+// SessionAutoApproved reports whether a session is running unattended. Safe
+// before the service exists (returns false), because the status bar renders
+// during startup.
+func SessionAutoApproved(sessionID string) bool {
+	if active == nil || sessionID == "" {
+		return false
+	}
+	return active.IsAutoApproved(sessionID)
 }
 
 func NewPermissionService() Service {
-	return &permissionService{
+	svc := &permissionService{
 		Broker:             pubsub.NewBroker[PermissionRequest](),
 		sessionPermissions: make([]PermissionRequest, 0),
+		childToParent:      make(map[string]string),
 	}
+	active = svc
+	return svc
 }
 
 // normalisePermissionPath returns the path a permission request is recorded

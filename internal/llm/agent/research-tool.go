@@ -1178,6 +1178,10 @@ func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID st
 	if err != nil {
 		return "", 0, fmt.Errorf("could not create helper session: %w", err)
 	}
+	// GORILLA FIX (2026-08-17): tell the permission service this helper belongs
+	// to the user's conversation, so one "allow for session" covers the run
+	// instead of every lane asking the same question again.
+	r.permissions.RegisterChildSession(helperSession.ID, parentSessionID)
 
 	// GORILLA FIX 2026-08-14: registration moved OUT to the caller, which
 	// registers before queueing for a slot. Registering here meant a helper

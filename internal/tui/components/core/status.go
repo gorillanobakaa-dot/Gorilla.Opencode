@@ -13,6 +13,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/lsp"
 	"github.com/opencode-ai/opencode/internal/lsp/protocol"
+	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/session"
 	"github.com/opencode-ai/opencode/internal/tui/components/chat"
@@ -221,7 +222,22 @@ func (m statusCmp) View() string {
 		helpersWidth = lipgloss.Width(helpers)
 	}
 
-	availableWidht := max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(m.model())-lipgloss.Width(diagnostics)-tokenInfoWidth-helpersWidth)
+	// GORILLA OVERRIDE: while YOLO is on, say so on every single frame. It
+	// switches off the prompt that stands between an agent and the user's
+	// files, so it must never be something you can forget you enabled — the
+	// same reasoning as the helper count beside it, one step louder.
+	yolo := ""
+	yoloWidth := 0
+	if permission.SessionAutoApproved(m.session.ID) {
+		yolo = styles.Padded().
+			Background(t.Error()).
+			Foreground(t.Background()).
+			Bold(true).
+			Render("☢ YOLO — auto-approving")
+		yoloWidth = lipgloss.Width(yolo)
+	}
+
+	availableWidht := max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(m.model())-lipgloss.Width(diagnostics)-tokenInfoWidth-helpersWidth-yoloWidth)
 
 	if m.info.Msg != "" {
 		infoStyle := styles.Padded().
@@ -248,6 +264,7 @@ func (m statusCmp) View() string {
 			Render("")
 	}
 
+	status += yolo
 	status += helpers
 	status += diagnostics
 	status += m.model()
