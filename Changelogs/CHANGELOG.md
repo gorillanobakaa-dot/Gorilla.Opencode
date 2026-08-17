@@ -37,6 +37,19 @@ for a full ten-helper supervised run, measured from an actual run rather than
 guessed. Because "$0.03 a minute" is true and sounds reassuring, and most people
 will not do the multiplication.
 
+Two more, found by using it rather than testing it. A run that burned 507,935
+tokens across seventeen helpers reported **44,688** in the status bar and $0.00 —
+helper usage was never counted, and on a free plan the cost reads zero however
+much you burn. The number now counts the whole run, worked out when displayed
+rather than stored, so it is right for past runs too: on the developer's own
+machine the same conversation went from **58,551 to 851,996**. And your research
+now **survives the write-up failing** — every helper's graded report is saved to
+a file by the program the moment the run ends, before the AI is asked to do
+anything with it. That mattered the same night: a two-hour investigation that
+verified three claims by hand announced "writing the dossier now" and wrote
+nothing, because assembling the answer is the most memory-hungry moment of a run
+and it had none left. The findings were never lost — they just had nowhere to go.
+
 Also: the serious research command is now called **OSINT All-Source Intelligence
 Analysis**, which is the correct name for what it does — combining many
 different kinds of source and weighing them against each other. It now follows
