@@ -422,7 +422,16 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 			mark = " ⚠"
 		}
 		// GORILLA OVERRIDE: real measured cost via ComponentTokens.
-		rest := fmt.Sprintf("%-32s ~%-6s  %s%s", c.Name, commaInt(config.ComponentTokens(c)), tradeoffText(on, c.Tradeoff), mark)
+		//
+		// GORILLA FIX (2026-08-17): rows whose real cost is paid when USED carry
+		// a +RUN marker. Without it the screen said "EXPENSIVE ~163" next to
+		// "~1,007" and looked like nonsense: both numbers were correct per-turn
+		// figures, but the expensive thing about these two rows is the run.
+		runMark := ""
+		if config.RunCostRow(c.ID) {
+			runMark = "+RUN"
+		}
+		rest := fmt.Sprintf("%-30s ~%-7s%-5s %s%s", c.Name, commaInt(config.ComponentTokens(c)), runMark, tradeoffText(on, c.Tradeoff), mark)
 		selected := m.selectedIdx == i+numDials
 		// GORILLA OVERRIDE: the two money-burners render bright red — several
 		// full LLM sessions per use — and the user must never lose sight of
@@ -467,6 +476,12 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	end := min(m.featureTop+featureRows, len(feature))
 	shown := feature[m.featureTop:end]
 
+	// The number column means ONE thing — tokens per message — and two rows have
+	// a second, larger cost that no per-turn figure can carry. Say so on screen
+	// rather than leaving the reader to reconcile it.
+	runNote := base.Foreground(t.TextMuted()).Width(w).
+		Render(fitLine("  +RUN = cheap to carry, costly to USE: one run is 4-10 full AI sessions. The number left of it is per message only."))
+
 	// Say so when rows are off-screen, or a hidden switch looks like a missing one.
 	scrollNote := ""
 	if len(shown) < len(feature) {
@@ -491,7 +506,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 		parts = append(parts, scrollNote)
 	}
 	if !compact {
-		parts = append(parts, "")
+		parts = append(parts, runNote, "")
 	}
 	parts = append(parts,
 		extrasHeader,

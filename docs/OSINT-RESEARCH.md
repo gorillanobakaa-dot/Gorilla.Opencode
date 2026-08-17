@@ -1,5 +1,5 @@
-<!-- Version: 1.1.0 · updated 26-08-17-17-45 -->
-# The Serious OSINT dossier — `/osint` explained for people who don't read code
+<!-- Version: 1.2.0 · updated 26-08-17-19-16 -->
+# OSINT All-Source Intelligence Analysis — `/osint` explained for people who don't read code
 
 **One sentence:** `/osint <question>` runs a real intelligence cycle — the
 method a professional analyst shop uses — against hundreds of free public
@@ -190,6 +190,49 @@ Two rules worth knowing:
   by track record, not by a professional-looking website.
 - The grade travels with the claim into the final report, so you can see at a
   glance which parts of the answer are load-bearing and which are thin.
+
+---
+
+## How it says how sure it is — the part that fights nonsense
+
+The characteristic failure of an AI answer is not that it is wrong. It is that
+everything sounds **equally certain**: the solid parts and the guesses arrive in
+the same steady voice, and you cannot tell them apart. That is what makes a
+confident wrong answer dangerous.
+
+So this follows the UK government's own standard for intelligence assessment,
+which keeps two things apart that ordinary writing smears together:
+
+**How likely is it?** Stated in one of seven fixed terms, never a number the AI
+invented for itself:
+
+| Term | What it means |
+|---|---|
+| Remote chance | above 0% up to about 5% |
+| Highly unlikely | about 10–20% |
+| Unlikely | about 25–35% |
+| Realistic possibility | about 40% to just under 50% |
+| Likely / probable | about 55–75% |
+| Highly likely | about 80–90% |
+| Almost certain | about 95% to just under 100% |
+
+The gaps between the bands are deliberate — they are the space between one
+judgement and the next, so nothing gets squeezed into false precision. If you
+ever see "roughly 63% likely" in a report, someone made that number up.
+
+**How solid is the basis?** Separately rated **HIGH**, **MODERATE** or **LOW**,
+naming which of three things set the level: how much was actually found, how
+hard it was tested, or how fast-moving and tangled the subject is.
+
+Why keeping them apart matters: *"highly likely, LOW confidence — one source,
+uncorroborated"* is an honest and genuinely useful sentence. It tells you the
+best guess AND that you should not bet the house on it. Merged into one word,
+that information is gone.
+
+On top of that, every line is marked as a **fact** (a source said it), an
+**inference** (the reasoning that followed), or an **assumption** (taken as
+given, with no evidence) — and rival explanations must be written down and
+tested, not just the first one that fit.
 
 ---
 

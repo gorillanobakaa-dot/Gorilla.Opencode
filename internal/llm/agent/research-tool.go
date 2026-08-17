@@ -469,6 +469,18 @@ RULES
 `
 
 func (r *researchTool) Info() tools.ToolInfo {
+	return r.infoWithDoctrine(r.infoBase())
+}
+
+// infoBase is the schema WITHOUT the dossier addition.
+//
+// GORILLA FIX (2026-08-17): calibration measures this, not Info(). Measuring
+// Info() while the dossier row was armed counted the dossier's tokens twice —
+// once inside tool.research (which had grown by them) and once as the
+// tool.dossier row — inflating the /context header total by ~163. Same
+// double-count class as the research basis figure fixed on 2026-08-14: two
+// rows must measure disjoint things or the total is fiction.
+func (r *researchTool) infoBase() tools.ToolInfo {
 	info := tools.ToolInfo{
 		Name: ResearchToolName,
 		Description: "Investigate a question with several helper agents in fixed, non-overlapping roles, " +
@@ -537,7 +549,7 @@ func (r *researchTool) Info() tools.ToolInfo {
 		},
 		Required: []string{"question"},
 	}
-	return r.infoWithDoctrine(info)
+	return info
 }
 
 // info wraps the static schema with the dossier addition when — and only
@@ -546,6 +558,12 @@ func (r *researchTool) infoWithDoctrine(base tools.ToolInfo) tools.ToolInfo {
 	if !config.LoadoutEnabled(config.DossierComponentID) {
 		return base
 	}
+	return addDoctrine(base)
+}
+
+// addDoctrine applies the marginal schema unconditionally. Split out so the
+// cost can be measured without consulting — or disturbing — the loadout.
+func addDoctrine(base tools.ToolInfo) tools.ToolInfo {
 	base.Description += dossierSchemaBlurb
 	base.Parameters["doctrine"] = dossierParamSchema()
 	return base
@@ -648,12 +666,20 @@ func dossierParamSchema() map[string]any {
 	}
 }
 
-// DossierSchemaTokens is the measured per-turn cost of arming the dossier row:
-// the marginal schema above, at the same ~4 chars/token rule calibration uses
-// everywhere else.
+// DossierSchemaTokens is the per-turn cost of arming the all-source row.
+//
+// GORILLA FIX (2026-08-17): measured by DIFFERENCE between the two real
+// schemas, not by adding up the strings. Summing the blurb and the parameter
+// under-reported by 5 tokens, because the schema is paid as JSON: the
+// description gets escaped, and the parameter arrives with a `"doctrine":`
+// key around it. A row's figure has to be what the model is actually sent, or
+// it is another number nobody can trust — the failure this session already hit
+// twice. State-independent by construction: it forces the doctrine on rather
+// than asking the loadout, so the figure does not depend on the switch it
+// describes.
 func DossierSchemaTokens() int {
-	b, _ := json.Marshal(dossierParamSchema())
-	return (len(dossierSchemaBlurb) + len(b)) / 4
+	r := &researchTool{}
+	return infoTokens(addDoctrine(r.infoBase())) - infoTokens(r.infoBase())
 }
 
 // dossierMethodAddendum upgrades a helper's vetting to the two-axis discipline.
@@ -681,6 +707,50 @@ QUERY HYGIENE. Web queries travel to the sites they reach and into their logs.
 Never put the user's personal identifiers — name, email, exact location, or
 anything that singles them out — into a query. Generalize the question first:
 the medical pattern, not the person; the company class, not the account.
+
+SAY HOW LIKELY, IN THE STANDARD WORDS. When you state a judgement rather than a
+fact, express its likelihood with ONE of these seven terms and no others. This
+is the UK PHIA Probability Yardstick; the percentages are what the terms mean,
+not something to quote at the reader:
+    Remote chance        >0% – ~5%
+    Highly unlikely     ~10% – ~20%
+    Unlikely            ~25% – ~35%
+    Realistic possibility ~40% – <50%
+    Likely / probable   ~55% – ~75%
+    Highly likely       ~80% – ~90%
+    Almost certain      ~95% – <100%
+The gaps between the bands are deliberate: they are the room between one
+judgement and the next, so do not straddle them. Never invent a number of your
+own ("about 63% likely") — that is false precision and it is the single easiest
+way to sound authoritative while being wrong.
+
+SAY HOW SOUND THE BASIS IS — SEPARATELY. Likelihood and confidence are two
+different things: probability is how likely the statement is to be true;
+analytical confidence is how solid the foundation under that estimate is. A
+well-founded "unlikely" and a shaky "unlikely" are not the same claim. Rate
+confidence HIGH, MODERATE or LOW against the three PHIA criteria, and name
+which one is dragging it down:
+    Information base   — the quantity and quality of what you actually found
+    Analytical rigour  — how hard you examined it, and whether you tested it
+    Complexity and volatility — how fast-moving or tangled the subject is
+
+LABEL WHAT KIND OF STATEMENT YOU ARE MAKING. Every line in your findings is one
+of three things and must be readable as such: a FACT (something a source
+states, with that source), an INFERENCE (your reasoning from those facts), or
+an ASSUMPTION (something you are taking as given without evidence). Assumptions
+are not a weakness — leaving them unlabelled is. State them, and say what would
+break each one.
+
+CONSIDER MORE THAN ONE ANSWER. Before settling, write down at least two
+distinct, plausible explanations that could account for what you found, and say
+what evidence would falsify each. If a single explanation was obvious from the
+first search and you never looked for a rival, say so — that is a finding about
+your own method, and it belongs in NOT ESTABLISHED.
+
+ANALYTICAL INTEGRITY. Your assessment reports what the evidence supports, not
+what the user appears to want, not what is comfortable, and not what would make
+the run look worthwhile. If the honest answer is "the evidence does not settle
+this", that IS the finding.
 `
 
 // dossierOutputContract replaces the standard contract's FINDINGS shape for
@@ -698,6 +768,17 @@ credibility 1-6, as defined in DOSSIER DISCIPLINE above. Grade every claim;
 a claim you cannot grade is F6 and belongs in NOT ESTABLISHED.`,
 	"- Never present a single_claim as fact.",
 	"- Never present anything below grade 2 as fact; C3 and weaker are leads, not findings.",
+	"## CONFIDENCE\nExactly one word: proven | strong | plausible | speculative",
+	`## CONFIDENCE
+Two lines, in this order:
+  LIKELIHOOD: one of the seven yardstick terms (remote chance / highly unlikely /
+  unlikely / realistic possibility / likely / highly likely / almost certain),
+  covering your lane's ANSWER above. Omit this line only if your lane produced
+  no judgement at all, only facts.
+  CONFIDENCE: HIGH, MODERATE or LOW — and in the same sentence, which of
+  information base, analytical rigour, or complexity/volatility set that level.
+A high likelihood on a low-confidence basis is a normal and honest result. The
+two are separate claims; do not average them into one word.`,
 ).Replace(researchOutputContract)
 
 // dossierDutiesFooter is appended to the tool's report on dossier runs: the
@@ -713,13 +794,27 @@ const dossierDutiesFooter = `
    ceiling — the user priced this run at the warning screen, not an open loop.
    If the gaps are not load-bearing, say so and skip the round.
 
-2. THE PRODUCT. Assemble the dossier in exactly this shape:
-   # Dossier: <the question>
-   ## Bottom line — the direct answer first, three sentences or fewer
-   ## Findings — every claim with its two-axis GRADE carried through unchanged
+2. THE PRODUCT. Assemble the assessment in exactly this shape:
+   # All-Source Assessment: <the question>
+   ## Key judgements — the direct answer first, three sentences or fewer. EVERY
+      judgement carries a yardstick term (remote chance / highly unlikely /
+      unlikely / realistic possibility / likely / highly likely / almost
+      certain) AND an analytical confidence of HIGH, MODERATE or LOW with the
+      reason for that level. Likelihood and confidence are separate claims:
+      "highly likely, LOW confidence — one source, no corroboration" is a
+      legitimate and useful judgement. Never merge them into one word.
+   ## Findings — every claim with its two-axis source GRADE carried through
+      unchanged, each marked FACT, INFERENCE or ASSUMPTION.
+   ## Alternatives considered — the rival explanations and what would falsify
+      each. If you tested none, say that.
    ## Sources tried — including the ones that returned nothing
-   ## Not established — stated plainly, never papered over
+   ## Not established — the intelligence gaps, stated plainly, never papered
+      over. Say which key judgement each gap would move if it were filled.
    ## Recommended action — what the user should do next, one paragraph
+
+   The two grading systems are not rivals and must both appear: the Admiralty
+   letter+digit grades the SOURCE and its information; the yardstick and
+   confidence rating express YOUR judgement built on them.
 
 3. THE FILE. Write the complete dossier as markdown into a NEW file under
    %s (create the folder if missing), filename

@@ -1,4 +1,4 @@
-<!-- Version: 1.0.0 · updated 26-08-17-17-48 -->
+<!-- Version: 1.1.0 · updated 26-08-17-19-16 -->
 # The intelligence doctrine behind `/osint` — technical track
 
 This is the technical companion to [OSINT-RESEARCH.md](OSINT-RESEARCH.md), the
@@ -141,6 +141,63 @@ the absence — absence is a measured finding with a method behind it, not a
 shrug. Both come straight from doctrine's insistence that a gap papered over
 is worse than a gap declared: the "not answerable from open sources" triage
 bucket seeds NOT ESTABLISHED before collection even starts.
+
+---
+
+## 2.6 Expressing judgement: the UK all-source standard
+
+The three manuals in §1 govern collection and vetting. They do not settle how a
+finished judgement should be WORDED, and that gap is where an AI assessment
+fails most often: uniform confidence, everything asserted in the same steady
+voice. For that layer the tool follows the UK **Professional Development
+Framework for All-Source Intelligence Assessment**, published by the
+Professional Head of Intelligence Assessment (PHIA) — which is also where the
+product takes its name, since fusing several source families and weighing them
+IS all-source assessment rather than OSINT collection.
+
+Two instruments are ported verbatim, because approximating them would defeat
+the point.
+
+**The PHIA Probability Yardstick.** Likelihood is stated in one of seven fixed
+terms, never a number the model invented:
+
+| Term | Range |
+|---|---|
+| Remote chance | >0% – ~5% |
+| Highly unlikely | ~10% – ~20% |
+| Unlikely | ~25% – ~35% |
+| Realistic possibility | ~40% – <50% |
+| Likely / probable | ~55% – ~75% |
+| Highly likely | ~80% – ~90% |
+| Almost certain | ~95% – <100% |
+
+The gaps between bands are deliberate in the original and are preserved: they
+are the space between one judgement and the next.
+
+**The Analytical Confidence Rating.** HIGH, MODERATE or LOW, assessed against
+three criteria — *information base* (what was actually found), *analytical
+rigour* (how hard it was tested), and *complexity and volatility* (how
+fast-moving the subject is). The framework's own distinction is the load-bearing
+part: "probability reflects the likelihood that a statement is true, [while]
+analytical confidence reflects the soundness and stability of the foundations on
+which the assessment of likelihood has been made." So "highly likely, LOW
+confidence" is a coherent and useful judgement, and collapsing the two into one
+word destroys information.
+
+**Where each grading system applies.** They are not rivals and both appear in a
+product: the Admiralty letter+digit (ATP 2-22.9) grades a SOURCE and its
+information at collection time; the yardstick and confidence rating express the
+ANALYST'S judgement built on top of them.
+
+Also carried from the framework's competencies: hypotheses must be "multiple,
+distinct, plausible and falsifiable"; assumptions are identified and
+"proactively challenge[d]"; intelligence gaps are articulated rather than
+smoothed over; and analytical integrity means the assessment reflects the
+evidence "in the face of challenge from your customer" — in this tool's case,
+in the face of a user who plainly wants a particular answer.
+
+Source: <https://www.gov.uk/government/publications/intelligence-analysis-professional-development-framework/the-professional-development-framework-for-all-source-intelligence-assessment>
+and <https://www.gov.uk/government/publications/explaining-uncertainty-in-uk-intelligence-assessment/explaining-uncertainty-in-uk-intelligence-assessment>
 
 ---
 

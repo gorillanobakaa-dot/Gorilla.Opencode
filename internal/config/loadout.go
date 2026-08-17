@@ -66,12 +66,17 @@ var LoadoutComponents = []LoadoutComponent{
 	// calibration ran by asserting the displayed value DIFFERS from the number
 	// written here. Set this to the measured value and that test can no longer
 	// tell a calibrated figure from an uncalibrated one.
-	{"tool.research", "OSINT research (multi-agent)", "agent can't run multi-helper OSINT research over hundreds of sources — it investigates alone, which is how two days went into the wrong fix", 450, true, false},
+	// GORILLA FIX (2026-08-17): the name went back to what it always was. It was
+	// briefly renamed "OSINT research (multi-agent)" when /osint was added, which
+	// left BOTH research rows saying OSINT and no way to tell the everyday tool
+	// from the expensive one — "i don't know which is the old one". The command
+	// name is now in the row, because that is the thing a user can act on.
+	{"tool.research", "Research helpers — /research", "agent can't send helpers to investigate a question — it works alone, which is how two days went into the wrong fix. A RUN is 4-10 full model sessions", 450, true, false},
 	// GORILLA OVERRIDE: the serious dossier ships OFF and is armed here by hand.
 	// That is the whole design: a run is 4-10 full model sessions plus a gap
 	// round, so nobody meets it by accident — /osint refuses until this row is
 	// on, and every run still starts with the burn-rate warning screen.
-	{DossierComponentID, DossierRowName, "the /osint professional dossier refuses to run. Arm it only if you accept a run costs real money — a warning with the exact burn rate appears before each one", 120, false, false},
+	{DossierComponentID, DossierRowName, "the /osint all-source assessment refuses to run. ARMING it costs the tokens on the left; RUNNING it costs 4-10 full model sessions plus a gap round — the most expensive thing here, and the warning screen prices it before each run", 120, false, false},
 	// GORILLA OVERRIDE: default OFF. sparse is the kernel's own semantic checker
 	// (__user/__kernel pointers, endianness, lock imbalance) — invaluable on
 	// kernel work, meaningless everywhere else, so its schema should not ride
@@ -118,8 +123,41 @@ func RegisterLoadoutComponents(extra []LoadoutComponent) {
 // can never drift apart).
 const (
 	DossierComponentID = "tool.dossier"
-	DossierRowName     = "Serious OSINT dossier — EXPENSIVE"
+	// GORILLA FIX (2026-08-17): "EXPENSIVE" left the NAME. It sat beside the
+	// per-turn token column and read as a claim about that number — which is
+	// the smallest on the screen, because arming this only adds a paragraph to
+	// one tool's description. What is expensive is RUNNING it. The row says
+	// which command it is; the cost lives in RunCostRow and in the row's text,
+	// in the unit it belongs to.
+	//
+	// RENAMED 2026-08-17 from "dossier" to all-source assessment, at the
+	// owner's direction and because it is the accurate term: the tool fuses
+	// several source types and grades them, which is all-source assessment,
+	// not OSINT collection. The name follows the UK Professional Development
+	// Framework for All-Source Intelligence Assessment (PHIA); the row is
+	// abbreviated to fit its column, and AllSourceProductName is the full one.
+	DossierRowName = "OSINT All-Source — /osint"
 )
+
+// RunCostRow reports whether a component's real cost is paid when it is USED
+// rather than per turn.
+//
+// GORILLA OVERRIDE (2026-08-17): /context has one number column and it means
+// "tokens added to every message". For almost every row that is the whole
+// story. For the two research rows it is the smaller half of the story: a run
+// is several complete model sessions. Displaying only the per-turn figure made
+// the expensive row look like the cheap one — reported from a real screen,
+// where the dossier showed ~163 beside "EXPENSIVE" while the everyday research
+// row showed ~1,007. Both figures were right and the screen was misleading.
+func RunCostRow(id string) bool {
+	return id == "tool.research" || id == DossierComponentID
+}
+
+// AllSourceProductName is what the product is called in full, on the capability
+// page and in the written assessment. "All-source" is the accurate description:
+// the tool fuses scholarly, official, corporate, humanitarian and news sources
+// and grades them, which is assessment rather than collection.
+const AllSourceProductName = "OSINT All-Source Intelligence Analysis"
 
 // DossierDir is where /osint writes its finished dossiers.
 //

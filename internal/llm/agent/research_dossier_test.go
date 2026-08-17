@@ -22,6 +22,22 @@ func TestDossierPromptCarriesTheDiscipline(t *testing.T) {
 		"CIRCULAR REPORTING",
 		"ULTIMATE ORIGIN",
 		"| GRADE: <A-F><1-6>",
+		// The PHIA instruments: the yardstick's exact terms and bands, the
+		// separation of likelihood from confidence, fact/inference/assumption
+		// labelling, and rival hypotheses. These are what stop a model
+		// sounding certain about a shaky finding, so their absence is a
+		// regression worth failing over — not a wording preference.
+		"Realistic possibility",
+		"Almost certain",
+		"~95% – <100%",
+		"that is false precision",
+		"analytical confidence is how solid the foundation",
+		"Information base",
+		"Analytical rigour",
+		"Complexity and volatility",
+		"FACT (something a source",
+		"CONSIDER MORE THAN ONE ANSWER",
+		"ANALYTICAL INTEGRITY",
 	} {
 		if !strings.Contains(dos, want) {
 			t.Errorf("dossier prompt missing %q", want)

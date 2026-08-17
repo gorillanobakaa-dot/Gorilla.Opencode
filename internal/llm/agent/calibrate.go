@@ -21,8 +21,11 @@ import (
 
 // toolTokens approximates the tokens a tool adds to every request: its
 // name, description, and JSON-Schema parameters, at ~4 chars/token.
-func toolTokens(t tools.BaseTool) int {
-	i := t.Info()
+func toolTokens(t tools.BaseTool) int { return infoTokens(t.Info()) }
+
+// infoTokens is the same measurement against an explicit schema, so a tool
+// whose Info() varies with configuration can be measured in a known state.
+func infoTokens(i tools.ToolInfo) int {
 	b, _ := json.Marshal(map[string]any{
 		"name":        i.Name,
 		"description": i.Description,
@@ -59,7 +62,12 @@ func CalibrateLoadout(
 	set("tool.patch", tools.NewPatchTool(lspClients, permissions, history))
 	set("tool.write", tools.NewWriteTool(lspClients, permissions, history))
 	set("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions))
-	set("tool.research", NewResearchTool(sessions, messages, lspClients, permissions))
+	// GORILLA FIX (2026-08-17): measure the research tool WITHOUT the dossier
+	// addition, and the dossier row as that addition alone. Measuring Info()
+	// here counted the dossier's tokens in BOTH rows whenever it was armed.
+	if rt, ok := NewResearchTool(sessions, messages, lspClients, permissions).(*researchTool); ok {
+		config.SetLoadoutTokens("tool.research", infoTokens(rt.infoBase()))
+	}
 	// The dossier row's cost is the MARGINAL schema the research tool gains
 	// when it is armed — measured from the actual strings, not guessed.
 	config.SetLoadoutTokens(config.DossierComponentID, DossierSchemaTokens())
