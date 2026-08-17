@@ -948,11 +948,11 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	type outcome struct {
 		reply string
 		err   error
-		cost  float64
+		spend helperSpend
 	}
 	results := make([]outcome, len(roles))
 	var mu sync.Mutex
-	var supervisorCost float64
+	var supervisorSpend helperSpend
 
 	// GORILLA FIX 2026-08-14: every helper is REGISTERED BEFORE it queues.
 	//
@@ -998,7 +998,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 
 				SetSubAgentState(entry.ID, SubAgentRunning)
 				prompt := buildPrompt(roles[i], params.Question, params.Context, peers, i, len(roles), params.Doctrine)
-				reply, cost, err := r.runHelper(hctx, sessionID, call.ID, roles[i], prompt, entry.ID)
+				reply, spend, err := r.runHelper(hctx, sessionID, call.ID, roles[i], prompt, entry.ID)
 				switch {
 				case err != nil && hctx.Err() != nil:
 					SetSubAgentState(entry.ID, SubAgentKilled)
@@ -1007,7 +1007,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 				default:
 					SetSubAgentState(entry.ID, SubAgentDone)
 				}
-				results[i] = outcome{reply: reply, err: err, cost: cost}
+				results[i] = outcome{reply: reply, err: err, spend: spend}
 			}(i)
 		}
 		wg.Wait()
@@ -1058,7 +1058,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 				defer func() { <-sem }()
 
 				SetSubAgentState(entry.ID, SubAgentRunning)
-				reply, cost, err := r.runHelper(hctx, sessionID, call.ID, sup,
+				reply, spend, err := r.runHelper(hctx, sessionID, call.ID, sup,
 					supervisorPrompt(roles[i], params.Question, results[i].reply), entry.ID)
 				if err != nil {
 					if hctx.Err() != nil {
@@ -1073,7 +1073,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 				SetSubAgentState(entry.ID, SubAgentDone)
 				audits[i] = strings.TrimSpace(reply)
 				mu.Lock()
-				supervisorCost += cost
+				supervisorSpend.add(spend)
 				mu.Unlock()
 			}(i)
 		}
@@ -1093,13 +1093,32 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	// One write for the whole run: N goroutines doing read-modify-write on the
 	// parent session would lose costs, and under-reporting spend is the wrong
 	// direction to be wrong in.
-	total := supervisorCost
+	//
+	// GORILLA FIX (2026-08-17): TOKENS are rolled up too, and the write no
+	// longer depends on cost being non-zero.
+	//
+	// MEASURED on a real run: eight helpers burned 248,122 input and 32,622
+	// output tokens — 280,744 — while the status bar read "13.3K in / 630 out,
+	// spent $0.00" and never moved. Two failures stacked. Helper tokens were
+	// never aggregated at all, only cost; and on a free or flat-rate tier every
+	// helper's cost is legitimately 0.00, so `if total > 0` skipped the write
+	// entirely and the one number that could have warned the user was
+	// structurally incapable of changing. The owner noticed by doing the
+	// arithmetic in his head and was within 7% of the truth — which is the
+	// wrong way for anyone to learn what they just spent.
+	//
+	// This project's whole argument is that tokens are a recurring bill for
+	// people who cannot afford surprises. Under-reporting a run by a factor of
+	// twenty is the worst bug available to it.
+	total := supervisorSpend
 	for _, o := range results {
-		total += o.cost
+		total.add(o.spend)
 	}
-	if total > 0 {
+	if total.cost > 0 || total.inTokens > 0 || total.outTokens > 0 {
 		if parent, err := r.sessions.Get(ctx, sessionID); err == nil {
-			parent.Cost += total
+			parent.Cost += total.cost
+			parent.PromptTokens += total.inTokens
+			parent.CompletionTokens += total.outTokens
 			_, _ = r.sessions.Save(ctx, parent)
 		}
 	}
@@ -1154,10 +1173,10 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 
 // runHelper spawns one helper in its own session, registered so the user can
 // see it in /tasks and kill it.
-func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID string, role researchRole, prompt string, registryID string) (string, float64, error) {
+func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID string, role researchRole, prompt string, registryID string) (string, helperSpend, error) {
 	helper, err := NewAgent(researchAgentName(), r.sessions, r.messages, ResearchAgentTools(r.lspClients, r.permissions))
 	if err != nil {
-		return "", 0, fmt.Errorf("could not create helper: %w", err)
+		return "", helperSpend{}, fmt.Errorf("could not create helper: %w", err)
 	}
 
 	// GORILLA OVERRIDE: the session id MUST be unique per helper.
@@ -1176,7 +1195,7 @@ func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID st
 	// prefix.
 	helperSession, err := r.sessions.CreateTaskSession(ctx, helperSessionID(callID, role), parentSessionID, "Research: "+role.ID)
 	if err != nil {
-		return "", 0, fmt.Errorf("could not create helper session: %w", err)
+		return "", helperSpend{}, fmt.Errorf("could not create helper session: %w", err)
 	}
 	// GORILLA FIX (2026-08-17): tell the permission service this helper belongs
 	// to the user's conversation, so one "allow for session" covers the run
@@ -1197,22 +1216,29 @@ func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID st
 
 	done, err := helper.Run(ctx, helperSession.ID, prompt)
 	if err != nil {
-		return "", 0, fmt.Errorf("could not start helper: %w", err)
+		return "", helperSpend{}, fmt.Errorf("could not start helper: %w", err)
 	}
 	result := <-done
 	if result.Error != nil {
-		return "", 0, fmt.Errorf("helper failed: %w", result.Error)
+		return "", helperSpend{}, fmt.Errorf("helper failed: %w", result.Error)
 	}
 	if result.Message.Role != message.Assistant {
-		return "", 0, fmt.Errorf("helper returned no assistant message")
+		return "", helperSpend{}, fmt.Errorf("helper returned no assistant message")
 	}
 
 	// Report the spend; the CALLER adds it up once. Doing the read-modify-write
 	// on the parent session here would race with every other helper and lose
 	// costs — /usage would under-report exactly when a run was most expensive.
-	var spent float64
+	//
+	// Tokens travel with the cost: on a free tier the cost is 0.00 however much
+	// was burned, so tokens are the only honest signal there is.
+	var spent helperSpend
 	if updated, err := r.sessions.Get(ctx, helperSession.ID); err == nil {
-		spent = updated.Cost
+		spent = helperSpend{
+			cost:      updated.Cost,
+			inTokens:  updated.PromptTokens,
+			outTokens: updated.CompletionTokens,
+		}
 	}
 
 	reply := result.Message.Content().String()
@@ -1220,6 +1246,21 @@ func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID st
 		return "", spent, fmt.Errorf("helper returned an empty reply")
 	}
 	return reply, spent, nil
+}
+
+// helperSpend is what one helper consumed. Cost alone is not enough: on a free
+// or flat-rate tier it is always 0.00, and a user watching only that number
+// would see a 280,000-token run report nothing at all.
+type helperSpend struct {
+	cost      float64
+	inTokens  int64
+	outTokens int64
+}
+
+func (h *helperSpend) add(o helperSpend) {
+	h.cost += o.cost
+	h.inTokens += o.inTokens
+	h.outTokens += o.outTokens
 }
 
 // helperSessionID derives a UNIQUE session id per helper. See the note at the

@@ -155,3 +155,35 @@ func TestOsintPageRendersAndScrolls(t *testing.T) {
 		t.Errorf("esc did not close the page: %+v", cmd())
 	}
 }
+
+// The gate must state the SIZE of the run in tokens, not only a per-minute
+// price.
+//
+// GORILLA OVERRIDE (2026-08-17): a real run burned 280,744 tokens while the
+// status bar read "13.3K in / 630 out, spent $0.00". The owner caught it by
+// totalling the database by hand and was within 7% — nobody else will do that.
+// His verdict on the old screen: the numbers "look deceivingly small and
+// reassuring". The token-per-hour line is the correction, so it is asserted.
+func TestGateStatesTheRunSizeInTokens(t *testing.T) {
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	d := NewOsintDialogCmp("q")
+	d.SetSize(150, 45)
+	d.agents = agent.ResearchMaxAgents
+	view := d.View()
+
+	for _, want := range []string{"TOKENS PER HOUR", "measured from a real run", "tokens/min each"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("gate does not state the run's size in tokens: missing %q", want)
+		}
+	}
+	// The figure must scale with the run: more sessions, bigger number.
+	small := NewOsintDialogCmp("q")
+	small.SetSize(150, 45)
+	small.agents = agent.ResearchMinAgents
+	if small.scaleLines()[0] == d.scaleLines()[0] {
+		t.Errorf("the token figure does not change between %d and %d helpers — it is decoration, not a measurement",
+			agent.ResearchMinAgents, agent.ResearchMaxAgents)
+	}
+}

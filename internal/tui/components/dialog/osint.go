@@ -11,6 +11,7 @@ package dialog
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -157,7 +158,13 @@ func (m OsintDialogCmp) moneyLines() []string {
 	var out []string
 	switch {
 	case !priced:
-		out = append(out, fmt.Sprintf("Cost: UNPRICED — no price table entry for %s. Assume it is not free.", name))
+		// The name is empty when no model is configured yet; a sentence with a
+		// hole in it reads like a bug and undermines the warning it carries.
+		which := name
+		if strings.TrimSpace(which) == "" {
+			which = "the model helpers will run on"
+		}
+		out = append(out, fmt.Sprintf("Cost: UNPRICED — no price-table entry for %s. Assume it is NOT free.", which))
 	case per1M <= 0:
 		out = append(out, fmt.Sprintf("Your tier (%s) bills flat or free — this run spends QUOTA: roughly %d ordinary questions' worth.",
 			name, config.ResearchQuotaMultiple(sessions)))
@@ -177,6 +184,27 @@ func (m OsintDialogCmp) moneyLines() []string {
 func assumptionsLine() string {
 	return fmt.Sprintf("Assumptions on screen, arguable: %d steps/helper, ~%d tokens out/step, ~%.0fs/step. Dossiers add a gap round on top.",
 		config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep)
+}
+
+// scaleLines states the size of the run in TOKENS, which is the only unit that
+// stays honest on every tier. Money reads as zero on a free plan however much
+// is burned; tokens do not.
+//
+// The rate is MEASURED, not modelled: a real eight-helper run on 2026-08-17
+// consumed 248,122 input and 32,622 output tokens in the thirteen minutes it
+// was working — 21,596 tokens a minute. Scaling is linear in the number of
+// sessions, which is the same assumption the per-minute figure already makes
+// and is printed on screen so it can be argued with.
+func (m OsintDialogCmp) scaleLines() []string {
+	measuredPerMinutePerSession := 21596.0 / 8.0
+	sessions := m.sessions()
+	perHour := measuredPerMinutePerSession * float64(sessions) * 60.0
+	return []string{
+		fmt.Sprintf("SIZE OF THIS RUN: about %s TOKENS PER HOUR while it works (%d sessions x ~%s tokens/min each,",
+			commaInt(int(perHour)), sessions, commaInt(int(measuredPerMinutePerSession))),
+		"measured from a real run, not modelled). A quarter of a million tokens in the first ten minutes is normal.",
+		"If a per-minute figure above looks small to you, this is the number to look at instead.",
+	}
 }
 
 func helperModel() models.Model {
@@ -207,10 +235,13 @@ func (m OsintDialogCmp) View() string {
 func (m OsintDialogCmp) renderAt(lean int) string {
 	t := theme.CurrentTheme()
 	base := styles.BaseStyle()
-	// GORILLA FIX (2026-08-17): never floor UP past what the terminal has —
-	// max(80, …) drew an 84-column frame into an 80-column window. Chrome is
-	// subtracted, never added. See the note on loadoutDialogCmp.width().
-	w := dialogWidth(m.width, 110, 8)
+	// GORILLA (2026-08-17): this screen takes the WHOLE terminal. It was a
+	// 110-column box and the owner's verdict was that the warning "gets
+	// truncated" and reads "deceivingly small and reassuring". A screen whose
+	// job is to stop someone spending money they do not have cannot be the
+	// screen that runs out of room. dialogWidth still guarantees it never
+	// exceeds the window — see loadoutDialogCmp.width().
+	w := dialogWidth(m.width, 200, 8)
 
 	red := base.Foreground(lipgloss.Color("#FF0000")).Bold(true).Width(w)
 	head := base.Foreground(t.Primary()).Bold(true).Width(w)
@@ -239,6 +270,20 @@ func (m OsintDialogCmp) renderAt(lean int) string {
 	// The money NEVER goes. It is the entire reason this screen exists.
 	for _, line := range m.moneyLines() {
 		b = append(b, red.Render(line))
+	}
+	// GORILLA (2026-08-17): the SCALE, in tokens, measured from a real run.
+	//
+	// The per-minute figure above is correct and it is not enough: "$0.03/min"
+	// and "12 questions' worth" read as small, and the owner — who can do this
+	// arithmetic — only caught the true size by totalling the database by hand
+	// afterwards. Most people cannot and will not. A measured run of EIGHT
+	// helpers burned 280,744 tokens in thirteen minutes: about 1.3 million
+	// tokens an hour, and a ten-helper supervised run projects to roughly 2.9
+	// million an hour. Those are the numbers that make the decision real.
+	if lean < 3 {
+		for _, line := range m.scaleLines() {
+			b = append(b, red.Render(line))
+		}
 	}
 	if lean < 3 {
 		// The styles carry .Width(w), which WRAPS rather than overflowing — so a
