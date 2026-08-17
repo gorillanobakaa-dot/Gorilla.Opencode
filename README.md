@@ -26,6 +26,12 @@ API keys or run models on your own machine.
 > requests, and exactly what our cost/pace/agent controls do (with the source
 > files so you can recreate them): **[docs/CONTROL-AND-COST.md](docs/CONTROL-AND-COST.md)**.
 >
+> **🤖 OpenAI models with no API key — a *free* ChatGPT account is enough.**
+> An API key needs a developer account, which needs a card. Signing in with the
+> ChatGPT account you already have does not. No per-use charge at all; go over
+> your plan's allowance and you are paused, never billed:
+> **[docs/CHATGPT-LOGIN.md](docs/CHATGPT-LOGIN.md)**.
+>
 > **🔑 Free Gemini with no API key.** Sign in with your Gmail
 > (`gorilla-opencode login`) to use Google's Code Assist free tier — the same
 > login Gemini CLI/Antigravity use, so your quota lasts: **[docs/GOOGLE-LOGIN.md](docs/GOOGLE-LOGIN.md)**.

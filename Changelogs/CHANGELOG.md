@@ -1,3 +1,53 @@
+## v0.1.87 — 2026-08-17 — sign in with ChatGPT (a free account is enough)
+
+Full dual-track document: [v0.1.87-release-notes.md](v0.1.87-release-notes.md).
+
+**Plain-language version:** You can now use OpenAI's models with the ChatGPT
+account you already have, instead of an API key — and a **free** ChatGPT account
+works. That matters because an API key needs a developer account, which needs a
+payment method, which needs a credit card, and for a lot of people that is where
+the road ends. You sign in through your browser the way you sign in to any
+website; ChatGPT is the second row on the start-up screen, tagged free. There is
+no per-use charge on this route at all, which is why those two models show no
+prices — showing API prices next to models that never charge you would be a lie.
+Go over your plan's allowance and you are paused for a while, never billed. You
+get GPT-5.5 for your work and a smaller model the program uses quietly in the
+background for jobs like naming your conversations, so it does not spend the
+strong model on a chat title and bring your cooldown forward for nothing. The two
+newest models, GPT-5.6 Terra and Luna, are deliberately **not** offered: they
+expect tools handed over in a shape this program does not speak yet, so listing
+them would mean you sign in, pick one, and watch it fail the first time it tries
+to read a file. The sign-in screen says so on the row itself. Honest limits, all
+stated on screen or in the notes: this rides an interface OpenAI does not
+publish, so it could break without warning; the smaller model is retired by
+OpenAI on 31 August 2026; there is no usage meter yet; and the model list is a
+snapshot that does not refresh itself.
+
+**Technical:** New provider `chatgpt` — OAuth 2.0 + PKCE (S256) against
+auth.openai.com, credentials at `~/.config/gorilla-opencode/chatgpt-oauth.json`
+(0600, its own file so the three sign-ins cannot clobber each other), loopback
+callback fixed at port 1455 because OpenAI matches `redirect_uri` exactly and a
+kernel-chosen port fails at authorize. `internal/llm/provider/chatgpt.go` is a
+hand-built Responses API transport, **not** `OpenAIClient` behind a base URL the
+way GROQ/xAI/DeepSeek are: the token does not authenticate against
+api.openai.com at all, and the backend uses `instructions`/`input`, top-level
+`function_call`/`function_call_output` items, flat tool objects and named
+`response.*` SSE events. `send()` drains `stream()` so there is no second parse
+to rot. Two of five advertised models registered; `gpt-5.6-terra`/`-luna` report
+`tool_mode: code_mode_only` and are withheld, `codex-auto-review` is
+`visibility: hide`. Catalogue costs are 0 by design. `backgroundModelByProvider`
+routes helpers to `gpt-5.4-mini` — one pool, so this is cheapness, not
+Antigravity's separate-quota split. Two live-measured corrections to inferred
+wire shape: this backend **rejects** `max_output_tokens` (400 Unsupported
+parameter, where the public Responses API accepts it), and `client_version` is a
+required *query* parameter on `/responses`, not a header. `provider.ProviderModel`
+/`NewProviderModel` exported so the portal renders headlessly; the row tests were
+confirmed to FAIL with the row deleted. Live probes gated behind `CHATGPT_LIVE=1`
+read past this package's config isolation for the credential only. Stripped
+binary 51,867,940 B, +77,824 B (+0.15%) over v0.1.86. Also folded in: `install.sh`
+fetch-then-parse, so a SIGPIPE from `curl | awk` is no longer misreported as a
+network failure.
+
 ## v0.1.86 — 2026-08-16 — the repairs v0.1.85 needed, and history that knows which folder it came from
 
 Full dual-track document: [v0.1.86-release-notes.md](v0.1.86-release-notes.md).
