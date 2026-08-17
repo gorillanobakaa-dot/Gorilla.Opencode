@@ -69,7 +69,7 @@ func osintContent() []osintLine {
 		armLine = osintLine{"red", "STATUS: ARMED. /osint <question> will show the burn-rate warning, then run on your say-so."}
 	}
 	return []osintLine{
-		{"h1", "GORILLA OSINT — All-Source Intelligence Analysis, explained"},
+		{"h1", "GORILLA " + config.AllSourceProductName + " — explained"},
 		{"mute", "↑↓/PgUp/PgDn scroll · esc closes · /osint <question> runs it (after the warning)"},
 		{"", ""},
 		armLine,
