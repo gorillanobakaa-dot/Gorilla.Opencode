@@ -6,6 +6,8 @@ package dialog
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -106,6 +108,25 @@ func loadoutRowCount() int {
 	return numDials + len(config.LoadoutComponents) + len(config.Extras)
 }
 
+// sortedLoadout is the display order of the feature rows: alphabetical by
+// name, case-insensitive.
+//
+// GORILLA OVERRIDE: registry order was registration order — hand-written tools,
+// then prompt blocks, then whatever RegisterLoadoutComponents appended, with
+// language servers at the end. Fifteen-plus rows in that order is a mess to
+// scan ("right now is a mess" — 2026-08-17). Sorting happens HERE, at display,
+// not in the registry: other consumers (calibration, the LSP gate) key on ID
+// and do not care, and both Update and renderAt must index the SAME order or
+// space would toggle a different row from the one highlighted.
+func sortedLoadout() []config.LoadoutComponent {
+	rows := make([]config.LoadoutComponent, len(config.LoadoutComponents))
+	copy(rows, config.LoadoutComponents)
+	sort.SliceStable(rows, func(i, j int) bool {
+		return strings.ToLower(rows[i].Name) < strings.ToLower(rows[j].Name)
+	})
+	return rows
+}
+
 // extrasFirstRow is the index where the "show me the working" section starts.
 //
 // GORILLA OVERRIDE: extras are a THIRD section, kept apart from the feature rows
@@ -165,7 +186,7 @@ func (m *loadoutDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, util.CmdHandler(LoadoutChangedMsg{})
 			}
-			config.ToggleLoadout(config.LoadoutComponents[m.selectedIdx-numDials].ID)
+			config.ToggleLoadout(sortedLoadout()[m.selectedIdx-numDials].ID)
 			return m, util.CmdHandler(LoadoutChangedMsg{})
 		case key.Matches(msg, loadoutKeys.Reset):
 			config.ResetLoadout()
@@ -296,46 +317,93 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 		}
 		return s
 	}
-	fitLine := func(line string) string {
-		if r := []rune(line); len(r) > w-1 {
-			return string(r[:w-2]) + "…"
+	fitTo := func(line string, width int) string {
+		if r := []rune(line); len(r) > width-1 {
+			return string(r[:width-2]) + "…"
 		}
 		return line
+	}
+	fitLine := func(line string) string { return fitTo(line, w) }
+
+	// GORILLA OVERRIDE (2026-08-17): state is shown by a WORD that flips, not a
+	// checkbox. Real-user feedback on v0.1.87: "Which is off/on, is it x'ed or
+	// unx'ed and greyed out, regardless the description still shows off". The
+	// [x]/[ ] idiom means nothing to someone who never used a terminal, and the
+	// tradeoff text opened with "off:" on rows that were ON. Now the row leads
+	// with ON/OFF in reverse-video (ANSI palette colours, so it survives any
+	// theme and any terminal background), the word visibly changes when space is
+	// pressed, and the description never opens with a bare "off".
+	//
+	// Composed from fixed-width fragments so the total is exactly w: the badge
+	// carries its own colours and is NEVER truncated; only the plain-text
+	// remainder passes through fitTo. Truncating a styled string would cut ANSI
+	// codes mid-sequence — that is how over-wide-line bugs get written.
+	const selW, badgeW = 2, 5
+	onBadge := base.Background(lipgloss.Color("2")).Foreground(lipgloss.Color("0")).Bold(true).Render(" ON  ")
+	offBadge := base.Background(t.TextMuted()).Foreground(t.Background()).Render(" OFF ")
+	toggleRow := func(selected, on bool, rest string, restStyle lipgloss.Style) string {
+		mark, markStyle := "  ", base
+		if selected {
+			mark, markStyle = "> ", base.Background(t.Primary()).Foreground(t.Background()).Bold(true)
+		}
+		badge := offBadge
+		if on {
+			badge = onBadge
+		}
+		restW := w - selW - badgeW
+		return lipgloss.JoinHorizontal(lipgloss.Top,
+			markStyle.Render(mark),
+			badge,
+			restStyle.Width(restW).MaxWidth(restW).Render(fitTo(rest, restW)))
+	}
+	// restStyle mirrors rowStyle minus the fixed width, for the composed rows.
+	restStyle := func(selected, muted bool) lipgloss.Style {
+		switch {
+		case selected:
+			return base.Background(t.Primary()).Foreground(t.Background()).Bold(true)
+		case muted:
+			return base.Foreground(t.TextMuted())
+		}
+		return base
 	}
 
 	// --- Section 1: the two Gorilla control dials (arrow-key adjustable) ---
 	dialHeader := base.Foreground(t.Primary()).Bold(true).Width(w).
 		Render("🦍 GORILLA CONTROLS — tune for your connection / free tier  (↑↓ pick a line · ←→ change it):")
-	paceLine := fitLine(fmt.Sprintf(" %-32s ‹ ←/→ ›  %s", "AI SERVER requests — pace-setter", paceDesc()))
-	leashLine := fitLine(fmt.Sprintf(" %-32s ‹ ←/→ ›  %s", "GORILLA AGENTS/SUBAGENTS — leash", leashDesc()))
+	// Dial rows carry the same "> " selection pointer as the toggle rows, so
+	// "where am I" reads the same way everywhere in the dialog.
+	dialRow := func(selected bool, label, desc string) string {
+		mark := "  "
+		if selected {
+			mark = "> "
+		}
+		return rowStyle(selected, false).Render(fitLine(fmt.Sprintf("%s%-32s ‹ ←/→ ›  %s", mark, label, desc)))
+	}
 
 	var rows []string
-	rows = append(rows, rowStyle(m.selectedIdx == rowPace, false).Render(paceLine))
-	rows = append(rows, rowStyle(m.selectedIdx == rowLeash, false).Render(leashLine))
+	rows = append(rows, dialRow(m.selectedIdx == rowPace, "AI SERVER requests — pace-setter", paceDesc()))
+	rows = append(rows, dialRow(m.selectedIdx == rowLeash, "GORILLA AGENTS/SUBAGENTS — leash", leashDesc()))
 
 	// --- Section 2: switch features on/off ---
 	featHeader := base.Foreground(t.Primary()).Bold(true).Width(w).
-		Render("Turn features on/off  (space):")
-	for i, c := range config.LoadoutComponents {
+		Render("Turn features ON/OFF  (> marks where you are · space flips it):")
+	for i, c := range sortedLoadout() {
 		on := config.LoadoutEnabled(c.ID)
-		box := "[ ]"
-		if on {
-			box = "[x]"
-		}
 		mark := ""
 		if c.Critical {
 			mark = " ⚠"
 		}
 		// GORILLA OVERRIDE: real measured cost via ComponentTokens.
-		line := fitLine(fmt.Sprintf("%s %-18s ~%-6s  %s%s", box, c.Name, commaInt(config.ComponentTokens(c)), tradeoffText(on, c.Tradeoff), mark))
+		rest := fmt.Sprintf("%-32s ~%-6s  %s%s", c.Name, commaInt(config.ComponentTokens(c)), tradeoffText(on, c.Tradeoff), mark)
+		selected := m.selectedIdx == i+numDials
 		// GORILLA OVERRIDE: research row is highlighted in bright red — it is the
 		// most expensive tool (several full LLM sessions per use) and the user must
 		// never lose sight of it in the list.
-		if c.ID == "tool.research" && m.selectedIdx != i+numDials {
-			rows = append(rows, base.Width(w).Foreground(lipgloss.Color("#FF0000")).Bold(true).Render(line))
-		} else {
-			rows = append(rows, rowStyle(m.selectedIdx == i+numDials, !on).Render(line))
+		style := restStyle(selected, !on)
+		if c.ID == "tool.research" && !selected {
+			style = base.Foreground(lipgloss.Color("#FF0000")).Bold(true)
 		}
+		rows = append(rows, toggleRow(selected, on, rest, style))
 	}
 
 	// --- Section 3: show me the working ---
@@ -348,22 +416,19 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	var extraRows []string
 	for i, e := range config.Extras {
 		on := config.ExtraEnabled(e.ID)
-		box := "[ ]"
-		if on {
-			box = "[x]"
-		}
 		cost := "free"
 		if e.Cost == config.CostGeneration {
 			cost = "COSTS EXTRA"
 		}
-		line := fitLine(fmt.Sprintf("%s %-30s %-12s  %s", box, e.Name, cost, e.What))
-		extraRows = append(extraRows, rowStyle(m.selectedIdx == extrasFirstRow()+i, !on).Render(line))
+		rest := fmt.Sprintf("%-34s %-12s  %s", e.Name, cost, e.What)
+		selected := m.selectedIdx == extrasFirstRow()+i
+		extraRows = append(extraRows, toggleRow(selected, on, rest, restStyle(selected, !on)))
 	}
 	extrasNote := base.Foreground(t.TextMuted()).Width(w).
 		Render(fitLine("  \"free\" = already generated and paid for; hiding it saves nothing. \"COSTS EXTRA\" = the model writes more."))
 
 	help := base.Foreground(t.TextMuted()).Width(w).
-		Render("↑↓ pick · ←→ dial · space toggle · L all LSPs · l low-bw · r reset · esc close   ⚠ = disabling cripples the agent")
+		Render("↑↓ pick · ←→ dial · space flips ON/OFF · L all LSPs · l low-bw · r reset · esc close   ⚠ = disabling cripples the agent")
 
 	// Window the feature rows rather than rendering all of them. featureRows is
 	// decided by measurement in View(), not by a guess at how much chrome the rest
@@ -486,11 +551,20 @@ func formatUSD(d float64) string {
 	return fmt.Sprintf("$%.2f", d)
 }
 
+// tradeoffText introduces the consequence line so it can never be misread as
+// the row's state.
+//
+// GORILLA OVERRIDE (2026-08-17): it used to open with "off:" on rows that were
+// ON (meaning "if you turn this off…") and "OFF —" on rows that were off, so
+// every row on the screen led with the word "off" whatever its state. A real
+// v0.1.87 user reported exactly that: "regardless the description still shows
+// off". The state now lives ONLY in the ON/OFF badge; this text is purely the
+// consequence, introduced unambiguously.
 func tradeoffText(on bool, tradeoff string) string {
 	if on {
-		return "off: " + tradeoff
+		return "turn off and: " + tradeoff
 	}
-	return "OFF — " + tradeoff
+	return "while off: " + tradeoff
 }
 
 // commaInt formats an int with thousands separators.

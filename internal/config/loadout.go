@@ -66,7 +66,7 @@ var LoadoutComponents = []LoadoutComponent{
 	// calibration ran by asserting the displayed value DIFFERS from the number
 	// written here. Set this to the measured value and that test can no longer
 	// tell a calibrated figure from an uncalibrated one.
-	{"tool.research", "Research (multi-agent)", "agent can't run multi-role research — it investigates alone, which is how two days went into the wrong fix", 450, true, false},
+	{"tool.research", "OSINT research (multi-agent)", "agent can't run multi-helper OSINT research over hundreds of sources — it investigates alone, which is how two days went into the wrong fix", 450, true, false},
 	// GORILLA OVERRIDE: default OFF. sparse is the kernel's own semantic checker
 	// (__user/__kernel pointers, endianness, lock imbalance) — invaluable on
 	// kernel work, meaningless everywhere else, so its schema should not ride

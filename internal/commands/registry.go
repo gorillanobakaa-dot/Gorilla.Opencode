@@ -57,18 +57,17 @@ var All = []Command{
 	// ─── Your conversation ───────────────────────────────────────────
 	{
 		Name:    "research",
+		Aliases: []string{"osint"},
 		Group:   GroupHelpers,
 		Args:    "<question>",
-		Summary: "Send helper agents to investigate, each on one angle.",
-		Detail: "Four to ten helpers, each given ONE angle: what already exists on this " +
-			"machine, whether anyone else has solved it, what the authoritative documents " +
-			"say, and what the target actually requires. A verifier then attacks their " +
-			"conclusions.\n\n" +
-			"You choose how it runs, because the choice multiplies the bill: sequential " +
-			"(one at a time), parallel (all at once — SAME cost, much less waiting) or " +
-			"supervised (parallel plus a second agent auditing every lane — DOUBLE). " +
-			"Each helper is a full model session, so four helpers is four sessions.\n\n" +
-			"Worth it when being wrong is expensive. Waste when a single grep would answer.",
+		Summary: "OSINT research: hundreds of sources, vetted and cited.",
+		Detail: "A real intelligence cycle, not a one-shot answer: helpers plan the " +
+			"question, collect from hundreds of free sources — scholarly APIs, World " +
+			"Bank, SEC filings, humanitarian data, global news — and a verifier attacks " +
+			"their findings. It cites only sources it actually opened and says plainly " +
+			"what it could NOT establish. Each helper is a full model session; the " +
+			"dialog shows the cost before anything starts. Worth it when being wrong " +
+			"is expensive, waste when a single search would answer.",
 	},
 	{
 		Name:    "clear",

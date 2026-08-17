@@ -950,7 +950,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The mode multiplies the bill (supervised is double), and the model
 		// picking it from a schema the user never sees is the wrong place for
 		// that decision.
-		case "research":
+		case "research", "osint":
 			q := strings.TrimSpace(msg.Args)
 			if q == "" {
 				return a, util.ReportWarn("Give it something to investigate: /research does X actually work on this machine?")
