@@ -115,3 +115,11 @@ Compiled.Builds/
 # The store is rebuildable from the atoms at any time:
 #   SECOND.BRAIN/vector_env/bin/python3 LESSONS/ingest_lessons.py
 LESSONS/
+
+# GORILLA OVERRIDE: local output of the code-review toolkit
+# (Documentation.Scripts/Code.review/), one timestamped directory per run.
+# Untracked but not ignored, it made `git status` dirty, and Go stamps that
+# into every binary as vcs.modified=true — so release builds claimed to come
+# from a modified tree when the tracked source was clean. The directory itself
+# is left in place; only its tracking is suppressed.
+.code_review/
