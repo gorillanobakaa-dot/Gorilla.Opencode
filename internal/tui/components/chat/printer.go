@@ -272,7 +272,10 @@ func (m *messagesCmp) printPending() []tea.Cmd {
 		if m.printed[msg.ID] {
 			continue
 		}
-		if !ScrollbackReady(msg) {
+		// Settled = finished AND its tool results exist (they arrive in a later
+		// message; printing before them bakes "Waiting for response..." into
+		// the terminal's permanent history — see ScrollbackSettled).
+		if !ScrollbackSettled(msg, m.messages) {
 			// Not settled, but its reasoning may be: print the lines that can
 			// no longer change, then stop so nothing overtakes this message.
 			cmds = append(cmds, m.streamReasoning(msg)...)

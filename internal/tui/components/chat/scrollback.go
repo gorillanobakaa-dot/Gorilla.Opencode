@@ -71,6 +71,43 @@ func RenderForScrollback(
 // A user message is complete the moment it exists. An assistant message is not
 // complete until it reports finished, because until then both its text and its
 // tool calls are still arriving.
+// ScrollbackSettled is ScrollbackReady plus one more condition: everything the
+// message will DISPLAY must exist too.
+//
+// GORILLA FIX (2026-08-17): an assistant message reports finished the moment
+// its stream ends — but its tool RESULTS arrive later, in a separate tool
+// message. Printing at IsFinished meant every tool-using turn rendered its
+// calls with the response==nil branch, so the terminal's permanent history
+// read "Waiting for response..." forever and what the tool actually returned
+// was never visible anywhere. Observed live on the crocodile search
+// (2026-08-17, v0.1.88~test1): the find call and its 32 KB result were in the
+// database and absent from the screen. Scrollback cannot be reprinted, so the
+// only correct moment to print a tool-using turn is after its results exist.
+//
+// The exception list is the anti-stall belt (see the 2026-07-30 corpse below):
+// a turn that ended abnormally — canceled, errored, permission-denied — may
+// legitimately never get results for every call, and the transcript must not
+// wait forever behind it. Those print immediately; their tool calls render
+// with whatever state they reached, which is the truthful account of that turn.
+func ScrollbackSettled(msg message.Message, all []message.Message) bool {
+	if !ScrollbackReady(msg) {
+		return false
+	}
+	if msg.Role != message.Assistant {
+		return true
+	}
+	switch msg.FinishReason() {
+	case message.FinishReasonCanceled, message.FinishReasonError, message.FinishReasonPermissionDenied:
+		return true
+	}
+	for _, tc := range msg.ToolCalls() {
+		if findToolResponse(tc.ID, all) == nil {
+			return false
+		}
+	}
+	return true
+}
+
 func ScrollbackReady(msg message.Message) bool {
 	switch msg.Role {
 	case message.User:

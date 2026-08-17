@@ -25,8 +25,17 @@ func TestATurnThatGoesStraightToAToolIsNotReportedAsEmpty(t *testing.T) {
 			message.Finish{Reason: message.FinishReasonToolUse},
 		},
 	}
+	// The result must exist for the turn to print at all — scrollback now waits
+	// for it (ScrollbackSettled), because printing earlier baked
+	// "Waiting for response..." into the terminal's history.
+	toolResult := message.Message{
+		ID: "t1", Role: message.Tool, CreatedAt: at + 1,
+		Parts: []message.ContentPart{
+			message.ToolResult{ToolCallID: "c1", Content: "ok"},
+		},
+	}
 
-	m := printerFor(t, 100, assistantWithCall)
+	m := printerFor(t, 100, assistantWithCall, toolResult)
 	out := strings.Join(plainLines(m.printPending()), "\n")
 
 	if strings.Contains(out, "Finished without output") {
