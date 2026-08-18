@@ -1,4 +1,4 @@
-<!-- Version: 1.0.0 · updated 26-08-17-19-30 -->
+<!-- Version: 1.1.0 · updated 26-08-18-20-13 -->
 # Gorilla OpenCode — screenshots & proof
 
 Real screenshots from a Debian 13 / GNOME 48 machine running the revived
@@ -21,6 +21,31 @@ downscaled, cropped for tidiness, or re-encoded to save bytes. The reason is the
 philosophy, not vanity: this project's claim is that a non-technical reader can
 CHECK what was built, and a screenshot too small to read destroys exactly that.
 Nothing is staged — the numbers on screen are real runs.
+
+---
+
+## v0.1.96 — when the link fails, it fails cheaply and says so
+
+Captured 2026-08-18 on Debian 13 / GNOME 48, model **Llama 3.3 70B**, over a
+**simulated bad satellite link** (a local proxy throttling to 2 KB/s, or dropping
+the connection). Both are real runs — the numbers on screen are the program's own.
+
+### A slow model is not a hung one — the screen says which
+
+While waiting for a slow endpoint, the indicator counts (`Generating… (12s)`),
+and once the wait crosses the point where a free model is usually just warming
+up, a notice says so in the status bar. You can tell "warming up" from "stuck"
+without guessing.
+
+[![The waiting indicator counting "Generating… (12s)" on a slow link, with the status bar reading "Still waiting on the model — a quiet endpoint is usually warming up, not stuck. First reply…"](screenshots/gallery/v0196-cold-start-toast.png)](screenshots/gallery/v0196-cold-start-toast.png)
+
+### When the link drops, it stops — and tells you what it spent
+
+A dropping connection used to retry silently and upload a megabyte for one
+unanswered question. Now the turn stops at a budget counted in the bytes you pay
+for, and says exactly what it cost, rather than failing in silence.
+
+[![The upload-budget stop after a dropping link: "stopped after 8 attempts: this turn had already uploaded 307 KB of the 307 KB it is allowed, and the connection kept failing. Nothing further was sent. On a slow or metered link each retry re-uploads the whole conversation, so retrying forever costs real money for no answer."](screenshots/gallery/v0196-upload-budget-error.png)](screenshots/gallery/v0196-upload-budget-error.png)
 
 ---
 

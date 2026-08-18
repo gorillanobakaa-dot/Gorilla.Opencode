@@ -1,5 +1,15 @@
 # Gorilla OpenCode v0.1.96 — when the link fails, it fails cheaply and says so
 
+[![The waiting indicator counting "Generating… (12s)" on a slow link, with the status bar reading "Still waiting on the model — a quiet endpoint is usually warming up, not stuck. First reply…" — so a slow model is never mistaken for a hang](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.96/docs/screenshots/gallery/v0196-cold-start-toast.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.96/docs/screenshots/gallery/v0196-cold-start-toast.png)
+
+[![After a dropping link, the turn stops and says what it spent: "stopped after 8 attempts: this turn had already uploaded 307 KB of the 307 KB it is allowed, and the connection kept failing. Nothing further was sent… retrying forever costs real money for no answer." Failing cheaply and out loud instead of a silent megabyte.](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.96/docs/screenshots/gallery/v0196-upload-budget-error.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.96/docs/screenshots/gallery/v0196-upload-budget-error.png)
+
+*Top: the on-screen liveness — the counter, and the warming-up notice. Bottom:
+the retry-budget stop, counted in the bytes you pay for. Both are real runs on a
+simulated 2 KB/s / dropping link; click either for the full-resolution original.*
+
+---
+
 **Everything you need is on this page**, printed in full.
 
 ## Download
