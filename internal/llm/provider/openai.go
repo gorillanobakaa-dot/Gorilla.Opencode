@@ -615,12 +615,18 @@ func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool)
 		// first-byte timeout gets exactly one retry — enough to ride out a real
 		// dropout, not enough to sit on a dead model.
 		if isFirstByteTimeout(err) && attempts > 1 {
+			// The wording matters and the first version of it was wrong. It said
+			// the model "is not actually being served". Measured 40 minutes
+			// later, the same black-holed model answered in 12 seconds: these
+			// endpoints COLD-START, so silence means "not warm yet or queued",
+			// not "broken". Telling a user to abandon a model that would have
+			// worked is worse than saying nothing.
 			return false, 0, fmt.Errorf(
-				"the server accepted the connection and then sent nothing, twice. "+
-					"That usually means this particular model is not actually being "+
-					"served, even if it is still listed — provider catalogues routinely "+
-					"advertise models that answer nothing. Try another model with "+
-					"/models. (waited %s each time; "+
+				"the server took the request and sent nothing back, twice. Models on "+
+					"shared endpoints are often idle and have to start up, which can take "+
+					"minutes — so this usually means 'not ready yet' rather than 'broken'. "+
+					"Either try again shortly, pick a model that is already warm with "+
+					"/models, or raise the wait. (waited %s each time; "+
 					"GORILLA_OPENCODE_FIRST_BYTE_TIMEOUT changes that): %w",
 				config.FirstByteTimeout(), err)
 		}

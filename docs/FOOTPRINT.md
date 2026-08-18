@@ -1,4 +1,4 @@
-<!-- Version: 1.3.0 · updated 26-08-18-16-35 -->
+<!-- Version: 1.4.0 · updated 26-08-18-17-07 -->
 # What it costs to run: memory, disk and network
 
 *Measured on 18 August 2026, on the reference machine (Sony VAIO SVE, i7-3632QM,
@@ -254,6 +254,26 @@ Sampling eight models from **NVIDIA NIM's own catalogue**:
 So a provider listing a model is advertising, not a capability. The 404s were
 already handled. The silence was not — and the client's entire response to it
 was to sit there with a spinner.
+
+**Corrected later the same day, and the correction changes the diagnosis.** The
+black hole is a COLD START, not a dead model. Forty minutes on, the same model
+answered in 12.07 s and `meta/llama-3.3-70b-instruct` in 19.08 s. A sweep of all
+102 listed models (`curl` per model, 25 s cap, 8 in parallel) gave:
+
+| outcome | count |
+|---|---|
+| 404 — not entitled / not offered to this account | 60 |
+| **200 — working** | **32** |
+| 000 — accepted and silent | 7 |
+| 400 / 500 | 3 |
+
+Working models cluster hard at the fast end: 27 of the 32 delivered a first byte
+in under a second, and the three slowest (11.65 s, 12.07 s, 19.08 s) are exactly
+the ones that had been black holes earlier — i.e. they were waking up.
+
+The first-byte guard is still correct; only its *message* was wrong. It said the
+model "is not actually being served", which would push a user off a model that
+merely needed a minute. It now says the endpoint is probably cold.
 
 ### Why there was no timeout to catch it
 

@@ -1,4 +1,4 @@
-<!-- Version: 1.0.0 · updated 26-08-18-16-34 -->
+<!-- Version: 1.1.0 · updated 26-08-18-17-07 -->
 # What happens when your connection is bad
 
 *Plain language. No jargon, and where a technical word is unavoidable it is
@@ -217,8 +217,22 @@ The silent ones are the problem, because from the outside "thinking very hard"
 and "dead" look identical. You wait. And on a metered connection, waiting after
 already uploading your whole conversation is money already spent.
 
-**The thing worth remembering: a provider's list of models is advertising, not a
-promise.** The only way to know a model works is to ask it something.
+**Correction, made the same afternoon.** The paragraph above originally said
+these models were "not actually being served". Forty minutes later the same
+silent model answered in **12 seconds**, and a second one in 19. A fuller sweep
+of all 102 listed models found **32 working, 60 refusing politely, and 7 silent**
+— so the silence is a **cold start**, not a lie. These endpoints go to sleep when
+nobody is using them, and waking one up can take minutes.
+
+That matters, because "this model is broken, use another" is bad advice if the
+model would have worked on the next try. The wording the program shows you was
+changed to say *not ready yet* rather than *not served*. The original claim is
+left here rather than deleted, because a correction is only useful if you can see
+what it corrected.
+
+**What still holds: a provider's list of models is advertising, not a promise.**
+The only way to know a model is ready is to ask it something. Roughly a third of
+the list worked on the day this was written.
 
 ---
 
@@ -342,6 +356,54 @@ was not safe in either of those ways this morning.
 
 Whether it is *pleasant* on a slow-but-working link is a different question, and
 that one is still open.
+
+---
+
+## A side question: why did one model answer twice?
+
+While testing, a run printed the answer **twice** — not the same words copied,
+two differently worded sentences:
+
+> A mutex is a mutual-exclusion lock that **ensures only one thread can access** a
+> shared resource or critical section **at a time**.
+>
+> A mutex is a mutual-exclusion lock that **lets only one thread access** a shared
+> resource or critical section **at any given time**.
+
+Different wording rules out the boring explanation. A program that accidentally
+prints something twice prints the *identical* text. Two paraphrases can only come
+from the model.
+
+It was worth chasing anyway, because if the program were mixing the model's
+private working-out into its answer, you would be paying for that text twice —
+once to receive it, and again every following message, since the whole
+conversation is re-sent each time.
+
+**It is not.** Checked three ways:
+
+1. **The raw data from the provider keeps them separate.** In one reply: 202
+   fragments of private reasoning, 24 fragments of answer. Cleanly divided.
+2. **The program stores them separately too** — the saved record has a
+   "reasoning" part and a "text" part, and only the text part is printed.
+3. **The duplicated text was inside the answer itself**, before the program
+   touched it.
+
+Then eleven models were each asked the same question six times:
+
+| model | answered twice |
+|---|---|
+| `nvidia/nemotron-3-nano-30b-a3b` | **2 of 6** |
+| the other ten | **0 of 6** |
+
+One model out of eleven, intermittently. It is a quirk of that model — it writes
+a draft, then a tidier version, and hands over both. Nothing in this program
+causes it and nothing here can reliably fix it.
+
+**Why it is worth knowing anyway.** If you see it, it is not a bug you should
+report and not something to work around — switch model. It also costs you real
+money on a slow link: a doubled answer is roughly double the download for that
+message, and it stays in the conversation, so it is re-uploaded with everything
+you send afterwards.
 
 ---
 
