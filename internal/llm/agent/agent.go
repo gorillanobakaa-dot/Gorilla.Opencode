@@ -560,6 +560,25 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 					a.finishMessage(ctx, &assistantMsg, message.FinishReasonPermissionDenied)
 					break
 				}
+
+				// GORILLA FIX (2026-08-18): report the failure instead of
+				// swallowing it.
+				//
+				// Only permission denial was handled above; every OTHER error
+				// fell through to the assignment below, which reads toolResult —
+				// the ZERO VALUE when the tool returned an error. So a failed
+				// tool handed the model Content:"" with IsError:false: an empty
+				// result flagged as SUCCESS. The model then reasons as though
+				// the work was done, which is the same defect as a silent
+				// truncation, one layer up. A tool that failed must say so.
+				logging.Error("tool returned an error",
+					"tool", toolCall.Name, "id", toolCall.ID, "err", toolErr)
+				toolResults[i] = message.ToolResult{
+					ToolCallID: toolCall.ID,
+					Content:    fmt.Sprintf("The %s tool failed and produced no result: %v", toolCall.Name, toolErr),
+					IsError:    true,
+				}
+				continue
 			}
 			toolResults[i] = message.ToolResult{
 				ToolCallID: toolCall.ID,
