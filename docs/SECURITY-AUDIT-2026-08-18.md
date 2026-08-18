@@ -104,8 +104,8 @@ whole attack for an attacker.
 
 ### What was NOT fixed, stated plainly
 
-Five confirmed problems remain open. They are listed here rather than left for
-someone to rediscover:
+Eight confirmed problems remain open. The five that would matter to you are
+listed here; the developer track has the full table with exact locations:
 
 - **Writing through a shortcut can still leave your project.** A shortcut file
   planted in the project can point outside it, and the question you're asked
