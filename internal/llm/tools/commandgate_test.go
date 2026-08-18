@@ -121,3 +121,26 @@ func TestPrefixLookalikesDoNotMatch(t *testing.T) {
 		}
 	}
 }
+
+// The shell inherits the whole process environment (shell/shell.go:124,
+// `cmd.Env = append(os.Environ(), ...)`), and provider API keys arrive as env
+// vars. So any command that can print the environment must never be on the
+// no-prompt path — it would put every key into the transcript, the model's
+// context and the session database in one go.
+//
+// This was MISSED on the first pass of the gate fix: `env` was removed from the
+// safe list and `printenv` was not.
+func TestEnvironmentDumpingCommandsAreNeverSilent(t *testing.T) {
+	for _, cmd := range []string{
+		"printenv",
+		"printenv PATH",
+		"env",
+		"set",
+		"ps auxww", // other processes' command lines carry credentials
+		"top -b -n1",
+	} {
+		if IsSafeReadOnly(cmd, safeReadOnlyCommands) {
+			t.Errorf("%q still runs with no prompt — it can expose credentials", cmd)
+		}
+	}
+}

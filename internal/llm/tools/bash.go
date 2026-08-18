@@ -62,6 +62,17 @@ var bannedCommands = []string{
 //	                                 only by any definition.
 //	go run, go install               execute / install arbitrary code.
 //	go clean                         DELETES build output.
+//	printenv                         DUMPS THE ENVIRONMENT. shell.go:124 does
+//	                                 `cmd.Env = append(os.Environ(), ...)`, so the
+//	                                 shell inherits every provider API key the
+//	                                 process holds — and an unprompted printenv
+//	                                 puts them in the transcript, the model's
+//	                                 context and the session database at once.
+//	                                 (Missed on the first pass of this very fix:
+//	                                 `env` was removed and `printenv` was not.)
+//	ps, top                          show other processes' full command lines,
+//	                                 which routinely carry credentials passed as
+//	                                 arguments.
 //
 // KNOWN RESIDUAL RISK, stated rather than hidden: `go build` and `go test` are
 // kept because a coding agent runs them constantly and prompting every time
@@ -69,8 +80,8 @@ var bannedCommands = []string{
 // generators, the tests themselves). They are safe only to the degree the tree
 // is. Writing that code requires the write tool, which does prompt.
 var safeReadOnlyCommands = []string{
-	"ls", "echo", "pwd", "date", "cal", "uptime", "whoami", "id", "groups", "printenv", "which", "type", "whereis",
-	"whatis", "uname", "hostname", "df", "du", "free", "top", "ps",
+	"ls", "echo", "pwd", "date", "cal", "uptime", "whoami", "id", "groups", "which", "type", "whereis",
+	"whatis", "uname", "hostname", "df", "du", "free",
 
 	"git status", "git log", "git diff", "git show", "git branch", "git tag", "git remote", "git ls-files", "git ls-remote",
 	"git rev-parse", "git config --get", "git config --list", "git describe", "git blame", "git grep", "git shortlog",
