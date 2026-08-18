@@ -1,3 +1,4 @@
+<!-- Version: 1.0.0 · updated 26-08-18-10-08 -->
 # Your past conversations: finding them, saving them, deleting them
 
 *Dual-track. The first half is the complete explanation in plain language — not a
