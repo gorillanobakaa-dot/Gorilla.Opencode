@@ -219,13 +219,35 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 			}
 			patchDiff, _, _ := diff.GenerateDiff(currentContent, newContent, path)
 			dir := filepath.Dir(path)
+
+			// GORILLA OVERRIDE (2026-08-18): "*** Move to:" writes the content to
+			// a DIFFERENT path and deletes the original (internal/diff/patch.go
+			// :638-644). Upstream asked permission for the source only, so the
+			// prompt read "Update file README.md" while the bytes landed wherever
+			// the patch text said — an absolute path included, since the caller's
+			// IsAbs branch leaves those untouched. MovePath was never validated
+			// anywhere: it appears in the parser, the plumbing and the write, and
+			// nowhere else.
+			//
+			// So: confine the destination to the workspace, and NAME it in the
+			// prompt. A permission dialog that shows the wrong path is worse than
+			// no dialog, because it converts the user's caution into consent.
+			describe := fmt.Sprintf("Update file %s", path)
+			if change.MovePath != nil {
+				dest := *change.MovePath
+				if err := ensureInsideWorkspace(dest); err != nil {
+					return NewTextErrorResponse(err.Error()), nil
+				}
+				describe = fmt.Sprintf("Update file %s AND MOVE it to %s", path, dest)
+			}
+
 			p := p.permissions.Request(
 				permission.CreatePermissionRequest{
 					SessionID:   sessionID,
 					Path:        dir,
 					ToolName:    PatchToolName,
 					Action:      "update",
-					Description: fmt.Sprintf("Update file %s", path),
+					Description: describe,
 					Params: EditPermissionsParams{
 						FilePath: path,
 						Diff:     patchDiff,
