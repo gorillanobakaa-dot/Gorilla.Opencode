@@ -16,7 +16,7 @@ import (
 )
 
 type ViewParams struct {
-	FilePath string `json:"file_path"`
+	FilePath string  `json:"file_path"`
 	Offset   FlexInt `json:"offset"`
 	Limit    FlexInt `json:"limit"`
 }
@@ -111,6 +111,13 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	filePath := params.FilePath
 	if !filepath.IsAbs(filePath) {
 		filePath = filepath.Join(config.WorkingDirectory(), filePath)
+	}
+
+	// GORILLA OVERRIDE (2026-08-18): credential files outside the project are
+	// refused. Anything read here reaches the provider and the session database.
+	// See sensitive.go — a blocklist, deliberately not a sandbox.
+	if why := RefuseSensitiveRead(filePath); why != "" {
+		return NewTextErrorResponse(why), nil
 	}
 
 	// Check if file exists

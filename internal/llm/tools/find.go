@@ -334,6 +334,14 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		return NewTextErrorResponse(fmt.Sprintf("path does not exist: %s", searchPath)), nil
 	}
 
+	// GORILLA OVERRIDE (2026-08-18): find PRINTS MATCHING LINES, so searching a
+	// credential directory puts the key itself into the transcript, the model's
+	// context and the session database. Refuse the search root outright; see
+	// sensitive.go. A blocklist, deliberately not a sandbox.
+	if why := RefuseSensitiveRead(searchPath); why != "" {
+		return NewTextErrorResponse(why), nil
+	}
+
 	if params.Query == "" && params.Glob == "" {
 		// Listing mode still needs a shape; a bare directory listing is what
 		// the old ls tool did, so keep that behaviour rather than erroring.

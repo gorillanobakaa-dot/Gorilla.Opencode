@@ -183,6 +183,23 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		return ToolResponse{}, permission.ErrorPermissionDenied
 	}
 
+	// GORILLA FIX (2026-08-18): re-check staleness AFTER the grant.
+	//
+	// The "modified since last read" guard ran before the permission prompt, and
+	// that prompt blocks for up to PermissionWait (10 minutes). Anything could
+	// change the file in between — the user editing it in their own editor being
+	// the ordinary case, not the adversarial one — and the write then silently
+	// discarded those changes. A check whose answer is ten minutes stale is not
+	// a check.
+	if info, statErr := os.Stat(filePath); statErr == nil && !info.IsDir() {
+		if info.ModTime().After(getLastReadTime(filePath)) {
+			return NewTextErrorResponse(fmt.Sprintf(
+				"File %s changed while waiting for permission (modified %s). "+
+					"Nothing was written. Read it again and redo the change.",
+				filePath, info.ModTime().Format(time.RFC3339))), nil
+		}
+	}
+
 	if err = os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
 		return ToolResponse{}, fmt.Errorf("error creating directory: %w", err)
 	}
