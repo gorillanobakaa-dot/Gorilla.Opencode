@@ -65,8 +65,8 @@ That is the whole design brief. Gorilla OpenCode is built for people running
 2012 laptops on connections measured in single-digit kilobytes per second —
 often young, often with no money for subscriptions, often on a machine someone
 else threw away. The same is true of every Gorilla project: the
-[kernel](https://github.com/gorillanobakaa-dot/gorilla-unleashed-kernel-7.1.2),
-the [Firefox fork](https://github.com/gorillanobakaa-dot/firefox.154), this.
+[kernel](https://github.com/gorillanobakaa-dot/debian-kernel),
+the [Firefox fork](https://github.com/gorillanobakaa-dot/firefox-154), this.
 
 It is not charity and it is not a stripped-down edition. It is the actual
 target, and it shapes everything:
