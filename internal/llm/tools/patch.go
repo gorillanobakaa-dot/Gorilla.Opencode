@@ -234,11 +234,13 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 			// no dialog, because it converts the user's caution into consent.
 			describe := fmt.Sprintf("Update file %s", path)
 			if change.MovePath != nil {
-				dest := *change.MovePath
-				if err := ensureInsideWorkspace(dest); err != nil {
-					return NewTextErrorResponse(err.Error()), nil
-				}
-				describe = fmt.Sprintf("Update file %s AND MOVE it to %s", path, dest)
+				// Name the destination the bytes ACTUALLY land on, symlinks
+				// followed, and say so loudly when it is outside the project.
+				// Not a refusal: roots.go documents that this codebase has no
+				// sandbox, and refusing would break working across /add-dir
+				// roots. The defect was a prompt that named the wrong file.
+				describe = fmt.Sprintf("Update file %s AND MOVE it to %s",
+					path, DescribeWriteTarget(*change.MovePath))
 			}
 
 			p := p.permissions.Request(

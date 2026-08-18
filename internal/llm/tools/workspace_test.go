@@ -1,58 +1,31 @@
 package tools
 
-// GORILLA OVERRIDE (2026-08-18): containment tests for patch "*** Move to:".
+// GORILLA OVERRIDE (2026-08-18): tests for honest write destinations.
 //
-// The exploit these exist for: a patch whose prompt says "Update file README.md"
-// while the bytes land in ~/.bashrc, because MovePath was never validated and
-// never shown. Confirmed by reading the code on 2026-08-18 — MovePath appeared
-// in the parser, the plumbing and the write, and nowhere else.
+// The defect these exist for is CONSENT INTEGRITY, not sandboxing. This codebase
+// has no sandbox by design — roots.go says so outright — so the fix is not a new
+// refusal (which would break working across /add-dir roots) but a permission
+// prompt that names the path the bytes actually land on.
+//
+// Two ways the old prompts lied:
+//   - patch "*** Move to:" named the SOURCE while writing to the destination;
+//   - write/edit named a SYMLINK while writing to its target.
 
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/opencode-ai/opencode/internal/config"
 )
 
-func TestMoveDestinationsOutsideTheWorkspaceAreRefused(t *testing.T) {
-	// This package isolates config in TestMain, so the workspace is whatever
-	// WorkingDirectory() reports — use that rather than assuming a TempDir.
+// A symlink inside the workspace pointing elsewhere must be reported by its
+// TARGET, and flagged as outside. Naming the link is the lie.
+func TestASymlinkIsDescribedByWhereItActuallyGoes(t *testing.T) {
 	wd := config.WorkingDirectory()
 	if wd == "" {
-		t.Skip("no working directory configured")
-	}
-
-	refuse := []struct{ dest, why string }{
-		{"/home/gorilla/.bashrc", "absolute path to the user's shell profile"},
-		{"/etc/cron.d/evil", "absolute path to a system directory"},
-		{"../escaped.txt", "relative traversal one level out"},
-		{"../../../../tmp/escaped.txt", "deep relative traversal"},
-		{"", "empty destination"},
-	}
-	for _, c := range refuse {
-		t.Run(c.dest, func(t *testing.T) {
-			if err := ensureInsideWorkspace(c.dest); err == nil {
-				t.Errorf("ALLOWED a write outside the workspace: %q (%s)", c.dest, c.why)
-			}
-		})
-	}
-
-	allow := []string{"notes.md", "sub/dir/notes.md", "./notes.md", filepath.Join(wd, "inside.md")}
-	_ = os.MkdirAll(wd, 0o755)
-	for _, dest := range allow {
-		if err := ensureInsideWorkspace(dest); err != nil {
-			t.Errorf("refused a legitimate in-workspace destination %q: %v", dest, err)
-		}
-	}
-}
-
-// A prefix-only containment check is defeated by a symlink inside the workspace
-// pointing out of it. This is why the check resolves symlinks before comparing.
-func TestASymlinkOutOfTheWorkspaceIsRefused(t *testing.T) {
-	wd := config.WorkingDirectory()
-	if wd == "" {
-		t.Skip("no working directory configured")
+		t.Skip("no workspace")
 	}
 	if err := os.MkdirAll(wd, 0o755); err != nil {
 		t.Skipf("workspace unavailable: %v", err)
@@ -62,29 +35,53 @@ func TestASymlinkOutOfTheWorkspaceIsRefused(t *testing.T) {
 	link := filepath.Join(wd, "innocent-link")
 	_ = os.Remove(link)
 	if err := os.Symlink(outside, link); err != nil {
-		t.Skipf("symlinks unavailable here: %v", err)
+		t.Skipf("symlinks unavailable: %v", err)
 	}
 	defer os.Remove(link)
 
-	dest := filepath.Join("innocent-link", "payload.txt") // looks inside; resolves outside
-	if err := ensureInsideWorkspace(dest); err == nil {
-		t.Errorf("a symlink escape was allowed: %q resolves into %s", dest, outside)
+	dest := filepath.Join("innocent-link", "payload.txt")
+
+	resolved, inside, err := ResolveWriteTarget(dest)
+	if err != nil {
+		t.Fatalf("ResolveWriteTarget: %v", err)
+	}
+	if !strings.HasPrefix(resolved, outside) {
+		t.Errorf("the symlink was not followed: %q resolved to %q, expected under %q", dest, resolved, outside)
+	}
+	if inside {
+		t.Error("a path resolving outside every root was reported as inside")
+	}
+
+	desc := DescribeWriteTarget(dest)
+	if !strings.Contains(desc, outside) {
+		t.Errorf("the prompt would not show the real destination: %q", desc)
+	}
+	if !strings.Contains(desc, "OUTSIDE") {
+		t.Errorf("the prompt does not warn that it leaves the project: %q", desc)
 	}
 }
 
-// Sibling directories that merely share a prefix are not inside.
-func TestPrefixNeighboursAreNotInside(t *testing.T) {
-	if withinDir("/home/u/project", "/home/u/project-evil/x") {
-		t.Error("a sibling sharing a name prefix was treated as inside the workspace")
+// Ordinary in-workspace paths must be described plainly — no scary noise on the
+// overwhelmingly common case, or the warning stops meaning anything.
+func TestOrdinaryPathsAreDescribedPlainly(t *testing.T) {
+	wd := config.WorkingDirectory()
+	if wd == "" {
+		t.Skip("no workspace")
 	}
-	if !withinDir("/home/u/project", "/home/u/project/sub/x") {
-		t.Error("a genuine child was treated as outside")
+	_ = os.MkdirAll(wd, 0o755)
+
+	for _, dest := range []string{"notes.md", "sub/dir/notes.md", "./notes.md"} {
+		desc := DescribeWriteTarget(dest)
+		if strings.Contains(desc, "OUTSIDE") || strings.Contains(desc, "resolves to") {
+			t.Errorf("an ordinary in-workspace path was decorated with a warning: %q -> %q", dest, desc)
+		}
 	}
 }
 
-// A patch that moves a file WITHIN the workspace must still be allowed — the
-// containment fix must not break the legitimate use of "*** Move to:".
-func TestLegitimateInWorkspaceMovesStillWork(t *testing.T) {
+// CAPABILITY GUARD. This is a coding agent: moving a file inside the project is
+// ordinary work. Every one of these must resolve inside a root, so nothing here
+// is ever flagged or impeded.
+func TestLegitimateInWorkspaceDestinationsStayInside(t *testing.T) {
 	wd := config.WorkingDirectory()
 	if wd == "" {
 		t.Skip("no workspace")
@@ -92,14 +89,36 @@ func TestLegitimateInWorkspaceMovesStillWork(t *testing.T) {
 	_ = os.MkdirAll(filepath.Join(wd, "pkg"), 0o755)
 
 	for _, dest := range []string{
-		"pkg/greet.go",              // subdirectory
-		"renamed.go",                // plain rename
-		"./also-fine.go",            // dot-relative
-		"a/b/c/deep.go",             // nested, none of it existing yet
-		filepath.Join(wd, "abs.go"), // absolute, but inside
+		"pkg/greet.go",
+		"renamed.go",
+		"./also-fine.go",
+		"a/b/c/deep.go",
+		filepath.Join(wd, "abs.go"),
 	} {
-		if err := ensureInsideWorkspace(dest); err != nil {
-			t.Errorf("REGRESSION: legitimate move destination refused: %q -> %v", dest, err)
+		_, inside, err := ResolveWriteTarget(dest)
+		if err != nil {
+			t.Errorf("REGRESSION: legitimate destination errored: %q -> %v", dest, err)
+			continue
 		}
+		if !inside {
+			t.Errorf("REGRESSION: legitimate in-workspace destination reported OUTSIDE: %q", dest)
+		}
+	}
+}
+
+// An empty destination is an error, not a silent pass.
+func TestEmptyDestinationIsAnError(t *testing.T) {
+	if _, _, err := ResolveWriteTarget("   "); err == nil {
+		t.Error("an empty destination was accepted")
+	}
+}
+
+// Sibling directories that merely share a name prefix are not inside.
+func TestPrefixNeighboursAreNotInside(t *testing.T) {
+	if withinDir("/home/u/project", "/home/u/project-evil/x") {
+		t.Error("a sibling sharing a name prefix was treated as inside")
+	}
+	if !withinDir("/home/u/project", "/home/u/project/sub/x") {
+		t.Error("a genuine child was treated as outside")
 	}
 }

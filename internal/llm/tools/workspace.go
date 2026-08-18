@@ -35,40 +35,78 @@ import (
 	"github.com/opencode-ai/opencode/internal/config"
 )
 
-// ensureInsideWorkspace reports an error if dest resolves outside the working
-// directory. Relative paths are taken as relative to the workspace, which is
-// what every other tool here assumes.
+// ResolveWriteTarget returns the path bytes will ACTUALLY be written to, after
+// following any symlink, and whether that path lies inside a configured root.
 //
-// It fails CLOSED: if the path cannot be resolved, it is refused rather than
-// allowed, because an unresolvable destination is not evidence of safety.
-func ensureInsideWorkspace(dest string) error {
-	wd := config.WorkingDirectory()
+// It does not refuse. This codebase has no sandbox by design — roots.go states
+// it outright: "tools accept absolute paths anywhere and only consult the
+// working directory to resolve relative paths and to pick a permission scope."
+// Adding /add-dir roots makes a directory first-class; it does not unlock it,
+// because nothing was locked.
+//
+// So the defect these fixes address is NOT that a write can leave the project.
+// It is that the permission prompt named the wrong path — the link rather than
+// its target, the source rather than the move destination. A dialog that names
+// the wrong file converts the user's caution into consent. The remedy is an
+// HONEST prompt, not a new refusal that would break working across roots.
+func ResolveWriteTarget(dest string) (resolved string, insideRoot bool, err error) {
 	if strings.TrimSpace(dest) == "" {
-		return fmt.Errorf("refusing an empty destination path")
+		return "", false, fmt.Errorf("empty destination path")
 	}
 
 	abs := dest
 	if !filepath.IsAbs(abs) {
-		abs = filepath.Join(wd, abs)
+		abs = filepath.Join(config.WorkingDirectory(), abs)
 	}
 	abs = filepath.Clean(abs)
 
-	realDest, err := resolveExistingAncestor(abs)
+	resolved, err = resolveExistingAncestor(abs)
 	if err != nil {
-		return fmt.Errorf("refusing to write to %s: its location could not be resolved (%v)", dest, err)
-	}
-	realWD, err := filepath.EvalSymlinks(wd)
-	if err != nil {
-		realWD = filepath.Clean(wd)
+		// Unresolvable: report the cleaned path and let the caller show it. Not
+		// knowing where it lands is exactly when the user should be asked.
+		return abs, false, nil
 	}
 
-	if !withinDir(realWD, realDest) {
-		return fmt.Errorf(
-			"refusing to write to %s: it resolves to %s, which is outside this project (%s). "+
-				"A patch may not move a file out of the workspace",
-			dest, realDest, realWD)
+	if _, ok := config.RootFor(resolved); ok {
+		return resolved, true, nil
 	}
-	return nil
+	// Fall back to the primary working directory for the common single-root case.
+	if wd, e := filepath.EvalSymlinks(config.WorkingDirectory()); e == nil {
+		return resolved, withinDir(wd, resolved), nil
+	}
+	return resolved, withinDir(filepath.Clean(config.WorkingDirectory()), resolved), nil
+}
+
+// DescribeWriteTarget renders the destination for a permission prompt, naming
+// the resolved location whenever it differs from what was asked for — which is
+// precisely the symlink and move cases that made the old prompts dishonest.
+func DescribeWriteTarget(dest string) string {
+	resolved, inside, err := ResolveWriteTarget(dest)
+	if err != nil {
+		return dest
+	}
+
+	// Compare against the ABSOLUTE form of what was asked for, not the raw
+	// string. Every relative path "resolves to" its absolute form, so comparing
+	// raw would decorate ordinary prompts with a note on every single write —
+	// and a warning that fires constantly is one nobody reads. Only a genuine
+	// redirection (a symlink) should be called out.
+	asked := dest
+	if !filepath.IsAbs(asked) {
+		asked = filepath.Join(config.WorkingDirectory(), asked)
+	}
+	redirected := filepath.Clean(resolved) != filepath.Clean(asked)
+
+	switch {
+	case redirected && !inside:
+		return fmt.Sprintf("%s (actually writes to %s — OUTSIDE this project)", dest, resolved)
+	case redirected:
+		return fmt.Sprintf("%s (actually writes to %s)", dest, resolved)
+	case !inside:
+		return fmt.Sprintf("%s (OUTSIDE this project)", dest)
+	default:
+		return dest
+	}
 }
 
 // resolveExistingAncestor resolves symlinks for a path that may not exist yet,

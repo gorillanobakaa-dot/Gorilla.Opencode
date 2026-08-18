@@ -181,11 +181,8 @@ func (e *editTool) createNewFile(ctx context.Context, filePath, content string) 
 		return ToolResponse{}, fmt.Errorf("failed to access file: %w", err)
 	}
 
-	dir := filepath.Dir(filePath)
-	if err = os.MkdirAll(dir, 0o755); err != nil {
-		return ToolResponse{}, fmt.Errorf("failed to create parent directories: %w", err)
-	}
-
+	// GORILLA OVERRIDE (2026-08-18): parent directories are created AFTER the
+	// grant, not before — a DENIED edit must not leave a directory tree behind.
 	sessionID, messageID := GetContextValues(ctx)
 	if sessionID == "" || messageID == "" {
 		return ToolResponse{}, fmt.Errorf("session ID and message ID are required for creating a new file")
@@ -203,7 +200,7 @@ func (e *editTool) createNewFile(ctx context.Context, filePath, content string) 
 			Path:        permissionPath,
 			ToolName:    EditToolName,
 			Action:      "write",
-			Description: fmt.Sprintf("Create file %s", filePath),
+			Description: fmt.Sprintf("Create file %s", DescribeWriteTarget(filePath)),
 			Params: EditPermissionsParams{
 				FilePath: filePath,
 				Diff:     diff,
@@ -212,6 +209,10 @@ func (e *editTool) createNewFile(ctx context.Context, filePath, content string) 
 	)
 	if !p {
 		return ToolResponse{}, permission.ErrorPermissionDenied
+	}
+
+	if err = os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
+		return ToolResponse{}, fmt.Errorf("failed to create parent directories: %w", err)
 	}
 
 	err = os.WriteFile(filePath, []byte(content), 0o644)
@@ -310,7 +311,7 @@ func (e *editTool) deleteContent(ctx context.Context, filePath, oldString string
 			Path:        permissionPath,
 			ToolName:    EditToolName,
 			Action:      "write",
-			Description: fmt.Sprintf("Delete content from file %s", filePath),
+			Description: fmt.Sprintf("Delete content from file %s", DescribeWriteTarget(filePath)),
 			Params: EditPermissionsParams{
 				FilePath: filePath,
 				Diff:     diff,
@@ -426,7 +427,7 @@ func (e *editTool) replaceContent(ctx context.Context, filePath, oldString, newS
 			Path:        permissionPath,
 			ToolName:    EditToolName,
 			Action:      "write",
-			Description: fmt.Sprintf("Replace content in file %s", filePath),
+			Description: fmt.Sprintf("Replace content in file %s", DescribeWriteTarget(filePath)),
 			Params: EditPermissionsParams{
 				FilePath: filePath,
 				Diff:     diff,

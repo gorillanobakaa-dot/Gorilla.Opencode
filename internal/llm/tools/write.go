@@ -136,11 +136,10 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		return ToolResponse{}, fmt.Errorf("error checking file: %w", err)
 	}
 
-	dir := filepath.Dir(filePath)
-	if err = os.MkdirAll(dir, 0o755); err != nil {
-		return ToolResponse{}, fmt.Errorf("error creating directory: %w", err)
-	}
-
+	// GORILLA OVERRIDE (2026-08-18): directories are created AFTER permission,
+	// not before. Upstream ran MkdirAll here, so a DENIED write still left the
+	// whole parent tree behind on disk — a refusal that still changed the
+	// filesystem.
 	oldContent := ""
 	if fileInfo != nil && !fileInfo.IsDir() {
 		oldBytes, readErr := os.ReadFile(filePath)
@@ -163,11 +162,15 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	permissionPath := permissionScope(filePath)
 	p := w.permissions.Request(
 		permission.CreatePermissionRequest{
-			SessionID:   sessionID,
-			Path:        permissionPath,
-			ToolName:    WriteToolName,
-			Action:      "write",
-			Description: fmt.Sprintf("Create file %s", filePath),
+			SessionID: sessionID,
+			Path:      permissionPath,
+			ToolName:  WriteToolName,
+			Action:    "write",
+			// GORILLA OVERRIDE (2026-08-18): name the path the bytes ACTUALLY
+			// land on. A symlink inside the workspace pointing elsewhere made
+			// this prompt describe the link while the write went to its target;
+			// a dialog that names the wrong file turns caution into consent.
+			Description: fmt.Sprintf("Create file %s", DescribeWriteTarget(filePath)),
 			Params: WritePermissionsParams{
 				FilePath: filePath,
 				Diff:     diff,
@@ -176,6 +179,10 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	)
 	if !p {
 		return ToolResponse{}, permission.ErrorPermissionDenied
+	}
+
+	if err = os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
+		return ToolResponse{}, fmt.Errorf("error creating directory: %w", err)
 	}
 
 	err = os.WriteFile(filePath, []byte(params.Content), 0o644)
