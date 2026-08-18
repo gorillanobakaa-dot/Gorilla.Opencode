@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/opencode-ai/opencode/internal/config"
@@ -69,6 +70,21 @@ type Service interface {
 	// List deliberately hides them (they are not conversations); recovery is
 	// the one caller that needs to see them.
 	ListResearchHelpers(ctx context.Context) ([]Session, error)
+
+	// Storage answers "what is this costing me on disk, and what do I get back
+	// if I delete it?" — per session and for the store as a whole.
+	Storage(ctx context.Context) (map[string]Storage, Totals, error)
+	// DeleteTree removes a session AND the helper sessions it spawned. Delete
+	// does not: sessions have no foreign key on parent_session_id, so a plain
+	// delete leaves seventeen orphans behind per supervised research run.
+	DeleteTree(ctx context.Context, id string) (int64, error)
+	// Reclaim returns freed space to the filesystem. Deleting rows does not.
+	Reclaim(ctx context.Context) error
+	// Search matches a needle against session titles AND message content.
+	Search(ctx context.Context, needle string) (map[string]bool, error)
+	// Children returns the sessions spawned from one conversation. An export
+	// that omits them drops the research lanes' reasoning and tool calls.
+	Children(ctx context.Context, parentID string) ([]Session, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -195,6 +211,113 @@ func (s *service) ListResearchHelpers(ctx context.Context) ([]Session, error) {
 			PromptTokens:     r.PromptTokens,
 			CompletionTokens: r.CompletionTokens,
 			CreatedAt:        r.CreatedAt,
+		})
+	}
+	return out, nil
+}
+
+// Storage is what one conversation occupies on disk, helpers included.
+type Storage struct {
+	Bytes    int64
+	Messages int64
+}
+
+// Totals is the whole store, for the header of the manager screen.
+type Totals struct {
+	Sessions int64
+	Helpers  int64
+	Messages int64
+	Bytes    int64
+}
+
+// storageQuerier is satisfied by the generated *db.Queries via the hand-written
+// session_storage.go. Type-asserted rather than added to db.Querier so the
+// generated interface stays untouched by this feature.
+type storageQuerier interface {
+	AllSessionStorage(ctx context.Context) (map[string]db.SessionStorage, error)
+	StoreTotals(ctx context.Context) (db.StoreTotals, error)
+	DeleteSessionTree(ctx context.Context, id string) (int64, error)
+	Reclaim(ctx context.Context) error
+	SearchSessions(ctx context.Context, needle string) (map[string]bool, error)
+	ListChildSessions(ctx context.Context, parentID string) ([]db.ResearchHelper, error)
+}
+
+func (s *service) Storage(ctx context.Context) (map[string]Storage, Totals, error) {
+	q, ok := s.q.(storageQuerier)
+	if !ok {
+		return nil, Totals{}, nil
+	}
+	rows, err := q.AllSessionStorage(ctx)
+	if err != nil {
+		return nil, Totals{}, err
+	}
+	per := make(map[string]Storage, len(rows))
+	for id, r := range rows {
+		per[id] = Storage{Bytes: r.Bytes, Messages: r.Messages}
+	}
+	t, err := q.StoreTotals(ctx)
+	if err != nil {
+		return per, Totals{}, err
+	}
+	return per, Totals{
+		Sessions: t.Sessions,
+		Helpers:  t.Helpers,
+		Messages: t.Messages,
+		Bytes:    t.Bytes,
+	}, nil
+}
+
+// DeleteTree removes a conversation and its helpers, then publishes the
+// deletion so the UI drops it. The session is fetched FIRST: after the rows are
+// gone there is nothing left to describe in the event.
+func (s *service) DeleteTree(ctx context.Context, id string) (int64, error) {
+	q, ok := s.q.(storageQuerier)
+	if !ok {
+		return 0, s.Delete(ctx, id)
+	}
+	sess, err := s.Get(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	n, err := q.DeleteSessionTree(ctx, id)
+	if err != nil {
+		return n, err
+	}
+	s.Publish(pubsub.DeletedEvent, sess)
+	return n, nil
+}
+
+func (s *service) Reclaim(ctx context.Context) error {
+	q, ok := s.q.(storageQuerier)
+	if !ok {
+		return nil
+	}
+	return q.Reclaim(ctx)
+}
+
+func (s *service) Search(ctx context.Context, needle string) (map[string]bool, error) {
+	q, ok := s.q.(storageQuerier)
+	if !ok {
+		return nil, nil
+	}
+	return q.SearchSessions(ctx, strings.ToLower(strings.TrimSpace(needle)))
+}
+
+func (s *service) Children(ctx context.Context, parentID string) ([]Session, error) {
+	q, ok := s.q.(storageQuerier)
+	if !ok {
+		return nil, nil
+	}
+	rows, err := q.ListChildSessions(ctx, parentID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Session, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, Session{
+			ID: r.ID, Title: r.Title, ParentSessionID: parentID,
+			PromptTokens: r.PromptTokens, CompletionTokens: r.CompletionTokens,
+			CreatedAt: r.CreatedAt,
 		})
 	}
 	return out, nil

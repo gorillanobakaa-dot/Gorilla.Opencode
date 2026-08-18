@@ -78,6 +78,28 @@ func Render(sess session.Session, msgs []message.Message, now time.Time) string 
 	return b.String()
 }
 
+// renderMessages renders a message list with no session header — used for the
+// helper sessions appended to a conversation's transcript, which already has
+// one and does not need seventeen more.
+func renderMessages(msgs []message.Message) string {
+	ordered := make([]message.Message, len(msgs))
+	copy(ordered, msgs)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		return ordered[i].CreatedAt < ordered[j].CreatedAt
+	})
+
+	var b strings.Builder
+	var start time.Time
+	if len(ordered) > 0 {
+		start = at(ordered[0].CreatedAt)
+	}
+	names := toolNamesByCallID(ordered)
+	for _, m := range ordered {
+		writeMessage(&b, m, start, names)
+	}
+	return b.String()
+}
+
 func toolNamesByCallID(msgs []message.Message) map[string]string {
 	names := map[string]string{}
 	for _, m := range msgs {

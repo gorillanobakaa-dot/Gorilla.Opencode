@@ -1,6 +1,7 @@
 package export
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -293,5 +294,81 @@ func TestNoReasoningMeansNoVolumeLine(t *testing.T) {
 
 	if out := header(Render(sess, msgs, time.Unix(realStoredTimestamp, 0))); strings.Contains(out, "Reasoning captured") {
 		t.Errorf("a session with no reasoning reported a volume:\n%s", out)
+	}
+}
+
+// A research run's helper sessions hold the bulk of what it did. Exporting the
+// conversation without them produced a file of 14 messages for a run the
+// manager listed as 275 — found by exporting a real run from /sessions, not by
+// any test that existed at the time.
+func TestExportingATreeKeepsEveryHelperSessionInFull(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Unix(realStoredTimestamp, 0)
+
+	parent, msgs := fixture()
+	laneSess, laneMsgs := fixture()
+	laneSess.ID = "call_a-local"
+	laneSess.Title = "Research: local"
+	laneSess.PromptTokens, laneSess.CompletionTokens = 21173, 1786
+
+	branches := []Branch{
+		{Session: laneSess, Messages: laneMsgs},
+		{Session: session.Session{ID: "call_a-prior_art", Title: "Research: prior_art"}, Messages: nil},
+	}
+
+	path, total, err := WriteSessionTree(dir, parent, msgs, branches, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := len(msgs) + len(laneMsgs); total != want {
+		t.Errorf("reported %d messages, want %d", total, want)
+	}
+
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(body)
+
+	for _, want := range []string{
+		"Helper sessions (2)",
+		"Research: local",
+		"Research: prior_art",
+		"call_a-local",
+		"/tmp/tui.go", // the tool INPUT survived (pretty-printed, so match the value)
+		"file_path",
+		"line 1",               // the tool RESULT survived
+		"21173 in / 1786 out",  // what the lane cost
+		"esc never reaches it", // the lane's REASONING survived
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the exported tree is missing %q", want)
+		}
+	}
+
+	// 0o600: a transcript holds whatever was discussed, and these machines are
+	// shared.
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("export written as %o; a transcript is not world-readable", perm)
+	}
+}
+
+// A conversation with no helpers must not sprout an empty section.
+func TestExportingAPlainConversationHasNoHelperSection(t *testing.T) {
+	sess, msgs := fixture()
+	path, total, err := WriteSessionTree(t.TempDir(), sess, msgs, nil, time.Unix(realStoredTimestamp, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != len(msgs) {
+		t.Errorf("counted %d messages, want %d", total, len(msgs))
+	}
+	body, _ := os.ReadFile(path)
+	if strings.Contains(string(body), "Helper sessions") {
+		t.Errorf("a conversation with no helpers grew a helper section")
 	}
 }

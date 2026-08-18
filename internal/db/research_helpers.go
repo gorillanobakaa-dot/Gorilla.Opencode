@@ -52,3 +52,36 @@ func (q *Queries) ListResearchHelpers(ctx context.Context) ([]ResearchHelper, er
 	}
 	return out, rows.Err()
 }
+
+const listChildSessions = `
+SELECT id, title, prompt_tokens, completion_tokens, created_at
+FROM sessions
+WHERE parent_session_id = ?1
+ORDER BY created_at
+`
+
+// ListChildSessions returns every session spawned from one conversation —
+// research lanes, supervisors, summarisers.
+//
+// GORILLA (2026-08-18): added when the sessions manager exported a run as "14
+// messages" while listing it as 275. The other 261 were in the helper sessions,
+// and they are where the reasoning and tool calls live — the material the
+// export exists to preserve. An export that silently drops 95% of a run is
+// worse than no export, because it looks complete.
+func (q *Queries) ListChildSessions(ctx context.Context, parentID string) ([]ResearchHelper, error) {
+	rows, err := q.db.QueryContext(ctx, listChildSessions, parentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []ResearchHelper
+	for rows.Next() {
+		var h ResearchHelper
+		if err := rows.Scan(&h.ID, &h.Title, &h.PromptTokens, &h.CompletionTokens, &h.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}

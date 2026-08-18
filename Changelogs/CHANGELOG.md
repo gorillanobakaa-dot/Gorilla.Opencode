@@ -1,3 +1,68 @@
+## v0.1.92 — 2026-08-18 — /sessions: reach a conversation you are no longer in, and actually get your disk back
+
+**Plain-language version:** Two things this program could not do, and both of
+them matter most on the machines it is built for.
+
+**It could not reach a conversation you had left.** The session switcher showed
+titles and nothing else — no date, no size, no search — and "save this
+conversation" could only ever save the one currently open. That assumes you are
+still sitting in the session you care about. On a fifteen-year-old laptop with a
+battery measured in minutes, the power cut ends the session, and sometimes the
+power does not come back for days.
+
+**It could not delete anything at all.** Conversations accumulated forever, with
+no way to see what they cost. The people this is built for have 1 to 2 GB of
+free space on eMMC or CompactFlash, not 500 GB.
+
+`/sessions` lists every conversation you have ever had, newest first, with the
+date, the message count and **how much space it takes up**. Type to search — it
+looks inside the messages, not just the titles, because titles are generated and
+"New Session" is a real title this program writes. Enter reopens one. Ctrl+E
+saves one to a file. DEL erases one for good and returns the space to your disk.
+
+**About that last part.** Deleting rows from a SQLite database frees no disk
+whatsoever — the space is marked reusable and the file stays exactly the same
+size. Measured in this release's own test: 1,073,152 bytes, delete every message,
+still 1,073,152 bytes, rebuild the file, 65,536 bytes. On a device with 1 GB
+free, an erase that returns nothing is not an erase. So erasing rebuilds the file
+and reports what the *filesystem* shows. Driven through the real interface on a
+real store: 5,575,048 bytes before, 2,351,104 after, screen said **"Erased 24
+sessions · 3.1 MB returned to the disk"**. Twenty-four, because one conversation
+plus the twenty-three helper sessions it had spawned — those were invisible
+before, and they held most of the bytes.
+
+The header shows what the database occupies **on disk**, not what the messages
+add up to. On this machine those were 9.4 MB and 4.6 MB: a write-ahead log had
+grown to 4.3 MB and nothing had ever truncated it. Nearly half the space was in a
+file nobody was counting.
+
+Exports now carry the whole run. A research conversation listed 275 messages and
+exported 14 — the other 261 lived in twenty-three helper sessions, which is where
+every piece of reasoning and every tool call was. The export is 2.6 MB and holds
+238 tool calls with their inputs and results, and 119 reasoning blocks. That is
+deliberate: when something goes wrong you need to be able to work out *how* it
+published something private, or *how* it deleted something. A record of the
+visible chat alone cannot answer either question.
+
+Six bugs found while building it, every one by driving the real binary rather
+than by a test that existed at the time: the export dropping 95% of a run; the
+size column vanishing whenever a title was long (which is almost always, since
+titles are generated); a row with double-width characters wrapping because
+truncation counted runes instead of display columns; the search box ignoring
+fast typing and every paste, because bubbletea coalesces input into one
+multi-rune key message; two of the three action keys never arriving at all; and
+the dialog drawing 32 rows in a 24-row window.
+
+That last key problem deserves naming, because the answer was already written
+down. Ctrl+S is XOFF and freezes a terminal that has software flow control on —
+and this program already binds it globally. Ctrl+D is EOF. Both facts were
+recorded in this repo before the screen existed, in the comment explaining why
+the provider escape hatch is a slash command and not a key binding. Erase is now
+on DEL and sorting on Tab, and a test pins it.
+
+Full detail, both tracks, with every measurement and where it came from:
+[docs/SESSIONS-AND-STORAGE.md](../docs/SESSIONS-AND-STORAGE.md).
+
 ## v0.1.91 — 2026-08-18 — `/osint --recover`: the command that was documented before it existed
 
 **Plain-language version:** Yesterday's release added a safety net for expensive

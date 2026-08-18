@@ -18,6 +18,7 @@ cost before they start. Everything else is local.
 |---|---|
 | `/clear` · `/new` | Start a fresh conversation. |
 | `/plain` · `/copy` `/copyable` | Switch to the interface you can select and copy. |
+| `/sessions` · `/history` | Every past conversation: search, reopen, save, erase. |
 | `/export` | Save this conversation to a file. |
 | `/compact` · `/summarize` `/summarise` | Squeeze the conversation down so it keeps working. |
 | `/cd [folder]` | Switch to working in one folder. |
@@ -57,11 +58,27 @@ The AI forgets everything said so far. Use this when you move to a different tas
 
 This interface draws on a screen your terminal keeps no history of, which is why Ctrl+A selects nothing here. Plain mode writes ordinary text instead, so you can select, copy and search the whole conversation with your terminal's own keys. It has fewer commands. This takes effect next time you start the program — the current screen is already running. Switch back in /settings, or right-click the desktop icon for a one-off.
 
+### `/sessions`
+
+*Also: `/history`*
+
+**Every past conversation: search, reopen, save, erase.**
+
+The one to reach for when a session ended without you — the power went, the connection dropped, the machine was closed. It lists every conversation you have ever had, newest first, with the date, how many messages, and how much space it is taking up.
+
+Type to search. It looks inside the messages as well as the titles, because titles are generated and are often useless weeks later — you remember the error you were chasing, not what the summary called that day.
+
+Enter reopens a conversation exactly where it stopped. Ctrl+E saves it to a file — the whole thing: every message with its time, the model's reasoning, and every tool it ran with the result that came back, including the failures. That is what lets you work out afterwards how something ended up published, or deleted.
+
+Ctrl+D erases one for good, along with the helper sessions it spawned, and returns the space to your disk — really returns it, and tells you how much came back. Deleting alone frees nothing on this kind of database; the file only shrinks when it is rebuilt, which is why this reports the actual before-and-after. Ctrl+S sorts by size, so the conversations worth deleting are the ones at the top.
+
 ### `/export`
 
 **Save this conversation to a file.**
 
 Asks you which folder and what to call it, then writes the whole session out as text: every message with its date and time, how far into the session it happened, which model answered, the model's reasoning, and every tool it ran with the result that came back — including the ones that failed. Use it when you need to know exactly what happened and when.
+
+This one saves the conversation you are in, and lets you name the file. To save a conversation you have LEFT — after a power cut, or from last week — use /sessions instead, which can also reach the helper sessions a research run spawned.
 
 ### `/compact`
 

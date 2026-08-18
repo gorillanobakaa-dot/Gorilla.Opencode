@@ -114,6 +114,31 @@ var All = []Command{
 			"a one-off.",
 	},
 	{
+		Name:    "sessions",
+		Aliases: []string{"history"},
+		Group:   GroupSession,
+		Summary: "Every past conversation: search, reopen, save, erase.",
+		Detail: "The one to reach for when a session ended without you — the power " +
+			"went, the connection dropped, the machine was closed. It lists every " +
+			"conversation you have ever had, newest first, with the date, how many " +
+			"messages, and how much space it is taking up.\n\n" +
+			"Type to search. It looks inside the messages as well as the titles, " +
+			"because titles are generated and are often useless weeks later — you " +
+			"remember the error you were chasing, not what the summary called that " +
+			"day.\n\n" +
+			"Enter reopens a conversation exactly where it stopped. Ctrl+E saves it " +
+			"to a file — the whole thing: every message with its time, the model's " +
+			"reasoning, and every tool it ran with the result that came back, " +
+			"including the failures. That is what lets you work out afterwards how " +
+			"something ended up published, or deleted.\n\n" +
+			"Ctrl+D erases one for good, along with the helper sessions it spawned, " +
+			"and returns the space to your disk — really returns it, and tells you " +
+			"how much came back. Deleting alone frees nothing on this kind of " +
+			"database; the file only shrinks when it is rebuilt, which is why this " +
+			"reports the actual before-and-after. Ctrl+S sorts by size, so the " +
+			"conversations worth deleting are the ones at the top.",
+	},
+	{
 		Name:    "export",
 		Group:   GroupSession,
 		Summary: "Save this conversation to a file.",
@@ -122,7 +147,11 @@ var All = []Command{
 			"into the session it happened, which model answered, the model's " +
 			"reasoning, and every tool it ran with the result that came back — " +
 			"including the ones that failed. Use it when you need to know exactly " +
-			"what happened and when.",
+			"what happened and when.\n\n" +
+			"This one saves the conversation you are in, and lets you name the " +
+			"file. To save a conversation you have LEFT — after a power cut, or " +
+			"from last week — use /sessions instead, which can also reach the " +
+			"helper sessions a research run spawned.",
 	},
 
 	// ─── Which files the AI can see ──────────────────────────────────

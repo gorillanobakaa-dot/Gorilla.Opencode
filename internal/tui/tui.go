@@ -17,6 +17,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/auth"
 	"github.com/opencode-ai/opencode/internal/commands"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/export"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/llm/prompt"
@@ -265,6 +266,12 @@ type appModel struct {
 	showOsintDialog bool
 	osintPage       dialog.OsintPageCmp
 	showOsintPage   bool
+	// GORILLA OVERRIDE (2026-08-18): /sessions — the manager that can reach a
+	// conversation you are no longer in: search it, revive it, export it, erase
+	// it. Built for machines where the power cut ends the session, not the user.
+	sessionsMgr     dialog.SessionsCmp
+	showSessionsMgr bool
+
 	// GORILLA OVERRIDE (2026-08-18): /osint --recover — the picker that turns a
 	// run whose write-up died into the dossier it should have been.
 	osintRecover     dialog.OsintRecoverCmp
@@ -1004,6 +1011,59 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			"dossier", msg.Mode, msg.Agents, config.DossierDir(), msg.Question)
 		return a, util.CmdHandler(chat.SendMsg{Text: prompt})
 
+	case dialog.SessionsCloseMsg:
+		a.showSessionsMgr = false
+		return a, nil
+
+	case dialog.SessionsSearchMsg:
+		// Titles are filtered inside the dialog; message CONTENT needs the
+		// database. Titles are frequently useless for finding a session weeks
+		// later — this program writes "New Session" as a real title.
+		hits, err := a.app.Sessions.Search(context.Background(), msg.Needle)
+		if err != nil {
+			return a, util.ReportError(err)
+		}
+		a.sessionsMgr.SetMatches(hits)
+		return a, nil
+
+	case dialog.SessionsReviveMsg:
+		a.showSessionsMgr = false
+		a.selectedSession = msg.Session
+		return a, util.CmdHandler(chat.SessionSelectedMsg(msg.Session))
+
+	case dialog.SessionsExportMsg:
+		// Export whichever session was chosen, not whichever one is open. That
+		// distinction is the point: after a power cut the session you want is
+		// never the one you are in.
+		ctx := context.Background()
+		msgs, err := a.app.Messages.List(ctx, msg.Session.ID)
+		if err != nil {
+			return a, util.ReportError(err)
+		}
+		// Helper sessions travel with the conversation. Without them a research
+		// run exported as 14 messages while the list said 275 — the other 261,
+		// and every lane's reasoning and tool call, were silently absent.
+		var branches []export.Branch
+		if kids, err := a.app.Sessions.Children(ctx, msg.Session.ID); err == nil {
+			for _, kid := range kids {
+				km, err := a.app.Messages.List(ctx, kid.ID)
+				if err != nil {
+					continue
+				}
+				branches = append(branches, export.Branch{Session: kid, Messages: km})
+			}
+		}
+		path, total, err := export.WriteSessionTree(config.SessionExportDir(), msg.Session, msgs, branches, time.Now())
+		if err != nil {
+			return a, util.ReportError(err)
+		}
+		a.sessionsMgr.SetNotice(fmt.Sprintf("Exported %d messages (%d helper sessions) → %s",
+			total, len(branches), path))
+		return a, nil
+
+	case dialog.SessionsDeleteMsg:
+		return a, a.eraseSession(msg.Session)
+
 	case dialog.CloseOsintRecoverMsg:
 		a.showOsintRecover = false
 		if !msg.Chosen {
@@ -1105,6 +1165,14 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.osintDialog = dialog.NewOsintDialogCmp(q)
 			a.osintDialog.SetSize(a.width, a.height)
 			a.showOsintDialog = true
+			return a, nil
+		// GORILLA OVERRIDE (2026-08-18): /sessions reaches a conversation you
+		// are no longer in. The old switcher (ctrl+s) showed titles and nothing
+		// else — no date, no size, no search — and could not export or erase.
+		case "sessions", "history":
+			if cmd := a.openSessionsManager(); cmd != nil {
+				return a, cmd
+			}
 			return a, nil
 		case "model", "models":
 			a.modelDialog.Init()
@@ -1507,7 +1575,11 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, nil
 		case key.Matches(msg, keys.SwitchSession):
-			if a.currentPage == page.ChatPage && !a.showQuit && !a.showPermissions && !a.showCommandDialog {
+			// Not while the manager is open: it owns the keyboard, and this
+			// binding would otherwise open the old switcher behind it. Found by
+			// driving the real binary — tab in the manager appeared to do
+			// nothing because this branch consumed the key first.
+			if a.currentPage == page.ChatPage && !a.showQuit && !a.showPermissions && !a.showCommandDialog && !a.showSessionsMgr {
 				// Load sessions and show the dialog
 				// Load both views: the sessions started in this folder, and
 				// every session. The dialog opens scoped to the current folder
@@ -1790,6 +1862,15 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d, oCmd := a.osintDialog.Update(msg)
 		a.osintDialog = d.(dialog.OsintDialogCmp)
 		cmds = append(cmds, oCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showSessionsMgr {
+		d, sCmd := a.sessionsMgr.Update(msg)
+		a.sessionsMgr = d.(dialog.SessionsCmp)
+		cmds = append(cmds, sCmd)
 		if _, ok := msg.(tea.KeyMsg); ok {
 			return a, tea.Batch(cmds...)
 		}
@@ -2284,6 +2365,17 @@ func (a appModel) View() string {
 
 	if a.showOsintDialog {
 		overlay := a.osintDialog.View()
+		appView = layout.PlaceOverlay(
+			a.width/2-lipgloss.Width(overlay)/2,
+			a.height/2-lipgloss.Height(overlay)/2,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
+	if a.showSessionsMgr {
+		overlay := a.sessionsMgr.View()
 		appView = layout.PlaceOverlay(
 			a.width/2-lipgloss.Width(overlay)/2,
 			a.height/2-lipgloss.Height(overlay)/2,

@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -69,34 +68,8 @@ func (a *appModel) writeExport(dir, name string) tea.Cmd {
 	return util.ReportInfo(fmt.Sprintf("Exported %d messages to %s", len(msgs), dst))
 }
 
-// suggestedExportName derives a filesystem-safe default from the session title.
-// The timestamp keeps successive exports of one session distinct, which matters
-// now that writeExport refuses to overwrite.
+// suggestedExportName delegates to the export package, where the naming now
+// lives so the sessions manager can use it for a session that is not on screen.
 func suggestedExportName(title string, now time.Time) string {
-	slug := strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
-			return r
-		case r >= 'A' && r <= 'Z':
-			return r + ('a' - 'A')
-		case r == ' ', r == '-', r == '_':
-			return '-'
-		default:
-			return -1
-		}
-	}, title)
-
-	// Collapse runs of dashes left behind by stripped punctuation.
-	for strings.Contains(slug, "--") {
-		slug = strings.ReplaceAll(slug, "--", "-")
-	}
-	slug = strings.Trim(slug, "-")
-	if slug == "" {
-		slug = "session"
-	}
-	const maxSlug = 60
-	if len([]rune(slug)) > maxSlug {
-		slug = strings.Trim(string([]rune(slug)[:maxSlug]), "-")
-	}
-	return fmt.Sprintf("gorilla-opencode-%s-%s.md", slug, now.Format("20060102-150405"))
+	return export.SuggestedName(title, now)
 }

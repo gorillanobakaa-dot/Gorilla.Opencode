@@ -17,6 +17,7 @@ package dialog
 // That is the same failure class an Arch tester reported on v0.1.87.
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
+	"github.com/opencode-ai/opencode/internal/session"
 )
 
 // frameFitSizes spans a cramped SSH window, the common 80x24 default, a laptop
@@ -70,6 +72,25 @@ func TestDialogFramesNeverExceedTheTerminal(t *testing.T) {
 		full := NewOsintRecoverCmp(recoverFixture())
 		full.SetSize(w, h)
 		views["/osint --recover"] = full.View()
+
+		// The sessions manager, in the three states that differ in height: a
+		// full list, an empty search, and a pending erase (which swaps in a red
+		// confirmation line).
+		mgr := NewSessionsCmp()
+		mgr.SetStore(sessionsFixture(), "s3")
+		mgr.SetSize(w, h)
+		views["/sessions"] = mgr.View()
+
+		empty2 := NewSessionsCmp()
+		empty2.SetStore(SessionsStore{}, "")
+		empty2.SetSize(w, h)
+		views["/sessions (empty)"] = empty2.View()
+
+		confirm := NewSessionsCmp()
+		confirm.SetStore(sessionsFixture(), "")
+		confirm.SetSize(w, h)
+		confirm.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
+		views["/sessions (confirming)"] = confirm.View()
 
 		for name, v := range views {
 			if got := lipgloss.Width(v); got > w {
@@ -137,4 +158,37 @@ func recoverFixture() []agent.RecoverableRun {
 		})
 	}
 	return runs
+}
+
+// sessionsFixture is more conversations than fit, with a title long enough to
+// wrap if anything forgets to truncate, and sizes spanning the formatter's
+// bytes/KB/MB branches.
+func sessionsFixture() SessionsStore {
+	long := "Establish or refute whether the local friend kelexine who designed the private Rust tool findx is the same person as the public developer Franklin Kelechi"
+	// A REAL title from the developer's store, containing U+FFFC (object
+	// replacement character). It is one rune and two display columns, and it
+	// wrapped the row on the first live run because fitLine counted runes.
+	// Emoji and CJK behave the same way and are far more likely in the hands of
+	// the people this is built for.
+	wide := "\ufffcDSML\ufffcparameter name=\"agents\" 中文 😀 " + long
+	rows := make([]SessionRow, 0, 20)
+	for i := 0; i < 20; i++ {
+		title := long
+		if i%3 == 0 {
+			title = wide
+		}
+		rows = append(rows, SessionRow{
+			Session: session.Session{
+				ID:        fmt.Sprintf("s%d", i),
+				Title:     title,
+				CreatedAt: time.Date(2026, 8, 17, 21, 30, 0, 0, time.UTC).Unix() - int64(i*3600),
+			},
+			Bytes: int64(i) * 500_000,
+			Msgs:  int64(i) * 7,
+		})
+	}
+	return SessionsStore{
+		Rows: rows, TotalBytes: 4_774_160, FileBytes: 9_826_688,
+		Sessions: 20, Helpers: 45, Msg: 578,
+	}
 }

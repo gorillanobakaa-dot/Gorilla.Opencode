@@ -179,6 +179,23 @@ func DossierDir() string {
 	return filepath.Join(home, "Gorilla-OSINT-Dossiers")
 }
 
+// SessionExportDir is where /sessions writes a transcript.
+//
+// Derived from the user's home, never hardcoded to this developer's machine —
+// the same rule DossierDir follows, and for the same reason: this has to work
+// on every computer it is installed on. Never the working folder: that is often
+// a git repository, and a transcript holds whatever was discussed.
+func SessionExportDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return filepath.Join(ConfigBase(), "session-exports")
+	}
+	if docs := filepath.Join(home, "Documents"); dirExists(docs) {
+		return filepath.Join(docs, "Gorilla-Session-Exports")
+	}
+	return filepath.Join(home, "Gorilla-Session-Exports")
+}
+
 func dirExists(p string) bool {
 	st, err := os.Stat(p)
 	return err == nil && st.IsDir()

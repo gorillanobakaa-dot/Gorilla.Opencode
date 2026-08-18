@@ -20,6 +20,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
@@ -214,12 +215,20 @@ func (m OsintRecoverCmp) Bindings() []key.Binding { return nil }
 // fitLine truncates rather than wraps. lipgloss WRAPS a string wider than its
 // Width, so an untruncated line silently becomes two rows — the same defect
 // that made /context grow taller exactly where there was least room.
+//
+// GORILLA FIX (2026-08-18): measured in DISPLAY COLUMNS, not runes. The first
+// version counted runes, and a real session title in the store contains U+FFFC
+// (object replacement character), which occupies two columns and counts as one
+// rune — so that row rendered two columns wider than the frame and wrapped,
+// stranding half of it. Rune count is not width for anything a user can paste
+// into a prompt: CJK, emoji and replacement characters are all double-width.
+// ansi.Truncate does the same arithmetic the terminal does.
 func fitLine(line string, width int) string {
 	if width < 4 {
 		return ""
 	}
-	if r := []rune(line); len(r) > width-1 {
-		return string(r[:width-2]) + "…"
+	if lipgloss.Width(line) <= width-1 {
+		return line
 	}
-	return line
+	return ansi.Truncate(line, width-2, "…")
 }
