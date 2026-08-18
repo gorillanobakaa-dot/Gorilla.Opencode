@@ -1,3 +1,39 @@
+## v0.1.96 — 2026-08-18 — when the link fails, it fails cheaply and says so
+
+**Plain-language version:** every earlier release measured what this program
+costs when the connection *works*. This one measured what it does when the
+connection *breaks* — the normal case on a satellite link — and fixed what that
+turned up.
+
+When the link **drops mid-answer**, it used to retry silently 14 times and
+upload a full megabyte for one question that never got answered. Three separate
+things were retrying without knowing about each other, and their effect
+multiplied. Now there is one budget counted in the thing you pay for — bytes —
+and the same drop costs 252 KB and ends in under a minute with a clear message.
+
+When the link **goes quiet** — a satellite dropout doesn't say goodbye, it just
+stops carrying anything while looking alive — it used to wait forever. Now two
+limits catch it: one for the answer never starting, one for the answer stopping
+halfway. The second is a stall timer, not a stopwatch, so an answer trickling in
+slowly on a bad link is never cut off (tested at 2 KB/s: it still completes).
+
+The **waiting indicator now counts** (`Thinking… (18s)`) and, once a wait crosses
+the point where a free model is probably warming up (measured: 12–19 seconds,
+sometimes minutes), says so — so you can tell "warming up" from "stuck".
+
+The **research and web tools now identify as a browser**, because a lot of the
+web reflexively blocks anything labelled a bot; a search a person could run was
+being refused. It reads only public pages a person could read. Switchable back
+with a setting.
+
+One thing we **measured and deliberately did not rush**: the input box spikes the
+processor on old hardware because it does a full redraw on every keystroke to
+size itself. That is real — but the redraw is also a documented correctness fix,
+so we recorded exactly what it costs, found the one safe way to speed it up, and
+left the code alone until there is a proper test behind the change.
+
+Full dual-track notes: `Changelogs/v0.1.96-release-notes.md`.
+
 ## v0.1.95 — 2026-08-18 — /review takes options, and every depth says what it skipped
 
 **Plain-language version:** v0.1.94 shipped `/review` with one argument: a
