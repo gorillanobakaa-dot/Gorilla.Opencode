@@ -61,10 +61,24 @@ func resilientHTTPClient() *http.Client {
 	}
 
 	return &http.Client{
-		// GORILLA OVERRIDE: gzip outgoing request bodies. Go compresses
-		// responses for free but never requests, and the uploaded
-		// conversation is the largest thing we send. See gzip_request.go.
-		Transport: newGzipRequestTransport(transport),
+		// GORILLA OVERRIDE: two wrappers, and the ORDER is load-bearing.
+		//
+		// gzip is OUTER, budget is INNER. A RoundTripper sees the request
+		// before the one it wraps, so the outer wrapper gets the original body
+		// and the inner one gets whatever the outer produced. The budget must
+		// therefore be innermost, or it charges for the uncompressed body
+		// rather than the bytes that actually travel — and the user pays for
+		// wire bytes.
+		//
+		// The first version had these the other way round, with a comment
+		// confidently claiming the opposite. TestTheBudgetMeasuresCompressed-
+		// WireBytes caught it: 132,000 bytes charged for a body that
+		// compresses about twenty times.
+		//
+		// gzip_request.go: Go compresses responses for free but never
+		// requests, and the uploaded conversation is the largest thing we send.
+		// uploadbudget.go: one retry ceiling that is actually the ceiling.
+		Transport: newGzipRequestTransport(newBudgetTransport(transport)),
 		// Deliberately NO Timeout — see the file comment.
 	}
 }

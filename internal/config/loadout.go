@@ -15,8 +15,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/opencode-ai/opencode/internal/llm/models"
 )
@@ -915,4 +917,49 @@ func AgentModel(name AgentName) models.ModelID {
 		return ""
 	}
 	return cfg.Agents[name].Model
+}
+
+// TurnUploadBudgetBytes is how much one turn may push up the link before it
+// stops trying, including retries.
+//
+// GORILLA OVERRIDE (2026-08-18): measured, not chosen. A dropping link produced
+// 14 attempts and 1.01 MB of upload for a single unanswered question, because
+// the application's retry loop and Go's http.Transport each counted separately.
+// See internal/llm/provider/uploadbudget.go.
+//
+// 4 MB is deliberately generous: a large conversation is ~100 KB per attempt,
+// so this still allows dozens of legitimate retries and a long agent turn with
+// many tool calls. It is a backstop against a storm, not a diet. What it stops
+// is the unbounded case — and on a metered satellite plan, unbounded is the
+// only number that actually hurts.
+//
+// GORILLA_OPENCODE_TURN_UPLOAD_MB overrides it; 0 disables the budget.
+func TurnUploadBudgetBytes() int64 {
+	if v := os.Getenv("GORILLA_OPENCODE_TURN_UPLOAD_MB"); v != "" {
+		if mb, err := strconv.ParseFloat(v, 64); err == nil && mb >= 0 {
+			return int64(mb * 1024 * 1024)
+		}
+	}
+	return 4 * 1024 * 1024
+}
+
+// NonInteractiveDeadline bounds a headless run (-p).
+//
+// GORILLA OVERRIDE (2026-08-18): the interactive path deliberately has no
+// timeout — a slow model on a slow link must not be killed mid-answer, and the
+// user can press ESC. Headless has no user. Measured against a link that went
+// silent without closing: it waited indefinitely, with no error and no output,
+// which for a script or a cron job means hanging forever.
+//
+// 30 minutes: long enough for a large model on a bad link doing a multi-step
+// agent turn, short enough that an unattended run fails and reports rather than
+// wedging. GORILLA_OPENCODE_HEADLESS_TIMEOUT accepts a Go duration ("45m");
+// "0" disables the deadline.
+func NonInteractiveDeadline() time.Duration {
+	if v := os.Getenv("GORILLA_OPENCODE_HEADLESS_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d >= 0 {
+			return d
+		}
+	}
+	return 30 * time.Minute
 }

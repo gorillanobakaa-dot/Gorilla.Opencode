@@ -109,6 +109,26 @@ func (app *App) initTheme() {
 func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat string, quiet bool) error {
 	logging.Info("Running in non-interactive mode")
 
+	// GORILLA OVERRIDE (2026-08-18): a wall-clock deadline, because there is
+	// nobody here to press ESC.
+	//
+	// provider/httpclient.go deliberately sets no client Timeout and no
+	// ResponseHeaderTimeout, so a big model over a satellite link is never
+	// killed mid-answer. That is right — and it assumes a human is watching,
+	// able to cancel. Measured on a link that went silent (socket held open,
+	// nothing forwarded, which is what a real dropout looks like): the
+	// interactive path can be escaped, and this one hung for as long as it was
+	// left, with no error and no output. A cron job or a script would hang
+	// forever.
+	//
+	// So the deadline exists only on this path, generous enough that a slow
+	// model on a slow link finishes comfortably, and it says what happened.
+	if d := config.NonInteractiveDeadline(); d > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, d)
+		defer cancel()
+	}
+
 	// Start spinner if not in quiet mode
 	var spinner *format.Spinner
 	if !quiet {
@@ -143,6 +163,26 @@ func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat
 	}
 
 	result := <-done
+
+	// GORILLA OVERRIDE (2026-08-18): a deadline is a FAILURE, not a cancellation.
+	//
+	// The branch below returns nil — exit code 0 — for a cancelled run, which is
+	// right when a human pressed ESC. But the headless deadline added above
+	// surfaces through the same path, and measured against a link that went
+	// silent this printed "No content available" and exited 0. A script or a
+	// cron job reads that as success with a strange answer, which is worse than
+	// the hang it replaced: the hang at least never claimed to have worked.
+	//
+	// So the deadline is checked FIRST and separately, and it fails loudly.
+	if ctx.Err() == context.DeadlineExceeded || errors.Is(result.Error, context.DeadlineExceeded) {
+		return fmt.Errorf(
+			"gave up after %s: no answer arrived. The connection may have gone silent — "+
+				"on a satellite or mobile link that is common, and there is nobody here to "+
+				"cancel by hand. Nothing was written. Raise or remove the limit with "+
+				"GORILLA_OPENCODE_HEADLESS_TIMEOUT (a duration such as 45m, or 0 to wait "+
+				"indefinitely)", config.NonInteractiveDeadline())
+	}
+
 	if result.Error != nil {
 		if errors.Is(result.Error, context.Canceled) || errors.Is(result.Error, agent.ErrRequestCancelled) {
 			logging.Info("Agent processing cancelled", "session_id", sess.ID)

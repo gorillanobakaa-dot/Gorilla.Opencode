@@ -322,6 +322,20 @@ func (a *agent) Run(ctx context.Context, sessionID string, content string, attac
 
 func (a *agent) processGeneration(ctx context.Context, sessionID, content string, attachmentParts []message.ContentPart) AgentEvent {
 	cfg := config.Get()
+
+	// GORILLA OVERRIDE (2026-08-18): give this turn an upload budget.
+	//
+	// Measured on a link that dropped every 8 seconds: 14 attempts, 1.01 MB
+	// uploaded, no answer, no error — because the application loop and Go's
+	// http.Transport each retried without knowing the other existed, so the
+	// real ceiling was their product rather than the maxRetries written down.
+	//
+	// The budget is attached HERE, once per turn, and every request the turn
+	// makes carries it — including retries the transport starts on its own.
+	// One counter, at the one place they all pass through. See
+	// internal/llm/provider/uploadbudget.go for why it counts bytes and not
+	// attempts.
+	ctx = provider.WithUploadBudget(ctx, provider.NewUploadBudget(config.TurnUploadBudgetBytes()))
 	// List existing messages; if none, start title generation asynchronously.
 	msgs, err := a.messages.List(ctx, sessionID)
 	if err != nil {

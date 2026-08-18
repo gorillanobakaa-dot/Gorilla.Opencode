@@ -1,4 +1,4 @@
-<!-- Version: 1.1.0 · updated 26-08-18-15-18 -->
+<!-- Version: 1.2.0 · updated 26-08-18-15-33 -->
 # What it costs to run: memory, disk and network
 
 *Measured on 18 August 2026, on the reference machine (Sony VAIO SVE, i7-3632QM,
@@ -172,17 +172,56 @@ ESC.
 **But the headless path has no user.** `gorilla-opencode -p "…"` in a script, a
 cron job or over SSH has nobody to press anything, so it waits forever.
 
-### Status
+### Both are now fixed — measured against the same proxy that found them
 
-Both are **reported, not fixed**. The measurements are here so the fix can be
-argued from numbers. The three directions that look right:
+**A per-turn upload budget.** One counter, attached once per turn, at the single
+choke point every attempt passes through no matter who started it. It refuses
+*before* sending, because the whole point is not to put the bytes on the link,
+and the error says what it spent.
 
-1. Count attempts once, across both layers, so the declared ceiling is the real
-   one.
-2. Budget retries in **bytes**, not attempts — the cost of a retry is the whole
-   conversation re-uploaded, and bytes are what the user pays.
-3. Give the headless path a wall-clock deadline, because the escape hatch the
-   interactive path relies on does not exist there.
+It is counted in **bytes, not attempts**, for the reason the grep tool taught
+this project: a limit must be expressed in the unit of the resource it protects.
+What a retry actually costs is the whole conversation re-uploaded.
+
+| the drop test | before | after |
+|---|---|---|
+| Attempts | 14+ | **7** |
+| Uploaded | 1.01 MB | **252 KB** |
+| Outcome | ran until killed, silent | **exits in 50 s with a clear error** |
+
+The error itself confirms the diagnosis — *"stopped after 7 attempts"* against a
+declared `maxRetries = 5`. The two layers really were multiplying.
+
+Default 4 MB per turn, which still allows dozens of legitimate retries on a
+large conversation. `GORILLA_OPENCODE_TURN_UPLOAD_MB` changes it; `0` disables
+it.
+
+**A deadline on the headless path only.** The interactive path keeps its
+deliberate absence of a timeout — a slow model must not be killed mid-answer,
+and a human can press ESC. Headless has no human.
+
+| the silence test | before | after |
+|---|---|---|
+| Outcome | hung indefinitely | **exits in 22 s** |
+| Exit code | — | **1** |
+| Message | none | names the cause and the override |
+
+Default 30 minutes; `GORILLA_OPENCODE_HEADLESS_TIMEOUT` accepts a duration, `0`
+waits forever.
+
+**One thing the first attempt got wrong, worth recording.** The deadline
+initially surfaced through the same branch as a user cancellation, so it printed
+*"No content available"* and exited **0**. A script would have read that as
+success with a strange answer — worse than the hang it replaced, because the
+hang never claimed to have worked. A deadline is a failure, not a cancellation,
+and is now checked first and separately.
+
+**And one in the fix itself.** The budget was first wrapped *outside* the gzip
+transport, with a comment confidently stating that this is what measures the
+wire. It is the opposite: a `RoundTripper` sees the request before whatever it
+wraps, so the outermost one sees the uncompressed body.
+`TestTheBudgetMeasuresCompressedWireBytes` caught it — 132,000 bytes charged for
+a body that compresses about twentyfold.
 
 ---
 
