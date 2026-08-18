@@ -194,9 +194,11 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 			patchDiff, _, _ := diff.GenerateDiff("", *change.NewContent, path)
 			p := p.permissions.Request(
 				permission.CreatePermissionRequest{
-					SessionID:   sessionID,
-					Path:        dir,
-					ToolName:    PatchToolName,
+					SessionID: sessionID,
+					Path:      dir,
+					ToolName:  PatchToolName,
+					// Grant covers THIS path, not every patch in the session.
+					GrantKey:    path,
 					Action:      "create",
 					Description: fmt.Sprintf("Create file %s", path),
 					Params: EditPermissionsParams{
@@ -245,9 +247,11 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 
 			p := p.permissions.Request(
 				permission.CreatePermissionRequest{
-					SessionID:   sessionID,
-					Path:        dir,
-					ToolName:    PatchToolName,
+					SessionID: sessionID,
+					Path:      dir,
+					ToolName:  PatchToolName,
+					// Grant covers THIS path, not every patch in the session.
+					GrantKey:    path,
 					Action:      "update",
 					Description: describe,
 					Params: EditPermissionsParams{
@@ -264,9 +268,11 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 			patchDiff, _, _ := diff.GenerateDiff(*change.OldContent, "", path)
 			p := p.permissions.Request(
 				permission.CreatePermissionRequest{
-					SessionID:   sessionID,
-					Path:        dir,
-					ToolName:    PatchToolName,
+					SessionID: sessionID,
+					Path:      dir,
+					ToolName:  PatchToolName,
+					// Grant covers THIS path, not every patch in the session.
+					GrantKey:    path,
 					Action:      "delete",
 					Description: fmt.Sprintf("Delete file %s", path),
 					Params: EditPermissionsParams{

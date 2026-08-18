@@ -51,6 +51,17 @@ type CreatePermissionRequest struct {
 	Action      string `json:"action"`
 	Params      any    `json:"params"`
 	Path        string `json:"path"`
+	// GrantKey identifies WHAT is being approved, so a remembered grant covers
+	// that thing rather than the whole tool. A bash request sets the command; a
+	// file tool sets the resolved path. Empty keeps the old tool-wide behaviour
+	// for callers that have no meaningful identity to offer.
+	//
+	// GORILLA FIX (2026-08-18): without this, "Allow for session" on one
+	// `cat README.md` silently authorised every later bash command in the
+	// session tree — the dialog showed one command in a fenced block and the
+	// grant matched only ToolName+Action+SessionID+Path, with Params stored and
+	// never compared.
+	GrantKey string `json:"grant_key"`
 }
 
 type PermissionRequest struct {
@@ -61,6 +72,8 @@ type PermissionRequest struct {
 	Action      string `json:"action"`
 	Params      any    `json:"params"`
 	Path        string `json:"path"`
+	// GrantKey — see CreatePermissionRequest.GrantKey.
+	GrantKey string `json:"grant_key"`
 }
 
 type Service interface {
@@ -158,6 +171,22 @@ func (s *permissionService) Deny(permission PermissionRequest) {
 	}
 }
 
+// hasGrant reports whether a remembered session grant covers this exact
+// request. Exposed for tests so the matching rule can be asserted directly
+// rather than inferred from a full Request round-trip.
+func (s *permissionService) hasGrant(sessionID, toolName, action, path, grantKey string) bool {
+	s.mu.RLock()
+	grants := slices.Clone(s.sessionPermissions)
+	s.mu.RUnlock()
+	for _, p := range grants {
+		if p.ToolName == toolName && p.Action == action &&
+			p.SessionID == sessionID && p.Path == path && p.GrantKey == grantKey {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	// Grants belong to the conversation, not to whichever helper happened to
 	// ask, so both the auto-approve list and the remembered grants are checked
@@ -180,10 +209,13 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 		Description: opts.Description,
 		Action:      opts.Action,
 		Params:      opts.Params,
+		GrantKey:    opts.GrantKey,
 	}
 
 	for _, p := range grants {
-		if p.ToolName == permission.ToolName && p.Action == permission.Action && p.SessionID == permission.SessionID && p.Path == permission.Path {
+		if p.ToolName == permission.ToolName && p.Action == permission.Action &&
+			p.SessionID == permission.SessionID && p.Path == permission.Path &&
+			p.GrantKey == permission.GrantKey {
 			return true
 		}
 	}

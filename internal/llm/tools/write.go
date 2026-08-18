@@ -165,7 +165,9 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 			SessionID: sessionID,
 			Path:      permissionPath,
 			ToolName:  WriteToolName,
-			Action:    "write",
+			// Grant covers THIS file, not every file the tool may touch.
+			GrantKey: filePath,
+			Action:   "write",
 			// GORILLA OVERRIDE (2026-08-18): name the path the bytes ACTUALLY
 			// land on. A symlink inside the workspace pointing elsewhere made
 			// this prompt describe the link while the write went to its target;

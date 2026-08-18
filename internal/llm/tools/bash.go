@@ -193,10 +193,13 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	if !isSafeReadOnly {
 		p := b.permissions.Request(
 			permission.CreatePermissionRequest{
-				SessionID:   sessionID,
-				Path:        config.WorkingDirectory(),
-				ToolName:    BashToolName,
-				Action:      "execute",
+				SessionID: sessionID,
+				Path:      config.WorkingDirectory(),
+				ToolName:  BashToolName,
+				Action:    "execute",
+				// Scope the grant to THIS command. "Allow for session" on
+				// `go build ./...` should not also authorise `rm -rf ~`.
+				GrantKey:    params.Command,
 				Description: fmt.Sprintf("Execute command: %s", params.Command),
 				Params: BashPermissionsParams{
 					Command: params.Command,

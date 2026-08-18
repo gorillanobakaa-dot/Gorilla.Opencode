@@ -196,9 +196,11 @@ func (e *editTool) createNewFile(ctx context.Context, filePath, content string) 
 	permissionPath := permissionScope(filePath)
 	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
-			SessionID:   sessionID,
-			Path:        permissionPath,
-			ToolName:    EditToolName,
+			SessionID: sessionID,
+			Path:      permissionPath,
+			ToolName:  EditToolName,
+			// Grant covers THIS file, not every file the tool may touch.
+			GrantKey:    filePath,
 			Action:      "write",
 			Description: fmt.Sprintf("Create file %s", DescribeWriteTarget(filePath)),
 			Params: EditPermissionsParams{
@@ -307,9 +309,11 @@ func (e *editTool) deleteContent(ctx context.Context, filePath, oldString string
 	permissionPath := permissionScope(filePath)
 	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
-			SessionID:   sessionID,
-			Path:        permissionPath,
-			ToolName:    EditToolName,
+			SessionID: sessionID,
+			Path:      permissionPath,
+			ToolName:  EditToolName,
+			// Grant covers THIS file, not every file the tool may touch.
+			GrantKey:    filePath,
 			Action:      "write",
 			Description: fmt.Sprintf("Delete content from file %s", DescribeWriteTarget(filePath)),
 			Params: EditPermissionsParams{
@@ -423,9 +427,11 @@ func (e *editTool) replaceContent(ctx context.Context, filePath, oldString, newS
 	permissionPath := permissionScope(filePath)
 	p := e.permissions.Request(
 		permission.CreatePermissionRequest{
-			SessionID:   sessionID,
-			Path:        permissionPath,
-			ToolName:    EditToolName,
+			SessionID: sessionID,
+			Path:      permissionPath,
+			ToolName:  EditToolName,
+			// Grant covers THIS file, not every file the tool may touch.
+			GrantKey:    filePath,
 			Action:      "write",
 			Description: fmt.Sprintf("Replace content in file %s", DescribeWriteTarget(filePath)),
 			Params: EditPermissionsParams{
