@@ -269,6 +269,67 @@ papered over:
 
 ---
 
+## When it dies before writing it up: `/osint --recover`
+
+This is the failure the tool was most likely to have, and it is now the one it
+handles best.
+
+**What went wrong.** On 17 August 2026 a ten-helper supervised run spent about
+two hours and roughly 850,000 tokens. It did the work: three load-bearing claims
+verified by hand, an identity bridged through an obscure tool-output
+fingerprint, honest grades throughout. Then it announced "writing the dossier
+now" and died without putting a single byte on disk. Its context stood at 145%
+of the model's window.
+
+Read that again, because it is the important part: **the run failed BECAUSE it
+succeeded.** Assembling the assessment is the most memory-hungry moment of the
+whole cycle, and how much memory it needs depends on how much was found. The
+better the research, the more likely the write-up dies.
+
+**What happens now, automatically.** The moment the helpers report, every graded
+lane report is written straight to disk by the program itself — before any model
+is asked to do anything with it. That step involves no AI, so it cannot fail the
+way the write-up failed. Worst case is now an unwritten dossier rather than a
+lost one.
+
+**What `/osint --recover` does.** It lists every past run that collected
+findings — the saved files, and the runs that live only in the local session
+store — showing what was asked, when, how many lanes reported, and what it cost.
+Pick one, and it is written up.
+
+The trick is not clever, it is arithmetic. The findings were never the problem:
+measured on that 850,000-token run, the nine lane reports came to about 15,045
+tokens, because the strict output contract had already squeezed two hours of
+searching into something that fits a 32K window with room to spare. What drowned
+the run was everything ELSE it was carrying — raw tool output, a JSON dump, its
+own reasoning, the whole conversation. So the write-up happens in a **fresh
+conversation carrying only the findings**. Different job, different size.
+
+Three things worth knowing:
+
+- **Nothing is researched again.** No helpers are sent out, no searches are run,
+  no web pages are fetched. The instructions say so in as many words. The only
+  cost is the write-up itself.
+- **Grades travel through unchanged.** A claim that arrived as C3 leaves as C3.
+  The model doing the write-up did not do the research and is not entitled to
+  upgrade its confidence. Lanes that reported nothing stay marked as uncovered.
+- **If the findings still will not fit, it says so.** Rather than truncating and
+  producing a dossier that quietly omits three lanes, it tells you the sizes and
+  suggests `/model` to pick a larger window. The findings are on disk either
+  way, so trying costs nothing.
+
+Measured across five real runs recovered from the store on 18 August 2026, the
+distilled findings came to between 696 and 22,448 tokens — against 95,000 to
+508,000 tokens spent collecting them.
+
+**Why this matters more than it sounds.** On a satellite uplink in Somalia,
+Sudan, the Lake Chad Basin — the connections this project is actually built for
+— an interrupted run is the normal case, not the contingency. Recovery is not a
+repair tool bolted on after a bug. It is part of how the thing is meant to be
+used.
+
+---
+
 ## What it will not do
 
 - It will not cite a source it did not actually open.

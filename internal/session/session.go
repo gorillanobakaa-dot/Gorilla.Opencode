@@ -65,6 +65,10 @@ type Service interface {
 	// rows are included rather than hidden.
 	ListByDir(ctx context.Context, dir string) ([]Session, error)
 	Save(ctx context.Context, session Session) (Session, error)
+	// ListResearchHelpers returns the helper sessions a research run spawned.
+	// List deliberately hides them (they are not conversations); recovery is
+	// the one caller that needs to see them.
+	ListResearchHelpers(ctx context.Context) ([]Session, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -159,6 +163,41 @@ func (s *service) withHelperTotals(ctx context.Context, sess Session) Session {
 	}
 	sess.TotalPromptTokens, sess.TotalCompletionTokens = prompt, completion
 	return sess
+}
+
+// researchHelperLister is satisfied by the generated *db.Queries via the
+// hand-written ListResearchHelpers. Type-asserted rather than added to
+// db.Querier so the generated interface stays untouched by this feature.
+type researchHelperLister interface {
+	ListResearchHelpers(ctx context.Context) ([]db.ResearchHelper, error)
+}
+
+// ListResearchHelpers returns every research helper session, newest first.
+//
+// Only the fields recovery reads are filled: the id (which encodes the run and
+// the lane), the title, what the lane cost, and when it started. A store that
+// cannot answer returns nothing rather than an error — a listing that fails
+// tells someone their two hours are gone, which would not even be true.
+func (s *service) ListResearchHelpers(ctx context.Context) ([]Session, error) {
+	l, ok := s.q.(researchHelperLister)
+	if !ok {
+		return nil, nil
+	}
+	rows, err := l.ListResearchHelpers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Session, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, Session{
+			ID:               r.ID,
+			Title:            r.Title,
+			PromptTokens:     r.PromptTokens,
+			CompletionTokens: r.CompletionTokens,
+			CreatedAt:        r.CreatedAt,
+		})
+	}
+	return out, nil
 }
 
 func (s *service) Save(ctx context.Context, session Session) (Session, error) {

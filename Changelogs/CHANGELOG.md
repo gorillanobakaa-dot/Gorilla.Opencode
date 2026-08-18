@@ -1,3 +1,57 @@
+## v0.1.91 — 2026-08-18 — `/osint --recover`: the command that was documented before it existed
+
+**Plain-language version:** Yesterday's release added a safety net for expensive
+research runs. When the helpers finish, their graded findings are written
+straight to disk by the program itself, before any AI is asked to do anything
+with them — so a run that collects good material and then dies at the write-up
+stage does not lose the material.
+
+The findings file told you what to do next: *run `/osint --recover`*. So did the
+tool's own report. **That command did not exist.** Typing it sent the literal
+text `--recover` into a ten-helper professional dossier as the subject to
+investigate. The model refused — "I cannot fabricate a dossier about
+'--recover', that's a flag, not a question" — which was exactly right, and cost
+the user the setup of a run to find out.
+
+It exists now, and it does the job properly. It lists every past run that
+collected findings, showing what was asked, when, how many lanes reported, and
+what it cost. Pick one and it is written up as a dossier — with **no searching,
+no helpers, and nothing collected again.**
+
+The reason it works where the original run failed is arithmetic, not cleverness.
+A run last night spent about 850,000 tokens and died with its context at 145% of
+the model's window. But the findings themselves were never big: the strict report
+format had already compressed two hours of searching down to about 15,000
+tokens. What drowned the run was everything else it was carrying — raw tool
+output, its own reasoning, the whole conversation. So the write-up now happens in
+a **fresh conversation carrying only the findings**.
+
+Proven against the real thing: **five dead runs from last night were recovered
+from the local store**, totalling roughly 1.3 million tokens of work that had
+been sitting there unusable. Their distilled findings measured between 696 and
+22,448 tokens.
+
+Three smaller things, each found by testing rather than by reading:
+
+- The picker **listed every recovered run twice** — once as its saved file and
+  once as the sessions it was built from. Caught the first time the screen was
+  driven live: eleven entries for six runs.
+- It claimed **"8 of 8 lanes reported"** for a run that was cancelled after two
+  minutes, where six of the eight had emitted nothing but "let me check the
+  memory directories". It was inferring coverage from token counts, which
+  narration also produces. It now states only what it actually knows.
+- The list drew **32 rows in a 24-row terminal**. Caught by an automated check
+  before it ever reached a screen — a frame taller than the window scrolls the
+  terminal and wrecks the layout.
+
+**Developer notes.** `internal/llm/agent/research_recover.go` extracts runs in
+pure Go — grouping helper sessions by tool-call id, pulling each lane's final
+report, pairing supervisor audits to the lanes they judged — so recovery costs
+nothing and cannot fail the way the write-up failed. `ListSessions` filters to
+`parent_session_id IS NULL` and correctly hides helper sessions from the session
+picker, which returned zero runs from a store holding five; the hand-written
+`internal/db/research_helpers.go` asks the question the picker cannot.
+
 ## v0.1.90 — 2026-08-17 — all-source analysis, and four ways the program was lying about itself
 
 Full dual-track document: [v0.1.90-release-notes.md](v0.1.90-release-notes.md).

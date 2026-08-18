@@ -265,6 +265,10 @@ type appModel struct {
 	showOsintDialog bool
 	osintPage       dialog.OsintPageCmp
 	showOsintPage   bool
+	// GORILLA OVERRIDE (2026-08-18): /osint --recover — the picker that turns a
+	// run whose write-up died into the dossier it should have been.
+	osintRecover     dialog.OsintRecoverCmp
+	showOsintRecover bool
 
 	// GORILLA OVERRIDE: "your background helpers moved too" — shown after a
 	// model switch drags summarizer/task/title/research along, with a revert.
@@ -1000,6 +1004,30 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			"dossier", msg.Mode, msg.Agents, config.DossierDir(), msg.Question)
 		return a, util.CmdHandler(chat.SendMsg{Text: prompt})
 
+	case dialog.CloseOsintRecoverMsg:
+		a.showOsintRecover = false
+		if !msg.Chosen {
+			return a, nil
+		}
+		path, findings, err := agent.RecoverFindings(context.Background(), msg.Run, a.app.Sessions, a.app.Messages)
+		if err != nil {
+			return a, util.ReportError(err)
+		}
+		// The write-up happens in a FRESH conversation. That is the entire
+		// mechanism: the original run did not fail for lack of findings, it
+		// failed because the orchestrator was carrying raw tool results, its own
+		// reasoning and the whole conversation at 145% of its window. The
+		// findings themselves measured ~15,045 tokens.
+		prompt := agent.AssemblyPrompt(msg.Run.Question, findings, path)
+		if est, window := agent.EstimateTokens(prompt), a.assemblyWindow(); window > 0 && est > window {
+			return a, util.ReportWarn(agent.ChunkedAssemblyNote(est, window))
+		}
+		a.selectedSession = session.Session{}
+		return a, tea.Sequence(
+			util.CmdHandler(chat.NewSessionMsg{}),
+			util.CmdHandler(chat.SendMsg{Text: prompt}),
+		)
+
 	case dialog.CloseOsintPageMsg:
 		a.showOsintPage = false
 		return a, nil
@@ -1050,6 +1078,21 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// toast — this command is the one that earns a full explanation.
 		case "osint", "dossier":
 			q := strings.TrimSpace(msg.Args)
+			// GORILLA OVERRIDE (2026-08-18): --recover is a FLAG, not a question.
+			//
+			// It was documented before it was built: the salvage path told users
+			// to run it, and typing it sent the literal string "--recover" into a
+			// ten-helper supervised dossier as the subject under investigation.
+			// The model refused to fabricate a dossier about a flag, which was the
+			// right call and cost the user a run's worth of setup to discover.
+			// Recognised here, before anything can be spent.
+			if isRecoverFlag(q) {
+				runs := agent.ListRecoverableRuns(context.Background(), a.app.Sessions, a.app.Messages)
+				a.osintRecover = dialog.NewOsintRecoverCmp(runs)
+				a.osintRecover.SetSize(a.width, a.height)
+				a.showOsintRecover = true
+				return a, nil
+			}
 			if q == "" {
 				a.osintPage = dialog.NewOsintPageCmp()
 				a.osintPage.SetSize(a.width, a.height)
@@ -1752,6 +1795,15 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if a.showOsintRecover {
+		d, rCmd := a.osintRecover.Update(msg)
+		a.osintRecover = d.(dialog.OsintRecoverCmp)
+		cmds = append(cmds, rCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
 	if a.showOsintPage {
 		d, pCmd := a.osintPage.Update(msg)
 		a.osintPage = d.(dialog.OsintPageCmp)
@@ -2241,6 +2293,17 @@ func (a appModel) View() string {
 		)
 	}
 
+	if a.showOsintRecover {
+		overlay := a.osintRecover.View()
+		appView = layout.PlaceOverlay(
+			a.width/2-lipgloss.Width(overlay)/2,
+			a.height/2-lipgloss.Height(overlay)/2,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
 	if a.showOsintPage {
 		overlay := a.osintPage.View()
 		appView = layout.PlaceOverlay(
@@ -2614,4 +2677,30 @@ func modelLabel(id models.ModelID) string {
 		return m.Name
 	}
 	return string(id)
+}
+
+// isRecoverFlag recognises the recovery flag in the forms someone will actually
+// type. Written permissively on purpose: the alternative to matching "-recover"
+// is silently treating it as a research question and spending money on it.
+func isRecoverFlag(arg string) bool {
+	switch strings.ToLower(strings.TrimSpace(arg)) {
+	case "--recover", "-recover", "recover", "--resume", "-resume", "resume":
+		return true
+	}
+	return false
+}
+
+// assemblyWindow is the context window of the model that will do the write-up —
+// the one currently selected, because /osint --recover is normally run after
+// /model precisely to pick a bigger one. Zero means unknown, and unknown must
+// not block the attempt: the findings are already on disk, so trying and failing
+// costs a turn rather than the run.
+func (a appModel) assemblyWindow() int {
+	if a.app == nil || a.app.CoderAgent == nil {
+		return 0
+	}
+	// Leave a third of the window for the dossier the model has to WRITE. A
+	// prompt that exactly fills the window leaves no room for the answer, which
+	// is the same mistake the original run made from the other direction.
+	return int(float64(a.app.CoderAgent.Model().ContextWindow) * 0.66)
 }

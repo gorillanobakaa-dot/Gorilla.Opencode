@@ -19,10 +19,12 @@ package dialog
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/llm/agent"
 )
 
 // frameFitSizes spans a cramped SSH window, the common 80x24 default, a laptop
@@ -57,6 +59,17 @@ func TestDialogFramesNeverExceedTheTerminal(t *testing.T) {
 		page := NewOsintPageCmp()
 		page.SetSize(w, h)
 		views["/osint page"] = page.View()
+
+		// The recovery picker, both states. Empty is not a cosmetic case: it is
+		// what someone sees the first time they reach for this, and a stranded
+		// row there lands on a user who has already lost a run once.
+		empty := NewOsintRecoverCmp(nil)
+		empty.SetSize(w, h)
+		views["/osint --recover (empty)"] = empty.View()
+
+		full := NewOsintRecoverCmp(recoverFixture())
+		full.SetSize(w, h)
+		views["/osint --recover"] = full.View()
 
 		for name, v := range views {
 			if got := lipgloss.Width(v); got > w {
@@ -103,4 +116,25 @@ func TestDialogWidthNeverExceedsTerminal(t *testing.T) {
 	if got := dialogWidth(0, 104, chrome); got != 104 {
 		t.Errorf("unknown terminal size should fall back to the preferred width, got %d", got)
 	}
+}
+
+// recoverFixture is more runs than fit on screen, with the longest real
+// question this project has actually asked — the 2026-08-17 identity run, whose
+// prompt ran to several hundred characters.
+func recoverFixture() []agent.RecoverableRun {
+	long := "Establish or refute whether the local \"friend\" kelexine who designed the private " +
+		"Rust tool findx (verified local note dated 2026-07-22 on the user's machine) is the " +
+		"same person as the public developer Franklin Kelechi who holds the @kelexine GitHub, " +
+		"HuggingFace, SourceForge, GitLab, dev.to, Mastodon and XDA accounts."
+	runs := make([]agent.RecoverableRun, 0, 12)
+	for i := 0; i < 12; i++ {
+		runs = append(runs, agent.RecoverableRun{
+			CallID:   "call_0123456789abcdef",
+			Question: long,
+			When:     time.Date(2026, 8, 17, 21, 30, 0, 0, time.UTC),
+			Lanes:    17,
+			Tokens:   507935,
+		})
+	}
+	return runs
 }
