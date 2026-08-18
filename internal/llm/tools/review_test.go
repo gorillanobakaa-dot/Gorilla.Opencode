@@ -32,7 +32,7 @@ func TestTrustBlockComesBeforeAnyFinding(t *testing.T) {
 		},
 	})
 
-	out, err := summariseReview(raw)
+	out, err := summariseReview(raw, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestNoFindingsIsNotReportedAsClean(t *testing.T) {
 		"findings": []map[string]any{}, "corroborated": []map[string]any{},
 		"trust": map[string]any{"tools_ran": []string{"gofmt"}},
 	})
-	out, err := summariseReview(raw)
+	out, err := summariseReview(raw, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestFindingsAreBoundedAndTruncationIsAnnounced(t *testing.T) {
 		"trust": map[string]any{"tools_ran": []string{"cppcheck"}},
 	})
 
-	out, err := summariseReview(raw)
+	out, err := summariseReview(raw, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestMostSevereFindingsComeFirst(t *testing.T) {
 		"corroborated": []map[string]any{},
 		"trust":        map[string]any{"tools_ran": []string{"a"}},
 	})
-	out, err := summariseReview(raw)
+	out, err := summariseReview(raw, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestCorroboratedFindingsAreNeverTruncated(t *testing.T) {
 		"target": "/src", "findings": []map[string]any{}, "corroborated": corr,
 		"trust": map[string]any{"tools_ran": []string{"cppcheck", "clang-tidy"}},
 	})
-	out, err := summariseReview(raw)
+	out, err := summariseReview(raw, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,4 +155,92 @@ func mustJSON(t *testing.T, v any) []byte {
 		t.Fatal(err)
 	}
 	return b
+}
+
+// A quick pass that does not say it skipped the security stage is the same lie
+// as an analyser that was never installed: the reader is left believing the
+// code was checked for things nobody looked for.
+func TestEachDepthDeclaresWhatItSkipped(t *testing.T) {
+	raw := mustJSON(t, map[string]any{
+		"target": "/src", "findings": []map[string]any{}, "corroborated": []map[string]any{},
+		"trust": map[string]any{"tools_ran": []string{"gofmt"}},
+	})
+
+	quick, err := summariseReview(raw, "quick")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"DEPTH: quick", "SKIPPED ENTIRELY", "cannot have found"} {
+		if !strings.Contains(quick, want) {
+			t.Errorf("a quick pass does not admit what it skipped — missing %q", want)
+		}
+	}
+	// And it must be inside the trust block, where a reader looking for "what
+	// was not checked" will find it.
+	if strings.Index(quick, "DEPTH: quick") > strings.Index(quick, "## Corroborated") {
+		t.Errorf("the depth note is below the findings; it belongs with the other 'what was not checked' facts")
+	}
+
+	sec, err := summariseReview(raw, "security")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sec, "deliberately left out") {
+		t.Errorf("focus=security narrows the report without saying what it dropped")
+	}
+
+	std, err := summariseReview(raw, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(std, "escalating automatically") {
+		t.Errorf("the default depth does not explain that the deep pass self-escalates")
+	}
+}
+
+// focus=security narrows the list but must never hide the real total.
+func TestSecurityFocusNarrowsTheListAndStatesTheTotal(t *testing.T) {
+	raw := mustJSON(t, map[string]any{
+		"target": "/src",
+		"findings": []map[string]any{
+			{"tool": "gosec", "file": "a.go", "line": 1, "severity": "high", "message": "hardcoded credentials"},
+			{"tool": "cppcheck", "file": "b.c", "line": 2, "severity": "error", "message": "buffer overrun (CWE-120)"},
+			{"tool": "gofmt", "file": "c.go", "line": 3, "severity": "style", "message": "formatting"},
+			{"tool": "pylint", "file": "d.py", "line": 4, "severity": "warning", "message": "unused variable"},
+		},
+		"corroborated": []map[string]any{},
+		"trust":        map[string]any{"tools_ran": []string{"gosec"}},
+	})
+
+	out, err := summariseReview(raw, "security")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Security findings: 2 (of 4 total") {
+		t.Errorf("the narrowing is not stated with the real total:\n%s", out)
+	}
+	if !strings.Contains(out, "hardcoded credentials") || !strings.Contains(out, "buffer overrun") {
+		t.Errorf("a real security finding was filtered out")
+	}
+	if strings.Contains(out, "unused variable") || strings.Contains(out, "- [style]") {
+		t.Errorf("style noise survived a security-focused report")
+	}
+}
+
+// The security filter reads the finding, not the tool. The same analyser emits
+// both a formatting nit and a command injection.
+func TestSecurityFilterJudgesTheFindingNotOnlyTheTool(t *testing.T) {
+	if !looksSecurity("warning", "possible command injection in exec call", "", "cppcheck") {
+		t.Error("an injection reported by a general-purpose linter was not treated as security")
+	}
+	if !looksSecurity("error", "buffer overrun", "CWE-120", "clang-tidy") {
+		t.Error("a CWE-tagged finding was not treated as security")
+	}
+	if looksSecurity("style", "line too long", "", "pylint") {
+		t.Error("a formatting nit was treated as security")
+	}
+	// Dedicated security tools count regardless of wording.
+	if !looksSecurity("low", "anything at all", "", "gitleaks-worktree") {
+		t.Error("a dedicated secrets scanner's finding was dropped")
+	}
 }

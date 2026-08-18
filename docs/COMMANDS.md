@@ -37,7 +37,7 @@ cost before they start. Everything else is local.
 | `/reset` · `/defaults` | Put things back the way they shipped. |
 | `/research <question>` | Send helper agents to investigate, each on one angle. |
 | `/osint <question>` · `/dossier` | The serious one. Professional dossier. Burns real money. |
-| `/review [folder or file]` · `/audit` `/codereview` | Run 30 real analysers over your code and report honestly. |
+| `/review [--quick|--security|--full] [--diff REF] [folder]` · `/audit` `/codereview` | Run 30 real analysers over your code and report honestly. |
 | `/yolo` · `/auto` `/autopilot` `/goal` | Approve everything for this conversation. No more prompts. |
 | `/tasks` · `/task` `/agents` `/kill` | See and stop background helpers. |
 | `/help` · `/commands` `/?` | This list. |
@@ -224,7 +224,7 @@ A professional intelligence assessment, not a chat answer: plans your question i
 
 /osint --recover writes up a run that collected its findings but never produced the dossier — the usual outcome when a connection drops or the model runs out of room at the very last step. It costs nothing to look: the findings are already on disk and in the local store, and it lists every past run so you can pick one. The write-up happens in a fresh conversation carrying only those findings, which is exactly why it succeeds where the original run ran out of room. Nothing is collected again and no helpers are sent out.
 
-### `/review [folder or file]`
+### `/review [--quick|--security|--full] [--diff REF] [folder]`
 
 *Also: `/audit`, `/codereview`*
 
@@ -233,6 +233,15 @@ A professional intelligence assessment, not a chat answer: plans your question i
 A professional static-analysis and security review, built in. Point it at a folder, a file, or your changes and it runs around thirty real analysers — the ones that find memory errors, injection, leaked secrets, unchecked errors — picking whichever suit the languages actually present. C, C++, Go, Python, JavaScript, TypeScript, Rust, shell and more.
 
 With no arguments it reviews your current folder. Add a path for somewhere else. The tools live inside the program; nothing is downloaded when you run it.
+
+**How deep:**
+  /review                    the normal pass — fast checks and static analysis, and it escalates to the deep security tools ON ITS OWN for any file that looks security-shaped. This is usually the one you want.
+  /review --quick            linters and formatters only, seconds. Skips the security stages entirely, and says so.
+  /review --security         forces the deep security pass over everything and reports only security findings.
+  /review --full             every stage over every file.
+  /review --diff HEAD        only what you changed. Add a ref for something else: --diff origin/main.
+
+These combine, and the order does not matter: /review --security --diff HEAD internal/auth
 
 **It tells you what did NOT run.** That is the part that matters. Those thirty analysers have to be installed on your machine, and if they are missing they simply find nothing — which looks exactly like a clean report. So the answer always starts with which tools ran, which are missing, and which failed; and if none of them are installed it refuses to run at all rather than hand you a reassuring blank.
 

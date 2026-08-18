@@ -62,8 +62,16 @@ type ReviewParams struct {
 	// Diff limits the review to what changed against a git ref, e.g. "HEAD~1"
 	// or "origin/main". Strongly preferred on a large tree.
 	Diff string `json:"diff"`
-	// Deep enables the toolkit's slower, deeper pass.
+	// Deep enables the toolkit's slower, deeper pass. Prefer Focus.
 	Deep bool `json:"deep"`
+	// Focus selects how much of the pipeline runs: "quick", "security" or
+	// "full". Empty means the default — stages 0-2 with automatic escalation.
+	Focus string `json:"focus"`
+	// MaxFiles bounds a very large tree. 0 means the toolkit's own default.
+	MaxFiles int `json:"max_files"`
+	// Profile overrides project detection: firefox, linux-kernel, go, rust,
+	// python, generic.
+	Profile string `json:"profile"`
 }
 
 type reviewTool struct {
@@ -101,9 +109,28 @@ START FROM corroborated. Those are lines flagged independently by two or more di
 				"type":        "string",
 				"description": "Limit the review to changes against this git ref, e.g. 'HEAD', 'HEAD~1', 'origin/main'. Strongly preferred on a large repository — without it every tracked file is reviewed.",
 			},
+			"focus": map[string]any{
+				"type": "string",
+				"enum": []string{"quick", "security", "full"},
+				"description": "How much to run. 'quick' = linters and formatters only, seconds, for a fast sanity check. " +
+					"'security' = force the deep security pass over everything and report only security, secrets and " +
+					"static-analysis findings. 'full' = every stage over every file. " +
+					"OMIT THIS for the normal review: by default the fast and standard stages run, and the deep security " +
+					"pass escalates ON ITS OWN for any file whose output mentions CWE, CVE, overflow, use-after-free, " +
+					"injection, a hardcoded secret, a race, a path traversal or a format string. That is usually what you want.",
+			},
+			"max_files": map[string]any{
+				"type":        "integer",
+				"description": "Cap the number of files reviewed. Use on a very large tree — prefer 'diff' first.",
+			},
+			"profile": map[string]any{
+				"type":        "string",
+				"enum":        []string{"firefox", "linux-kernel", "go", "rust", "python", "generic"},
+				"description": "Override project detection. Only set this when auto-detection is visibly wrong: the correct profile makes the toolkit prefer a tree's own native tooling (./mach lint for Firefox, checkpatch and sparse for a kernel) over noisier generic tools.",
+			},
 			"deep": map[string]any{
 				"type":        "boolean",
-				"description": "Run the slower, deeper pass. Off by default.",
+				"description": "Deprecated — use focus='full'. Kept so an older call still works.",
 			},
 		},
 		Required: []string{},
@@ -166,7 +193,28 @@ func (r *reviewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 	if params.Diff != "" {
 		args = append(args, "--diff", params.Diff)
 	}
-	if params.Deep {
+	if params.MaxFiles > 0 {
+		args = append(args, "--max-files", fmt.Sprint(params.MaxFiles))
+	}
+	if params.Profile != "" {
+		args = append(args, "--profile", params.Profile)
+	}
+
+	// focus maps onto the toolkit's four stages. See its tools_registry.py:
+	// stage 0 recon, 1 fast linters, 2 static analysis and security, 3 deep —
+	// where stage 3 normally escalates by itself on files whose earlier output
+	// looked security-shaped.
+	focus := strings.ToLower(strings.TrimSpace(params.Focus))
+	if focus == "" && params.Deep {
+		focus = "full" // the old boolean, still honoured
+	}
+	switch focus {
+	case "quick":
+		// Stages 0-1 only, and never escalate. For "did I break anything
+		// obvious", where waiting minutes for a security sweep is the wrong
+		// trade.
+		args = append(args, "--no-stage3")
+	case "security", "full":
 		args = append(args, "--deep")
 	}
 
@@ -185,7 +233,7 @@ func (r *reviewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 			"\n\nDo not describe the code as reviewed."), nil
 	}
 
-	summary, err := summariseReview(out)
+	summary, err := summariseReview(out, focus)
 	if err != nil {
 		return NewTextErrorResponse(fmt.Sprintf("the review ran but its output could not be read: %s", err)), nil
 	}
@@ -257,7 +305,7 @@ type agentReport struct {
 // seen: what did NOT run comes first, the corroborated findings second, and the
 // long tail last, truncated. A reader who stops after two paragraphs still
 // leaves with the two things that stop them drawing a false conclusion.
-func summariseReview(raw []byte) (string, error) {
+func summariseReview(raw []byte, focus string) (string, error) {
 	var rep agentReport
 	if err := json.Unmarshal(raw, &rep); err != nil {
 		return "", err
@@ -287,6 +335,28 @@ func summariseReview(raw []byte) (string, error) {
 	if rep.Trust.PositionCheck {
 		fmt.Fprintf(&b, "- Every reported line was checked against the file; %d findings were dropped as stale.\n", rep.Trust.Dropped)
 	}
+	// What the CHOSEN DEPTH skipped belongs in the trust block, beside what was
+	// missing from the machine. Both answer the same question — what did this
+	// review not look at — and a quick pass that does not say it skipped the
+	// security stage is the same lie as an uninstalled analyser.
+	switch focus {
+	case "quick":
+		b.WriteString("- **DEPTH: quick.** Only the fast linters and formatters ran. The " +
+			"security and deep stages were SKIPPED ENTIRELY — this pass cannot have found a " +
+			"buffer overrun, an injection, or a leaked credential, and says nothing about " +
+			"whether one is there.\n")
+	case "security":
+		b.WriteString("- **DEPTH: security.** The deep pass was forced over every file, and " +
+			"only security, secrets and static-analysis findings are listed below. Style and " +
+			"formatting findings exist and were deliberately left out.\n")
+	case "full":
+		b.WriteString("- **DEPTH: full.** Every stage ran over every file.\n")
+	default:
+		b.WriteString("- Depth: standard — fast and static-analysis stages, with the deep " +
+			"security pass escalating automatically on any file whose output looked " +
+			"security-shaped.\n")
+	}
+
 	b.WriteString("\nStatic analysers do not find semantic bugs — wrong logic, broken " +
 		"invariants, swallowed errors. Read the changed code yourself as well, and say " +
 		"in your answer that you did.\n\n")
@@ -317,7 +387,31 @@ func summariseReview(raw []byte) (string, error) {
 		return si < sj
 	})
 
-	fmt.Fprintf(&b, "## All findings: %d\n\n", len(findings))
+	// A security review lists security findings. The others still exist and the
+	// count says so, so nothing is hidden — it is narrowed, and the narrowing
+	// is stated.
+	total := len(findings)
+	if focus == "security" {
+		var kept []struct {
+			Tool     string `json:"tool"`
+			File     string `json:"file"`
+			Line     int    `json:"line"`
+			Severity string `json:"severity"`
+			Message  string `json:"message"`
+			Rule     string `json:"rule"`
+			Excerpt  string `json:"excerpt"`
+		}
+		for _, f := range findings {
+			if looksSecurity(f.Severity, f.Message, f.Rule, f.Tool) {
+				kept = append(kept, f)
+			}
+		}
+		fmt.Fprintf(&b, "## Security findings: %d (of %d total; style and formatting omitted by focus=security)\n\n",
+			len(kept), total)
+		findings = kept
+	} else {
+		fmt.Fprintf(&b, "## All findings: %d\n\n", total)
+	}
 	shown := findings
 	if len(shown) > reviewMaxFindings {
 		shown = shown[:reviewMaxFindings]
@@ -377,4 +471,33 @@ func oneLineOf(s string, max int) string {
 		return string([]rune(s)[:max]) + "…"
 	}
 	return s
+}
+
+// looksSecurity decides whether a finding belongs in a security-focused report.
+//
+// Matched on the evidence in the finding itself rather than on a tool
+// allow-list: the same analyser produces both a formatting nit and a command
+// injection, so filtering by tool would drop real findings and keep noise. The
+// vocabulary is the toolkit's own escalation keyword set, which is what decides
+// the deep stage in the first place — one definition of "security-shaped",
+// used in both places.
+func looksSecurity(severity, message, rule, tool string) bool {
+	switch strings.ToLower(tool) {
+	case "gosec", "bandit", "bandit-deep", "semgrep", "semgrep-deep",
+		"gitleaks-worktree", "gitleaks-history", "cargo-audit", "npm-audit":
+		return true
+	}
+	hay := strings.ToLower(message + " " + rule)
+	for _, k := range []string{
+		"cwe-", "cve-", "overflow", "use-after-free", "double-free", "uaf",
+		"injection", "unsanitized", "unsanitised", "hardcoded", "hard-coded",
+		"secret", "credential", "race condition", "deserializ", "ssti",
+		"path traversal", "format string", "null pointer dereference",
+		"buffer overrun", "security", "unsafe", "tainted", "xss", "csrf",
+	} {
+		if strings.Contains(hay, k) {
+			return true
+		}
+	}
+	return strings.EqualFold(severity, "critical")
 }

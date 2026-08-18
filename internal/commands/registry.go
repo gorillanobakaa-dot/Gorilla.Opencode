@@ -117,7 +117,7 @@ var All = []Command{
 		Name:    "review",
 		Aliases: []string{"audit", "codereview"},
 		Group:   GroupHelpers,
-		Args:    "[folder or file]",
+		Args:    "[--quick|--security|--full] [--diff REF] [folder]",
 		Summary: "Run 30 real analysers over your code and report honestly.",
 		Detail: "A professional static-analysis and security review, built in. Point " +
 			"it at a folder, a file, or your changes and it runs around thirty real " +
@@ -128,6 +128,19 @@ var All = []Command{
 			"With no arguments it reviews your current folder. Add a path for " +
 			"somewhere else. The tools live inside the program; nothing is " +
 			"downloaded when you run it.\n\n" +
+			"**How deep:**\n" +
+			"  /review                    the normal pass — fast checks and static analysis, " +
+			"and it escalates to the deep security tools ON ITS OWN for any file that looks " +
+			"security-shaped. This is usually the one you want.\n" +
+			"  /review --quick            linters and formatters only, seconds. Skips the " +
+			"security stages entirely, and says so.\n" +
+			"  /review --security         forces the deep security pass over everything and " +
+			"reports only security findings.\n" +
+			"  /review --full             every stage over every file.\n" +
+			"  /review --diff HEAD        only what you changed. Add a ref for something " +
+			"else: --diff origin/main.\n\n" +
+			"These combine, and the order does not matter: /review --security --diff HEAD " +
+			"internal/auth\n\n" +
 			"**It tells you what did NOT run.** That is the part that matters. Those " +
 			"thirty analysers have to be installed on your machine, and if they are " +
 			"missing they simply find nothing — which looks exactly like a clean " +

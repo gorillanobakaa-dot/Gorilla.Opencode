@@ -1,3 +1,47 @@
+## v0.1.95 — 2026-08-18 — /review takes options, and every depth says what it skipped
+
+**Plain-language version:** v0.1.94 shipped `/review` with one argument: a
+folder. Anything else you typed was treated as a folder name — so `/review
+--deep` asked for a review of a directory called "--deep".
+
+That is the same defect as `/osint --recover` earlier the same day: a flag read
+as content. Written hours later, after the lesson was filed, and after a test
+was added that was supposed to catch that class — except that test only checks
+whether a command *mentioned in prose* exists. It has nothing to say about a
+command mishandling its own arguments. There is now one that does, and it types
+what a person actually types: flags before the path, flags after the path,
+`--sec`, `--fast`, `--focus=security`, and a bare word that really is a
+directory called `security`.
+
+**And now the depth is yours to choose.** The engine underneath was never blunt —
+it has four stages and escalates to the deep security tools *by itself* for any
+file whose output mentions a CWE, a CVE, an overflow, an injection, a hardcoded
+secret, a race, a path traversal or a format string. Only the files that earn
+it. That was already happening; nothing exposed it.
+
+| you type | what happens |
+|---|---|
+| `/review` | fast checks and static analysis, with the deep pass escalating on its own where the evidence justifies it. Usually the right one. |
+| `/review --quick` | linters and formatters only. Seconds. |
+| `/review --security` | forces the deep pass over everything, reports only security findings. |
+| `/review --full` | every stage over every file. |
+| `/review --diff HEAD` | only what you changed. |
+
+They combine in any order: `/review --security --diff HEAD internal/auth`.
+
+**Every depth declares what it skipped.** A quick pass says outright that it
+"cannot have found a buffer overrun, an injection, or a leaked credential, and
+says nothing about whether one is there". Without that, a quick pass is exactly
+the same lie as an analyser that was never installed — the reader believes the
+code was checked for something nobody looked for. A security-focused report
+states how many findings it filtered out, and the real total.
+
+A mistyped option is named back to you rather than guessed at or silently
+ignored. `/review --secrutiy internal/auth` reviews nothing and says which
+option it did not recognise, because running the wrong review wastes real time.
+
+Full detail, both tracks: [docs/CODE-REVIEW.md](../docs/CODE-REVIEW.md).
+
 ## v0.1.94 — 2026-08-18 — /review: thirty static-analysis and security tools, built in
 
 **Plain-language version:** Type `/review` and the program runs around thirty

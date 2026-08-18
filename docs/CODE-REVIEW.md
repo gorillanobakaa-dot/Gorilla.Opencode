@@ -1,4 +1,4 @@
-<!-- Version: 1.0.0 · updated 26-08-18-13-36 -->
+<!-- Version: 1.1.0 · updated 26-08-18-14-02 -->
 # Code review, built in
 
 *Dual-track. The first half is the complete explanation in plain language — not
@@ -56,6 +56,26 @@ So this is half a review, and it says so every time. The AI still has to read
 the code, and is instructed to tell you plainly that it did and what it found.
 A review that claims to be complete having only run the tools is lying to you.
 
+### How deep — you choose, or let it choose
+
+By default it works out the depth for you, and that is usually right:
+
+| you type | what happens |
+|---|---|
+| `/review` | fast checks and static analysis, and the **deep security tools escalate on their own** for any file whose output mentions a CWE, a CVE, an overflow, an injection, a hardcoded secret, a race, a path traversal or a format string. Only the files that earned it. |
+| `/review --quick` | linters and formatters only. Seconds. **Skips the security stages entirely — and says so in the answer.** |
+| `/review --security` | forces the deep pass over everything and lists only security findings. Says how many it left out. |
+| `/review --full` | every stage over every file. |
+| `/review --diff HEAD` | only what you changed. Or `--diff origin/main`. |
+
+They combine and the order does not matter:
+`/review --security --diff HEAD internal/auth`
+
+That automatic escalation is the part worth understanding. A light pass turns
+itself into a proper security review exactly where the evidence justifies it,
+and nowhere else — so you are not choosing between "fast and shallow" and "slow
+and thorough" on every single run.
+
 ### If tools are missing
 
 The answer names them and gives you the command that installs them. The full
@@ -71,8 +91,8 @@ rather than installing everything.
 
 | | |
 |---|---|
-| `/review [path]` | routed through the agent, not called directly |
-| `review` tool | `path`, `diff`, `deep` |
+| `/review [flags] [path]` | routed through the agent, not called directly |
+| `review` tool | `path`, `diff`, `focus`, `max_files`, `profile`, `deep` (deprecated) |
 | Loadout row | `tool.review`, **475 tokens**, on by default |
 | Vendored at | `internal/llm/tools/codereview/toolkit/` |
 | Payload | 444 KB, `go:embed all:toolkit` |
@@ -104,6 +124,51 @@ Unpacking is content-addressed: `Version()` is a SHA-256 over every embedded
 file, and that hash names the unpack directory, so a binary upgrade unpacks
 beside the old copy rather than mixing versions. A `.complete` marker is written
 **last**, so an extraction killed halfway is redone rather than silently used.
+
+### The four stages, and what focus maps onto
+
+The vendored toolkit is not a single pass. From its `tools_registry.py`:
+
+| stage | what | tools |
+|---|---|---|
+| 0 | recon — cheap, informational, always runs | 2 |
+| 1 | fast linters and formatters | 23 |
+| 2 | static analysis and security | 12 |
+| 3 | deep dive | 10 |
+
+Stage 3 is **evidence-driven**. After stages 1 and 2, their output is scanned
+for `ESCALATION_KEYWORDS` — `CWE-`, `CVE-`, `overflow`, `use-after-free`,
+`injection`, `unsanitized`, `hardcoded`, `secret`, `race condition`,
+`deserializ`, `SSTI`, `path traversal`, `format string`, `null pointer
+dereference`, `buffer overrun` — and only the files that hit are escalated.
+
+`focus` maps onto that:
+
+- `quick` → `--no-stage3`, stages 0–1, no escalation.
+- `security` → `--deep` (stage 3 over everything), then the report is filtered
+  to security, secrets and static-analysis findings.
+- `full` → `--deep`, nothing filtered.
+- omitted → stages 0–2 with automatic escalation.
+
+Ten further tools are **manual scope**: a full rebuild under `scan-build`,
+`valgrind` against a specific binary. They are printed as exact copy-paste
+commands and never run behind the user's back. Two are **checklist scope** —
+no CLI tool exists for that language, so a human review checklist is emitted
+instead. Thirty-four per-language rule documents ride along as the criteria.
+
+### Every depth declares what it skipped
+
+The trust block reports two different kinds of "not checked", together, because
+they answer the same question:
+
+- what was **missing from the machine** (analyser not installed), and
+- what the **chosen depth skipped**.
+
+A `quick` pass states outright that it "cannot have found a buffer overrun, an
+injection, or a leaked credential, and says nothing about whether one is there".
+Without that line a quick pass is the same lie as an uninstalled analyser — the
+reader believes the code was checked for something nobody looked for.
+`TestEachDepthDeclaresWhatItSkipped` pins it.
 
 ### Output bounding
 
