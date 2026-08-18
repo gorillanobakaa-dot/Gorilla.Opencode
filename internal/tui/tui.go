@@ -667,6 +667,36 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Status
 	case util.InfoMsg:
+		// GORILLA OVERRIDE (2026-08-18): an Echo notice is too long for the
+		// status bar, which truncates to one line — so also print it in full into
+		// the transcript, where it wraps freely and stays. tea.Println is the
+		// only safe way to write above the inline frame, and scrollback is where
+		// the permanent copy belongs; the footer keeps its short flash. Same
+		// dual-channel pattern the quota reading uses.
+		if msg.Echo && a.scrollback && strings.TrimSpace(msg.Msg) != "" {
+			t := theme.CurrentTheme()
+			// Bookend the transcript line with util.NoticeDeco (🦍⚠️ ⚠️ 🦍). Drop
+			// the message's own leading gorilla so the bookend supplies them all.
+			// The footer banner is untouched — this is transcript-only.
+			body := strings.TrimSpace(strings.TrimPrefix(msg.Msg, "🦍"))
+			plain := "  " + time.Now().Format("15:04:05") + "  " +
+				util.NoticeDeco + " " + body + " " + util.NoticeDeco
+
+			// WRAP to the terminal. Composed, this notice is ~188 columns; on a
+			// narrower terminal the tail wrapped and dumped the closing bookend
+			// alone on the next line at column 0, which read as broken output.
+			// Word-wrapping keeps the bookend at the end of the last line where
+			// it belongs. Width 0 means no WindowSizeMsg has arrived yet — leave
+			// it unwrapped rather than render into a zero-width style.
+			style := lipgloss.NewStyle().Bold(true).Foreground(t.Warning())
+			if a.width > 20 {
+				style = style.Width(a.width)
+			}
+			// One line, wrapped to the terminal. No blank lines, no rule: extra
+			// lines are just more that can render wrong, and the bookends already
+			// mark where the notice starts and ends.
+			cmds = append(cmds, tea.Println(style.Render(plain)))
+		}
 		s, cmd := a.status.Update(msg)
 		a.status = s.(core.StatusCmp)
 		cmds = append(cmds, cmd)

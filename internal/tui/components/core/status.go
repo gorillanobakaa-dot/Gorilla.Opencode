@@ -34,6 +34,14 @@ type statusCmp struct {
 	session    session.Session
 	// GORILLA OVERRIDE: show the "cost is an estimate" note once per run.
 	costNoticeShown bool
+	// GORILLA FIX (2026-08-18): msgSeq is the generation of the message
+	// currently shown. Every message increments it and arms a clear stamped with
+	// it; a clear only fires if its stamp still matches. Without this, each
+	// message armed an independent 10s timer with no way to invalidate an older
+	// one, so message A's timer would wipe message B early — the reported "footer
+	// messages vanish quite fast these days", worst in a burst where the last
+	// message could be cleared almost immediately by the first message's timer.
+	msgSeq int
 }
 
 // truncateStatusMsg fits a status/error message into width terminal COLUMNS.
@@ -66,10 +74,11 @@ func truncateStatusMsg(msg string, width int) string {
 	return ansi.Truncate(msg, width, "...")
 }
 
-// clearMessageCmd clears the status message after ttl elapses.
-func (m statusCmp) clearMessageCmd(ttl time.Duration) tea.Cmd {
+// clearMessageCmd clears the status message after ttl elapses — but only if it
+// is still the message shown, via the seq stamp checked in the handler.
+func (m statusCmp) clearMessageCmd(ttl time.Duration, seq int) tea.Cmd {
 	return tea.Tick(ttl, func(time.Time) tea.Msg {
-		return util.ClearStatusMsg{}
+		return util.ClearStatusMsg{Seq: seq}
 	})
 }
 
@@ -105,6 +114,7 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case util.InfoMsg:
 		m.info = msg
+		m.msgSeq++
 		ttl := msg.TTL
 		if ttl == 0 {
 			ttl = m.messageTTL
@@ -121,9 +131,13 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				ttl = errorMessageTTL
 			}
 		}
-		return m, m.clearMessageCmd(ttl)
+		return m, m.clearMessageCmd(ttl, m.msgSeq)
 	case util.ClearStatusMsg:
-		m.info = util.InfoMsg{}
+		// Only clear if no newer message has arrived since this clear was armed;
+		// otherwise an older message's timer would wipe a newer one early.
+		if msg.Seq == m.msgSeq {
+			m.info = util.InfoMsg{}
+		}
 	}
 	return m, nil
 }

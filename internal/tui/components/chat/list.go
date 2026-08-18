@@ -70,7 +70,7 @@ type messagesCmp struct {
 	// single phase — it fires once when the wait first crosses the threshold,
 	// and resets when the phase changes.
 	coldStartWarned bool
-	attachments   viewport.Model
+	attachments     viewport.Model
 	// GORILLA OVERRIDE: throttle streaming re-renders (see below).
 	lastStreamRender time.Time
 	// GORILLA OVERRIDE: scrollback mode. When the alternate screen is off — the
@@ -284,7 +284,11 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// silent wait, this explains it while it lasts.
 		if !m.coldStartWarned && shouldColdStartWarn(m.taskLabel, m.elapsedInPhase()) {
 			m.coldStartWarned = true
-			cmds = append(cmds, util.ReportInfo(
+			// Echo: the sentence is longer than the status bar can show, and the
+			// half it drops ("First reply can take a minute…") is the half that
+			// tells the user what to do — so it also goes into the transcript in
+			// full. See util.ReportInfoEcho.
+			cmds = append(cmds, util.ReportInfoEcho(
 				"🦍 Still waiting on the model — a quiet endpoint is usually warming up, not "+
 					"stuck. First reply can take a minute on a shared/free model. Press esc to cancel."))
 		}

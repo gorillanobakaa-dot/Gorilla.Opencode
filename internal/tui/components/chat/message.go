@@ -18,6 +18,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
+	"github.com/opencode-ai/opencode/internal/tui/util"
 )
 
 type uiMessageType int
@@ -282,13 +283,21 @@ func renderAssistantMessage(
 				// So: details when we have them, the guess only when we do not.
 				// Fenced, so a URL or JSON fragment is not mangled by markdown and
 				// is visibly the machine's words rather than ours.
+				// GORILLA OVERRIDE (2026-08-18): bookend the error header with
+				// util.NoticeDeco, the same 🦍⚠️ ⚠️ 🦍 the cold-start notice uses in
+				// the transcript, so a Gorilla notice reads the same whatever path
+				// it came through — provider error here, echo elsewhere.
+				// The closing bookend goes AFTER the provider's text, not after the
+				// header — it closes the whole notice, so the reader can see where
+				// it ends. A header sandwiched between both marks looked like the
+				// message had finished before the error had even been printed.
 				if d := strings.TrimSpace(finishData.Details); d != "" {
-					content = "*The model returned an error and produced no answer:*" +
-						"\n\n```\n" + d + "\n```"
+					content = util.NoticeDeco + " *The model returned an error and produced no answer:*" +
+						"\n\n```\n" + d + "\n```\n\n" + util.NoticeDeco
 				} else {
-					content = "*The model returned an error and produced no answer. " +
+					content = util.NoticeDeco + " *The model returned an error and produced no answer. " +
 						"If the context percentage in the footer is over 100%, the request " +
-						"was almost certainly rejected for being too large.*"
+						"was almost certainly rejected for being too large.* " + util.NoticeDeco
 				}
 			case message.FinishReasonMaxTokens:
 				content = "*Stopped at the model's output limit before finishing the answer.*"
