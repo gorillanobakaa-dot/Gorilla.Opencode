@@ -53,6 +53,21 @@ func newOpenAIClient(opts providerClientOptions) OpenAIClient {
 	// GORILLA OVERRIDE: use the satellite-hardened HTTP client (keep-alive,
 	// HTTP/2, no wall-clock stream timeout) instead of the SDK default.
 	openaiClientOptions = append(openaiClientOptions, option.WithHTTPClient(resilientHTTPClient()))
+
+	// GORILLA OVERRIDE (2026-08-18): the SDK must not retry. It defaults to
+	// MaxRetries: 2 (requestconfig.go), which was never configured here, so
+	// every one of OUR attempts was silently three of the SDK's.
+	//
+	// This is the THIRD independent retry layer found in this one path, after
+	// the application loop below and Go's own http.Transport replay (see
+	// uploadbudget.go). Their effect is multiplicative, not additive: measured
+	// against a live black-holed model with a 20-second first-byte timeout, a
+	// cap meant to stop at roughly 41 seconds did not stop until 123.
+	//
+	// Retries belong to shouldRetry, which is the only layer that knows whether
+	// content has already streamed (retrying mid-answer duplicates it), what the
+	// turn has spent, and what to tell the user. So the SDK gets zero.
+	openaiClientOptions = append(openaiClientOptions, option.WithMaxRetries(0))
 	if opts.apiKey != "" {
 		openaiClientOptions = append(openaiClientOptions, option.WithAPIKey(opts.apiKey))
 	}
@@ -340,8 +355,14 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			// without this, GLM-5.2 on NIM streams only [content, role] and the
 			// reasoning reader below never fires. See reasoning.go.
 			reqOpts := append(o.cacheOptions(), thinkingRequestOptions(modelID)...)
+
+			// GORILLA OVERRIDE: guard against the answer starting and then
+			// stopping — headers arrived, so no header timeout can fire, and the
+			// read blocks forever. Armed by the first chunk, reset by every
+			// chunk after it. See stallguard.go.
+			streamCtx, guard := newStallGuard(ctx, config.StreamStallTimeout())
 			openaiStream := o.client.Chat.Completions.NewStreaming(
-				ctx,
+				streamCtx,
 				params,
 				reqOpts...,
 			)
@@ -369,6 +390,7 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			var streamUsage openai.CompletionUsage
 
 			for openaiStream.Next() {
+				guard.Progress()
 				chunk := openaiStream.Current()
 				acc.AddChunk(chunk)
 				if chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
@@ -403,6 +425,16 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			}
 
 			err := openaiStream.Err()
+			// GORILLA OVERRIDE: a stall cancels the stream's context, so the
+			// SDK reports a bare context.Canceled — indistinguishable from the
+			// user pressing ESC. Translate it before anything downstream can
+			// treat a failure as a deliberate cancellation and stay silent.
+			// The guard is released here rather than by defer because the
+			// enclosing loop retries, and each attempt needs its own.
+			if guard.Fired() {
+				err = &ErrStreamStalled{Idle: config.StreamStallTimeout(), Got: len(currentContent)}
+			}
+			guard.Stop()
 			// GORILLA FIX: always release the stream's underlying HTTP/2
 			// connection. The SDK does NOT auto-close the body when the
 			// stream is drained; leaving it open keeps the request "in
@@ -569,6 +601,30 @@ func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool)
 		//   2. transport blips — dropped SSE, unexpected EOF, reset, timeout
 		//      (the "SSE existential crisis" on slow 550B models / flaky
 		//      links). Back off SHORT and try again.
+		// GORILLA OVERRIDE (2026-08-18): a first-byte timeout that happens TWICE
+		// is not a transient link problem, it is a server that will not answer.
+		//
+		// config.FirstByteTimeout bounds one attempt. Retrying it five times
+		// multiplies the bound back into something unbounded-feeling: measured
+		// against a live black-holed model with a 20s timeout, the run was still
+		// going at 123 seconds. At the 120s default that is twelve minutes of
+		// silence, and every attempt re-uploads the whole conversation.
+		//
+		// This is the same trap as the retry storm in uploadbudget.go, one layer
+		// down: a limit is only a limit if nothing above it multiplies it. So the
+		// first-byte timeout gets exactly one retry — enough to ride out a real
+		// dropout, not enough to sit on a dead model.
+		if isFirstByteTimeout(err) && attempts > 1 {
+			return false, 0, fmt.Errorf(
+				"the server accepted the connection and then sent nothing, twice. "+
+					"That usually means this particular model is not actually being "+
+					"served, even if it is still listed — provider catalogues routinely "+
+					"advertise models that answer nothing. Try another model with "+
+					"/models. (waited %s each time; "+
+					"GORILLA_OPENCODE_FIRST_BYTE_TIMEOUT changes that): %w",
+				config.FirstByteTimeout(), err)
+		}
+
 		busy := isServerBusyError(err)
 		if !busy && !isTransientStreamError(err) {
 			return false, 0, err

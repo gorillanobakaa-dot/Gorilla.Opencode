@@ -19,8 +19,13 @@
 //   - ForceAttemptHTTP2: multiplex over a single connection instead of opening
 //     new ones — far more frugal with the tiny bandwidth budget.
 //   - Finite dial / TLS-handshake timeouts so a dead link fails in ~30s instead
-//     of hanging forever, but NOT a response-header timeout (first byte can be
-//     legitimately slow on a big model + slow link).
+//     of hanging forever.
+//   - A response-header timeout AFTER ALL. The original line here read "but NOT
+//     a response-header timeout (first byte can be legitimately slow on a big
+//     model + slow link)". It is kept in this comment because it was wrong in an
+//     instructive way: Go starts that timer only after the request body is fully
+//     written, so a slow uplink never counts against it. See
+//     config.FirstByteTimeout for what was measured.
 //   - Proxy from environment: satellite terminals frequently front traffic
 //     through a local caching/optimising proxy (HTTP_PROXY/HTTPS_PROXY).
 package provider
@@ -29,6 +34,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/opencode-ai/opencode/internal/config"
 )
 
 // resilientHTTPClient returns an *http.Client tuned for high-latency, lossy,
@@ -55,9 +62,13 @@ func resilientHTTPClient() *http.Client {
 		IdleConnTimeout:       120 * time.Second,
 		TLSHandshakeTimeout:   30 * time.Second,
 		ExpectContinueTimeout: 5 * time.Second,
-		// Deliberately NO ResponseHeaderTimeout: a big model over a slow link
-		// can take a long time to the first byte; we rely on context
-		// cancellation and the stream-retry logic instead of a fixed cap.
+		// Bound the wait for response HEADERS. This does NOT bound the answer:
+		// Go starts the clock only once the request body is fully uploaded, and
+		// stops it as soon as headers arrive, so neither a slow uplink nor a
+		// long stream is affected. It bounds exactly one thing — a server that
+		// accepted the connection and will never reply. Measured live: NVIDIA
+		// NIM does that for models it still lists in /v1/models.
+		ResponseHeaderTimeout: config.FirstByteTimeout(),
 	}
 
 	return &http.Client{

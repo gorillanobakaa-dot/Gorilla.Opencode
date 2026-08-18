@@ -963,3 +963,66 @@ func NonInteractiveDeadline() time.Duration {
 	}
 	return 30 * time.Minute
 }
+
+// FirstByteTimeout bounds how long to wait for a server's response HEADERS
+// after the request body has finished uploading.
+//
+// GORILLA OVERRIDE (2026-08-18): measured against a live provider, not chosen
+// defensively. httpclient.go deliberately set no ResponseHeaderTimeout, on the
+// stated grounds that "first byte can be legitimately slow on a big model + slow
+// link". That reasoning conflated two different things, and the second half of
+// it is simply not how Go counts:
+//
+//   - Go's ResponseHeaderTimeout starts AFTER the request body is fully written.
+//     A slow uplink therefore never counts against it. Uploading 100 KB at
+//     2 KB/s spends 50 seconds of wall clock and zero seconds of this budget.
+//   - What remains is genuine server-side thinking time before the first token,
+//     which is real for reasoning models but is not unbounded.
+//
+// What made this urgent: NVIDIA NIM advertises models in /v1/models that it then
+// black-holes. On 2026-08-18, of eight models drawn from its own catalogue, four
+// returned an honest 404 in under 0.2s, ONE served normally with a first byte at
+// 0.36s — and two, including the configured default, accepted the connection and
+// returned nothing at all, forever. A bare curl hung identically, so this is the
+// provider, not the client. But the client's response was to sit on it silently.
+//
+// 120 seconds is ~330x the measured first byte of the model that worked, which
+// leaves enormous room for a slow reasoning model on a bad link, while still
+// turning "hangs until the user gives up" into a stated failure.
+//
+// GORILLA_OPENCODE_FIRST_BYTE_TIMEOUT accepts a Go duration ("5m"); "0" restores
+// the old unbounded behaviour.
+func FirstByteTimeout() time.Duration {
+	if v := os.Getenv("GORILLA_OPENCODE_FIRST_BYTE_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d >= 0 {
+			return d
+		}
+	}
+	return 120 * time.Second
+}
+
+// StreamStallTimeout bounds a gap BETWEEN chunks once an answer has started.
+//
+// GORILLA OVERRIDE (2026-08-18): FirstByteTimeout only covers the wait for
+// headers. A link that dies after the answer has begun leaves the socket open
+// and the stream simply stops — headers arrived, so no header timeout can fire,
+// and the read blocks forever. That is the exact shape of the "black hole" the
+// satellite proxy reproduces, and it is what a satellite dropout actually looks
+// like mid-answer.
+//
+// This is a STALL timer, not a wall clock: it resets on every chunk. A stream
+// that is making progress is never killed, however slowly it crawls. Only a
+// stream making NO progress for the whole window is.
+//
+// 90 seconds. Deliberately longer than the gap any healthy stream shows, since
+// the cost of a false positive is a destroyed answer the user already paid for.
+//
+// GORILLA_OPENCODE_STREAM_STALL_TIMEOUT overrides it; "0" disables it.
+func StreamStallTimeout() time.Duration {
+	if v := os.Getenv("GORILLA_OPENCODE_STREAM_STALL_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d >= 0 {
+			return d
+		}
+	}
+	return 90 * time.Second
+}

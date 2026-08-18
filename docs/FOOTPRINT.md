@@ -1,4 +1,4 @@
-<!-- Version: 1.2.0 · updated 26-08-18-15-33 -->
+<!-- Version: 1.3.0 · updated 26-08-18-16-15 -->
 # What it costs to run: memory, disk and network
 
 *Measured on 18 August 2026, on the reference machine (Sony VAIO SVE, i7-3632QM,
@@ -225,6 +225,86 @@ a body that compresses about twentyfold.
 
 ---
 
+## The third failure: the server answers the phone and says nothing
+
+The two failures above were *induced* with a test proxy. This one was found by
+accident, live, and it is the one an ordinary user actually meets.
+
+A baseline run hung. So did the same run with the proxy removed — so the
+instrument was innocent. Two bare `curl` calls to the same host with the same
+key then split it in one step:
+
+| request | result |
+|---|---|
+| `GET /v1/models` | **200 in 0.083 s** |
+| `POST /v1/chat/completions` (the configured default model) | **0 bytes, hangs** |
+
+Sampling eight models from **NVIDIA NIM's own catalogue**:
+
+| outcome | count | example |
+|---|---|---|
+| honest 404 in <0.2 s | 4 | `mistralai/mistral-large-2-instruct` |
+| **served normally, first byte 0.36 s** | **1** | `nvidia/nemotron-3-nano-30b-a3b` |
+| **accepted the connection, returned nothing, ever** | **2** | `meta/llama-3.3-70b-instruct` |
+
+So a provider listing a model is advertising, not a capability. The 404s were
+already handled. The silence was not — and the client's entire response to it
+was to sit there with a spinner.
+
+### Why there was no timeout to catch it
+
+`httpclient.go` set no `ResponseHeaderTimeout`, justified in a comment as *"first
+byte can be legitimately slow on a big model + slow link"*.
+
+That was an intuition, and Go's own documentation contradicts it:
+ResponseHeaderTimeout *"specifies the amount of time to wait for a server's
+response headers **after fully writing the request (including its body, if
+any)**"*. A slow uplink therefore never counts against it. Uploading 100 KB at
+2 KB/s spends 50 seconds of wall clock and **zero** seconds of that budget.
+
+The comment is preserved in the file, because being wrong in a documented way is
+more useful than being quietly corrected.
+
+### Two guards, because there are two failures
+
+**`FirstByteTimeout`** (default 120 s) bounds the wait for headers — the server
+that never replies. 120 s is about 330× the measured first byte of the model
+that actually worked.
+
+**`StreamStallTimeout`** (default 90 s) covers what a header timeout structurally
+cannot see: headers arrived, the answer started, and *then* the link died. No
+header timeout can fire, because the headers already came.
+
+It is a **stall timer, not a wall clock** — every chunk resets it, and it only
+arms once the first chunk lands. A stream crawling in at one token a second is
+never touched; only a stream delivering nothing at all for the whole window is.
+That distinction is the whole design: a false positive destroys an answer the
+user has already paid for twice, in money and in upload time.
+
+### And a third retry layer, found by arithmetic
+
+With a 20-second first-byte timeout the run should have stopped near 41 s. It
+was still going at **123 s**. That ratio is almost exactly 3, and the 3 was
+`openai-go`'s own `MaxRetries: 2` default — never configured, so every one of our
+attempts was silently three of the SDK's.
+
+That is the **third** independent retry layer in one call path, after the
+application loop and Go's transport replay found earlier the same day. Their
+effect multiplies. The SDK now gets `WithMaxRetries(0)`: retries belong to the
+one layer that knows whether content has already streamed, what the turn has
+spent, and what to tell the user.
+
+| the black-hole test | before | after |
+|---|---|---|
+| Outcome | still running at 110 s+, silent | **exits at 43 s** |
+| Exit code | — | **1** |
+| Message | none | names the likely cause and points at `/models` |
+| Working model, same build | 4 s, exit 0 | **4 s, exit 0 — unchanged** |
+
+The last row is the one that mattered most to check.
+
+---
+
 ## How to reproduce any of this
 
 ```bash
@@ -245,3 +325,17 @@ Every figure above is **stated in input** — produced by the command named, on
 2026-08-18, on the reference machine. The only inference is the arithmetic
 converting bytes to seconds at a given link speed, which assumes the link
 achieves its nominal rate and no retransmission; real satellite links do worse.
+
+```bash
+# Split "is the provider broken" from "is this model broken" in two calls
+curl -s -o /dev/null -w "models:  %{http_code} %{time_total}s\n" \
+  -H "Authorization: Bearer $KEY" https://integrate.api.nvidia.com/v1/models
+curl -s -o /dev/null -w "chat:    %{http_code} ttfb=%{time_starttransfer}s\n" --max-time 30 \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"MODEL","messages":[{"role":"user","content":"hi"}],"max_tokens":10}' \
+  https://integrate.api.nvidia.com/v1/chat/completions
+# http_code 000 with 0 bytes = black hole. 404 in <0.2s = not entitled/not served.
+
+# Where is a hung build actually blocked? Go dumps every goroutine on SIGQUIT
+GOTRACEBACK=all gorilla-opencode -p "..." & sleep 25; kill -QUIT $!
+```
