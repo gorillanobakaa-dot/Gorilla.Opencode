@@ -81,3 +81,25 @@ func TestPrefixNeighboursAreNotInside(t *testing.T) {
 		t.Error("a genuine child was treated as outside")
 	}
 }
+
+// A patch that moves a file WITHIN the workspace must still be allowed — the
+// containment fix must not break the legitimate use of "*** Move to:".
+func TestLegitimateInWorkspaceMovesStillWork(t *testing.T) {
+	wd := config.WorkingDirectory()
+	if wd == "" {
+		t.Skip("no workspace")
+	}
+	_ = os.MkdirAll(filepath.Join(wd, "pkg"), 0o755)
+
+	for _, dest := range []string{
+		"pkg/greet.go",              // subdirectory
+		"renamed.go",                // plain rename
+		"./also-fine.go",            // dot-relative
+		"a/b/c/deep.go",             // nested, none of it existing yet
+		filepath.Join(wd, "abs.go"), // absolute, but inside
+	} {
+		if err := ensureInsideWorkspace(dest); err != nil {
+			t.Errorf("REGRESSION: legitimate move destination refused: %q -> %v", dest, err)
+		}
+	}
+}
