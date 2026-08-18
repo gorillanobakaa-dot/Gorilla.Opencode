@@ -37,6 +37,7 @@ cost before they start. Everything else is local.
 | `/reset` · `/defaults` | Put things back the way they shipped. |
 | `/research <question>` | Send helper agents to investigate, each on one angle. |
 | `/osint <question>` · `/dossier` | The serious one. Professional dossier. Burns real money. |
+| `/review [folder or file]` · `/audit` `/codereview` | Run 30 real analysers over your code and report honestly. |
 | `/yolo` · `/auto` `/autopilot` `/goal` | Approve everything for this conversation. No more prompts. |
 | `/tasks` · `/task` `/agents` `/kill` | See and stop background helpers. |
 | `/help` · `/commands` `/?` | This list. |
@@ -222,6 +223,22 @@ The everyday investigation tool: four to ten helpers, each given ONE angle, coll
 A professional intelligence assessment, not a chat answer: plans your question into sub-questions, collects from hundreds of free primary sources (scholarly APIs, SEC filings, World Bank, humanitarian data, global news), grades every claim on two axes like a real intelligence shop, hunts its own gaps, and tells you plainly what it could NOT establish. OFF by default — arm it in /context. Every run starts with a warning showing the burn rate in money, because 4-10 helpers is 4-10 full model sessions. Type /osint alone for the full explanation page.
 
 /osint --recover writes up a run that collected its findings but never produced the dossier — the usual outcome when a connection drops or the model runs out of room at the very last step. It costs nothing to look: the findings are already on disk and in the local store, and it lists every past run so you can pick one. The write-up happens in a fresh conversation carrying only those findings, which is exactly why it succeeds where the original run ran out of room. Nothing is collected again and no helpers are sent out.
+
+### `/review [folder or file]`
+
+*Also: `/audit`, `/codereview`*
+
+**Run 30 real analysers over your code and report honestly.**
+
+A professional static-analysis and security review, built in. Point it at a folder, a file, or your changes and it runs around thirty real analysers — the ones that find memory errors, injection, leaked secrets, unchecked errors — picking whichever suit the languages actually present. C, C++, Go, Python, JavaScript, TypeScript, Rust, shell and more.
+
+With no arguments it reviews your current folder. Add a path for somewhere else. The tools live inside the program; nothing is downloaded when you run it.
+
+**It tells you what did NOT run.** That is the part that matters. Those thirty analysers have to be installed on your machine, and if they are missing they simply find nothing — which looks exactly like a clean report. So the answer always starts with which tools ran, which are missing, and which failed; and if none of them are installed it refuses to run at all rather than hand you a reassuring blank.
+
+It also flags every line that two or more DIFFERENT tools complained about independently. Those are the ones worth reading first.
+
+What it cannot do: find wrong logic, a broken assumption, or an error quietly ignored. No static tool can. This is half a review and it says so — the AI still has to read the code, and should tell you it did.
 
 ### `/yolo`
 

@@ -114,6 +114,33 @@ var All = []Command{
 			"a one-off.",
 	},
 	{
+		Name:    "review",
+		Aliases: []string{"audit", "codereview"},
+		Group:   GroupHelpers,
+		Args:    "[folder or file]",
+		Summary: "Run 30 real analysers over your code and report honestly.",
+		Detail: "A professional static-analysis and security review, built in. Point " +
+			"it at a folder, a file, or your changes and it runs around thirty real " +
+			"analysers — the ones that find memory errors, injection, leaked " +
+			"secrets, unchecked errors — picking whichever suit the languages " +
+			"actually present. C, C++, Go, Python, JavaScript, TypeScript, Rust, " +
+			"shell and more.\n\n" +
+			"With no arguments it reviews your current folder. Add a path for " +
+			"somewhere else. The tools live inside the program; nothing is " +
+			"downloaded when you run it.\n\n" +
+			"**It tells you what did NOT run.** That is the part that matters. Those " +
+			"thirty analysers have to be installed on your machine, and if they are " +
+			"missing they simply find nothing — which looks exactly like a clean " +
+			"report. So the answer always starts with which tools ran, which are " +
+			"missing, and which failed; and if none of them are installed it refuses " +
+			"to run at all rather than hand you a reassuring blank.\n\n" +
+			"It also flags every line that two or more DIFFERENT tools complained " +
+			"about independently. Those are the ones worth reading first.\n\n" +
+			"What it cannot do: find wrong logic, a broken assumption, or an error " +
+			"quietly ignored. No static tool can. This is half a review and it says " +
+			"so — the AI still has to read the code, and should tell you it did.",
+	},
+	{
 		Name:    "resume",
 		Aliases: []string{"continue", "handoff"},
 		Group:   GroupSession,

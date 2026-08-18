@@ -1173,6 +1173,31 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// GORILLA OVERRIDE (2026-08-18): /sessions reaches a conversation you
 		// are no longer in. The old switcher (ctrl+s) showed titles and nothing
 		// else — no date, no size, no search — and could not export or erase.
+		// GORILLA OVERRIDE (2026-08-18): /review runs the embedded code-review
+		// toolkit. Routed through the AGENT rather than called directly: the
+		// analysers are half a review, and the model has to read the changed
+		// code and say so. A command that printed findings and stopped would be
+		// the "looks complete, is half" failure the tool's own description
+		// warns about.
+		case "review", "audit", "codereview":
+			target := strings.TrimSpace(msg.Args)
+			where := "the current folder"
+			if target != "" {
+				where = target
+			}
+			prompt := fmt.Sprintf(
+				"Review the code in %s using the `review` tool.\n\n"+
+					"If this is a git repository with uncommitted or recent changes, pass "+
+					"diff=\"HEAD\" so the review is scoped to what changed rather than every "+
+					"tracked file.\n\n"+
+					"When it returns: read the trust block FIRST and tell the user plainly "+
+					"which analysers did not run, because an empty findings list is not the "+
+					"same as clean code. Start from the corroborated findings. Then READ the "+
+					"code yourself for the things static analysis cannot see — wrong logic, "+
+					"broken invariants, swallowed errors — and say explicitly that you did, "+
+					"and what you found.", where)
+			return a, util.CmdHandler(chat.SendMsg{Text: prompt})
+
 		case "sessions", "history":
 			if cmd := a.openSessionsManager(); cmd != nil {
 				return a, cmd

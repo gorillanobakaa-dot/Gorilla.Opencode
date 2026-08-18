@@ -1,3 +1,57 @@
+## v0.1.94 — 2026-08-18 — /review: thirty static-analysis and security tools, built in
+
+**Plain-language version:** Type `/review` and the program runs around thirty
+real code-analysis and security tools over your code — `cppcheck`, `gosec`,
+`bandit`, `semgrep`, `clippy`, `shellcheck`, `gitleaks` and the rest — picking
+whichever suit the languages you actually have. They find the mechanical faults:
+memory errors, injection holes, leaked credentials, errors nobody checked. The
+tools live inside the program; nothing is downloaded when you run it.
+
+**The part that makes it trustworthy.** A review that found nothing because
+nothing was installed looks exactly like a review that found nothing because
+your code is fine. That is the worst way a review tool can fail, and no small
+model can spot it. So every answer *starts* with which tools ran, which are
+missing and which failed — before a single finding — and says the code a missing
+tool covers is **UNREVIEWED**, in those words. If nothing is installed for your
+language it refuses to run at all rather than hand you a comforting blank page.
+
+It also flags every line that two or more **different** tools objected to
+independently. Not "the AI thinks this matters" — two separate programs, written
+by different people, disagreeing with the same line. Those are computed, and
+they are never truncated.
+
+**What it will not do**, and it says so every time: find wrong logic, a broken
+assumption, or an error quietly swallowed. No static tool finds those. This is
+half a review, and `/review` instructs the model to read the changed code itself
+and tell you it did.
+
+**Measured, on a real run over 50 files:** 17 analysers, 42 seconds, **739,476
+bytes of raw JSON returned as a 7,315-byte summary** — a 99% reduction, because
+every tool result is re-sent on every later turn. The trust block and the
+corroborated findings are never cut; the long tail is capped at 60, sorted
+most-severe-first, with the real total always stated.
+
+The whole toolkit is embedded in the binary: **444 KB of payload, +480 KB of
+binary**, about fifty seconds on an 8 KB/s line. "Install this other thing
+first" is a wall, not a step, for the people this is built for — the same
+reasoning that made `lynx` a hard dependency.
+
+**A test this change had to fix, worth naming.** The loadout calibration test
+asserted that a row's measured token count *differs* from its hand-written
+estimate — a proxy for "calibration ran". `tool.review` measured 475 tokens, the
+estimate was corrected from 320 to 475, and the test promptly declared the
+correct figure a guess. It now stamps a sentinel no real schema can produce and
+asserts calibration overwrote it. Same failure class as a limit counted in the
+wrong unit: a proxy breaks exactly in the case it was meant to reward.
+
+Also in this release: the first live run flagged credentials in two OAuth files.
+They are installed-app client credentials publicly embedded in the open-source
+Gemini and Antigravity CLIs, and were never confidential. The toolkit reported
+their location and **withheld every value from the report**, which is the rule
+that matters more than the finding.
+
+Full detail, both tracks: [docs/CODE-REVIEW.md](../docs/CODE-REVIEW.md).
+
 ## v0.1.93 — 2026-08-18 — /resume: pick up work that stopped, or work another model started
 
 **Plain-language version:** v0.1.92 let you find and reopen a past conversation.

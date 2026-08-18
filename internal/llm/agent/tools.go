@@ -68,6 +68,11 @@ func CoderAgentTools(
 	}
 	// GORILLA OVERRIDE: kernel semantic checker, default off in the loadout.
 	add("tool.sparse", tools.NewSparseTool(permissions))
+	// GORILLA OVERRIDE (2026-08-18): the code-review toolkit, ~30 analysers
+	// embedded in the binary. Loadout-gated because its description is not
+	// free and most turns are not reviews — but ON by default, because a
+	// review capability nobody knows about is not a capability.
+	add("tool.review", tools.NewReviewTool(permissions))
 	return append(coderTools, otherTools...)
 }
 

@@ -83,6 +83,15 @@ var LoadoutComponents = []LoadoutComponent{
 	// every request for a user who never touches the kernel. Turn it on when
 	// starting kernel patches.
 	{"tool.sparse", "Sparse checker (kernel)", "agent can't check kernel semantics (__user pointers, endianness, lock imbalance) — needs a build to catch them instead", 180, false, false},
+	// GORILLA OVERRIDE (2026-08-18): the code-review toolkit — ~30 static
+	// analysers embedded in the binary. ON by default: a review capability
+	// nobody is told about is not a capability, and this is the one feature no
+	// other coding agent ships. Its description is deliberately long because it
+	// has to say what static analysis CANNOT find; a short description here
+	// would produce reviews that claim to be complete and are half a review.
+	// 475 is MEASURED (toolTokens), not estimated — the first hand-written
+	// guess here was 320, out by 48%, and calibrate_test.go caught it.
+	{"tool.review", "Code review — /review", "agent loses the 30 static-analysis and security tools; it can still read your code, but nothing mechanically checks for memory errors, injection, leaked secrets or unchecked errors", 475, true, false},
 	// GORILLA OVERRIDE: env estimate was 150 when the block was a recursive
 	// 1000-file tree dump (real cost often 10k–30k). After the shallow
 	// project_summary refactor it really is ~100–200 tokens; calibrate

@@ -12,6 +12,7 @@ API keys or run models on your own machine.
 > and menus (incl. how to reach the Google models): **[docs/GUIDE.md](docs/GUIDE.md)**.
 > Every command, with what it does and what it costs: **[docs/COMMANDS.md](docs/COMMANDS.md)**.
 > Lost a session to a power cut, or run out of disk? **[docs/SESSIONS-AND-STORAGE.md](docs/SESSIONS-AND-STORAGE.md)**.
+> Thirty static-analysis and security tools, built in: **[docs/CODE-REVIEW.md](docs/CODE-REVIEW.md)**.
 > Screenshots & proof: **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)**.
 >
 > **⏱️ Why does an AI model feel slow?** A free, hands-on lesson built from

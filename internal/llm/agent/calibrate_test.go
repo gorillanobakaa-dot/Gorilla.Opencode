@@ -21,9 +21,21 @@ func TestCalibrationCoversEveryComponentWithNoLSPClients(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 
-	declared := map[string]int{}
+	// GORILLA FIX (2026-08-18): this used to assert "calibrated != hand-written",
+	// which is a PROXY for "calibration ran" — and it fails exactly when the
+	// hand-written estimate happens to be right. tool.review measured 475 and
+	// the estimate was corrected to 475, at which point the test declared the
+	// figure a guess. Same shape as the limit-in-the-wrong-unit trap: a proxy
+	// breaks precisely in the case it was meant to reward.
+	//
+	// Stamp a sentinel that no real schema can produce, then assert calibration
+	// overwrote it. That measures the thing itself.
+	const sentinel = -424242
 	for _, c := range config.LoadoutComponents {
-		declared[c.ID] = c.Tokens
+		if strings.HasPrefix(c.ID, "lsp.") {
+			continue
+		}
+		config.SetLoadoutTokens(c.ID, sentinel)
 	}
 
 	CalibrateLoadout(nil, nil, nil, nil, nil) // no LSP clients at all
@@ -34,9 +46,13 @@ func TestCalibrationCoversEveryComponentWithNoLSPClients(t *testing.T) {
 		if strings.HasPrefix(c.ID, "lsp.") {
 			continue
 		}
-		if got := config.ComponentTokens(c); got == declared[c.ID] && declared[c.ID] != 0 {
-			t.Errorf("%s still reports its hand-written estimate (%d) after calibration — the figure shown in /context is a guess",
-				c.ID, got)
+		got := config.ComponentTokens(c)
+		if got == sentinel {
+			t.Errorf("%s was never calibrated — the figure shown in /context is whatever was hand-written",
+				c.ID)
+		}
+		if got < 0 {
+			t.Errorf("%s calibrated to %d; a negative token cost is not a measurement", c.ID, got)
 		}
 	}
 }
