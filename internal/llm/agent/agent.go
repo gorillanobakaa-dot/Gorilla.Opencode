@@ -709,6 +709,19 @@ func (a *agent) processEvent(ctx context.Context, sessionID string, assistantMsg
 		return event.Error
 	case provider.EventComplete:
 		assistantMsg.SetToolCalls(event.Response.ToolCalls)
+		// GORILLA OVERRIDE (2026-08-18): if the model wrote a tool call as TEXT
+		// instead of making one, say so rather than printing the raw JSON as the
+		// answer. Labelled only, never dispatched — see leakedtoolcall.go.
+		if len(assistantMsg.ToolCalls()) == 0 {
+			if name := LeakedToolCallName(assistantMsg.Content().String(), a.toolNames()); name != "" {
+				logging.Warn("model emitted a tool call as text", "tool", name)
+				assistantMsg.AddFinish(event.Response.FinishReason, LeakedToolCallNotice(name))
+				if err := a.messages.Update(ctx, *assistantMsg); err != nil {
+					return fmt.Errorf("failed to update message: %w", err)
+				}
+				return a.TrackUsage(ctx, sessionID, a.provider.Model(), event.Response.Usage)
+			}
+		}
 		assistantMsg.AddFinish(event.Response.FinishReason)
 		if err := a.messages.Update(ctx, *assistantMsg); err != nil {
 			return fmt.Errorf("failed to update message: %w", err)
@@ -717,6 +730,17 @@ func (a *agent) processEvent(ctx context.Context, sessionID string, assistantMsg
 	}
 
 	return nil
+}
+
+// toolNames lists the tools registered for this turn, so a leaked tool call can
+// be required to name a REAL one before it is labelled as such.
+func (a *agent) toolNames() []string {
+	tools := a.getTools()
+	names := make([]string, 0, len(tools))
+	for _, t := range tools {
+		names = append(names, t.Info().Name)
+	}
+	return names
 }
 
 func (a *agent) TrackUsage(ctx context.Context, sessionID string, model models.Model, usage provider.TokenUsage) error {
