@@ -1026,3 +1026,47 @@ func StreamStallTimeout() time.Duration {
 	}
 	return 90 * time.Second
 }
+
+// BrowserUserAgent is the User-Agent the web-fetch tool sends when reading a
+// page.
+//
+// GORILLA OVERRIDE (2026-08-18): measured, then decided. The tool used to send
+// an honest bot token, "gorilla-opencode/1.0 (+github…)". Measured that day, that
+// token alone was the block: https://www.google.com/search returned 302 to the
+// bot token and 200 to a Firefox token, from the same client, same second;
+// news sites behaved the same way. lynx did not help — Reuters 401'd it too —
+// so the lever is the User-Agent, not a browser subprocess.
+//
+// Reading a public page a human could read, while identified as the browser a
+// human would use, is standard practice for every research tool and scraper on
+// the web. The tool is not evading authentication or a paywall; it is declining
+// to wear a "bot" badge that some sites reject reflexively. That was the owner's
+// explicit call.
+//
+// This does NOT touch two other User-Agents on purpose:
+//   - the provider auth handshakes (Antigravity, CodeAssist), which MUST
+//     identify the real client or the OAuth flow breaks; and
+//   - the JSON-API contact string in websearch.go, because some fair-access
+//     APIs REQUIRE a specific identity — SEC EDGAR 403s anything that is not an
+//     email-form contact (measured 2026-08-17). A browser token would break it.
+//
+// A default UA ages into a fingerprint of its own; refresh it periodically, or
+// override per-machine with GORILLA_OPENCODE_USER_AGENT. Setting that variable
+// to "honest" restores the identifying bot token.
+func BrowserUserAgent() string {
+	if v := os.Getenv("GORILLA_OPENCODE_USER_AGENT"); v != "" {
+		if strings.EqualFold(v, "honest") {
+			return honestUserAgent
+		}
+		return v
+	}
+	return defaultBrowserUserAgent
+}
+
+const (
+	// A current, common desktop Firefox on Linux — authentic for this project's
+	// own audience, which runs a Linux distribution with a Firefox fork.
+	defaultBrowserUserAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
+	// The original identifying token, restored by GORILLA_OPENCODE_USER_AGENT=honest.
+	honestUserAgent = "gorilla-opencode/1.0 (+https://github.com/gorillanobakaa-dot/Gorilla.Opencode)"
+)
