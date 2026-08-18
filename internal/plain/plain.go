@@ -23,6 +23,7 @@ package plain
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -200,6 +201,47 @@ func (s *Session) drain(msgs <-chan pubsub.Event[message.Message]) {
 	}
 }
 
+// describePermissionParams renders a permission request's parameters for a
+// terminal that has no dialog. Params is an `any` carried from the tool, so it
+// is inspected via JSON rather than by importing every tool's type — which would
+// be an import cycle, and would need updating for each new tool.
+//
+// A "diff" or "command" field is printed verbatim, indented: those are the whole
+// point of the prompt and must be readable, not JSON-escaped.
+func describePermissionParams(params any) string {
+	if params == nil {
+		return ""
+	}
+	raw, err := json.Marshal(params)
+	if err != nil {
+		return ""
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return ""
+	}
+
+	var b strings.Builder
+	for _, key := range []string{"command", "diff", "content", "file_path", "filePath"} {
+		v, ok := fields[key]
+		if !ok {
+			continue
+		}
+		text, ok := v.(string)
+		if !ok || strings.TrimSpace(text) == "" {
+			continue
+		}
+		for _, line := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+			b.WriteString("    " + line + "\n")
+		}
+		// The diff or command IS the decision; once shown, stop.
+		if key == "diff" || key == "command" {
+			break
+		}
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
 func (s *Session) askPermission(req permission.PermissionRequest) {
 	s.closeBlock()
 	fmt.Fprintf(s.out, "\n--- permission needed ---\n")
@@ -209,6 +251,16 @@ func (s *Session) askPermission(req permission.PermissionRequest) {
 	}
 	if req.Description != "" {
 		fmt.Fprintf(s.out, "  action: %s\n", req.Description)
+	}
+	// GORILLA FIX (2026-08-18): show WHAT is being approved, not just which tool.
+	//
+	// The TUI renders the diff and the command in a fenced block; this mode
+	// showed neither, so a file rewrite was approved blind. Plain mode is
+	// documented as equivalent and is the mode steered to on weak terminals —
+	// PHILOSOPHY.md's whole claim is that the user can CHECK what was done, and
+	// a consent screen that hides the change defeats it.
+	if body := describePermissionParams(req.Params); body != "" {
+		fmt.Fprintf(s.out, "  details:\n%s\n", body)
 	}
 	fmt.Fprint(s.out, "allow? [y]es / [n]o / [a]lways for this session: ")
 
