@@ -1,4 +1,4 @@
-<!-- Version: 1.4.0 · updated 26-08-18-17-07 -->
+<!-- Version: 1.5.0 · updated 26-08-18-18-21 -->
 # What it costs to run: memory, disk and network
 
 *Measured on 18 August 2026, on the reference machine (Sony VAIO SVE, i7-3632QM,
@@ -329,6 +329,38 @@ The last row is the one that mattered most to check.
 
 ---
 
+## The slow-but-working link: the guards must not misfire
+
+The failure cases above are the dramatic ones. The common one is a link that
+works and is merely slow, and it is the case most able to produce a FALSE
+positive — every timeout added this session watches for silence, and a slow link
+is full of silences that are not failures. A stall guard that cannot distinguish
+"crawling" from "dead" destroys a working answer, which is strictly worse than
+the hang it replaced.
+
+Tested through the same CONNECT proxy in `slow` mode (a fixed byte rate), against
+a warm, instant model so the only variable is link speed:
+
+| rate | exit | wall | full answer | largest inter-chunk gap |
+|---|---|---|---|---|
+| 4 KB/s | 0 | 70 s | yes | 18 s |
+| 2 KB/s | 0 | 130 s | yes (150 words) | **32.8 s** |
+
+`config.StreamStallTimeout` is 90 s. The worst real gap on the slower link was
+32.8 s, a ~2.7x margin, and it holds at the 2 KB/s bad-day floor. So the guard
+has comfortable headroom before a slow link could read as a dead one. Below
+~1 KB/s the margin would narrow, but 2 KB/s is already the floor at which the
+tool is usable at all.
+
+The dominant cost on the slow link was not latency but VOLUME: one throwaway
+question pushed **~140 KB upstream** — the conversation and every tool schema,
+re-sent per step of the agent turn — which at 2 KB/s is where most of the 130 s
+went. This is the same asymmetry the per-message section measures (85% outbound),
+observed from the failure-handling side: on a constrained uplink the guards were
+never the risk, the upload was.
+
+---
+
 ## How to reproduce any of this
 
 ```bash
@@ -359,6 +391,11 @@ curl -s -o /dev/null -w "chat:    %{http_code} ttfb=%{time_starttransfer}s\n" --
   -d '{"model":"MODEL","messages":[{"role":"user","content":"hi"}],"max_tokens":10}' \
   https://integrate.api.nvidia.com/v1/chat/completions
 # http_code 000 with 0 bytes = black hole. 404 in <0.2s = not entitled/not served.
+
+# Slow-but-working link: proxy at a fixed byte rate, then a real turn through it
+python3 scripts/satellite-proxy.py slow 999 8873 2000   # 2 KB/s
+HTTPS_PROXY=http://127.0.0.1:8873 gorilla-opencode -q -p "your prompt"
+# watch the proxy log: inter-chunk gaps must stay under StreamStallTimeout (90s).
 
 # Where is a hung build actually blocked? Go dumps every goroutine on SIGQUIT
 GOTRACEBACK=all gorilla-opencode -p "..." & sleep 25; kill -QUIT $!

@@ -1,4 +1,4 @@
-<!-- Version: 1.1.0 · updated 26-08-18-17-07 -->
+<!-- Version: 1.2.0 · updated 26-08-18-18-21 -->
 # What happens when your connection is bad
 
 *Plain language. No jargon, and where a technical word is unavoidable it is
@@ -339,10 +339,8 @@ Honestly, and with what is still unknown stated as unknown.
 
 **What is not known yet, stated plainly rather than assumed.**
 
-- **A connection that works but crawls has not been tested.** Everything above
-  tested connections that *break*. The ordinary satellite experience is not a
-  dramatic failure, it is everything being slow. That test has not been run, and
-  it is the next one.
+- **A connection that works but crawls — now tested, and it passes.** See the
+  section below. This was the gap this document used to admit to; it is closed.
 - **Recovery has not been tested.** If the link dies and comes back, does the
   program carry on, or does it need restarting? Unknown.
 - The three fixes were verified from a script. The screen-and-keyboard version
@@ -356,6 +354,45 @@ was not safe in either of those ways this morning.
 
 Whether it is *pleasant* on a slow-but-working link is a different question, and
 that one is still open.
+
+---
+
+## The ordinary case: a link that works but crawls
+
+Everything up to here broke the connection — cut it, silenced it, black-holed it.
+But the everyday satellite experience is not a dramatic break. It is everything
+being **slow**. A link that works fine, just at the speed of a trickle.
+
+That is the case most likely to trip a false alarm, because all the new safety
+limits are watching for silence — and a slow link produces long silences that are
+not failures. If a guard cannot tell "crawling" from "dead", it will kill a
+working answer, which is worse than the problem it was added for.
+
+So it was tested directly, at two real satellite speeds, with a model that
+answers instantly so the *only* thing being measured is the link.
+
+| link speed | outcome | time | longest gap with nothing arriving |
+|---|---|---|---|
+| 4 KB/s | **finished, full answer** | 70 s | 18 s |
+| 2 KB/s (a bad day) | **finished, full answer** | 130 s | 33 s |
+
+Both finished cleanly. No false alarm, no cut-off answer, no error.
+
+The number that matters is the last column. The guard that watches for a dead
+stream gives up after **90 seconds** of nothing arriving. On the worst link
+tested, the longest real gap was **33 seconds** — so there is roughly a
+three-to-one safety margin before a slow link could ever be mistaken for a broken
+one. It holds even on the bad-day 2 KB/s floor.
+
+One honest observation from the same test, because it is the real cost on a slow
+link and it is not small: a single throwaway question moved about **140 KB up the
+wire** — the whole conversation and every tool description, re-sent for each step
+of the answer. At 2 KB/s that is over a minute of uploading, and it is where
+almost all of the 130 seconds went. The link was not the bottleneck the safety
+limits worry about; the sheer volume of upload was. That is the same finding as
+the rest of this document, arriving from a different direction: on a slow link,
+**what you send costs far more than what you receive**, which is exactly why
+turning off parts of the loadout you do not use is real time saved.
 
 ---
 
