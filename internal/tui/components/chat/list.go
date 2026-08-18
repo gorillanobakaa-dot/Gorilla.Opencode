@@ -54,6 +54,22 @@ type messagesCmp struct {
 	// so the chain now lives exactly as long as it is drawn.
 	spinning  bool
 	rendering bool
+	// GORILLA OVERRIDE (2026-08-18): the working indicator now carries an
+	// elapsed clock and escalates its wording once the wait crosses the
+	// cold-start threshold. Measured that day: on shared endpoints (NVIDIA NIM)
+	// an idle model has to warm up, taking 12–19 seconds and sometimes minutes
+	// before the first token — during which a mute "Thinking..." spinner is
+	// indistinguishable from a hang. That ambiguity was fixed at the wire in the
+	// same session (config.FirstByteTimeout); this is the human-facing half of
+	// it. taskLabel is the phase the clock is timing, taskSince when that phase
+	// began — the clock resets on every phase change so it always reads "how
+	// long has THIS step been quiet", not total turn time.
+	taskLabel string
+	taskSince time.Time
+	// coldStartWarned stops the "warming up" toast from repeating within a
+	// single phase — it fires once when the wait first crosses the threshold,
+	// and resets when the phase changes.
+	coldStartWarned bool
 	attachments   viewport.Model
 	// GORILLA OVERRIDE: throttle streaming re-renders (see below).
 	lastStreamRender time.Time
@@ -251,6 +267,27 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.spinning = true
 			cmds = append(cmds, m.spinner.Tick)
 		}
+		// GORILLA OVERRIDE: drive the elapsed clock here, in Update, so the
+		// render path stays pure. Reset it whenever the phase changes, so it
+		// times the CURRENT step's quiet rather than the whole turn — a fresh
+		// "Thinking..." after a tool result should not inherit the previous
+		// step's seconds.
+		if label := m.taskLabel_(); label != m.taskLabel {
+			m.taskLabel = label
+			m.taskSince = time.Now()
+			m.coldStartWarned = false
+		}
+		// GORILLA OVERRIDE: once a pre-first-token phase has been quiet past the
+		// cold-start threshold, say so — once — in a toast, where a full
+		// sentence is safe (the footer is one row and cannot hold it). This is
+		// the human-facing twin of config.FirstByteTimeout: that bounds the
+		// silent wait, this explains it while it lasts.
+		if !m.coldStartWarned && shouldColdStartWarn(m.taskLabel, m.elapsedInPhase()) {
+			m.coldStartWarned = true
+			cmds = append(cmds, util.ReportInfo(
+				"🦍 Still waiting on the model — a quiet endpoint is usually warming up, not "+
+					"stuck. First reply can take a minute on a shared/free model. Press esc to cancel."))
+		}
 		s, cmd := m.spinner.Update(msg)
 		m.spinner = s
 		cmds = append(cmds, cmd)
@@ -259,8 +296,31 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Swallow this one: not forwarding it ends the chain.
 			m.spinning = false
 		}
+		m.taskLabel = ""
+		m.taskSince = time.Time{}
+		m.coldStartWarned = false
 	}
 	return m, tea.Batch(cmds...)
+}
+
+// taskLabel_ names the phase the agent is in right now. It is the single source
+// of truth for both the clock reset (Update) and the rendered text (working()),
+// so the two can never disagree about which phase is being timed.
+func (m *messagesCmp) taskLabel_() string {
+	if len(m.messages) == 0 {
+		return "Thinking..."
+	}
+	lastMessage := m.messages[len(m.messages)-1]
+	switch {
+	case hasToolsWithoutResponse(m.messages):
+		return "Waiting for tool response..."
+	case hasUnfinishedToolCalls(m.messages):
+		return "Building tool call..."
+	case !lastMessage.IsFinished():
+		return "Generating..."
+	default:
+		return "Thinking..."
+	}
 }
 
 func (m *messagesCmp) IsAgentWorking() bool {
@@ -452,27 +512,75 @@ func hasUnfinishedToolCalls(messages []message.Message) bool {
 	return false
 }
 
+// coldStartHint is when a quiet wait stops reading as "just a moment" and
+// starts reading as "is this broken?". Measured 2026-08-18: warm models on
+// NVIDIA NIM answer in well under a second, while a cold one took 12–19s. So a
+// wait past ~12s is very likely a warm-up, and that is exactly when the user
+// most needs telling.
+const coldStartHint = 12 * time.Second
+
+// elapsedInPhase is how long the current step has been running, or 0 if the
+// clock is not set (the first frame of a phase, before Update has stamped it).
+func (m *messagesCmp) elapsedInPhase() time.Duration {
+	if m.taskSince.IsZero() {
+		return 0
+	}
+	return time.Since(m.taskSince)
+}
+
+// isPreTokenPhase reports whether a phase is a wait for the model's FIRST
+// output, as opposed to a tool round-trip. Only these get the cold-start
+// explanation, because only these are the "is it warming up or hung?" ambiguity
+// — calling a tool wait a model warm-up would be a plain lie.
+func isPreTokenPhase(task string) bool {
+	return task == "Thinking..." || task == "Generating..."
+}
+
+// shouldColdStartWarn is the toast decision, pulled out of Update so it can be
+// tested without driving the whole event loop. It fires once a pre-token phase
+// has been quiet past the measured threshold.
+func shouldColdStartWarn(task string, elapsed time.Duration) bool {
+	return isPreTokenPhase(task) && elapsed >= coldStartHint
+}
+
+// workingLabel turns a phase and its elapsed time into the footer text.
+//
+// It is deliberately SHORT — the footer is exactly FooterReservedRows (1) tall,
+// and lipgloss WRAPS rather than truncates, so a long string here would become a
+// second row and break the cursor-erase invariant printer.go depends on. So the
+// footer only ever counts: "Thinking... (20s)". The sentence that EXPLAINS a
+// long wait is emitted once as an info toast from Update (see coldStartToast),
+// where length is free. This split is the same one the helper heartbeat uses.
+func (m *messagesCmp) workingLabel(task string, elapsed time.Duration) string {
+	if task == "" {
+		return ""
+	}
+	if secs := int(elapsed.Seconds()); secs > 0 {
+		return fmt.Sprintf("%s (%ds)", task, secs)
+	}
+	return task
+}
+
 func (m *messagesCmp) working() string {
 	text := ""
 	if m.IsAgentWorking() && len(m.messages) > 0 {
 		t := theme.CurrentTheme()
 		baseStyle := styles.BaseStyle()
 
-		task := "Thinking..."
-		lastMessage := m.messages[len(m.messages)-1]
-		if hasToolsWithoutResponse(m.messages) {
-			task = "Waiting for tool response..."
-		} else if hasUnfinishedToolCalls(m.messages) {
-			task = "Building tool call..."
-		} else if !lastMessage.IsFinished() {
-			task = "Generating..."
-		}
-		if task != "" {
+		task := m.taskLabel_()
+		// GORILLA OVERRIDE: show how long this step has been quiet, and once it
+		// crosses the measured cold-start threshold, say so in words. Silence on
+		// a shared endpoint is usually a model warming up, not a crash — the
+		// program should say which. Only the pre-first-token phases carry the
+		// reassurance: "Waiting for tool response" is a different wait and has
+		// its own honest label.
+		label := m.workingLabel(task, m.elapsedInPhase())
+		if label != "" {
 			text += baseStyle.
 				Width(m.width).
 				Foreground(t.Primary()).
 				Bold(true).
-				Render(fmt.Sprintf("%s %s ", m.spinner.View(), task))
+				Render(fmt.Sprintf("%s %s ", m.spinner.View(), label))
 		}
 	}
 	return text
