@@ -8,6 +8,7 @@ package dialog
 // erase decision is made from.
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -336,5 +337,46 @@ func TestManagerActionsAvoidReservedKeys(t *testing.T) {
 	m.SetSize(100, 30)
 	if _, msg := send(m, "delete", "y"); func() bool { _, ok := msg.(SessionsDeleteMsg); return !ok }() {
 		t.Errorf("DEL then y did not erase; got %T", msg)
+	}
+}
+
+// Every action must be reachable. This exists because a resume key was written
+// into the help line and the changelog while the `case` that implements it was
+// never added — a python edit targeted the wrong indentation and silently did
+// nothing, and four rounds of live testing then "disproved" keys that had never
+// been bound at all. A test asserting the message is emitted would have caught
+// it in one second.
+func TestEveryAdvertisedActionIsActuallyWired(t *testing.T) {
+	for _, c := range []struct {
+		key  string
+		want any
+	}{
+		{"ctrl+r", SessionsResumeMsg{}},
+		{"enter", SessionsReviveMsg{}},
+		{"ctrl+e", SessionsExportMsg{}},
+	} {
+		m := NewSessionsCmp()
+		m.SetStore(rows(3), "")
+		m.SetSize(100, 30)
+
+		_, msg := send(m, c.key)
+		if msg == nil {
+			t.Errorf("%s emitted nothing — the action is advertised but not wired", c.key)
+			continue
+		}
+		if fmt.Sprintf("%T", msg) != fmt.Sprintf("%T", c.want) {
+			t.Errorf("%s emitted %T, want %T", c.key, msg, c.want)
+		}
+	}
+
+	// And the help line must name only keys that do something.
+	m := NewSessionsCmp()
+	m.SetStore(rows(3), "")
+	m.SetSize(120, 30)
+	view := m.View()
+	for _, k := range []string{"enter", "ctrl+r", "ctrl+e", "DEL", "tab"} {
+		if !strings.Contains(view, k) {
+			t.Errorf("the help line does not mention %q", k)
+		}
 	}
 }

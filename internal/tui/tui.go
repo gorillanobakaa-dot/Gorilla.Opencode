@@ -1061,6 +1061,10 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			total, len(branches), path))
 		return a, nil
 
+	case dialog.SessionsResumeMsg:
+		a.showSessionsMgr = false
+		return a, a.resumeSession(msg.Session)
+
 	case dialog.SessionsDeleteMsg:
 		return a, a.eraseSession(msg.Session)
 
@@ -1173,6 +1177,16 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if cmd := a.openSessionsManager(); cmd != nil {
 				return a, cmd
 			}
+			return a, nil
+		// GORILLA OVERRIDE (2026-08-18): /resume opens the same list, because
+		// picking up stalled work always starts with "which one" — and once you
+		// are there, reopening, exporting and erasing are the same three things
+		// you might want. The hint line tells you which key hands it over.
+		case "resume", "continue", "handoff":
+			if cmd := a.openSessionsManager(); cmd != nil {
+				return a, cmd
+			}
+			a.sessionsMgr.SetNotice("ctrl+r hands the highlighted work to this model in a fresh conversation.")
 			return a, nil
 		case "model", "models":
 			a.modelDialog.Init()

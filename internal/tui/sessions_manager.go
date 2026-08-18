@@ -10,10 +10,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/export"
 	"github.com/opencode-ai/opencode/internal/session"
+	"github.com/opencode-ai/opencode/internal/tui/components/chat"
 	"github.com/opencode-ai/opencode/internal/tui/components/dialog"
 	"github.com/opencode-ai/opencode/internal/tui/util"
 )
@@ -144,4 +147,78 @@ func humanBytes(n int64) string {
 	default:
 		return fmt.Sprintf("%d B", n)
 	}
+}
+
+// resumeSession hands stalled work to the currently selected model, in a FRESH
+// conversation carrying a brief instead of the whole history.
+//
+// WHY NOT JUST REOPEN IT. Reopening is the right answer for a short
+// conversation and the wrong one for a long-running job — and a long-running
+// job is exactly what gets interrupted. A real working session on this machine
+// held 275 messages and 2.6 MB; putting that back into a 32K model reproduces
+// the context blow-out that stopped the work in the first place. The bigger the
+// session, the more certainly reopening it fails, which is backwards.
+//
+// The brief is built in pure Go (internal/export/handoff.go). No model is asked
+// to work out what happened, because that step is precisely the one that
+// already failed once.
+//
+// It also carries the HELPER sessions' instructions and failures where there
+// are any: a research run's lanes are where the work happened, and a brief that
+// reports the orchestrator's twelve messages as the whole story is describing
+// the wrapper rather than the job.
+func (a *appModel) resumeSession(sess session.Session) tea.Cmd {
+	ctx := context.Background()
+
+	msgs, err := a.app.Messages.List(ctx, sess.ID)
+	if err != nil {
+		return util.ReportError(err)
+	}
+	if len(msgs) == 0 {
+		return util.ReportWarn("That conversation has no messages to pick up from.")
+	}
+
+	// Budget the brief against the model that will read it, leaving room for the
+	// work itself. Two thirds is the same split /osint --recover uses: a prompt
+	// that exactly fills the window leaves nothing to answer with.
+	budgetChars := 0
+	if a.app.CoderAgent != nil {
+		if w := a.app.CoderAgent.Model().ContextWindow; w > 0 {
+			budgetChars = int(float64(w) * 0.5 * 4) // ~4 chars per token, half the window
+		}
+	}
+
+	// Helper sessions travel too — a research run's work is in its lanes, and a
+	// brief built from the orchestrator alone describes the wrapper, not the job.
+	var branches []export.Branch
+	if kids, err := a.app.Sessions.Children(ctx, sess.ID); err == nil {
+		for _, kid := range kids {
+			km, err := a.app.Messages.List(ctx, kid.ID)
+			if err != nil {
+				continue
+			}
+			branches = append(branches, export.Branch{Session: kid, Messages: km})
+		}
+	}
+
+	brief, stats := export.Handoff(sess, msgs, branches, budgetChars)
+
+	// A fresh session, then the brief. Sequenced rather than batched: the chat
+	// page clears its session on the first message and creates a new one on the
+	// second, and the order is what makes the brief land in the new
+	// conversation rather than the old one.
+	a.selectedSession = session.Session{}
+
+	note := fmt.Sprintf("Picking up %q — %d instructions, %d files touched, %d failures, ~%dK tokens",
+		strings.TrimSpace(sess.Title), stats.Instructions, stats.FilesTouched,
+		stats.Failures, stats.EstimatedTokens()/1000)
+	if stats.Truncated {
+		note += " (trimmed to fit this model — the full session is still stored)"
+	}
+
+	return tea.Sequence(
+		util.CmdHandler(chat.NewSessionMsg{}),
+		util.CmdHandler(chat.SendMsg{Text: brief}),
+		util.ReportInfo(note),
+	)
 }

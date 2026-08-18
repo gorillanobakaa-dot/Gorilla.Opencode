@@ -114,6 +114,30 @@ var All = []Command{
 			"a one-off.",
 	},
 	{
+		Name:    "resume",
+		Aliases: []string{"continue", "handoff"},
+		Group:   GroupSession,
+		Summary: "Pick up work that stopped, or work another model started.",
+		Detail: "For when the job is not finished: the power went, the connection " +
+			"dropped, the model ran out of room, or you want a different model to " +
+			"take over. It opens the same list as /sessions — press Ctrl+R on the " +
+			"one you want.\n\n" +
+			"This is NOT the same as reopening the conversation. Reopening loads " +
+			"every message back in, which is right for a short chat and wrong for " +
+			"a long job — and a long job is exactly what gets interrupted. Putting " +
+			"a thousand messages back into a small model is what stopped the work " +
+			"in the first place.\n\n" +
+			"Instead it writes a short brief and starts a FRESH conversation with " +
+			"just that: everything you asked for, word for word, in order; which " +
+			"files were changed and which commands were run; what went wrong; and " +
+			"where it stopped. The brief is built by the program itself, so it " +
+			"costs nothing and cannot fail the way the original did.\n\n" +
+			"It also says plainly what it does NOT know — whether any of the work " +
+			"was correct, and whether it was finished. That matters most when you " +
+			"hand it to a different model, which has no way to tell a finished job " +
+			"from an abandoned one and would otherwise assume the best.",
+	},
+	{
 		Name:    "sessions",
 		Aliases: []string{"history"},
 		Group:   GroupSession,

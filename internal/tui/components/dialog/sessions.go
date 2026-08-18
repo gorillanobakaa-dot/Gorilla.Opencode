@@ -54,6 +54,16 @@ type SessionsExportMsg struct{ Session session.Session }
 // and everything they hold, then return the space to the disk.
 type SessionsDeleteMsg struct{ Session session.Session }
 
+// SessionsResumeMsg asks the app to HAND OFF a conversation: distil it into a
+// brief and continue in a fresh session.
+//
+// Distinct from SessionsReviveMsg, and the difference matters. Reviving reloads
+// every message — right for a short conversation, and for a long one it
+// reproduces the context blow-out that stopped the work in the first place.
+// Resuming carries the goal, what was done, what failed and what is unverified,
+// and nothing else, so a different model on a smaller window can pick it up.
+type SessionsResumeMsg struct{ Session session.Session }
+
 // SessionRow is one conversation as the manager shows it.
 type SessionRow struct {
 	Session session.Session
@@ -197,6 +207,15 @@ func (m SessionsCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if row, ok := m.Current(); ok {
 				return m, util.CmdHandler(SessionsExportMsg{Session: row.Session})
 			}
+		// ctrl+r hands the work over. Verified against the real binary rather
+		// than assumed: ctrl+r is absent from this app's global keymap (which
+		// binds ctrl+l c _ h s k f o t y) and is bound only in the chat editor,
+		// which a modal shields — the same position ctrl+e is in, and ctrl+e
+		// arrives.
+		case "ctrl+r":
+			if row, ok := m.Current(); ok {
+				return m, util.CmdHandler(SessionsResumeMsg{Session: row.Session})
+			}
 		// DELETE, not ctrl+d.
 		//
 		// GORILLA FIX (2026-08-18): ctrl+d was the first choice and never
@@ -301,7 +320,7 @@ func (m SessionsCmp) View() string {
 	var lines []string
 	lines = append(lines,
 		base.Foreground(t.Primary()).Bold(true).Width(width).
-			Render(fitLine("Sessions — find, revive, export, erase", width)))
+			Render(fitLine("Sessions — find, reopen, resume, export, erase", width)))
 
 	// The totals line is the reason this screen exists. On a device with 1 GB
 	// free, "what is this costing me" is the first question, not a footnote.
@@ -380,11 +399,11 @@ func (m SessionsCmp) View() string {
 		lines = append(lines, base.Foreground(t.Success()).Width(width).Render(fitLine(m.lastMessage, width)))
 	default:
 		lines = append(lines, mute.Render(fitLine(
-			"Erasing removes the conversation, its helper sessions, and returns the space to the disk.", width)))
+			"reopen loads the whole conversation back.  resume hands the work to this model in a fresh one.", width)))
 	}
 
 	lines = append(lines, "", mute.Render(fitLine(
-		"↑↓ move   enter revive   ctrl+e export   DEL erase   tab sort   esc close", width)))
+		"↑↓ move   enter reopen   ctrl+r resume   ctrl+e export   DEL erase   tab sort   esc", width)))
 
 	return base.Padding(1, 2).Border(lipgloss.RoundedBorder()).
 		BorderBackground(styles.PanelBackground()).BorderForeground(t.TextMuted()).

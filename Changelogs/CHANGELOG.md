@@ -1,3 +1,46 @@
+## v0.1.93 — 2026-08-18 — /resume: pick up work that stopped, or work another model started
+
+**Plain-language version:** v0.1.92 let you find and reopen a past conversation.
+Reopening is the right answer for a short chat and the wrong one for a long job
+— and a long job is exactly what gets interrupted. Reopening loads every message
+back in, so on a 275-message session it reproduces the failure that stopped the
+work in the first place. The bigger the job, the more certainly reopening it
+fails, which is backwards.
+
+**`/resume`** does the other thing. Pick a conversation, press Ctrl+R, and the
+program writes a short brief and starts a **fresh** conversation with just that:
+everything you asked for, word for word and in order — including your
+corrections, which are the most valuable lines in any session because they record
+where the last attempt went wrong — which files were changed, which commands were
+run, what went wrong and where it stopped.
+
+And then it says what it does **not** know: whether any of the work was correct,
+and whether it was finished. That is the part that makes it safe to hand to a
+different model. A brief that reads as settled fact turns "someone was working on
+this" into "this is done", and that is how half-finished work gets built on or
+committed.
+
+The brief is written by the program itself, in ordinary code — no AI is asked to
+work out what happened, because that is exactly the step that already failed
+once. Driven against a real 106-message research run with 16 helper sessions, it
+produced a brief carrying the goal verbatim and seven distinct helper failures
+(three empty searches, two timeouts, a missing path, a 403), attributed to the
+lane that hit each one.
+
+**One bug worth naming, because it wasted the most time.** The scripted edit that
+added the Ctrl+R handler targeted three tabs of indentation where the file used
+two. The replacement matched nothing, changed nothing, and the script exited
+successfully — so the help line, the command list and the notes all advertised a
+key that had no code behind it. Four rounds of live testing then appeared to rule
+out Ctrl+R, F5, Shift+Tab and Insert; not one of them had ever been bound. The
+signal was there and was missed: when four independent candidates fail in exactly
+the same way, the fault is in the path they share, not in the candidates. There
+is now a test that asserts every advertised action actually emits its message,
+and it catches this in a second.
+
+Full detail, both tracks:
+[docs/SESSIONS-AND-STORAGE.md](../docs/SESSIONS-AND-STORAGE.md).
+
 ## v0.1.92 — 2026-08-18 — /sessions: reach a conversation you are no longer in, and actually get your disk back
 
 **Plain-language version:** Two things this program could not do, and both of
