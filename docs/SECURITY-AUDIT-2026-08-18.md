@@ -1,4 +1,4 @@
-<!-- Version: 1.0.0 · updated 26-08-18-23-08 -->
+<!-- Version: 1.1.0 · updated 26-08-18-23-36 -->
 # Security audit, 18 August 2026 — what was found, what was fixed, what was not
 
 *Two tracks, both complete. Neither is a summary of the other. Every fix below is
@@ -102,23 +102,32 @@ patches and run builds. That was tested for real, not assumed:
 still do. Some commands now show a prompt first — one keypress for you, and the
 whole attack for an attacker.
 
-### What was NOT fixed, stated plainly
+### What was NOT fixed at first — now all closed
 
-Eight confirmed problems remain open. The five that would matter to you are
-listed here; the developer track has the full table with exact locations:
+The first pass fixed four things and left eight confirmed problems open. Those
+eight are now closed too:
 
-- **Writing through a shortcut can still leave your project.** A shortcut file
-  planted in the project can point outside it, and the question you're asked
-  names the shortcut, not where it really goes.
-- **"Allow for this session" grants far more than it says.** Approve one command
-  and every later command of that type is approved silently.
-- **The no-menus mode never shows you the change.** File rewrites are approved
-  without you seeing what changes.
-- **A failed tool reports success.** If something goes wrong, the assistant is
-  handed an empty result marked "fine" — so it carries on believing the work was
-  done.
-- **Reading is not gated.** The assistant can read any file on the machine
-  without asking.
+- **Writing through a shortcut.** The question you're asked now names where the
+  bytes actually land, not the shortcut you were shown.
+- **"Allow for this session" granted far too much.** It now remembers *what* you
+  approved — approve `go build` and it stops asking about that, while a later
+  `rm -rf` still has to ask.
+- **The no-menus mode showed you nothing.** It now prints the actual diff and the
+  actual command before asking.
+- **A failed tool reported success.** It now says what failed and why, so the
+  assistant stops pretending the work was done.
+- **Reading was completely ungated.** Credential files outside your project —
+  SSH keys, cloud logins, this program's own settings — are now refused. Files
+  inside your project are untouched.
+- **The question defaulted to "yes".** It now defaults to *no*, and the answer
+  resets for every new question, so a stray Enter can't approve something you
+  never read.
+- **A refused write still created folders.** It no longer touches the disk.
+- **A ten-minute-old safety check.** If the file changes while the question sits
+  waiting, the write is now refused rather than silently overwriting your edits.
+
+**And it still codes.** Re-tested after all eight: write, edit, patch, build,
+search — all working, and the edited program compiled and ran.
 
 ---
 
@@ -192,21 +201,41 @@ write → edit (compiled and ran) → patch → patch move-to-subdirectory → b
 move cases (subdirectory, rename, dot-relative, deep non-existent parents,
 absolute-but-inside) as a permanent guard.
 
-### Confirmed and NOT fixed
+### Confirmed and fixed — the full set
 
-| severity | defect | location |
-|---|---|---|
-| high | `write`/`edit` follow symlinks out of the workspace; prompt shows the link | `write.go:181`, `edit.go:324,440` |
-| medium | session grant matches ToolName+Action+SessionID+Path, never `Params` | `permission.go:186` |
-| medium | plain mode shows neither diff nor tool params | `plain.go` |
-| medium | non-permission tool errors discarded; model gets empty result as success | `agent.go:564` |
-| medium | `view`/`find` read any absolute path, no permission gate | `view.go:110`, `find.go:353` |
-| medium | permission dialog default-ALLOW, selection not reset between prompts | `dialog/permission.go:514` |
-| medium | TOCTOU: staleness check and diff computed before the prompt | `write.go:126` |
-| low | denied write still creates the parent directory tree | `write.go:139-142` |
+All eight items confirmed-but-open at first writing are now closed.
 
-`ensureInsideWorkspace` already exists and is the natural fix for the first row;
-it is simply not yet wired into `write.go` and `edit.go`.
+| severity | defect | fix | commit |
+|---|---|---|---|
+| high | `write`/`edit` follow symlinks out of the workspace; prompt names the link | `ResolveWriteTarget`/`DescribeWriteTarget` name the real target; **not** a refusal, per `roots.go`'s no-sandbox decision | `2727690` |
+| medium | grant matched ToolName+Action+SessionID+Path, never `Params` | `GrantKey` — bash keys on the command, file tools on the path | `b333c23` |
+| medium | plain mode showed neither diff nor params | `describePermissionParams` prints the diff/command verbatim | `f0d4b28` |
+| medium | non-permission tool errors discarded; empty result flagged success | error surfaced, named, logged | `9a653f3` |
+| medium | `view`/`find` read any absolute path | `RefuseSensitiveRead` — credential paths outside the roots only | `e406974` |
+| medium | dialog default-ALLOW, selection not reset | defaults to Deny; resets per request | `d169128` |
+| medium | TOCTOU: staleness checked before a 10-minute prompt | re-checked after the grant | `e406974` |
+| low | denied write still created the parent tree | `MkdirAll` moved after the grant | `2727690` |
+
+**One earlier fix was corrected in the process.** `d22f075` made patch *refuse*
+move destinations outside the working directory. That contradicts
+`internal/config/roots.go:12` — *"There is no sandbox in this codebase"* — and
+would have broken working across `/add-dir` roots. `2727690` replaces the refusal
+with an honest prompt. The defect was always consent integrity, not containment;
+the audit's own verifier reached the same conclusion independently.
+
+### Capability re-verified after every change
+
+Re-run end to end against a fresh project once all eight landed:
+
+write → edit (built binary printed `5`, proving the edit real) → patch → bash
+build → find → view. All six worked; `view` read an ordinary project file
+without refusal, confirming the credential blocklist does not touch normal work.
+
+Permanent guards: `TestOrdinaryProjectFilesAreStillReadable`,
+`TestLegitimateInWorkspaceDestinationsStayInside`,
+`TestOrdinaryPathsAreDescribedPlainly`, `TestLookalikeDirectoryNamesAreNotCaught`,
+`TestAKeylessGrantStillCoversTheTool`. Each fails if a future tightening starts
+impeding ordinary work.
 
 ### Methodology note
 
