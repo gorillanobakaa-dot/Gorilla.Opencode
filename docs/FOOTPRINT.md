@@ -1,4 +1,4 @@
-<!-- Version: 1.0.0 · updated 26-08-18-14-43 -->
+<!-- Version: 1.1.0 · updated 26-08-18-15-18 -->
 # What it costs to run: memory, disk and network
 
 *Measured on 18 August 2026, on the reference machine (Sony VAIO SVE, i7-3632QM,
@@ -118,6 +118,71 @@ hundred messages, close to four minutes of waiting and 1.8 MB of transfer.
 
 That is the entire argument for the `/context` screen, in measured bytes rather
 than principle.
+
+---
+
+## What happens when the link fails — measured, and it is not good
+
+Bandwidth is the easy half. The harder half is what happens when a satellite
+link does what satellite links do: drop, or go silent.
+
+`tc netem` was unavailable — **this machine's own kernel has
+`CONFIG_NET_SCH_NETEM` unset**, a casualty of the de-bloat. So the test was done
+with a local CONNECT proxy instead, which works because the HTTP client honours
+`HTTPS_PROXY` and a CONNECT tunnel relays TLS untouched, so certificates still
+validate. No root, no kernel module.
+
+### The link drops mid-turn → a retry storm
+
+The proxy accepted the request, relayed it, then reset the connection eight
+seconds in — every time.
+
+| | |
+|---|---|
+| Attempts | **14** |
+| Uploaded | **1.01 MB** |
+| Elapsed | ~120 s, still going when killed |
+| Answer produced | **none** |
+| Error shown to the user | **none** |
+
+`internal/llm/provider/provider.go` declares `maxRetries = 5`.
+
+The extra attempts come from **two layers retrying independently**: the
+application's own loop, and Go's `http.Transport`, which silently re-sends a
+request when the connection dies before any response byte arrives. It can do
+that here because the gzip request wrapper sets `GetBody` — which is precisely
+what makes a body replayable. Neither layer knows about the other, so the real
+ceiling is their product rather than the number written down.
+
+On a metered link this is the expensive failure: **one unanswered question cost
+a megabyte**, and at 8 KB/s that is more than two minutes of upload for nothing.
+
+### The link goes silent → it hangs
+
+The proxy held the socket open and simply stopped forwarding — no close, no
+reset, which is what a satellite dropout actually looks like.
+
+**It hung for the full 90-second cutoff.** No error, no output, no timeout.
+
+That is deliberate for the interactive case: `httpclient.go` documents having no
+`ResponseHeaderTimeout` and no `client.Timeout`, so a large model over a slow
+link is never killed mid-answer, and cancellation is left to the user pressing
+ESC.
+
+**But the headless path has no user.** `gorilla-opencode -p "…"` in a script, a
+cron job or over SSH has nobody to press anything, so it waits forever.
+
+### Status
+
+Both are **reported, not fixed**. The measurements are here so the fix can be
+argued from numbers. The three directions that look right:
+
+1. Count attempts once, across both layers, so the declared ceiling is the real
+   one.
+2. Budget retries in **bytes**, not attempts — the cost of a retry is the whole
+   conversation re-uploaded, and bytes are what the user pays.
+3. Give the headless path a wall-clock deadline, because the escape hatch the
+   interactive path relies on does not exist there.
 
 ---
 
