@@ -1,9 +1,13 @@
-<!-- Version: 1.3.0 · updated 26-08-18-16-15 -->
+<!-- Version: 1.3.0 · updated 26-08-18-16-35 -->
 # What it costs to run: memory, disk and network
 
 *Measured on 18 August 2026, on the reference machine (Sony VAIO SVE, i7-3632QM,
 Debian 13), against gorilla-opencode v0.1.95. Every figure below says which
 command produced it. Nothing here is estimated.*
+
+*This is the developer track. `SATELLITE.md` tells the same story in plain
+language — not a simplification, the same facts and the same numbers written for
+someone who does not want the code.*
 
 ---
 
