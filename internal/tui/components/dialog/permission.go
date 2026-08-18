@@ -470,6 +470,13 @@ func (p *permissionDialogCmp) SetSize() tea.Cmd {
 
 func (p *permissionDialogCmp) SetPermissions(permission permission.PermissionRequest) tea.Cmd {
 	p.permission = permission
+	// GORILLA FIX (2026-08-18): reset the selection for every NEW request.
+	//
+	// The dialog is reused, and the highlight persisted. So after approving one
+	// thing, the next — different — request opened with an answer already
+	// chosen, and a single Enter accepted a question the user had not read.
+	// Consent has to be given per request, not inherited from the last one.
+	p.selectedOption = 2 // Deny
 	return p.SetSize()
 }
 
@@ -511,8 +518,15 @@ func NewPermissionDialogCmp() PermissionDialogCmp {
 
 	return &permissionDialogCmp{
 		contentViewPort: contentViewport,
-		selectedOption:  0, // Default to "Allow"
-		diffCache:       make(map[string]string),
-		markdownCache:   make(map[string]string),
+		// GORILLA FIX (2026-08-18): default to DENY, not Allow.
+		//
+		// This dialog is the only security boundary in the program. Landing on
+		// "Allow" means the safe answer costs two keystrokes and the dangerous
+		// one costs a reflex — and a prompt that appears mid-typing can be
+		// answered by an Enter the user meant for something else. Defaulting to
+		// the refusal makes the accident harmless.
+		selectedOption: 2, // Default to "Deny"
+		diffCache:      make(map[string]string),
+		markdownCache:  make(map[string]string),
 	}
 }
