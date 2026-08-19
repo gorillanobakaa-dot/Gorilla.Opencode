@@ -384,6 +384,15 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 	if err != nil {
 		return a.err(fmt.Errorf("failed to create user message: %w", err))
 	}
+	// GORILLA FIX (2026-08-19): a new user turn clears the taint bit.
+	//
+	// The user typing IS the trust boundary — they have seen what the last
+	// turn did and are asking for the next thing. Taint that never cleared
+	// would be permanently set after the first web search, every egress would
+	// prompt forever, and a prompt that always fires is a prompt nobody reads.
+	// That is how a control gets switched off in practice while still looking
+	// present in the source. See internal/permission/taint.go.
+	permission.ClearTaint(sessionID)
 	// Append the new user message to the conversation history.
 	msgHistory := append(msgs, userMsg)
 

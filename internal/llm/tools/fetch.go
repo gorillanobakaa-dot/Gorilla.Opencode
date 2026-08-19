@@ -476,11 +476,20 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		ToolName:    FetchToolName,
 		Action:      "fetch",
 		Description: fmt.Sprintf("Fetch content from URL: %s", params.URL),
-		// GORILLA FIX (2026-08-19): scope the grant to THIS URL. Without it,
-		// "allow for session" on one fetch authorised every later fetch in the
-		// session — an exfiltration path, since a poisoned page can steer the
-		// model to a URL of its choosing and the user is never asked again.
-		GrantKey: params.URL,
+		// GORILLA FIX (2026-08-19): scope the grant. Without it, "allow for
+		// session" on one fetch authorised every later fetch in the session —
+		// an exfiltration path, since a poisoned page can steer the model to a
+		// URL of its choosing and the user is never asked again.
+		//
+		// The key is the HOST, not the full URL. Per-URL was the first
+		// attempt and it is the wrong granularity: reading documentation means
+		// dozens of pages on one site, so a per-URL grant produces a prompt
+		// per page, and a prompt that fires constantly is a prompt that gets
+		// answered without being read. Per-host still asks the question that
+		// matters — "why is it talking to THAT site?" — which is the question
+		// an exfiltration attempt fails.
+		GrantKey: fetchGrantKey(params.URL),
+		Egress:   true,
 		Params:   FetchPermissionsParams(params),
 	}) {
 		return ToolResponse{}, permission.ErrorPermissionDenied
@@ -619,7 +628,12 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	if len(notes) > 0 {
 		header += "\nHow: " + strings.Join(notes, "; ")
 	}
-	return NewTextResponse(header + "\n\n" + out), nil
+	// GORILLA FIX (2026-08-19): this returned the page raw. A fetched page is
+	// written by whoever controls that server; it is evidence, never
+	// instruction. MarkTainted is what stops the model acting on it — see
+	// permission.MarkTainted.
+	permission.MarkTainted(sessionID, fmt.Sprintf("web page fetched from %s", target))
+	return NewUntrustedTextResponse("web page", target, header, out), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -714,4 +728,15 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// fetchGrantKey reduces a URL to the thing a session grant should cover: the
+// scheme and host. Falls back to the whole URL if it will not parse, because
+// an unparseable key is still a narrower grant than no key at all.
+func fetchGrantKey(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return raw
+	}
+	return u.Scheme + "://" + u.Host
 }

@@ -2,6 +2,7 @@ package permission
 
 import (
 	"errors"
+	"path/filepath"
 	"slices"
 	"sync"
 	"time"
@@ -62,6 +63,11 @@ type CreatePermissionRequest struct {
 	// grant matched only ToolName+Action+SessionID+Path, with Params stored and
 	// never compared.
 	GrantKey string `json:"grant_key"`
+	// Egress marks a request that sends something OFF this machine — a fetch,
+	// a search, an MCP call to a remote server. Auto-approve does not cover
+	// egress unconditionally, because the sink is where a prompt injection
+	// gets paid. See mustAskAnyway.
+	Egress bool `json:"egress"`
 }
 
 type PermissionRequest struct {
@@ -74,6 +80,13 @@ type PermissionRequest struct {
 	Path        string `json:"path"`
 	// GrantKey — see CreatePermissionRequest.GrantKey.
 	GrantKey string `json:"grant_key"`
+	// Egress — see CreatePermissionRequest.Egress.
+	Egress bool `json:"egress"`
+	// AutoApproveOverridden records that this prompt is being shown DESPITE
+	// auto-approve being on, and why. The dialog says so: a prompt appearing
+	// in a mode the user believes is unattended is confusing unless it
+	// explains itself.
+	AutoApproveOverridden string `json:"auto_approve_overridden,omitempty"`
 }
 
 type Service interface {
@@ -197,19 +210,34 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	autoApproved := slices.Contains(s.autoApproveSessions, root) || slices.Contains(s.autoApproveSessions, opts.SessionID)
 	s.mu.RUnlock()
 
+	// GORILLA FIX (2026-08-19): this used to be an unconditional `return true`
+	// and it was the FIRST thing in the function — before grant matching,
+	// before anything. Auto-approve meant total, with zero carve-outs, so
+	// every "it's fine, the user gets asked" claim elsewhere in the codebase
+	// was false the moment YOLO was on.
+	//
+	// It now has carve-outs. Note the ordering: a carve-out does not deny, it
+	// falls THROUGH to the normal path, so a remembered grant still covers it
+	// and the user is asked once per thing rather than once per call.
+	override := ""
 	if autoApproved {
-		return true
+		override = s.mustAskAnyway(opts, root)
+		if override == "" {
+			return true
+		}
 	}
 	dir := normalisePermissionPath(opts.Path)
 	permission := PermissionRequest{
-		ID:          uuid.New().String(),
-		Path:        dir,
-		SessionID:   root,
-		ToolName:    opts.ToolName,
-		Description: opts.Description,
-		Action:      opts.Action,
-		Params:      opts.Params,
-		GrantKey:    opts.GrantKey,
+		ID:                    uuid.New().String(),
+		Path:                  dir,
+		SessionID:             root,
+		ToolName:              opts.ToolName,
+		Description:           opts.Description,
+		Action:                opts.Action,
+		Params:                opts.Params,
+		GrantKey:              opts.GrantKey,
+		Egress:                opts.Egress,
+		AutoApproveOverridden: override,
 	}
 
 	for _, p := range grants {
@@ -371,4 +399,37 @@ func PermissionWaitForTest(d time.Duration) func() {
 	prev := permissionWait
 	permissionWait = d
 	return func() { permissionWait = prev }
+}
+
+// mustAskAnyway returns the reason auto-approve does NOT cover this request,
+// or "" if it does.
+//
+// Three carve-outs, and each one is a sink rather than a source:
+//
+//  1. Egress. Whatever a hostile page talked the model into, it has to leave
+//     the machine to matter. This is the single control that turns "the model
+//     was tricked" into "the model was tricked and could not act on it".
+//  2. A path outside every configured root. Auto-approve is a statement about
+//     the work in front of you; it is not consent to touch ~/.ssh.
+//  3. A tainted turn. The conversation has read something a stranger wrote,
+//     so the next action is not necessarily the user's idea.
+//
+// It does not deny anything. It only declines to skip the question.
+func (s *permissionService) mustAskAnyway(opts CreatePermissionRequest, root string) string {
+	if opts.Egress {
+		if reason, ok := TaintOf(root); ok {
+			return "this leaves the machine, and this turn has already read untrusted content (" + reason.Reason + ")"
+		}
+		return "this sends a request off the machine"
+	}
+	if IsTainted(root) {
+		reason, _ := TaintOf(root)
+		return "this turn has already read untrusted content (" + reason.Reason + ")"
+	}
+	if p := opts.Path; p != "" && p != "." && filepath.IsAbs(p) {
+		if _, inRoot := config.RootFor(p); !inRoot {
+			return "this targets " + p + ", which is outside every workspace root"
+		}
+	}
+	return ""
 }

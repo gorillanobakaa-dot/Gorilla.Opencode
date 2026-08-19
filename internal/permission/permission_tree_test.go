@@ -12,6 +12,8 @@ package permission
 import (
 	"testing"
 	"time"
+
+	"github.com/opencode-ai/opencode/internal/config"
 )
 
 func req(session, tool string) CreatePermissionRequest {
@@ -92,6 +94,24 @@ func TestGrantDoesNotCrossConversations(t *testing.T) {
 
 // YOLO covers the whole tree, and can be switched back off.
 func TestYoloCoversTheTreeAndRevokes(t *testing.T) {
+	// AMENDED 2026-08-19: this used req(), whose Path is the fixed literal
+	// "/tmp/project". That was fine while auto-approve was unconditional. It
+	// is not fine now: an out-of-root path is one of the three carve-outs
+	// (see carveout_test.go), so the request correctly raised a prompt and
+	// this test blocked on it for the full permission wait.
+	//
+	// The path is changed rather than the carve-out, because what this test is
+	// FOR is tree coverage and revocation, not path scope. Using a real
+	// workspace root keeps it testing that.
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	inRoot := func(session, tool string) CreatePermissionRequest {
+		r := req(session, tool)
+		r.Path = config.WorkingDirectory()
+		return r
+	}
+
 	s := NewPermissionService().(*permissionService)
 	s.RegisterChildSession("helper-a1", "conversation")
 
@@ -103,7 +123,7 @@ func TestYoloCoversTheTreeAndRevokes(t *testing.T) {
 	if !s.IsAutoApproved("helper-a1") {
 		t.Errorf("a helper does not see the conversation's YOLO stance")
 	}
-	if !s.Request(req("helper-a1", "bash")) {
+	if !s.Request(inRoot("helper-a1", "bash")) {
 		t.Errorf("YOLO did not approve a helper's request")
 	}
 

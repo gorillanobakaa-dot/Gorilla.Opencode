@@ -888,6 +888,7 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		Description: fmt.Sprintf("Search %s for: %s", source, params.Query),
 		// Grant covers THIS query, not every search in the session.
 		GrantKey: params.Query,
+		Egress:   true,
 		Params:   params,
 	}) {
 		return ToolResponse{}, permission.ErrorPermissionDenied
@@ -1033,5 +1034,10 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		}
 		fmt.Fprintf(&sb, "   via: %s\n", h.Backend)
 	}
-	return NewTextResponse(sb.String()), nil
+	// GORILLA FIX (2026-08-19): search results are titles, abstracts and
+	// snippets written by whoever published the page. They came back raw and
+	// undelimited, sitting in the history looking exactly like the user's own
+	// words. See untrusted.go.
+	permission.MarkTainted(sessionID, fmt.Sprintf("web search results for %q", params.Query))
+	return NewUntrustedTextResponse("search results", source, "", sb.String()), nil
 }

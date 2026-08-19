@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
@@ -45,7 +46,7 @@ func (b *mcpTool) Info() tools.ToolInfo {
 	}
 }
 
-func runTool(ctx context.Context, c MCPClient, toolName string, input string) (tools.ToolResponse, error) {
+func runTool(ctx context.Context, c MCPClient, serverName, toolName string, input string) (tools.ToolResponse, error) {
 	defer c.Close()
 	initRequest := mcp.InitializeRequest{}
 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
@@ -71,16 +72,28 @@ func runTool(ctx context.Context, c MCPClient, toolName string, input string) (t
 		return tools.NewTextErrorResponse(err.Error()), nil
 	}
 
-	output := ""
-	for _, v := range result.Content {
-		if v, ok := v.(mcp.TextContent); ok {
-			output = v.Text
+	// GORILLA FIX (2026-08-19): this was `output = v.Text` inside the loop —
+	// plain assignment, not append. A server returning several content blocks
+	// had every block but the last silently discarded, and the result looked
+	// perfectly well-formed, so there was nothing to notice. Multi-block
+	// results are normal in MCP: one block of prose and one of structured
+	// data is the common shape.
+	var out strings.Builder
+	for i, v := range result.Content {
+		if i > 0 {
+			out.WriteString("\n")
+		}
+		if tc, ok := v.(mcp.TextContent); ok {
+			out.WriteString(tc.Text)
 		} else {
-			output = fmt.Sprintf("%v", v)
+			fmt.Fprintf(&out, "%v", v)
 		}
 	}
 
-	return tools.NewTextResponse(output), nil
+	// An MCP server is third-party code returning third-party content. It is
+	// exactly the shape untrusted.go exists for: the model must be able to
+	// tell a server's output from its operator's instructions.
+	return tools.NewUntrustedTextResponse("MCP server", serverName, "", out.String()), nil
 }
 
 func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolResponse, error) {
@@ -102,6 +115,10 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 			// one call must not authorise every later call to that server with
 			// different arguments.
 			GrantKey: params.Input,
+			// An MCP server may be a remote HTTP endpoint. Stdio servers are
+			// local processes, but a local process is free to open a socket,
+			// so both count as egress for the auto-approve carve-out.
+			Egress: true,
 		},
 	)
 	if !p {
@@ -118,8 +135,18 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 		if err != nil {
 			return tools.NewTextErrorResponse(err.Error()), nil
 		}
-		return runTool(ctx, c, b.tool.Name, params.Input)
+		tools.MarkMCPTaint(sessionID, b.mcpName)
+		return runTool(ctx, c, b.mcpName, b.tool.Name, params.Input)
 	case config.MCPSse:
+		// GORILLA FIX (2026-08-19): this dialled whatever URL was in config
+		// with no check at all, while fetch.go twenty files away has a
+		// three-layer SSRF guard. `http://169.254.169.254/latest/meta-data/`
+		// was a valid MCP server address until this line existed.
+		if reason := tools.BlockedMCPTarget(b.mcpConfig.URL); reason != "" {
+			return tools.NewTextErrorResponse(fmt.Sprintf(
+				"Refusing to contact MCP server %q at %s: %s",
+				b.mcpName, b.mcpConfig.URL, reason)), nil
+		}
 		c, err := client.NewSSEMCPClient(
 			b.mcpConfig.URL,
 			client.WithHeaders(b.mcpConfig.Headers),
@@ -127,7 +154,8 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 		if err != nil {
 			return tools.NewTextErrorResponse(err.Error()), nil
 		}
-		return runTool(ctx, c, b.tool.Name, params.Input)
+		tools.MarkMCPTaint(sessionID, b.mcpName)
+		return runTool(ctx, c, b.mcpName, b.tool.Name, params.Input)
 	}
 
 	return tools.NewTextErrorResponse("invalid mcp type"), nil

@@ -210,7 +210,23 @@ func (p *permissionDialogCmp) renderHeader() string {
 		Width(p.width - lipgloss.Width(pathKey)).
 		Render(fmt.Sprintf(": %s", p.permission.Path))
 
-	headerParts := []string{
+	headerParts := []string{}
+
+	// GORILLA FIX (2026-08-19): a prompt that appears while auto-approve is ON
+	// must say why it appeared. Without this the user sees a dialog in the
+	// mode they switched on precisely to stop seeing dialogs, concludes the
+	// setting is broken, and stops reading them — which is the failure mode
+	// the whole carve-out was built to avoid. See permission.mustAskAnyway.
+	if reason := p.permission.AutoApproveOverridden; reason != "" {
+		headerParts = append(headerParts,
+			baseStyle.Foreground(t.Warning()).Bold(true).Width(p.width).
+				Render("Asking even though auto-approve is on:"),
+			baseStyle.Foreground(t.Warning()).Width(p.width).Render(reason),
+			baseStyle.Render(strings.Repeat(" ", p.width)),
+		)
+	}
+
+	headerParts = append(headerParts,
 		lipgloss.JoinHorizontal(
 			lipgloss.Left,
 			toolKey,
@@ -223,7 +239,7 @@ func (p *permissionDialogCmp) renderHeader() string {
 			pathValue,
 		),
 		baseStyle.Render(strings.Repeat(" ", p.width)),
-	}
+	)
 
 	// Add tool-specific header information
 	switch p.permission.ToolName {
