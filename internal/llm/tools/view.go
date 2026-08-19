@@ -54,12 +54,21 @@ FEATURES:
 - Automatically truncates very long lines for better display
 - Suggests similar file names when the requested file isn't found
 
+IMAGES AND SCREENSHOTS:
+- Point this at a .png/.jpg/.webp screenshot or scan and it RETURNS THE TEXT IN IT, read
+  locally with OCR. Never say you cannot read an image without trying: try it first.
+- What comes back is a TRANSCRIPTION, not the picture. It can misread similar shapes and
+  loses layout, so quote it as "the image appears to say" and flag anything garbled.
+- It reads WORDS only. It cannot tell you what a photograph depicts, what colour something
+  is, or where things sit on screen.
+- If this machine has no OCR installed, the answer says so and gives the one command that
+  fixes it. That is a real answer - pass it on rather than guessing at the contents.
+
 LIMITATIONS:
 - Maximum file size is 5MB
 - Default reading limit is 2000 lines
 - Lines longer than 2000 characters are truncated
-- Cannot display binary files or images
-- Images can be identified but not displayed
+- Cannot display binary files that are not images
 
 TIPS:
 - Use the find tool first to locate files, then View to examine them
@@ -168,11 +177,43 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		params.Limit = FlexInt(DefaultReadLimit)
 	}
 
-	// Check if it's an image file
-	isImage, imageType := isImageFile(filePath)
-	// TODO: handle images
-	if isImage {
-		return NewTextErrorResponse(fmt.Sprintf("This is an image file of type: %s\nUse a different tool to process images", imageType)), nil
+	// GORILLA OVERRIDE (2026-08-19): read the words out of it.
+	//
+	// This was `// TODO: handle images` and a refusal telling the model to
+	// "use a different tool" — a different tool that does not exist. That
+	// refusal is what produced the whole tooling proposal: a model reported it
+	// could not read a screenshot while tesseract sat installed on the same
+	// machine, unused, because nothing connected the two.
+	//
+	// Before this was written the owner watched a model route around it
+	// anyway: `command -v tesseract`, then its own `for f in *.png; do
+	// tesseract "$f" -` pipeline through bash. It worked, after several turns,
+	// one malformed command and a permission prompt per attempt. The
+	// capability was reachable and the route was terrible. This is the same
+	// power without the trial and error.
+	if isImage, imageType := isImageFile(filePath); isImage {
+		if !OCRAvailable() {
+			return NewTextErrorResponse(noOCRMessage(filePath, imageType)), nil
+		}
+		res, err := OCRImage(ctx, filePath)
+		if err != nil {
+			return NewTextErrorResponse(fmt.Sprintf(
+				"Could not read text out of %s (%s): %v", filePath, imageType, err)), nil
+		}
+		if res.Empty {
+			// A real answer, not a failure. A photograph of a landscape has no
+			// words in it, and saying "no text found" is different from
+			// saying the read failed.
+			return NewTextResponse(fmt.Sprintf(
+				"No text found in %s (%s). OCR ran successfully and the image contains no "+
+					"words it could recognise - it may be a photograph, a diagram, or text too "+
+					"small or low-contrast to read.", filePath, imageType)), nil
+		}
+		recordFileRead(filePath)
+		return WithResponseMetadata(
+			NewTextResponse(ocrHeader(filePath, res)+"\n<image_text>\n"+res.Text+"\n</image_text>\n"),
+			ViewResponseMetadata{FilePath: filePath},
+		), nil
 	}
 
 	// Read the file content
