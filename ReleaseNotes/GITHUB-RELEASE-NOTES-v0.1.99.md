@@ -1,0 +1,250 @@
+# Gorilla OpenCode v0.1.99 — /arsenal
+
+**Everything you need is on this page**, printed in full.
+
+## Download
+
+| File | For |
+|---|---|
+| `gorilla-opencode_0.1.99_amd64.deb` | Debian, Ubuntu, Mint — `sudo apt install ./gorilla-opencode_0.1.99_amd64.deb` |
+| `gorilla-opencode-0.1.99-1-x86_64.pkg.tar.zst` | Arch, CachyOS, Manjaro — `sudo pacman -U ...` |
+| `gorilla-opencode-linux-x86_64.tar.gz` | Any Linux, no installer |
+| `SHA256SUMS-v0.1.99.txt` | `sha256sum -c` |
+
+Use `apt`, not `dpkg -i`. Restart the program if it is already running.
+
+---
+
+## In one paragraph
+
+A model was asked to read a screenshot and said it could not read images. The
+tool that reads text out of pictures was already installed on that machine. The
+capability had been sitting there, unused, because nothing ever told anybody it
+existed. `/arsenal` is the fix: type it, and the program checks your machine for
+about thirty capabilities and shows what you have, what you do not, what each
+one would let the AI do, what will disappoint you about it, and exactly what the
+missing ones cost — measured by your own package manager, in minutes as well as
+megabytes. It installs nothing and never asks for your password.
+
+---
+
+## Plain-language track
+
+### The thing that started this
+
+Yesterday somebody asked the AI to read a screenshot. It said it could not read
+images.
+
+That was true of the AI and false of the computer. The tool that reads text out
+of pictures — tesseract — was already installed on that machine, working, and
+had been for months. Nothing had ever told anybody it was there.
+
+That is not a missing feature. **It is a missing map.**
+
+Nobody stumbles across `binwalk`, or `sleuthkit`, or `ssdeep`, or `libesedb`.
+You cannot ask for something you do not know exists. So the barrier was never
+the download — plenty of people are willing to leave a machine downloading
+overnight. The barrier was that nobody ever tells you what is out there.
+
+### What `/arsenal` is
+
+Type `/arsenal` and the program checks **your** machine for about thirty
+capabilities, and shows you three things: what you already have, what you do
+not, and exactly what the missing ones would cost you.
+
+Not a list of package names. For every single one, in plain words:
+
+- **What it is**, written for somebody who has never heard of it.
+- **What the AI would be able to do** that it cannot do now.
+- **What will disappoint you about it** — the part almost no documentation
+  tells you, and the part you most need.
+- **The exact command** to get it, for your system.
+
+Eight groups: the minimum that makes the agent work properly, documents,
+media, coding, forensics, Android and iOS, Windows files, and research.
+
+### Slackware, and why
+
+The model here is the old Slackware installer — the text one that let you pick
+your system apart down to individual libraries, with a one-line description of
+every single package right where you chose it. That description is the part
+that taught people what existed.
+
+So: **take a whole group, walk it item by item, or pick single tools.** Three
+levels, always. `a` takes everything.
+
+### Costs are information, not a fence
+
+Press `p` and your own package manager works out what your selection really
+costs — including everything you already have, so the number is true for *your*
+machine rather than a worst case out of a table.
+
+Measured on the machine this was built on: everything missing is **134 MB to
+download, 424 MB on disk, about 4 hours and 40 minutes on a slow connection.**
+
+That number is there so you can decide. It is **not** there to talk you out of
+it. "Everything" is always one key away, and always will be. Somebody willing
+to leave a computer downloading for a night is not short of patience — they are
+short of a list of what exists, and that list costs nothing to give away.
+
+The time is shown as well as the megabytes, because megabytes hide the cost
+from exactly the person who most needs to see it.
+
+### It never installs anything
+
+`/arsenal` does not install software and never asks for your password. It shows
+you the command, in full, and says plainly that you are the one who runs it.
+
+That is not caution for its own sake. Yesterday's release was a security audit
+whose central finding was that a question describing something other than what
+is about to happen is worse than no question at all. An installer is the
+highest-stakes prompt there is, so this one does not pretend to be a prompt —
+it hands you the command and gets out of the way.
+
+Everything listed is free. Nothing needs an account. Nothing needs a card.
+
+### Selections are files you can share
+
+Press `s` and your selection is saved as an ordinary text file — one name per
+line, with a comment saying what each thing is, so it explains itself to
+whoever opens it. Press `L` to load one back.
+
+This matters more than it looks. Somebody who works out a good forensics
+selection can post that file, and the next person gets the map for free. That is
+the whole point of the project, pointed at tooling.
+
+### Three things that were wrong, caught by using it
+
+Not by the tests. By running the real program and looking at the screen.
+
+**A tool with no package for your system was priced at zero** — which, sitting
+next to "not installed", reads as *free*. It is not free, it is unobtainable
+that way, and those are opposite facts. That is exactly the mistake the rest of
+this code is written to avoid, and it turned up in my own work within the hour.
+
+**A tool that was installed was reported as missing.** ast-grep answers to two
+different names depending on how it was installed, and the check demanded both.
+So the machine said "you do not have this" about something it had — which is
+the *exact* bug this whole feature exists to fix, reproduced inside the fix.
+
+**Pressing the install key sent the command to the AI to be explained.** That is
+a full paid AI turn, every press, to repeat information the program already
+carries in plain words. For people paying per use, a screen that quietly spends
+money when you press a key is a screen you learn not to press. It now writes the
+plan itself, for nothing.
+
+---
+
+## Developer track
+
+### Scope
+
+One commit. New package `internal/arsenal`, new dialog, new command, no changes
+to any existing behaviour.
+
+### The manifest
+
+`internal/arsenal/manifest.json`, 30 KB, `//go:embed`-ed. 33 entries across 8
+series. Per entry: `teaches`, `unlocks`, `detect`, `packages` (apt + pacman),
+`needs`, `tier`, `caveats`.
+
+`TestEveryEntryTeachesSomething` enforces the schema as a contract: unique ids,
+a `teaches` of at least 12 words, non-empty `unlocks`, `detect`, `caveats` and
+`packages`, a valid tier. The manifest is a teaching document that happens to be
+machine-readable, so a field that does not teach and does not decide is bloat in
+the binary.
+
+### Detection
+
+`DetectEntry` uses `exec.LookPath` only — measured, never asserted.
+`TestDetectionAgreesWithTheActualMachine` re-checks every claim against
+`LookPath` independently.
+
+`Detect.Mode` is `all` (default) or `any`.
+`TestAnyModeIsOnlyUsedWhereTheNamesAreAlternatives` pins the five entries
+allowed to use `any`, so it cannot spread to an entry where one binary would
+falsely claim a whole capability.
+
+`Status.Partial()` distinguishes half-installed from absent: "you have
+pdftotext but not pdfimages" is actionable; "not installed" for the same state
+is misleading.
+
+### Cost
+
+`MeasureCost` shells `apt-get --print-uris install -y` (or `pacman -Sp
+--print-format %s`) under `LC_ALL=C` — a decimal comma would silently turn
+29.5 MB into 295 MB — and installs nothing. It resolves the full dependency
+closure against what is already present, which is why it beats any static table:
+the research measured a **147x** gap between a loaded desktop and a fresh
+netinst for the same package.
+
+`Cost.Measured` and `Cost.Note` exist so an unmeasurable cost says so.
+`TestAnUnmeasurableCostSaysSoRatherThanShowingZero`: a zero reads as free.
+
+`Available()` / `UnavailableNote()` separate "free" from "not obtainable here" —
+added after the first live run priced ast-grep at 0 B on Debian.
+
+Pricing runs as a `tea.Cmd`, not inline: apt takes a second or two and a screen
+that freezes on open is a screen people stop opening.
+
+### The page
+
+Four views — series, entries, detail, plan — with space selecting at whatever
+granularity is on screen. `a` everything, `n` none, `p` price, `i` plan, `s`
+save, `L` load.
+
+`TestNoLineIsWiderThanTheTerminal` walks all four views at 60, 80, 100 and 160
+columns. Bubbletea's inline renderer erases by moving up N *logical* lines; an
+over-wide line takes two *physical* rows and counts as one, so the erase
+under-reaches every frame and the footer walks down the screen. That cost three
+releases and three wrong diagnoses, so a new full-screen page asserts it from
+the start. Text is truncated, never `.Width()`-wrapped, and `wrapPlain` does
+word wrapping explicitly so line counts are known.
+
+### Tagfiles
+
+Plain text, one id per line, `#` comments, titles written in as comments.
+`LoadTagfile` returns unknown ids rather than dropping them — a tagfile from a
+newer build naming a capability this one lacks is a fact the user should hear.
+Loading skips already-present entries so a shared selection cannot inflate the
+cost with things you have.
+
+### Verification
+
+Headless assertions for all four views plus the width invariant. Then driven
+live in a detached GNU screen against the real binary: series list with
+per-series counts, into a series, into a detail page, selecting, pricing against
+real apt (38 KB / 101 KB / "about 5 seconds" for one entry; 134.0 MB / 424.0 MB
+/ "about 4.7 hours" for everything), the install plan with the unavailable entry
+flagged separately, and a tagfile written to `~/.cache/gorilla-opencode/arsenal/`
+and read back.
+
+All three of the defects listed in the plain-language track were found in that
+live run, not by `go test`.
+
+### Declared residual risk
+
+- The manifest is hand-curated from the research proposal. Package names are
+  correct for Debian 13 and Arch as of 2026-08-19 and will drift.
+- `zbarimg` decode accuracy was never measured; the entry's caveat says so.
+- `libyal` has no Arch packages listed; the entry says so rather than pretending.
+- Costs come from the package manager and are as right as its index is fresh.
+
+### Claim Sources
+
+| Claim | Basis | Evidence |
+|---|---|---|
+| 24 present / 9 missing on this machine | 📄 stated in input | Live run, header line on screen. |
+| 134.0 MB / 424.0 MB / ~4.7 hours for everything | 📄 stated in input | Live run, apt-get --print-uris via the page. |
+| 38 KB / 101 KB / ~5 seconds for zbar-tools | 📄 stated in input | Live run, same path. |
+| ast-grep was reported missing while installed | 📄 stated in input | Live run before the fix; `sg --version` prints ast-grep 0.43.0. |
+| An unpackaged entry priced at 0 B | 📄 stated in input | First cost-probe run; the `coding` series showed 0 B with one missing. |
+| Tagfile round-trips | 📄 stated in input | File read from disk after a live save; contents in the commit message. |
+| No line exceeds the terminal width | 📄 stated in input | `TestNoLineIsWiderThanTheTerminal`, four widths, four views. |
+| 147x install-cost gap between baselines | 📄 stated in input | Measured in the research proposal, not re-measured here. |
+| These 33 are the right 33 | 🤖 model inference | Curated from the proposal's research lanes. Opinion — argue with it. |
+| The manifest is worth 30 KB in the binary | 🤖 model inference | A judgement about the trade between binary size and discoverability. |
+| Per-machine cost beats a static table | 🤖 model inference | Reasoned from the 147x measurement; the reasoning is the inference. |
+
+`📄 stated in input` — produced by a named command, or present in quoted source.
+`🤖 model inference` — the model's own judgement. Treat as reasoned opinion.

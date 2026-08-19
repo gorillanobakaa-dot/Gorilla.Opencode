@@ -1,3 +1,40 @@
+## v0.1.99 — 2026-08-19 — /arsenal
+
+**Plain-language version:** yesterday somebody asked the AI to read a
+screenshot and it said it could not read images. That was true of the AI and
+false of the computer — tesseract, the tool that reads text out of pictures,
+was already installed on that machine and had been for months. Nothing had ever
+told anybody it was there.
+
+That is not a missing feature, it is a missing MAP. Nobody stumbles across
+binwalk or sleuthkit or ssdeep, and you cannot ask for something you do not know
+exists. The barrier was never the download — plenty of people will leave a
+machine going overnight. The barrier is that nobody tells you what is out there.
+
+So: type /arsenal and the program checks YOUR machine for about thirty
+capabilities and shows what you have, what you do not, and what the rest would
+cost. For every single one, in plain words: what it is, what the AI could then
+do, what will disappoint you about it, and the exact command to get it.
+Slackware style — take a whole group, walk it item by item, or pick single
+tools.
+
+Press p and your own package manager works out the real cost, counting what you
+already have, so the number is true for your machine and not a worst case from a
+table. On the machine this was built on, everything missing is 134 MB to
+download and about four and a half hours on a slow line. That number is there so
+you can decide — not to talk you out of it. "Everything" is always one key away.
+
+It never installs anything and never asks for your password: it shows the
+command and you run it. Everything listed is free and needs no account. Press s
+and your selection saves as an ordinary text file you can hand to somebody
+else — which is the point, because then the next person gets the map for free.
+
+Three things were wrong and were caught by USING it rather than by any test: a
+tool with no package for your system was priced at zero, which reads as free
+when it actually means unobtainable; a tool that WAS installed was reported
+missing because it answers to two names; and pressing the install key spent a
+paid AI turn to explain what the program already knew.
+
 ## v0.1.98 — 2026-08-19 — the sink, not just the source
 
 **Plain-language version:** every safety check in this program protected the
