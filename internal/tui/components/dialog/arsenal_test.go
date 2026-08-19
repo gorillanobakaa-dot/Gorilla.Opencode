@@ -240,3 +240,102 @@ func TestLoadingWithNoTagfileSaysSoRatherThanFailingSilently(t *testing.T) {
 		t.Fatal("loading a selection that does not exist did nothing and said nothing")
 	}
 }
+
+// GORILLA OVERRIDE (2026-08-19), reported by the owner within minutes of the
+// release: "is it me or space does not select anything? p also does not list
+// the costs."
+//
+// It was not him and it was not the key. The page opens with the cursor on
+// "The minimum", which on his machine is 8/8 ALREADY INSTALLED — so space
+// correctly selected nothing and said nothing, and p then correctly priced an
+// empty selection and also said nothing. Two keys doing exactly the right
+// thing and looking completely broken.
+//
+// Directive §3 arriving in a UI: silence and success must never look alike.
+// Every test here called toggle() on entries chosen to be missing, which is
+// why none of them could see it.
+func TestPressingSpaceOnAFullyInstalledGroupSaysSo(t *testing.T) {
+	m := NewArsenalCmp()
+	m.SetSize(120, 40)
+
+	var full []string
+	for _, s := range m.man.Series {
+		all := len(s.Entries) > 0
+		for _, e := range s.Entries {
+			if !m.status[e.ID].Present {
+				all = false
+			}
+		}
+		if all {
+			for _, e := range s.Entries {
+				full = append(full, e.ID)
+			}
+			break
+		}
+	}
+	if full == nil {
+		t.Skip("no fully-installed series on this machine")
+	}
+
+	m.toggle(full)
+	if m.notice == "" {
+		t.Fatal("selecting a group that is entirely installed did nothing and said nothing — " +
+			"indistinguishable from a broken key")
+	}
+	if !strings.Contains(m.notice, "already installed") {
+		t.Errorf("the message does not explain why nothing happened: %q", m.notice)
+	}
+	if !strings.Contains(m.View(), "already installed") {
+		t.Error("the explanation was set but never rendered")
+	}
+}
+
+// Pressing p with nothing selected is the second half of the same report.
+func TestPricingNothingSaysWhichKeySelects(t *testing.T) {
+	m := NewArsenalCmp()
+	m.SetSize(120, 40)
+	if cmd := m.price(); cmd != nil {
+		t.Error("priced an empty selection instead of explaining")
+	}
+	if !strings.Contains(m.notice, "space") {
+		t.Fatalf("the message does not say which key selects: %q", m.notice)
+	}
+}
+
+// A successful selection must confirm itself too, or the user is guessing.
+func TestASuccessfulSelectionConfirmsWhatItDid(t *testing.T) {
+	m := NewArsenalCmp()
+	m.SetSize(120, 40)
+	var missing string
+	for _, s := range m.man.Series {
+		for _, e := range s.Entries {
+			if !m.status[e.ID].Present {
+				missing = e.ID
+			}
+		}
+	}
+	if missing == "" {
+		t.Skip("everything is installed on this machine")
+	}
+	m.toggle([]string{missing})
+	if !strings.Contains(m.notice, "selected 1") {
+		t.Fatalf("a real selection did not confirm itself: %q", m.notice)
+	}
+	m.toggle([]string{missing})
+	if !strings.Contains(m.notice, "un-selected") {
+		t.Errorf("un-selecting did not confirm itself: %q", m.notice)
+	}
+}
+
+// The key dispatch must not throw away what the handler did. `return m,
+// m.price()` reads `m` at a moment the spec does not pin down.
+func TestKeyHandlersMutationsSurviveTheReturn(t *testing.T) {
+	m := NewArsenalCmp()
+	m.SetSize(120, 40)
+	var model tea.Model = m
+	// p with nothing selected sets a notice and nothing else.
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	if model.(ArsenalCmp).notice == "" {
+		t.Fatal("the notice set inside the p handler did not survive the return")
+	}
+}

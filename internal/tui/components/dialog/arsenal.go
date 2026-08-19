@@ -195,25 +195,73 @@ func (m ArsenalCmp) seriesIDs(s arsenal.Series) []string {
 	return ids
 }
 
+// toggle flips a group, and REPORTS what it did.
+//
+// GORILLA FIX (2026-08-19), found by the owner within minutes of the release:
+// "is it me or space does not select anything?"
+//
+// It was not him, and it was not the key. The page opens with the cursor on
+// the first series — "The minimum" — which on his machine is 8/8 ALREADY
+// INSTALLED. So space correctly selected nothing, and then said nothing, and
+// the next key (p, price it) correctly priced an empty selection and also said
+// nothing. Two keys in a row doing exactly the right thing and looking
+// completely broken.
+//
+// This is directive §3 arriving in a UI: silence and success must never look
+// alike. The behaviour was right; the absence of feedback was the bug, and it
+// was invisible to every test because the tests called toggle() on entries
+// chosen to be missing.
 func (m *ArsenalCmp) toggle(ids []string) {
-	// If everything in the group is already on, the key turns it off. That is
-	// what makes one key both "take this series" and "drop it".
+	selectable := 0
+	present := 0
+	for _, id := range ids {
+		if m.status[id].Present {
+			present++
+			continue
+		}
+		selectable++
+	}
+	if selectable == 0 {
+		switch {
+		case present == 0:
+			m.notice = "Nothing here to select."
+		case present == 1:
+			m.notice = "That one is already installed — nothing to select."
+		default:
+			m.notice = fmt.Sprintf("All %d of these are already installed — nothing to select.", present)
+		}
+		return
+	}
+
+	// If everything selectable in the group is already on, the key turns it
+	// off. That is what makes one key both "take this series" and "drop it".
 	allOn := true
 	for _, id := range ids {
 		if m.status[id].Present {
-			continue // nothing to select; already here
+			continue
 		}
 		if !m.selected[id] {
 			allOn = false
 			break
 		}
 	}
+	changed := 0
 	for _, id := range ids {
 		if m.status[id].Present {
 			continue
 		}
 		m.selected[id] = !allOn
+		changed++
 	}
+	verb := "selected"
+	if allOn {
+		verb = "un-selected"
+	}
+	m.notice = fmt.Sprintf("%s %d", verb, changed)
+	if present > 0 {
+		m.notice += fmt.Sprintf(" (%d already installed, skipped)", present)
+	}
+	m.notice += " — press p to measure the cost."
 }
 
 func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -221,6 +269,9 @@ func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyMsg:
+		// Cleared here so a message never outlives the key that caused it —
+		// but every branch below that does nothing visible MUST set it again,
+		// or the screen goes back to looking broken.
 		m.notice = ""
 		switch msg.String() {
 		case "esc", "q":
@@ -271,14 +322,27 @@ func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "n":
 			m.selected = map[string]bool{}
 			return m, nil
+		// GORILLA FIX (2026-08-19): these were `return m, m.price()`.
+		//
+		// The Go spec orders function CALLS left to right within a return
+		// statement, but says nothing about when a plain operand like `m` is
+		// read — so `m` could be copied BEFORE the method mutates it, and
+		// every notice and view change set inside would be silently thrown
+		// away. It happened to work with this compiler, which is the worst
+		// kind of working: correct by accident, on one toolchain, with no
+		// test that could tell.
 		case "p":
-			return m, m.price()
+			cmd := m.price()
+			return m, cmd
 		case "i":
-			return m, m.showPlan()
+			cmd := m.showPlan()
+			return m, cmd
 		case "s":
-			return m, m.saveTagfile()
+			cmd := m.saveTagfile()
+			return m, cmd
 		case "L":
-			return m, m.loadTagfile()
+			cmd := m.loadTagfile()
+			return m, cmd
 		case "?":
 			// Costs a model turn, so it is never the default path.
 			return m, m.emitInstall()
@@ -331,11 +395,15 @@ type arsenalPricedMsg struct {
 // price measures the current selection with the real package manager. It runs
 // as a command rather than inline because apt-get takes a second or two and a
 // screen that freezes on open is a screen people stop opening.
-func (m ArsenalCmp) price() tea.Cmd {
+func (m *ArsenalCmp) price() tea.Cmd {
 	ids := m.selectedIDs()
 	if len(ids) == 0 {
+		// Same failure as toggle's: pricing nothing is correct and looks
+		// broken. Say which key selects.
+		m.notice = "Nothing selected yet — space takes what the cursor is on, a takes everything."
 		return nil
 	}
+	m.notice = "measuring with " + pmName(m.pm) + "…"
 	pkgs, _, _ := m.installable(ids)
 	key := strings.Join(ids, ",")
 	pm := m.pm
@@ -715,7 +783,11 @@ func (m ArsenalCmp) View() string {
 	lines := m.lines()
 	visible := len(lines)
 	if m.height > 0 {
-		visible = max(5, m.height-6)
+		// Chrome is border(2) + padding(2) + the two trailing rows this View
+		// may append: the "more lines" marker and the notice. Reserved rather
+		// than hoped for — a frame taller than the window is the one case
+		// bubbletea genuinely cannot recover from.
+		visible = max(5, m.height-8)
 	}
 	top := m.scrollTop
 	if top > len(lines)-visible {
