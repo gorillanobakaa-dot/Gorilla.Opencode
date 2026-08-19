@@ -135,11 +135,91 @@ Working directory: %s
 Is directory a git repo: %s
 Platform: %s
 Today's date: %s
-</env>
+%s</env>
 <project_summary>
 %s
 </project_summary>
-%s`, cwd, boolToYesNo(isGit), platform, date, summary, extra)
+%s`, cwd, boolToYesNo(isGit), platform, date, userDirs(), summary, extra)
+}
+
+// userDirs tells the model where this machine actually keeps pictures,
+// downloads and documents.
+//
+// GORILLA OVERRIDE (2026-08-19), from a real run: asked to look in "my
+// screenshots folder", the agent ran a home-wide find for *screenshot*, got a
+// page of matches from inside other projects' documentation trees, tried a
+// second search that TIMED OUT AT 30 SECONDS, and finally fell back to
+// guessing /home/gorilla/Pictures through bash — about two minutes and three
+// tool calls to find a directory the operating system could have named
+// instantly.
+//
+// That was read as the model being limited. It is fairer to say the program
+// never told it. These paths are not a convention to be inferred, they are
+// configuration: XDG writes them to ~/.config/user-dirs.dirs and any desktop
+// Linux can print them. Localised installs make guessing actively wrong —
+// "Pictures" is "Bilder", "Imágenes", "画像" depending on the user's language,
+// so an English guess fails on exactly the machines this project is built for.
+//
+// Deliberately FACTS, not instructions: this block states where things are and
+// says nothing about what to do, which is what keeps it cheap. Measured at
+// roughly 30 tokens, only for the directories that actually exist, and it
+// rides the prompt.env row so anyone who does not want it can switch it off.
+func userDirs() string {
+	// Read the XDG config rather than shelling out to xdg-user-dir: no process
+	// per prompt render, and it works when xdg-utils is not installed.
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	raw, err := os.ReadFile(filepath.Join(home, ".config", "user-dirs.dirs"))
+	if err != nil {
+		return ""
+	}
+	// Three, not six. The full XDG set measured 66 tokens on every turn and
+	// Videos and Music are not a coding agent's business — if it ever needs
+	// them it can ask, and asking costs nothing until it happens. These three
+	// are the ones that prevent the failure that prompted this: where
+	// screenshots land, where downloads land, and where the user's own work
+	// lives. Measured at ~35 tokens.
+	want := map[string]string{
+		"XDG_DOWNLOAD_DIR":  "Downloads",
+		"XDG_DOCUMENTS_DIR": "Documents",
+		"XDG_PICTURES_DIR":  "Pictures (screenshots land here)",
+	}
+	order := []string{"XDG_DOCUMENTS_DIR", "XDG_DOWNLOAD_DIR", "XDG_PICTURES_DIR"}
+	found := map[string]string{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		if _, wanted := want[strings.TrimSpace(k)]; !wanted {
+			continue
+		}
+		v = strings.Trim(strings.TrimSpace(v), `"`)
+		v = strings.Replace(v, "$HOME", home, 1)
+		// Only claim a directory that is really there. A path the model is
+		// told about and cannot open is worse than silence.
+		if st, err := os.Stat(v); err != nil || !st.IsDir() {
+			continue
+		}
+		found[strings.TrimSpace(k)] = v
+	}
+	if len(found) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("This machine's standard folders:\n")
+	for _, k := range order {
+		if v, ok := found[k]; ok {
+			fmt.Fprintf(&b, "  %s: %s\n", want[k], v)
+		}
+	}
+	return b.String()
 }
 
 func isGitRepo(dir string) bool {

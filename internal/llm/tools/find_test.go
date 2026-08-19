@@ -216,7 +216,7 @@ func TestFindSlashGlobMatchesLikeTheExamples(t *testing.T) {
 
 func TestNormaliseGlob(t *testing.T) {
 	for in, want := range map[string]string{
-		"*.go":          "*.go",          // no slash: basename match, leave alone
+		"*.go":          "*.go", // no slash: basename match, leave alone
 		"src/**/*.ts":   "**/src/**/*.ts",
 		"!src/*.min.js": "!**/src/*.min.js",
 		"**/x/*.c":      "**/x/*.c", // already anchored
@@ -493,4 +493,33 @@ func TestFindModifiedOnlyFiltersToDirtyFiles(t *testing.T) {
 	assert.False(t, resp.IsError, "content: %s", resp.Content)
 	assert.Contains(t, resp.Content, "dirty.txt", "the uncommitted file must be listed")
 	assert.NotContains(t, resp.Content, "clean.txt", "committed-and-unchanged files must be filtered out")
+}
+
+// GORILLA OVERRIDE (2026-08-19), from a real run.
+//
+// Asked to look in "my screenshots folder", the agent searched the whole home
+// directory, hit this timeout, was told only "narrow it with path or glob",
+// and fell back to guessing a path through bash. Two minutes and three tool
+// calls for a directory the operating system can name instantly.
+//
+// "Narrow it" is true and useless. The caller has just told us the one thing
+// that would let us help — where it was looking. An error that says what to do
+// next is worth more than one that says what went wrong.
+func TestTheHomeDirectoryTimeoutSaysWhatToDoNext(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home directory")
+	}
+	if !withinHome(home, home) {
+		t.Fatal("a search rooted at the home directory was not recognised as one")
+	}
+	if withinHome(filepath.Join(home, "Documents"), home) {
+		t.Error("a search inside a subdirectory was treated as a whole-home search")
+	}
+	if withinHome("", home) {
+		t.Error("an empty path was treated as a home search")
+	}
+	if withinHome("/etc", home) {
+		t.Error("/etc was treated as a home search")
+	}
 }

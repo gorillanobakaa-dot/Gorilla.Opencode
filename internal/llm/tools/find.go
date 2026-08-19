@@ -475,8 +475,24 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	stderr := strings.TrimSpace(stderrBuf.String())
 
 	if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+		// GORILLA FIX (2026-08-19), from a real run: this used to say only
+		// "narrow it with path or glob", which is true and useless — the
+		// caller has just told us the ONE thing that would let us help, which
+		// is where it was looking and for what.
+		//
+		// Observed: asked for "my screenshots folder", the agent searched the
+		// whole home directory, timed out here, and fell back to guessing a
+		// path through bash. Two minutes and three tool calls for a directory
+		// the operating system can name instantly. An error that says what to
+		// do next is worth more than one that says what went wrong.
+		hint := "Narrow it: give a more specific path, or a glob that matches fewer files."
+		if home, err := os.UserHomeDir(); err == nil && withinHome(params.Path, home) {
+			hint = "You searched a whole home directory, which is usually thousands of files across " +
+				"unrelated projects. The standard folders are listed in the environment block at the " +
+				"top of this conversation — use one of those paths, or ask the user which folder they mean."
+		}
 		return NewTextErrorResponse(fmt.Sprintf(
-			"search timed out after %s. Narrow it with path or glob", findTimeout)), nil
+			"search timed out after %s. %s", findTimeout, hint)), nil
 	}
 	// Exit-code contract (grep convention, enforced in pfind.py's own __main__
 	// handler): 0 = matches, 1 = no matches, anything else = the search FAILED.
@@ -530,4 +546,17 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 			DurationS: elapsed.Round(time.Millisecond).String(),
 		},
 	), nil
+}
+
+// withinHome reports a search rooted at the home directory itself — the case
+// that reliably times out, because it walks every project on the machine.
+func withinHome(path, home string) bool {
+	if path == "" {
+		return false
+	}
+	p := path
+	if !filepath.IsAbs(p) {
+		p = filepath.Join(config.WorkingDirectory(), p)
+	}
+	return filepath.Clean(p) == filepath.Clean(home)
 }

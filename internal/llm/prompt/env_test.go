@@ -194,3 +194,56 @@ func itoa(i int) string {
 	}
 	return string(b[n:])
 }
+
+// GORILLA OVERRIDE (2026-08-19), from a real run: asked to look in "my
+// screenshots folder", the agent ran a home-wide find for *screenshot*, got a
+// page of hits from inside other projects' documentation trees, ran a second
+// search that TIMED OUT AT 30 SECONDS, and finally guessed
+// /home/gorilla/Pictures through bash. Two minutes and three tool calls for a
+// directory the operating system could have named instantly.
+//
+// That reads as a limited model. It is fairer to say the program never told it.
+// These paths are configuration, not convention — XDG writes them to
+// ~/.config/user-dirs.dirs — and on a localised install guessing is actively
+// wrong, because "Pictures" is "Bilder", "Imágenes" or "画像" depending on the
+// user's language. Guessing in English fails on exactly the machines this
+// project is built for.
+func TestTheEnvironmentBlockNamesTheStandardFolders(t *testing.T) {
+	got := userDirs()
+	if got == "" {
+		t.Skip("no ~/.config/user-dirs.dirs on this machine")
+	}
+	for _, want := range []string{"Pictures", "Downloads", "Documents"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the block does not name %s:\n%s", want, got)
+		}
+	}
+	// It rides EVERY turn, so its size is a recurring bill (directive 8). The
+	// full XDG set measured 66 tokens; three directories is ~41.
+	if tokens := len(got) / 4; tokens > 60 {
+		t.Errorf("the block is ~%d tokens per turn; it is meant to be about 41.\n"+
+			"Anything riding every turn is money taken repeatedly, not once.", tokens)
+	}
+}
+
+// A path the model is told about and cannot open is worse than silence.
+func TestOnlyDirectoriesThatExistAreClaimed(t *testing.T) {
+	got := userDirs()
+	if got == "" {
+		t.Skip("no user-dirs.dirs")
+	}
+	for _, line := range strings.Split(got, "\n") {
+		i := strings.LastIndex(line, ": ")
+		if i < 0 {
+			continue
+		}
+		p := strings.TrimSpace(line[i+2:])
+		if !strings.HasPrefix(p, "/") {
+			continue
+		}
+		st, err := os.Stat(p)
+		if err != nil || !st.IsDir() {
+			t.Errorf("the block claims %q, which is not a directory on this machine", p)
+		}
+	}
+}
