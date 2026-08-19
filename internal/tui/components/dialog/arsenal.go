@@ -463,7 +463,7 @@ func (m ArsenalCmp) planLines() []arsLine {
 	}
 
 	out = append(out, arsLine{"", ""}, arsLine{"h2", fmt.Sprintf("%d package(s)", len(pkgs))})
-	for _, l := range wrapPlain(strings.Join(pkgs, " "), 96) {
+	for _, l := range wrapPlain(strings.Join(pkgs, " "), maxInt(30, m.width-12)) {
 		out = append(out, arsLine{"mute", "  " + l})
 	}
 
@@ -482,7 +482,7 @@ func (m ArsenalCmp) planLines() []arsLine {
 		arsLine{"", ""},
 		arsLine{"h2", "Run this yourself"},
 		arsLine{"", ""})
-	for _, l := range wrapPlain(arsenal.InstallCommand(pkgs, m.pm), 96) {
+	for _, l := range wrapPlain(arsenal.InstallCommand(pkgs, m.pm), maxInt(30, m.width-12)) {
 		out = append(out, arsLine{"on", "  " + l})
 	}
 	out = append(out,
@@ -629,7 +629,7 @@ func (m ArsenalCmp) seriesLines() []arsLine {
 		}
 		out = append(out, arsLine{kind, fmt.Sprintf("%s%-46s %s", cursor, s.Title, tag)})
 		if i == m.seriesIdx {
-			for _, l := range wrapPlain(s.Why, 96) {
+			for _, l := range wrapPlain(s.Why, maxInt(30, m.width-14)) {
 				out = append(out, arsLine{"mute", "    " + l})
 			}
 		}
@@ -666,7 +666,7 @@ func (m ArsenalCmp) entryLines() []arsLine {
 		if i == m.entryIdx {
 			// The one-line description AT THE POINT OF CHOOSING is the part of
 			// the Slackware installer that actually taught people what exists.
-			for _, l := range wrapPlain(e.Teaches, 92) {
+			for _, l := range wrapPlain(e.Teaches, maxInt(30, m.width-17)) {
 				out = append(out, arsLine{"mute", "       " + l})
 			}
 			if n := arsenal.UnavailableNote(e, m.pm); n != "" {
@@ -699,7 +699,7 @@ func (m ArsenalCmp) detailLines() []arsLine {
 		out = append(out, arsLine{"mute", "not installed — looked for: " + strings.Join(e.Detect.Binaries, ", ")})
 	}
 	out = append(out, arsLine{"", ""}, arsLine{"h2", "What it is"})
-	for _, l := range wrapPlain(e.Teaches, 96) {
+	for _, l := range wrapPlain(e.Teaches, maxInt(30, m.width-10)) {
 		out = append(out, arsLine{"", l})
 	}
 
@@ -709,7 +709,7 @@ func (m ArsenalCmp) detailLines() []arsLine {
 	}
 
 	out = append(out, arsLine{"", ""}, arsLine{"h2", "What will disappoint you"})
-	for _, l := range wrapPlain(e.Caveats, 96) {
+	for _, l := range wrapPlain(e.Caveats, maxInt(30, m.width-10)) {
 		out = append(out, arsLine{"warn", l})
 	}
 
@@ -740,6 +740,22 @@ func pickVerb(on bool) string {
 		return "un-pick it"
 	}
 	return "pick it"
+}
+
+// truncateToWidth cuts a line to w DISPLAY COLUMNS, not runes.
+//
+// Rune counting is wrong here: an em-dash is one rune and one column, but CJK
+// and emoji are one rune and TWO, so a rune-counted line can still overflow.
+// lipgloss.Width measures what the terminal will actually draw.
+func truncateToWidth(s string, w int) string {
+	if w < 2 || lipgloss.Width(s) <= w {
+		return s
+	}
+	r := []rune(s)
+	for len(r) > 0 && lipgloss.Width(string(r))+1 > w {
+		r = r[:len(r)-1]
+	}
+	return string(r) + "…"
 }
 
 // wrapPlain wraps unstyled text at w columns on word boundaries. Done here
@@ -775,25 +791,58 @@ func (m ArsenalCmp) lines() []arsLine {
 	return m.seriesLines()
 }
 
+// View renders the page FULL SCREEN.
+//
+// GORILLA FIX (2026-08-19), owner's call: "you can always make the window
+// either bigger or full screen. That solves the problem."
+//
+// It does, and it is the better fix. The previous version sized the box to its
+// content and then had to reserve rows for the trailing notice and the "more
+// lines" marker, because those are appended AFTER the content is windowed —
+// so a full box plus a notice could render a frame taller than the terminal,
+// which is the one case bubbletea genuinely cannot recover from.
+//
+// Reserving rows treats the symptom. Taking the whole screen removes the
+// question: the budget is fixed, known before anything is rendered, and the
+// content scrolls inside it. It also just reads better — this page is a map
+// with long descriptions, and a centred box two thirds the width of the
+// terminal was throwing away the space that makes it legible.
 func (m ArsenalCmp) View() string {
 	t := theme.CurrentTheme()
 	base := styles.BaseStyle()
-	w := dialogWidth(m.width, 108, 6)
+
+	// Chrome, counted exactly rather than approximately.
+	//
+	// The border adds 2 columns and 2 rows OUTSIDE the styled width; the
+	// Padding(1,2) below adds 4 columns and 2 rows INSIDE it. So the box's
+	// styled width is m.width-2, and the usable text width is 4 narrower
+	// again. Getting this wrong is not a cosmetic error: every line then
+	// exceeds its own container, lipgloss WRAPS rather than overflowing, and
+	// the frame silently grows in HEIGHT — which is exactly the failure this
+	// whole change was meant to remove. Measured at 60x20 before the fix: a
+	// 27-row frame in a 20-row terminal.
+	boxW := max(24, m.width-2)
+	w := max(20, boxW-4)
+	budget := max(5, m.height-4)
 
 	lines := m.lines()
-	visible := len(lines)
-	if m.height > 0 {
-		// Chrome is border(2) + padding(2) + the two trailing rows this View
-		// may append: the "more lines" marker and the notice. Reserved rather
-		// than hoped for — a frame taller than the window is the one case
-		// bubbletea genuinely cannot recover from.
-		visible = max(5, m.height-8)
+	// The notice and the overflow marker are part of the budget, not extra.
+	reserve := 0
+	if m.notice != "" {
+		reserve++
 	}
+	visible := max(1, budget-reserve)
 	top := m.scrollTop
 	if top > len(lines)-visible {
 		top = max(0, len(lines)-visible)
 	}
 	end := min(top+visible, len(lines))
+	if end < len(lines) {
+		// The marker takes one of the content rows rather than being added on
+		// top of them.
+		visible = max(1, visible-1)
+		end = min(top+visible, len(lines))
+	}
 
 	var b []string
 	for _, l := range lines[top:end] {
@@ -810,21 +859,28 @@ func (m ArsenalCmp) View() string {
 		case "mute":
 			st = st.Foreground(t.TextMuted())
 		}
-		text := l.text
 		// Truncate rather than let lipgloss wrap: an over-wide line costs a
 		// physical row the renderer does not count, which strands debris in
 		// the transcript on every frame.
-		if r := []rune(text); len(r) > w-1 {
-			text = string(r[:w-2]) + "…"
-		}
-		b = append(b, st.Render(text))
+		b = append(b, st.Render(truncateToWidth(l.text, w)))
 	}
 	if end < len(lines) {
 		b = append(b, base.Width(w).Foreground(t.TextMuted()).
 			Render(fmt.Sprintf("  … %d more line(s) — ↓ to continue", len(lines)-end)))
 	}
 	if m.notice != "" {
-		b = append(b, base.Width(w).Foreground(t.Warning()).Render(m.notice))
+		// Truncated like every other line. It was not, and a long notice
+		// wrapped to two rows — putting the frame one row over the terminal
+		// at 60x20, which is the exact bug the surrounding arithmetic exists
+		// to prevent, one line further down.
+		b = append(b, base.Width(w).Foreground(t.Warning()).Render(truncateToWidth(m.notice, w)))
+	}
+
+	// Pad to the full height so the frame is a constant size. A frame whose
+	// height changes is survivable, but a constant one is predictable, and
+	// predictable is what the renderer's erase arithmetic likes.
+	for len(b) < budget {
+		b = append(b, base.Width(w).Render(""))
 	}
 
 	content := lipgloss.JoinVertical(lipgloss.Left, b...)
@@ -832,7 +888,11 @@ func (m ArsenalCmp) View() string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(t.Primary()).
 		BorderBackground(styles.PanelBackground()).
-		Width(lipgloss.Width(content) + 4).
+		// boxW, not w: lipgloss counts padding INSIDE Width, so the box is
+		// told its full styled width and the lines are told the narrower text
+		// width. Passing w here made the box 4 columns too narrow for its own
+		// content, and lipgloss wraps rather than overflowing.
+		Width(boxW).
 		Render(content)
 }
 

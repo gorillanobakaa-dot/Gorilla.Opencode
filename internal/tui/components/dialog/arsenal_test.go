@@ -339,3 +339,56 @@ func TestKeyHandlersMutationsSurviveTheReturn(t *testing.T) {
 		t.Fatal("the notice set inside the p handler did not survive the return")
 	}
 }
+
+// GORILLA OVERRIDE (2026-08-19), owner's call: "you can always make the window
+// either bigger or full screen. That solves the problem."
+//
+// It does, and it is the better fix. Reserving rows for a trailing notice
+// treats the symptom; taking the whole screen removes the question — the
+// budget is fixed and known before anything renders, and the content scrolls
+// inside it.
+func TestThePageFillsTheScreenExactly(t *testing.T) {
+	for _, size := range []struct{ w, h int }{{80, 24}, {100, 30}, {160, 50}, {60, 20}, {200, 60}} {
+		m := NewArsenalCmp()
+		m.SetSize(size.w, size.h)
+		// Worst case: a notice AND more content than fits.
+		m.notice = "a notice that must not push the frame off the bottom of the terminal"
+
+		for _, view := range []arsenalView{viewSeries, viewEntries, viewDetail, viewPlan} {
+			m.view = view
+			out := m.View()
+			gotH := lipgloss.Height(out)
+			if gotH > size.h {
+				t.Errorf("%dx%d view %d: frame is %d rows tall, taller than the terminal",
+					size.w, size.h, view, gotH)
+			}
+			if gotH != size.h {
+				t.Errorf("%dx%d view %d: frame is %d rows, want exactly %d — a constant "+
+					"full-screen frame is the point", size.w, size.h, view, gotH, size.h)
+			}
+			for i, line := range strings.Split(out, "\n") {
+				if got := lipgloss.Width(line); got > size.w {
+					t.Errorf("%dx%d view %d line %d is %d cols wide", size.w, size.h, view, i, got)
+				}
+			}
+		}
+	}
+}
+
+// A notice must never cost the user a row of content silently — it is inside
+// the budget, and the overflow marker still appears when content is cut.
+func TestTheNoticeAndTheOverflowMarkerLiveInsideTheBudget(t *testing.T) {
+	m := NewArsenalCmp()
+	m.SetSize(100, 14) // deliberately short: content cannot fit
+	m.notice = "selected 2 — press p to measure the cost."
+	out := m.View()
+	if lipgloss.Height(out) != 14 {
+		t.Fatalf("frame is %d rows, want 14", lipgloss.Height(out))
+	}
+	if !strings.Contains(out, "more line") {
+		t.Error("content was cut with no marker saying so")
+	}
+	if !strings.Contains(out, "press p") {
+		t.Error("the notice was dropped to make room; it must be inside the budget, not extra")
+	}
+}

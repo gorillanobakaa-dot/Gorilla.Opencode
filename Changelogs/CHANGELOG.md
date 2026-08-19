@@ -1,3 +1,31 @@
+## v0.1.100 — 2026-08-19 — /arsenal says what it did
+
+**Plain-language version:** v0.1.99 shipped /arsenal, and within minutes the
+first person to use it reported that space selected nothing and p showed no
+costs. Both keys were working perfectly — and that was the problem. The page
+opens on the first group, "The minimum", and on that machine all eight of those
+tools were already installed. So space correctly selected nothing, and p then
+correctly priced an empty selection. Two keys doing exactly the right thing and
+looking completely broken.
+
+This project's own rules say it: silence and success must never look alike. The
+behaviour was right, the missing feedback was the bug. Every keypress now
+reports itself — "All 8 of these are already installed, nothing to select",
+"selected 2 (3 already installed, skipped), press p to measure the cost" — and
+then the cost appears as it always did.
+
+No test caught it because every test picked tools that were MISSING, since that
+is the interesting case. The uninteresting one is what the user hit first.
+
+The page is also full screen now, which was the owner's call over my smaller fix
+— and going there immediately exposed two real width bugs the smaller box had
+been hiding, one of which rendered a 27-row frame inside a 20-row terminal.
+
+While fixing all that, a defect turned up that nobody reported: four keys were
+written in a way where the program might have thrown away the work they had just
+done, depending on the compiler. It happened to work with this one, which is the
+worst kind of working. Written explicitly now, with a test.
+
 ## v0.1.99 — 2026-08-19 — /arsenal
 
 **Plain-language version:** yesterday somebody asked the AI to read a
