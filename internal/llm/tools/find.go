@@ -342,6 +342,25 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		return NewTextErrorResponse(why), nil
 	}
 
+	// GORILLA FIX (2026-08-19): refuse a doomed search UP FRONT rather than
+	// spending thirty seconds discovering it is doomed.
+	//
+	// From a real run: asked "what is in my screenshots folder", a model ran a
+	// CONTENT search (query) rooted at the home directory. That reads inside
+	// every file on the machine — every source file, every PDF, every git
+	// object — to look for a folder name. It timed out, and the model then
+	// fell back to guessing paths through bash.
+	//
+	// The wider point, and the owner's: teaching a model where Pictures lives
+	// is not a scalable answer, because there is always another convention.
+	// Making the WRONG TOOL CALL FAIL FAST AND SAY WHY costs zero tokens,
+	// works for every model including ones not yet released, and does not have
+	// to be repeated on every turn. A tool that lets you walk into a
+	// thirty-second wall and then shrugs is the actual defect.
+	if why := doomedContentSearch(params, searchPath); why != "" {
+		return NewTextErrorResponse(why), nil
+	}
+
 	if params.Query == "" && params.Glob == "" {
 		// Listing mode still needs a shape; a bare directory listing is what
 		// the old ls tool did, so keep that behaviour rather than erroring.
@@ -559,4 +578,36 @@ func withinHome(path, home string) bool {
 		p = filepath.Join(config.WorkingDirectory(), p)
 	}
 	return filepath.Clean(p) == filepath.Clean(home)
+}
+
+// doomedContentSearch catches the one shape that cannot succeed: reading the
+// contents of every file under a whole home directory (or higher).
+//
+// Deliberately narrow. It refuses a search NOBODY wants — nothing useful comes
+// from grepping an entire home directory through an agent — and says what to
+// use instead. It does not try to guess whether other searches are "too big";
+// a guess that blocks a legitimate search is worse than a timeout.
+func doomedContentSearch(params FindParams, searchPath string) string {
+	if params.Query == "" {
+		return "" // a name/glob search is cheap even over a large tree
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	clean := filepath.Clean(searchPath)
+	tooBig := clean == filepath.Clean(home) || clean == "/" ||
+		clean == "/home" || clean == "/usr" || clean == "/var"
+	if !tooBig {
+		return ""
+	}
+	return fmt.Sprintf(
+		"Refusing this search: `query` looks INSIDE every file, and %s contains every project, "+
+			"cache and archive on the machine. It would read millions of lines and time out "+
+			"without finding anything.\n\n"+
+			"If you are looking for a FILE OR FOLDER BY NAME, drop `query` and use `glob` "+
+			"instead — that matches names and is fast even here.\n"+
+			"If you really do want to search file CONTENTS, give a `path` inside one project.\n\n"+
+			"The standard folders on this machine are listed in the environment block at the top "+
+			"of this conversation.", clean)
 }

@@ -523,3 +523,55 @@ func TestTheHomeDirectoryTimeoutSaysWhatToDoNext(t *testing.T) {
 		t.Error("/etc was treated as a home search")
 	}
 }
+
+// GORILLA OVERRIDE (2026-08-19): fail fast on the search that cannot work.
+//
+// From a real run: asked "what is in my screenshots folder", a model ran a
+// CONTENT search rooted at the home directory — reading inside every file on
+// the machine to find a folder name. Thirty seconds, no answer, then a
+// fallback to guessing paths through bash.
+//
+// The owner's objection to the alternative is the point: hand-feeding a model
+// where Pictures lives does not scale, because there is always another
+// convention. Making the wrong call FAIL FAST AND SAY WHY costs zero tokens,
+// works for every model including ones not yet released, and never has to be
+// repeated.
+func TestAContentSearchOverTheWholeHomeDirectoryIsRefusedImmediately(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home directory")
+	}
+	why := doomedContentSearch(FindParams{Query: "screenshot"}, home)
+	if why == "" {
+		t.Fatal("a content search over the whole home directory was allowed; it will time out")
+	}
+	for _, want := range []string{"glob", "INSIDE every file", "environment block"} {
+		if !strings.Contains(why, want) {
+			t.Errorf("the refusal does not say %q:\n%s", want, why)
+		}
+	}
+}
+
+// A NAME search over the same tree is cheap and must stay allowed — that is
+// how you actually find a folder.
+func TestANameSearchOverTheHomeDirectoryIsStillAllowed(t *testing.T) {
+	home, _ := os.UserHomeDir()
+	if why := doomedContentSearch(FindParams{Glob: "*screenshot*"}, home); why != "" {
+		t.Errorf("a name search was refused: %s", why)
+	}
+}
+
+// It must refuse only the shape nobody wants. A guess that blocks a legitimate
+// search is worse than a timeout.
+func TestContentSearchesInsideAProjectAreUntouched(t *testing.T) {
+	home, _ := os.UserHomeDir()
+	for _, p := range []string{
+		filepath.Join(home, "Documents", "Gorilla.Opencode"),
+		filepath.Join(home, "Documents"),
+		"/tmp/whatever",
+	} {
+		if why := doomedContentSearch(FindParams{Query: "func main"}, p); why != "" {
+			t.Errorf("refused a legitimate content search in %s: %s", p, why)
+		}
+	}
+}
