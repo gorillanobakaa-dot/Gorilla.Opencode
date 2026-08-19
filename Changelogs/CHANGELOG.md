@@ -1,3 +1,52 @@
+## v0.1.98 — 2026-08-19 — the sink, not just the source
+
+**Plain-language version:** every safety check in this program protected the
+START of an action — is this command safe, is this file inside your project.
+Nothing protected the END of one. That matters because the program reads web
+pages, a web page is written by whoever owns that website, and it can contain
+text aimed at the AI rather than at you. If the AI falls for it, the next thing
+it does is a perfectly ordinary-looking request to a website; the only thing
+wrong with that request is what happened three steps earlier.
+
+So: fetched pages now arrive fenced off, with a sentence AFTER them saying this
+is data and not instructions. That position is the whole mechanism — researchers
+measured the warning-first ordering making things worse than no warning at all,
+and making the AI refuse ordinary work two times in three. The conversation now
+remembers it has read something risky, and until you type again, anything
+leaving your machine asks first. And "approve everything" is no longer quite
+everything: egress, folders outside your project, and a conversation that just
+read a stranger's words still ask — once each, remembered afterwards. When a
+question does appear in that mode, it now says why.
+
+An MCP server URL was dialled with no checks at all, so the address where cloud
+providers keep their unprotected password list was a valid MCP server. Now
+refused — while your own machine and home network stay allowed, because that is
+how people actually run these.
+
+Numbers that were wrong: your token counts were answering two different
+questions with one pair of figures, so a saved transcript reported one turn as
+though it were the whole conversation. MCP tools were not counted on the
+/context screen at all. That screen now also admits its figures run about 10%
+high rather than printing an estimate in the typography of a measurement.
+
+AGENTS.md — the open standard 60,000+ projects use for project instructions —
+was not read at all, while a competitor's file and three capitalisations of this
+program's own name were. Now read, with four guards, because a file that goes
+into the AI's instructions the moment you enter a folder means `git clone` can
+give the AI orders: your main folder only, announced with its size, refused for
+somebody else's repository, and ahead of the competitor's file.
+
+Two additions: web_fetch can be pointed at part of a page (measured 96% fewer
+tokens on a real documentation page), and five hints about tools the AI gets
+wrong by instinct — off by default, because a line in the instructions is
+charged every turn forever.
+
+Everything was driven end to end against the real program and a live model, with
+every result checked in the files rather than taken from the assistant's report.
+That run found a bug no test could: in scripted mode there is no screen, so a
+permission question went out to nobody and waited ten minutes before failing.
+Scripted runs now log what they waved through instead of asking.
+
 ## v0.1.97 — 2026-08-18 — the permission prompt tells the truth
 
 **Plain-language version:** this release started as a complaint that a status-bar
