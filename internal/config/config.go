@@ -186,6 +186,12 @@ const (
 )
 
 var defaultContextPaths = []string{
+	// GORILLA OVERRIDE (2026-08-19): AGENTS.md was missing entirely, and it is
+	// ordered FIRST — ahead of .cursorrules — so the open standard wins when a
+	// repository carries both. It is gated: see AutoLoadProjectInstructions,
+	// which refuses it for repositories that are not the user's, and
+	// prompt.processContextPaths, which never reads it from an /add-dir root.
+	AgentsFile,
 	".github/copilot-instructions.md",
 	".cursorrules",
 	".cursor/rules/",

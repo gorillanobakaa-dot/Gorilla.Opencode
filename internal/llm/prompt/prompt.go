@@ -84,9 +84,36 @@ func getContextFromPaths() string {
 	// CLAUDE.md is never read is just a directory the agent was already able to
 	// open by absolute path.
 	cfg := config.Get()
+	primary := config.WorkingDirectory()
 	var parts []string
 	for _, root := range config.Roots() {
-		if s := processContextPaths(root, cfg.ContextPaths); s != "" {
+		paths := cfg.ContextPaths
+
+		// GORILLA OVERRIDE (2026-08-19), guards 1 and 3 on AGENTS.md.
+		//
+		// A context file is spliced into the system prompt automatically, on
+		// entering a directory, before the user has typed anything, with no
+		// tool call and no permission prompt. `git clone && cd` is therefore
+		// prompt injection, and AGENTS.md is a PUBLIC STANDARD an attacker
+		// knows is honoured — unlike CLAUDE.md, which is at least a
+		// convention of the tools that read it.
+		//
+		// Guard 1: the primary working directory only. An /add-dir root is a
+		// directory you granted READ access to, often somebody else's
+		// checkout; it is not a statement that you want its instructions
+		// governing your session.
+		//
+		// Guard 3: not for a repository that is not yours. See
+		// config.AutoLoadProjectInstructions.
+		if root != primary {
+			paths = withoutAgentsFile(paths)
+		} else if v := config.AutoLoadProjectInstructions(root); !v.Loaded && v.Bytes > 0 {
+			logging.Info("not loading "+config.AgentsFile+" automatically",
+				"path", v.Path, "bytes", v.Bytes, "reason", v.Reason)
+			paths = withoutAgentsFile(paths)
+		}
+
+		if s := processContextPaths(root, paths); s != "" {
 			parts = append(parts, s)
 		}
 	}
@@ -173,4 +200,18 @@ func processFile(filePath string) string {
 		return ""
 	}
 	return "# From:" + filePath + "\n" + string(content)
+}
+
+// withoutAgentsFile copies paths minus AGENTS.md. A copy, not a filter in
+// place: cfg.ContextPaths is shared, and mutating it here would silently
+// disable the file for the primary root too.
+func withoutAgentsFile(paths []string) []string {
+	out := make([]string, 0, len(paths))
+	for _, p := range paths {
+		if p == config.AgentsFile {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }

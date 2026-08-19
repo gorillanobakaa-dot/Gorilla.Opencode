@@ -197,7 +197,7 @@ Filenames the program looks for in each of your folders and feeds to the AI as p
 - **Setting:** `contextPaths`
 - **Type:** list
 - **Accepts:** comma-separated list
-- **Default:** `.github/copilot-instructions.md, .cursorrules, .cursor/rules/, CLAUDE.md, CLAUDE.local.md, opencode.md, opencode.local.md, OpenCode.md, OpenCode.local.md, OPENCODE.md, OPENCODE.local.md`
+- **Default:** `AGENTS.md, .github/copilot-instructions.md, .cursorrules, .cursor/rules/, CLAUDE.md, CLAUDE.local.md, opencode.md, opencode.local.md, OpenCode.md, OpenCode.local.md, OPENCODE.md, OPENCODE.local.md`
 
 ### Ask which folder to work in at startup
 

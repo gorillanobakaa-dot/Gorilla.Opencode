@@ -209,6 +209,30 @@ func TestSettingsRejectBadInput(t *testing.T) {
 			t.Error("accepted an empty contextPaths; the AI would get no project instructions at all")
 		}
 	})
+
+	// GORILLA OVERRIDE (2026-08-19): AGENTS.md was missing from the defaults
+	// entirely, so this tool read .cursorrules and three case-variants of its
+	// own name but not the file 60,000+ repositories actually use — and
+	// silence and success looked identical to the user. Asserted here so it
+	// cannot quietly go away again.
+	t.Run("AGENTS.md is a default context path, ahead of .cursorrules", func(t *testing.T) {
+		agents, cursor := -1, -1
+		for i, p := range defaultContextPaths {
+			switch p {
+			case AgentsFile:
+				agents = i
+			case ".cursorrules":
+				cursor = i
+			}
+		}
+		if agents < 0 {
+			t.Fatalf("%s is not in defaultContextPaths: %v", AgentsFile, defaultContextPaths)
+		}
+		if cursor >= 0 && agents > cursor {
+			t.Errorf("%s is ordered after .cursorrules (%d vs %d); the open standard should win",
+				AgentsFile, agents, cursor)
+		}
+	})
 }
 
 // A read-only row must not be silently editable through the generic path.

@@ -322,6 +322,35 @@ func (a appModel) Init() tea.Cmd {
 	cmd = a.themeDialog.Init()
 	cmds = append(cmds, cmd)
 
+	// GORILLA OVERRIDE (2026-08-19), guard 2 on AGENTS.md: SAY that project
+	// instructions were loaded, and how many bytes of them.
+	//
+	// A file spliced into the model's instructions before the user has typed
+	// anything is the one thing in this program that changes its behaviour
+	// invisibly. Announcing it costs one line and turns "why is it doing
+	// that?" into "because this repository told it to". The refusal case is
+	// announced too, and more loudly, because a file that silently did not
+	// load is indistinguishable from a file that is not there.
+	cmds = append(cmds, func() tea.Msg {
+		v := config.AutoLoadProjectInstructions(config.WorkingDirectory())
+		switch {
+		case v.Bytes == 0:
+			return nil
+		case v.Loaded:
+			return util.InfoMsg{
+				Type: util.InfoTypeInfo,
+				Msg: fmt.Sprintf("Loaded %s (%s) into the system prompt — %s.",
+					config.AgentsFile, humanBytes(int64(v.Bytes)), v.Reason),
+			}
+		default:
+			return util.InfoMsg{
+				Type: util.InfoTypeWarn,
+				Msg: fmt.Sprintf("NOT loading %s (%s): %s. Read it yourself, and if you trust it, paste what matters.",
+					config.AgentsFile, humanBytes(int64(v.Bytes)), v.Reason),
+			}
+		}
+	})
+
 	// Check if we should show the init dialog
 	cmds = append(cmds, func() tea.Msg {
 		shouldShow, err := config.ShouldShowInitDialog()
