@@ -1,0 +1,1083 @@
+{
+  "manifest_version": 1,
+  "generated": "2026-08-19",
+  "series": [
+    {
+      "id": "minimum",
+      "title": "The minimum — the agent works properly at all",
+      "why": "Small, free, no accounts. On a machine with nothing installed this whole series is about 75 MB; on a normal desktop Debian it is about 4 MB, because most of it is already there. Nothing here needs a card and nothing phones anywhere.",
+      "entries": [
+        {
+          "id": "poppler",
+          "title": "Read PDFs as text",
+          "teaches": "pdftotext pulls the words out of a PDF without opening it. pdfimages pulls the pictures out. pdfinfo says how many pages and whether it is a scan. A PDF is not text until something converts it — without this, a PDF is a wall the agent cannot see through.",
+          "unlocks": [
+            "read a PDF instead of refusing it",
+            "tell a real PDF from a scanned one",
+            "pull page images out for OCR"
+          ],
+          "detect": {
+            "binaries": [
+              "pdftotext",
+              "pdfimages",
+              "pdfinfo"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "poppler-utils"
+            ],
+            "pacman": [
+              "poppler"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "MINIMUM",
+          "caveats": "On a SCANNED pdf pdftotext returns nothing at all, silently. That is the signal to send it through OCR — pdfimages then tesseract — not evidence the document is empty."
+        },
+        {
+          "id": "tesseract",
+          "title": "Read text out of images and screenshots (OCR)",
+          "teaches": "Optical Character Recognition. Turns a picture of text — a screenshot, a photo of a page, a scanned contract — into text a model can actually read. Without it an image is a dead end for any model with no vision, which is most of the cheap ones.",
+          "unlocks": [
+            "read a screenshot instead of refusing it",
+            "search scanned PDFs",
+            "read text in photographs"
+          ],
+          "detect": {
+            "binaries": [
+              "tesseract"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "tesseract-ocr",
+              "tesseract-ocr-eng"
+            ],
+            "pacman": [
+              "tesseract",
+              "tesseract-data-eng"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "MINIMUM",
+          "caveats": "Accuracy depends far more on the picture than on the engine. A deskew and a threshold with imagemagick usually beats switching OCR engine. Other languages are separate packages, roughly 2-10 MB each."
+        },
+        {
+          "id": "ripgrep",
+          "title": "Search a whole codebase in a fraction of a second",
+          "teaches": "ripgrep searches file contents across a tree, skipping what .gitignore excludes. It is what makes searching a large project instant rather than a coffee break.",
+          "unlocks": [
+            "fast content search on big trees",
+            "the find tool's fastest engine"
+          ],
+          "detect": {
+            "binaries": [
+              "rg"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "ripgrep"
+            ],
+            "pacman": [
+              "ripgrep"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "MINIMUM",
+          "caveats": "It respects .gitignore by default, which is usually what you want and occasionally hides the file you are looking for."
+        },
+        {
+          "id": "sqlite3",
+          "title": "Query data, and full-text search without a server",
+          "teaches": "A whole database in one file, with no server to run. Its FTS5 module does proper ranked full-text search — the same idea a search engine uses — over your own notes, code or documents, locally.",
+          "unlocks": [
+            "ranked local search over your own files",
+            "query CSV and JSON as tables",
+            "keep a ledger the agent can read back"
+          ],
+          "detect": {
+            "binaries": [
+              "sqlite3"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "sqlite3"
+            ],
+            "pacman": [
+              "sqlite"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "MINIMUM",
+          "caveats": "FTS5 is compiled into every sqlite3 since 3.9, so there is nothing extra to install for it. Python's own sqlite3 module is free and already present."
+        },
+        {
+          "id": "jq",
+          "title": "Cut JSON down to the part you need",
+          "teaches": "JSON from an API is often megabytes of which you want three fields. jq extracts them before they reach the model. That is the difference between a cheap call and an expensive one.",
+          "unlocks": [
+            "sieve huge API responses to a few fields",
+            "reshape JSON without writing a script"
+          ],
+          "detect": {
+            "binaries": [
+              "jq"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "jq"
+            ],
+            "pacman": [
+              "jq"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "MINIMUM",
+          "caveats": "In streaming mode (--stream) forgetting -n silently produces wrong output rather than an error."
+        },
+        {
+          "id": "imagemagick",
+          "title": "Prepare an image so OCR can actually read it",
+          "teaches": "Deskew a photographed page, convert to grey, raise the contrast, crop. This is the step that decides whether OCR returns your document or gibberish, and it is almost always worth more than a better OCR engine.",
+          "unlocks": [
+            "make a bad scan readable",
+            "convert between image formats",
+            "extract frames and thumbnails"
+          ],
+          "detect": {
+            "binaries": [
+              "convert",
+              "magick",
+              "identify"
+            ],
+            "mode": "any"
+          },
+          "packages": {
+            "apt": [
+              "imagemagick"
+            ],
+            "pacman": [
+              "imagemagick"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "MINIMUM",
+          "caveats": "Blanket upscaling does NOT reliably improve OCR — measured, it made three of five test images worse. Deskew and greyscale are the reliable wins."
+        },
+        {
+          "id": "p7zip",
+          "title": "Open almost any archive or disk image",
+          "teaches": "One tool that opens zip, 7z, rar, cab, iso, and the innards of Windows installers and firmware images. Often the fastest way to look inside something without special software.",
+          "unlocks": [
+            "list and extract most archive formats",
+            "look inside installers and disk images"
+          ],
+          "detect": {
+            "binaries": [
+              "7z",
+              "7za"
+            ],
+            "mode": "any"
+          },
+          "packages": {
+            "apt": [
+              "p7zip-full"
+            ],
+            "pacman": [
+              "p7zip"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "MINIMUM",
+          "caveats": "An archive can expand to far more than its own size — check before extracting something you did not make."
+        },
+        {
+          "id": "bubblewrap",
+          "title": "Run something in a box it cannot get out of",
+          "teaches": "Sandboxing. Runs a command with its own view of the filesystem, so it can only see what you handed it. This is the only real boundary available without root, and it is what makes running unknown code survivable.",
+          "unlocks": [
+            "run untrusted code with a limited view",
+            "confine a tool to one directory"
+          ],
+          "detect": {
+            "binaries": [
+              "bwrap"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "bubblewrap"
+            ],
+            "pacman": [
+              "bubblewrap"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "MINIMUM",
+          "caveats": "Needs unprivileged user namespaces enabled, which most distributions do by default. Landlock is NOT available on this machine's kernel; bwrap is the path here."
+        }
+      ]
+    },
+    {
+      "id": "documents",
+      "title": "Documents — a text model reading anything",
+      "why": "The trigger for this whole list: a model with no vision met a screenshot and had nowhere to go, while the tool that reads it was already installed. Everything here runs on your machine, so only the words ever leave it — never the file.",
+      "entries": [
+        {
+          "id": "pandoc",
+          "title": "Convert between forty document formats",
+          "teaches": "Word documents, ODT, EPUB, LaTeX, HTML, RST — pandoc turns almost any of them into markdown the model can read, without opening an office suite.",
+          "unlocks": [
+            "read .docx, .odt, .epub and rst",
+            "convert your own notes between formats"
+          ],
+          "detect": {
+            "binaries": [
+              "pandoc"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "pandoc"
+            ],
+            "pacman": [
+              "pandoc-cli"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "It converts structure, not layout. A document whose meaning lives in its visual arrangement comes out as prose."
+        },
+        {
+          "id": "pdfrepair",
+          "title": "Fix, split and unlock stubborn PDFs",
+          "teaches": "Ghostscript and qpdf repair damaged PDFs, split a 900-page file into the ten pages you want, and remove a password you already know. Often the difference between a file that reads and one that does not.",
+          "unlocks": [
+            "repair a PDF other tools reject",
+            "split out the pages you need",
+            "decrypt a PDF you have the password for"
+          ],
+          "detect": {
+            "binaries": [
+              "gs",
+              "qpdf"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "ghostscript",
+              "qpdf"
+            ],
+            "pacman": [
+              "ghostscript",
+              "qpdf"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Removing a password you do NOT have is not what this does and is not what it is for."
+        },
+        {
+          "id": "exiftool",
+          "title": "Read the hidden information inside a file",
+          "teaches": "Photographs and documents carry metadata: camera, timestamps, GPS coordinates, editing software, sometimes the author's name. Useful for research and worth knowing about before you publish your own files.",
+          "unlocks": [
+            "read camera, date and GPS from photographs",
+            "see what software produced a document",
+            "strip metadata from your own files before sharing"
+          ],
+          "detect": {
+            "binaries": [
+              "exiftool"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "libimage-exiftool-perl"
+            ],
+            "pacman": [
+              "perl-image-exiftool"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Metadata is trivially faked, so treat it as a claim rather than a fact. Do not run it automatically on every image — its output is long and it is a route for hostile text to reach the model."
+        },
+        {
+          "id": "zbar",
+          "title": "Read QR codes and barcodes out of pictures",
+          "teaches": "A QR code in a screenshot is a URL the model cannot see. zbarimg decodes it to text. About 200 KB.",
+          "unlocks": [
+            "decode a QR code in a screenshot",
+            "read barcodes from photographs"
+          ],
+          "detect": {
+            "binaries": [
+              "zbarimg"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "zbar-tools"
+            ],
+            "pacman": [
+              "zbar"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Decode accuracy on real photographs was not measured — no package was installed unprompted during the research. Treat the claim as untested."
+        },
+        {
+          "id": "libreoffice",
+          "title": "The last resort for office files",
+          "teaches": "When pandoc cannot read a document, LibreOffice in headless mode almost certainly can. It is the heaviest thing in this whole list.",
+          "unlocks": [
+            "read office documents nothing else will open",
+            "convert spreadsheets and presentations"
+          ],
+          "detect": {
+            "binaries": [
+              "libreoffice",
+              "soffice"
+            ],
+            "mode": "any"
+          },
+          "packages": {
+            "apt": [
+              "libreoffice-core",
+              "libreoffice-writer",
+              "libreoffice-calc"
+            ],
+            "pacman": [
+              "libreoffice-still"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Roughly 400 MB. Only worth it if pandoc has already failed on files you actually have. On a slow link this is hours."
+        }
+      ]
+    },
+    {
+      "id": "media",
+      "title": "Media — audio, video, subtitles",
+      "why": "Video is expensive to move and cheap to strip. Most of the time you want the subtitles or one frame, not the file.",
+      "entries": [
+        {
+          "id": "ffmpeg",
+          "title": "Take apart any audio or video file",
+          "teaches": "Extract the audio from a video, pull out one frame, read the subtitles already embedded in it, or find out what a file actually is. The universal tool for anything that moves or makes a sound.",
+          "unlocks": [
+            "extract audio for transcription",
+            "pull frames out for OCR",
+            "read embedded subtitles",
+            "identify what a media file really contains"
+          ],
+          "detect": {
+            "binaries": [
+              "ffmpeg",
+              "ffprobe"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "ffmpeg"
+            ],
+            "pacman": [
+              "ffmpeg"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "MINIMUM",
+          "caveats": "Its command line is famously unforgiving about argument order. Ask for what you want in plain words and let the agent build it."
+        },
+        {
+          "id": "ytdlp",
+          "title": "Get the subtitles without downloading the video",
+          "teaches": "yt-dlp downloads video — but with --skip-download --write-auto-sub it fetches only the subtitle track, which is a few kilobytes instead of hundreds of megabytes. That is a lecture, an interview or a documentary as readable text, at almost no bandwidth.",
+          "unlocks": [
+            "read a video's transcript for a few KB",
+            "fetch metadata without the file",
+            "download the video itself when you do want it"
+          ],
+          "detect": {
+            "binaries": [
+              "yt-dlp"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "yt-dlp"
+            ],
+            "pacman": [
+              "yt-dlp"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": true
+          },
+          "tier": "NICE",
+          "caveats": "Sites change constantly and a yt-dlp more than a few months old often just fails. The distro package is frequently too old; updating it is part of using it. Auto-generated subtitles have no punctuation and mis-hear names."
+        }
+      ]
+    },
+    {
+      "id": "coding",
+      "title": "Coding — what a coding agent should have",
+      "why": "These are the tools that let the agent check its own work instead of asserting it. Every one of them turns a claim into a result.",
+      "entries": [
+        {
+          "id": "shellcheck",
+          "title": "Catch shell script bugs before they run",
+          "teaches": "Shell is full of traps — unquoted variables, exit codes that lie through a pipe. shellcheck finds them by reading the script, which is much cheaper than finding them by running it.",
+          "unlocks": [
+            "static checking of shell scripts",
+            "catch quoting and exit-code bugs"
+          ],
+          "detect": {
+            "binaries": [
+              "shellcheck"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "shellcheck"
+            ],
+            "pacman": [
+              "shellcheck"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "It cannot know what your script means, only what the shell will do with it."
+        },
+        {
+          "id": "astgrep",
+          "title": "Search code by its structure, not its text",
+          "teaches": "Ordinary search matches characters. ast-grep matches SHAPES — 'every function that calls X without checking the error' — across a whole codebase. It is the difference between grepping and understanding.",
+          "unlocks": [
+            "find code patterns text search cannot express",
+            "structural rewrites across a tree"
+          ],
+          "detect": {
+            "binaries": [
+              "ast-grep",
+              "sg"
+            ],
+            "mode": "any"
+          },
+          "packages": {
+            "apt": [],
+            "pacman": [
+              "ast-grep"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Not in Debian's repositories — it comes from cargo or a release binary. Beware: a broken npm shim called 'sg' can shadow the real one, and the standard /usr/bin/sg is an unrelated system command."
+        },
+        {
+          "id": "hyperfine",
+          "title": "Measure whether it actually got faster",
+          "teaches": "Timing a command once tells you almost nothing. hyperfine runs it many times, warms the cache, and reports a real figure with a spread — so 'this is faster' becomes a number instead of an impression.",
+          "unlocks": [
+            "honest before-and-after benchmarks",
+            "detect noise instead of reporting it as a win"
+          ],
+          "detect": {
+            "binaries": [
+              "hyperfine"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "hyperfine"
+            ],
+            "pacman": [
+              "hyperfine"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "It measures the whole command including startup. For a millisecond-level change, that overhead may be most of what you are timing."
+        },
+        {
+          "id": "valgrind",
+          "title": "Find memory bugs that have not crashed yet",
+          "teaches": "C and C++ programs can read memory they do not own and appear to work perfectly for years. valgrind runs the program and reports every one of those, at the cost of running maybe fifty times slower.",
+          "unlocks": [
+            "find use-after-free and uninitialised reads",
+            "find memory leaks with a call stack"
+          ],
+          "detect": {
+            "binaries": [
+              "valgrind"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "valgrind"
+            ],
+            "pacman": [
+              "valgrind"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Very slow, and only useful for compiled languages. For Go or Rust the built-in race detector and checks are the better tool."
+        }
+      ]
+    },
+    {
+      "id": "forensics",
+      "title": "Forensics — looking inside things that were not meant to be read",
+      "why": "Recovering a deleted file, understanding a firmware image, working out what a disk actually contains. Powerful, and honest about its limits — some of what people expect from these tools is not possible.",
+      "entries": [
+        {
+          "id": "testdisk",
+          "title": "Recover deleted files and repair partition tables",
+          "teaches": "photorec recovers files by recognising their contents rather than trusting the filesystem, so it works even when the directory is gone. testdisk repairs a partition table that stopped a whole disk mounting.",
+          "unlocks": [
+            "recover photographs and documents from a damaged disk",
+            "repair a partition table",
+            "read a filesystem the OS refuses to mount"
+          ],
+          "detect": {
+            "binaries": [
+              "photorec",
+              "testdisk"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "testdisk"
+            ],
+            "pacman": [
+              "testdisk"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "IT CANNOT RECOVER SOURCE CODE OR TEXT FILES. Carving recognises whole files by their signature; a .go or .txt file has none. And ext4 clears the extent tree on delete, so ordinary deleted-file recovery on ext4 usually fails. Anyone who promises otherwise is guessing."
+        },
+        {
+          "id": "binwalk",
+          "title": "Find what is hidden inside a firmware image",
+          "teaches": "A router or camera firmware file is many things glued together — a bootloader, a kernel, a compressed filesystem. binwalk finds the seams and pulls them apart.",
+          "unlocks": [
+            "extract filesystems out of firmware",
+            "find embedded archives inside a binary"
+          ],
+          "detect": {
+            "binaries": [
+              "binwalk"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "binwalk"
+            ],
+            "pacman": [
+              "binwalk"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "It matches byte patterns, so it reports things that are not there. Measured false positives include a 'JBOOT STAG header' and an 'ESP Image segment' found inside a normal Windows explorer.exe. Never pass its raw output to a model as fact."
+        },
+        {
+          "id": "sleuthkit",
+          "title": "Walk a disk image like a filesystem",
+          "teaches": "Lists files inside a disk image without mounting it, including deleted directory entries, and builds a timeline of when things were created and changed. The standard toolkit for reading a disk as evidence.",
+          "unlocks": [
+            "list files inside a disk image",
+            "build a filesystem timeline",
+            "read a filesystem without mounting it"
+          ],
+          "detect": {
+            "binaries": [
+              "fls",
+              "icat",
+              "mmls",
+              "fsstat"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "sleuthkit"
+            ],
+            "pacman": [
+              "sleuthkit"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Timestamps come from the filesystem and can be set to anything. A timeline is evidence of what the filesystem recorded, not of what happened."
+        },
+        {
+          "id": "ssdeep",
+          "title": "Find files that are nearly the same",
+          "teaches": "An ordinary checksum says identical or not. Fuzzy hashing says 90% similar — which finds the edited copy, the near-duplicate, the same document with a different header. Small and genuinely useful for research.",
+          "unlocks": [
+            "find near-duplicate files",
+            "spot an edited copy of a document"
+          ],
+          "detect": {
+            "binaries": [
+              "ssdeep",
+              "hashdeep"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "ssdeep"
+            ],
+            "pacman": [
+              "ssdeep"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Similarity scores are a hint, not proof. Two unrelated files can score higher than you would expect."
+        }
+      ]
+    },
+    {
+      "id": "mobile",
+      "title": "Mobile — Android and iOS",
+      "why": "Understanding an app or a phone from a laptop. About 1.5 MB for the whole set, and the two most useful pieces are already here.",
+      "entries": [
+        {
+          "id": "adb",
+          "title": "Talk to an Android phone over USB",
+          "teaches": "Read the phone's logs, list installed apps, copy files, install and remove software. The basic connection between a computer and an Android device.",
+          "unlocks": [
+            "read device logs while a bug happens",
+            "list and pull installed apps",
+            "copy files to and from the phone"
+          ],
+          "detect": {
+            "binaries": [
+              "adb",
+              "fastboot"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "adb",
+              "fastboot"
+            ],
+            "pacman": [
+              "android-tools"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "MINIMUM",
+          "caveats": "adb backup is DEAD — removed in Android 12 and later, and it fails by producing an empty or tiny file rather than an error. Do not plan around it."
+        },
+        {
+          "id": "apkinspect",
+          "title": "Look inside an Android app",
+          "teaches": "aapt reads an APK's name, version, permissions and minimum Android version in one command, without unpacking anything. jadx turns the compiled app back into readable Java. Together they answer 'what does this app actually do and what is it asking for?'",
+          "unlocks": [
+            "read an app's real permissions before installing it",
+            "decompile an app to readable source",
+            "check what an APK claims about itself"
+          ],
+          "detect": {
+            "binaries": [
+              "aapt",
+              "aapt2",
+              "jadx",
+              "apktool"
+            ],
+            "mode": "any"
+          },
+          "packages": {
+            "apt": [
+              "aapt",
+              "apktool"
+            ],
+            "pacman": [
+              "android-tools",
+              "jadx"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Use 'aapt dump badging' rather than unpacking — unpacking costs minutes and gives you a tree you then have to read. Debian's apktool is usually too old; fetch the 3.x jar and run it with java."
+        },
+        {
+          "id": "scrcpy",
+          "title": "See and control the phone's screen on your laptop",
+          "teaches": "Mirrors an Android screen over USB with no app installed on the phone, and lets you use the mouse and keyboard. About 100 KB from backports.",
+          "unlocks": [
+            "see the phone screen while debugging",
+            "control the device from the laptop",
+            "record what the screen is doing"
+          ],
+          "detect": {
+            "binaries": [
+              "scrcpy"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "scrcpy"
+            ],
+            "pacman": [
+              "scrcpy"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Needs USB debugging switched on on the phone, which is a menu the user has to find."
+        },
+        {
+          "id": "imobiledevice",
+          "title": "Talk to an iPhone from Linux",
+          "teaches": "Read device information, logs and backups from an iPhone or iPad without iTunes and without a Mac. Roughly 125 KB.",
+          "unlocks": [
+            "read iOS device logs",
+            "list apps and device details",
+            "mount the device filesystem"
+          ],
+          "detect": {
+            "binaries": [
+              "ideviceinfo",
+              "idevicesyslog",
+              "ifuse"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "libimobiledevice-utils",
+              "ifuse"
+            ],
+            "pacman": [
+              "libimobiledevice",
+              "ifuse"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Apple changes the protocol with iOS releases, so a distro package can be behind what your phone speaks."
+        }
+      ]
+    },
+    {
+      "id": "windows",
+      "title": "Windows — understanding Windows files on Linux",
+      "why": "Reading Windows artefacts without a Windows machine: installers, event logs, Outlook archives, program internals.",
+      "entries": [
+        {
+          "id": "msitools",
+          "title": "Open a Windows installer without installing it",
+          "teaches": "Extract the contents of an .msi or .cab and see exactly what a Windows installer would put on a machine, and where — before running anything.",
+          "unlocks": [
+            "extract files from an MSI or CAB",
+            "see what an installer would do"
+          ],
+          "detect": {
+            "binaries": [
+              "msiextract",
+              "cabextract"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "msitools",
+              "cabextract"
+            ],
+            "pacman": [
+              "msitools",
+              "cabextract"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Extracting shows the payload, not the install scripts, which can do more than the file list suggests."
+        },
+        {
+          "id": "pev",
+          "title": "Read the innards of a Windows program",
+          "teaches": "A Windows .exe or .dll carries a structured header: what it imports, when it was built, whether it is signed, what resources it embeds. pev reads all of it without running the file.",
+          "unlocks": [
+            "inspect an exe or dll safely",
+            "see what libraries a program calls",
+            "read embedded resources and version info"
+          ],
+          "detect": {
+            "binaries": [
+              "pescan",
+              "readpe",
+              "pestr"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "pev"
+            ],
+            "pacman": [
+              "pev"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Reading a file is safe; running it is not. Nothing here should be run under wine to 'see what it does' unless it is inside a sandbox."
+        },
+        {
+          "id": "libyal",
+          "title": "Read Windows event logs, Outlook archives and search indexes",
+          "teaches": "Windows keeps its history in formats nothing on Linux opens: .evtx event logs, .pst Outlook archives, the Windows Search database. These libraries read all three.",
+          "unlocks": [
+            "read Windows event logs",
+            "open an Outlook PST archive",
+            "read the Windows Search index"
+          ],
+          "detect": {
+            "binaries": [
+              "evtxexport",
+              "pffexport",
+              "esedbexport"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "libevtx-utils",
+              "pff-tools",
+              "libesedb-utils"
+            ],
+            "pacman": []
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Not packaged for Arch — building from source there. These formats are undocumented and the readers are reverse-engineered, so odd files sometimes fail."
+        }
+      ]
+    },
+    {
+      "id": "osint",
+      "title": "Research and OSINT — sources without accounts",
+      "why": "Everything here works with no account and no card. That is deliberate: the sources that demand a signup are the ones this audience cannot reach.",
+      "entries": [
+        {
+          "id": "lynx",
+          "title": "Fetch a web page as a browser would",
+          "teaches": "A text browser that renders pages properly, including ones that refuse a plain download. It is what makes web search work here with no API key and no account.",
+          "unlocks": [
+            "read pages that block simple fetches",
+            "search the web with no API key"
+          ],
+          "detect": {
+            "binaries": [
+              "lynx"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "lynx"
+            ],
+            "pacman": [
+              "lynx"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": true
+          },
+          "tier": "MINIMUM",
+          "caveats": "It runs no JavaScript, so a page that builds itself in the browser comes back nearly empty. That is a limit of the approach, not a bug."
+        },
+        {
+          "id": "whoisdns",
+          "title": "Find out who owns a domain or an address",
+          "teaches": "whois and dig answer the basic questions of any internet investigation: who registered this domain, when, where does it point, what mail servers does it use. All free, all public record.",
+          "unlocks": [
+            "look up domain ownership and age",
+            "resolve and trace addresses",
+            "read DNS records directly"
+          ],
+          "detect": {
+            "binaries": [
+              "whois",
+              "dig",
+              "host"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "whois",
+              "dnsutils"
+            ],
+            "pacman": [
+              "whois",
+              "bind"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": true
+          },
+          "tier": "MINIMUM",
+          "caveats": "Most registrations are behind a privacy service now, so whois usually names the privacy service rather than a person. RDAP is the modern, structured replacement and needs no account either."
+        },
+        {
+          "id": "gpg",
+          "title": "Check a signature, verify a download",
+          "teaches": "Confirms a file really came from who it claims and was not altered on the way. This is how you check that a downloaded package is genuine rather than hoping.",
+          "unlocks": [
+            "verify signed downloads",
+            "check that a release is genuine",
+            "sign your own files"
+          ],
+          "detect": {
+            "binaries": [
+              "gpg"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "gnupg"
+            ],
+            "pacman": [
+              "gnupg"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "MINIMUM",
+          "caveats": "A valid signature proves the file matches a key. It does not prove the key belongs to who you think — that is a separate question."
+        }
+      ]
+    }
+  ]
+}

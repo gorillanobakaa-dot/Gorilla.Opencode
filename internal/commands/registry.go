@@ -92,6 +92,30 @@ var All = []Command{
 			"again and no helpers are sent out.",
 	},
 	{
+		Name:    "arsenal",
+		Aliases: []string{"tools"},
+		Group:   GroupTuning,
+		Summary: "What this agent can do here, what it could do, and the cost.",
+		Detail: "A map of capabilities, not a chat answer. It checks THIS machine for about " +
+			"thirty tools — reading PDFs and scanned pages, transcribing audio, taking apart " +
+			"firmware and disk images, inspecting Android apps and Windows files, looking up " +
+			"who owns a domain — and shows what is already here, what is not, and the exact " +
+			"command to get the rest.\n\n" +
+			"It exists because a capability was found sitting unused: a model reported that it " +
+			"could not read a screenshot while the tool that reads screenshots was already " +
+			"installed on the same machine. Nobody stumbles onto binwalk or sleuthkit or " +
+			"ssdeep unaided, and you cannot ask for a thing you do not know exists. The " +
+			"barrier was never bandwidth — it was the map.\n\n" +
+			"Slackware style: take a whole group, walk it item by item, or pick single tools. " +
+			"Every entry says in plain words what it is FOR, what the agent gains, and — the " +
+			"part most documentation leaves out — what will disappoint you about it. Costs are " +
+			"measured against your own machine by your own package manager, including " +
+			"everything already installed, and are shown in minutes as well as megabytes.\n\n" +
+			"It NEVER installs anything and never asks for your password. It prints the exact " +
+			"command into the conversation and you decide. Everything listed is free and needs " +
+			"no account.",
+	},
+	{
 		Name:    "clear",
 		Aliases: []string{"new"},
 		Group:   GroupSession,

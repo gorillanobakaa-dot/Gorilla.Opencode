@@ -31,6 +31,7 @@ cost before they start. Everything else is local.
 | `/login` | Sign in with your Google account. |
 | `/logout` | Sign out of your Google account. |
 | `/usage` | Show your quota and balances — how many bananas are left. |
+| `/arsenal` · `/tools` | What this agent can do here, what it could do, and the cost. |
 | `/context` · `/loadout` `/tokens` | Turn features off to spend less. |
 | `/settings` · `/config` `/prefs` | Every option, what it accepts, and its default. |
 | `/prompts` · `/prompt` | Read or change the AI's standing instructions. |
@@ -173,6 +174,20 @@ Removes the stored sign-in. Any API keys you typed are untouched.
 Shows what you have left to spend, in plain words. If you signed in with the Antigravity free tier: how much of your weekly allowance remains — Gemini has a separate pool from Claude and GPT-OSS — and when each resets. If you have a DeepSeek or OpenRouter key: your remaining balance there too. A one-line summary also appears on its own at the start of each session.
 
 ## Cost, speed and behaviour
+
+### `/arsenal`
+
+*Also: `/tools`*
+
+**What this agent can do here, what it could do, and the cost.**
+
+A map of capabilities, not a chat answer. It checks THIS machine for about thirty tools — reading PDFs and scanned pages, transcribing audio, taking apart firmware and disk images, inspecting Android apps and Windows files, looking up who owns a domain — and shows what is already here, what is not, and the exact command to get the rest.
+
+It exists because a capability was found sitting unused: a model reported that it could not read a screenshot while the tool that reads screenshots was already installed on the same machine. Nobody stumbles onto binwalk or sleuthkit or ssdeep unaided, and you cannot ask for a thing you do not know exists. The barrier was never bandwidth — it was the map.
+
+Slackware style: take a whole group, walk it item by item, or pick single tools. Every entry says in plain words what it is FOR, what the agent gains, and — the part most documentation leaves out — what will disappoint you about it. Costs are measured against your own machine by your own package manager, including everything already installed, and are shown in minutes as well as megabytes.
+
+It NEVER installs anything and never asks for your password. It prints the exact command into the conversation and you decide. Everything listed is free and needs no account.
 
 ### `/context`
 

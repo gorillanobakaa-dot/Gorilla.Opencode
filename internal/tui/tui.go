@@ -266,6 +266,10 @@ type appModel struct {
 	showOsintDialog bool
 	osintPage       dialog.OsintPageCmp
 	showOsintPage   bool
+	// GORILLA OVERRIDE (2026-08-19): /arsenal — the capability map. See
+	// internal/arsenal.
+	arsenalPage dialog.ArsenalCmp
+	showArsenal bool
 	// GORILLA OVERRIDE (2026-08-18): /sessions — the manager that can reach a
 	// conversation you are no longer in: search it, revive it, export it, erase
 	// it. Built for machines where the power cut ends the session, not the user.
@@ -1155,6 +1159,22 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.showOsintPage = false
 		return a, nil
 
+	case dialog.CloseArsenalMsg:
+		a.showArsenal = false
+		return a, nil
+
+	// GORILLA OVERRIDE (2026-08-19): /arsenal NEVER installs anything. It
+	// prints the exact command into the conversation, where it can be read,
+	// selected and copied — and where the user decides. An installer is the
+	// highest-stakes prompt in this program, and the August audit's finding
+	// was that a prompt describing less than what happens is worse than none.
+	case dialog.ArsenalInstallMsg:
+		a.showArsenal = false
+		return a, util.CmdHandler(chat.SendMsg{Text: "I chose these from /arsenal:\n\n" +
+			msg.Summary + "\nThe command to install them is:\n\n    " + msg.Command +
+			"\n\nDo NOT run it. Show it to me, tell me in one line what each one will let you do " +
+			"that you cannot do now, and say plainly if any of it is a bad idea on this machine."})
+
 	case dialog.CloseInitDialogMsg:
 		a.showInitDialog = false
 		if msg.Initialize {
@@ -1199,6 +1219,16 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// question can never be swept into someone's git repo and pushed to the
 		// internet. Bare /osint opens the capability page instead of a warning
 		// toast — this command is the one that earns a full explanation.
+		// GORILLA OVERRIDE (2026-08-19): /arsenal is the capability map — what
+		// this agent can do on THIS machine, what it could do, and what that
+		// would cost. It exists because a model reported it could not read a
+		// screenshot while tesseract sat installed three inches away: the
+		// barrier was never bandwidth, it was knowing the thing exists.
+		case "arsenal", "tools":
+			a.arsenalPage = dialog.NewArsenalCmp()
+			a.arsenalPage.SetSize(a.width, a.height)
+			a.showArsenal = true
+			return a, nil
 		case "osint", "dossier":
 			q := strings.TrimSpace(msg.Args)
 			// GORILLA OVERRIDE (2026-08-18): --recover is a FLAG, not a question.
@@ -1760,6 +1790,10 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					a.showOsintPage = false
 					return a, nil
 				}
+				if a.showArsenal {
+					a.showArsenal = false
+					return a, nil
+				}
 				if a.showInitDialog {
 					a.showInitDialog = false
 					// Mark the project as initialized without running the command
@@ -1983,6 +2017,15 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d, pCmd := a.osintPage.Update(msg)
 		a.osintPage = d.(dialog.OsintPageCmp)
 		cmds = append(cmds, pCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showArsenal {
+		d, aCmd := a.arsenalPage.Update(msg)
+		a.arsenalPage = d.(dialog.ArsenalCmp)
+		cmds = append(cmds, aCmd)
 		if _, ok := msg.(tea.KeyMsg); ok {
 			return a, tea.Batch(cmds...)
 		}
@@ -2492,6 +2535,17 @@ func (a appModel) View() string {
 
 	if a.showOsintPage {
 		overlay := a.osintPage.View()
+		appView = layout.PlaceOverlay(
+			a.width/2-lipgloss.Width(overlay)/2,
+			a.height/2-lipgloss.Height(overlay)/2,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
+	if a.showArsenal {
+		overlay := a.arsenalPage.View()
 		appView = layout.PlaceOverlay(
 			a.width/2-lipgloss.Width(overlay)/2,
 			a.height/2-lipgloss.Height(overlay)/2,
