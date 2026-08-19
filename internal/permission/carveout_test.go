@@ -11,6 +11,7 @@ package permission
 
 import (
 	"testing"
+	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
 )
@@ -153,5 +154,55 @@ func TestANewUserTurnClearsTaint(t *testing.T) {
 		Path:      config.WorkingDirectory(),
 	}) {
 		t.Fatal("taint outlived the turn that caused it")
+	}
+}
+
+// GORILLA OVERRIDE (2026-08-19): the carve-outs assume a prompt can be
+// ANSWERED. In a -p run or a cron job there is no TUI subscribed to the
+// permission broker, so a carve-out would publish a question into an empty
+// room, wait the full ten-minute PermissionWait, and then deny — turning a
+// working headless script into one that hangs for ten minutes and then fails.
+//
+// This is the test that would have caught it. Every other test in this package
+// answers its own prompts, which is exactly why the gap was invisible.
+func TestUnattendedRunsAreNotBlockedByACarveOut(t *testing.T) {
+	s := autoApproved(t)
+	denyPrompts(t, s)
+	s.SetUnattended(true)
+
+	done := make(chan bool, 1)
+	go func() {
+		done <- s.Request(CreatePermissionRequest{
+			SessionID: "conversation",
+			ToolName:  "web_fetch",
+			Action:    "fetch",
+			Path:      config.WorkingDirectory(),
+			GrantKey:  "https://docs.python.org",
+			Egress:    true,
+		})
+	}()
+
+	select {
+	case ok := <-done:
+		if !ok {
+			t.Fatal("a headless fetch was denied by a carve-out nobody could answer")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("a headless fetch blocked on a permission prompt with no subscriber to answer it")
+	}
+}
+
+// Unattended must not become a way to disable the carve-outs for a real user.
+func TestUnattendedIsOffForAnInteractiveSession(t *testing.T) {
+	s := autoApproved(t)
+	denyPrompts(t, s)
+	if s.Request(CreatePermissionRequest{
+		SessionID: "conversation",
+		ToolName:  "web_fetch",
+		Action:    "fetch",
+		Path:      config.WorkingDirectory(),
+		Egress:    true,
+	}) {
+		t.Fatal("an interactive session skipped the egress carve-out without SetUnattended")
 	}
 }

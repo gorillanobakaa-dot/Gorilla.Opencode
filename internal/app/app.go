@@ -156,6 +156,11 @@ func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat
 
 	// Automatically approve all permission requests for this non-interactive session
 	a.Permissions.AutoApproveSession(sess.ID)
+	// GORILLA FIX (2026-08-19): and say that nobody is watching, so the
+	// auto-approve carve-outs log instead of publishing a question no
+	// subscriber exists to answer. Without this a headless fetch would block
+	// for the full ten-minute PermissionWait and then be denied.
+	a.Permissions.SetUnattended(true)
 
 	done, err := a.CoderAgent.Run(ctx, sess.ID, prompt)
 	if err != nil {
