@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -539,6 +540,42 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 				}
 				continue
 			}
+			// GORILLA FIX (2026-08-19): a tool call whose ARGUMENTS arrived
+			// corrupted must say so, and must not be blamed on the model.
+			//
+			// Recovered from the session database after a real run: a bash
+			// call arrived as
+			//
+			//     {"\ufffd\ufffd\ufffd\ufffd\ufffd\ufffdcommand":""}
+			//
+			// Six U+FFFD REPLACEMENT CHARACTERs prepended to the parameter
+			// name. U+FFFD is what a decoder emits for bytes that were not
+			// valid UTF-8, so this is a TRANSPORT fault — a stream chunk split
+			// mid-character, or a byte sequence decoded before it was
+			// complete. The model did not send that.
+			//
+			// What happened without this check: the key was no longer
+			// "command", the bash tool saw no command, and the model — given
+			// an empty result and no explanation — apologised for a mistake it
+			// had not made ("That command was malformed") and retried. A model
+			// misled into blaming itself will keep doing the same thing,
+			// because it is fixing the wrong thing.
+			if reason := corruptedToolInput(toolCall.Input); reason != "" {
+				logging.Warn("tool call arguments arrived corrupted",
+					"tool", toolCall.Name, "id", toolCall.ID, "reason", reason,
+					"raw", toolCall.Input)
+				toolResults[i] = message.ToolResult{
+					ToolCallID: toolCall.ID,
+					Content: fmt.Sprintf(
+						"The arguments for %s arrived damaged in transport and were not run: %s. "+
+							"This is NOT a mistake in what you sent — the text was corrupted between "+
+							"the model and this program. Send the same call again unchanged.",
+						toolCall.Name, reason),
+					IsError: true,
+				}
+				continue
+			}
+
 			tool := available[idx]
 			if cleaned {
 				// Never silently. A name that had to be repaired is recorded,
@@ -1073,4 +1110,25 @@ func createAgentProvider(agentName config.AgentName) (provider.Provider, error) 
 	}
 
 	return agentProvider, nil
+}
+
+// corruptedToolInput reports arguments that were damaged on the wire, or ""
+// if they look intact.
+//
+// It deliberately checks only for evidence a DECODER produced — replacement
+// characters, and JSON that will not parse at all — rather than trying to
+// judge whether the arguments are sensible. Sensible is the tool's job;
+// intact is this layer's.
+func corruptedToolInput(input string) string {
+	if strings.ContainsRune(input, '\uFFFD') {
+		return "it contains Unicode replacement characters, which means bytes arrived that were not valid UTF-8"
+	}
+	if strings.TrimSpace(input) == "" {
+		return ""
+	}
+	var probe any
+	if err := json.Unmarshal([]byte(input), &probe); err != nil {
+		return "the arguments are not valid JSON (" + err.Error() + ")"
+	}
+	return ""
 }
