@@ -480,7 +480,18 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	case "long":
 		args = append(args, "--long")
 	case "code":
-		args = append(args, "--code")
+		// GORILLA FIX (2026-08-19), audit finding: cap the file size.
+		//
+		// view=code counts lines by language across a whole tree, and it was
+		// doing that to EVERY file — including 1.1 GB of .deb and .tar.zst
+		// release artefacts sitting in this repository's build directory.
+		// MEASURED: 30-second timeout before, 1.6 seconds after. The answer
+		// was not merely slow, it was never arriving.
+		//
+		// 2 MB is far above any real source file and far below any binary
+		// worth mistaking for one. Counting "lines" in a compiled package is
+		// not a cheaper version of the right answer, it is a meaningless one.
+		args = append(args, "--code", "--max-filesize", "2M")
 	default:
 		if params.Query == "" {
 			if params.Recent || params.ModifiedOnly {

@@ -700,6 +700,25 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		}
 	}
 
+	// GORILLA FIX (2026-08-19), audit: a page that produced no text must say
+	// so, and say why it is not the same as an empty page.
+	//
+	// Same shape as the find and view findings. lynx and the HTML extractor
+	// both return "" for a page whose content is built by JavaScript in the
+	// browser — which is most of the modern web. Returning an empty fence
+	// reads as "this page is blank", and a model reports that as a fact about
+	// the site rather than a limit of the tool.
+	if strings.TrimSpace(out) == "" {
+		return NewTextErrorResponse(fmt.Sprintf(
+			"%s was fetched successfully (HTTP %d, %d bytes) but no readable text could be "+
+				"extracted from it.\n\n"+
+				"This is NOT the same as the page being empty. The usual cause is a page whose "+
+				"content is assembled by JavaScript in the browser, which nothing here executes. "+
+				"Try format=\"html\" to see the raw markup, look for an API or .md/.txt version of "+
+				"the same document, or ask the user to paste what they can see.",
+			target, status, len(res.body))), nil
+	}
+
 	header := fmt.Sprintf("Fetched: %s", target)
 	if len(notes) > 0 {
 		header += "\nHow: " + strings.Join(notes, "; ")

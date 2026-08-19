@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/logging"
@@ -216,10 +218,56 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		), nil
 	}
 
+	// GORILLA FIX (2026-08-19), search-strategy audit extended to view: refuse
+	// a binary file instead of dumping its bytes into the conversation.
+	//
+	// MEASURED before this: viewing a 7-byte binary returned
+	//     <file>     1|\x00\x01\x02\x03\x00\xff\x00</file>
+	// — raw bytes rendered as if they were source. The file-size limit is
+	// 5 MB, so a real binary could put five megabytes of garbage into the
+	// context, where it would then be re-sent on every later turn. The tool's
+	// own description already claimed it "cannot display binary files"; it
+	// displayed them, badly.
+	//
+	// Images are handled above and are NOT binary as far as this tool is
+	// concerned — they are read with OCR.
+	if kind := binaryFileKind(filePath); kind != "" {
+		return NewTextErrorResponse(fmt.Sprintf(
+			"%s is a binary file (%s), so its contents are not text and were not read.\n\n"+
+				"Dumping raw bytes here would fill the conversation with unreadable data and "+
+				"cost tokens on every later turn.\n\n"+
+				"If you need to know what is INSIDE it, use bash with a tool built for that: "+
+				"`file`, `strings`, `xxd | head`, `7z l`, `readelf`, or `binwalk`. "+
+				"Run /arsenal to see which of those this machine has.", filePath, kind)), nil
+	}
+
 	// Read the file content
 	content, lineCount, err := readTextFile(filePath, params.Offset.Int(), params.Limit.Int())
 	if err != nil {
 		return ToolResponse{}, fmt.Errorf("error reading file: %w", err)
+	}
+
+	// GORILLA FIX (2026-08-19), audit: an empty result must say WHY it is
+	// empty. Both of these used to return "<file>\n\n</file>" — a shape that
+	// looks like a failed read, and that a model reports as "the file appears
+	// to be empty" whichever of the two it actually was.
+	if strings.TrimSpace(content) == "" {
+		if fileInfo.Size() == 0 {
+			return NewTextResponse(fmt.Sprintf(
+				"%s is empty (0 bytes). The read succeeded; there is nothing in the file.",
+				filePath)), nil
+		}
+		if params.Offset.Int() > 0 {
+			// readTextFile resets its counter to the requested offset, so it
+			// cannot report the REAL length here — and the real length is the
+			// entire point of this message. Counted separately, on this error
+			// path only, where one extra pass costs nothing.
+			total := countFileLines(filePath)
+			return NewTextErrorResponse(fmt.Sprintf(
+				"%s has %d line(s), so offset %d is past the end of it and nothing was returned. "+
+					"This is NOT an empty file — read it from offset 0, or from a line below %d.",
+				filePath, total, params.Offset.Int(), total)), nil
+		}
 	}
 
 	notifyLspOpenFile(ctx, filePath, v.lspClients)
@@ -359,4 +407,72 @@ func (s *LineScanner) Text() string {
 
 func (s *LineScanner) Err() error {
 	return s.scanner.Err()
+}
+
+// binaryFileKind names a binary payload, or "" if the file looks like text.
+//
+// Deliberately conservative: it reads only the first chunk and looks for the
+// one thing that never appears in text, a NUL byte, plus a handful of magic
+// numbers for the formats people actually try to open by mistake. A false
+// positive here refuses a readable file, which is worse than the bytes it
+// prevents, so the test is narrow on purpose.
+func binaryFileKind(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	buf := make([]byte, 8192)
+	n, _ := f.Read(buf)
+	if n == 0 {
+		return ""
+	}
+	head := buf[:n]
+
+	for magic, name := range map[string]string{
+		"\x7fELF":            "ELF executable or library",
+		"MZ":                 "Windows executable",
+		"PK\x03\x04":         "zip-based archive (zip, jar, docx, apk)",
+		"\x1f\x8b":           "gzip archive",
+		"BZh":                "bzip2 archive",
+		"\xfd7zXZ":           "xz archive",
+		"(\xb5/\xfd":         "zstd archive",
+		"7z\xbc\xaf\x27\x1c": "7-zip archive",
+		"!<arch>":            "ar archive (.deb, .a)",
+		"%PDF":               "PDF",
+		"\x00asm":            "WebAssembly module",
+		"SQLite format 3":    "SQLite database",
+	} {
+		if bytes.HasPrefix(head, []byte(magic)) {
+			return name
+		}
+	}
+
+	// A NUL byte in the first chunk is the classic test, and the one every
+	// other tool uses. Valid UTF-8 text never contains one.
+	if bytes.IndexByte(head, 0) >= 0 {
+		return "binary data"
+	}
+	// Not valid UTF-8 at all, and not obviously a known format.
+	if !utf8.Valid(head) && n > 16 {
+		return "not valid UTF-8 text"
+	}
+	return ""
+}
+
+// countFileLines returns the number of lines in a file, or 0 if it cannot be read.
+// Used only to make an error message truthful, never on the success path.
+func countFileLines(path string) int {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+	n := 0
+	sc := NewLineScanner(f)
+	for sc.Scan() {
+		n++
+	}
+	return n
 }
