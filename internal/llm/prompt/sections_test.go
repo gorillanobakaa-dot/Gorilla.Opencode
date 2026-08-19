@@ -204,3 +204,30 @@ func TestRegisterSectionComponentsIsIdempotent(t *testing.T) {
 		t.Errorf("second call added %d duplicate rows", len(config.LoadoutComponents)-n)
 	}
 }
+
+// GORILLA OVERRIDE (2026-08-19): a line-gated loadout row must report a
+// MEASURED cost, like every other row on /context. prompt.localtools is gated
+// per line rather than per section, and per-line gating had nothing measuring
+// it — so it would have shipped showing a hand-typed number on the one screen
+// whose entire purpose is not doing that.
+func TestGatedLineTokensMeasuresTheRealLines(t *testing.T) {
+	got := GatedLineTokens("prompt.localtools")
+	if got <= 0 {
+		t.Fatalf("prompt.localtools measured %d tokens; the hints are in coder-modern.txt and are not free", got)
+	}
+	// Measured against the raw source, not the assembled prompt: a row that is
+	// currently OFF must still report what turning it ON would cost.
+	if none := GatedLineTokens("prompt.definitely-not-a-real-id"); none != 0 {
+		t.Errorf("an id that gates nothing measured %d tokens", none)
+	}
+}
+
+// The hints exist to replace wrong instincts. If the sentences go, the row is
+// charging for nothing.
+func TestTheLocalToolHintsAreActuallyPresent(t *testing.T) {
+	for _, want := range []string{"adb backup", "aapt dump badging", "--skip-download", "apktool", "carving"} {
+		if !strings.Contains(baseModernCoderPrompt, want) {
+			t.Errorf("the prompt no longer mentions %q, but prompt.localtools still bills for it", want)
+		}
+	}
+}

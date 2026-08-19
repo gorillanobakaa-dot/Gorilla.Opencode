@@ -290,3 +290,34 @@ func RegisterSectionComponents() {
 	}
 	config.RegisterLoadoutComponents(comps)
 }
+
+// GatedLineTokens measures the prompt lines that carry [[needs <id>]], so a
+// line-gated loadout row can report a MEASURED cost rather than a guess.
+//
+// GORILLA OVERRIDE (2026-08-19): rows gated per-SECTION already get measured
+// by section. Rows gated per-LINE had nothing measuring them, so
+// prompt.localtools would have shipped showing whatever number was typed into
+// the registry — on the one screen whose entire purpose is not doing that.
+// calibrate_test.go's sentinel caught it immediately.
+func GatedLineTokens(id string) int {
+	// The gates have already been applied and the markers stripped by the time
+	// BaseCoderPrompt returns, so measure the RAW embedded source instead —
+	// otherwise a row that is currently OFF would measure as costing nothing,
+	// which is true and useless: the number has to say what turning it ON
+	// would cost.
+	raw := baseModernCoderPrompt
+	total := 0
+	for _, line := range strings.Split(raw, "\n") {
+		m := needsMarkerRe.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		for _, want := range strings.Fields(m[1]) {
+			if want == id {
+				total += len(needsMarkerRe.ReplaceAllString(line, "")) / 4
+				break
+			}
+		}
+	}
+	return total
+}

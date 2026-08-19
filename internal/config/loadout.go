@@ -100,6 +100,19 @@ var LoadoutComponents = []LoadoutComponent{
 	// still overwrites this at startup with a measured value.
 	{"prompt.env", "Environment info", "agent won't be told your cwd, OS, top-level files, or short git status", 150, true, false},
 	{"prompt.lsp", "LSP info", "agent won't be told which language servers are active", 100, true, false},
+	// GORILLA OVERRIDE (2026-08-19): five hints that REPLACE WRONG INSTINCTS
+	// rather than add capability — adb backup has been dead since Android 12
+	// and fails silently, yt-dlp downloads the whole video unless told not to,
+	// carving cannot recover source code. Each one is a wrong first move that
+	// costs the user a wasted round trip or, worse, a promise the agent cannot
+	// keep.
+	//
+	// Default OFF, and that is the point. They are worth real money to someone
+	// doing Android or media or forensics work and worth nothing to everyone
+	// else, and a prompt line is a RECURRING bill — it rides every turn
+	// forever. Shipping them on by default would tax every user for a
+	// capability most of them will never use.
+	{"prompt.localtools", "Local tool hints (android, media, forensics)", "agent keeps the wrong first instincts about local tools: it will reach for adb backup (dead since Android 12, fails silently), let yt-dlp pull whole videos to get subtitles, and may imply carving can recover source code", 120, false, false},
 }
 
 // RegisterLoadoutComponents appends dynamically discovered switchable

@@ -20,6 +20,23 @@ require (
 	github.com/go-logfmt/logfmt v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/lrstanley/bubblezone v0.0.0-20250315020633-c249a3fe1231
+	// GORILLA OVERRIDE (2026-08-19): this pin is a DECISION, not a default,
+	// and it has a cost worth stating.
+	//
+	// v0.17.0 hard-codes LATEST_PROTOCOL_VERSION = "2024-11-05". Upstream is
+	// at v0.58.0 (plus a v1.0.0 beta) and speaks later revisions. So this
+	// client asks every MCP server for a two-year-old protocol, and a server
+	// that only offers a newer one will negotiate down or fail — which,
+	// before 2026-08-19, was invisible: nothing logged the negotiated
+	// version, so a capability missing because of a version mismatch looked
+	// exactly like a capability the server does not have. getTools now logs
+	// what was requested and what was agreed, and warns when they differ.
+	//
+	// Left pinned rather than bumped in the same commit as a security fix:
+	// forty-one minor versions of an RPC library is its own change, with its
+	// own testing, and SECURITY.md's "the only thing that showed up was the
+	// AI endpoint we had chosen" claim has to be re-verified against whatever
+	// transports a newer version brings.
 	github.com/mark3labs/mcp-go v0.17.0
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
 	github.com/muesli/reflow v0.3.0

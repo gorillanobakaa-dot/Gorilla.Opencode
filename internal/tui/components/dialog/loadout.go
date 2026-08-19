@@ -342,6 +342,21 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 		Render(fitLine(fmt.Sprintf("~%s tokens sent on EVERY turn, even to say \"yo\"%s.", commaInt(total), loadoutCostSuffix())))
 	fixed := base.Foreground(t.TextMuted()).Width(w).
 		Render(fitLine(fmt.Sprintf("(base system prompt ~%s is always on; the rest is yours to cut)", commaInt(config.LoadoutBaseTokens()))))
+	// GORILLA FIX (2026-08-19): say how good these numbers are.
+	//
+	// Every figure on this screen comes from infoTokens(), which serialises a
+	// schema and divides by four. Measured against a real tokeniser it
+	// OVERSTATES by about 10.1%. And the byte cost in FOOTPRINT.md (6.06
+	// bytes/token) was measured against a provider that REFUSES compression,
+	// so it is a worst case, not a typical one.
+	//
+	// Both are good enough for the decision this screen exists to inform —
+	// which rows to switch off — and neither is good enough to be quoted as a
+	// bill. A screen whose whole purpose is honesty about cost cannot present
+	// an estimate in the typography of a measurement.
+	accuracy := base.Foreground(t.TextMuted()).Width(w).
+		Render(fitLine("estimates, ~10% high: schema bytes ÷ 4, not a real tokeniser"))
+
 	// rowStyle applies the shared selected / disabled styling to any row.
 	rowStyle := func(selected, muted bool) lipgloss.Style {
 		s := base.Width(w)
@@ -494,7 +509,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	if !compact {
 		// The subtitle and the context-size line explain; they are not state you
 		// act on, so they are the first to go on a short terminal.
-		parts = append(parts, sub, fixed, "")
+		parts = append(parts, sub, fixed, accuracy, "")
 	}
 	parts = append(parts,
 		dialHeader,

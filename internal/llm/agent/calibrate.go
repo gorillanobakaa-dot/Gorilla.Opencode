@@ -88,5 +88,11 @@ func CalibrateLoadout(
 	base := prompt.BaseCoderPrompt(models.ProviderLocal)
 	config.SetBasePromptTokens(len(base) / 4)
 	config.SetLoadoutTokens("prompt.env", len(prompt.EnvironmentInfoBlock())/4)
+	// GORILLA FIX (2026-08-19): line-gated rows need measuring too. Rows gated
+	// per SECTION are measured by section; prompt.localtools is gated per LINE
+	// and had nothing measuring it, so it would have shipped displaying a
+	// hand-typed guess on the one screen built not to do that. The sentinel in
+	// calibrate_test.go caught it on the first run.
+	config.SetLoadoutTokens("prompt.localtools", prompt.GatedLineTokens("prompt.localtools"))
 	config.SetLoadoutTokens("prompt.lsp", len(prompt.LSPInfoBlock())/4)
 }

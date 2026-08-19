@@ -27,6 +27,14 @@ func CoderAgentTools(
 ) []tools.BaseTool {
 	ctx := context.Background()
 	otherTools := GetMcpTools(ctx, permissions)
+	// GORILLA FIX (2026-08-19): MCP tools were never registered in the
+	// loadout, so /context, the per-turn cost line and the burn-rate warning
+	// were all computed over a tool list that excluded them. Someone with
+	// three MCP servers was shown a number that was simply wrong — on the one
+	// screen built to tell them what their setup costs. Registered here
+	// because this is the first point at which the servers have been contacted
+	// and their real schemas measured; the registry is idempotent by ID.
+	config.RegisterLoadoutComponents(McpLoadoutComponents())
 	if len(lspClients) > 0 && loadoutOn("tool.diagnostics") {
 		otherTools = append(otherTools, tools.NewDiagnosticsTool(lspClients))
 	}
