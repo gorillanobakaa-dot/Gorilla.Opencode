@@ -18,6 +18,8 @@ INSERT INTO sessions (
     message_count,
     prompt_tokens,
     completion_tokens,
+    cumulative_prompt_tokens,
+    cumulative_completion_tokens,
     cost,
     started_in,
     summary_message_id,
@@ -32,21 +34,25 @@ INSERT INTO sessions (
     ?,
     ?,
     ?,
+    ?,
+    ?,
     null,
     strftime('%s', 'now'),
     strftime('%s', 'now')
-) RETURNING id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in
+) RETURNING id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens
 `
 
 type CreateSessionParams struct {
-	ID               string         `json:"id"`
-	ParentSessionID  sql.NullString `json:"parent_session_id"`
-	Title            string         `json:"title"`
-	MessageCount     int64          `json:"message_count"`
-	PromptTokens     int64          `json:"prompt_tokens"`
-	CompletionTokens int64          `json:"completion_tokens"`
-	Cost             float64        `json:"cost"`
-	StartedIn        string         `json:"started_in"`
+	ID                         string         `json:"id"`
+	ParentSessionID            sql.NullString `json:"parent_session_id"`
+	Title                      string         `json:"title"`
+	MessageCount               int64          `json:"message_count"`
+	PromptTokens               int64          `json:"prompt_tokens"`
+	CompletionTokens           int64          `json:"completion_tokens"`
+	CumulativePromptTokens     int64          `json:"cumulative_prompt_tokens"`
+	CumulativeCompletionTokens int64          `json:"cumulative_completion_tokens"`
+	Cost                       float64        `json:"cost"`
+	StartedIn                  string         `json:"started_in"`
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
@@ -57,6 +63,8 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 		arg.MessageCount,
 		arg.PromptTokens,
 		arg.CompletionTokens,
+		arg.CumulativePromptTokens,
+		arg.CumulativeCompletionTokens,
 		arg.Cost,
 		arg.StartedIn,
 	)
@@ -73,6 +81,8 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 		&i.CreatedAt,
 		&i.SummaryMessageID,
 		&i.StartedIn,
+		&i.CumulativePromptTokens,
+		&i.CumulativeCompletionTokens,
 	)
 	return i, err
 }
@@ -88,7 +98,7 @@ func (q *Queries) DeleteSession(ctx context.Context, id string) error {
 }
 
 const getSessionByID = `-- name: GetSessionByID :one
-SELECT id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in
+SELECT id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens
 FROM sessions
 WHERE id = ? LIMIT 1
 `
@@ -108,12 +118,14 @@ func (q *Queries) GetSessionByID(ctx context.Context, id string) (Session, error
 		&i.CreatedAt,
 		&i.SummaryMessageID,
 		&i.StartedIn,
+		&i.CumulativePromptTokens,
+		&i.CumulativeCompletionTokens,
 	)
 	return i, err
 }
 
 const listSessions = `-- name: ListSessions :many
-SELECT id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in
+SELECT id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens
 FROM sessions
 WHERE parent_session_id is NULL
 ORDER BY created_at DESC
@@ -140,6 +152,8 @@ func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {
 			&i.CreatedAt,
 			&i.SummaryMessageID,
 			&i.StartedIn,
+			&i.CumulativePromptTokens,
+			&i.CumulativeCompletionTokens,
 		); err != nil {
 			return nil, err
 		}
@@ -155,7 +169,7 @@ func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {
 }
 
 const listSessionsByDir = `-- name: ListSessionsByDir :many
-SELECT id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in
+SELECT id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens
 FROM sessions
 WHERE parent_session_id is NULL
   AND (started_in = ? OR started_in = '')
@@ -183,6 +197,8 @@ func (q *Queries) ListSessionsByDir(ctx context.Context, startedIn string) ([]Se
 			&i.CreatedAt,
 			&i.SummaryMessageID,
 			&i.StartedIn,
+			&i.CumulativePromptTokens,
+			&i.CumulativeCompletionTokens,
 		); err != nil {
 			return nil, err
 		}
@@ -203,19 +219,23 @@ SET
     title = ?,
     prompt_tokens = ?,
     completion_tokens = ?,
+    cumulative_prompt_tokens = ?,
+    cumulative_completion_tokens = ?,
     summary_message_id = ?,
     cost = ?
 WHERE id = ?
-RETURNING id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in
+RETURNING id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens
 `
 
 type UpdateSessionParams struct {
-	Title            string         `json:"title"`
-	PromptTokens     int64          `json:"prompt_tokens"`
-	CompletionTokens int64          `json:"completion_tokens"`
-	SummaryMessageID sql.NullString `json:"summary_message_id"`
-	Cost             float64        `json:"cost"`
-	ID               string         `json:"id"`
+	Title                      string         `json:"title"`
+	PromptTokens               int64          `json:"prompt_tokens"`
+	CompletionTokens           int64          `json:"completion_tokens"`
+	CumulativePromptTokens     int64          `json:"cumulative_prompt_tokens"`
+	CumulativeCompletionTokens int64          `json:"cumulative_completion_tokens"`
+	SummaryMessageID           sql.NullString `json:"summary_message_id"`
+	Cost                       float64        `json:"cost"`
+	ID                         string         `json:"id"`
 }
 
 func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) (Session, error) {
@@ -223,6 +243,8 @@ func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) (S
 		arg.Title,
 		arg.PromptTokens,
 		arg.CompletionTokens,
+		arg.CumulativePromptTokens,
+		arg.CumulativeCompletionTokens,
 		arg.SummaryMessageID,
 		arg.Cost,
 		arg.ID,
@@ -240,6 +262,8 @@ func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) (S
 		&i.CreatedAt,
 		&i.SummaryMessageID,
 		&i.StartedIn,
+		&i.CumulativePromptTokens,
+		&i.CumulativeCompletionTokens,
 	)
 	return i, err
 }

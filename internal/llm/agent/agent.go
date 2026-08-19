@@ -779,6 +779,27 @@ func (a *agent) TrackUsage(ctx context.Context, sessionID string, model models.M
 	sess.CompletionTokens = usage.OutputTokens
 	sess.PromptTokens = usage.InputTokens + usage.CacheCreationTokens + usage.CacheReadTokens
 
+	// GORILLA FIX (2026-08-19): the two fields above are the CURRENT context
+	// occupancy — assigned, not accumulated, because the status bar and
+	// sidebar compare their sum against the model's context window and a
+	// running total would climb past 100% and sit there showing a false
+	// warning. Compaction depends on the same reading: it zeroes PromptTokens
+	// because the context really has been emptied.
+	//
+	// The problem was that three OTHER readers treated the same two fields as
+	// lifetime totals. The session export writes "Tokens: N in / M out" into a
+	// document meant to be kept, and the sidebar labels them "Input" and
+	// "Output" — all of them reporting the last turn only, with nothing on
+	// screen to say so. Meanwhile Cost, three lines up, has always used `+=`,
+	// so one panel could show a cost accumulated over an hour next to a token
+	// count from thirty seconds ago.
+	//
+	// Both readings are legitimate and they are different numbers, so both are
+	// now stored. Accumulating the existing fields — which is what the
+	// proposal asked for — would have fixed the export and broken the gauge.
+	sess.CumulativeCompletionTokens += usage.OutputTokens
+	sess.CumulativePromptTokens += usage.InputTokens + usage.CacheCreationTokens + usage.CacheReadTokens
+
 	_, err = a.sessions.Save(ctx, sess)
 	if err != nil {
 		return fmt.Errorf("failed to save session: %w", err)
@@ -944,8 +965,16 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 			return
 		}
 		oldSession.SummaryMessageID = msg.ID
+		// The context has genuinely been emptied and refilled with a summary,
+		// so the gauge resets. The cumulative counters do not — summarising
+		// costs real tokens, and a ledger that forgets them at every
+		// compaction would understate a long session by exactly the amount
+		// the user is most likely to be asking about.
 		oldSession.CompletionTokens = response.Usage.OutputTokens
 		oldSession.PromptTokens = 0
+		oldSession.CumulativeCompletionTokens += response.Usage.OutputTokens
+		oldSession.CumulativePromptTokens += response.Usage.InputTokens +
+			response.Usage.CacheCreationTokens + response.Usage.CacheReadTokens
 		model := a.summarizeProvider.Model()
 		usage := response.Usage
 		cost := model.CostPer1MInCached/1e6*float64(usage.CacheCreationTokens) +

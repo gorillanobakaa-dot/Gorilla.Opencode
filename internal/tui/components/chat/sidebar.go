@@ -194,10 +194,23 @@ func (m *sidebarCmp) tokenUsageSection() string {
 			fmt.Sprintf("%-8s%s", label, formatTokens(v)))
 	}
 
+	// GORILLA FIX (2026-08-19): this said "Input"/"Output" and showed the
+	// CURRENT context occupancy, which is the last turn — next to a Cost
+	// figure accumulated over the whole session. Two numbers on adjacent rows
+	// measuring different spans of time, with nothing saying so.
+	//
+	// Both are worth seeing, so both are shown and each is labelled with the
+	// span it covers. Sessions created before the cumulative columns existed
+	// read 0 there; that is left visible rather than back-filled, because a
+	// plausible wrong number is worse than an honest zero.
 	return lipgloss.JoinVertical(lipgloss.Left,
 		baseStyle.Foreground(t.Primary()).Bold(true).Width(m.width).Render("Token Usage"),
 		row("Input", m.session.PromptTokens),
 		row("Output", m.session.CompletionTokens),
+		baseStyle.Foreground(t.TextMuted()).Width(m.width).Render("(context now)"),
+		row("Total in", m.session.CumulativePromptTokens),
+		row("Total out", m.session.CumulativeCompletionTokens),
+		baseStyle.Foreground(t.TextMuted()).Width(m.width).Render("(whole session)"),
 	)
 }
 

@@ -155,7 +155,13 @@ func WriteSessionTree(dir string, sess session.Session, msgs []message.Message, 
 			fmt.Fprintf(&b, "\n---\n\n## Helper: %s\n\n", title)
 			fmt.Fprintf(&b, "- **Session ID:** `%s`\n", br.Session.ID)
 			fmt.Fprintf(&b, "- **Messages:** %d\n", len(br.Messages))
-			fmt.Fprintf(&b, "- **Tokens:** %d in / %d out\n\n",
+			// GORILLA FIX (2026-08-19): this wrote the LAST TURN's token counts
+			// into a document meant to be kept, labelled as though it were the
+			// helper's total. A transcript that misstates what a run cost is
+			// worse than one that omits it.
+			fmt.Fprintf(&b, "- **Tokens (whole run):** %d in / %d out\n",
+				br.Session.CumulativePromptTokens, br.Session.CumulativeCompletionTokens)
+			fmt.Fprintf(&b, "- **Context at the end:** %d in / %d out\n\n",
 				br.Session.PromptTokens, br.Session.CompletionTokens)
 			b.WriteString(renderMessages(br.Messages))
 		}
