@@ -911,12 +911,21 @@ func (m ArsenalCmp) View() string {
 		b = append(b, base.Width(w).Foreground(t.Warning()).Render(truncateToWidth(m.notice, w)))
 	}
 
-	// Pad to the full height so the frame is a constant size. A frame whose
-	// height changes is survivable, but a constant one is predictable, and
-	// predictable is what the renderer's erase arithmetic likes.
-	for len(b) < budget {
-		b = append(b, base.Width(w).Render(""))
-	}
+	// GORILLA FIX (2026-08-19), from a screenshot: do NOT pad to the full
+	// height.
+	//
+	// The previous version padded every view out to the terminal height so the
+	// frame would be a constant size. On screen that means the series list —
+	// eight rows of content — sits in a box with thirty blank rows under it,
+	// covering the sidebar and the conversation to display nothing. It reads
+	// as a program that stopped halfway.
+	//
+	// The invariant that actually matters is "never TALLER than the terminal",
+	// not "always exactly the terminal". Constant height was my reasoning, and
+	// the picture beat it: v0.1.56's note already records that bubbletea
+	// handles a frame that shrinks. The budget still comes from the terminal
+	// height, which is what keeps the notice and the overflow marker inside a
+	// known bound; the box simply stops when the content does.
 
 	content := lipgloss.JoinVertical(lipgloss.Left, b...)
 	return base.Padding(1, 2).

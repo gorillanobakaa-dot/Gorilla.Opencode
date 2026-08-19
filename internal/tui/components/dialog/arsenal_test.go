@@ -359,13 +359,17 @@ func TestThePageFillsTheScreenExactly(t *testing.T) {
 			m.view = view
 			out := m.View()
 			gotH := lipgloss.Height(out)
+			// AMENDED 2026-08-19 from a screenshot: the invariant is "never
+			// TALLER than the terminal", not "always exactly it". Padding a
+			// short page out to full height put thirty blank rows under eight
+			// rows of content, covering the sidebar and the conversation to
+			// show nothing, and reading as a program that had stopped.
 			if gotH > size.h {
 				t.Errorf("%dx%d view %d: frame is %d rows tall, taller than the terminal",
 					size.w, size.h, view, gotH)
 			}
-			if gotH != size.h {
-				t.Errorf("%dx%d view %d: frame is %d rows, want exactly %d — a constant "+
-					"full-screen frame is the point", size.w, size.h, view, gotH, size.h)
+			if gotH < 3 {
+				t.Errorf("%dx%d view %d: frame collapsed to %d rows", size.w, size.h, view, gotH)
 			}
 			for i, line := range strings.Split(out, "\n") {
 				if got := lipgloss.Width(line); got > size.w {
@@ -383,6 +387,8 @@ func TestTheNoticeAndTheOverflowMarkerLiveInsideTheBudget(t *testing.T) {
 	m.SetSize(100, 14) // deliberately short: content cannot fit
 	m.notice = "selected 2 — press p to measure the cost."
 	out := m.View()
+	// Content cannot fit at this height, so the frame DOES fill it — that is
+	// the case the budget arithmetic exists for.
 	if lipgloss.Height(out) != 14 {
 		t.Fatalf("frame is %d rows, want 14", lipgloss.Height(out))
 	}
@@ -456,4 +462,27 @@ func TestAFailedMeasurementReplacesTheNoticeToo(t *testing.T) {
 	if !strings.Contains(got.notice, "could not measure") {
 		t.Errorf("the failure was not reported: %q", got.notice)
 	}
+}
+
+// GORILLA OVERRIDE (2026-08-19), from a screenshot: a short page must not
+// reserve the whole screen to display nothing.
+//
+// The series list is eight rows. Padded to a 52-row terminal it covered the
+// sidebar and the conversation with thirty blank rows, which reads as a program
+// that stopped halfway. "Never taller than the terminal" is the invariant;
+// "always exactly the terminal" was my addition and it was wrong.
+func TestAShortPageDoesNotReserveTheWholeScreen(t *testing.T) {
+	m := NewArsenalCmp()
+	m.SetSize(150, 52)
+	out := m.View()
+	h := lipgloss.Height(out)
+	if h > 52 {
+		t.Fatalf("frame is %d rows, taller than the terminal", h)
+	}
+	if h >= 45 {
+		t.Errorf("the series list rendered %d rows on a 52-row terminal; it has %d series and "+
+			"the rest is blank padding covering the conversation for nothing",
+			h, len(m.man.Series))
+	}
+	t.Logf("series list on a 52-row terminal: %d rows", h)
 }
