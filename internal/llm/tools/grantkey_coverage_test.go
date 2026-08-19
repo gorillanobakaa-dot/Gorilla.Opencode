@@ -15,6 +15,7 @@ package tools
 // request in the package forgets its key.
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -28,7 +29,26 @@ var (
 )
 
 func TestEveryPermissionRequestSetsAGrantKey(t *testing.T) {
-	files, err := filepath.Glob("*.go")
+	// Walk the WHOLE repository, not this package.
+	//
+	// The first version of this test globbed "*.go" here and passed — while
+	// internal/llm/agent/mcp-tools.go:93 still had an unkeyed request. The guard
+	// had the same blind spot as the bug it was written to catch: it only looked
+	// where someone had already looked. A structural test that is scoped to the
+	// place you happened to be standing is not structural.
+	var files []string
+	err := filepath.WalkDir("../../..", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() && (d.Name() == ".git" || d.Name() == "vendor" || d.Name() == "node_modules") {
+			return fs.SkipDir
+		}
+		if !d.IsDir() && strings.HasSuffix(path, ".go") {
+			files = append(files, path)
+		}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -97,6 +97,11 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 			Action:      "execute",
 			Description: permissionDescription,
 			Params:      params.Input,
+			// GORILLA FIX (2026-08-19): scope the grant to THIS invocation.
+			// An MCP server's tools are third-party code; "allow for session" on
+			// one call must not authorise every later call to that server with
+			// different arguments.
+			GrantKey: params.Input,
 		},
 	)
 	if !p {
