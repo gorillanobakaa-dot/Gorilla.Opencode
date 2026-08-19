@@ -1,3 +1,4 @@
+<!-- Version: 1.0.0 · updated 26-08-19-10-02 -->
 # Working on gorilla-opencode
 
 > ## ⛔ STOP — read `~/.agents/SETTLED.md` before advising or warning
@@ -366,6 +367,48 @@ cost real confusion; they are not optional.
   symptom of an untruncated long string is extra **height**, not extra width — a
   width assertion passes against it. Test the height. (I wrote the width version
   first and it passed against the bug.)
+- **DECORATION IS A LAYOUT LIABILITY, NOT A STYLE CHOICE — and this is now the
+  FOURTH instance of one class.** The three bullets above (chrome is subtracted;
+  lipgloss WRAPS rather than overflows; no line may be wider than the terminal)
+  are the same trap wearing three faces. Stated once, generally:
+
+  **Every border, margin, padding and fixed width is a SUBTRACTION from a fixed
+  terminal budget, and lipgloss fails by WRAPPING — silently, as extra HEIGHT,
+  in a different place from the cause.** That is why it keeps being
+  misdiagnosed: the symptom never resembles the mistake. Upstream's own issue
+  tracker carries open width-measurement and output-width-mismatch bugs, and
+  its release history is full of height/overflow-with-wrapping fixes, so this
+  is not a local misunderstanding of the library.
+
+  Recorded 2026-08-19 on `/arsenal`, where it happened TWICE IN ONE HOUR:
+  - The box was passed the TEXT width instead of its own styled width.
+    lipgloss counts padding INSIDE `Width()`, so the box was 4 columns too
+    narrow for its own content — every line wrapped to two. Measured with a
+    debug render harness: **a 27-row frame in a 20-row terminal.**
+  - Truncation counted RUNES, not display columns. An em-dash is 1 rune and 1
+    column; CJK and emoji are 1 rune and 2. Truncate with `lipgloss.Width`.
+
+  **The rules, in order:**
+  1. **Prefer a full-screen fixed budget to a content-sized box.** Reserving
+     rows for optional trailing elements manages the symptom; a budget known
+     before anything renders removes the question. This was the owner's call
+     over a smaller fix, and it immediately exposed both bugs above — which the
+     small box had been hiding.
+  2. **Assert the frame is EXACTLY the terminal height, never "not taller".**
+     "Not taller" passes against a box that is silently too small, and too
+     small is precisely the state that causes wrapping.
+  3. **Count chrome exactly, in a comment, at the point of arithmetic.** Border
+     = 2 columns and 2 rows OUTSIDE the styled width; `Padding(1,2)` = 4
+     columns and 2 rows INSIDE it.
+  4. **Truncate by display columns; never let lipgloss wrap a line you own.**
+  5. **Honour `WindowSizeMsg` on every component.** A component that keeps a
+     size from startup is wrong the moment the window changes.
+  6. **When a decoration is close to free versus a real risk, drop it.** The
+     owner's standing instruction, given more than once, is `NO LINES` and
+     "simplicity works best". Nice window decorations look good in a
+     screenshot and cost frames in a 1600×900 terminal on the machine this is
+     built for.
+
 - **`viper.ConfigFileUsed()` stays empty for the whole process if no config.json
   existed at startup** — nothing re-runs `ReadInConfig`. `updateCfgFile` keyed
   "does a config exist?" off it and substituted a literal `{}`, so on a fresh
