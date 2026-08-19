@@ -1,3 +1,36 @@
+## v0.1.107 — 2026-08-19 — the one I said was fine
+
+**Plain-language version:** yesterday's release audited four tools and fixed ten
+problems, and the notes said two tools were checked and deliberately left alone.
+The owner's reply was, in effect: check those too. One was fine. The other had a
+bug that cost a full minute every time and then lied about what happened.
+
+Ask the program to run a shell command ending in `exit` — something like
+`build.sh || exit 1`, an ordinary thing to write — and the command ran, worked,
+and had its output captured. Then the shell it ran in shut itself down, because
+that is what `exit` does. The program waited for a result that was never coming,
+and sixty seconds later reported "Command execution timed out or was
+interrupted". Every part of that is wrong except the waiting.
+
+It matters more than the minute. An assistant told "this timed out" does the
+sensible thing and tries again, or raises the time limit, or tells you the
+machine is hanging — all the wrong fix, for a command that had already worked.
+It now returns instantly and says the shell session ended, that `exit` is the
+usual reason, that the output above is real, and that the exit code was lost
+with the shell. Sixty seconds down to a hundredth of one.
+
+The other tool really was fine. Web search distinguishes three situations rather
+than two — every source failed, nothing found but coverage incomplete, and
+results found with some sources down — each worded differently, including an
+explicit instruction not to substitute remembered citations when a search fails.
+That is the standard the rest of this week has been trying to reach.
+
+The honest bit: I did not test the shell tool before saying it was fine. I
+reasoned about it, decided it made sense, and wrote that in the release notes.
+That is the second time in one day — earlier, a test I wrote to catch a bug
+caught me committing the same bug in my own list of programming languages.
+Reasoning about what a program does is a guess; running it is the answer.
+
 ## v0.1.106 — 2026-08-19 — ten ways it could have lied to you
 
 **Plain-language version:** the search tool replaced three older ones, so it now
