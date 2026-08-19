@@ -13,8 +13,41 @@
 
 Use `apt`, not `dpkg -i`. Restart the program if it is already running.
 
-**Screenshots of everything in this release:**
-[docs/SCREENSHOTS.md](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.1.103/docs/SCREENSHOTS.md)
+---
+
+## Screenshots - every one of these is a real measurement, taken on a 2012 laptop
+
+*Click any image for the full-resolution original. Unscaled, uncropped, nothing staged.*
+
+**/arsenal - what the agent can do here, and what the rest would cost.** The header is measured on open, never claimed. The costs come from your own package manager, counted against what is already on your disk.
+
+[![The /arsenal series list: 25 of 33 capabilities already present on this machine, 8 not, and a measured cost of 97.9 MB to download and 331.0 MB on disk for the two selected - about 3.4 hours at 8 KB per second](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-arsenal-series-measured-cost.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-arsenal-series-measured-cost.png)
+
+**The install plan is the whole argument on one screen.** Nothing is installed by this program. It prints the command and gets out of the way.
+
+[![The /arsenal install plan: 2 capabilities to add, 4 packages, 97.9 MB to download and 331.0 MB on disk, the exact sudo apt-get command, and the line - This program will not run it and will never ask for your password](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-arsenal-install-plan.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-arsenal-install-plan.png)
+
+**Every key says what it did.** Pressing space on a group that is already installed used to do nothing and say nothing, which is indistinguishable from a broken key.
+
+[![The /arsenal page reporting - All 8 of these are already installed, nothing to select - after space was pressed on a group that is fully present](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-arsenal-already-installed.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-arsenal-already-installed.png)
+
+**Lines that behave.** These rules used to be 56 columns of box-drawing typed at a fixed length - too long for any narrower window, so each wrapped into two physical rows. Three on one screen meant three rows of debris. They are ASCII now and sized to the frame at render time.
+
+[![The /research cost dialog in supervised mode: ASCII rules spanning the frame exactly one row each, 0.192 dollars per minute, about 0.431 dollars for the run, 18 sessions across 10 helpers and 8 auditors](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-research-supervised-cost-ascii-rules.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-research-supervised-cost-ascii-rules.png)
+
+The same screen priced for four helpers. Note what it volunteers: which model the helpers will actually run on, that it is not the one you are chatting with, and that parallel buys time rather than answers.
+
+[![The /research cost dialog in parallel mode: 0.128 dollars per minute, about 0.0958 dollars for the run, and the note that parallel is the same token cost as sequential](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-research-parallel-cost-ascii-rules.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-research-parallel-cost-ascii-rules.png)
+
+**/osint explains itself before it spends anything.**
+
+[![The /osint capability page explaining the five-stage intelligence cycle, the 985-source registry of which 866 are free and 370 need no account, and the two-axis A-F reliability and 1-6 credibility grading](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-osint-capability-page.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-osint-capability-page.png)
+
+**It declined to burn money on a joke.** Pointed at a deliberately silly question with 10 agents, supervised, and told "the user chose these and they decide what this costs" - it refused, priced the refusal, answered for free anyway, and asked what the real work was.
+
+*Read the caveat: one run, one model (Deepseek V4 Flash), one question. The arithmetic - roughly 20 sessions - is ours, from the tool's own description. The decision to refuse is the model's. It has not been tested across models.*
+
+[![The agent declining a 10-agent supervised research run, explaining it would be roughly 20 LLM sessions and would waste the user money, then answering the question directly for free](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-refuses-expensive-run-on-a-joke.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.103/docs/screenshots/gallery/v0103-refuses-expensive-run-on-a-joke.png)
 
 ---
 

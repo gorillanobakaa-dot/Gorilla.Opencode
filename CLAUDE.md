@@ -189,6 +189,24 @@ Before any release, these must exist:
 - [ ] Screenshots at full capture resolution in `docs/screenshots/gallery/`,
       written up in `docs/SCREENSHOTS.md`, clickable to the original, never
       thumbnailed (directive §13). **Ask for them.**
+- [ ] **EMBEDDED IN THE RELEASE PAGE ITSELF**, not linked. This has had to be
+      said more than once, so it is now a TEST:
+      `internal/version/release_screenshots_test.go` fails the build if a
+      release page from v0.1.103 on carries no images, uses a relative or
+      `/main/` path, has thin alt text, or has an image that is not wrapped in
+      a link to its own full-resolution original.
+
+      v0.1.103 shipped with the words *"Everything you need is on this page,
+      printed in full"* directly above a link sending the reader elsewhere for
+      the screenshots — both halves wrong at once. And **no release page in
+      this project had ever embedded one**, which is why writing the rule down
+      four times did not fix it.
+
+      Two mechanics that were got wrong and are now pinned by the test:
+      **relative and `blob/` paths do not render in a GitHub release body** —
+      it must be an absolute `raw.githubusercontent.com` URL — and it must be
+      **pinned to the tag**, or the picture on a published page changes when
+      the file does.
 - [ ] A brain lesson for every non-obvious bug fixed in the cycle, each with its
       `generalisation`, so the next instance is recognised as a repeat.
 - [ ] Every measurement taken during the cycle written into a doc. Measurements
