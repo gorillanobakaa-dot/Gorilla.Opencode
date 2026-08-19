@@ -575,3 +575,144 @@ func TestContentSearchesInsideAProjectAreUntouched(t *testing.T) {
 		}
 	}
 }
+
+// ── search-strategy audit, 2026-08-19 ────────────────────────────────────
+//
+// Prompted by the owner: pfind replaced grep, glob and ls, so it is now on
+// nearly every turn, and its parameter surface is large enough that today's
+// bug is unlikely to be the only one of its kind. The audit looked for one
+// shape specifically — A FILTER THAT MISFIRES AND LOOKS LIKE AN EMPTY RESULT —
+// because that is what makes a model report a false fact about the codebase
+// rather than retry.
+
+// MEASURED before the fix: glob=".github/**" returned "No matches found" while
+// .github/workflows/ held build.yml, ci.yml and release.yml. A model asked
+// "does this project have CI?" is told no, and says no.
+//
+// Skipping hidden files is right as a DEFAULT and indefensible when the
+// request names the hidden thing. Typing ".github/**" is not ambiguous.
+func TestExplicitlyAskingForAHiddenPathFindsIt(t *testing.T) {
+	dir := t.TempDir()
+	hidden := filepath.Join(dir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(hidden, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(hidden, "ci.yml"),
+		[]byte("jobs:\n  build:\n    runs-on: ubuntu-latest\n"), 0o644))
+
+	resp := runFind(t, FindParams{Path: dir, Glob: ".github/**"})
+	assert.False(t, resp.IsError, resp.Content)
+	assert.Contains(t, resp.Content, "ci.yml",
+		"a glob that names a dot-directory must find it; otherwise the answer is "+
+			"indistinguishable from the project having no CI")
+
+	// And a content search rooted inside it.
+	resp = runFind(t, FindParams{Path: hidden, Query: "runs-on"})
+	assert.Contains(t, resp.Content, "runs-on")
+}
+
+// An ordinary search must NOT start dredging up .git objects and caches: the
+// default exists for a reason and the fix is intent-driven, not a blanket flag.
+func TestAnOrdinarySearchStillSkipsHiddenFiles(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".secretcache"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".secretcache", "junk.txt"),
+		[]byte("UNIQUEHIDDENMARKER\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "real.txt"),
+		[]byte("UNIQUEHIDDENMARKER\n"), 0o644))
+
+	resp := runFind(t, FindParams{Path: dir, Query: "UNIQUEHIDDENMARKER"})
+	assert.Contains(t, resp.Content, "real.txt")
+	assert.NotContains(t, resp.Content, "junk.txt",
+		"an ordinary search pulled in a hidden directory; the default is there so "+
+			"caches and .git do not flood every result")
+}
+
+// MEASURED before the fix: `pfind -t notalanguage` exits 0 with no output. So
+// type="pyton" produced "No matches found", which a model reads and reports as
+// "this project has no Python in it".
+//
+// A filter that misfires must never be indistinguishable from an empty result.
+func TestAnUnknownTypeIsRefusedRatherThanReturningNothing(t *testing.T) {
+	for _, bad := range []string{"pyton", "golang", "typescrip", "notalanguage"} {
+		why := checkType(bad)
+		require.NotEmpty(t, why, "type %q was accepted", bad)
+		assert.Contains(t, why, "NOT run",
+			"the message must say the search did not happen, not merely that the type is odd")
+		assert.Contains(t, why, "Valid types:")
+	}
+	// The realistic typos should get a suggestion.
+	assert.Contains(t, checkType("pyton"), "Did you mean")
+	assert.Contains(t, checkType("golang"), "Did you mean")
+}
+
+func TestEveryValidTypeIsAccepted(t *testing.T) {
+	for ok := range knownTypes() {
+		assert.Empty(t, checkType(ok), "valid type %q was rejected", ok)
+		assert.Empty(t, checkType(strings.ToUpper(ok)), "type matching must be case-insensitive")
+	}
+	assert.Empty(t, checkType(""), "an absent type is not an error")
+}
+
+// The audit's own guard: validTypes must not drift from what the engine
+// actually accepts. A list that quietly goes stale reintroduces exactly the
+// bug it was written to prevent — a valid type refused, or an invalid one let
+// through to return a misleading nothing.
+func TestTheTypeListMatchesTheEngine(t *testing.T) {
+	bin, prefix, err := findPfindPath()
+	if err != nil {
+		t.Skipf("pfind not available: %v", err)
+	}
+	out, err := exec.Command(bin, append(append([]string{}, prefix...), "--type-list")...).CombinedOutput()
+	if err != nil {
+		t.Skipf("could not list types: %v", err)
+	}
+	engine := map[string]bool{}
+	for _, line := range strings.Split(string(out), "\n") {
+		f := strings.Fields(line)
+		if len(f) >= 2 && !strings.HasSuffix(f[0], ":") {
+			engine[f[0]] = true
+		}
+	}
+	if len(engine) == 0 {
+		t.Skip("could not parse the engine's type list")
+	}
+	for v := range knownTypes() {
+		if !engine[v] {
+			t.Errorf("we accept type %q but the engine does not know it — a search with it "+
+				"returns nothing, which reads as 'no such code here'", v)
+		}
+	}
+}
+
+// MEASURED before the fix: modified_only outside a git repository returned
+// "No matches found" — the identical answer you get inside a repository whose
+// tree is clean.
+//
+// Those are different facts. One says "nothing has been edited"; the other
+// says "this question cannot be asked here". A model told the first will
+// report a clean working tree for a directory with no version control at all.
+func TestModifiedOnlyOutsideGitSaysSoRatherThanNoMatches(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.txt"), []byte("hello\n"), 0o644))
+
+	resp := runFind(t, FindParams{Path: dir, ModifiedOnly: true})
+	assert.True(t, resp.IsError, "content: %s", resp.Content)
+	assert.Contains(t, resp.Content, "not inside a git repository")
+	assert.Contains(t, resp.Content, "NOT the same as",
+		"the message must distinguish it from an empty result, which is the whole point")
+}
+
+func TestInsideGitRepoDetection(t *testing.T) {
+	repo := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(repo, ".git"), 0o755))
+	sub := filepath.Join(repo, "a", "b")
+	require.NoError(t, os.MkdirAll(sub, 0o755))
+	assert.True(t, insideGitRepo(repo), "the repository root")
+	assert.True(t, insideGitRepo(sub), "a nested directory")
+
+	// A worktree or submodule has .git as a FILE, not a directory.
+	wt := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: /elsewhere\n"), 0o644))
+	assert.True(t, insideGitRepo(wt), "a worktree, where .git is a file")
+
+	assert.False(t, insideGitRepo(t.TempDir()), "a plain directory")
+}

@@ -11,8 +11,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
@@ -360,6 +362,24 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	if why := doomedContentSearch(params, searchPath); why != "" {
 		return NewTextErrorResponse(why), nil
 	}
+	if why := checkType(params.Type); why != "" {
+		return NewTextErrorResponse(why), nil
+	}
+	// GORILLA FIX (2026-08-19), audit finding: modified_only outside a git
+	// repository returned "No matches found" — identical to the answer you get
+	// inside a repository with a clean tree.
+	//
+	// Those are different facts. One says "nothing has been edited"; the other
+	// says "this question cannot be asked here". A model told the former will
+	// report a clean working tree for a directory that has no version control
+	// at all.
+	if params.ModifiedOnly && !insideGitRepo(searchPath) {
+		return NewTextErrorResponse(fmt.Sprintf(
+			"modified_only asks git which files have uncommitted changes, and %s is not inside a "+
+				"git repository — so there is no such information here. This is NOT the same as "+
+				"'nothing has been modified'. Drop modified_only to search the files normally.",
+			searchPath)), nil
+	}
 
 	if params.Query == "" && params.Glob == "" {
 		// Listing mode still needs a shape; a bare directory listing is what
@@ -424,6 +444,18 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	}
 	if params.Fuzzy {
 		args = append(args, "--fuzzy")
+	}
+	// GORILLA FIX (2026-08-19), from the search-strategy audit: if the caller
+	// EXPLICITLY named a hidden or ignored path, show it to them.
+	//
+	// Measured on this repository: glob=".github/**" returned "No matches
+	// found" while .github/workflows/ held build.yml, ci.yml and release.yml.
+	// A model asked "does this project have CI?" is told no, and answers no.
+	// The skip is correct as a DEFAULT — nobody wants node_modules in every
+	// result — and indefensible when the request names the thing being
+	// skipped. Typing ".github/**" is not ambiguous.
+	if wantsHidden(params) {
+		args = append(args, "--hidden", "--no-ignore-vcs")
 	}
 	if params.ModifiedOnly {
 		// Listings FILTER to uncommitted files; searches add the git signal to
@@ -610,4 +642,140 @@ func doomedContentSearch(params FindParams, searchPath string) string {
 			"If you really do want to search file CONTENTS, give a `path` inside one project.\n\n"+
 			"The standard folders on this machine are listed in the environment block at the top "+
 			"of this conversation.", clean)
+}
+
+// wantsHidden reports that the caller explicitly asked for something normally
+// skipped: a dot-path, or a path/glob naming a directory git ignores.
+//
+// Intent-driven rather than a blanket flag. Always passing --hidden would put
+// .git objects, caches and editor droppings into every ordinary search, which
+// is the reason the default exists. This only fires when the request itself
+// names the hidden thing.
+func wantsHidden(params FindParams) bool {
+	for _, v := range []string{params.Glob, params.Path} {
+		v = strings.TrimPrefix(v, "!")
+		if v == "" {
+			continue
+		}
+		// A leading dot component, or one anywhere in the path: ".github",
+		// "src/.config", "**/.github/**".
+		if strings.HasPrefix(v, ".") && !strings.HasPrefix(v, "./") && !strings.HasPrefix(v, "..") {
+			return true
+		}
+		if strings.Contains(v, "/.") && !strings.Contains(v, "/./") && !strings.Contains(v, "/../") {
+			return true
+		}
+	}
+	return false
+}
+
+// knownTypes is the language list, READ FROM THE ENGINE rather than typed out.
+//
+// GORILLA FIX (2026-08-19): the first version of this was a hand-written list,
+// and TestTheTypeListMatchesTheEngine immediately caught six languages in it
+// that pfind has never heard of — protobuf, r, rb, rs, svelte, vue. I invented
+// them from memory while writing the guard against exactly this: a type we
+// accept but the engine does not know returns nothing, which reads as "there
+// is none of that language here".
+//
+// So it is derived, not declared. A hand-maintained mirror of somebody else's
+// list rots, and rots silently, in the direction of a false answer. The
+// fallback is used only if the engine cannot be asked at all, and is
+// deliberately the small set nobody could get wrong.
+var (
+	typesOnce sync.Once
+	typesSet  map[string]bool
+)
+
+var fallbackTypes = []string{"c", "cpp", "go", "js", "json", "md", "py", "python",
+	"rust", "sh", "ts", "yaml"}
+
+func knownTypes() map[string]bool {
+	typesOnce.Do(func() {
+		typesSet = map[string]bool{}
+		bin, prefix, err := findPfindPath()
+		if err == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			out, err := exec.CommandContext(ctx, bin, append(append([]string{}, prefix...), "--type-list")...).Output()
+			if err == nil {
+				for _, line := range strings.Split(string(out), "\n") {
+					f := strings.Fields(line)
+					// Rows are "name   .ext, .ext". Every type name is
+					// lowercase, which is what separates them from the
+					// header "Language types supported:" — whose first
+					// field carries no colon, so a colon check misses it.
+					// The drift test caught "language" getting in this way.
+					if len(f) >= 2 && f[0] == strings.ToLower(f[0]) &&
+						!strings.HasSuffix(f[0], ":") {
+						typesSet[f[0]] = true
+					}
+				}
+			}
+		}
+		if len(typesSet) == 0 {
+			for _, t := range fallbackTypes {
+				typesSet[t] = true
+			}
+		}
+	})
+	return typesSet
+}
+
+// sortedTypes is the list as shown to the model.
+func sortedTypes() []string {
+	m := knownTypes()
+	out := make([]string, 0, len(m))
+	for t := range m {
+		out = append(out, t)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// checkType returns an error message for an unknown type, or "".
+func checkType(t string) string {
+	if t == "" {
+		return ""
+	}
+	lower := strings.ToLower(strings.TrimSpace(t))
+	if knownTypes()[lower] {
+		return ""
+	}
+	// Offer the nearest few by prefix, which covers the realistic mistakes
+	// ("pyton", "golang", "typescrip").
+	var near []string
+	for _, v := range sortedTypes() {
+		if len(lower) >= 2 && (strings.HasPrefix(v, lower[:2]) || strings.HasPrefix(lower, v)) {
+			near = append(near, v)
+		}
+	}
+	msg := fmt.Sprintf("Unknown type %q, so this search was NOT run. "+
+		"An unrecognised type would otherwise return nothing, which looks exactly like "+
+		"\"there is none of that language here\" — and it is not the same thing.", t)
+	if len(near) > 0 {
+		msg += fmt.Sprintf(" Did you mean: %s?", strings.Join(near, ", "))
+	}
+	msg += "\n\nValid types: " + strings.Join(sortedTypes(), ", ")
+	return msg
+}
+
+// insideGitRepo walks up looking for a .git entry, the way git itself does.
+// A worktree or submodule has .git as a FILE rather than a directory, so the
+// check is for existence, not for a directory.
+func insideGitRepo(path string) bool {
+	dir := path
+	if st, err := os.Stat(dir); err == nil && !st.IsDir() {
+		dir = filepath.Dir(dir)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+			return true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false
+		}
+		dir = parent
+	}
 }
