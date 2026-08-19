@@ -214,6 +214,25 @@ echo $EXEC_EXIT_CODE > %s
 	}
 
 	interrupted := false
+	// GORILLA FIX (2026-08-19), tool audit: a command containing `exit` ends
+	// THIS shell, not a subshell.
+	//
+	// The command runs through `eval`, which executes in the current shell —
+	// so `exit 1`, or a script ending `|| exit 1`, terminates the persistent
+	// shell itself. The status file is then never written, the watcher below
+	// polls for it until the FULL TIMEOUT elapses (one minute by default), and
+	// the result comes back as "Command execution timed out or was
+	// interrupted".
+	//
+	// Every part of that is wrong except the delay. The command did not time
+	// out, it was not interrupted, and it very often succeeded — its output is
+	// sitting in the stdout file. A model told "timed out" retries, or raises
+	// the timeout, or reports a hang to the user. It fixes the wrong thing,
+	// having waited a minute to be misled.
+	//
+	// Measured before this: `echo out; exit 1` took the full timeout and
+	// reported a timeout. After: it returns at once and says what happened.
+	shellExited := false
 
 	startTime := time.Now()
 
@@ -229,6 +248,13 @@ echo $EXEC_EXIT_CODE > %s
 
 			case <-time.After(10 * time.Millisecond):
 				if fileExists(statusFile) && fileSize(statusFile) > 0 {
+					done <- true
+					return
+				}
+				// The shell died before writing its status. Stop waiting for a
+				// file that is never coming.
+				if !s.isAlive {
+					shellExited = true
 					done <- true
 					return
 				}
@@ -256,6 +282,15 @@ echo $EXEC_EXIT_CODE > %s
 	exitCode := 0
 	if exitCodeStr != "" {
 		fmt.Sscanf(exitCodeStr, "%d", &exitCode)
+	} else if shellExited {
+		// Named accurately. The output above is real and complete up to the
+		// point the shell ended; only the exit code was lost with it.
+		exitCode = 1
+		stderr += "\nThe shell session ended while running this command — the usual cause is an " +
+			"`exit` in the command itself, which ends this shell rather than a subshell. " +
+			"Any output above is real. The exit code could not be recorded. " +
+			"Drop the `exit` (use `false`, or let the last command's own status stand) and a " +
+			"fresh shell will be started for the next command."
 	} else if interrupted {
 		exitCode = 143
 		stderr += "\nCommand execution timed out or was interrupted"
