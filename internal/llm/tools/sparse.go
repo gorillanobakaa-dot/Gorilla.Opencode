@@ -147,7 +147,9 @@ func (s *sparseTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 			ToolName:    SparseToolName,
 			Action:      "execute",
 			Description: fmt.Sprintf("Run sparse semantic checks on %s", filePath),
-			Params:      params,
+			// Grant covers THIS file, not every file in the session.
+			GrantKey: filePath,
+			Params:   params,
 		})
 		if !granted {
 			return ToolResponse{}, permission.ErrorPermissionDenied

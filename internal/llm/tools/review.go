@@ -184,7 +184,9 @@ func (r *reviewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 		ToolName:    ReviewToolName,
 		Action:      "run",
 		Description: "Run static analysis and security tools over " + shown,
-		Params:      params,
+		// Grant covers THIS target, not every path in the session.
+		GrantKey: target,
+		Params:   params,
 	}) {
 		return ToolResponse{}, permission.ErrorPermissionDenied
 	}

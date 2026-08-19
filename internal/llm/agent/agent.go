@@ -755,8 +755,20 @@ func (a *agent) TrackUsage(ctx context.Context, sessionID string, model models.M
 		model.CostPer1MOut/1e6*float64(usage.OutputTokens)
 
 	sess.Cost += cost
-	sess.CompletionTokens = usage.OutputTokens + usage.CacheReadTokens
-	sess.PromptTokens = usage.InputTokens + usage.CacheCreationTokens
+	// GORILLA FIX (2026-08-19): a cache READ is INPUT, not output.
+	//
+	// Upstream did `CompletionTokens = OutputTokens + CacheReadTokens` and left
+	// cache reads out of PromptTokens entirely. Cache reads are prompt tokens
+	// served from cache — they are input by definition. So the ledger inflated
+	// output and understated input by the same amount.
+	//
+	// This matters more than a cosmetic mislabel: tool schemas live INSIDE the
+	// cached prefix, so the very number a user would consult to answer "what are
+	// my tool schemas costing me" was the one attributing them to the wrong
+	// column. The MONEY figure survived by luck — CostPer1MOutCached happens to
+	// hold the cache-read rate despite its name — but the token counts did not.
+	sess.CompletionTokens = usage.OutputTokens
+	sess.PromptTokens = usage.InputTokens + usage.CacheCreationTokens + usage.CacheReadTokens
 
 	_, err = a.sessions.Save(ctx, sess)
 	if err != nil {

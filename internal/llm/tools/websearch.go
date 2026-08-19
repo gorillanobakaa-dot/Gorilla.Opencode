@@ -886,7 +886,9 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		ToolName:    WebSearchToolName,
 		Action:      "search",
 		Description: fmt.Sprintf("Search %s for: %s", source, params.Query),
-		Params:      params,
+		// Grant covers THIS query, not every search in the session.
+		GrantKey: params.Query,
+		Params:   params,
 	}) {
 		return ToolResponse{}, permission.ErrorPermissionDenied
 	}

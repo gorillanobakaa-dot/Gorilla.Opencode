@@ -476,7 +476,12 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		ToolName:    FetchToolName,
 		Action:      "fetch",
 		Description: fmt.Sprintf("Fetch content from URL: %s", params.URL),
-		Params:      FetchPermissionsParams(params),
+		// GORILLA FIX (2026-08-19): scope the grant to THIS URL. Without it,
+		// "allow for session" on one fetch authorised every later fetch in the
+		// session — an exfiltration path, since a poisoned page can steer the
+		// model to a URL of its choosing and the user is never asked again.
+		GrantKey: params.URL,
+		Params:   FetchPermissionsParams(params),
 	}) {
 		return ToolResponse{}, permission.ErrorPermissionDenied
 	}
