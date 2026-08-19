@@ -1,3 +1,39 @@
+## v0.1.106 — 2026-08-19 — ten ways it could have lied to you
+
+**Plain-language version:** the search tool replaced three older ones, so it now
+runs on almost every message. It failed yesterday in a small specific way, and
+the obvious question followed: what else can go wrong like that? So the whole
+tool got audited — not for crashes, but for one particular kind of lie.
+
+"No matches found" is a statement about YOUR CODE. "The filter didn't work" is a
+statement about THE REQUEST. If a tool says the first when it means the second,
+the assistant believes it, tells you your project doesn't have the thing, and
+never tries again. A confident wrong answer with no sign anything went wrong.
+
+Ten of those were found. Asking for .github/** said "no matches" on a project
+with three CI files sitting right there. A typo in the language filter — pyton
+instead of python — returned nothing, which reads as "this project has no Python
+in it". Viewing a binary file printed its raw bytes into the conversation as if
+they were source, with a 5 MB limit and everything re-sent on every message
+after. An empty file and a failed read looked identical. Reading past the end of
+a file looked like an empty file. Asking which files have uncommitted changes,
+outside a git repository, said "no matches" — same as a clean repository. A web
+page built by JavaScript came back blank, which reads as "this page is empty".
+And the language-breakdown view timed out because it was counting lines inside
+1.1 GB of release packages: 30 seconds down to 1.6.
+
+The test written to catch the typo bug failed immediately against my own work —
+I had typed the list of valid languages from memory and invented six that do not
+exist. Same bug, committed while fixing the bug. The list is now read from the
+tool itself rather than written down, because a hand-copied list of someone
+else's data goes stale silently and always toward a wrong answer.
+
+Two things deliberately left alone: a failing shell command reports its exit
+code without being flagged an error, because grep exits 1 for "no match" and
+test exits 1 for "false" — flagging those would turn correct answers into
+errors. And web search already tells "every source failed" apart from "nothing
+found".
+
 ## v0.1.105 — 2026-08-19 — it can read your screenshots
 
 **Plain-language version:** yesterday someone asked this program to read a
