@@ -301,7 +301,7 @@ func lynxSnippet(lines []string, from int) string {
 	}
 	s := strings.Join(parts, " ")
 	if len(s) > 400 {
-		s = s[:400] + "…"
+		s = s[:400] + "..."
 	}
 	return s
 }

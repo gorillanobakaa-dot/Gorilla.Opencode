@@ -107,12 +107,27 @@ func TestBookmarksColumnComesFirst(t *testing.T) {
 // name starting with a multi-byte rune came back as invalid fragments — one
 // replacement glyph per byte. "★ bookmarks" rendered as "◆◆◆ bookmarks".
 func TestProviderDisplayNameHandlesMultiByteNames(t *testing.T) {
+	// AMENDED 2026-08-19: the bookmarks marker is ASCII now ("*"), because a
+	// star is East-Asian-Ambiguous and this one sits in an ALIGNED list. But
+	// the bug this test exists for — byte-slicing a multi-byte name — is
+	// unaffected by that, so the guard is kept honest by feeding it a
+	// multi-byte name directly. Asserting the new ASCII marker alone would
+	// have quietly turned a real regression test into a decorative one.
 	got := providerDisplayName(ProviderBookmarks)
-	if !strings.HasPrefix(got, "★") {
-		t.Errorf("the star must survive intact, got %q (% x)", got, got)
+	if !strings.HasPrefix(got, "*") {
+		t.Errorf("the bookmarks marker must survive intact, got %q (% x)", got, got)
 	}
 	if !utf8.ValidString(got) {
 		t.Errorf("produced invalid UTF-8: % x", got)
+	}
+	for _, name := range []string{"★starred", "日本語", "émigré", "🦍gorilla"} {
+		out := providerDisplayName(models.ModelProvider(name))
+		if !utf8.ValidString(out) {
+			t.Errorf("providerDisplayName(%q) produced invalid UTF-8: % x", name, out)
+		}
+		if out == "" {
+			t.Errorf("providerDisplayName(%q) came back empty", name)
+		}
 	}
 	// The ASCII path must still capitalise.
 	if n := providerDisplayName("openai"); n != "Openai" {

@@ -1044,7 +1044,7 @@ func StreamStallTimeout() time.Duration {
 // page.
 //
 // GORILLA OVERRIDE (2026-08-18): measured, then decided. The tool used to send
-// an honest bot token, "gorilla-opencode/1.0 (+github…)". Measured that day, that
+// an honest bot token, "gorilla-opencode/1.0 (+github...)". Measured that day, that
 // token alone was the block: https://www.google.com/search returned 302 to the
 // bot token and 200 to a Firefox token, from the same client, same second;
 // news sites behaved the same way. lynx did not help — Reuters 401'd it too —

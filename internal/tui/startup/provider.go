@@ -289,7 +289,7 @@ func (m *providerModel) View() string {
 			b.WriteString(dim.Render(m.echo(m.input, cur.Secret, w)) + "\n\n")
 			writeWrapped(lipgloss.NewStyle(), "2. "+cur.InputPrompt2)
 			b.WriteString(m.echo(m.input2, cur.Secret2, w) + "\n")
-			writeWrapped(dim, "Enter to save · Esc to go back to the first value")
+			writeWrapped(dim, "Enter to save | Esc to go back to the first value")
 		} else {
 			prompt := cur.InputPrompt
 			if cur.InputPrompt2 != "" {
@@ -297,9 +297,9 @@ func (m *providerModel) View() string {
 			}
 			writeWrapped(lipgloss.NewStyle(), prompt)
 			b.WriteString(m.echo(m.input, cur.Secret, w) + "\n")
-			next := "Enter to save · Esc to go back"
+			next := "Enter to save | Esc to go back"
 			if cur.InputPrompt2 != "" {
-				next = "Enter for the next value · Esc to go back"
+				next = "Enter for the next value | Esc to go back"
 			}
 			writeWrapped(dim, next)
 		}
@@ -309,12 +309,12 @@ func (m *providerModel) View() string {
 	}
 
 	b.WriteString("\n")
-	keys := "up/down move · enter select · esc keep current setup · ctrl+c quit"
+	keys := "up/down move | enter select | esc keep current setup | ctrl+c quit"
 	if !m.canKeep {
-		keys = "up/down move · enter select · esc/ctrl+c quit"
+		keys = "up/down move | enter select | esc/ctrl+c quit"
 	}
 	if cur.Configured && cur.NeedsInput {
-		keys = "up/down move · enter select · r replace saved key · esc keep current · ctrl+c quit"
+		keys = "up/down move | enter select | r replace saved key | esc keep current | ctrl+c quit"
 	}
 	writeWrapped(dim, keys)
 	return b.String()
@@ -337,7 +337,7 @@ func (m *providerModel) echo(val []rune, secret bool, w int) string {
 	}
 	var shown string
 	if secret {
-		shown = clip(strings.Repeat("•", n), room)
+		shown = clip(strings.Repeat("*", n), room)
 	} else {
 		shown = clip(string(val), room)
 	}

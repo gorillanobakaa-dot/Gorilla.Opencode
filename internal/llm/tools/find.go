@@ -72,7 +72,7 @@ const (
 	// findMaxPerFile bounds how many MATCHES are shown per file, with their
 	// context. Without it one kernel file with 36 hits emitted every one of
 	// them: the same query returned 35 KB before this cap and 10.5 KB after.
-	// pfind prints "… N more match(es) in this file" when it bites, so the
+	// pfind prints "... N more match(es) in this file" when it bites, so the
 	// agent can tell a capped result from a complete one.
 	findMaxPerFile = 3
 
@@ -390,7 +390,7 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		// multi-thousand-character line consumed space that could have held
 		// ten more files' worth of real matches inside the 32 KB cap.
 		// --max-columns-preview keeps the line's head with an explicit
-		// "[… omitted end of long line]" marker instead of dropping it.
+		// "[... omitted end of long line]" marker instead of dropping it.
 		"--max-columns", strconv.Itoa(findMaxLineChars),
 		"--max-columns-preview",
 	)
@@ -441,7 +441,7 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 				// Plain listing: --files lists what would be searched. Depth-
 				// limit it like ls would, so a kernel-sized tree does not
 				// answer with its first 15 files in traversal order. pfind
-				// caps the count and prints "… and N more" when it cuts.
+				// caps the count and prints "... and N more" when it cuts.
 				args = append(args, "--files")
 				if params.Glob == "" {
 					args = append(args, "--max-depth", "2")

@@ -45,8 +45,8 @@ type tasksKeyMap struct {
 }
 
 var tasksKeys = tasksKeyMap{
-	Up:   key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑", "up")),
-	Down: key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓", "down")),
+	Up:   key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("up", "up")),
+	Down: key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("down", "down")),
 	Kill: key.NewBinding(key.WithKeys("enter", "x", "d"), key.WithHelp("enter", "kill selected")),
 	// GORILLA NUCLEAR OPTION — "Kill 'em all, and the horse they rode in on."
 	Nuke:   key.NewBinding(key.WithKeys("X", "ctrl+x"), key.WithHelp("X", "kill 'em all")),
@@ -164,7 +164,7 @@ func (m *tasksDialogCmp) View() string {
 	}
 
 	help := base.Foreground(t.TextMuted()).Width(w).
-		Render("↑↓ pick · enter/x kill one · X kill 'em all (Nuclear) · esc close")
+		Render("up/down pick | enter/x kill one | X kill 'em all (Nuclear) | esc close")
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		header, sub, "",
@@ -192,9 +192,9 @@ func truncate(s string, max int) string {
 		return s
 	}
 	if max == 1 {
-		return "…"
+		return "..."
 	}
-	return string(r[:max-1]) + "…"
+	return string(r[:max-3]) + styles.Ellipsis
 }
 
 // taskRowPrefixCells is the display width of everything a row prints before the

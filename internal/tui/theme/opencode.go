@@ -64,7 +64,7 @@ func NewOpenCodeTheme() *OpenCodeTheme {
 		Dark:  darkRed,
 		Light: lightRed,
 	}
-theme.WarningColor = lipgloss.AdaptiveColor{
+	theme.WarningColor = lipgloss.AdaptiveColor{
 		Dark:  "#FF0000",
 		Light: "#FF0000",
 	}

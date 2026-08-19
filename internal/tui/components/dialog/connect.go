@@ -172,8 +172,8 @@ type connectKeyMap struct {
 }
 
 var connectKeys = connectKeyMap{
-	Up:     key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑", "up")),
-	Down:   key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓", "down")),
+	Up:     key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("up", "up")),
+	Down:   key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("down", "down")),
 	Enter:  key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "add/edit")),
 	Escape: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close/back")),
 	Toggle: key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "enable/disable")),
@@ -569,13 +569,13 @@ func (m *connectDialogCmp) frameAt(visible int) string {
 	base := styles.BaseStyle()
 	// Render EACH line at full width (lipgloss .Width() does not pad every line
 	// of a multi-line string, so a single Render leaves the short gorilla lines'
-	// right side unpainted → terminal black). Per-line render matches the other
+	// right side unpainted -> terminal black). Per-line render matches the other
 	// dialogs and paints the whole width with the theme background.
 	gStyle := base.Foreground(t.Primary()).Bold(true).Width(connectDialogWidth)
 	gLines := []string{
 		"     .-\"-.-\"-.",
 		"    (  o   o  )",
-		"     )  \\_/  (     gorilla · /connect",
+		"     )  \\_/  (     gorilla | /connect",
 		"    (  =====  )",
 		"     '-.___.-'",
 	}
@@ -643,7 +643,7 @@ func (m *connectDialogCmp) listViewAt(visible int) string {
 	rows := make([]string, 0, len(entries))
 	for i, e := range entries {
 		connected, disabled := m.status(e)
-		badge := "  ·  "
+		badge := "  |  "
 		switch {
 		case connected && disabled:
 			badge = " off "
@@ -659,7 +659,7 @@ func (m *connectDialogCmp) listViewAt(visible int) string {
 		}
 		line := fmt.Sprintf("%s %s", badge, label)
 		if r := []rune(line); len(r) > w-1 {
-			line = string(r[:w-2]) + "…"
+			line = string(r[:w-4]) + styles.Ellipsis
 		}
 		st := base.Width(w)
 		switch {
@@ -682,7 +682,7 @@ func (m *connectDialogCmp) listViewAt(visible int) string {
 	if len(shown) < len(rows) {
 		// Say so, or a scrolled-off connection looks like a missing one.
 		out = append(out, base.Foreground(t.TextMuted()).Width(w).
-			Render(truncateTo(fmt.Sprintf("  showing %d-%d of %d — ↑↓ for the rest",
+			Render(truncateTo(fmt.Sprintf("  showing %d-%d of %d — up/down for the rest",
 				m.listTop+1, end, len(rows)), w)))
 	}
 	out = append(out, blank, hint1, hint2)
@@ -722,9 +722,9 @@ func truncateTo(s string, w int) string {
 		return s
 	}
 	if w <= 1 {
-		return "…"
+		return "..."
 	}
-	return string(r[:w-1]) + "…"
+	return string(r[:w-3]) + styles.Ellipsis
 }
 
 func (m *connectDialogCmp) formView() string {
@@ -740,7 +740,7 @@ func (m *connectDialogCmp) formView() string {
 	case kindKey:
 		labels = []string{"API key"}
 	case kindLocal:
-		labels = []string{"Name", "Base URL (…/v1)", "API key (optional)"}
+		labels = []string{"Name", "Base URL (.../v1)", "API key (optional)"}
 	}
 
 	blank := base.Width(w).Render("")

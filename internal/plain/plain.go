@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"io"
 	"os"
 	"path/filepath"
@@ -395,7 +396,7 @@ func oneLine(s string) string {
 	s = strings.Join(strings.Fields(s), " ")
 	const max = 120
 	if len([]rune(s)) > max {
-		return string([]rune(s)[:max-1]) + "…"
+		return string([]rune(s)[:max-3]) + styles.Ellipsis
 	}
 	return s
 }

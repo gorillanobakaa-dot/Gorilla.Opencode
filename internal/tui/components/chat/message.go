@@ -798,7 +798,7 @@ func renderToolMessage(
 	} else {
 		prefix := baseStyle.
 			Foreground(t.TextMuted()).
-			Render(" └ ")
+			Render(" \\_ ")
 		formattedParams := baseStyle.
 			Width(width - 2 - lipgloss.Width(toolNameText)).
 			Foreground(t.TextMuted()).

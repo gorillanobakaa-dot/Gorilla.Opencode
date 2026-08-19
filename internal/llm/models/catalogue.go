@@ -42,8 +42,8 @@ func CleanCatalogueDescription(desc string, ctx int64, inPer1M, outPer1M float64
 	}
 	s = strings.Join(strings.Fields(s), " ")
 	// GORILLA OVERRIDE (2026-08-09): 90 characters cut almost every description
-	// mid-sentence — "…is an instruction-tuned Mixture-of-Experts (MoE) model
-	// from Google Deep…" — which defeats the point. The description is the ONE
+	// mid-sentence — "...is an instruction-tuned Mixture-of-Experts (MoE) model
+	// from Google Deep..." — which defeats the point. The description is the ONE
 	// thing standing between someone and a web search per model name, and a
 	// search per model is impossible on a single-digit-KB/s line.
 	//
@@ -51,7 +51,7 @@ func CleanCatalogueDescription(desc string, ctx int64, inPer1M, outPer1M float64
 	// ROW to the terminal width anyway. Wide terminals therefore show the whole
 	// thing; narrow ones cut to fit, which is the only place cutting belongs.
 	if len(s) > 220 {
-		s = strings.TrimSpace(s[:220]) + "…"
+		s = strings.TrimSpace(s[:220]) + "..."
 	}
 
 	// GORILLA OVERRIDE (2026-08-09): price goes FIRST, on every entry.
@@ -149,9 +149,9 @@ func DetailForPicker(apiModel, vendorDesc string) string {
 		s = strings.Join(strings.Fields(s), " ")
 		// Upstream truncation is detected BEFORE our own cap, so the apology
 		// below can never blame OpenRouter for a cut we made ourselves.
-		upstreamCut := strings.HasSuffix(s, "...") || strings.HasSuffix(s, "…")
+		upstreamCut := strings.HasSuffix(s, "...") || strings.HasSuffix(s, "...")
 		if len(s) > 2400 {
-			s = strings.TrimSpace(s[:2400]) + "…"
+			s = strings.TrimSpace(s[:2400]) + "..."
 			upstreamCut = false
 		}
 		parts = append(parts, "Vendor's own description (their claim, not our finding): "+s)
@@ -199,7 +199,7 @@ func PreferFullerDetail(fresh, existing string) string {
 	if f == "" {
 		return existing
 	}
-	stem := strings.TrimRight(f, ".…")
+	stem := strings.TrimRight(f, "....")
 	if stem != "" && strings.HasPrefix(e, stem) {
 		return existing
 	}

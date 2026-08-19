@@ -21,11 +21,17 @@ import (
 //     thing stays one unbreakable token.
 //
 // The middle dot rather than a full stop because it is already this project's
-// separator (the footer reads "model X · in Y · context Z"), so it reads as
+// separator (the footer reads "model X | in Y | context Z"), so it reads as
 // deliberate rather than as punctuation.
 //
 // Kept here so every path that surfaces such a notice — the cold-start echo, a
 // provider error — reads identically, whatever pipeline it came through.
+// NoticeDeco is EXEMPT from the ASCII-drawing rule, deliberately and on the
+// owner's instruction. The middle dots were chosen precisely because they have
+// no space to break on and absorb the U+FE0F width mismatch that the warning
+// emoji carries. Settled 2026-08-18 after several rejected designs ("stop
+// inventing things... simple", "NO LINES"). Do not "fix" it to ASCII: that
+// would re-derive a decision already made and lose the reason it was made.
 const NoticeDeco = "🦍⚠️·⚠️·🦍"
 
 func CmdHandler(msg tea.Msg) tea.Cmd {
@@ -62,7 +68,7 @@ func ReportInfo(info string) tea.Cmd {
 // sentence and where it stays scrollable and copyable.
 //
 // GORILLA OVERRIDE (2026-08-18): added because the cold-start "still warming up"
-// notice was cut to "…First reply…" in the status bar — the half that told the
+// notice was cut to "...First reply..." in the status bar — the half that told the
 // user what to do was the half that got dropped. The footer answers "something
 // is happening"; the transcript answers "here is the whole of it".
 func ReportInfoEcho(info string) tea.Cmd {

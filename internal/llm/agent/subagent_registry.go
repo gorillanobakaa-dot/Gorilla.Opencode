@@ -282,7 +282,7 @@ func KillAllSubAgents() int {
 }
 
 // shortHandle turns a spawn sequence number into a compact, typeable id:
-// a1, a2, … a9, then a10, a11, … Stable for the life of the process.
+// a1, a2, ... a9, then a10, a11, ... Stable for the life of the process.
 func shortHandle(seq int) string {
 	return "a" + itoa(seq)
 }

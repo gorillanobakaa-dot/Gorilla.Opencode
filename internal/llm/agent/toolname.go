@@ -61,7 +61,7 @@ import (
 // depth, and neither layer may be removed either:
 //
 //   - PERMISSIONS ARE ASKED BY THE TOOL, NOT BY THE CALLER. Every tool passes
-//     its OWN constant (BashToolName, EditToolName…) into permission.Request.
+//     its OWN constant (BashToolName, EditToolName...) into permission.Request.
 //     A tool cannot be smuggled past a deny-list under an alias, because it
 //     fills in its own name badge AFTER dispatch has already resolved it.
 //     TestPermissionRequestsUseTheToolsOwnConstantName holds that.

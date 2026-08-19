@@ -98,7 +98,7 @@ type modelKeyMap struct {
 	// another wall.
 	Bookmark key.Binding
 	// GORILLA OVERRIDE: jump straight to the shortlist from any column.
-	// ←/→ move ONE provider at a time, and after browsing to bookmark things
+	// <-/-> move ONE provider at a time, and after browsing to bookmark things
 	// you are typically several columns away from it — so the list you just
 	// built was reachable only by pressing left repeatedly, or by closing the
 	// dialog and reopening it. Neither is discoverable.
@@ -112,19 +112,19 @@ type modelKeyMap struct {
 var modelKeys = modelKeyMap{
 	Up: key.NewBinding(
 		key.WithKeys("up"),
-		key.WithHelp("↑", "previous model"),
+		key.WithHelp("up", "previous model"),
 	),
 	Down: key.NewBinding(
 		key.WithKeys("down"),
-		key.WithHelp("↓", "next model"),
+		key.WithHelp("down", "next model"),
 	),
 	Left: key.NewBinding(
 		key.WithKeys("left"),
-		key.WithHelp("←", "scroll left"),
+		key.WithHelp("<-", "scroll left"),
 	),
 	Right: key.NewBinding(
 		key.WithKeys("right"),
-		key.WithHelp("→", "scroll right"),
+		key.WithHelp("->", "scroll right"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),
@@ -551,7 +551,7 @@ func (m *modelDialogCmp) View() string {
 	if m.width > 0 && m.width-8 > w {
 		w = m.width - 8
 	}
-	// GORILLA OVERRIDE: … and never wider than the terminal. maxDialogWidth
+	// GORILLA OVERRIDE: ... and never wider than the terminal. maxDialogWidth
 	// acted as a floor, so on anything narrower than 68 columns the frame was
 	// clipped at the screen edge. Chrome is subtracted from the terminal
 	// (border 2 + padding 4), never added to content. 24 is the last-resort
@@ -587,10 +587,10 @@ func (m *modelDialogCmp) View() string {
 	if m.searchActive {
 		// The query line doubles as the match counter, so narrowing the words
 		// visibly narrows the number.
-		qline := fmt.Sprintf("/ %s▌  — %d of %d models match name or description",
+		qline := fmt.Sprintf("/ %s|  — %d of %d models match name or description",
 			m.query, len(m.models), len(m.searchDomain))
 		if r := []rune(qline); len(r) > w {
-			qline = string(r[:w-1]) + "…"
+			qline = string(r[:w-3]) + styles.Ellipsis
 		}
 		infoLines = append(infoLines, baseStyle.Foreground(t.Accent()).Width(w).Render(qline))
 	} else {
@@ -614,7 +614,7 @@ func (m *modelDialogCmp) View() string {
 		// an informed pick without knowing which key is live right now.
 		if cl := m.connectionLine(); cl != "" {
 			if r := []rune(cl); len(r) > w {
-				cl = string(r[:w-1]) + "…"
+				cl = string(r[:w-3]) + styles.Ellipsis
 			}
 			infoLines = append(infoLines, baseStyle.Foreground(t.TextMuted()).Width(w).Render(cl))
 		}
@@ -663,10 +663,10 @@ func (m *modelDialogCmp) View() string {
 		// whether they already bookmarked something and toggles it back off by
 		// accident — and the whole point of the list is that you decide once.
 		if m.provider != ProviderBookmarks && config.IsBookmarked(string(m.models[i].ID)) {
-			label = "★ " + label
+			label = "* " + label
 		}
 		if r := []rune(label); len(r) > w-1 {
-			label = string(r[:w-2]) + "…"
+			label = string(r[:w-4]) + styles.Ellipsis
 		}
 		itemStyle := baseStyle.Width(w)
 		if i == m.selectedIdx {
@@ -695,7 +695,7 @@ func (m *modelDialogCmp) View() string {
 	switch {
 	case m.searchActive:
 		segs = []hintSeg{
-			{"type to filter   ↑/↓ move   ", false},
+			{"type to filter   up/down move   ", false},
 			{"tab details", true},
 			{"   enter use   esc back to columns", false},
 		}
@@ -708,7 +708,7 @@ func (m *modelDialogCmp) View() string {
 		}
 	default:
 		segs = []hintSeg{
-			{"space ★ bookmark   ", false},
+			{"space * bookmark   ", false},
 			{"b YOUR LIST", true},
 			{"   ", false},
 			{"/ search", true},
@@ -718,7 +718,7 @@ func (m *modelDialogCmp) View() string {
 	}
 	if !m.searchActive {
 		if m.hScrollPossible {
-			segs = append(segs, hintSeg{"   ←/→ other providers", false})
+			segs = append(segs, hintSeg{"   <-/-> other providers", false})
 		}
 		segs = append(segs, hintSeg{"   enter use   esc close", false})
 	}
@@ -800,7 +800,7 @@ func (m *modelDialogCmp) renderDetail(w int) string {
 
 	clamp := func(s string) string {
 		if r := []rune(s); len(r) > w {
-			return string(r[:w-1]) + "…"
+			return string(r[:w-3]) + styles.Ellipsis
 		}
 		return s
 	}
@@ -844,7 +844,7 @@ func (m *modelDialogCmp) renderDetail(w int) string {
 		fact("rank", fmt.Sprintf("#%d on this provider's ranked list (1 = best)", mod.Rank))
 	}
 	if config.IsBookmarked(string(mod.ID)) {
-		fact("bookmarked", "★ yes — space removes it")
+		fact("bookmarked", "* yes — space removes it")
 	} else {
 		fact("bookmarked", "no — space adds it")
 	}
@@ -860,7 +860,7 @@ func (m *modelDialogCmp) renderDetail(w int) string {
 	// guessing here at render time.
 	if strings.TrimSpace(body) != "" {
 		rows = append(rows, norm.Render(""))
-		// frame chrome: padding+border+hint ≈ 7 rows; never render past the
+		// frame chrome: padding+border+hint ~ 7 rows; never render past the
 		// window (a frame taller than its window is the marching-footer bug).
 		budget := m.height - len(rows) - 8
 		if budget < 4 {
@@ -868,7 +868,7 @@ func (m *modelDialogCmp) renderDetail(w int) string {
 		}
 		wrapped := strings.Split(lipgloss.NewStyle().Width(w).Render(body), "\n")
 		if len(wrapped) > budget {
-			wrapped = append(wrapped[:budget], clamp("… (window too small for the rest — resize to read it all)"))
+			wrapped = append(wrapped[:budget], clamp("... (window too small for the rest — resize to read it all)"))
 		}
 		for _, ln := range wrapped {
 			rows = append(rows, norm.Render(ln))
@@ -882,12 +882,12 @@ func (m *modelDialogCmp) renderDetail(w int) string {
 		if maxRows < 3 {
 			maxRows = 3
 		}
-		rows = append(rows[:maxRows], clamp("… (terminal too small — resize to see the rest)"))
+		rows = append(rows[:maxRows], clamp("... (terminal too small — resize to see the rest)"))
 	}
 
 	rows = append(rows, norm.Render(""))
 	rows = append(rows, renderHint(w, []hintSeg{
-		{"space ★ bookmark   enter use this model   ", false},
+		{"space * bookmark   enter use this model   ", false},
 		{"tab/esc back", true},
 	}))
 
@@ -939,19 +939,19 @@ func (m *modelDialogCmp) getScrollIndicators(maxWidth int) string {
 
 	if len(m.models) > m.visibleRows() {
 		if m.scrollOffset > 0 {
-			indicator += "↑ "
+			indicator += "up "
 		}
 		if m.scrollOffset+m.visibleRows() < len(m.models) {
-			indicator += "↓ "
+			indicator += "down "
 		}
 	}
 
 	if m.hScrollPossible {
 		if m.hScrollOffset > 0 {
-			indicator = "← " + indicator
+			indicator = "<- " + indicator
 		}
 		if m.hScrollOffset < len(m.availableProviders)-1 {
-			indicator += "→"
+			indicator += "->"
 		}
 	}
 
@@ -1034,7 +1034,7 @@ func getEnabledProviders(cfg *config.Config) []models.ModelProvider {
 	// GORILLA OVERRIDE: also include providers whose API key is present in
 	// the environment but never persisted to cfg.Providers. Without this,
 	// exporting GROQ_API_KEY (or any other *_API_KEY) leaves the provider
-	// invisible in /model until the user goes through /connect → save — a
+	// invisible in /model until the user goes through /connect -> save — a
 	// step that only exists to write a file the user did not ask to write.
 	//
 	// A provider EXPLICITLY disabled in cfg wins over its env var — the seen
@@ -1147,7 +1147,7 @@ func (m *modelDialogCmp) setupModelsForProvider(provider models.ModelProvider) {
 //
 // So: decide once, from the curated descriptions already here, and never scroll
 // the catalogue again.
-const ProviderBookmarks models.ModelProvider = "★ bookmarks"
+const ProviderBookmarks models.ModelProvider = "* bookmarks"
 
 // bookmarkedModels resolves the saved ids. Entries that no longer resolve are
 // kept and marked unavailable rather than dropped: a bookmark disappearing with
@@ -1157,7 +1157,7 @@ func bookmarkedModels() []models.Model {
 	for _, id := range config.BookmarkedModels() {
 		if m, ok := models.SupportedModels[models.ModelID(id)]; ok {
 			// The rank belongs to the model's home provider and means nothing
-			// here: the shortlist showed "10, 2, 3, 5, 6, 10 …" with two entries
+			// here: the shortlist showed "10, 2, 3, 5, 6, 10 ..." with two entries
 			// numbered 10, which reads as a broken sort. Cleared, so the list
 			// shows the only order the user authored — the one they added them
 			// in — and the "N ranked best-first" subtitle stops claiming a
@@ -1264,11 +1264,11 @@ func providerDisplayName(p models.ModelProvider) string {
 	case models.ProviderChatGPT:
 		return "ChatGPT (OpenAI login — free plan works)"
 	case ProviderBookmarks:
-		// "★ bookmarks" was accurate and told nobody anything. Someone landing
+		// "* bookmarks" was accurate and told nobody anything. Someone landing
 		// here has to work out that this is THEIR list, assembled by them —
 		// which is exactly the reading-comprehension tax this list exists to
 		// remove.
-		return "★ YOUR BOOKMARKS — the models you picked"
+		return "* YOUR BOOKMARKS — the models you picked"
 	}
 	s := string(p)
 	if s == "" {
@@ -1277,7 +1277,7 @@ func providerDisplayName(p models.ModelProvider) string {
 	// GORILLA FIX (2026-08-09): this was strings.ToUpper(s[:1]) + s[1:], which
 	// slices the first BYTE, not the first rune. Any provider name starting
 	// with a multi-byte character was cut into invalid UTF-8 fragments and
-	// rendered as one replacement glyph per byte - "★ bookmarks" came out as
+	// rendered as one replacement glyph per byte - "* bookmarks" came out as
 	// "◆◆◆ bookmarks", three diamonds for one star. Latent since the function
 	// was written; the bookmarks column was simply the first name to trigger it.
 	r := []rune(s)

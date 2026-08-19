@@ -143,7 +143,7 @@ func TestDetailForPickerDoesNotBlameUpstreamForCompleteText(t *testing.T) {
 func TestDetailForPickerDoesNotBlameUpstreamForOurOwnCap(t *testing.T) {
 	long := strings.Repeat("many words about a model with no trailing dots whatsoever ", 60) + "the end"
 	d := DetailForPicker("mocklab/long", long)
-	if !strings.Contains(d, "…") {
+	if !strings.Contains(d, "...") {
 		t.Fatalf("text over the cap should be visibly cut; got tail %q", d[len(d)-80:])
 	}
 	if strings.Contains(d, "sorry lads") {

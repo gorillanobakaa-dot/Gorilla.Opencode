@@ -118,7 +118,7 @@ func (m ModelFollowDialogCmp) lines() []costLine {
 	add(kindMuted, "model as well, and they have followed you to «%s».", toName)
 	add(kindMuted, "")
 
-	add(kindHeader, "── WHAT MOVED ──────────────────────────────────────────")
+	add(kindHeader, "WHAT MOVED")
 	for _, mv := range m.moves {
 		fromName := string(mv.From)
 		if fm, ok := models.SupportedModels[mv.From]; ok {
@@ -133,11 +133,11 @@ func (m ModelFollowDialogCmp) lines() []costLine {
 			kind = kindAssumed // this one is probably waste; say so below
 		}
 		add(kind, "%s", job)
-		add(kindMuted, "   was %s  →  now %s", fromName, toName)
+		add(kindMuted, "   was %s  ->  now %s", fromName, toName)
 	}
 	add(kindMuted, "")
 
-	add(kindHeader, "── WHAT IT COSTS YOU ───────────────────────────────────")
+	add(kindHeader, "WHAT IT COSTS YOU")
 	fromModel, fromKnown := models.SupportedModels[m.moves[0].From]
 	switch {
 	case !toKnown || !fromKnown:
@@ -152,11 +152,11 @@ func (m ModelFollowDialogCmp) lines() []costLine {
 			amount(toModel.CostPer1MIn))
 		add(kindDanger, "That is a NEW bill that did not exist five seconds ago.")
 	case toModel.CostPer1MIn == 0:
-		add(kindMeasured, "These jobs got CHEAPER: %s per 1M in → no per-token rate.",
+		add(kindMeasured, "These jobs got CHEAPER: %s per 1M in -> no per-token rate.",
 			amount(fromModel.CostPer1MIn))
 	default:
 		ratio := toModel.CostPer1MIn / fromModel.CostPer1MIn
-		add(kindMoney, "Per million words in: %s  →  %s",
+		add(kindMoney, "Per million words in: %s  ->  %s",
 			amount(fromModel.CostPer1MIn), amount(toModel.CostPer1MIn))
 		switch {
 		case ratio >= 1.1:
@@ -195,7 +195,7 @@ func (m ModelFollowDialogCmp) lines() []costLine {
 	}
 
 	add(kindMuted, "")
-	add(kindHeader, "── WHAT YOU GET ────────────────────────────────────────")
+	add(kindHeader, "WHAT YOU GET")
 	add(kindMeasured, "Your «/research» now runs on the model you actually picked.")
 	add(kindMuted, "   That is the reason this happens automatically: research is the")
 	add(kindMuted, "   deep work, and it was silently being done by a weaker model.")
@@ -220,9 +220,13 @@ func (m ModelFollowDialogCmp) View() string {
 	var rows []string
 	for _, l := range m.lines() {
 		st := base.Width(maxWidth).Padding(0, 1)
+		text := l.text
 		switch l.kind {
 		case kindHeader:
 			st = st.Foreground(t.TextMuted())
+			// Sized, not typed — see the note in research.go's renderCost and
+			// internal/tui/styles/ascii.go.
+			text = styles.RuleLabel(text, maxInt(8, maxWidth-2))
 		case kindMoney, kindDanger:
 			st = st.Foreground(t.Error()).Bold(true)
 		case kindQuota, kindAssumed:
@@ -234,7 +238,7 @@ func (m ModelFollowDialogCmp) View() string {
 		default:
 			st = st.Foreground(t.TextMuted())
 		}
-		rows = append(rows, st.Render(emphasise(l.text, t)))
+		rows = append(rows, st.Render(emphasise(text, t)))
 	}
 
 	hints := base.Width(maxWidth).Padding(1, 1, 0, 1).Foreground(t.TextMuted()).

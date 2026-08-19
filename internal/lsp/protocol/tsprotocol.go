@@ -2313,7 +2313,7 @@ type FileOperationPattern struct {
 	//  - `?` to match on one character in a path segment
 	//  - `**` to match any number of path segments, including none
 	//  - `{}` to group sub patterns into an OR expression. (e.g. `**​/*.{ts,js}` matches all TypeScript and JavaScript files)
-	//  - `[]` to declare a range of characters to match in a path segment (e.g., `example.[0-9]` to match on `example.0`, `example.1`, …)
+	//  - `[]` to declare a range of characters to match in a path segment (e.g., `example.[0-9]` to match on `example.0`, `example.1`, ...)
 	//  - `[!...]` to negate a range of characters to match in a path segment (e.g., `example.[!0-9]` to match on `example.a`, `example.b`, but not `example.0`)
 	Glob string `json:"glob"`
 	// Whether to match files or folders with this pattern.
@@ -4095,7 +4095,7 @@ type PartialResultParams struct {
 //   - `?` to match on one character in a path segment
 //   - `**` to match any number of path segments, including none
 //   - `{}` to group conditions (e.g. `**​/*.{ts,js}` matches all TypeScript and JavaScript files)
-//   - `[]` to declare a range of characters to match in a path segment (e.g., `example.[0-9]` to match on `example.0`, `example.1`, …)
+//   - `[]` to declare a range of characters to match in a path segment (e.g., `example.[0-9]` to match on `example.0`, `example.1`, ...)
 //   - `[!...]` to negate a range of characters to match in a path segment (e.g., `example.[!0-9]` to match on `example.a`, `example.b`, but not `example.0`)
 //
 // @since 3.17.0
@@ -5444,7 +5444,7 @@ type TextDocumentEdit struct {
 //   - `?` to match on one character in a path segment
 //   - `**` to match any number of path segments, including none
 //   - `{}` to group sub patterns into an OR expression. (e.g. `**​/*.{ts,js}` matches all TypeScript and JavaScript files)
-//   - `[]` to declare a range of characters to match in a path segment (e.g., `example.[0-9]` to match on `example.0`, `example.1`, …)
+//   - `[]` to declare a range of characters to match in a path segment (e.g., `example.[0-9]` to match on `example.0`, `example.1`, ...)
 //   - `[!...]` to negate a range of characters to match in a path segment (e.g., `example.[!0-9]` to match on `example.a`, `example.b`, but not `example.0`)
 //
 // @sample A language filter that applies to typescript files on disk: `{ language: 'typescript', scheme: 'file' }`

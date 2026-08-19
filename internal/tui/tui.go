@@ -396,7 +396,7 @@ func (a appModel) Init() tea.Cmd {
 var quotaAlertStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF0000"))
 
 func formatQuotaScrollbackLine(at time.Time, line string) string {
-	return quotaAlertStyle.Render("  " + at.Format("15:04:05") + "  quota · " + line)
+	return quotaAlertStyle.Render("  " + at.Format("15:04:05") + "  quota | " + line)
 }
 
 // quotaLineMsg carries a fetched quota reading.
@@ -413,7 +413,7 @@ type quotaLineMsg struct {
 	line string
 	kind util.InfoType
 	// summary, when non-nil, renders the full Models & Quota panel into the
-	// scrollback (bars, plain-language "left/used", green→red colour). Set only
+	// scrollback (bars, plain-language "left/used", green->red colour). Set only
 	// on an explicit /usage: the automatic session-start reading stays one line
 	// so it never floods the top of every conversation.
 	summary *auth.QuotaSummary
@@ -689,7 +689,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(msg.alerts) > 0 {
 			info := util.InfoMsg{
 				Type: util.InfoTypeWarn,
-				Msg:  stripBananaEmoji(strings.Join(msg.alerts, " · ")),
+				Msg:  stripBananaEmoji(strings.Join(msg.alerts, " | ")),
 				TTL:  15 * time.Second,
 			}
 			st, cmd := a.status.Update(info)
@@ -1120,7 +1120,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if err != nil {
 			return a, util.ReportError(err)
 		}
-		a.sessionsMgr.SetNotice(fmt.Sprintf("Exported %d messages (%d helper sessions) → %s",
+		a.sessionsMgr.SetNotice(fmt.Sprintf("Exported %d messages (%d helper sessions) -> %s",
 			total, len(branches), path))
 		return a, nil
 
@@ -1253,7 +1253,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, nil
 			}
 			if !config.LoadoutEnabled(config.DossierComponentID) {
-				return a, util.ReportWarn("The serious OSINT dossier is switched OFF (it burns real money, so it ships that way). Arm it: /context → \"" + config.DossierRowName + "\" → space. Or type /osint alone to read what it does first.")
+				return a, util.ReportWarn("The serious OSINT dossier is switched OFF (it burns real money, so it ships that way). Arm it: /context -> \"" + config.DossierRowName + "\" -> space. Or type /osint alone to read what it does first.")
 			}
 			a.osintDialog = dialog.NewOsintDialogCmp(q)
 			a.osintDialog.SetSize(a.width, a.height)
@@ -2089,9 +2089,9 @@ func truncatePrompt(s string, max int) string {
 		return s
 	}
 	if max < 1 {
-		return "…"
+		return "..."
 	}
-	return string(r[:max-1]) + "…"
+	return string(r[:max-3]) + styles.Ellipsis
 }
 
 // RegisterCommand adds a command to the command dialog

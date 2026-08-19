@@ -66,8 +66,8 @@ type addDirKeyMap struct {
 // Arrow keys only for navigation — `-`/`+`/`[`/`]` are awkward or hidden on
 // non-US layouts (the JP-keyboard lesson from loadout.go).
 var addDirKeys = addDirKeyMap{
-	Up:      key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑", "up")),
-	Down:    key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓", "down")),
+	Up:      key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("up", "up")),
+	Down:    key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("down", "down")),
 	Add:     key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add a root")),
 	Remove:  key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "remove")),
 	Promote: key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "make primary (/cd)")),
@@ -337,7 +337,7 @@ func (m *addDirDialogCmp) listView() string {
 	rows = append(rows,
 		base.Width(w).Render(""),
 		base.Foreground(t.TextMuted()).Width(w).
-			Render("a add / switch   d remove   c make primary   ↑↓ move   esc close"),
+			Render("a add / switch   d remove   c make primary   up/down move   esc close"),
 	)
 
 	return base.Padding(1, 2).Border(lipgloss.RoundedBorder()).
@@ -397,7 +397,7 @@ func describeRoot(root string) string {
 	if n == 1 {
 		plural = ""
 	}
-	return fmt.Sprintf("%d context file%s · %s", n, plural, git)
+	return fmt.Sprintf("%d context file%s | %s", n, plural, git)
 }
 
 func truncatePath(p string, maxLen int) string {
@@ -405,7 +405,7 @@ func truncatePath(p string, maxLen int) string {
 		return p
 	}
 	// Keep the tail — the distinctive part of a path is its end.
-	return "…" + p[len(p)-maxLen+1:]
+	return "..." + p[len(p)-maxLen+1:]
 }
 
 func (m *addDirDialogCmp) BindingKeys() []key.Binding {

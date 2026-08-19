@@ -30,17 +30,17 @@ const quotaPanelMaxWidth = 80
 // quota view so the two read the same.
 const quotaBarMaxCells = 50
 
-// quotaHexColor maps remaining fraction to a hue on the green→red line:
-// 1.0 → #00FF00 (hue 120°), 0.5 → #FFFF00, 0.0 → #FF0000 (hue 0°), full
+// quotaHexColor maps remaining fraction to a hue on the green->red line:
+// 1.0 -> #00FF00 (hue 120°), 0.5 -> #FFFF00, 0.0 -> #FF0000 (hue 0°), full
 // saturation and value throughout. Blue is always zero on this segment, so the
 // two-sextant form below is the whole HSV conversion.
 func quotaHexColor(remaining float64) string {
 	f := math.Min(1, math.Max(0, remaining))
 	h := 120 * f / 60 // position in sextants: [0,2]
 	var r, g float64
-	if h < 1 { // red → yellow
+	if h < 1 { // red -> yellow
 		r, g = 1, h
-	} else { // yellow → green
+	} else { // yellow -> green
 		r, g = 2-h, 1
 	}
 	return fmt.Sprintf("#%02X%02X00", int(r*255+0.5), int(g*255+0.5))
@@ -150,8 +150,8 @@ func stripBananaEmoji(s string) string {
 	}, s))
 }
 
-// quotaBar draws "[████░░░░]" as a thermometer scale: every cell has a FIXED
-// colour (red left end → green right end, via barCellColor), and the fill
+// quotaBar draws "[####....]" as a thermometer scale: every cell has a FIXED
+// colour (red left end -> green right end, via barCellColor), and the fill
 // recedes leftward as quota burns. Two signals in one glance: the tip of the
 // fill is always the colour of the current level (green when full, red when
 // nearly gone — the same value the old single-colour bar showed), and a
@@ -171,10 +171,10 @@ func quotaBar(remaining float64, cells int) string {
 	sb.WriteString("[")
 	for i := 0; i < filled; i++ {
 		sb.WriteString(lipgloss.NewStyle().
-			Foreground(lipgloss.Color(barCellColor(i, cells))).Render("█"))
+			Foreground(lipgloss.Color(barCellColor(i, cells))).Render("#"))
 	}
 	rest := lipgloss.NewStyle().Foreground(theme.CurrentTheme().TextMuted())
-	sb.WriteString(rest.Render(strings.Repeat("░", cells-filled)))
+	sb.WriteString(rest.Render(strings.Repeat(".", cells-filled)))
 	sb.WriteString("]")
 	return sb.String()
 }
@@ -278,7 +278,7 @@ func renderQuotaPanel(q *auth.QuotaSummary, account string, balances []quota.Rea
 		b.WriteString("    " + quotaBar(f, cells) + fmt.Sprintf(" %.2f%%", f*100) + "\n")
 		status := fmt.Sprintf("%s — %d%% left, %d%% used", bananaStatus(f), left, 100-left)
 		if reset := quotaResetPhrase(bk.ResetTime, now); reset != "" {
-			status += " · " + reset
+			status += " | " + reset
 		}
 		b.WriteString(wrapIndent(status, 4) + "\n")
 	}
@@ -295,7 +295,7 @@ func renderQuotaPanel(q *auth.QuotaSummary, account string, balances []quota.Rea
 }
 
 // renderBalanceSections renders the paid-provider balances (DeepSeek,
-// OpenRouter, …) in the same layout and voice as the Antigravity groups: a bar
+// OpenRouter, ...) in the same layout and voice as the Antigravity groups: a bar
 // only where the provider gives a denominator, the amount in words always, and
 // a failed fetch shown as a failed fetch — a provider silently missing from
 // the panel reads as "no key configured", which is a lie when the truth is

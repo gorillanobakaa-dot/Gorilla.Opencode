@@ -155,7 +155,7 @@ func TestGitStatusBrief_CapsLines(t *testing.T) {
 	// status lines (excluding branch line) should be capped
 	nonBranch := 0
 	for _, line := range strings.Split(out, "\n") {
-		if strings.HasPrefix(line, "branch:") || strings.HasPrefix(line, "…") {
+		if strings.HasPrefix(line, "branch:") || strings.HasPrefix(line, "...") {
 			continue
 		}
 		if line != "" {

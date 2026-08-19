@@ -4,7 +4,7 @@
 // logged-in user runs Gemini through the free tier instead of an API key.
 //
 // It is NOT OpenAI-compatible and it does NOT use the genai SDK — the
-// backend wraps the standard Gemini request as {model, project, request:{…}}
+// backend wraps the standard Gemini request as {model, project, request:{...}}
 // and nests each streamed response under a "response" field. We build that
 // JSON by hand, mirroring the conversion the SDK-based gemini.go does.
 package provider
@@ -341,7 +341,7 @@ func collectParts(parts []caPart) (string, []message.ToolCall) {
 			}
 			input, _ := json.Marshal(args)
 			// GORILLA OVERRIDE: preserve the backend's own tool-call id when it
-			// sends one (Antigravity/Claude does — "toolu_vrtx_…"), so replaying
+			// sends one (Antigravity/Claude does — "toolu_vrtx_..."), so replaying
 			// it in history satisfies the native format. Gemini sends none, so
 			// this falls back to a generated id exactly as before.
 			id := p.FunctionCall.ID

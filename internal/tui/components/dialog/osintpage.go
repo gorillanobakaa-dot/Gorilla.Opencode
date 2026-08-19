@@ -1,6 +1,6 @@
 // GORILLA OVERRIDE: this file did not exist upstream. It is the /osint
 // capability page — opened by typing /osint with no question, and pointed at
-// from /help. The owner's spec: "that command deserves its own page…
+// from /help. The owner's spec: "that command deserves its own page...
 // maximized to the max in which the whole capabilities will have to be
 // explained to the user."
 //
@@ -64,13 +64,13 @@ type osintLine struct {
 
 func osintContent() []osintLine {
 	armed := config.LoadoutEnabled(config.DossierComponentID)
-	armLine := osintLine{"red", "STATUS: OFF. Arm it in /context → \"" + config.DossierRowName + "\" → space. Until then /osint <question> refuses."}
+	armLine := osintLine{"red", "STATUS: OFF. Arm it in /context -> \"" + config.DossierRowName + "\" -> space. Until then /osint <question> refuses."}
 	if armed {
 		armLine = osintLine{"red", "STATUS: ARMED. /osint <question> will show the burn-rate warning, then run on your say-so."}
 	}
 	return []osintLine{
 		{"h1", "GORILLA " + config.AllSourceProductName + " — explained"},
-		{"mute", "↑↓/PgUp/PgDn scroll · esc closes · /osint <question> runs it (after the warning)"},
+		{"mute", "up/down, PgUp/PgDn scroll | esc closes | /osint <question> runs it (after the warning)"},
 		{"", ""},
 		armLine,
 		{"", ""},
@@ -101,9 +101,9 @@ func osintContent() []osintLine {
 		{"", "             and a recommended action."},
 		{"", ""},
 		{"h2", "Iron rules it follows"},
-		{"", "• It never cites a source it did not actually open."},
-		{"", "• It says what it could NOT establish instead of papering over it."},
-		{"", "• Every grade travels with its claim — you always know how much weight a sentence bears."},
+		{"", "* It never cites a source it did not actually open."},
+		{"", "* It says what it could NOT establish instead of papering over it."},
+		{"", "* Every grade travels with its claim — you always know how much weight a sentence bears."},
 		{"", ""},
 		{"h2", "How it states what it thinks (and why that is the anti-nonsense part)"},
 		{"", "The weakness of an AI answer is uniform confidence: everything sounds equally certain. This"},
@@ -145,7 +145,7 @@ func osintContent() []osintLine {
 func (m OsintPageCmp) View() string {
 	t := theme.CurrentTheme()
 	base := styles.BaseStyle()
-	// GORILLA FIX (2026-08-17): see dialogWidth — the old max(70, …) floor drew
+	// GORILLA FIX (2026-08-17): see dialogWidth — the old max(70, ...) floor drew
 	// a frame wider than a narrow terminal, which strands rows in scrollback.
 	w := dialogWidth(m.width, 104, 6)
 
@@ -176,13 +176,13 @@ func (m OsintPageCmp) View() string {
 		}
 		text := l.text
 		if r := []rune(text); len(r) > w-1 {
-			text = string(r[:w-2]) + "…"
+			text = string(r[:w-4]) + styles.Ellipsis
 		}
 		b = append(b, st.Render(text))
 	}
 	if end < len(lines) {
 		b = append(b, base.Width(w).Foreground(t.TextMuted()).
-			Render(fmt.Sprintf("  … %d more line(s) — ↓ to continue", len(lines)-end)))
+			Render(fmt.Sprintf("  ... %d more line(s) — down to continue", len(lines)-end)))
 	}
 
 	content := lipgloss.JoinVertical(lipgloss.Left, b...)

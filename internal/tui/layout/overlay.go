@@ -86,10 +86,15 @@ func PlaceOverlay(
 		baseStyle := styles.BaseStyle()
 
 		var shadowbg string = ""
+		// GORILLA FIX (2026-08-19): a space, not a shade block. The shadow is
+		// the BACKGROUND COLOUR; the glyph was only ever carrying it, at the
+		// cost of a non-ASCII character that a stripped font may not have and
+		// that costs a table lookup to measure. A solid dark cell is the same
+		// effect with none of that.
 		shadowchar := lipgloss.NewStyle().
 			Background(t.BackgroundDarker()).
 			Foreground(t.Background()).
-			Render("░")
+			Render(" ")
 		bgchar := baseStyle.Render(" ")
 		for i := 0; i <= fgHeight; i++ {
 			if i == 0 {

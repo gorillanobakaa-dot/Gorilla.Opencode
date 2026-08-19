@@ -403,7 +403,7 @@ func (m *ArsenalCmp) price() tea.Cmd {
 		m.notice = "Nothing selected yet — space takes what the cursor is on, a takes everything."
 		return nil
 	}
-	m.notice = "measuring with " + pmName(m.pm) + "…"
+	m.notice = "measuring with " + pmName(m.pm) + "..."
 	pkgs, _, _ := m.installable(ids)
 	key := strings.Join(ids, ",")
 	pm := m.pm
@@ -441,13 +441,13 @@ func (m ArsenalCmp) planLines() []arsLine {
 
 	out := []arsLine{
 		{"h1", "Install plan"},
-		{"mute", "esc back · s save this selection as a shareable file"},
+		{"mute", "esc back | s save this selection as a shareable file"},
 		{"", ""},
 	}
 	if len(chosen) > 0 {
 		out = append(out, arsLine{"h2", fmt.Sprintf("%d capabilit%s to add", len(chosen), plural(len(chosen)))})
 		for _, e := range chosen {
-			out = append(out, arsLine{"", "  • " + e.Title})
+			out = append(out, arsLine{"", "  * " + e.Title})
 		}
 	}
 	if already > 0 {
@@ -509,7 +509,7 @@ func (m ArsenalCmp) emitInstall() tea.Cmd {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "%d capabilit%s, %d package(s):\n", len(chosen), plural(len(chosen)), len(pkgs))
 	for _, e := range chosen {
-		fmt.Fprintf(&sb, "  • %s — %s\n", e.ID, e.Title)
+		fmt.Fprintf(&sb, "  * %s — %s\n", e.ID, e.Title)
 	}
 	for _, e := range unavailable {
 		fmt.Fprintf(&sb, "  ! %s — %s\n", e.ID, arsenal.UnavailableNote(e, m.pm))
@@ -567,7 +567,7 @@ func (m ArsenalCmp) header() []arsLine {
 	}
 	head := []arsLine{
 		{"h1", "ARSENAL — what this agent can do, and what it could do"},
-		{"mute", fmt.Sprintf("on this machine: %d capabilities present, %d not · package manager: %s",
+		{"mute", fmt.Sprintf("on this machine: %d capabilities present, %d not | package manager: %s",
 			haveN, missN, pmName(m.pm))},
 	}
 	if pickN > 0 {
@@ -575,18 +575,18 @@ func (m ArsenalCmp) header() []arsLine {
 		if c, ok := m.pricing[strings.Join(m.selectedIDs(), ",")]; ok {
 			switch {
 			case !c.Measured:
-				line += " · could not price: " + c.Note
+				line += " | could not price: " + c.Note
 			case c.DownloadBytes == 0:
-				line += " · nothing to download — all of it is already here"
+				line += " | nothing to download — all of it is already here"
 			default:
-				line += fmt.Sprintf(" · %s to download, %s on disk",
+				line += fmt.Sprintf(" | %s to download, %s on disk",
 					arsenal.HumanBytes(c.DownloadBytes), arsenal.HumanBytes(c.DiskBytes))
 				if t := arsenal.DownloadTime(c.DownloadBytes, m.linkSpeed); t != "" {
-					line += fmt.Sprintf(" · about %s at %.0f KB/s", t, m.linkSpeed)
+					line += fmt.Sprintf(" | about %s at %.0f KB/s", t, m.linkSpeed)
 				}
 			}
 		} else {
-			line += " · press p to measure what it costs"
+			line += " | press p to measure what it costs"
 		}
 		head = append(head, arsLine{"sel", line})
 	}
@@ -604,8 +604,8 @@ func (m ArsenalCmp) seriesLines() []arsLine {
 	out := m.header()
 	out = append(out,
 		arsLine{"", ""},
-		arsLine{"mute", "↑↓ move · enter open · space take this series · a everything · n none"},
-		arsLine{"mute", "p measure the real cost · i the install command · s save selection · L load one · esc close"},
+		arsLine{"mute", "up/down move | enter open | space take this series | a everything | n none"},
+		arsLine{"mute", "p measure the real cost | i the install command | s save selection | L load one | esc close"},
 		arsLine{"", ""})
 
 	for i, s := range m.man.Series {
@@ -650,7 +650,7 @@ func (m ArsenalCmp) entryLines() []arsLine {
 	out = append(out,
 		arsLine{"", ""},
 		arsLine{"h2", s.Title},
-		arsLine{"mute", "↑↓ move · enter full detail · space take this one · p cost · i install command · esc back"},
+		arsLine{"mute", "up/down move | enter full detail | space take this one | p cost | i install command | esc back"},
 		arsLine{"", ""})
 
 	for i, e := range s.Entries {
@@ -685,7 +685,7 @@ func (m ArsenalCmp) detailLines() []arsLine {
 	st := m.status[e.ID]
 	out := []arsLine{
 		{"h1", e.Title},
-		{"mute", "esc back · space " + pickVerb(m.selected[e.ID])},
+		{"mute", "esc back | space " + pickVerb(m.selected[e.ID])},
 		{"", ""},
 	}
 
@@ -705,7 +705,7 @@ func (m ArsenalCmp) detailLines() []arsLine {
 
 	out = append(out, arsLine{"", ""}, arsLine{"h2", "What the agent gains"})
 	for _, u := range e.Unlocks {
-		out = append(out, arsLine{"", "• " + u})
+		out = append(out, arsLine{"", "* " + u})
 	}
 
 	out = append(out, arsLine{"", ""}, arsLine{"h2", "What will disappoint you"})
@@ -751,11 +751,18 @@ func truncateToWidth(s string, w int) string {
 	if w < 2 || lipgloss.Width(s) <= w {
 		return s
 	}
+	// Reserve the marker's REAL width. It was "…" at one column; it is now
+	// "..." at three, and the reservation did not follow it — so every
+	// truncated line came out two columns too long, wrapped, and grew the
+	// frame. Caught immediately by TestThePageFillsTheScreenExactly, which is
+	// exactly why that test asserts an exact height rather than "not taller".
+	marker := styles.Ellipsis
+	mw := lipgloss.Width(marker)
 	r := []rune(s)
-	for len(r) > 0 && lipgloss.Width(string(r))+1 > w {
+	for len(r) > 0 && lipgloss.Width(string(r))+mw > w {
 		r = r[:len(r)-1]
 	}
-	return string(r) + "…"
+	return string(r) + marker
 }
 
 // wrapPlain wraps unstyled text at w columns on word boundaries. Done here
@@ -866,7 +873,7 @@ func (m ArsenalCmp) View() string {
 	}
 	if end < len(lines) {
 		b = append(b, base.Width(w).Foreground(t.TextMuted()).
-			Render(fmt.Sprintf("  … %d more line(s) — ↓ to continue", len(lines)-end)))
+			Render(fmt.Sprintf("  ... %d more line(s) — down to continue", len(lines)-end)))
 	}
 	if m.notice != "" {
 		// Truncated like every other line. It was not, and a long notice

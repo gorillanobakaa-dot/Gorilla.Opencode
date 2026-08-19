@@ -233,7 +233,7 @@ func (m *sidebarCmp) mcpSection() string {
 		lines = append(lines, baseStyle.Foreground(t.TextMuted()).Width(m.width).Render("No MCP servers"))
 	} else {
 		for _, s := range servers {
-			lines = append(lines, baseStyle.Foreground(t.Text()).Width(m.width).Render("• "+s))
+			lines = append(lines, baseStyle.Foreground(t.Text()).Width(m.width).Render("* "+s))
 		}
 	}
 

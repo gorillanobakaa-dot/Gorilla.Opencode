@@ -106,8 +106,10 @@ func TestPromptsDialogRendersBothViews(t *testing.T) {
 			t.Errorf("prompts sections view missing %q:\n%s", want, joined)
 		}
 	}
-	// The critical-section warning marker must be present.
-	if !strings.Contains(joined, "▲") {
+	// The critical-section warning marker must be present. ASCII since
+	// 2026-08-19 — the triangle was East-Asian-Ambiguous and this marker sits
+	// in an aligned list.
+	if !strings.Contains(joined, "^") {
 		t.Errorf("sections view does not mark the critical sections:\n%s", joined)
 	}
 }

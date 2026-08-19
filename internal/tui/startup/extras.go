@@ -17,6 +17,7 @@ package startup
 
 import (
 	"fmt"
+	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"os"
 	"strings"
 
@@ -179,7 +180,7 @@ func (m *extrasModel) View() string {
 	}
 
 	b.WriteString("\n")
-	writeWrapped(dim, "↑↓ move · space toggle · enter continue · esc quit")
+	writeWrapped(dim, "up/down move | space toggle | enter continue | esc quit")
 	writeWrapped(dim, "Asked once. Change it any time with /context or /settings.")
 	return b.String()
 }
@@ -195,9 +196,9 @@ func clip(s string, w int) string {
 		return s
 	}
 	if w == 1 {
-		return "…"
+		return "..."
 	}
-	return string(r[:w-1]) + "…"
+	return string(r[:w-3]) + styles.Ellipsis
 }
 
 // extrasCostLines is the honest account, wrapped.
@@ -212,10 +213,10 @@ func extrasCostLines(w int) []string {
 	paras := []string{
 		"Thinking out loud means the model writes a lot more than just the answer — " +
 			"often several times as much. What that costs depends on where it runs:",
-		"  · a provider that bills per token — real money, more of it",
-		"  · a free tier such as NVIDIA NIM — no money, but your allowance runs " +
+		"  | a provider that bills per token — real money, more of it",
+		"  | a free tier such as NVIDIA NIM — no money, but your allowance runs " +
 			"down faster and you may start hitting request limits",
-		"  · a model on this machine such as Ollama — no money, but more CPU, " +
+		"  | a model on this machine such as Ollama — no money, but more CPU, " +
 			"more heat, more battery",
 		"Either way, every reply takes longer.",
 		"No figure is shown because none is published for these models. A made-up " +
@@ -234,7 +235,7 @@ func extrasCostLines(w int) []string {
 // theme and the TUI exist — so this does not reach for a wrapping library.
 //
 // The indent handling is not decoration: strings.Fields discards leading
-// whitespace, so an earlier version turned "  · a provider that bills" into
+// whitespace, so an earlier version turned "  | a provider that bills" into
 // "· a provider that bills" and the cost list stopped reading as a list.
 func wrapTo(s string, w int) []string {
 	if w < 8 {
@@ -242,11 +243,16 @@ func wrapTo(s string, w int) []string {
 	}
 
 	// Split any leading whitespace/bullet marker from the prose so it survives.
+	//
+	// ASCII marker since 2026-08-19: the middle dot is East-Asian-Ambiguous,
+	// and these lines are wrapped to a measured width. The producer is
+	// internal/config/extras.go — the two must change together or the bullet
+	// stops being recognised and the cost list silently loses its indent.
 	prefix := ""
 	rest := s
-	if i := strings.Index(s, "· "); i >= 0 && strings.TrimSpace(s[:i]) == "" {
-		prefix = s[:i+len("· ")]
-		rest = s[i+len("· "):]
+	if i := strings.Index(s, styles.Bullet+" "); i >= 0 && strings.TrimSpace(s[:i]) == "" {
+		prefix = s[:i+2]
+		rest = s[i+2:]
 	}
 	// Continuation lines align under the text, not under the bullet.
 	cont := strings.Repeat(" ", len([]rune(prefix)))

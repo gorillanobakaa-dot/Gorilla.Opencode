@@ -6,7 +6,7 @@
 // with no payment method can take.
 //
 // Every field below was read from the live model list on 2026-08-17 (a free
-// plan, HTTP 200, five models). The list is at GET /models?client_version=…;
+// plan, HTTP 200, five models). The list is at GET /models?client_version=...;
 // see auth.ChatGPTCreds.ProbeBackend.
 //
 // # WHY ONLY TWO OF THE FIVE ARE REGISTERED

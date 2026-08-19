@@ -185,10 +185,10 @@ func ExtraCostExplanation(c ExtraCost) string {
 			"text than the answer alone, often several times as much.",
 		"",
 		"What that costs depends on where the model runs:",
-		"  · a provider that charges per token — real money, more of it",
-		"  · a free tier such as NVIDIA NIM — no money, but you use up your " +
+		"  * a provider that charges per token — real money, more of it",
+		"  * a free tier such as NVIDIA NIM — no money, but you use up your " +
 			"allowance faster and may start hitting request limits",
-		"  · a model on your own machine such as Ollama — no money, but noticeably " +
+		"  * a model on your own machine such as Ollama — no money, but noticeably " +
 			"more CPU, more heat and more battery",
 		"",
 		"In every case, replies take longer.",

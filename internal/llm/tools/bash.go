@@ -261,7 +261,7 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 
 // GORILLA OVERRIDE: build-log signal extraction. Raw output from
 // `make -j`, `./mach build`, `cargo build`, kbuild, etc. is thousands of
-// progress lines (CC/CXX/AR/LD/…) that saturate the model's context and
+// progress lines (CC/CXX/AR/LD/...) that saturate the model's context and
 // bury the one line that matters. When output is long AND looks like a
 // build/compile log, we keep only the lines that carry signal — errors,
 // warnings, linker failures, and the file:line they point at — plus a

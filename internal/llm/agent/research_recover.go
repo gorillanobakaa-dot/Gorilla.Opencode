@@ -80,7 +80,7 @@ func (r RecoverableRun) Label() string {
 		q = "(question not recorded)"
 	}
 	if len(q) > 60 {
-		q = strings.TrimSpace(q[:57]) + "…"
+		q = strings.TrimSpace(q[:57]) + "..."
 	}
 	return fmt.Sprintf("%s  %s", r.When.Format("Jan 02 15:04"), q)
 }

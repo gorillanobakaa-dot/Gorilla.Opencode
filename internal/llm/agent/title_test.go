@@ -91,14 +91,18 @@ func TestSanitiseTitleRespectsTheLengthLimit(t *testing.T) {
 	long := "An extremely long and rambling session title that no sidebar could ever hope to display on one line"
 	got := sanitiseTitle(long, "fallback")
 
-	if n := len([]rune(got)); n > maxTitleChars+1 { // +1 for the ellipsis
+	// AMENDED 2026-08-19: the marker now fits INSIDE the limit rather than
+	// being added on top of it, so the assertion is the limit itself. The old
+	// "+1 for the ellipsis" was tolerating a real off-by-one that only became
+	// visible when the marker grew from one character to three.
+	if n := len([]rune(got)); n > maxTitleChars {
 		t.Errorf("title is %d chars: %q", n, got)
 	}
-	if !strings.HasSuffix(got, "…") {
+	if !strings.HasSuffix(got, "...") {
 		t.Errorf("a truncated title should show it was cut: %q", got)
 	}
 	// Cut at a word boundary, so it reads as shortened not corrupted.
-	if strings.HasSuffix(strings.TrimSuffix(got, "…"), " ") {
+	if strings.HasSuffix(strings.TrimSuffix(got, "..."), " ") {
 		t.Errorf("trailing space before the ellipsis: %q", got)
 	}
 	if strings.Contains(got, "\n") {

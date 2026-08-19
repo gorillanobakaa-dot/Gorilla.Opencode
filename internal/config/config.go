@@ -917,7 +917,7 @@ func getProviderAPIKey(provider models.ModelProvider) string {
 // frame, because picker frames get screenshotted into chats (directive:
 // a length and a short prefix, never the value).
 //
-// Format: "sk-or-…#a3f2 (73 chars)". The prefix is the first six characters —
+// Format: "sk-or-...#a3f2 (73 chars)". The prefix is the first six characters —
 // vendor boilerplate shared by every key from that vendor. The hash is the
 // first two bytes of SHA-256, which is what actually distinguishes two rotated
 // keys, and is useless for recovering one. Empty string = no key-based
@@ -946,7 +946,7 @@ func ProviderKeyFingerprint(provider models.ModelProvider) string {
 	if r := []rune(key); len(r) >= 20 {
 		prefix = string(r[:6])
 	}
-	fp := fmt.Sprintf("%s…#%02x%02x (%d chars", prefix, sum[0], sum[1], len(key))
+	fp := fmt.Sprintf("%s...#%02x%02x (%d chars", prefix, sum[0], sum[1], len(key))
 	if fromEnv {
 		fp += ", from env"
 	}

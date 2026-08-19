@@ -323,7 +323,7 @@ WHAT IT DOES FOR YOU:
 - Asks the server for markdown first (Accept: text/markdown). Many
   documentation sites serve their source markdown, which is cleaner and far
   smaller than the rendered page.
-- Rewrites github.com/…/blob/… to raw.githubusercontent.com automatically.
+- Rewrites github.com/.../blob/... to raw.githubusercontent.com automatically.
 - If a documentation URL returns HTML, tries the ".md" companion once.
 - Falls back to converting HTML to markdown locally.
 - Re-uses a conditional request (ETag) when you fetch the same URL twice.
@@ -549,7 +549,7 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		// what to do about it.
 		excerpt := strings.TrimSpace(decodeBody(res.body, res.contentType))
 		if len(excerpt) > 2000 {
-			excerpt = excerpt[:2000] + "\n…[error body truncated]"
+			excerpt = excerpt[:2000] + "\n...[error body truncated]"
 		}
 		msg := fmt.Sprintf("Request failed with status %d (%s).", status, http.StatusText(status))
 		if excerpt != "" {

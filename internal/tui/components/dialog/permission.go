@@ -52,11 +52,11 @@ type permissionsMapping struct {
 var permissionsKeys = permissionsMapping{
 	Left: key.NewBinding(
 		key.WithKeys("left"),
-		key.WithHelp("←", "switch options"),
+		key.WithHelp("<-", "switch options"),
 	),
 	Right: key.NewBinding(
 		key.WithKeys("right"),
-		key.WithHelp("→", "switch options"),
+		key.WithHelp("->", "switch options"),
 	),
 	EnterSpace: key.NewBinding(
 		key.WithKeys("enter", " "),

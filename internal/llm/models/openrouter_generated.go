@@ -1532,7 +1532,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterMetaLlamaLlama4Maverick: {
 		ID:                  OpenRouterMetaLlamaLlama4Maverick,
 		Name:                "Meta: Llama 4 Maverick",
-		Description:         "$0.20/$0.70 per 1M — shit tier for code — vision/image model (vendor: \"vision-language\") — Llama 4 Maverick 17B Instruct (128E) is a high-capacity multimodal language model from Meta, built on a mixture-of-experts (MoE) architecture with… (1048K ctx)",
+		Description:         "$0.20/$0.70 per 1M — shit tier for code — vision/image model (vendor: \"vision-language\") — Llama 4 Maverick 17B Instruct (128E) is a high-capacity multimodal language model from Meta, built on a mixture-of-experts (MoE) architecture with... (1048K ctx)",
 		Detail:              "Vendor's own description (their claim, not our finding): Llama 4 Maverick 17B Instruct (128E) is a high-capacity multimodal language model from Meta, built on a mixture-of-experts (MoE) architecture with 128 experts and 17 billion active parameters per forward pass (400B total). It supports multilingual text and image input, and produces multilingual text and code output across 12 supported languages. Optimized for vision-language tasks, Maverick is instruction-tuned for assistant-like behavior, image reasoning, and general-purpose multimodal interaction. Maverick features early fusion for native multimodality and a 1 million token context window. It was trained on a curated mixture of public, licensed, and Meta-platform data, covering ~22 trillion tokens, with a knowledge cutoff in August 2024. Released on April 5, 2025 under the Llama 4 Community License, Maverick is suited for research and commercial applications requiring advanced multimodal understanding and high model throughput.",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "meta-llama/llama-4-maverick",
@@ -2272,7 +2272,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterOpenaiGpt4: {
 		ID:                  OpenRouterOpenaiGpt4,
 		Name:                "OpenAI: GPT-4",
-		Description:         "$30.0/$60.0 per 1M — research/admin work (vendor: \"reasoning\") — OpenAI's flagship model, GPT-4 is a large-scale multimodal language model capable of solving difficult problems with greater accuracy than previous models due to its broader… (8K ctx)",
+		Description:         "$30.0/$60.0 per 1M — research/admin work (vendor: \"reasoning\") — OpenAI's flagship model, GPT-4 is a large-scale multimodal language model capable of solving difficult problems with greater accuracy than previous models due to its broader... (8K ctx)",
 		Detail:              "Vendor's own description (their claim, not our finding): OpenAI's flagship model, GPT-4 is a large-scale multimodal language model capable of solving difficult problems with greater accuracy than previous models due to its broader general knowledge and advanced reasoning capabilities. Training data: up to Sep 2021.",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "openai/gpt-4",
@@ -3280,7 +3280,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen330bA3b: {
 		ID:                  OpenRouterQwenQwen330bA3b,
 		Name:                "Qwen: Qwen3 30B A3B",
-		Description:         "$0.12/$0.50 per 1M — mentions coding (vendor: \"coding\") — Qwen3, the latest generation in the Qwen large language model series, features both dense and mixture-of-experts (MoE) architectures to excel in reasoning, multilingual support, and… (131K ctx)",
+		Description:         "$0.12/$0.50 per 1M — mentions coding (vendor: \"coding\") — Qwen3, the latest generation in the Qwen large language model series, features both dense and mixture-of-experts (MoE) architectures to excel in reasoning, multilingual support, and... (131K ctx)",
 		Detail:              "Vendor's own description (their claim, not our finding): Qwen3, the latest generation in the Qwen large language model series, features both dense and mixture-of-experts (MoE) architectures to excel in reasoning, multilingual support, and advanced agent tasks. Its unique ability to switch seamlessly between a thinking mode for complex reasoning and a non-thinking mode for efficient dialogue ensures versatile, high-quality performance. Significantly outperforming prior models like QwQ and Qwen2.5, Qwen3 delivers superior mathematics, coding, commonsense reasoning, creative writing, and interactive dialogue capabilities. The Qwen3-30B-A3B variant includes 30.5 billion parameters (3.3 billion activated), 48 layers, 128 experts (8 activated per task), and supports up to 131K token contexts with YaRN, setting a new standard among open-source models.",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-30b-a3b",
@@ -3430,7 +3430,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Max: {
 		ID:                  OpenRouterQwenQwen3Max,
 		Name:                "Qwen: Qwen3 Max",
-		Description:         "$0.8/$3.9 per 1M — mentions coding (vendor: \"coding\") — Qwen3-Max is an updated release built on the Qwen3 series, offering major improvements in reasoning, instruction following, multilingual support, and long-tail knowledge coverage co… (262K ctx)",
+		Description:         "$0.8/$3.9 per 1M — mentions coding (vendor: \"coding\") — Qwen3-Max is an updated release built on the Qwen3 series, offering major improvements in reasoning, instruction following, multilingual support, and long-tail knowledge coverage co... (262K ctx)",
 		Detail:              "Vendor's own description (their claim, not our finding): Qwen3-Max is an updated release built on the Qwen3 series, offering major improvements in reasoning, instruction following, multilingual support, and long-tail knowledge coverage compared to the January 2025 version. It delivers higher accuracy in math, coding, logic, and science tasks, follows complex instructions in Chinese and English more reliably, reduces hallucinations, and produces higher-quality responses for open-ended Q\\u0026A, writing, and conversation. The model supports over 100 languages with stronger translation and commonsense reasoning, and is optimized for retrieval-augmented generation (RAG) and tool calling, though it does not include a dedicated “thinking” mode.",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-max",
@@ -3490,7 +3490,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl235bA22bInstruct: {
 		ID:                  OpenRouterQwenQwen3Vl235bA22bInstruct,
 		Name:                "Qwen: Qwen3 VL 235B A22B Instruct",
-		Description:         "$0.3/$1.0 per 1M — shit tier for code — vision/image model (vendor: \"vision-language\") — Qwen3-VL-235B-A22B Instruct is an open-weight multimodal model that unifies strong text generation with visual understanding across images and vid… (262K ctx)",
+		Description:         "$0.3/$1.0 per 1M — shit tier for code — vision/image model (vendor: \"vision-language\") — Qwen3-VL-235B-A22B Instruct is an open-weight multimodal model that unifies strong text generation with visual understanding across images and vid... (262K ctx)",
 		Detail:              "Vendor's own description (their claim, not our finding): Qwen3-VL-235B-A22B Instruct is an open-weight multimodal model that unifies strong text generation with visual understanding across images and video. The Instruct model targets general vision-language use (VQA, document parsing, chart/table extraction, multilingual OCR). The series emphasizes robust perception (recognition of diverse real-world and synthetic categories), spatial understanding (2D/3D grounding), and long-form visual comprehension, with competitive results on public multimodal benchmarks for both perception and reasoning. Beyond analysis, Qwen3-VL supports agentic interaction and tool use: it can follow complex instructions over multi-image, multi-turn dialogues; align text to video timelines for precise temporal queries; and operate GUI elements for automation tasks. The models also enable visual coding workflows—turning sketches or mockups into code and assisting with UI debugging—while maintaining strong text-only performance comparable to the flagship Qwen3 language models. This makes Qwen3-VL suitable for production scenarios spanning document AI, multilingual OCR, software/UI assistance, spatial/embodied tasks, and research on vision-language agents.",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-235b-a22b-instruct",
@@ -3550,7 +3550,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl32bInstruct: {
 		ID:                  OpenRouterQwenQwen3Vl32bInstruct,
 		Name:                "Qwen: Qwen3 VL 32B Instruct",
-		Description:         "$0.10/$0.42 per 1M — shit tier for code — vision/image model (vendor: \"vision-language\") — Qwen3-VL-32B-Instruct is a large-scale multimodal vision-language model designed for high-precision understanding and reasoning across text, image… (131K ctx)",
+		Description:         "$0.10/$0.42 per 1M — shit tier for code — vision/image model (vendor: \"vision-language\") — Qwen3-VL-32B-Instruct is a large-scale multimodal vision-language model designed for high-precision understanding and reasoning across text, image... (131K ctx)",
 		Detail:              "Vendor's own description (their claim, not our finding): Qwen3-VL-32B-Instruct is a large-scale multimodal vision-language model designed for high-precision understanding and reasoning across text, images, and video. With 32 billion parameters, it combines deep visual perception with advanced text comprehension, enabling fine-grained spatial reasoning, document and scene analysis, and long-horizon video understanding.Robust OCR in 32 languages, and enhanced multimodal fusion through Interleaved-MRoPE and DeepStack architectures. Optimized for agentic interaction and visual tool use, Qwen3-VL-32B delivers state-of-the-art performance for complex real-world multimodal tasks.",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-32b-instruct",
@@ -3565,7 +3565,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl8bInstruct: {
 		ID:                  OpenRouterQwenQwen3Vl8bInstruct,
 		Name:                "Qwen: Qwen3 VL 8B Instruct",
-		Description:         "$0.12/$0.45 per 1M — shit tier for code — vision/image model (vendor: \"vision-language\") — Qwen3-VL-8B-Instruct is a multimodal vision-language model from the Qwen3-VL series, built for high-fidelity understanding and reasoning across te… (262K ctx)",
+		Description:         "$0.12/$0.45 per 1M — shit tier for code — vision/image model (vendor: \"vision-language\") — Qwen3-VL-8B-Instruct is a multimodal vision-language model from the Qwen3-VL series, built for high-fidelity understanding and reasoning across te... (262K ctx)",
 		Detail:              "Vendor's own description (their claim, not our finding): Qwen3-VL-8B-Instruct is a multimodal vision-language model from the Qwen3-VL series, built for high-fidelity understanding and reasoning across text, images, and video. It features improved multimodal fusion with Interleaved-MRoPE for long-horizon temporal reasoning, DeepStack for fine-grained visual-text alignment, and text-timestamp alignment for precise event localization. The model supports a native 256K-token context window, extensible to 1M tokens, and handles both static and dynamic media inputs for tasks like document parsing, visual question answering, spatial reasoning, and GUI control. It achieves text understanding comparable to leading LLMs while expanding OCR coverage to 32 languages and enhancing robustness under varied visual conditions.",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-8b-instruct",
@@ -3580,7 +3580,7 @@ var OpenRouterGeneratedModels = map[ModelID]Model{
 	OpenRouterQwenQwen3Vl8bThinking: {
 		ID:                  OpenRouterQwenQwen3Vl8bThinking,
 		Name:                "Qwen: Qwen3 VL 8B Thinking",
-		Description:         "$0.2/$2.1 per 1M — shit tier for code — vision/image model (vendor: \"OCR\") — Qwen3-VL-8B-Thinking is the reasoning-optimized variant of the Qwen3-VL-8B multimodal model, designed for advanced visual and textual reasoning across complex… (131K ctx)",
+		Description:         "$0.2/$2.1 per 1M — shit tier for code — vision/image model (vendor: \"OCR\") — Qwen3-VL-8B-Thinking is the reasoning-optimized variant of the Qwen3-VL-8B multimodal model, designed for advanced visual and textual reasoning across complex... (131K ctx)",
 		Detail:              "Vendor's own description (their claim, not our finding): Qwen3-VL-8B-Thinking is the reasoning-optimized variant of the Qwen3-VL-8B multimodal model, designed for advanced visual and textual reasoning across complex scenes, documents, and temporal sequences. It integrates enhanced multimodal alignment and long-context processing (native 256K, expandable to 1M tokens) for tasks such as scientific visual analysis, causal inference, and mathematical reasoning over image or video inputs. Compared to the Instruct edition, the Thinking version introduces deeper visual-language fusion and deliberate reasoning pathways that improve performance on long-chain logic tasks, STEM problem-solving, and multi-step video understanding. It achieves stronger temporal grounding via Interleaved-MRoPE and timestamp-aware embeddings, while maintaining robust OCR, multilingual comprehension, and text generation on par with large text-only LLMs.",
 		Provider:            ProviderOpenRouter,
 		APIModel:            "qwen/qwen3-vl-8b-thinking",

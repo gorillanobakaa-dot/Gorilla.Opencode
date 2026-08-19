@@ -213,10 +213,10 @@ func TestQuotaBarScalesWithRemaining(t *testing.T) {
 	}
 	for _, c := range cases {
 		bar := quotaBar(c.remaining, 50)
-		if got := strings.Count(bar, "█"); got != c.filled {
+		if got := strings.Count(bar, "#"); got != c.filled {
 			t.Errorf("remaining %.4f: %d filled cells, want %d\nbar: %s", c.remaining, got, c.filled, bar)
 		}
-		if got := strings.Count(bar, "░"); got != 50-c.filled {
+		if got := strings.Count(bar, "."); got != 50-c.filled {
 			t.Errorf("remaining %.4f: %d empty cells, want %d", c.remaining, got, 50-c.filled)
 		}
 	}

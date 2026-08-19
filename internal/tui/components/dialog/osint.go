@@ -169,11 +169,11 @@ func (m OsintDialogCmp) moneyLines() []string {
 		out = append(out, fmt.Sprintf("Your tier (%s) bills flat or free — this run spends QUOTA: roughly %d ordinary questions' worth.",
 			name, config.ResearchQuotaMultiple(sessions)))
 		if pm, ph, via, ok := config.ResearchPaidEquivalent(helperModel(), m.inFlight()); ok && via != "" {
-			out = append(out, fmt.Sprintf("The same run on the paid API (%s): ≈ %s/min at peak, ≈ %s per helper. That is the size of what you are spending.",
+			out = append(out, fmt.Sprintf("The same run on the paid API (%s): ~ %s/min at peak, ~ %s per helper. That is the size of what you are spending.",
 				via, formatUSD(pm), formatUSD(ph)))
 		}
 	default:
-		out = append(out, fmt.Sprintf("PEAK BURN: ≈ %s per MINUTE while it runs (%s @ $%.2f/1M in). ≈ %s per helper, %d sessions total.",
+		out = append(out, fmt.Sprintf("PEAK BURN: ~ %s per MINUTE while it runs (%s @ $%.2f/1M in). ~ %s per helper, %d sessions total.",
 			formatUSD(perMinute), name, per1M, formatUSD(perHelper), sessions))
 	}
 	return out
@@ -306,7 +306,7 @@ func (m OsintDialogCmp) renderAt(lean int) string {
 	}
 	b = append(b,
 		body.Render(""),
-		head.Render(fmt.Sprintf("Helpers: ‹ %d ›  (←/→, %d–%d)", m.agents, agent.ResearchMinAgents, agent.ResearchMaxAgents)),
+		head.Render(fmt.Sprintf("Helpers: ‹ %d ›  (<-/->, %d–%d)", m.agents, agent.ResearchMinAgents, agent.ResearchMaxAgents)),
 	)
 	for i, o := range osintModes {
 		line := fmt.Sprintf("  %-11s %s", o.label, o.what)
@@ -318,7 +318,7 @@ func (m OsintDialogCmp) renderAt(lean int) string {
 	}
 	b = append(b,
 		body.Render(""),
-		mute.Render("enter: burn it   ↑↓: mode   ←→: helpers   esc: walk away (costs nothing)"),
+		mute.Render("enter: burn it   up/down: mode   left/right: helpers   esc: walk away (costs nothing)"),
 	)
 
 	content := lipgloss.JoinVertical(lipgloss.Left, b...)

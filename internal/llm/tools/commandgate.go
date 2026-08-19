@@ -7,7 +7,7 @@
 //
 //	A COMMAND IS NOT ITS FIRST WORD. The shell runs the whole string.
 //	Any check that inspects only the beginning is decoration, because
-//	`&&`, `;`, `|`, `$(…)` and backticks all attach a second command that the
+//	`&&`, `;`, `|`, `$(...)` and backticks all attach a second command that the
 //	check never sees. Do not "optimise" this back into a prefix test.
 //
 // ─────────────────────────────────────────────────────────────────────────────
@@ -67,10 +67,10 @@ var shellChainOperators = []string{"&&", "||", ";", "|", "&", "\n", "\r"}
 // — we do not attempt to analyse inside them, because a gate that guesses is a
 // gate that is wrong eventually.
 //
-//	$( … )  `…`   command substitution: arbitrary nested command
-//	${ … }         parameter expansion, can carry substitution
+//	$( ... )  `...`   command substitution: arbitrary nested command
+//	${ ... }         parameter expansion, can carry substitution
 //	>  >>          redirection: writes, so not read-only by definition
-//	<( … ) >( … )  process substitution
+//	<( ... ) >( ... )  process substitution
 var opaqueConstructs = []string{"$(", "`", "${", ">", "<("}
 
 // splitShellCommands breaks a command line into the individual commands a shell

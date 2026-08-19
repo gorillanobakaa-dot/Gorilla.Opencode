@@ -325,7 +325,7 @@ func (m SessionsCmp) View() string {
 	// The totals line is the reason this screen exists. On a device with 1 GB
 	// free, "what is this costing me" is the first question, not a footnote.
 	lines = append(lines, mute.Render(fitLine(fmt.Sprintf(
-		"%d conversations · %d helper sessions · %d messages · %s on disk",
+		"%d conversations | %d helper sessions | %d messages | %s on disk",
 		m.store.Sessions, m.store.Helpers, m.store.Msg, humanBytes(m.store.FileBytes)), width)))
 
 	search := m.search
@@ -339,7 +339,7 @@ func (m SessionsCmp) View() string {
 		sortLabel = "size"
 	}
 	lines = append(lines, mute.Render(fitLine(fmt.Sprintf(
-		"%d shown · sorted by %s", len(m.filtered), sortLabel), width)), "")
+		"%d shown | sorted by %s", len(m.filtered), sortLabel), width)), "")
 
 	if len(m.filtered) == 0 {
 		lines = append(lines, text.Render(fitLine("Nothing matches.", width)))
@@ -358,7 +358,7 @@ func (m SessionsCmp) View() string {
 		}
 		marker := " "
 		if row.Session.ID == m.currentID {
-			marker = "•" // the conversation you are in
+			marker = "*" // the conversation you are in
 		}
 		// Size right-aligned so the expensive rows are findable by eye, which
 		// is the whole point of being able to sort by it.
@@ -403,7 +403,7 @@ func (m SessionsCmp) View() string {
 	}
 
 	lines = append(lines, "", mute.Render(fitLine(
-		"↑↓ move   enter reopen   ctrl+r resume   ctrl+e export   DEL erase   tab sort   esc", width)))
+		"up/down move   enter reopen   ctrl+r resume   ctrl+e export   DEL erase   tab sort   esc", width)))
 
 	return base.Padding(1, 2).Border(lipgloss.RoundedBorder()).
 		BorderBackground(styles.PanelBackground()).BorderForeground(t.TextMuted()).

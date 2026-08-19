@@ -148,7 +148,7 @@ const (
 // U+25B2 rather than a heavier arrow like U+2B06: the latter is rendered as an
 // emoji by most fonts, which makes it double-width, and a glyph whose width the
 // renderer guesses wrong shifts everything after it.
-const overflowArrow = "▲"
+const overflowArrow = "^"
 
 // HeightCapped is implemented by a component that can be told the most rows it
 // may occupy. The frame owner knows the window size; the component does not.

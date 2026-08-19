@@ -238,7 +238,7 @@ func (m statusCmp) View() string {
 		helpers = styles.Padded().
 			Background(t.Warning()).
 			Foreground(t.Background()).
-			Render(fmt.Sprintf("🦍 %d helper(s) · /tasks", n))
+			Render(fmt.Sprintf("🦍 %d helper(s) | /tasks", n))
 		helpersWidth = lipgloss.Width(helpers)
 	}
 

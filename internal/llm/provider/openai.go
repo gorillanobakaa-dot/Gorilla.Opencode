@@ -254,7 +254,7 @@ func (o *openaiClient) preparedParams(messages []openai.ChatCompletionMessagePar
 // 2026-07-20) and reports no cache metrics at all, i.e. NIM offers no
 // prompt caching to enable. Sending the key by default would BREAK every
 // NIM request. So it is off unless you opt in with GORILLA_OPENCODE_PROMPT_CACHE=1,
-// for endpoints known to support it (OpenAI, DeepSeek's direct API, …).
+// for endpoints known to support it (OpenAI, DeepSeek's direct API, ...).
 // Anthropic caching is separate and always on (see anthropic.go).
 func (o *openaiClient) cacheOptions() []option.RequestOption {
 	if on, _ := strconv.ParseBool(os.Getenv("GORILLA_OPENCODE_PROMPT_CACHE")); !on {
@@ -442,7 +442,7 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			// a low per-worker in-flight cap) these half-open streams pile up
 			// over an agentic session — every tool-loop round opens another —
 			// until the worker refuses new requests with
-			//   "ResourceExhausted: Worker local total request limit reached (N/…)".
+			//   "ResourceExhausted: Worker local total request limit reached (N/...)".
 			// Closing here covers all three exits below: success, retry, error.
 			openaiStream.Close()
 			if err == nil || errors.Is(err, io.EOF) {
@@ -542,7 +542,7 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 // which does not match OpenAI's {"error":{...}} schema, so openai-go's
 // unmarshal populates nothing: RawJSON(), Code, Message and Type all come back
 // EMPTY and only StatusCode survives. The user was therefore shown
-// `failed to process events: POST "…": 404 Not Found` — technically true and
+// `failed to process events: POST "...": 404 Not Found` — technically true and
 // completely useless, since it looks like the app or the network is broken when
 // in fact the key is fine and only that one model is off-limits.
 //
@@ -700,7 +700,7 @@ func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool)
 // capacity/rate condition that is worth retrying after a longer back-off —
 // most importantly NVIDIA NIM's in-band stream error
 //
-//	"ResourceExhausted: Worker local total request limit reached (N/…)"
+//	"ResourceExhausted: Worker local total request limit reached (N/...)"
 //
 // which arrives on the SSE stream (not as an HTTP status), plus the usual
 // rate-limit / overloaded phrasings from other providers. Matched on message

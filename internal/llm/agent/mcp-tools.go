@@ -281,7 +281,7 @@ func describeMCPServer(name string) string {
 	if d.Instructions != "" {
 		desc := d.Instructions
 		if len(desc) > 300 {
-			desc = desc[:300] + "…"
+			desc = desc[:300] + "..."
 		}
 		fmt.Fprintf(&b, "\nThe server describes itself as: %q (its own words, not verified)", desc)
 	}

@@ -44,8 +44,14 @@ func ToString(width int, img image.Image) string {
 				color2 = color1
 			}
 
+			// GORILLA NOTE (2026-08-19): U+2580 stays, deliberately, and is
+			// exempt from the ASCII-drawing rule in internal/tui/styles/ascii.go.
+			// The upper-half block IS the image renderer: one cell shows two
+			// pixels by colouring the top half and the bottom half separately.
+			// There is no ASCII substitute — replacing it does not degrade the
+			// picture, it removes the technique.
 			str.WriteString(lipgloss.NewStyle().Foreground(color1).
-				Background(color2).Render("▀"))
+				Background(color2).Render("\u2580"))
 		}
 
 		str.WriteString("\n")

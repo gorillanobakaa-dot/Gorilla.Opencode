@@ -470,7 +470,7 @@ func firstOf(s []string) string {
 func oneLineOf(s string, max int) string {
 	s = strings.Join(strings.Fields(s), " ")
 	if len([]rune(s)) > max {
-		return string([]rune(s)[:max]) + "…"
+		return string([]rune(s)[:max]) + "..."
 	}
 	return s
 }

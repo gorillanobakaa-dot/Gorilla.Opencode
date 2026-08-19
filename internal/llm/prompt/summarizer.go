@@ -12,8 +12,8 @@ import (
 // prompt, which was already embedded. All four base prompts (coder, summarizer,
 // task, title) now share the same "embedded .txt + strings.TrimSpace" pattern,
 // which is the prerequisite for the user-editable override layer in plan 04.
-// Zero behaviour change: strings.TrimSpace of "…decisions made\n" equals
-// "…decisions made", the exact bytes the literal returned.
+// Zero behaviour change: strings.TrimSpace of "...decisions made\n" equals
+// "...decisions made", the exact bytes the literal returned.
 
 //go:embed summarizer.txt
 var baseSummarizerPrompt string

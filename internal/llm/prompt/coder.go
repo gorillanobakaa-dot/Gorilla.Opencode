@@ -197,7 +197,7 @@ func listTopLevelBrief(dir string, limit int) string {
 	//
 	// This was a plain sort.Strings over everything, which is ASCII, which puts
 	// CAPITALS first. In this very repo that meant the 25 slots were consumed by
-	// GITHUB-RELEASE-NOTES-0.1.65 … 0.1.77 and SHA256SUMS-*, and NOT ONE source
+	// GITHUB-RELEASE-NOTES-0.1.65 ... 0.1.77 and SHA256SUMS-*, and NOT ONE source
 	// entry reached the model - no cmd/, no internal/, no go.mod. The block whose
 	// entire job is "where am I" was describing a pile of old builds.
 	//
@@ -217,7 +217,7 @@ func listTopLevelBrief(dir string, limit int) string {
 	}
 	out := strings.Join(shown, "\n")
 	if extra > 0 {
-		out += fmt.Sprintf("\n… +%d more (not listed)", extra)
+		out += fmt.Sprintf("\n... +%d more (not listed)", extra)
 	}
 	return out
 }
@@ -238,7 +238,7 @@ var versionRunRe = regexp.MustCompile(`[0-9][0-9.]*`)
 // actually distinguish this project from any other.
 //
 // It also removes an accidental prompt injection. Thirteen consecutive
-// GITHUB-RELEASE-NOTES-0.1.65…0.1.77 lines read as a sequence, and on 2026-08-09
+// GITHUB-RELEASE-NOTES-0.1.65...0.1.77 lines read as a sequence, and on 2026-08-09
 // a model given the input "oi" and nothing else continued that sequence: it ran
 // `git tag -a v0.1.78`, and the tag was really created. Nothing was
 // hallucinated - the context contained a monotonic counter and an idle agent.
@@ -331,7 +331,7 @@ func gitStatusBrief(dir string, maxLines int) string {
 	}
 	body := strings.Join(lines, "\n")
 	if extra > 0 {
-		body += fmt.Sprintf("\n… +%d more changed paths (not listed)", extra)
+		body += fmt.Sprintf("\n... +%d more changed paths (not listed)", extra)
 	}
 	if branch != "" {
 		return "branch: " + branch + "\n" + body

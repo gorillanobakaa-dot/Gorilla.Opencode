@@ -41,7 +41,7 @@ func generateMarkdownStyleConfig() ansi.StyleConfig {
 			StylePrimitive: ansi.StylePrimitive{
 				Color:  stringPtr(adaptiveColorToString(t.MarkdownBlockQuote())),
 				Italic: boolPtr(true),
-				Prefix: "┃ ",
+				Prefix: "| ",
 			},
 			Indent:      uintPtr(1),
 			IndentToken: stringPtr(BaseStyle().Render(" ")),
@@ -118,10 +118,10 @@ func generateMarkdownStyleConfig() ansi.StyleConfig {
 		},
 		HorizontalRule: ansi.StylePrimitive{
 			Color:  stringPtr(adaptiveColorToString(t.MarkdownHorizontalRule())),
-			Format: "\n─────────────────────────────────────────\n",
+			Format: "\n-----------------------------------------\n",
 		},
 		Item: ansi.StylePrimitive{
-			BlockPrefix: "• ",
+			BlockPrefix: "* ",
 			Color:       stringPtr(adaptiveColorToString(t.MarkdownListItem())),
 		},
 		Enumeration: ansi.StylePrimitive{
@@ -258,9 +258,9 @@ func generateMarkdownStyleConfig() ansi.StyleConfig {
 			StyleBlock: ansi.StyleBlock{
 				StylePrimitive: ansi.StylePrimitive{},
 			},
-			CenterSeparator: stringPtr("┼"),
-			ColumnSeparator: stringPtr("│"),
-			RowSeparator:    stringPtr("─"),
+			CenterSeparator: stringPtr("+"),
+			ColumnSeparator: stringPtr("|"),
+			RowSeparator:    stringPtr("-"),
 		},
 		DefinitionDescription: ansi.StylePrimitive{
 			BlockPrefix: "\n ❯ ",

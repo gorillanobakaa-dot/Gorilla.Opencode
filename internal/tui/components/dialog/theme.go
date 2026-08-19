@@ -44,11 +44,11 @@ type themeKeyMap struct {
 var themeKeys = themeKeyMap{
 	Up: key.NewBinding(
 		key.WithKeys("up"),
-		key.WithHelp("↑", "previous theme"),
+		key.WithHelp("up", "previous theme"),
 	),
 	Down: key.NewBinding(
 		key.WithKeys("down"),
-		key.WithHelp("↓", "next theme"),
+		key.WithHelp("down", "next theme"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),

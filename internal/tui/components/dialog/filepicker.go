@@ -48,11 +48,11 @@ var filePickerKeyMap = FilePrickerKeyMap{
 	),
 	Down: key.NewBinding(
 		key.WithKeys("j", downArrow),
-		key.WithHelp("↓/j", "down"),
+		key.WithHelp("down/j", "down"),
 	),
 	Up: key.NewBinding(
 		key.WithKeys("k", upArrow),
-		key.WithHelp("↑/k", "up"),
+		key.WithHelp("up/k", "up"),
 	),
 	Forward: key.NewBinding(
 		key.WithKeys("l"),

@@ -235,7 +235,7 @@ func Handoff(sess session.Session, msgs []message.Message, branches []Branch, bu
 			fmt.Fprintf(&b, "- %s\n", clip(oneLine(f), 200))
 		}
 		if len(failures) > 15 {
-			fmt.Fprintf(&b, "- …and %d earlier failures\n", len(failures)-15)
+			fmt.Fprintf(&b, "- ...and %d earlier failures\n", len(failures)-15)
 		}
 		b.WriteString("\n")
 	}
@@ -347,7 +347,7 @@ func clip(s string, n int) string {
 		return ""
 	}
 	if r := []rune(s); len(r) > n {
-		return string(r[:n]) + "…"
+		return string(r[:n]) + "..."
 	}
 	return s
 }

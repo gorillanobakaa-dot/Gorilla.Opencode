@@ -58,7 +58,7 @@ func WriteSession(dir string, sess session.Session, msgs []message.Message, now 
 	return path, nil
 }
 
-// freePath returns name inside dir, or name-2, name-3… if it is taken. Bounded:
+// freePath returns name inside dir, or name-2, name-3... if it is taken. Bounded:
 // after 99 attempts something is wrong with the directory rather than with the
 // name, and looping forever on a slow disk helps nobody.
 func freePath(dir, name string) string {

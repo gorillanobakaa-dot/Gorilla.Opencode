@@ -224,7 +224,8 @@ func TestOneLineCollapsesAndClipsToolInput(t *testing.T) {
 	if n := len([]rune(long)); n > 120 {
 		t.Errorf("clipped to %d runes, want <=120", n)
 	}
-	if !strings.HasSuffix(long, "…") {
+	// ASCII marker since 2026-08-19; see internal/tui/styles/ascii.go.
+	if !strings.HasSuffix(long, "...") {
 		t.Errorf("clipped text does not show it was cut: %q", long)
 	}
 }

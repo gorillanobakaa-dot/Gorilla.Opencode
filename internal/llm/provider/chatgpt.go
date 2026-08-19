@@ -185,7 +185,7 @@ func cgConvertMessages(messages []message.Message) []cgItem {
 			for _, bin := range msg.BinaryContent() {
 				// ProviderOpenAI, not ProviderChatGPT: that argument selects the
 				// ENCODING, and only the OpenAI branch emits the
-				// "data:<mime>;base64,…" URL that image_url requires. Passing our
+				// "data:<mime>;base64,..." URL that image_url requires. Passing our
 				// own provider id would send bare base64 and the image would be
 				// rejected as a malformed URL.
 				content = append(content, cgContent{

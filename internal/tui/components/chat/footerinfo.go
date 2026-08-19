@@ -13,7 +13,7 @@
 // to twenty-odd rows. The footer is redrawn in place, and outside the alternate
 // screen bubbletea erases its previous frame by counting logical lines — so a tall
 // footer does not merely look wrong, it makes every later erase land in the wrong
-// place. Two rows of "key: value · key: value" carries the same facts within that
+// place. Two rows of "key: value | key: value" carries the same facts within that
 // budget.
 package chat
 
@@ -44,7 +44,7 @@ const footerInfoRows = 2
 
 // separator between fields on a line. A middle dot rather than a pipe because it
 // reads as a gap instead of a border, and the footer already has enough furniture.
-const fieldSep = "  ·  "
+const fieldSep = "  |  "
 
 // CompactView renders the session's state as at most footerInfoRows lines, wrapped
 // to width. It returns "" if there is nothing worth showing, so the footer does not
@@ -125,7 +125,7 @@ func join(base lipgloss.Style, width int, fields ...string) string {
 	if width <= 0 {
 		return line // unpadded: the caller is composing a wider line itself
 	}
-	return base.Width(width).MaxWidth(width).Render(ansi.Truncate(line, width, "…"))
+	return base.Width(width).MaxWidth(width).Render(ansi.Truncate(line, width, "..."))
 }
 
 // joinWithTrailer lays fields out on the left and pins one field to the RIGHT edge,
@@ -138,11 +138,11 @@ func join(base lipgloss.Style, width int, fields ...string) string {
 func joinWithTrailer(base lipgloss.Style, width int, trailer string, fields ...string) string {
 	left := join(base, 0, fields...)
 	if trailer == "" {
-		return base.Width(width).MaxWidth(width).Render(ansi.Truncate(left, width, "…"))
+		return base.Width(width).MaxWidth(width).Render(ansi.Truncate(left, width, "..."))
 	}
 	gap := width - lipgloss.Width(left) - lipgloss.Width(trailer)
 	if gap < 2 {
-		return base.Width(width).MaxWidth(width).Render(ansi.Truncate(left, width, "…"))
+		return base.Width(width).MaxWidth(width).Render(ansi.Truncate(left, width, "..."))
 	}
 	return base.MaxWidth(width).Render(left + base.Render(strings.Repeat(" ", gap)) + trailer)
 }

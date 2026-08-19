@@ -111,11 +111,11 @@ var messageKeys = MessageKeys{
 	),
 	HalfPageUp: key.NewBinding(
 		key.WithKeys("ctrl+u"),
-		key.WithHelp("ctrl+u", "½ page up"),
+		key.WithHelp("ctrl+u", "1/2 page up"),
 	),
 	HalfPageDown: key.NewBinding(
 		key.WithKeys("ctrl+d", "ctrl+d"),
-		key.WithHelp("ctrl+d", "½ page down"),
+		key.WithHelp("ctrl+d", "1/2 page down"),
 	),
 }
 
@@ -285,7 +285,7 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.coldStartWarned && shouldColdStartWarn(m.taskLabel, m.elapsedInPhase()) {
 			m.coldStartWarned = true
 			// Echo: the sentence is longer than the status bar can show, and the
-			// half it drops ("First reply can take a minute…") is the half that
+			// half it drops ("First reply can take a minute...") is the half that
 			// tells the user what to do — so it also goes into the transcript in
 			// full. See util.ReportInfoEcho.
 			cmds = append(cmds, util.ReportInfoEcho(

@@ -125,13 +125,13 @@ func (a *appModel) eraseSession(sess session.Session) tea.Cmd {
 			"Erased %d sessions, but the space was NOT returned to the disk: %v", removed, reclaimErr))
 	case after < before:
 		a.sessionsMgr.SetNotice(fmt.Sprintf(
-			"Erased %d sessions · %s returned to the disk", removed, humanBytes(before-after)))
+			"Erased %d sessions | %s returned to the disk", removed, humanBytes(before-after)))
 	default:
 		// Honest about the small case: a short conversation can be less than one
 		// database page, and claiming a reclaim that did not measurably happen
 		// is the failure mode this whole path exists to avoid.
 		a.sessionsMgr.SetNotice(fmt.Sprintf(
-			"Erased %d sessions · too small to change the file size", removed))
+			"Erased %d sessions | too small to change the file size", removed))
 	}
 	return nil
 }

@@ -1,9 +1,9 @@
 // GORILLA OVERRIDE (2026-08-18): recognise a tool call that arrived as TEXT.
 //
-// WHAT HAPPENS, AND WHY IT IS NOT THE MODEL MISBEHAVING
+// # WHAT HAPPENS, AND WHY IT IS NOT THE MODEL MISBEHAVING
 //
 // Llama 3.x tool calling is a TEXT protocol. Meta's own prompt format documents
-// the model emitting `<|python_tag|>{"type":"function","name":…,"parameters":…}`
+// the model emitting `<|python_tag|>{"type":"function","name":...,"parameters":...}`
 // and the SERVING LAYER is expected to lift that out of the stream and return it
 // as a structured tool call. Hosted stacks that detokenise with
 // skip_special_tokens=True destroy the `<|python_tag|>` frame first — vLLM's own
@@ -14,15 +14,15 @@
 // MEASURED, and the measurement decided the design. Replaying the session
 // database on 2026-08-18: 4 of 13 `local.meta/llama-3.3-70b-instruct` assistant
 // turns (31%) were a leaked call as the whole content. Every single one was
-// INVALID JSON — `"parameters": "query": "…"`, with the inner brace missing:
+// INVALID JSON — `"parameters": "query": "..."`, with the inner brace missing:
 //
-//	{"type": "function", "name": "web_search", "parameters": "query": "…"}
+//	{"type": "function", "name": "web_search", "parameters": "query": "..."}
 //
 // That fact killed the obvious implementations. A detector requiring
 // json.Unmarshal to succeed matches NONE of the real occurrences, so the shape
 // test below is deliberately structural rather than a parse.
 //
-// WHY THIS ONLY LABELS, AND NEVER DISPATCHES
+// # WHY THIS ONLY LABELS, AND NEVER DISPATCHES
 //
 // Synthesising a tool call from model TEXT and executing it is exactly the
 // fuzzy-output-to-dispatch path internal/llm/agent/toolname.go exists to forbid:

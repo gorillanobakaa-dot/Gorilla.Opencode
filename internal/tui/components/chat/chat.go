@@ -58,7 +58,7 @@ func header(width int, base lipgloss.Style) string {
 func lspsConfigured(width int, base lipgloss.Style) string {
 	cfg := config.Get()
 	title := "LSP Configuration"
-	title = ansi.Truncate(title, width, "…")
+	title = ansi.Truncate(title, width, "...")
 
 	t := theme.CurrentTheme()
 	baseStyle := base
@@ -93,10 +93,10 @@ func lspsConfigured(width int, base lipgloss.Style) string {
 		lsp := cfg.LSP[name]
 		lspName := baseStyle.
 			Foreground(t.Text()).
-			Render(fmt.Sprintf("• %s", name))
+			Render(fmt.Sprintf("* %s", name))
 
 		cmd := lsp.Command
-		cmd = ansi.Truncate(cmd, width-lipgloss.Width(lspName)-3, "…")
+		cmd = ansi.Truncate(cmd, width-lipgloss.Width(lspName)-3, "...")
 
 		lspPath := baseStyle.
 			Foreground(t.TextMuted()).
@@ -125,7 +125,7 @@ func lspsConfigured(width int, base lipgloss.Style) string {
 		lspViews = append(lspViews, baseStyle.
 			Width(width).
 			Foreground(t.TextMuted()).
-			Render(ansi.Truncate(note, width, "…")))
+			Render(ansi.Truncate(note, width, "...")))
 	}
 
 	return baseStyle.

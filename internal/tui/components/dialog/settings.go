@@ -65,12 +65,12 @@ type settingsKeyMap struct {
 // Arrow keys for adjustment — `-`/`+`/`[`/`]` are awkward or hidden on non-US
 // layouts (the JP-keyboard lesson).
 var settingsKeys = settingsKeyMap{
-	Up:       key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑", "up")),
-	Down:     key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓", "down")),
+	Up:       key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("up", "up")),
+	Down:     key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("down", "down")),
 	PageUp:   key.NewBinding(key.WithKeys("pgup"), key.WithHelp("pgup", "page up")),
 	PageDown: key.NewBinding(key.WithKeys("pgdown"), key.WithHelp("pgdn", "page down")),
-	Left:     key.NewBinding(key.WithKeys("left"), key.WithHelp("←", "lower")),
-	Right:    key.NewBinding(key.WithKeys("right"), key.WithHelp("→", "higher")),
+	Left:     key.NewBinding(key.WithKeys("left"), key.WithHelp("<-", "lower")),
+	Right:    key.NewBinding(key.WithKeys("right"), key.WithHelp("->", "higher")),
 	Toggle:   key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "toggle / edit")),
 	Edit:     key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "edit")),
 	Reset:    key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reset this one")),
@@ -392,7 +392,7 @@ func (m *settingsDialogCmp) refuseReadOnly(s *config.Setting) tea.Cmd {
 	return nil
 }
 
-// nudge handles ←/→: step a number, walk a preset ladder, cycle an enum, flip a
+// nudge handles <-/->: step a number, walk a preset ladder, cycle an enum, flip a
 // bool. Text and list settings open the editor instead.
 func (m *settingsDialogCmp) nudge(dir int) tea.Cmd {
 	s := m.current()
@@ -604,7 +604,7 @@ func (m *settingsDialogCmp) View() string {
 	}
 	if !m.cramped() {
 		head = append(head, base.Foreground(t.TextMuted()).Width(w).
-			Render(fmt.Sprintf("%d of %d differ from the shipped defaults · r resets one · /reset does whole scopes",
+			Render(fmt.Sprintf("%d of %d differ from the shipped defaults | r resets one | /reset does whole scopes",
 				changed, len(config.Settings))))
 	}
 	if m.filtering || m.filter != "" {
@@ -651,7 +651,7 @@ func (m *settingsDialogCmp) View() string {
 	}
 	foot = append(foot,
 		base.Foreground(t.TextMuted()).Width(w).
-			Render("↑↓ move  ←→ change  space toggle/edit  r reset one  / filter  esc close"+scrollNote),
+			Render("up/down move  left/right change  space toggle/edit  r reset one  / filter  esc close"+scrollNote),
 	)
 
 	all := append(append(head, body...), foot...)
@@ -714,9 +714,9 @@ func (m *settingsDialogCmp) settingRows(s *config.Setting, selected bool, w int)
 	if s.Kind == config.KindBool {
 		cur, _ := s.Get().(bool)
 		if cur {
-			desc = "ON: " + s.WhenOn + "   ·   OFF: " + s.WhenOff
+			desc = "ON: " + s.WhenOn + "   |   OFF: " + s.WhenOff
 		} else {
-			desc = "OFF: " + s.WhenOff + "   ·   ON: " + s.WhenOn
+			desc = "OFF: " + s.WhenOff + "   |   ON: " + s.WhenOn
 		}
 	}
 	if s.ReadOnly {
@@ -748,7 +748,7 @@ func (m *settingsDialogCmp) editView(w int) string {
 		base.Foreground(t.Primary()).Bold(true).Width(w).Render("Edit: " + s.Name),
 		base.Width(w).Render(""),
 		base.Foreground(t.TextMuted()).Width(w).Render("  " + clip(s.Layman, w-4)),
-		base.Foreground(t.TextMuted()).Width(w).Render(fmt.Sprintf("  accepts: %s   ·   default: %s",
+		base.Foreground(t.TextMuted()).Width(w).Render(fmt.Sprintf("  accepts: %s   |   default: %s",
 			config.SettingRange(s), config.FormatSettingValue(s.Default))),
 		base.Width(w).Render(""),
 		base.Width(w).Render("  " + m.editInput.View()),
@@ -772,7 +772,7 @@ func clip(s string, max int) string {
 	if max <= 4 {
 		return s[:max]
 	}
-	return s[:max-1] + "…"
+	return s[:max-3] + styles.Ellipsis
 }
 
 func (m *settingsDialogCmp) BindingKeys() []key.Binding {

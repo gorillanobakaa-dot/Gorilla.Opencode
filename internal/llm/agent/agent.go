@@ -414,7 +414,7 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 			// GORILLA FIX: no "failed to process events:" prefix. It is internal
 			// jargon that told the user nothing and buried the one sentence that
 			// did — the provider errors below are already written as plain
-			// sentences ("… is not available to your account", "still failing
+			// sentences ("... is not available to your account", "still failing
 			// after N retries — the provider is busy"), so a prefix about event
 			// processing only made a clear message look like a crash.
 			return a.err(err)

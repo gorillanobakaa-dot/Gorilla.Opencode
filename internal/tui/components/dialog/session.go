@@ -57,11 +57,11 @@ type sessionKeyMap struct {
 var sessionKeys = sessionKeyMap{
 	Up: key.NewBinding(
 		key.WithKeys("up"),
-		key.WithHelp("↑", "previous session"),
+		key.WithHelp("up", "previous session"),
 	),
 	Down: key.NewBinding(
 		key.WithKeys("down"),
-		key.WithHelp("↓", "next session"),
+		key.WithHelp("down", "next session"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),
@@ -198,7 +198,7 @@ func (s *sessionDialogCmp) View() string {
 		Foreground(t.TextMuted()).
 		Width(maxWidth).
 		Padding(0, 1).
-		Render(fmt.Sprintf("%s (%d) · ctrl+a to switch", scopeLabel, len(s.sessions)))
+		Render(fmt.Sprintf("%s (%d) | ctrl+a to switch", scopeLabel, len(s.sessions)))
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,

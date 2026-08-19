@@ -141,16 +141,16 @@ func TestNoLineExceedsTheTerminalWidth(t *testing.T) {
 }
 
 // The bullet list must stay a bullet list. strings.Fields discards leading
-// whitespace, and an earlier version silently flattened "  · a provider…" to
-// "· a provider…", so the cost breakdown stopped reading as a list.
+// whitespace, and an earlier version silently flattened "  * a provider…" to
+// "* a provider…", so the cost breakdown stopped reading as a list.
 func TestBulletIndentSurvivesWrapping(t *testing.T) {
-	const bullet = "  · a free tier such as NVIDIA NIM — no money, but your allowance runs down faster and you may start hitting request limits"
+	const bullet = "  * a free tier such as NVIDIA NIM — no money, but your allowance runs down faster and you may start hitting request limits"
 
 	lines := wrapTo(bullet, 60)
 	if len(lines) < 2 {
 		t.Fatalf("expected the long bullet to wrap, got %d line(s)", len(lines))
 	}
-	if !strings.HasPrefix(lines[0], "  · ") {
+	if !strings.HasPrefix(lines[0], "  * ") {
 		t.Errorf("the bullet marker and its indent were lost: %q", lines[0])
 	}
 	// Continuations align under the text, not under the bullet character.
@@ -158,7 +158,7 @@ func TestBulletIndentSurvivesWrapping(t *testing.T) {
 		if !strings.HasPrefix(l, "    ") {
 			t.Errorf("continuation %d is not indented under the text: %q", i, l)
 		}
-		if strings.Contains(l, "·") {
+		if strings.Contains(l, "*") {
 			t.Errorf("continuation %d repeated the bullet: %q", i, l)
 		}
 	}

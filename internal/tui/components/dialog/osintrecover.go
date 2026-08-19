@@ -201,7 +201,7 @@ func (m OsintRecoverCmp) View() string {
 	lines = append(lines,
 		"",
 		base.Foreground(t.TextMuted()).Width(width).Render(
-			fitLine("↑↓ choose   enter  write it up   esc  cancel", width)),
+			fitLine("up/down choose   enter  write it up   esc  cancel", width)),
 	)
 
 	return base.Padding(1, 2).Border(lipgloss.RoundedBorder()).
@@ -230,5 +230,5 @@ func fitLine(line string, width int) string {
 	if lipgloss.Width(line) <= width-1 {
 		return line
 	}
-	return ansi.Truncate(line, width-2, "…")
+	return ansi.Truncate(line, width-2, "...")
 }

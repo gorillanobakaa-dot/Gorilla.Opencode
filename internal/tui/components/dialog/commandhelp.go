@@ -61,8 +61,8 @@ type commandHelpKeyMap struct {
 }
 
 var commandHelpKeys = commandHelpKeyMap{
-	Up:        key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑", "up")),
-	Down:      key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓", "down")),
+	Up:        key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("up", "up")),
+	Down:      key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("down", "down")),
 	Filter:    key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 	Escape:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
 	Backspace: key.NewBinding(key.WithKeys("backspace")),
@@ -362,7 +362,7 @@ func (m *commandHelpCmp) renderAt(listRows int, withDetail, withSubtitle bool) s
 	// the user needs to see and dropping it would look like the search broke.
 	searching := m.filtering || m.filter != ""
 	if withSubtitle || searching {
-		sub := "type / to search · ↑↓ to read · esc to close"
+		sub := "type / to search | up/down to read | esc to close"
 		if searching {
 			sub = "search: " + m.filter + "_"
 		}

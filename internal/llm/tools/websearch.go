@@ -1028,7 +1028,7 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		}
 		if a := strings.TrimSpace(h.Abstract); a != "" {
 			if len(a) > 700 {
-				a = a[:700] + "… [abstract truncated; web_fetch the url for the full text]"
+				a = a[:700] + "... [abstract truncated; web_fetch the url for the full text]"
 			}
 			fmt.Fprintf(&sb, "   abstract: %s\n", a)
 		}

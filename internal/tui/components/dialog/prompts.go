@@ -62,8 +62,8 @@ type promptsKeyMap struct {
 }
 
 var promptsKeys = promptsKeyMap{
-	Up:     key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑", "up")),
-	Down:   key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓", "down")),
+	Up:     key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("up", "up")),
+	Down:   key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("down", "down")),
 	Enter:  key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "sections")),
 	Edit:   key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit in $EDITOR")),
 	Reset:  key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reset to default")),
@@ -315,7 +315,7 @@ func (m *promptsDialogCmp) listView() string {
 					on++
 				}
 			}
-			extra = fmt.Sprintf("  ·  %d/%d sections on (enter)", on, len(secs))
+			extra = fmt.Sprintf("  |  %d/%d sections on (enter)", on, len(secs))
 		}
 
 		style := base.Width(w)
@@ -378,7 +378,7 @@ func (m *promptsDialogCmp) sectionsView() string {
 		}
 		warn := ""
 		if s.ID == prompt.SectionID("honesty") || s.ID == prompt.SectionID("preamble") {
-			warn = " ▲"
+			warn = " ^"
 		}
 
 		style := base.Width(w)
@@ -395,7 +395,7 @@ func (m *promptsDialogCmp) sectionsView() string {
 	rows = append(rows,
 		base.Width(w).Render(""),
 		base.Foreground(t.TextMuted()).Width(w).
-			Render("space toggle   backspace back   esc close   ▲ = disabling this hurts trustworthiness"),
+			Render("space toggle   backspace back   esc close   ^ = disabling this hurts trustworthiness"),
 	)
 
 	return base.Padding(1, 2).Border(lipgloss.RoundedBorder()).

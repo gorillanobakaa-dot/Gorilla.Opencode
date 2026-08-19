@@ -122,9 +122,19 @@ func truncateTitle(s string, limit int) string {
 	if len(r) <= limit {
 		return s
 	}
-	cut := string(r[:limit])
-	if i := strings.LastIndexFunc(cut, unicode.IsSpace); i > limit/2 {
+	// GORILLA FIX (2026-08-19): the marker has to fit INSIDE the limit.
+	// This cut to `limit` and then appended, so the result was always over by
+	// the marker's length — invisible at one character, obvious the moment the
+	// marker became "..." at three. A budget that the thing announcing the
+	// budget does not fit inside is not a budget.
+	const marker = "..."
+	room := limit - len(marker)
+	if room < 1 {
+		room = 1
+	}
+	cut := string(r[:room])
+	if i := strings.LastIndexFunc(cut, unicode.IsSpace); i > room/2 {
 		cut = cut[:i]
 	}
-	return strings.TrimRight(strings.TrimSpace(cut), ".,;:!—- ") + "…"
+	return strings.TrimRight(strings.TrimSpace(cut), ".,;:!—- ") + marker
 }

@@ -93,13 +93,13 @@ type loadoutKeyMap struct {
 }
 
 var loadoutKeys = loadoutKeyMap{
-	Up:   key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑", "up")),
-	Down: key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓", "down")),
-	// GORILLA OVERRIDE: ←/→ adjust the selected dial (speed / helpers). Arrow
+	Up:   key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("up", "up")),
+	Down: key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("down", "down")),
+	// GORILLA OVERRIDE: <-/-> adjust the selected dial (speed / helpers). Arrow
 	// keys work on every keyboard layout — unlike -/+/[/], which are awkward
 	// or hidden on non-US keyboards (this was a real pain on a JP keyboard).
-	Left:   key.NewBinding(key.WithKeys("left"), key.WithHelp("←", "less")),
-	Right:  key.NewBinding(key.WithKeys("right"), key.WithHelp("→", "more")),
+	Left:   key.NewBinding(key.WithKeys("left"), key.WithHelp("<-", "less")),
+	Right:  key.NewBinding(key.WithKeys("right"), key.WithHelp("->", "more")),
 	Toggle: key.NewBinding(key.WithKeys(" ", "enter"), key.WithHelp("space", "toggle/change")),
 	Reset:  key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reset defaults")),
 	// GORILLA OVERRIDE: one-key low-bandwidth profile (optional tools off).
@@ -329,7 +329,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	// alternative cost rows.
 	fitTo := func(line string, width int) string {
 		if r := []rune(line); len(r) > width-1 {
-			return string(r[:width-2]) + "…"
+			return string(r[:width-4]) + styles.Ellipsis
 		}
 		return line
 	}
@@ -355,7 +355,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	// bill. A screen whose whole purpose is honesty about cost cannot present
 	// an estimate in the typography of a measurement.
 	accuracy := base.Foreground(t.TextMuted()).Width(w).
-		Render(fitLine("estimates, ~10% high: schema bytes ÷ 4, not a real tokeniser"))
+		Render(fitLine("estimates, ~10% high: schema bytes / 4, not a real tokeniser"))
 
 	// rowStyle applies the shared selected / disabled styling to any row.
 	rowStyle := func(selected, muted bool) lipgloss.Style {
@@ -412,7 +412,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 
 	// --- Section 1: the two Gorilla control dials (arrow-key adjustable) ---
 	dialHeader := base.Foreground(t.Primary()).Bold(true).Width(w).
-		Render(fitLine("🦍 GORILLA CONTROLS — tune for your connection / free tier  (↑↓ pick a line · ←→ change it):"))
+		Render(fitLine("🦍 GORILLA CONTROLS — tune for your connection / free tier  (up/down pick a line | left/right change it):"))
 	// Dial rows carry the same "> " selection pointer as the toggle rows, so
 	// "where am I" reads the same way everywhere in the dialog.
 	dialRow := func(selected bool, label, desc string) string {
@@ -420,7 +420,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 		if selected {
 			mark = "> "
 		}
-		return rowStyle(selected, false).Render(fitLine(fmt.Sprintf("%s%-32s ‹ ←/→ ›  %s", mark, label, desc)))
+		return rowStyle(selected, false).Render(fitLine(fmt.Sprintf("%s%-32s ‹ <-/-> ›  %s", mark, label, desc)))
 	}
 
 	var rows []string
@@ -429,7 +429,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 
 	// --- Section 2: switch features on/off ---
 	featHeader := base.Foreground(t.Primary()).Bold(true).Width(w).
-		Render(fitLine("Turn features ON/OFF  (> marks where you are · space flips it):"))
+		Render(fitLine("Turn features ON/OFF  (> marks where you are | space flips it):"))
 	for i, c := range sortedLoadout() {
 		on := config.LoadoutEnabled(c.ID)
 		mark := ""
@@ -481,7 +481,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 		Render(fitLine("  \"free\" = already generated and paid for; hiding it saves nothing. \"COSTS EXTRA\" = the model writes more."))
 
 	help := base.Foreground(t.TextMuted()).Width(w).
-		Render(fitLine("↑↓ pick · ←→ dial · space flips ON/OFF · L all LSPs · l low-bw · r reset · esc close   ⚠ = disabling cripples the agent"))
+		Render(fitLine("up/down pick | left/right dial | space flips ON/OFF | L all LSPs | l low-bw | r reset | esc close   ⚠ = disabling cripples the agent"))
 
 	// Window the feature rows rather than rendering all of them. featureRows is
 	// decided by measurement in View(), not by a guess at how much chrome the rest
@@ -501,7 +501,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	scrollNote := ""
 	if len(shown) < len(feature) {
 		scrollNote = base.Foreground(t.TextMuted()).Width(w).
-			Render(fitLine(fmt.Sprintf("  showing %d-%d of %d — ↑↓ to reach the rest",
+			Render(fitLine(fmt.Sprintf("  showing %d-%d of %d — up/down to reach the rest",
 				m.featureTop+1, end, len(feature))))
 	}
 
@@ -541,7 +541,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 }
 
 // loadoutCostSuffix turns the per-turn token overhead into money at the
-// active model's input rate, e.g. " — ≈ $0.0033/turn (Grok 4.5 @ $3.00/1M in)".
+// active model's input rate, e.g. " — ~ $0.0033/turn (Grok 4.5 @ $3.00/1M in)".
 // Empty string if we can't price it and there is nothing useful to add.
 func loadoutCostSuffix() string {
 	dollars, per1MIn, name, priced := config.LoadoutCost()
@@ -552,9 +552,9 @@ func loadoutCostSuffix() string {
 		return ""
 	}
 	if per1MIn <= 0 {
-		return fmt.Sprintf(" — ≈ $0.00/turn (%s: free / flat-rate tier)", name)
+		return fmt.Sprintf(" — ~ $0.00/turn (%s: free / flat-rate tier)", name)
 	}
-	return fmt.Sprintf(" — ≈ %s/turn (%s @ $%.2f/1M in)", formatUSD(dollars), name, per1MIn)
+	return fmt.Sprintf(" — ~ %s/turn (%s @ $%.2f/1M in)", formatUSD(dollars), name, per1MIn)
 }
 
 // paceDesc / leashDesc are the full descriptive strings shown in the dial rows —
@@ -614,7 +614,7 @@ func formatUSD(d float64) string {
 // the row's state.
 //
 // GORILLA OVERRIDE (2026-08-17): it used to open with "off:" on rows that were
-// ON (meaning "if you turn this off…") and "OFF —" on rows that were off, so
+// ON (meaning "if you turn this off...") and "OFF —" on rows that were off, so
 // every row on the screen led with the word "off" whatever its state. A real
 // v0.1.87 user reported exactly that: "regardless the description still shows
 // off". The state now lives ONLY in the ON/OFF badge; this text is purely the

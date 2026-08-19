@@ -122,7 +122,7 @@ func (p *chatPage) FooterView(maxRows int) string {
 	//
 	// GORILLA FIX: a blank row between what you are TYPING and the session
 	// numbers. Without it the input line butts straight against
-	// "model … context … spent …", so the prompt and the statistics read as one
+	// "model ... context ... spent ...", so the prompt and the statistics read as one
 	// block and the cursor is hard to find. A gap already existed ABOVE the
 	// prompt (the reserved live row); this is its counterpart below.
 	//

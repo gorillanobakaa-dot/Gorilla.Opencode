@@ -40,7 +40,7 @@ func (k initDialogKeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		key.NewBinding(
 			key.WithKeys("tab", "left", "right"),
-			key.WithHelp("tab/←/→", "toggle selection"),
+			key.WithHelp("tab/<-/->", "toggle selection"),
 		),
 		key.NewBinding(
 			key.WithKeys("enter"),

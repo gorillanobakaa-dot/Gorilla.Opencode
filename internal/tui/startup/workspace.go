@@ -24,6 +24,7 @@ package startup
 
 import (
 	"fmt"
+	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"os"
 	"path/filepath"
 	"strings"
@@ -332,7 +333,7 @@ func (m *model) View() string {
 		fmt.Sprintf("ctrl+r %s don't ask again — remember this folder", check))))
 	b.WriteString("\n")
 	b.WriteString(line(lipgloss.NewStyle().Foreground(dim).Render(
-		"enter choose  ↑↓ move  esc quit    add more folders later with /add-dir")))
+		"enter choose  up/down move  esc quit    add more folders later with /add-dir")))
 
 	// GORILLA OVERRIDE: tell people their model list has gone stale, but only
 	// when it actually has.
@@ -369,7 +370,7 @@ func truncatePath(p string, w int) string {
 	if w < 12 || len(p) <= w {
 		return p
 	}
-	return "…" + p[len(p)-(w-1):]
+	return styles.Ellipsis + p[len(p)-(w-3):]
 }
 
 // Ask runs the picker. It returns Choice{Quit: true} if the user aborted.

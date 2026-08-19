@@ -65,8 +65,8 @@ type resetKeyMap struct {
 }
 
 var resetKeys = resetKeyMap{
-	Up:     key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑", "up")),
-	Down:   key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓", "down")),
+	Up:     key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("up", "up")),
+	Down:   key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("down", "down")),
 	Select: key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "select")),
 	Apply:  key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "reset selected")),
 	Escape: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),

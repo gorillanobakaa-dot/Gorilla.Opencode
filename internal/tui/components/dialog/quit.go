@@ -36,7 +36,7 @@ type helpMapping struct {
 var helpKeys = helpMapping{
 	LeftRight: key.NewBinding(
 		key.WithKeys("left", "right"),
-		key.WithHelp("←/→", "switch options"),
+		key.WithHelp("<-/->", "switch options"),
 	),
 	EnterSpace: key.NewBinding(
 		key.WithKeys("enter", " "),

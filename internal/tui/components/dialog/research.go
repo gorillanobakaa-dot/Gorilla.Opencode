@@ -106,8 +106,8 @@ type researchDialogKeyMap struct{}
 
 func (k researchDialogKeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		key.NewBinding(key.WithKeys("up", "down"), key.WithHelp("↑/↓", "mode")),
-		key.NewBinding(key.WithKeys("left", "right"), key.WithHelp("←/→", "helpers")),
+		key.NewBinding(key.WithKeys("up", "down"), key.WithHelp("up/down", "mode")),
+		key.NewBinding(key.WithKeys("left", "right"), key.WithHelp("<-/->", "helpers")),
 		key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "helper model")),
 		key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "go")),
 		key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
@@ -172,7 +172,7 @@ func (m ResearchDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 //
 // It is only right at exactly 4 helpers. Supervision covers the BLIND lanes;
 // the verifier and completeness lanes peek at the others and are never audited.
-// Measured against the real selectRoles: 5→9 not 10, 6→11 not 12, 10→18 not 20.
+// Measured against the real selectRoles: 5->9 not 10, 6->11 not 12, 10->18 not 20.
 // Asking agent.SupervisedSessions means the forecast reads the same role table
 // the run does, so the two cannot drift.
 func (m ResearchDialogCmp) sessionCount() int {
@@ -421,7 +421,7 @@ func (m ResearchDialogCmp) costLines() []costLine {
 		}
 	}
 
-	add(kindHeader, "── WHAT THIS COSTS ─────────────────────────────────────")
+	add(kindHeader, "WHAT THIS COSTS")
 	switch {
 	case !priced:
 		add(kindDanger, "CANNOT PRICE %s. No rate on record.", modelName)
@@ -461,7 +461,7 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	// screen stating the maximum is 10. One word carrying two different meanings
 	// is most of why the arithmetic looked broken.
 	add(kindMuted, "")
-	add(kindHeader, "── QUOTA ───────────────────────────────────────────────")
+	add(kindHeader, "QUOTA")
 	add(kindQuota, "WORTH ABOUT %d ORDINARY QUESTIONS in tokens.", config.ResearchQuotaMultiple(n))
 	if mode == "supervised" {
 		add(kindMuted, "   %d helpers + %d auditors = %d sessions, %d steps each.",
@@ -489,11 +489,11 @@ func (m ResearchDialogCmp) costLines() []costLine {
 
 	add(kindMuted, "")
 	if !m.compact {
-		add(kindHeader, "── HOW THIS IS WORKED OUT ──────────────────────────────")
+		add(kindHeader, "HOW THIS IS WORKED OUT")
 	}
 	add(kindMeasured, "MEASURED: %s tokens of context per step (this machine).", humanCount(config.ResearchBasisTokens()))
 	add(kindPublished, "PUBLISHED: the model's own per-1M price.")
-	add(kindAssumed, "ASSUMED («not measured»): %d steps · %d out · %.0fs per step — the per-minute figure rests on that %.0fs.",
+	add(kindAssumed, "ASSUMED («not measured»): %d steps | %d out | %.0fs per step — the per-minute figure rests on that %.0fs.",
 		config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep, config.ResearchSecondsPerStep)
 	return lines
 }
@@ -505,9 +505,18 @@ func (m ResearchDialogCmp) renderCost(width int) string {
 	var out []string
 	for _, l := range m.costLines() {
 		st := base.Width(width).Padding(0, 1)
+		text := l.text
 		switch l.kind {
 		case kindHeader:
 			st = st.Foreground(t.Primary()).Bold(true)
+			// GORILLA FIX (2026-08-19): the rule is SIZED here, not typed in
+			// costLines. It used to be a hard-coded run of "─" chosen to look
+			// right in one terminal — so it was too long in every narrower
+			// one, wrapped, and added a row per rule. Three rules, three extra
+			// rows, all at once: the "stacked and overlapping lines" symptom.
+			// ASCII because box-drawing is East-Asian-Ambiguous and can render
+			// two columns wide. See internal/tui/styles/ascii.go.
+			text = styles.RuleLabel(text, maxInt(8, width-2))
 		case kindMoney:
 			st = st.Foreground(t.Error()).Bold(true)
 		case kindDanger:
@@ -523,7 +532,7 @@ func (m ResearchDialogCmp) renderCost(width int) string {
 		default:
 			st = st.Foreground(t.TextMuted())
 		}
-		out = append(out, st.Render(emphasise(l.text, t)))
+		out = append(out, st.Render(emphasise(text, t)))
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, out...)
 }
@@ -639,13 +648,13 @@ func (m ResearchDialogCmp) View() string {
 
 	rows = append(rows,
 		base.Foreground(t.Text()).Width(maxWidth).Padding(0, 1).
-			Render(fmt.Sprintf("Helpers: ← %d →   (4 minimum, 10 maximum)", m.agents)),
+			Render(fmt.Sprintf("Helpers: <- %d ->   (4 minimum, 10 maximum)", m.agents)),
 		m.renderCost(maxWidth),
 		base.Foreground(t.Primary()).Bold(true).Width(maxWidth).Padding(1, 1).
 			Render(m.theWarning()),
 		base.Width(maxWidth).Render(""),
 		base.Foreground(t.TextMuted()).Width(maxWidth).Padding(0, 1).
-			Render("enter: go   ↑↓: mode   ←→: helpers   esc: cancel"),
+			Render("enter: go   up/down: mode   left/right: helpers   esc: cancel"),
 	)
 
 	content := lipgloss.JoinVertical(lipgloss.Left, rows...)
