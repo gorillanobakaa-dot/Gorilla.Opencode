@@ -1,3 +1,34 @@
+## v0.1.105 — 2026-08-19 — it can read your screenshots
+
+**Plain-language version:** yesterday someone asked this program to read a
+screenshot and it said it could not read images. That was true of the AI and
+false of the computer — tesseract, the tool that reads text out of pictures, was
+already installed on that machine and had been for months. Nothing connected the
+two. That single gap produced everything built since: the tooling research, the
+/arsenal capability map, and now this.
+
+Before it was written, the owner watched a model work around the problem on its
+own: it went looking for tesseract, found it, wrote its own command to run it
+over every file, and read the text back. It worked — after several attempts, one
+broken command it had to apologise for, and a permission prompt each time. The
+ability was there and the route to it was awful. This is the same power without
+the fumbling: an image now reads the way a file reads.
+
+Point it at a screenshot and it gives you the words, labelled as a
+TRANSCRIPTION rather than the picture, with a warning that OCR confuses similar
+shapes and loses layout. In the first live test the model used that warning
+correctly and unprompted, spotting that a capital L in a package name was an OCR
+artifact because Debian package names are always lowercase. It reads words only
+— it cannot tell you what a photograph shows. "No text found" is an answer, not
+a failure. And if your machine has no OCR it gives you the one command that
+fixes it, free and no account, rather than just refusing.
+
+The part that nearly shipped broken: with OCR wired in and tested, a live model
+STILL refused, because the tool's own description still said "cannot display
+binary files or images". It read that and believed it, correctly. This program
+already had that exact failure written down about its web-fetching tool. A
+capability the description denies does not exist, however well it is built.
+
 ## v0.1.104 — 2026-08-19 — it knows where your pictures are
 
 **Plain-language version:** someone asked it to look in their screenshots
