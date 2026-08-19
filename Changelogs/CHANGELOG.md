@@ -1,3 +1,32 @@
+## v0.1.102 — 2026-08-19 — it says when it has finished
+
+**Plain-language version:** two bugs, both found by someone using the program
+and sending a screenshot, neither visible to the test suite.
+
+Pressing p in /arsenal asks your package manager what a selection really costs,
+which takes a second, so it says "measuring with apt...". It never stopped
+saying it. The answer arrived and went into the header — 97.9 MB, 331.0 MB
+on disk, about 3.4 hours — while the line underneath still said it was working.
+The screen was showing the result and denying it had it, at the same time, and
+anyone reading that concludes the program has hung. A thing that has finished
+must not still look like a thing that is running. The message is replaced by its
+outcome now, failures included.
+
+The same screenshot showed the page stopping partway down with no bottom edge.
+The page was fine; the surface underneath it was not. Pop-ups are refused
+permission to be taller than the thing they sit on — sensible — but in the
+scrolling-text mode the thing they sit on is only the conversation and the
+status bar, which is short. So a full-screen page painted onto it had its bottom
+rows and its border quietly trimmed. Measured: a 40-row page on a 2-row
+background came back as 2 rows. That is the exact reverse of what the trimming
+was written to prevent, and it only happens in the mode this project recommends
+for older machines. The background is filled out to the full height of the
+terminal now, before anything is placed on it, which fixes every pop-up.
+
+Worth saying plainly: the page was correct and the test proving the page is
+exactly the height of your terminal was correct. The picture was still wrong.
+Neither of them was looking at the surface underneath.
+
 ## v0.1.101 — 2026-08-19 — lines that can't misbehave
 
 **Plain-language version:** continuous drawn lines kept mangling the display —
