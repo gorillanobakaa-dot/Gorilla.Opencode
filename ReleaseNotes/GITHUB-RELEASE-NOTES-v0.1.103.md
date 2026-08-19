@@ -1,0 +1,145 @@
+# Gorilla OpenCode v0.1.103 — /arsenal is a window, and the screenshots to prove it
+
+**Everything you need is on this page**, printed in full.
+
+## Download
+
+| File | For |
+|---|---|
+| `gorilla-opencode_0.1.103_amd64.deb` | Debian, Ubuntu, Mint — `sudo apt install ./gorilla-opencode_0.1.103_amd64.deb` |
+| `gorilla-opencode-0.1.103-1-x86_64.pkg.tar.zst` | Arch, CachyOS, Manjaro — `sudo pacman -U ...` |
+| `gorilla-opencode-linux-x86_64.tar.gz` | Any Linux, no installer |
+| `SHA256SUMS-v0.1.103.txt` | `sha256sum -c` |
+
+Use `apt`, not `dpkg -i`. Restart the program if it is already running.
+
+**Screenshots of everything in this release:**
+[docs/SCREENSHOTS.md](https://github.com/gorillanobakaa-dot/Gorilla.Opencode/blob/v0.1.103/docs/SCREENSHOTS.md)
+
+---
+
+## Plain-language track
+
+### What this release is
+
+Three layout corrections to `/arsenal`, and the first proper photographs of the
+new features. No new capability.
+
+All three corrections came from someone using the program and sending
+screenshots. None of them were visible to the test suite, and two of them were
+not bugs at all — they were decisions of mine that looked fine in a test and
+wrong on a screen.
+
+### It was taking over your terminal
+
+Every other page in this program draws itself as a **window**: it picks a
+sensible width, leaves the sidebar visible, and has a border you can see.
+`/arsenal` was the only one that took the entire terminal width.
+
+Two things followed, and both got reported as bugs:
+
+- It **covered the sidebar**, so the program looked like it had gone somewhere
+  else entirely.
+- Its border landed on the very edge of the screen, where a border is
+  indistinguishable from **no border**.
+
+It is a window now, like everything else.
+
+### It was reserving the whole screen to show nothing
+
+The list of capability groups is eight lines long. It was being padded out to
+the full height of your terminal — so eight lines of content sat in a box with
+thirty blank lines underneath, covering your conversation to display nothing.
+
+That reads as a program that stopped halfway, and several of the "it's cut off"
+reports were really that.
+
+I had done it deliberately, reasoning that a frame which is always the same
+height is more predictable. The rule that actually matters is **never taller
+than your terminal**, not always exactly it. The box stops when the content
+does now: **23 rows instead of 52**.
+
+### And the notice that never finished
+
+Fixed in the previous release, and now visible in the screenshots: pressing `p`
+used to say `measuring with apt...` and never stop saying it, even once the
+answer was on screen.
+
+### The screenshots
+
+`docs/SCREENSHOTS.md` now has a section for this release: the capability list
+with real measured costs, the install plan with the exact command, the research
+cost dialog with its rules drawing correctly at last, the `/osint` explainer,
+and the agent refusing to spend money on a joke question.
+
+Full size, unscaled, click through to the original. Every number on them is a
+real measurement taken at that moment.
+
+### One of them needs its caveat read
+
+One screenshot shows the agent refusing a ten-agent research run on a silly
+question, on cost grounds, after being told *"the user chose these and they
+decide what this costs"*.
+
+That is real and it happened. It is also **one run, one model, one question**.
+The arithmetic it used — "roughly 20 sessions" — is ours, from the tool's own
+description. The decision to refuse is the model's. It has not been tested
+across models, and the write-up says so rather than letting you assume.
+
+---
+
+## Developer track
+
+### Three corrections, all from screenshots
+
+**1. Width.** `arsenal.go` computed `boxW := m.width - 2` while every other
+dialog uses `dialogWidth(termWidth, preferred, chrome)`. Now
+`dialogWidth(m.width, 120, 6)` — 120 rather than `/osint`'s 104 because the
+entries carry long plain-language descriptions and legibility is their purpose,
+but capped, so the frame is a window on anything wider.
+
+`TestThePageIsAWindowNotATakeover` asserts the rendered width is strictly less
+than the terminal at 120, 150 and 200 columns, and never exceeds it at 70.
+
+**2. Height.** `View()` padded `b` out to `budget` so the frame was a constant
+size. On a 52-row terminal the series list rendered 52 rows for 23 rows of
+content. Removed. The budget still derives from `m.height` — that is what keeps
+the trailing notice and the overflow marker inside a known bound — but the box
+ends with the content.
+
+`TestThePageFillsTheScreenExactly` relaxed from `== size.h` to `<= size.h`, and
+`TestAShortPageDoesNotReserveTheWholeScreen` added, asserting the series list is
+under 45 rows on a 52-row terminal. `TestTheNoticeAndTheOverflowMarkerLiveInsideTheBudget`
+still pins the overflow case at exactly 14 rows on a 14-row terminal, which is
+the case the arithmetic exists for.
+
+**3. The stuck notice** (shipped in v0.1.102, photographed here).
+
+### Why the tests could not see any of this
+
+All three were **correct output that looked wrong**. A render assertion checks
+what a component emits; it cannot check whether emitting that is a good idea. A
+box that is exactly the terminal height passes every dimensional test ever
+written for it and still covers your work with blank rows.
+
+Third instance this session of the same class — the previous two were a
+component whose output was clipped downstream by `PlaceOverlay`, and a marker
+whose reserved width no longer matched its real width. Filed.
+
+### The screenshots
+
+Seven added to `docs/screenshots/gallery/` at capture resolution, written up in
+`docs/SCREENSHOTS.md`, each clickable to its original, with alt text stating
+what the image proves rather than what it depicts.
+
+### Claim Sources
+
+| Claim | Basis | Evidence |
+|---|---|---|
+| The page took the full terminal width | 📄 stated in input | `boxW := m.width - 2` in the previous commit; every other dialog uses `dialogWidth`. |
+| 52 rows for 23 rows of content | 📄 stated in input | `TestAShortPageDoesNotReserveTheWholeScreen` logs the figure. |
+| The notice never cleared | 📄 stated in input | User screenshot, fixed in v0.1.102, visible here. |
+| The refusal happened as shown | 📄 stated in input | Screenshot; the model's reasoning is legible in it. |
+| "20 sessions" came from our schema | 📄 stated in input | `research-tool.go`: "supervised roughly doubles that again". |
+| Refusal generalises across models | 🚫 not established | One run, one model. Explicitly not claimed. |
+| A window reads better than a takeover | 🤖 model inference | A judgement, made after seeing both. |

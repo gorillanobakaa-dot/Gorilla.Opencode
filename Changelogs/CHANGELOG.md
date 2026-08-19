@@ -1,3 +1,33 @@
+## v0.1.103 — 2026-08-19 — /arsenal is a window, and the screenshots to prove it
+
+**Plain-language version:** three layout corrections and the first proper
+photographs of the new features. All three came from someone using the program
+and sending screenshots, none were visible to the test suite, and two were not
+bugs at all — they were decisions of mine that looked fine in a test and wrong
+on a screen.
+
+/arsenal was the only page taking the entire terminal width. So it covered the
+sidebar, and its border landed on the very edge of the screen where a border is
+indistinguishable from no border. Both got reported as bugs. It is a window now,
+like every other page.
+
+It was also padding itself out to the full height of the terminal: eight lines
+of content in a box with thirty blank lines underneath, covering your
+conversation to display nothing. That reads as a program that stopped halfway. I
+had done it deliberately for a constant frame height; the rule that actually
+matters is never TALLER than your terminal, not always exactly it. 23 rows now
+instead of 52.
+
+docs/SCREENSHOTS.md gains a section for this release: the capability list with
+real measured costs, the install plan with the exact command, the research cost
+dialog with its rules drawing correctly at last, the /osint explainer, and the
+agent declining to spend money on a joke question. Full size, click through to
+the original, every number a real measurement.
+
+That last one needs its caveat read: it is one run, one model, one question. The
+arithmetic it used is ours; the decision to refuse is the model's; it has not
+been tested across models, and the write-up says so.
+
 ## v0.1.102 — 2026-08-19 — it says when it has finished
 
 **Plain-language version:** two bugs, both found by someone using the program

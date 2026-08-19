@@ -486,3 +486,28 @@ func TestAShortPageDoesNotReserveTheWholeScreen(t *testing.T) {
 	}
 	t.Logf("series list on a 52-row terminal: %d rows", h)
 }
+
+// GORILLA OVERRIDE (2026-08-19): this page must be a WINDOW, not a takeover.
+//
+// It was the only page taking the full terminal width. Two consequences, both
+// visible in screenshots and both mistaken for bugs: it covered the sidebar,
+// and its border landed on the very edge of the screen where it reads as no
+// border at all.
+func TestThePageIsAWindowNotATakeover(t *testing.T) {
+	for _, w := range []int{150, 200, 120} {
+		m := NewArsenalCmp()
+		m.SetSize(w, 52)
+		got := lipgloss.Width(m.View())
+		if got >= w {
+			t.Errorf("at %d columns the page rendered %d wide — it covers the whole terminal, "+
+				"so its border sits on the screen edge and reads as no border", w, got)
+		}
+	}
+	// On a genuinely narrow terminal it may use nearly everything; it must
+	// still never exceed it.
+	m := NewArsenalCmp()
+	m.SetSize(70, 24)
+	if got := lipgloss.Width(m.View()); got > 70 {
+		t.Errorf("at 70 columns the page rendered %d wide", got)
+	}
+}

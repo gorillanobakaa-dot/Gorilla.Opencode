@@ -856,7 +856,19 @@ func (m ArsenalCmp) View() string {
 	// the frame silently grows in HEIGHT — which is exactly the failure this
 	// whole change was meant to remove. Measured at 60x20 before the fix: a
 	// 27-row frame in a 20-row terminal.
-	boxW := max(24, m.width-2)
+	// GORILLA FIX (2026-08-19), the third thing the screenshots taught: use the
+	// house width helper like every other page does.
+	//
+	// This page was the only one taking the FULL terminal width. Two
+	// consequences, both visible and both mistaken for bugs: it covered the
+	// sidebar, and its border landed on the very edge of the screen where it
+	// reads as no border at all. /osint caps at 104 and looks like a window;
+	// this looked like the program had taken over the terminal.
+	//
+	// 120 rather than 104 because the entries carry long plain-language
+	// descriptions and the whole point of them is being readable — but capped,
+	// so the frame is a window on any screen wider than that.
+	boxW := max(24, dialogWidth(m.width, 120, 6))
 	w := max(20, boxW-4)
 	budget := max(5, m.height-4)
 

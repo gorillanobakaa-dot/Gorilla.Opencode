@@ -1,4 +1,4 @@
-<!-- Version: 1.1.0 · updated 26-08-18-20-13 -->
+<!-- Version: 1.2.0 · updated 26-08-19-11-15 -->
 # Gorilla OpenCode — screenshots & proof
 
 Real screenshots from a Debian 13 / GNOME 48 machine running the revived
@@ -362,6 +362,88 @@ leash** (cap helper agents down to the ☢ Nuclear Option). Full write-up:
 [GUIDE](GUIDE.md#the-context-loadout-context--your-token-budget).
 
 ![The context loadout with Gorilla controls](screenshots/02-context-loadout.png)
+
+---
+
+# v0.1.103 — /arsenal, and lines that behave
+
+*Captured 19 August 2026 on the machine this project is built for: a Sony VAIO
+SVE, 1600x900, Debian 13. Unscaled, uncropped, click any image for the
+full-resolution original. The numbers on screen are real measurements taken at
+that moment, not mock-ups.*
+
+## /arsenal — what the agent can do here, and what the rest would cost
+
+The feature exists because of a capability that was sitting unused: a model was
+asked to read a screenshot and said it could not read images, while tesseract
+was installed on the same machine and had been for months. Nobody stumbles onto
+`binwalk` or `sleuthkit` or `ssdeep`, and you cannot ask for a thing you do not
+know exists. The barrier was never bandwidth. It was the map.
+
+The header is measured on open, never claimed — **25 capabilities present, 8
+not**, and the package manager it actually found.
+
+[![The /arsenal series list showing 25 of 33 capabilities present on this machine, with a measured cost of 97.9 MB to download and 331.0 MB on disk for the two selected, about 3.4 hours at 8 KB per second](screenshots/gallery/v0103-arsenal-series-measured-cost.png)](screenshots/gallery/v0103-arsenal-series-measured-cost.png)
+
+Every key says what it did. Pressing space on a group that is already fully
+installed used to do nothing and say nothing, which is indistinguishable from a
+broken key — the line at the bottom is the fix.
+
+[![The /arsenal page reporting "All 8 of these are already installed - nothing to select" after space was pressed on a fully installed group](screenshots/gallery/v0103-arsenal-already-installed.png)](screenshots/gallery/v0103-arsenal-already-installed.png)
+
+**The install plan is the whole argument on one screen.** The costs come from
+your own package manager, counted against what is already on your disk — so
+they are true for your machine rather than a worst case from a table. And
+nothing is installed by this program: it prints the command and gets out of the
+way.
+
+[![The /arsenal install plan listing 2 capabilities, 4 packages, 97.9 MB to download and 331.0 MB on disk, the exact apt-get command, and the line "This program will not run it and will never ask for your password"](screenshots/gallery/v0103-arsenal-install-plan.png)](screenshots/gallery/v0103-arsenal-install-plan.png)
+
+## Lines that behave — the rule that used to draw itself twice
+
+A tester reported continuous rules rendering doubled, stacked and misaligned.
+The cause was rules typed at a fixed length: 56 columns of box-drawing chosen to
+look right in one window, too long in any narrower one, wrapping into two
+physical rows each. Three of them on one screen meant three rows of debris at
+once.
+
+They are ASCII now, and **sized to the box at render time rather than typed** —
+the `-- WHAT THIS COSTS ----` and `-- QUOTA ----` rules below span the frame
+exactly, one row each, at any width.
+
+[![The /research cost dialog in supervised mode showing ASCII rules spanning the frame exactly, with $0.192 per minute, $0.431 for the run, and 18 sessions across 10 helpers and 8 auditors](screenshots/gallery/v0103-research-supervised-cost-ascii-rules.png)](screenshots/gallery/v0103-research-supervised-cost-ascii-rules.png)
+
+The same screen in parallel mode, priced for four helpers. Note what it tells
+you without being asked: which model the helpers will actually run on, that it
+is not the one you are chatting with, and that parallel buys time and not
+answers.
+
+[![The /research cost dialog in parallel mode showing $0.128 per minute, about $0.0958 for the run, and the note that parallel is the same token cost as sequential](screenshots/gallery/v0103-research-parallel-cost-ascii-rules.png)](screenshots/gallery/v0103-research-parallel-cost-ascii-rules.png)
+
+## /osint — the page that explains itself before it spends anything
+
+[![The /osint capability page explaining the five-stage intelligence cycle, the 985-source registry of which 866 are free and 370 need no account, and the two-axis A-F and 1-6 grading system](screenshots/gallery/v0103-osint-capability-page.png)](screenshots/gallery/v0103-osint-capability-page.png)
+
+## It declined to burn money on a joke
+
+Not a designed feature, and worth being precise about. The research tool's
+description carries the arithmetic — *"6 helpers is still 6 LLM sessions"*,
+*"supervised roughly doubles that again"*, *"over-spawning is the main way this
+tool wastes the user's money"* — so the model has the numbers before it chooses.
+
+Here it was pointed at a deliberately silly question with **10 agents,
+supervised**, and told *"the user chose these and they decide what this costs"*.
+It refused, priced the refusal, answered the question for free anyway, and asked
+what the real work was.
+
+[![The agent declining a 10-agent supervised research run, explaining it would be roughly 20 LLM sessions and would waste the user money, then answering the question directly for free](screenshots/gallery/v0103-refuses-expensive-run-on-a-joke.png)](screenshots/gallery/v0103-refuses-expensive-run-on-a-joke.png)
+
+**Read the caveat before quoting this.** One run, one model (Deepseek V4 Flash),
+one question. The number 20 is ours — it is not inferable without the doubling
+rule in our schema — but the decision to refuse under an explicit instruction to
+comply is the model's, and it has not been tested across models. The full split
+of what is the program and what is the model is in
+[CONTROL-AND-COST.md](CONTROL-AND-COST.md).
 
 ---
 
