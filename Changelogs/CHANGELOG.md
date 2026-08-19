@@ -1,3 +1,35 @@
+## v0.1.104 — 2026-08-19 — it knows where your pictures are
+
+**Plain-language version:** someone asked it to look in their screenshots
+folder. It searched the entire home directory, got back documentation images
+from unrelated projects, tried again and gave up after thirty seconds, then
+guessed at /home/gorilla/Pictures through a shell command. Two minutes and three
+attempts for a folder the operating system could have named instantly.
+
+The obvious reading is that the model is not very clever. The fairer one is that
+the program never told it. Your computer already knows where your pictures live
+— every Linux desktop writes it into ~/.config/user-dirs.dirs — and the short
+description of your machine that the assistant gets at the start of every
+conversation simply never mentioned it.
+
+That matters more than it looks, because guessing is worse than useless on most
+of the world's computers: in German the folder is Bilder, in Spanish Imagenes,
+in Japanese it is written in Japanese. An assistant guessing "Pictures" in
+English fails on exactly the machines this project exists to serve.
+
+Three folders are now listed — Documents, Downloads, Pictures — read from your
+own configuration, and only if they really exist. Three rather than six: the
+full set cost 66 tokens on every single message and these cost 41. Videos and
+Music are not a coding assistant's business, and it can ask if it ever needs
+them. Anything riding every message is money taken repeatedly rather than once.
+
+The search timeout used to say "narrow it with path or glob", which is true and
+useless — the assistant had just said where it was looking. It now says what
+searching a whole home directory actually means and points at the folder list.
+
+Verified with the identical request: two tool calls instead of three, no
+timeout, straight to the right folder.
+
 ## v0.1.103 — 2026-08-19 — /arsenal is a window, and the screenshots to prove it
 
 **Plain-language version:** three layout corrections and the first proper
