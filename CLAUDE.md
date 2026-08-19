@@ -401,6 +401,23 @@ cost real confusion; they are not optional.
      = 2 columns and 2 rows OUTSIDE the styled width; `Padding(1,2)` = 4
      columns and 2 rows INSIDE it.
   4. **Truncate by display columns; never let lipgloss wrap a line you own.**
+  4a. **Draw rules with ASCII `-`, not box-drawing `─`. MEASURED 2026-08-19,
+     owner's proposal, and all three of his claims held:**
+     - **Width.** `─ │ ╭ … · •` are East Asian **Ambiguous**: width 1 normally
+       and **width 2** in a terminal configured for CJK. `- | + .` are always
+       1. So a box-drawn rule can literally DOUBLE in width on somebody else's
+       machine — the "notoriously hard to control" observation, and it has a
+       cause.
+     - **Slicing.** A naive byte slice of `─` yields `"─\xe2\x94"` — a broken
+       rune, invalid UTF-8, measured as width 2. ASCII byte-slices cleanly, so
+       byte offset == rune offset == column.
+     - **Cost.** `lipgloss.Width` on a 100-char line: **12,361 ns** for box
+       drawing vs **404 ns** for ASCII — **30x**, because runewidth has an
+       ASCII fast path and falls back to table lookups otherwise. I expected
+       this to be negligible and it is not: on a full 45-row redraw that is
+       ~0.5 ms per frame, free to avoid, on a 2012 laptop.
+     Borders and tables are NOT banned — use `lipgloss.ASCIIBorder()`, which
+     ships in the library. What is banned is a decorative continuous line.
   5. **Honour `WindowSizeMsg` on every component.** A component that keeps a
      size from startup is wrong the moment the window changes.
   6. **When a decoration is close to free versus a real risk, drop it.** The
