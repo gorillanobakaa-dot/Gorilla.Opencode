@@ -1,3 +1,40 @@
+## v0.1.101 — 2026-08-19 — lines that can't misbehave
+
+**Plain-language version:** continuous drawn lines kept mangling the display —
+doubled, stacked, overlapping, misaligned. The fix is plain dashes, the way DOS
+and Unix did it, and the reasons turned out to be solid on all three counts.
+
+Box-drawing characters are formally "ambiguous width": one column on most
+terminals, TWO on a terminal set up for Chinese, Japanese or Korean. The program
+measures one; when the terminal draws two the line no longer fits, and the
+drawing library's answer to a line that doesn't fit is not to complain but to
+WRAP it onto a second row. So the mistake is about width and the symptom is
+about height, somewhere else, with nothing connecting them — which is exactly
+why it kept being misdiagnosed. They also break when cut at the wrong byte, and
+they are genuinely slower to measure: 12,361 nanoseconds against 404 for plain
+ASCII on a 100-character line, thirty times, because the library has a fast path
+for plain characters. I expected that last one to be irrelevant. It isn't.
+
+The worst offenders were rules typed out by hand at a fixed length that looked
+right in one window — too long in any narrower one, so each wrapped and added a
+row, three of them at once on the same screen. They are measured now, not typed.
+
+Everything that draws is plain ASCII: rules, bullets, separators, arrows, the
+truncation marker, table lines, the progress bar, the drop shadow behind pop-ups
+(which was a colour all along, the fancy character was just carrying it). Across
+66 files, 1,798 risky characters down to 195, none of which draw anything.
+Borders and tables are NOT banned — the library ships an ASCII border style.
+
+Two things were deliberately left: the image viewer's half-block, which IS the
+technique for showing two pixels in one cell, and the gorilla warning banner's
+middle dots, chosen yesterday for a reason. Both now say so in the code.
+
+It uncovered two real bugs that had been hiding behind a one-character marker:
+session titles were always one over their limit, and a page I wrote yesterday
+reserved one column for a marker that takes three. And a test now fails if a
+box-drawing character reappears in anything that draws — because recording the
+individual mistakes had already been tried three times and did not work.
+
 ## v0.1.100 — 2026-08-19 — /arsenal says what it did
 
 **Plain-language version:** v0.1.99 shipped /arsenal, and within minutes the

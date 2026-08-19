@@ -1,0 +1,220 @@
+# Gorilla OpenCode v0.1.101 — lines that can't misbehave
+
+**Everything you need is on this page**, printed in full.
+
+## Download
+
+| File | For |
+|---|---|
+| `gorilla-opencode_0.1.101_amd64.deb` | Debian, Ubuntu, Mint — `sudo apt install ./gorilla-opencode_0.1.101_amd64.deb` |
+| `gorilla-opencode-0.1.101-1-x86_64.pkg.tar.zst` | Arch, CachyOS, Manjaro — `sudo pacman -U ...` |
+| `gorilla-opencode-linux-x86_64.tar.gz` | Any Linux, no installer |
+| `SHA256SUMS-v0.1.101.txt` | `sha256sum -c` |
+
+Use `apt`, not `dpkg -i`. Restart the program if it is already running.
+
+---
+
+## Plain-language track
+
+### The complaint
+
+Continuous drawn lines — `────────────────────` — kept mangling the display:
+doubled, stacked, overlapping, misaligned. The owner's instinct was that plain
+dashes `--------` would behave, the way they did on DOS and Unix decades ago.
+
+He was right, on all three counts, and one of them I was about to tell him
+didn't matter.
+
+### Why the pretty lines misbehave
+
+**They are not always one character wide.** Box-drawing characters are formally
+"ambiguous width": one column on most terminals, **two columns** on a terminal
+configured for Chinese, Japanese or Korean text. The program measures them as
+one. When the terminal draws two, every calculation on that line is off — and
+the drawing library's response to a line that doesn't fit is not to complain,
+but to **wrap it onto a second row**.
+
+So the mistake is about *width* and the symptom is about *height*, in a
+different place, with nothing connecting them. That is exactly why it kept
+being misdiagnosed.
+
+**They break when cut.** Chopping a line of `─` at a byte boundary produces
+half a character — invalid text that the terminal renders as garbage. Plain
+dashes can be cut anywhere.
+
+**They are genuinely slower.** Measuring the width of a 100-character line:
+**12,361 nanoseconds** for box-drawing against **404** for plain ASCII. Thirty
+times. The library has a fast path for plain characters and falls back to
+lookup tables for everything else. Small per line; about half a millisecond
+on every full redraw, repeatedly, on a fifteen-year-old laptop. I expected this
+one to be irrelevant and said so. It isn't.
+
+### And the history is right too
+
+`+----+----+` was how you drew a table on DOS and Unix *precisely because* the
+pretty version wasn't portable. DOS had real box-drawing characters in code page
+437, and they turned to garbage the moment you left that code page. Same
+failure, forty years apart.
+
+### The worst offenders
+
+Rules like this, typed out by hand:
+
+```
+── WHAT THIS COSTS ─────────────────────────────────────
+```
+
+That is a fixed length, chosen to look right in one particular window. In any
+narrower window it was too long, so it wrapped, so it added a row — **and there
+were three of them on one screen**, adding three rows at once. That is the
+"stacked and overlapping" symptom: not one bug, one bug per line, all firing
+together.
+
+They are now **measured, not typed**: the rule is built to the width actually
+available, from plain dashes.
+
+### What changed
+
+Everything that draws is plain ASCII now — rules, bullets, separators, arrows,
+the truncation marker, table lines, the message tree, the progress bar, the
+drop shadow behind pop-up windows (which turned out to be a *colour* all along;
+the fancy character was just carrying it).
+
+Across 66 files: **1,798 risky characters down to 195, and none of them draw
+anything.** The 195 left are dashes inside ordinary sentences, deliberately —
+they sit in text that gets wrapped anyway, where being one column out is
+absorbed instead of accumulating into a broken frame.
+
+**Borders and tables are not banned.** The drawing library ships an ASCII
+border style, and that is what to use. What is banned is the decorative
+continuous line.
+
+### Two things deliberately left alone
+
+- **The image viewer.** Its half-block character *is* the technique — one
+  character cell shows two pixels by colouring its top and bottom halves
+  separately. There is no plain-text substitute; removing it doesn't make
+  pictures simpler, it removes pictures.
+- **The gorilla warning banner.** Its middle dots were chosen on purpose
+  yesterday, because they have no space to break at and they absorb a width
+  quirk in the warning emoji. Undoing that would have thrown away a decision
+  made for a reason.
+
+Both are written down in the code, with the reason, so the next person doesn't
+"fix" them.
+
+### Two real bugs this uncovered
+
+Both were already there, hiding behind a one-character marker:
+
+**Session titles were always over their limit.** The code cut the title to 50
+characters and *then* added the "…", making 51. Invisible while the marker was
+one character; obvious the moment it became three. A budget that the thing
+announcing the budget doesn't fit inside is not a budget. The test had been
+tolerating it with a comment saying "+1 for the ellipsis".
+
+**And I made the same mistake yesterday** in `/arsenal` — reserved one column
+for a marker that now takes three. Caught within seconds by the test that
+asserts the page is *exactly* the terminal height, which is precisely why that
+test says "exactly" and not "no taller".
+
+### So it can't come back
+
+A test now reads every file that draws and fails if a box-drawing character
+appears in it, with the two exemptions above carrying their written reasons.
+
+That's necessary because recording the individual mistakes didn't work: three
+of them were already written down in this project's own instructions and got
+made again anyway.
+
+---
+
+## Developer track
+
+### The measurements
+
+```
+runewidth, ambiguous-width check:
+  "─" "│" "╭" "…" "·" "•" "↑" "↓"   normal=1  eastasian=2
+  "-" "|" "+" "."                   normal=1  eastasian=1
+
+byte slicing:
+  "──────────"[:5] -> "─\xe2\x94"   broken rune, invalid UTF-8, width 2
+  "----------"[:5] -> "-----"       clean
+
+lipgloss.Width, 100-char line, 200,000 iterations:
+  box-drawing   12,361 ns/call
+  ASCII            404 ns/call      ~30x
+```
+
+The mechanism: lipgloss measures with `runewidth`'s default
+(`EastAsianWidth=false`, ambiguous = 1). The terminal may disagree. When it
+does, the line overflows its container and lipgloss **wraps** rather than
+overflowing — so a width error manifests as height, elsewhere, and a width
+assertion passes against it.
+
+### New: `internal/tui/styles/ascii.go`
+
+`Ellipsis` (3 columns — reserve accordingly), `Bullet`, `Sep`, `VLine`,
+`HChar`, plus `Rule(w)` and `RuleLabel(label, w)`. Rules are **sized at render
+time**, never typed. `RuleLabel` truncates the label rather than overflowing
+when there is no room for both: a heading that overflows its container is the
+failure the file exists to prevent.
+
+### Swept
+
+66 files. Hard-coded `──` header rules in `research.go` and `modelfollow.go`
+became labels expanded by `RuleLabel` at render width. Glamour table separators
+and block-quote prefix, the tool-call tree corner, the quota bar (`█░` ->
+`#.`), the overlay drop shadow (a space over `BackgroundDarker` — the shadow
+was always the colour), arrows in key hints, `·` separators, `•` bullets,
+`…` markers.
+
+The provider-cost bullet had to change on both sides in one commit:
+`internal/config/extras.go` produces it, `internal/tui/startup/extras.go`
+parses it to preserve hanging indents.
+
+`1798 -> 195` ambiguous runes in non-comment string literals under
+`internal/`; zero drawing characters. The remainder is em/en-dash prose.
+
+### The guard
+
+`TestNothingThatDrawsUsesAmbiguousWidthCharacters` walks every non-test file
+under `internal/tui/`, parses it, and fails on any banned drawing rune in a
+string literal. Exemptions are a map from path to **reason** — an exemption
+without a reason is how a rule becomes decoration. Proven non-vacuous by
+inserting `───` into a notice string and watching it report file and position.
+
+Test files are out of scope: a test may legitimately name a character in order
+to assert its absence.
+
+### Two latent bugs surfaced
+
+`truncateTitle` cut to `limit` then appended, exceeding it by the marker width
+— pre-existing, tolerated by a `+1 for the ellipsis` in the test. Fixed so the
+marker fits inside the budget; the test now asserts `maxTitleChars` exactly.
+
+`truncateToWidth` in `arsenal.go` (mine, yesterday) reserved 1 column for a
+3-column marker. Caught by `TestThePageFillsTheScreenExactly`.
+
+### A guard kept honest rather than updated
+
+`TestProviderDisplayNameHandlesMultiByteNames` existed to catch byte-slicing a
+multi-byte provider name. The marker it asserted became ASCII, which would have
+made the test vacuous, so it now feeds multi-byte names (`日本語`, `émigré`,
+`🦍gorilla`) directly.
+
+### Claim Sources
+
+| Claim | Basis | Evidence |
+|---|---|---|
+| Box-drawing chars are ambiguous-width | 📄 stated in input | `runewidth.RuneWidth` with `EastAsianWidth` toggled, output in this document. |
+| Byte-slicing breaks them | 📄 stated in input | Measured; the broken rune is quoted above. |
+| 30x measurement cost | 📄 stated in input | 200,000 iterations per variant, same machine, same run. |
+| 1,798 -> 195 ambiguous runes | 📄 stated in input | AST scan of string literals before and after. |
+| Zero drawing characters remain | 📄 stated in input | The guard test passes; proven non-vacuous. |
+| truncateTitle was always over budget | 📄 stated in input | Read from source; the test's own comment admitted it. |
+| CP437 history | 🤖 model inference | Well-established, but not verified against a source this session. |
+| Prose dashes are safe to leave | 🤖 model inference | Reasoned: wrapped text absorbs a one-column drift. Not measured against a CJK terminal. |
+| The 30x matters on a 2012 laptop | 🤖 model inference | ~0.5 ms per full redraw, extrapolated from the per-line figure. |
