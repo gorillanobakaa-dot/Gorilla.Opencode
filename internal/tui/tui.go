@@ -2224,6 +2224,25 @@ func (a appModel) View() string {
 
 	appView := lipgloss.JoinVertical(lipgloss.Top, components...)
 
+	// GORILLA FIX (2026-08-19), from a screenshot of a real run: pad the
+	// background to the terminal height BEFORE compositing any overlay.
+	//
+	// PlaceOverlay clamps an overlay to the background's height — deliberately,
+	// so a dialog can never be taller than what it sits on. In scrollback mode
+	// the background is just the chat page plus the status bar, which is short,
+	// so a FULL-SCREEN page (/arsenal, /osint) had its bottom rows and its
+	// bottom border silently cut off. The page was correct; the canvas it was
+	// painted on was smaller than the screen.
+	//
+	// This is the mirror image of the bug the clamp exists to prevent, and it
+	// only appears in scrollback mode — which is the mode this project steers
+	// older machines toward, so it is the mode most users are in.
+	if a.height > 0 {
+		if h := lipgloss.Height(appView); h < a.height {
+			appView += strings.Repeat("\n", a.height-h)
+		}
+	}
+
 	if a.showPermissions {
 		overlay := a.permissions.View()
 		row := lipgloss.Height(appView) / 2

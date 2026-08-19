@@ -10,6 +10,7 @@ package dialog
 // diagnoses, so every new full-screen page asserts it from the start.
 
 import (
+	"github.com/opencode-ai/opencode/internal/arsenal"
 	"strings"
 	"testing"
 
@@ -390,5 +391,69 @@ func TestTheNoticeAndTheOverflowMarkerLiveInsideTheBudget(t *testing.T) {
 	}
 	if !strings.Contains(out, "press p") {
 		t.Error("the notice was dropped to make room; it must be inside the budget, not extra")
+	}
+}
+
+// GORILLA OVERRIDE (2026-08-19), reported from a real run with a screenshot:
+// the header showed "97.9 MB to download, 331.0 MB on disk, about 3.4 hours"
+// while the line underneath still read "measuring with apt...". The screen
+// displayed the answer and simultaneously denied having it, and the reasonable
+// conclusion for anyone reading that is that the program has hung.
+//
+// A progress message must be REPLACED BY ITS OUTCOME. Same rule as everywhere
+// else here: a state that has finished must not still look like one that is
+// running.
+func TestTheMeasuringNoticeIsReplacedByTheResult(t *testing.T) {
+	m := NewArsenalCmp()
+	m.SetSize(120, 40)
+	m.toggle([]string{"zbar"})
+
+	cmd := m.price()
+	if cmd == nil {
+		t.Fatal("pricing a real selection produced no work")
+	}
+	if !strings.Contains(m.notice, "measuring") {
+		t.Fatalf("no progress message while measuring: %q", m.notice)
+	}
+
+	// The measurement comes back.
+	var model tea.Model = m
+	model, _ = model.Update(arsenalPricedMsg{
+		key:  strings.Join(m.selectedIDs(), ","),
+		cost: arsenal.Cost{DownloadBytes: 97_900_000, DiskBytes: 331_000_000, Measured: true},
+	})
+	got := model.(ArsenalCmp)
+
+	if strings.Contains(got.notice, "measuring") {
+		t.Fatalf("the progress message survived the result: %q", got.notice)
+	}
+	for _, want := range []string{"97.9 MB", "331.0 MB", "hours"} {
+		if !strings.Contains(got.notice, want) {
+			t.Errorf("the outcome does not report %q: %q", want, got.notice)
+		}
+	}
+	if !strings.Contains(got.View(), "97.9 MB") {
+		t.Error("the outcome was set but never rendered")
+	}
+}
+
+// A failed measurement must say so rather than sit on "measuring" forever.
+func TestAFailedMeasurementReplacesTheNoticeToo(t *testing.T) {
+	m := NewArsenalCmp()
+	m.SetSize(120, 40)
+	m.toggle([]string{"zbar"})
+	m.price()
+
+	var model tea.Model = m
+	model, _ = model.Update(arsenalPricedMsg{
+		key:  strings.Join(m.selectedIDs(), ","),
+		cost: arsenal.Cost{Note: "E: Unable to locate package zbar-tools"},
+	})
+	got := model.(ArsenalCmp)
+	if strings.Contains(got.notice, "measuring") {
+		t.Fatalf("a failed measurement left the progress message up: %q", got.notice)
+	}
+	if !strings.Contains(got.notice, "could not measure") {
+		t.Errorf("the failure was not reported: %q", got.notice)
 	}
 }

@@ -349,6 +349,34 @@ func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case arsenalPricedMsg:
 		m.pricing[msg.key] = msg.cost
+		// GORILLA FIX (2026-08-19), reported from a real run: the "measuring
+		// with apt..." notice was set when the measurement STARTED and nothing
+		// ever replaced it. The header updated with the answer — 97.9 MB,
+		// 331.0 MB, about 3.4 hours — while the line underneath still said it
+		// was working. So the screen showed the result and denied having it,
+		// and the reasonable conclusion for anyone reading it is that the
+		// program has hung.
+		//
+		// A progress message MUST be replaced by its outcome. The general
+		// version of this is the same rule as everywhere else in the program:
+		// a state that has finished must not still look like a state that is
+		// running.
+		switch {
+		case !msg.cost.Measured:
+			m.notice = "could not measure: " + msg.cost.Note
+		case msg.cost.DownloadBytes == 0:
+			m.notice = "measured: nothing to download - all of it is already here."
+		default:
+			// Short enough to survive an 80-column terminal, because the
+			// figure is the whole point of the line and a truncated number is
+			// no number at all. The full breakdown is on the install plan.
+			m.notice = "measured: " + arsenal.HumanBytes(msg.cost.DownloadBytes) + " down / " +
+				arsenal.HumanBytes(msg.cost.DiskBytes) + " disk"
+			if t := arsenal.DownloadTime(msg.cost.DownloadBytes, m.linkSpeed); t != "" {
+				m.notice += " / ~" + t
+			}
+			m.notice += " -- press i"
+		}
 		return m, nil
 	}
 	return m, nil
