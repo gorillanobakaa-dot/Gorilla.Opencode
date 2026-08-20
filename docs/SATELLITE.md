@@ -1,4 +1,4 @@
-<!-- Version: 1.2.0 · updated 26-08-18-18-21 -->
+<!-- Version: 1.5.0 · updated 26-08-20-13-54 -->
 # What happens when your connection is bad
 
 *Plain language. No jargon, and where a technical word is unavoidable it is
@@ -459,3 +459,127 @@ discount them:
 - "Only one model in eight worked" is a sample of eight taken at one moment on
   one provider. It is not a claim about that provider's general reliability, and
   it may look completely different tomorrow.
+
+
+## The download side is worse, and it is not ours to fix
+
+Everything above is about what gets **sent**. Measured on 20 August 2026, the
+bigger waste is what comes **back**.
+
+When the AI answers, it does not send the reply in one piece. It sends one small
+message per word, and every one of those carries a full wrapper around it — an
+id, a model name, a position counter, the same fields repeated every time. The
+words themselves are a tiny fraction of it.
+
+Measured, on a real answer of 59 words:
+
+| | |
+|---|---|
+| What arrived | **22,256 bytes** |
+| Words delivered | 59 |
+| Cost per word | **377 bytes** |
+
+A 500-word answer is roughly **188 KB coming down the wire**. On a 2 KB/s
+satellite link that is **about a minute and a half of just receiving**, before
+you read a thing.
+
+Now the part that stings. That traffic is enormously repetitive, so it squashes
+beautifully. Compressed the way a live stream has to be compressed — a little at
+a time, so it still arrives as it is written — the same answer would be
+**1,663 bytes instead of 22,256. A 92.5% saving.** Ten point nine seconds
+becomes under one.
+
+*(Squashing the whole thing in one lump would show 97%, and that number is a lie
+of the kind this project has been caught by before: it only works if you wait
+for the entire answer first, which defeats the point of streaming. 92.5% is the
+honest figure.)*
+
+**We already ask for this.** Every request this program sends says it can accept
+compressed replies. The providers simply decline — verified on the wire: NVIDIA
+NIM returns no compression header at all, and neither does a local llama.cpp
+server. GitHub's API, tested as a control, compresses happily. So the request is
+well formed; the answer is no.
+
+This is the one saving on the list that **cannot be fixed from here**. Whether a
+reply is compressed is the server's decision. All a client can do is ask, which
+it does.
+
+
+## Watching it type costs 27 times more data
+
+Measured 20 August 2026, and this one you can act on.
+
+There are two ways the answer can come back. **Word by word**, so you watch it
+appear — or **all at once** when it is finished.
+
+They contain exactly the same answer. Here is what each costs on your connection:
+
+| | |
+|---|---|
+| Word by word (watching it type) | **22,256 bytes** |
+| All at once | **834 bytes** |
+| Difference | **27 times more data** |
+
+Why: when it types, every single word is put in its own package with a full
+label wrapped round it — who sent it, which model, what position it is in the
+sentence. The labels are far bigger than the words inside them.
+
+**The AI company charges you the same either way.** We checked both: 106 words
+counted on both routes, identical. So this is not about the bill from the AI
+company. It is about the data your connection has to carry — and where data is
+bought by the megabyte, that is money out of your pocket.
+
+That matters enormously in the places this program is built for. In much of
+South America, in Chad, in Afghanistan and across remote Africa, data is paid
+for up front by the megabyte, often with no card to top it up with. Paying 27
+times over for a typing animation is not a trade anybody would make if somebody
+asked them first.
+
+So on the two slowest profiles, **Austere** and **Constrained**, the typing
+effect is switched off.
+
+**What you lose:** the answer no longer appears gradually. The screen stays
+quiet, then the whole reply arrives at once. It also becomes harder to tell a
+slow answer from a stuck one, because the dribble of words was itself proof that
+something was alive.
+
+**What you do not lose:** anything else at all. Same answer, same quality, same
+abilities, same word count, same bill.
+
+**If you would rather watch it type**, pick a faster profile from the list, or
+set `GORILLA_OPENCODE_STREAM=1`, which overrules the profile. The choice is
+yours — it is explained on the picker screen so you can make it there.
+
+
+## The five connection profiles, at a glance
+
+Pick the row that matches your connection. You are asked once, on first run, and
+you can change it any time with `/connection`.
+
+| profile | your connection | how the answer arrives | waits up to | data per message |
+|---|---|---|---|---|
+| **Austere environment** | 1-9 KB/s | **whole answer at once** | 15 min | 0.5 MB |
+| **Constrained** | 10-60 KB/s | **whole answer at once** | 8 min | 1.5 MB |
+| **Modest** *(default)* | 60-250 KB/s | types live | 4 min | 4 MB |
+| **Broadband** | 250 KB/s - 5 MB/s | types live | 2 min | 8 MB |
+| **Unconstrained** | 5 MB/s and up | types live | 1 min | 16 MB |
+
+Recognise your own connection here:
+
+- **Austere** - Iridium Short Burst, Inmarsat C, 2G phone data
+- **Constrained** - Iridium Certus 100/200, EDGE, 1xRTT
+- **Modest** - Inmarsat BGAN, Certus 700, 3G/UMTS, older satellite broadband
+- **Broadband** - HSPA+, EV-DO, early 4G
+- **Unconstrained** - modern 4G/5G, Starlink, current satellite broadband
+
+**"Waits up to"** is how long it will sit patiently before deciding the
+connection is dead rather than slow. On a satellite link a real answer genuinely
+takes minutes, so being impatient there throws away answers that were coming.
+
+**"Data per message"** is the ceiling on what one message may spend, including
+any retries. Every message re-sends the whole conversation, so a program that
+retries forever can spend a lot of your allowance and produce nothing. When a
+message would exceed the ceiling, nothing is sent and you are told why.
+
+**A profile only changes waiting and data. It never changes what the AI can
+do** - same tools, same abilities, same quality of answer, on every row.

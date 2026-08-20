@@ -1,4 +1,4 @@
-<!-- Version: 1.5.0 · updated 26-08-18-18-21 -->
+<!-- Version: 1.8.0 · updated 26-08-20-13-54 -->
 # What it costs to run: memory, disk and network
 
 *Measured on 18 August 2026, on the reference machine (Sony VAIO SVE, i7-3632QM,
@@ -400,3 +400,125 @@ HTTPS_PROXY=http://127.0.0.1:8873 gorilla-opencode -q -p "your prompt"
 # Where is a hung build actually blocked? Go dumps every goroutine on SIGQUIT
 GOTRACEBACK=all gorilla-opencode -p "..." & sleep 25; kill -QUIT $!
 ```
+
+
+## Response compression: asked for, refused, quantified
+
+Measured 2026-08-20. `DisableCompression` is unset and nothing sets
+`Accept-Encoding` manually — which matters, because setting that header by hand
+silently disables Go's automatic inflate. So the transport does the right thing:
+it advertises gzip and would transparently decompress.
+
+Providers decline.
+
+| endpoint | `Accept-Encoding: gzip` sent | `content-encoding` returned | bytes |
+|---|---|---|---|
+| NIM `/v1/models` | yes | **absent** | 9,848 either way |
+| NIM streaming completion | yes | **absent** | 22,256 |
+| local llama.cpp | yes | **absent** | 602 either way |
+| `api.github.com/meta` (control) | yes | `gzip` | — |
+
+The control matters: it proves the request is well formed and the mechanism
+works, so "absent" is a refusal rather than a bug on our side.
+
+**The streaming case is the expensive one.** SSE sends one JSON envelope per
+token — `id`, `model`, `object`, `choices[0].index`, `delta`, `finish_reason` —
+around a payload of a few characters. Measured on a 59-token completion:
+
+```
+raw stream               22,256 bytes    377 bytes per token
+whole-blob gzip             665 bytes    97.0%  <- FLATTERS ITSELF
+per-chunk Z_SYNC_FLUSH    1,663 bytes    92.5%  <- the honest number
+```
+
+Quote **92.5%**. The 97% figure requires compressing the completed stream, which
+cannot be done without destroying incrementality — the same self-flattering
+measurement trap recorded for request gzip, where a synthetic corpus reported
+99.3% against a real-world 77%.
+
+At the Austere profile's 2 KB/s that is **10.9s of pure receive time per short
+answer, against 0.8s if it were compressed**. A 500-token reply costs ~188 KB
+and roughly 94 seconds of downlink.
+
+**Nothing to implement.** Response encoding is the server's choice; the client
+already asks. Recorded so the saving is not mistaken for an available one, and
+so the next person measuring bytes per turn counts the downlink too — it is
+larger than the uplink for any answer longer than a couple of hundred tokens.
+
+Also observed in the same headers: `deprecation: 2026-08-26T09:00:00Z` on
+`meta/llama-3.1-8b-instruct`.
+
+
+## Non-streaming on slow profiles: 27x less downlink, identical tokens
+
+Measured 2026-08-20 against NIM, same prompt, same model, same 60-token answer:
+
+```
+stream:true    22,256 bytes    377 bytes per output token
+stream:false      834 bytes
+                  27x
+```
+
+Token accounting is IDENTICAL — `total_tokens: 106` on both, read from each
+response's own usage block. The provider bill does not move; only the user's
+metered allowance does. Those are the same money on a satellite or prepaid
+mobile plan and different money on a flat link, which is exactly why this is
+per-profile rather than global.
+
+Cause is the transport, not the model. SSE wraps every token in its own JSON
+envelope (`id`, `model`, `object`, `choices[0].index`, `delta`,
+`finish_reason`) around a payload of a few characters. A non-streamed reply
+sends one envelope for the whole answer.
+
+**Where it is implemented.** `baseProvider.StreamResponse` in
+`internal/llm/provider/provider.go` checks `config.StreamRepliesEnabled()` and,
+when false, routes to `sendAsSingleEvent` — which runs the existing
+non-streaming `send()` and reports it on the same channel: one
+`EventContentDelta` carrying the whole text, then `EventComplete` with tool
+calls and usage. Callers keep consuming a channel exactly as before, so the TUI
+never learns which mode it is in, and every provider inherits it from one seam
+rather than each client implementing it.
+
+`Stream` is false for Austere and Constrained, true for Modest and above.
+`GORILLA_OPENCODE_STREAM=0/1` overrules the profile.
+
+**The trade-off, stated because it is real.** Non-streaming removes the stall
+guard's progress signal: `stallGuard` resets on every chunk, and with one chunk
+there is nothing to reset. A stalled link stops being distinguishable from a
+slow answer, leaving `FirstByteTimeout` to carry that job alone — which is why
+the slow profiles set it to 8 and 15 minutes.
+
+**What it does not change:** capability. Same tools, same answer, same
+quality — consistent with the rule that a connection profile alters waiting and
+spending, never what the agent can do.
+
+
+## Connection profile ladder (as shipped)
+
+| profile | band | `Stream` | `FirstByte` | `StreamStall` | `UploadMB` | `MaxRetries` |
+|---|---|---|---|---|---|---|
+| `austere` | 1-9 KB/s | **false** | 15m | 5m | 0.5 | 2 |
+| `constrained` | 10-60 KB/s | **false** | 8m | 3m | 1.5 | 3 |
+| `modest` *(default)* | 60-250 KB/s | true | 4m | 2m | 4 | 4 |
+| `broadband` | 250 KB/s-5 MB/s | true | 2m | 90s | 8 | 5 |
+| `unconstrained` | 5 MB/s+ | true | 60s | 45s | 16 | 5 |
+
+Defined in `internal/config/connprofile.go`. The ladder is asserted monotonic by
+`TestConnProfileLadderIsMonotonic` — a rung that is less patient or less frugal
+than a slower one is a bug, because the user picks "slower" and would silently
+get "less careful".
+
+`modest` is the default deliberately: its numbers sit close to the pre-profile
+shipped values (120s / 90s / 4 MB), so upgrading changes almost nothing for
+anyone who never opens the picker. The default is not `unconstrained`, because
+this program is built for bad connections and must not assume a good one.
+
+**Precedence:** an explicit environment variable always beats the profile —
+`GORILLA_OPENCODE_FIRST_BYTE_TIMEOUT`, `GORILLA_OPENCODE_STREAM_STALL_TIMEOUT`,
+`GORILLA_OPENCODE_TURN_UPLOAD_MB`, `GORILLA_OPENCODE_STREAM`. Someone who set one
+meant it, and a preset silently overriding a deliberate choice is the same
+silent-failure class this subsystem exists to remove.
+
+**Scope, fixed by design:** a profile sets waiting and spending only. It never
+touches the loadout, the tool set or the model, so switching profiles is
+predictable and reversible.
