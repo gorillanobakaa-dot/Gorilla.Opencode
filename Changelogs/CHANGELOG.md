@@ -1,3 +1,59 @@
+## v0.1.111 — 2026-08-20 — the meter got its colours back, and a 204 KB file that could eat 420 MB
+
+**Plain-language version:** three repairs, no new features. Two of them undo
+damage done by earlier passes that looked helpful at the time.
+
+The quota meter is back. Two days ago a tidy-up pass swept 81 files replacing
+anything that "looked like a box character" with plain keyboard symbols; the
+request behind it had only concerned some misaligned lines in the prompt given
+to the model. One of the things it flattened was the coloured bar showing how
+much of your free allowance is left. `[████░░░░]` became `[####....]` — a solid
+block reads as a meter, a row of `#` reads as text. The colour maths was never
+damaged; it was still computing a red-to-green gradient into a body that no
+longer existed to show it. Two glyphs, and the object was gone.
+
+It is now protected by three tests that fail loudly if it happens again: one for
+the solid block, one that checks the gradient still runs red to green *and* that
+the cells are actually different colours, and one holding all nine banana rungs
+word for word. Both locks were verified by breaking them on purpose. A future
+change can still alter any of it — it just has to delete the lock deliberately
+and say why. An accident cannot; only a decision can.
+
+A compression bomb is closed. A 204 KB archive could be built to expand into
+200 MB of data, and the archive-search mode decompressed it straight into memory
+with no limit. Measured on a real bomb: 420.7 MB of memory before, 148.9 MB
+after. On the 4 GB laptops this is built for, the old behaviour is a swap storm;
+a bigger bomb is an out-of-memory kill. The budget is shared across the whole
+archive rather than per file inside it, because ten thousand small members add
+up the same as one huge one. It is loud when it bites — it names the file and
+the limit — since truncating quietly would make "found nothing" and "I stopped
+reading" identical.
+
+The model cannot reach that path: archive search is off by default and is never
+exposed to it. Only a person running the search script by hand could. Fixed
+anyway, because the standalone copy of that script is exactly that person's tool
+and had the identical hole. Two bugs in the fix itself were caught by testing it
+rather than reading it — the budget charged for data it was offered instead of
+data it actually read, cutting a legitimate archive off after 3 MB, and the
+warning printed the wrong limit.
+
+Six screenshots deleted in v0.1.90 had been showing as broken images on the
+public gallery page since 17 August. Recovered byte-for-byte from history. Found
+by the owner noticing, not by any test.
+
+Four files were opened and left to the language to close. One of those is a
+write, which can exit with data still sitting in a buffer, and a half-written
+catalogue looks exactly like a complete one.
+
+Deliberately not changed: six commands that run other programs still have no
+time limit. A blanket fix there would be the same mistake as the sweep that
+flattened the meter. They were decided one at a time instead — four got a
+timeout, one got an optional parameter defaulting to none because it runs
+`git push` and uploads a 20 MB asset over links measured in single-digit KB/s,
+and the one that installs system packages under `sudo` got nothing at all, since
+`sudo` may simply be waiting for someone to type a password and killing a
+package installation halfway through breaks the package database.
+
 ## v0.1.110 — 2026-08-20 — a model list you can finally curate
 
 **Plain-language version:** some providers offer hundreds of models, and the
