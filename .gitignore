@@ -127,3 +127,6 @@ LESSONS/
 # from a modified tree when the tracked source was clean. The directory itself
 # is left in place; only its tracking is suppressed.
 .code_review/
+# dual_track.py working files — local only, never published
+PAYLOAD.*
+PRECHECK.json

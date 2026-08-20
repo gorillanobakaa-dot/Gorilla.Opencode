@@ -1,3 +1,48 @@
+## v0.1.108 — 2026-08-20 — your connection is now a setting, and answers can arrive in one piece
+
+**Plain-language version:** this program is built for people whose internet is a
+satellite phone or a weak mobile signal, where data is bought by the megabyte
+and often cannot be topped up with a card. Everything needed to survive a bad
+connection was already built and already measured. None of it could be found:
+every setting was an environment variable, so the person on a 2 KB/s satellite
+link had to read the source code to survive on it. There are now five profiles
+you pick from a list, from Austere (a satellite phone or a 2G signal) up to
+Unconstrained (Starlink, modern 4G and 5G). A profile changes how patiently the
+program waits before deciding your connection is dead, and how much data one
+message may spend. It never changes what the AI can do.
+
+The picker shows an estimate of your speed and never downloads anything to
+measure it. That is a rule, not a shortcut: at 2 KB/s a 100 KB test file costs
+about 50 seconds and real money to report something you already know, and with a
+one-to-two-second satellite round trip it would measure the delay rather than
+the speed. The estimate times traffic that was going to happen anyway. On first
+run there has been none, so the screen says nothing has been measured and asks
+you to pick the line that sounds like your connection, instead of inventing a
+suggestion it cannot support.
+
+One thing you will see immediately. On the two slowest profiles the answer now
+arrives all at once instead of typing itself out. When the AI writes a word at a
+time, each word is sent in its own package with a full label wrapped around it,
+and the labels are far bigger than the words: measured on the same answer,
+22,256 bytes word-by-word against 834 bytes in one piece. Twenty-seven times the
+data for an identical reply. The AI company charges you the same either way —
+106 words counted on both routes — so this is not the AI bill, it is the data
+bill, and where data is prepaid by the megabyte that is money out of a pocket.
+You lose the gradual appearance, and it becomes harder to tell a slow answer
+from a stuck one. You lose nothing else. The screen explains all of it so you
+can overrule it, and a faster profile or GORILLA_OPENCODE_STREAM=1 does that.
+
+Also: a message too big for your data ceiling used to be reported as the
+connection failing, sending you to debug a link that was working perfectly. It
+now says the connection is fine and the conversation has grown too big for this
+profile.
+
+**Not done, and said here rather than discovered later:** each profile declares
+how many times to retry, but the program still uses its old fixed five, so that
+number has no effect yet. And none of this has run on a genuinely slow
+connection — it was built and tested on a fast one, against measurements taken
+in August with a deliberately broken link.
+
 ## v0.1.107 — 2026-08-19 — the one I said was fine
 
 **Plain-language version:** yesterday's release audited four tools and fixed ten

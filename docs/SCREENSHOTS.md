@@ -1,4 +1,4 @@
-<!-- Version: 1.2.0 · updated 26-08-19-11-15 -->
+<!-- Version: 1.3.0 · updated 26-08-20-14-23 -->
 # Gorilla OpenCode — screenshots & proof
 
 Real screenshots from a Debian 13 / GNOME 48 machine running the revived
@@ -444,6 +444,56 @@ rule in our schema — but the decision to refuse under an explicit instruction 
 comply is the model's, and it has not been tested across models. The full split
 of what is the program and what is the model is in
 [CONTROL-AND-COST.md](CONTROL-AND-COST.md).
+
+
+---
+
+## v0.1.108 — the connection profile picker
+
+The program is built for people on satellite phone links and weak mobile
+signals. Everything needed to survive a bad connection already existed and had
+been measured; none of it could be found, because every setting was an
+environment variable. These five profiles put them on one screen.
+
+You are asked once, on first run, and after that only if your measured speed
+disagrees with your chosen profile by two rungs or more. One rung is inside the
+noise of a single measurement and must never interrupt you.
+
+[![The connection picker with Austere environment selected, showing the 1-9 KB/s band, Iridium Short Burst and 2G examples, and the full plain-language explanation of why the typing effect is switched off including the 22,256 against 834 byte measurement](screenshots/gallery/v0108-connection-picker-austere-explains-non-streaming.png)](screenshots/gallery/v0108-connection-picker-austere-explains-non-streaming.png)
+
+Austere is the reason the feature exists. Note what the screen does **not** do:
+it has no measurement yet on first run, so it says *"Nothing measured yet, so
+there is no suggestion below"* instead of inventing a recommendation. Nothing is
+ever downloaded to test the line — at 2 KB/s a 100 KB probe costs about 50
+seconds of a metered allowance to report what the user already knows, and a
+one-to-two-second satellite round trip would make it measure delay rather than
+speed.
+
+[![The connection picker with Constrained selected, showing the 10-60 KB/s band with Iridium Certus and EDGE examples, an 8 minute wait limit, 1.5 MB per message and 3 retries](screenshots/gallery/v0108-connection-picker-constrained-profile.png)](screenshots/gallery/v0108-connection-picker-constrained-profile.png)
+
+[![The connection picker with Modest selected and marked as current, the shipped default covering 60-250 KB/s with Inmarsat BGAN and UMTS examples, 4 minute wait and 4 MB per message](screenshots/gallery/v0108-connection-picker-modest-current-default.png)](screenshots/gallery/v0108-connection-picker-modest-current-default.png)
+
+Modest is the shipped default, and the cursor starts on whichever profile is
+already current — so Enter always means "keep what I have" for someone who
+opened this by accident.
+
+[![The connection picker with Unconstrained selected for 5 MB/s and up, showing Starlink and 5G examples, a 60 second wait limit, and text confirming answers still arrive a word at a time on fast links](screenshots/gallery/v0108-connection-picker-unconstrained-keeps-live-typing.png)](screenshots/gallery/v0108-connection-picker-unconstrained-keeps-live-typing.png)
+
+The two slowest profiles receive the answer in one piece rather than word by
+word. Measured on the same reply: **22,256 bytes streamed against 834 bytes in
+one piece**, with **identical token accounting** — 106 either way, read from
+each response's own usage block. The AI bill does not move; the data bill does.
+The fast profiles keep live typing, and every row says which behaviour it has
+and why.
+
+[![Gorilla OpenCode v0.1.108 running a web search tool call against Llama 3.3 70B, showing the search results block with untrusted content markers and the model composing its follow-up](screenshots/gallery/v0108-agent-tool-call-working-on-v0108.png)](screenshots/gallery/v0108-agent-tool-call-working-on-v0108.png)
+
+**Read the caveat before quoting this.** These profiles have never run on a
+genuinely slow connection — they were built and tested on a fast one, against
+measurements taken on 2026-08-18 with a deliberately broken link
+([SATELLITE.md](SATELLITE.md)). The byte counts are real and repeatable; the
+choice of timeout values for each band is judgement, not measurement. And each
+profile's retry count is declared but not yet consumed by the provider layer.
 
 ---
 
