@@ -3041,15 +3041,56 @@ func (a *appModel) refreshModelCatalogues() tea.Cmd {
 		dir := config.CacheBase()
 		var notes []string
 
+		// 1. OpenRouter - a plain HTTP fetch, no credential needed.
 		if res, err := models.RefreshOpenRouter(dir); err != nil {
-			notes = append(notes, fmt.Sprintf("OpenRouter: %v", err))
+			notes = append(notes, fmt.Sprintf("OpenRouter failed: %v", err))
 		} else {
-			notes = append(notes, fmt.Sprintf("OpenRouter: %d usable, %d added, %d gone",
+			notes = append(notes, fmt.Sprintf("OpenRouter %d usable (+%d, -%d)",
 				res.Usable, len(res.Added), len(res.Removed)))
 		}
 
+		// 2. Antigravity - needs the stored Gmail login. Absent credentials is
+		// not a failure, it is "you are not signed in", and saying so is more
+		// use than an error nobody can act on.
+		if creds, err := auth.LoadAntigravityCreds(); err != nil || creds == nil {
+			notes = append(notes, "Antigravity skipped (not signed in)")
+		} else if fetched, ferr := creds.FetchAvailableModels(context.Background()); ferr != nil {
+			notes = append(notes, fmt.Sprintf("Antigravity failed: %v", ferr))
+		} else {
+			rows := make([]models.AntigravityRow, 0, len(fetched))
+			for id, m := range fetched {
+				rows = append(rows, models.AntigravityRow{
+					ID: id, DisplayName: m.DisplayName, APIProvider: m.APIProvider,
+					MaxTokens: m.MaxTokens, MaxOutputTokens: m.MaxOutputTokens,
+					SupportsImages: m.SupportsImages, SupportsThinking: m.SupportsThinking,
+					IsInternal: m.IsInternal,
+				})
+			}
+			if res, rerr := models.RefreshAntigravity(dir, rows); rerr != nil {
+				notes = append(notes, fmt.Sprintf("Antigravity failed: %v", rerr))
+			} else {
+				notes = append(notes, fmt.Sprintf("Antigravity %d usable", res.Usable))
+			}
+		}
+
+		// 3. Every OpenAI-compatible endpoint the user configured - NVIDIA NIM,
+		// a local llama.cpp, LM Studio, anything added with /connect. Each is
+		// re-asked what it serves right now, which is the only way a model
+		// retired since the endpoint was added stops being offered.
+		if n := config.ReregisterLocalEndpoints(); n > 0 {
+			notes = append(notes, fmt.Sprintf("%d configured endpoint(s) re-asked", n))
+		}
+
+		// 4. Say what CANNOT be refreshed, so silence is not read as success.
+		// Anthropic, OpenAI, Gemini, Groq, Cerebras, Azure, xAI, VertexAI,
+		// DeepSeek, Copilot and ChatGPT ship compiled into the binary. There is
+		// no list to fetch; they change when the app is updated. Without this
+		// line "/update" looks like it refreshed ten providers when it refreshed
+		// the three that have anything to fetch.
+		notes = append(notes, "built-in providers unchanged (they update with the app)")
+
 		if n := config.HiddenCount(); n > 0 {
-			notes = append(notes, fmt.Sprintf("%d hidden model(s) stayed hidden - press H in /models to review", n))
+			notes = append(notes, fmt.Sprintf("%d hidden stayed hidden (H to review)", n))
 		}
 		return util.InfoMsg{Type: util.InfoTypeInfo, Msg: strings.Join(notes, " | ")}
 	}

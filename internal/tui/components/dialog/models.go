@@ -631,7 +631,15 @@ func (m *modelDialogCmp) View() string {
 	}
 
 	// Capitalize first letter of provider name (with friendly overrides)
+	// GORILLA OVERRIDE (2026-08-20): the virtual columns are not providers and
+	// must not be wrapped in "Select ... Model". Their display names are whole
+	// sentences, so the template stranded the word "Model" on the end:
+	//   "Select * HIDDEN - press d to restore, they return to their own provider Model"
+	// Caught by reading a screenshot, not by any test.
 	titleText := fmt.Sprintf("Select %s Model", providerDisplayName(m.provider))
+	if m.provider == ProviderHidden || m.provider == ProviderBookmarks {
+		titleText = providerDisplayName(m.provider)
+	}
 	if m.searchActive {
 		titleText = "Search Models — every provider at once"
 	}
@@ -1420,7 +1428,9 @@ func providerDisplayName(p models.ModelProvider) string {
 		// remove.
 		return "* YOUR BOOKMARKS — the models you picked"
 	case ProviderHidden:
-		return "* HIDDEN — press d to restore, they return to their own provider"
+		// Short: this is a HEADING. The instruction lives in the hint line at
+		// the bottom, which is where every other key is explained.
+		return "* HIDDEN — models you removed from the lists"
 	}
 	s := string(p)
 	if s == "" {

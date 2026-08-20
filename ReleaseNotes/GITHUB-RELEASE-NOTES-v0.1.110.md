@@ -27,12 +27,29 @@ picker.
 | `H` | Review what you hid. `d` there **restores** it |
 | `space` | Bookmark, as before |
 
+[![The model picker filling the entire terminal window with 31 models visible at once, showing the new key hints for mark, add marked and hide along the bottom row](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.110/docs/screenshots/gallery/v0110-picker-full-window-with-mark-hide-keys.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.110/docs/screenshots/gallery/v0110-picker-full-window-with-mark-hide-keys.png)
+
+The picker now uses the whole window - thirty-one models visible at once instead
+of the thirty-row slice it was capped at - and the new keys are spelled out along
+the bottom.
+
 And two commands:
 
 - **`/purge`** — empties the downloaded provider lists
 - **`/update`** — asks each provider what it serves today
 
 **Your own list and your hidden models survive both.**
+
+[![The status bar reporting that 293 downloaded models were purged leaving 189, and confirming that bookmarks and the hidden list were untouched](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.110/docs/screenshots/gallery/v0110-purge-293-models-bookmarks-untouched.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.110/docs/screenshots/gallery/v0110-purge-293-models-bookmarks-untouched.png)
+
+Two hundred and ninety-three models cleared in one command, and it says plainly
+what it did **not** touch.
+
+[![The status bar after running update, showing OpenRouter returned 288 usable models with 288 added, while 3 hidden models stayed hidden across the refresh](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.110/docs/screenshots/gallery/v0110-update-288-back-3-stayed-hidden.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.110/docs/screenshots/gallery/v0110-update-288-back-3-stayed-hidden.png)
+
+Then `/update` brings 288 back - **and the three hidden models stay hidden.**
+That is the entire point: purge on Monday, refresh on Tuesday, and what you
+rejected does not come back.
 
 ---
 
@@ -55,6 +72,10 @@ having a bad minute.
 
 **And hiding is never a one-way door.** A `HIDDEN` column appears the moment
 anything is hidden, and the key that hides is the key that restores.
+
+[![The HIDDEN column listing three models the user removed, with the hint line showing d RESTORE as the first action, proving hiding can always be undone](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.110/docs/screenshots/gallery/v0110-hidden-column-restore-with-d.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.110/docs/screenshots/gallery/v0110-hidden-column-restore-with-d.png)
+
+Three hidden models, and `d RESTORE` is the first thing the hint line offers.
 
 ---
 

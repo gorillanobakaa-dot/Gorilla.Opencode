@@ -1923,3 +1923,26 @@ func providerOf(id models.ModelID) (models.ModelProvider, bool) {
 	m, ok := models.SupportedModels[id]
 	return m.Provider, ok
 }
+
+// ReregisterLocalEndpoints re-asks every enabled OpenAI-compatible endpoint what
+// it serves right now, and reports how many endpoints answered.
+//
+// GORILLA OVERRIDE (2026-08-20): exported for /update. It reuses
+// registerLocalEndpoints rather than iterating cfg.LocalEndpoints from the TUI,
+// because that function carries the dedupe-by-baseURL rule that prefers a keyed
+// entry — reimplementing it at the call site would drop the protection against
+// two entries for one URL, where the last one wins and a wrong key silently
+// routes every model through a 401.
+func ReregisterLocalEndpoints() int {
+	if cfg == nil {
+		return 0
+	}
+	n := 0
+	for _, ep := range cfg.LocalEndpoints {
+		if !ep.Disabled && ep.BaseURL != "" {
+			n++
+		}
+	}
+	registerLocalEndpoints()
+	return n
+}

@@ -1,4 +1,4 @@
-<!-- Version: 1.3.0 · updated 26-08-20-14-23 -->
+<!-- Version: 1.4.0 · updated 26-08-20-19-12 -->
 # Gorilla OpenCode — screenshots & proof
 
 Real screenshots from a Debian 13 / GNOME 48 machine running the revived
@@ -494,6 +494,45 @@ measurements taken on 2026-08-18 with a deliberately broken link
 ([SATELLITE.md](SATELLITE.md)). The byte counts are real and repeatable; the
 choice of timeout values for each band is judgement, not measurement. The retry ceiling is
 now driven by the profile — two attempts on Austere, five on a fast line.
+
+
+---
+
+## v0.1.110 — a model list you can curate
+
+Some providers offer hundreds of models. Before this release there was no way to
+prune the list: you could bookmark one at a time, but not remove one, not
+refresh, and not start clean.
+
+[![The model picker filling the entire terminal window with 31 models visible at once, showing the new key hints for mark, add marked and hide along the bottom row](screenshots/gallery/v0110-picker-full-window-with-mark-hide-keys.png)](screenshots/gallery/v0110-picker-full-window-with-mark-hide-keys.png)
+
+The picker uses the whole window now. It was capped at thirty rows however large
+the screen, which threw away seven usable rows on a 1600x900 display and pushed
+models behind a scroll — the exact wall the list exists to remove. `x` marks,
+`a` adds every marked model at once, `d` hides.
+
+[![The HIDDEN column listing three models the user removed, with the hint line showing d RESTORE as the first action, proving hiding can always be undone](screenshots/gallery/v0110-hidden-column-restore-with-d.png)](screenshots/gallery/v0110-hidden-column-restore-with-d.png)
+
+Hiding is never a one-way door. The column appears the moment anything is
+hidden, and `d` there restores. Nothing is ever hidden automatically — on the
+same day, five models we tried to benchmark returned unreachable and could not
+be told apart from our own exhausted API quota.
+
+[![The status bar reporting that 293 downloaded models were purged leaving 189, and confirming that bookmarks and the hidden list were untouched](screenshots/gallery/v0110-purge-293-models-bookmarks-untouched.png)](screenshots/gallery/v0110-purge-293-models-bookmarks-untouched.png)
+
+[![The status bar after running update, showing OpenRouter returned 288 usable models with 288 added, while 3 hidden models stayed hidden across the refresh](screenshots/gallery/v0110-update-288-back-3-stayed-hidden.png)](screenshots/gallery/v0110-update-288-back-3-stayed-hidden.png)
+
+**These two together are the design.** `/purge` clears 293 downloaded models and
+says what it did not touch. `/update` brings 288 back — **and the three hidden
+models stay hidden.** A purge that a refresh undoes is not a purge, which is why
+hiding is recorded on disk rather than being a deletion.
+
+**Read the caveat before quoting this.** The numbers are from one machine with
+one set of configured providers; yours will differ. And `/update` only refreshes
+what can be fetched — OpenRouter, Antigravity and any OpenAI-compatible endpoint
+you configured. The eleven providers compiled into the app have no list to
+fetch; they change when the app is updated, and the command now says so rather
+than implying it refreshed everything.
 
 ---
 
