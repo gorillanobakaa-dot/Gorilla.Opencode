@@ -77,7 +77,20 @@ func TestLiveGzipProbe(t *testing.T) {
 			if !ok {
 				t.Fatal("transport is disabled by GORILLA_OPENCODE_NO_REQUEST_GZIP; unset it to probe")
 			}
-			client := &http.Client{Transport: tr, Timeout: 90 * time.Second}
+			// GORILLA OVERRIDE (2026-08-20): the 90s fixed timeout could not
+			// probe a slow local model. A 1-bit 8B on a no-AVX2 CPU needs ~170s
+			// just to INGEST the 3 KB padding this probe deliberately sends, so
+			// the run died with "Client.Timeout exceeded" and reported nothing
+			// about gzip at all. That is the same fixed-timeout-assumes-a-fast-
+			// responder trap the connection profiles exist to fix, in the tool
+			// meant to measure it. PROBE_TIMEOUT accepts a Go duration.
+			probeTimeout := 90 * time.Second
+			if v := os.Getenv("PROBE_TIMEOUT"); v != "" {
+				if d, err := time.ParseDuration(v); err == nil && d > 0 {
+					probeTimeout = d
+				}
+			}
+			client := &http.Client{Transport: tr, Timeout: probeTimeout}
 
 			url := tg.baseURL + "/chat/completions"
 			req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))

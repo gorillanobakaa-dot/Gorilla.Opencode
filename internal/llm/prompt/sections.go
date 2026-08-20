@@ -1,9 +1,21 @@
 // GORILLA OVERRIDE: this file did not exist upstream. It splits the coder prompt
 // into its "# " sections so each can be switched off individually in /context.
 //
-// Honest scoping, because this is easy to oversell: the whole base prompt is
-// ~460 tokens across 8 sections. Turning one off saves TENS of tokens, not
-// thousands. The real bandwidth wins already shipped — prompt.env was 10k-30k
+// Honest scoping, because this is easy to oversell: turning a section off saves
+// HUNDREDS of tokens at most, not thousands.
+//
+// CORRECTED 2026-08-20 - the previous note said "~460 tokens across 8 sections"
+// and was out of date by more than 4x. Measured from coder-modern.txt: 12
+// sections, ~2,000 tokens total. Largest are tools (~469), change reporting
+// (~207), honesty (~173), precedence (~160), output (~154). It matters because
+// this is the exact comment someone reads while deciding what to switch off on
+// a metered link, and a 4x understatement points them at the wrong lever.
+//
+// AND THE OUTPUT SECTION IS A TRAP: switching "# output" off saves ~154 tokens
+// of upload and removes the instruction to keep replies SHORT. At a measured
+// 377 bytes per output token, fifty extra tokens of reply costs ~18,850 bytes -
+// about 30x what was saved. On a slow link it is the most valuable section in
+// the prompt. Leave it on. The real bandwidth wins already shipped — prompt.env was 10k-30k
 // before the shallow-summary refactor, and tool schemas are 200-850 each.
 //
 // The value here is BEHAVIOURAL control, not bandwidth: drop "# build discipline"

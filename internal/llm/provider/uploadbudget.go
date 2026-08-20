@@ -35,6 +35,8 @@ import (
 	"fmt"
 	"net/http"
 	"sync/atomic"
+
+	"github.com/opencode-ai/opencode/internal/config"
 )
 
 // uploadBudgetKey scopes a budget to one turn.
@@ -88,6 +90,32 @@ func (e *ErrUploadBudget) Error() string {
 		e.Attempts, humanBytes(e.Spent), humanBytes(e.Limit))
 }
 
+// ErrTurnTooLarge is returned when the FIRST attempt of a turn is already
+// bigger than the whole budget. That is a different failure from ErrUploadBudget
+// and needs a different remedy, which is why it is a different error.
+//
+// GORILLA OVERRIDE (2026-08-20): found while adding connection profiles. The
+// budget check correctly refused before sending, but reported every refusal as
+// "the connection kept failing" — so someone on the Austere profile whose
+// conversation had simply grown too long was told to check a link that was
+// working perfectly. Nothing failed; the message did not fit. Telling someone to
+// debug their satellite dish when the fix is "start a new conversation" is the
+// silent-failure class this subsystem exists to remove, wearing a helpful face.
+type ErrTurnTooLarge struct {
+	Size, Limit int64
+	Profile     string
+}
+
+func (e *ErrTurnTooLarge) Error() string {
+	return fmt.Sprintf(
+		"nothing was sent: this message would upload %s, but the %q connection profile "+
+			"allows %s per message. The connection is fine - the conversation has simply "+
+			"grown too big for this profile. Every message re-uploads the whole "+
+			"conversation, so this will not get smaller on its own. Start a new "+
+			"conversation, or pick a faster connection profile",
+		humanBytes(e.Size), e.Profile, humanBytes(e.Limit))
+}
+
 func humanBytes(n int64) string {
 	switch {
 	case n >= 1<<20:
@@ -129,6 +157,13 @@ func (t *budgetTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// Refuse BEFORE sending. The whole point is not to put the bytes on the
 	// link, so the check cannot happen afterwards.
+	// A first attempt that cannot fit at all is not a retry problem, and saying
+	// so is the difference between "start a new conversation" and a pointless
+	// hunt for a network fault.
+	if b.attempts.Load() == 0 && size > b.limit {
+		return nil, &ErrTurnTooLarge{Size: size, Limit: b.limit, Profile: config.CurrentConnProfile().Name}
+	}
+
 	if b.spent.Load()+size > b.limit {
 		return nil, &ErrUploadBudget{
 			Spent:    b.spent.Load(),
