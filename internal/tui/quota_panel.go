@@ -150,7 +150,7 @@ func stripBananaEmoji(s string) string {
 	}, s))
 }
 
-// quotaBar draws "[####....]" as a thermometer scale: every cell has a FIXED
+// quotaBar draws "[████░░░░]" as a thermometer scale: every cell has a FIXED
 // colour (red left end -> green right end, via barCellColor), and the fill
 // recedes leftward as quota burns. Two signals in one glance: the tip of the
 // fill is always the colour of the current level (green when full, red when
@@ -158,6 +158,29 @@ func stripBananaEmoji(s string) string {
 // healthy bar shows the whole green-to-red spectrum.
 // A non-zero remainder never rounds down to an empty bar: "a sliver left" and
 // "nothing left" must not look identical.
+// DO NOT "MODERNISE" THIS TO ASCII. Locked by TestQuotaBarKeepsItsSolidBody.
+//
+// GORILLA OVERRIDE (2026-08-20, restoring 2026-08-19). This bar was
+// [████░░░░] and a codebase-wide ASCII sweep (5e4cd97, 81 files) turned it into
+// [####....]. The owner had asked for a fix to misaligned lines in the PROMPT;
+// the change was applied by pattern-match across the whole tree and took two
+// days of deliberate design with it. The gradient survived - only the glyphs
+// were swapped - but a solid block reads as a METER and a row of # reads as
+// TEXT, which is the entire point of the thing.
+//
+// WHY THE ASCII RULE DOES NOT APPLY HERE, stated so the next sweep stops:
+// styles/ascii.go exists because ambiguous-width characters make lipgloss
+// mis-measure a frame and WRAP it, and the damage shows up as height somewhere
+// else. That is a real hazard for chrome that WRAPS CONTENT. This panel is
+// printed to SCROLLBACK with tea.Println (see tui.go, the msg.summary branch),
+// not into the persistent inline frame, and it sizes its own cells with
+// explicit chrome accounting. Worst case on a CJK-configured terminal is one
+// wrapped line in scrollback that immediately scrolls away. It cannot corrupt
+// the one-row footer, which is what the rule protects.
+//
+// U+2588 FULL BLOCK is East Asian Ambiguous; U+2591 LIGHT SHADE is Neutral.
+// Only the first carries even the theoretical risk, in the one context where it
+// cannot bite.
 func quotaBar(remaining float64, cells int) string {
 	f := math.Min(1, math.Max(0, remaining))
 	filled := int(f*float64(cells) + 0.5)
@@ -171,10 +194,10 @@ func quotaBar(remaining float64, cells int) string {
 	sb.WriteString("[")
 	for i := 0; i < filled; i++ {
 		sb.WriteString(lipgloss.NewStyle().
-			Foreground(lipgloss.Color(barCellColor(i, cells))).Render("#"))
+			Foreground(lipgloss.Color(barCellColor(i, cells))).Render("\u2588"))
 	}
 	rest := lipgloss.NewStyle().Foreground(theme.CurrentTheme().TextMuted())
-	sb.WriteString(rest.Render(strings.Repeat(".", cells-filled)))
+	sb.WriteString(rest.Render(strings.Repeat("\u2591", cells-filled)))
 	sb.WriteString("]")
 	return sb.String()
 }

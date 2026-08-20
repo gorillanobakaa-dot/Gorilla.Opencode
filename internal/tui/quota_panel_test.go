@@ -213,10 +213,12 @@ func TestQuotaBarScalesWithRemaining(t *testing.T) {
 	}
 	for _, c := range cases {
 		bar := quotaBar(c.remaining, 50)
-		if got := strings.Count(bar, "#"); got != c.filled {
+		// U+2588 / U+2591, not '#' / '.' — the meter has a solid body again
+		// (restored 2026-08-20; see quota_locked_test.go for why it is locked).
+		if got := strings.Count(bar, "\u2588"); got != c.filled {
 			t.Errorf("remaining %.4f: %d filled cells, want %d\nbar: %s", c.remaining, got, c.filled, bar)
 		}
-		if got := strings.Count(bar, "."); got != 50-c.filled {
+		if got := strings.Count(bar, "\u2591"); got != 50-c.filled {
 			t.Errorf("remaining %.4f: %d empty cells, want %d", c.remaining, got, 50-c.filled)
 		}
 	}

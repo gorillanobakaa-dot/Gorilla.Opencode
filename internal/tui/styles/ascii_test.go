@@ -58,6 +58,13 @@ var exemptFiles = map[string]string{
 	"util/util.go": "NoticeDeco's middle dots were chosen deliberately (2026-08-18) because " +
 		"they have no space to break on and absorb the U+FE0F width mismatch the warning emoji carries.",
 	"styles/ascii_test.go": "this file names the banned characters in order to ban them",
+	"quota_panel.go": "the quota meter is a THERMOMETER and needs a solid body — U+2588 filled, " +
+		"U+2591 trough — for the red-to-green gradient to sit in. A '#' reads as text, not a meter. " +
+		"Safe here because this panel prints to SCROLLBACK via tea.Println, NOT into the one-row " +
+		"inline frame this rule protects: a mis-measured cell can at worst wrap one line that then " +
+		"scrolls away, and cannot strand debris in a frame that must be exactly its window height. " +
+		"Restored 2026-08-20 after a codebase-wide sweep (5e4cd97, 81 files) flattened it while " +
+		"fixing something else entirely. Locked by tui/quota_locked_test.go — change both or neither.",
 }
 
 func TestNothingThatDrawsUsesAmbiguousWidthCharacters(t *testing.T) {
