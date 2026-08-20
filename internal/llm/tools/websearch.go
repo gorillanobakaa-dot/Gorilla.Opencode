@@ -846,7 +846,7 @@ func (t *webSearchTool) searchSearxNG(ctx context.Context, q string, n int) ([]s
 
 func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error) {
 	var params WebSearchParams
-	if err := json.Unmarshal([]byte(call.Input), &params); err != nil {
+	if err := UnmarshalToolInput(call.Input, &params); err != nil {
 		return NewTextErrorResponse("Failed to parse web_search parameters: " + err.Error()), nil
 	}
 	if strings.TrimSpace(params.Query) == "" {

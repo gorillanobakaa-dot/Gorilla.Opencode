@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -469,7 +468,7 @@ func (t *fetchTool) do(ctx context.Context, client *http.Client, target string) 
 
 func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error) {
 	var params FetchParams
-	if err := json.Unmarshal([]byte(call.Input), &params); err != nil {
+	if err := UnmarshalToolInput(call.Input, &params); err != nil {
 		return NewTextErrorResponse("Failed to parse web_fetch parameters: " + err.Error()), nil
 	}
 	if params.URL == "" {

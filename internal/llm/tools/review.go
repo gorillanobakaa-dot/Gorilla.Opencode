@@ -140,7 +140,7 @@ START FROM corroborated. Those are lines flagged independently by two or more di
 func (r *reviewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error) {
 	var params ReviewParams
 	if call.Input != "" {
-		if err := json.Unmarshal([]byte(call.Input), &params); err != nil {
+		if err := UnmarshalToolInput(call.Input, &params); err != nil {
 			return NewTextErrorResponse(fmt.Sprintf("could not read the parameters: %s", err)), nil
 		}
 	}

@@ -19,7 +19,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -109,7 +108,7 @@ func (s *sparseTool) Info() ToolInfo {
 
 func (s *sparseTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error) {
 	var params SparseParams
-	if err := json.Unmarshal([]byte(call.Input), &params); err != nil {
+	if err := UnmarshalToolInput(call.Input, &params); err != nil {
 		return NewTextErrorResponse("failed to parse sparse parameters: " + err.Error()), nil
 	}
 	if params.FilePath == "" {

@@ -849,13 +849,25 @@ func (a *agent) Update(agentName config.AgentName, modelID models.ModelID) (mode
 		return models.Model{}, fmt.Errorf("cannot change model while processing requests")
 	}
 
-	if err := config.UpdateAgentModel(agentName, modelID); err != nil {
-		return models.Model{}, fmt.Errorf("failed to update config: %w", err)
-	}
-
-	provider, err := createAgentProvider(agentName)
+	// GORILLA OVERRIDE (2026-08-20): BUILD FIRST, COMMIT SECOND.
+	//
+	// This used to write the config and then build the provider. When the build
+	// failed - a disabled provider, an unknown model, a missing key - the error
+	// was returned and looked like a refusal, but the config had ALREADY moved.
+	// The footer and status bar read the config, so they showed the model the
+	// user picked, while the agent still held its previous provider and answered
+	// every message with the old model. Nothing in the interface disagreed with
+	// itself, so there was nothing to notice.
+	//
+	// Building first makes the failure honest: if the provider cannot be made,
+	// the config is untouched and the interface keeps telling the truth.
+	provider, err := createAgentProviderFor(agentName, modelID)
 	if err != nil {
 		return models.Model{}, fmt.Errorf("failed to create provider for model %s: %w", modelID, err)
+	}
+
+	if err := config.UpdateAgentModel(agentName, modelID); err != nil {
+		return models.Model{}, fmt.Errorf("failed to update config: %w", err)
 	}
 
 	a.provider = provider
@@ -1042,7 +1054,35 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 	return nil
 }
 
+// createAgentProvider builds a provider for whatever model the agent is
+// CONFIGURED to use.
 func createAgentProvider(agentName config.AgentName) (provider.Provider, error) {
+	cfg := config.Get()
+	if cfg == nil {
+		return nil, fmt.Errorf("config not loaded")
+	}
+	agentConfig, ok := cfg.Agents[agentName]
+	if !ok {
+		return nil, fmt.Errorf("agent %s not found", agentName)
+	}
+	return createAgentProviderFor(agentName, agentConfig.Model)
+}
+
+// createAgentProviderFor builds a provider for an EXPLICIT model, without
+// consulting the agent's configured model.
+//
+// GORILLA OVERRIDE (2026-08-20): this split exists so a model switch can be
+// made atomic. Update() used to write the config first and build the provider
+// second; when the build failed, the config had already moved and the live
+// agent kept its old provider. The result was a program whose config, footer
+// and status bar all said one model while a completely different one answered
+// every message - observed on 2026-08-20, where the picker was set to
+// antigravity.claude-sonnet-4-6 sixteen seconds before the session started and
+// every reply in the database came from local.meta/llama-3.3-70b-instruct.
+//
+// That is this project's oldest failure class wearing new clothes: the NAME of
+// a thing is not its CONTENTS, and silence and success must not look alike.
+func createAgentProviderFor(agentName config.AgentName, modelID models.ModelID) (provider.Provider, error) {
 	cfg := config.Get()
 	// GORILLA OVERRIDE: config.Get() returns nil until Load() has run, and
 	// cfg.Agents on a nil *Config panics. Production always loads first, so this
@@ -1056,9 +1096,9 @@ func createAgentProvider(agentName config.AgentName) (provider.Provider, error) 
 	if !ok {
 		return nil, fmt.Errorf("agent %s not found", agentName)
 	}
-	model, ok := models.SupportedModels[agentConfig.Model]
+	model, ok := models.SupportedModels[modelID]
 	if !ok {
-		return nil, fmt.Errorf("model %s not supported", agentConfig.Model)
+		return nil, fmt.Errorf("model %s not supported", modelID)
 	}
 
 	// GORILLA OVERRIDE: local models don't use a single providers.local key —
