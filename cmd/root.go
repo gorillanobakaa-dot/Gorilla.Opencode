@@ -263,6 +263,18 @@ understanding code directly from the terminal.`,
 				// started yet, leave silently.
 				return nil
 			}
+
+			// GORILLA OVERRIDE: the connection profile picker runs AFTER the
+			// provider portal, and the ordering is a requirement rather than a
+			// preference. The portal has just made a real network round trip
+			// (fetching a model list), so a throughput estimate is available for
+			// free. Asking first would mean buying a measurement, which on a
+			// 2 KB/s link costs the user money to be told something they know.
+			//
+			// It stays quiet unless this is the first run or the measurement
+			// disagrees with the active profile by two rungs or more - see
+			// config.ShouldOfferProfilePicker.
+			maybeOfferConnectionPicker()
 		}
 
 		// GORILLA OVERRIDE: fill the /settings theme row's options from the theme
@@ -331,6 +343,7 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 		// internal/tui cannot import cmd (cmd imports it), so the escape hatch is
 		// injected here rather than called directly.
 		tui.ReopenProviderPortal = reopenProviderPortal
+		tui.ReopenConnectionPicker = func() error { runConnectionPicker(); return nil }
 		zone.NewGlobal()
 		program := tea.NewProgram(
 			tui.New(app),

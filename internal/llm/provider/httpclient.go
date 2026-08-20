@@ -50,8 +50,12 @@ func resilientHTTPClient() *http.Client {
 	}
 
 	transport := &http.Transport{
-		Proxy:       http.ProxyFromEnvironment,
-		DialContext: dialer.DialContext,
+		Proxy: http.ProxyFromEnvironment,
+		// GORILLA OVERRIDE: count bytes at the socket for the passive link-speed
+		// estimate. This is the only layer that sees WIRE bytes — a RoundTripper
+		// sits above Go's transparent response decompression and would report a
+		// heavily-compressed stream as a much faster link. See linksample.go.
+		DialContext: countingDialContext(dialer.DialContext),
 		// Prefer HTTP/2 so all traffic to one provider multiplexes over a
 		// single connection — cheaper on a constrained uplink.
 		ForceAttemptHTTP2: true,

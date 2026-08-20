@@ -64,6 +64,17 @@ type keyMap struct {
 // cmd: cmd imports this package.
 var ReopenProviderPortal func() error
 
+// ReopenConnectionPicker opens the connection profile picker from inside a
+// session. Set by cmd at startup; nil in builds that do not wire it.
+//
+// GORILLA OVERRIDE (2026-08-20): the profile only offered itself on first run or
+// on a two-rung mismatch, deliberately, so it does not nag. That leaves no way
+// to reach it on purpose — and "my connection got worse and turns are failing"
+// is exactly when someone wants it and has no reason to know it lives in
+// /settings. Same hook shape as ReopenProviderPortal, and for the same reason:
+// internal/tui cannot import cmd.
+var ReopenConnectionPicker func() error
+
 // portalExec runs the provider portal while bubbletea has released the
 // terminal. The portal is its own tea.Program and needs the screen to itself;
 // tea.Exec is the same mechanism the editor already uses for $EDITOR.
@@ -1481,6 +1492,26 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return util.InfoMsg{
 					Type: util.InfoTypeInfo,
 					Msg:  "Provider updated — use /models if you want a different model from it.",
+				}
+			})
+		case "connection", "conn", "link":
+			// GORILLA OVERRIDE (2026-08-20): /connection — the profile picker.
+			// Dispatch happens through this switch, not the palette: a palette
+			// registration alone leaves a typed `/connection` reported as an
+			// unknown command (learned from /usage).
+			if ReopenConnectionPicker == nil {
+				return a, util.ReportWarn("the connection picker is not available in this build")
+			}
+			if a.app.CoderAgent != nil && a.app.CoderAgent.IsBusy() {
+				return a, util.ReportWarn("finish or cancel the current turn before changing the connection profile")
+			}
+			return a, tea.Exec(portalExec{run: ReopenConnectionPicker}, func(err error) tea.Msg {
+				if err != nil {
+					return util.InfoMsg{Type: util.InfoTypeError, Msg: err.Error()}
+				}
+				return util.InfoMsg{
+					Type: util.InfoTypeInfo,
+					Msg:  "Connection profile updated - it changes waiting and data limits only, not what the AI can do.",
 				}
 			})
 		case "usage":

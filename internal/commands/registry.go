@@ -287,6 +287,18 @@ var All = []Command{
 			"remove one of yours for good, or space to just switch it off.",
 	},
 	{
+		Name:    "connection",
+		Aliases: []string{"conn", "link"},
+		Group:   GroupModels,
+		Summary: "Tell the app how fast your internet is.",
+		Detail: "Picks how patient the app is with your connection and how much " +
+			"data one message may spend. Shows a speed measured from traffic it " +
+			"already sent - it never downloads anything just to test your line. " +
+			"Pick the row that matches your connection; a slower one waits longer " +
+			"and uploads less. It changes waiting and data only, never what the AI " +
+			"can do.",
+	},
+	{
 		Name:    "providers",
 		Aliases: []string{"provider", "switch"},
 		Group:   GroupModels,

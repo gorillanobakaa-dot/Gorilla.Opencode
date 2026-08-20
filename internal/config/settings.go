@@ -294,6 +294,32 @@ var Settings = []Setting{
 
 	// ─── Network and pace ────────────────────────────────────────────
 	{
+		ID:    "connection.profile",
+		Group: GroupNetwork,
+		Name:  "Connection profile",
+		Layman: "How patient this program is with your internet, and how much " +
+			"data one message is allowed to spend. Pick the row that matches your " +
+			"connection. A slower profile waits longer before deciding something " +
+			"is broken and uploads less; a faster one gives up quickly, because on " +
+			"a good line a long silence means a real fault. This changes waiting " +
+			"and spending only - it never changes what the AI can do.",
+		Kind:    KindEnum,
+		Default: connProfileNameByID(DefaultConnProfile),
+		Options: ConnProfileNames(),
+		Get:     func() any { return CurrentConnProfile().Name },
+		Set: func(v any) error {
+			name, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("expected a profile name")
+			}
+			id, ok := ConnProfileByName(name)
+			if !ok {
+				return fmt.Errorf("unknown connection profile %q", name)
+			}
+			return SetConnProfile(id)
+		},
+	},
+	{
 		ID:      "ratelimit.rpm",
 		Group:   GroupNetwork,
 		Name:    "Requests per minute",

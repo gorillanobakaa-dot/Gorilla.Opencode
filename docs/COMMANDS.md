@@ -27,6 +27,7 @@ cost before they start. Everything else is local.
 | `/init` | Write the project notes file the AI reads first. |
 | `/model` · `/models` | Choose which AI answers you. |
 | `/connect` · `/connections` | Add or manage your AI accounts and keys. |
+| `/connection` · `/conn` `/link` | Tell the app how fast your internet is. |
 | `/providers` · `/provider` `/switch` | Switch to a different AI provider. |
 | `/login` | Sign in with your Google account. |
 | `/logout` | Sign out of your Google account. |
@@ -146,6 +147,14 @@ Bigger models are better at hard problems and cost more; small ones are cheap an
 **Add or manage your AI accounts and keys.**
 
 Where you paste an API key, add a local server such as Ollama or NVIDIA, or turn a connection off without deleting it. Adding a connection makes its models appear in /model. The list shows the servers you have added as well as the ones on offer; press d to remove one of yours for good, or space to just switch it off.
+
+### `/connection`
+
+*Also: `/conn`, `/link`*
+
+**Tell the app how fast your internet is.**
+
+Picks how patient the app is with your connection and how much data one message may spend. Shows a speed measured from traffic it already sent - it never downloads anything just to test your line. Pick the row that matches your connection; a slower one waits longer and uploads less. It changes waiting and data only, never what the AI can do.
 
 ### `/providers`
 

@@ -953,7 +953,7 @@ func TurnUploadBudgetBytes() int64 {
 			return int64(mb * 1024 * 1024)
 		}
 	}
-	return 4 * 1024 * 1024
+	return int64(CurrentConnProfile().UploadMB * 1024 * 1024)
 }
 
 // NonInteractiveDeadline bounds a headless run (-p).
@@ -1011,7 +1011,7 @@ func FirstByteTimeout() time.Duration {
 			return d
 		}
 	}
-	return 120 * time.Second
+	return CurrentConnProfile().FirstByte
 }
 
 // StreamStallTimeout bounds a gap BETWEEN chunks once an answer has started.
@@ -1037,7 +1037,7 @@ func StreamStallTimeout() time.Duration {
 			return d
 		}
 	}
-	return 90 * time.Second
+	return CurrentConnProfile().StreamStall
 }
 
 // BrowserUserAgent is the User-Agent the web-fetch tool sends when reading a

@@ -151,6 +151,15 @@ Only does anything when "Draw on a separate screen" is ON. With that off, your t
 
 ## Network and pace
 
+### Connection profile
+
+How patient this program is with your internet, and how much data one message is allowed to spend. Pick the row that matches your connection. A slower profile waits longer before deciding something is broken and uploads less; a faster one gives up quickly, because on a good line a long silence means a real fault. This changes waiting and spending only - it never changes what the AI can do.
+
+- **Setting:** `connection.profile`
+- **Type:** choice
+- **Accepts:** Austere environment / Constrained / Modest / Broadband / Unconstrained
+- **Default:** `Modest`
+
 ### Requests per minute
 
 How fast this program is allowed to talk to the AI provider. Free accounts cut you off if you go too fast. Lower is slower but avoids cut-offs. 0 means no limit at all.
