@@ -60,6 +60,34 @@ API keys or run models on your own machine.
 > changed, is documented for both humans and developers in
 > [DOCUMENTATION.dual-track.md](Changelogs/DOCUMENTATION.dual-track.md), per this
 > project's [Open Source Philosophy](PHILOSOPHY.md).
+>
+> **What is inherited and what is not**, since a fork's history is easy to
+> misread. Upstream's last commit was **29 July 2025**; the revival began
+> **20 July 2026**, after the project had sat archived for a year. Measured
+> against that final upstream commit:
+>
+> | | |
+> |---|---|
+> | New files added by the revival | **679** |
+> | Upstream files modified | **104** |
+> | Upstream files deleted | **5** |
+> | Commits, revival / upstream | **406 / 185** |
+> | Lines added — program code | **50,820** |
+> | Lines added — tests | **32,643** across 236 test files |
+> | Lines added — documentation | **37,788** |
+>
+> Read the deletion count first. **Five files.** The revival did not rewrite
+> somebody's bad code — it inherited a working program that had been abandoned,
+> left it almost entirely intact, and built on top of it. Nearly everything here
+> is *additional*: providers that did not exist in 2025, the whole test suite,
+> the cost and connection controls, the research tooling, and the documentation.
+>
+> The original is credited in `LICENSE` and stays there. It is the foundation,
+> not a starting point that had to be repaired.
+>
+> Counted 20 August 2026 at v0.1.111, and reproducible — `a33e13b` is upstream's
+> final commit:
+> `git diff --shortstat a33e13b HEAD -- '*.go' ':(exclude)*_test.go'`
 
 ## Who this is built for
 
