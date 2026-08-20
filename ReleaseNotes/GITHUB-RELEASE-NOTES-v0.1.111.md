@@ -185,8 +185,26 @@ release's prose** — the comment above it already recorded the first. A naming
 convention changed underneath a pattern anchored to the old one, and the pattern
 kept passing.
 
-Noted and not fixed: the Arch package ships no `pfind` command-line tool of its
-own, while the Debian package does.
+### The Arch package was missing a working search tool
+
+Diffing the two built packages file by file turned up a second thing: the Arch
+package shipped no `pfind` at all, and declared only one of its three
+dependencies.
+
+The missing dependency is the one that matters. The `find` tool — which replaced
+`ls`, `grep` and `glob` — **refuses to run without Python**, and the Arch package
+never said it needed it. `pacman` would report a clean install and the agent
+would then have no search at all.
+
+The Debian dependency list could not simply be copied across: Arch calls that
+package `python`, not `python3`. Copying it verbatim would have turned a silent
+gap into a package that will not install.
+
+Fixed, and verified by downloading the published package back and running its
+search engine on a real file.
+
+**The Debian package was never affected.** If you are on Debian or Ubuntu,
+nothing here changes for you.
 
 ---
 
