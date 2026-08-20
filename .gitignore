@@ -92,6 +92,29 @@ checksums.sha256
 !/scripts/benchmark-tool-discipline.py
 *.sh
 
+# GORILLA: exception (2026-08-20) — build-arch.sh is PUBLISHED. This narrows the
+# "packaging scripts stay untracked" line above; that line still holds for
+# build-deb.sh, build-tarball.sh and the release tooling.
+#
+# WHY THIS ONE. The .deb is a finished artifact and a Debian user never needs the
+# script that made it. Arch is different: the distro's whole convention is that
+# you can read and rebuild the recipe, and the repo already invites exactly that
+# — packaging/PKGBUILD documents `makepkg -si` as install route 1.
+#
+# It also stops a real class of loss. On 2026-08-20 this script was found to be
+# missing pfind entirely and to declare one dependency of three, so `pacman -U`
+# reported a clean install and the find tool then refused to run. The fix lived
+# only on the build machine. An untracked file has no history, no diff and no
+# backup: if this machine dies the recipe dies with it, and the .deb-only
+# survivors would not reveal what the Arch package was supposed to contain.
+#
+# SAFE TO PUBLISH, checked rather than assumed: no credentials, no API keys, no
+# internal paths (everything is relative to $ROOT). The only personal datum is
+# the packager e-mail, which is already public in packaging/PKGBUILD line 1, in
+# every commit author, and in the packager field of every Arch package already
+# shipped — where it is meant to be, so users know who built it.
+!/scripts/build-arch.sh
+
 # Third-party leaked prompts kept LOCAL for study, not redistributed
 system-prompts/reference/
 
