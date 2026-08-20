@@ -332,9 +332,34 @@ func (m *editorCmp) Init() tea.Cmd {
 //
 // These open a local dialog and send nothing to the model, so letting them
 // through cannot interleave with a request in flight.
+// EXTENDED 2026-08-20, same complaint, wider: a model caught in a tool loop
+// left the user unable to change model or trim the tool set until it finished.
+// "I can't change model, I can't modify context, I just have to wait for it to
+// finish" is the failure the allowlist exists to prevent, and it only covered
+// the helper-management commands.
+//
+// Only /context (with its aliases) was added, and only because the machinery
+// already makes it safe: the loadout dialog is pure in-TUI state, and applying
+// it goes through RebuildProvider, which DEFERS when a turn is in flight
+// (pendingRebuild, drained on completion). So trimming the tool set mid-loop is
+// recorded now and takes effect when the turn ends.
+//
+// /model and /models were added here and REMOVED again on the same day. Opening
+// the dialog is inert, but CHOOSING from it calls CoderAgent.Update() and swaps
+// the provider out from under a request already in flight.
+// TestSendingCommandsAreStillGated had said so all along and it was right; the
+// criterion is the command's CONSEQUENCE, not how its dispatch looks.
+//
+// Deliberately NOT added: /providers, /switch and /connection. Those hand the
+// terminal over with tea.Exec to run a full-screen picker, and doing that while
+// a stream is writing to the same terminal corrupts the display.
+//
+// Also note esc already cancels the running turn (CoderAgent.Cancel, see
+// page/chat.go) — stopping was never blocked, only changing settings was.
 var controlCommands = map[string]bool{
 	"tasks": true, "task": true, "agents": true, "kill": true,
 	"help": true, "commands": true,
+	"context": true, "loadout": true, "tokens": true,
 }
 
 func (m *editorCmp) send() tea.Cmd {
@@ -352,7 +377,7 @@ func (m *editorCmp) send() tea.Cmd {
 	}
 
 	if m.app.CoderAgent.IsSessionBusy(m.session.ID) {
-		return util.ReportWarn("Agent is working, please wait... (/tasks still works — it is how you stop helpers)")
+		return util.ReportWarn("Agent is working. esc cancels it. /model, /context and /tasks still work.")
 	}
 
 	value := m.textarea.Value()

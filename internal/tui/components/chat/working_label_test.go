@@ -13,9 +13,16 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/opencode-ai/opencode/internal/config"
 )
 
 func TestWorkingLabelIsAlwaysAShortCounter(t *testing.T) {
+	// GORILLA OVERRIDE (2026-08-20): state the profile explicitly. The label now
+	// carries a short delivery hint on the non-streaming profiles, so this test
+	// silently depended on whichever profile a previously-run test had left in
+	// the package variable. Being explicit makes it order-independent.
+	config.UseConnProfileForTest(t, config.ProfileModest)
 	m := &messagesCmp{}
 
 	// Early on: phase plus a counter, so the screen is visibly ticking.
@@ -70,6 +77,7 @@ func TestToolWaitPhasesStillCount(t *testing.T) {
 // The very first frame of a phase has no stamped start time; it must read as the
 // bare phase name, never "(0s)" noise or a panic on the zero time.
 func TestZeroElapsedIsJustThePhaseName(t *testing.T) {
+	config.UseConnProfileForTest(t, config.ProfileModest)
 	m := &messagesCmp{}
 	if got := m.workingLabel("Generating...", 0); got != "Generating..." {
 		t.Errorf("zero elapsed should be the bare phase, got %q", got)

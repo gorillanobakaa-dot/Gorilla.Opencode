@@ -285,12 +285,19 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.coldStartWarned && shouldColdStartWarn(m.taskLabel, m.elapsedInPhase()) {
 			m.coldStartWarned = true
 			// Echo: the sentence is longer than the status bar can show, and the
-			// half it drops ("First reply can take a minute...") is the half that
-			// tells the user what to do — so it also goes into the transcript in
-			// full. See util.ReportInfoEcho.
-			cmds = append(cmds, util.ReportInfoEcho(
-				"🦍 Still waiting on the model — a quiet endpoint is usually warming up, not "+
-					"stuck. First reply can take a minute on a shared/free model. Press esc to cancel."))
+			// half it drops is the half that tells the user what to do — so it also
+			// goes into the transcript in full. See util.ReportInfoEcho.
+			//
+			// GORILLA OVERRIDE (2026-08-20): WHICH sentence depends on whether
+			// replies are streamed, and getting this wrong was a real regression.
+			// The original message treats silence as a symptom ("a quiet endpoint
+			// is usually warming up"). On the slow connection profiles streaming
+			// is off, so NOTHING arrives until the whole answer is finished —
+			// silence is the DESIGNED behaviour, not evidence of a stall. Firing
+			// the old warning there told users on a healthy fast link that their
+			// endpoint was struggling, every single turn, and sent them hunting a
+			// connection fault that did not exist.
+			cmds = append(cmds, util.ReportInfoEcho(coldStartMessage()))
 		}
 		s, cmd := m.spinner.Update(msg)
 		m.spinner = s
@@ -523,6 +530,46 @@ func hasUnfinishedToolCalls(messages []message.Message) bool {
 // most needs telling.
 const coldStartHint = 12 * time.Second
 
+// coldStartMessage explains a long quiet phase. There are two, because there are
+// two different causes and they need different advice.
+//
+// Streaming on: silence means nothing has come back yet, which usually IS a cold
+// endpoint. Streaming off (the austere and constrained connection profiles):
+// silence is expected for the whole generation, because the reply is delivered in
+// one piece. Telling someone on a healthy link that their endpoint is warming up
+// is worse than saying nothing.
+func coldStartMessage() string {
+	if config.StreamRepliesEnabled() {
+		return "🦍 Still waiting on the model — a quiet endpoint is usually warming up, not " +
+			"stuck. First reply can take a minute on a shared/free model. Press esc to cancel."
+	}
+	return "🦍 The quiet is expected here. Your connection profile receives the whole answer " +
+		"in one piece instead of word by word, so nothing appears until it is finished — that " +
+		"uses about 27 times less data for the same reply. This is not a stalled connection. " +
+		"To watch it type instead, pick a faster profile with /connection. Press esc to cancel."
+}
+
+// arrivesWholeSuffix is the FOOTER half of the same message. It must stay short:
+// the footer is exactly FooterReservedRows (1) tall and lipgloss WRAPS rather
+// than truncates, so a long string here becomes a second row and breaks the
+// cursor-erase invariant printer.go depends on. The full sentence goes to the
+// transcript via coldStartMessage.
+func arrivesWholeSuffix() string {
+	if config.StreamRepliesEnabled() {
+		return ""
+	}
+	// Kept to a few characters on purpose. working_label_test.go caps the whole
+	// label at 32 bytes because the footer is one row and lipgloss WRAPS; the
+	// first version of this suffix was 23 bytes and pushed the worst case to 42,
+	// which would have become a second row. The full sentence is in the toast.
+	// ASCII ONLY. The first version used a middot separator and
+	// TestNothingThatDrawsUsesAmbiguousWidthCharacters rejected it: U+00B7 is
+	// East Asian Ambiguous, so lipgloss measures 1 column where a CJK-configured
+	// terminal draws 2, and the footer silently wraps into a second row. See
+	// internal/tui/styles/ascii.go.
+	return " (one piece)"
+}
+
 // elapsedInPhase is how long the current step has been running, or 0 if the
 // clock is not set (the first frame of a phase, before Update has stamped it).
 func (m *messagesCmp) elapsedInPhase() time.Duration {
@@ -559,10 +606,14 @@ func (m *messagesCmp) workingLabel(task string, elapsed time.Duration) string {
 	if task == "" {
 		return ""
 	}
-	if secs := int(elapsed.Seconds()); secs > 0 {
-		return fmt.Sprintf("%s (%ds)", task, secs)
+	suffix := ""
+	if isPreTokenPhase(task) {
+		suffix = arrivesWholeSuffix()
 	}
-	return task
+	if secs := int(elapsed.Seconds()); secs > 0 {
+		return fmt.Sprintf("%s (%ds)%s", task, secs, suffix)
+	}
+	return task + suffix
 }
 
 func (m *messagesCmp) working() string {
