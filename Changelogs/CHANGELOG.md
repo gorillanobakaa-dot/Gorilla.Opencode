@@ -1,3 +1,39 @@
+## v0.1.109 — 2026-08-20 — a message that told people their connection was broken when it was fine
+
+**Plain-language version:** yesterday's release made answers arrive all at once
+on the two slowest connection settings, because sending a reply word by word
+costs 27 times more data. That part works. What it broke was a warning message.
+
+The program watches for a worrying silence: if nothing has come back after
+twelve seconds it says so, because on a shared or free AI service that usually
+means the service is cold and warming up. That made sense when answers always
+arrived word by word, because the first word turning up was itself proof that
+something was alive. With the answer now arriving in one piece, nothing turns up
+until it is finished — so the program saw silence, decided the connection was in
+trouble, and said so on every single message, on a fast connection, with a
+healthy service. It was seen firing twice inside one answer.
+
+The wording was the damaging part. "A quiet endpoint is usually warming up, not
+stuck" is a diagnosis, and it was the wrong one: it sends someone hunting a
+broken connection that was never broken. There are now two messages. On the fast
+settings the original one stays, because silence there really is a symptom. On
+the slow settings it says the quiet is expected, the whole answer is coming at
+once, that this uses 27 times less data, that nothing is stalled, and how to
+switch back. The short form is in the bottom line, the full sentence in the
+conversation, because the bottom line is one row and a long sentence would break
+the display.
+
+Also fixed: a model stuck in a loop used to leave you unable to change anything
+until it finished. `/context` now works while the AI is working, so you can
+switch off the tools it is looping on — the change is recorded straight away and
+applied when the current answer ends. And the busy message now mentions that
+escape cancels, which it always did; nothing had ever said so.
+
+**Not changed, deliberately:** you still cannot switch model mid-answer. Opening
+the model list is harmless, but choosing from it replaces the connection the
+running request is using. Press escape first, then switch — the safer order
+anyway.
+
 ## v0.1.108 — 2026-08-20 — your connection is now a setting, and answers can arrive in one piece
 
 **Plain-language version:** this program is built for people whose internet is a
