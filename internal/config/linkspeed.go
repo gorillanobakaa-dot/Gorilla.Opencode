@@ -192,7 +192,10 @@ func writeLinkFile(f linkFile) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(ConfigBase(), 0o755); err != nil {
+	// 0700, not 0755: this directory holds config.json, which carries provider
+	// API keys. 0755 lets any other account on the machine list it. Flagged by
+	// gosec on the diff and it is right.
+	if err := os.MkdirAll(ConfigBase(), 0o700); err != nil {
 		return err
 	}
 	return os.WriteFile(connProfilePath(), append(data, '\n'), 0o600)
