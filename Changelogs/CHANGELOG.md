@@ -1,3 +1,48 @@
+## v0.1.110 — 2026-08-20 — a model list you can finally curate
+
+**Plain-language version:** some providers offer hundreds of models, and the
+list they produce is long enough to be useless. There was no way to prune it.
+You could bookmark models one at a time, but you could not remove one, could not
+refresh the list to see what a provider actually serves today, and could not
+start again from a clean slate. A picker that cannot pick, purge or update is
+missing the parts that make it a picker.
+
+Now: mark several models with x, add them all to your list with a, hide the ones
+you never want to see with d, and review or restore anything you hid by pressing
+H. `/purge` empties the downloaded lists and `/update` fetches them again. Your
+own list and your hidden models survive both.
+
+Hiding had to be permanent to be worth anything. Nothing in this program had
+ever removed a model — the list is built from providers compiled into the app
+and added to by every refresh — so a plain deletion is undone by the next launch
+and by the next refresh. You would clear three hundred entries on Monday and
+find them all back on Tuesday. Hidden models are recorded on disk and honoured
+by refresh, which is the whole point.
+
+Nothing is hidden automatically. On the same day, five models we tried to test
+came back unreachable and we could not tell whether they were broken or whether
+our own free allowance had run out — a provider having a bad afternoon is not
+evidence a model is finished.
+
+The picker also uses the whole window now. It was capped at thirty rows however
+large your screen, which threw away seven usable rows on a 1600x900 display and
+pushed models behind a scroll — the exact wall the list exists to remove.
+
+**And an embarrassing fix.** The connection speed estimate added two releases
+ago never ran. Not once. The code was written, tested and shipped, and nothing
+ever called it, so the picker said "nothing measured yet" forever. It works now,
+and the repair comes with a test that sends a real request through the real code
+and fails if no measurement is recorded — the earlier tests passed because they
+called the measuring function directly, proving it worked while never asking
+whether anything used it.
+
+**Also published:** measurements showing that some AI models run tools nobody
+asked for. A two-word greeting made one search the web for "Debian kernel
+configuration for beginners" — not one word of which came from the user. We
+checked whether our own instructions caused it. They do not: other models read
+the identical instructions and behave correctly. The findings and the script to
+reproduce them are in the repository.
+
 ## v0.1.109 — 2026-08-20 — a message that told people their connection was broken when it was fine
 
 **Plain-language version:** yesterday's release made answers arrive all at once
