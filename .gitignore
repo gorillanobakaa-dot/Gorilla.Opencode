@@ -153,3 +153,10 @@ LESSONS/
 # dual_track.py working files — local only, never published
 PAYLOAD.*
 PRECHECK.json
+
+# GORILLA (2026-08-20): compiled Python bytecode. Created whenever anything
+# imports a .py in the tree - a test harness importing pfind.py was enough - and
+# a `git add -A` sweeps it straight in. A 168 KB .pyc was committed exactly that
+# way and had to be reset. Build junk, never source.
+__pycache__/
+*.pyc
