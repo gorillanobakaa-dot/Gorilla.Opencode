@@ -454,5 +454,9 @@ verification results, and honest limitations:
 
 ## License
 
-MIT, unchanged from the original. © 2025 Kujtim Hoxha (original),
-revival patches © 2026 contributors, same license.
+MIT, unchanged from the original. © 2025 Kujtim Hoxha (original OpenCode),
+© 2026 gorillanobakaa (the revival and subsequent work), same license.
+
+The `LICENSE` file names both holders. The original notice stays exactly where
+it is - MIT requires it to be retained, and it is the reason this fork can exist
+at all.

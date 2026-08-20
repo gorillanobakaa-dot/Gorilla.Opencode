@@ -15,19 +15,53 @@
 #        sudo pacman -U gorilla-opencode-${pkgver}-1-x86_64.pkg.tar.zst
 
 pkgname=gorilla-opencode
-pkgver=0.1.85
+# GORILLA OVERRIDE (2026-08-20): this sat at 0.1.85 while releases reached
+# 0.1.111 - twenty-six behind. It is the file the README points Arch users at as
+# install route 1, so following the project's own instructions built a version
+# from July. Nothing checked it, because a stale version number is still a valid
+# PKGBUILD: makepkg succeeds, the package installs, and only the version string
+# betrays it. BUMP THIS WITH EVERY RELEASE; TestPKGBUILDTracksTheCurrentRelease
+# now fails the build if it drifts.
+pkgver=0.1.111
 pkgrel=1
 pkgdesc="Terminal AI coding agent (revived original OpenCode) — bring your own API keys"
 arch=('x86_64')
 url="https://github.com/gorillanobakaa-dot/Gorilla.Opencode"
 license=('MIT')
-depends=('lynx')
+# GORILLA OVERRIDE (2026-08-20): three dependencies, not one. This declared lynx
+# alone while the .deb declared lynx, python3 and ripgrep, so makepkg produced a
+# package that installed cleanly and then had no working search.
+#
+#   python   - HARD. internal/llm/tools/find.go REFUSES without it: "the find
+#              tool needs python3 (its search engine is a Python program
+#              embedded in this binary)". find replaced ls, grep and glob, so
+#              without python the agent has no search at all.
+#              NOTE THE NAME: Arch ships this as `python`, NOT `python3`.
+#              Copying the Debian string across verbatim yields an unsatisfiable
+#              dependency - a silent gap turned into a package that will not
+#              install.
+#   ripgrep  - pfind.py accelerates through it when present (HAVE_RG) and works
+#              without it. Declared anyway to match the .deb: per the 2026-08-09
+#              lynx decision, a promise that only holds for people who install
+#              the expert way is not a promise.
+depends=('lynx' 'python' 'ripgrep')
 makedepends=('go>=1.21')
 # GORILLA: source is the tagged tarball from GitHub. The sha256sum covers the
 # archive as downloaded; regenerate with `makepkg -g` after a version bump.
 source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gorillanobakaa-dot/Gorilla.Opencode/archive/refs/tags/v${pkgver}.tar.gz")
-# Update this with: makepkg -g
-sha256sums=('SKIP')
+# GORILLA OVERRIDE (2026-08-20): a real checksum, not SKIP.
+#
+# SKIP disables integrity checking entirely - makepkg accepts whatever arrives
+# from the network. The comment above it had said "regenerate with makepkg -g"
+# since the file was written, and nobody ever did. On a project whose SECURITY.md
+# invites people to verify what they downloaded, shipping a recipe that verifies
+# nothing is the "transparent in theory, closed door in practice" failure
+# PHILOSOPHY.md exists to prevent.
+#
+# Measured against the published v0.1.111 tarball, 17,572,729 bytes.
+# REGENERATE ON EVERY VERSION BUMP - a stale sum fails loudly, which is correct,
+# but it fails the user rather than the person who forgot.
+sha256sums=('0408d175f06a6c32f91a08aca01e71551e0c89bb3485d1a1792d89f14747c55b')
 
 build() {
     cd "Gorilla.Opencode-${pkgver}"
@@ -67,23 +101,64 @@ package() {
         "packaging/setup-searxng.sh" \
         "${pkgdir}/usr/share/${pkgname}/setup-searxng.sh"
 
+    # GORILLA OVERRIDE (2026-08-20): pfind. Absent from this file entirely until
+    # today, and from scripts/build-arch.sh too - build-deb.sh gained it on
+    # 2026-08-17 when the engine was vendored, and neither Arch recipe was
+    # updated. Three packaging descriptions, all drifted apart; the same
+    # per-format-copy failure that shipped a launcher with no plain-mode action
+    # in v0.1.43.
+    #
+    # The same bytes are embedded in the binary (find.go go:embed), so this copy
+    # is not what makes the tool work. It exists so users get a `pfind` CLI of
+    # their own and so the search engine is inspectable as a plain file.
+    install -Dm644 \
+        "internal/llm/tools/pfind.py" \
+        "${pkgdir}/usr/share/${pkgname}/pfind.py"
+    install -d "${pkgdir}/usr/bin"
+    cat > "${pkgdir}/usr/bin/pfind" <<'WRAP'
+#!/bin/sh
+exec python3 /usr/share/gorilla-opencode/pfind.py "$@"
+WRAP
+    chmod 755 "${pkgdir}/usr/bin/pfind"
+
     # Documentation
     install -Dm644 README.md       "${pkgdir}/usr/share/doc/${pkgname}/README.md"
     install -Dm644 LICENSE         "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
     install -Dm644 PHILOSOPHY.md   "${pkgdir}/usr/share/doc/${pkgname}/PHILOSOPHY.md"
+    # GORILLA OVERRIDE (2026-08-20): the project-wide dual-track document, which
+    # both binary packages ship and this recipe did not. Found by diffing the
+    # simulated package() output against the built .pkg.tar.zst rather than by
+    # reading the two files.
+    install -Dm644 Changelogs/DOCUMENTATION.dual-track.md \
+        "${pkgdir}/usr/share/doc/${pkgname}/DOCUMENTATION.dual-track.md"
 
-    [ -f docs/CONTROL-AND-COST.md ] && install -Dm644 \
-        docs/CONTROL-AND-COST.md \
-        "${pkgdir}/usr/share/doc/${pkgname}/CONTROL-AND-COST.md"
-    [ -f docs/SETTINGS.md ] && install -Dm644 \
-        docs/SETTINGS.md \
-        "${pkgdir}/usr/share/doc/${pkgname}/SETTINGS.md"
+    # GORILLA OVERRIDE (2026-08-20): the full documentation set, matching
+    # scripts/build-arch.sh and the .deb. This shipped four documents where the
+    # binary packages ship sixty-odd, so someone who built from source got the
+    # program without the commands reference, the measured footprint, the
+    # satellite guide, the security audit or any of the OSINT research
+    # documentation. The whole "why and how" is the deliverable here, not a
+    # bonus attached to one install route.
+    for d in CONTROL-AND-COST SETTINGS COMMANDS FOOTPRINT SATELLITE SHELL-SAFETY \
+             SECURITY-AUDIT-2026-08-18 CODE-REVIEW SESSIONS-AND-STORAGE \
+             OSINT-RESEARCH OSINT-DOCTRINE OSINT-SOURCE-CATALOG FIND-TOOL-METRICS; do
+        [ -f "docs/$d.md" ] && install -Dm644 "docs/$d.md" \
+            "${pkgdir}/usr/share/doc/${pkgname}/$d.md"
+    done
 
     for cl in Changelogs/CHANGELOG*.md; do
         [ -f "$cl" ] && install -Dm644 "$cl" \
             "${pkgdir}/usr/share/doc/${pkgname}/$(basename "$cl")"
     done
-    for rn in Changelogs/*release-notes.md; do
+    # GORILLA OVERRIDE (2026-08-20): *release-notes*.md, not *release-notes.md.
+    # THIRD copy of one bug - build-deb.sh and build-arch.sh carried it too. The
+    # dual-track docs split into v<ver>-release-notes.layman.md and
+    # .developer.md, and the anchored glob matches NEITHER, so every package
+    # built after the split shipped sixty older releases' notes and none for the
+    # release it actually was. The full-looking directory is what kept it
+    # invisible: grepping for "release-notes" returned plenty and read as a pass.
+    # Verify by the SPECIFIC version, never by the class of file.
+    for rn in Changelogs/*release-notes*.md; do
         [ -f "$rn" ] && install -Dm644 "$rn" \
             "${pkgdir}/usr/share/doc/${pkgname}/$(basename "$rn")"
     done
