@@ -168,6 +168,28 @@ Decided one at a time instead:
 
 ---
 
+## A packaging bug found while cutting this release
+
+Both packaging scripts had quietly stopped putting the current release's notes
+**inside the package**. The dual-track documents were split into two files a few
+releases ago, and the pattern that collects them was still anchored to the old
+single-file name — so it matched neither.
+
+It stayed invisible because the folder still looked full: sixty older releases'
+notes were all sitting there. Checking that *something* was present passed.
+Checking that *this release* was present did not.
+
+Fixed in both the Debian and the Arch package, and verified in the built
+artifacts. **This is the second time that one line has dropped the current
+release's prose** — the comment above it already recorded the first. A naming
+convention changed underneath a pattern anchored to the old one, and the pattern
+kept passing.
+
+Noted and not fixed: the Arch package ships no `pfind` command-line tool of its
+own, while the Debian package does.
+
+---
+
 ## What is NOT verified
 
 - The meter was confirmed by diffing the drawing code against the pre-sweep
