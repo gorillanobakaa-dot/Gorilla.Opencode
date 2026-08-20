@@ -155,7 +155,8 @@ def main():
     if not KEY:
         print("Set NIM_KEY (or LOCAL_ENDPOINT_API_KEY) first.", file=sys.stderr)
         return 2
-    system = open(PROMPT_FILE).read() + ENV_BLOCK
+    with open(PROMPT_FILE) as fh:
+        system = fh.read() + ENV_BLOCK
     models = args.models or DEFAULT_MODELS
     results = {}
 
