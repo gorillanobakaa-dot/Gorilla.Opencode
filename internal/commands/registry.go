@@ -287,6 +287,27 @@ var All = []Command{
 			"remove one of yours for good, or space to just switch it off.",
 	},
 	{
+		Name:    "purge",
+		Aliases: []string{"purgemodels", "purge-models"},
+		Group:   GroupModels,
+		Summary: "Empty the downloaded model lists and start clean.",
+		Detail: "Providers like OpenRouter offer hundreds of models, and the list " +
+			"gets long enough to be useless. This clears the downloaded lists so " +
+			"the picker only shows the models that come with the app. Your own " +
+			"bookmarked list is NOT touched, and neither is anything you hid. " +
+			"Run /update afterwards to fetch the lists again.",
+	},
+	{
+		Name:    "update",
+		Aliases: []string{"updatemodels", "update-models", "refresh"},
+		Group:   GroupModels,
+		Summary: "Download fresh model lists from your providers.",
+		Detail: "Asks each provider what it serves today and rebuilds the list, so " +
+			"retired models stop appearing and new ones show up. Models you hid " +
+			"stay hidden - refreshing does not undo that. Pair it with /purge for " +
+			"a clean slate: purge, then update.",
+	},
+	{
 		Name:    "connection",
 		Aliases: []string{"conn", "link"},
 		Group:   GroupModels,

@@ -19,3 +19,12 @@ func UseConnProfileForTest(t *testing.T, id ConnProfileID) {
 	}
 	t.Cleanup(func() { _ = SetConnProfile(prev) })
 }
+
+// ResetLinkSamplesForTest clears the in-memory samples so a test starts from a
+// known state. Exported for the provider package's reachability test.
+func ResetLinkSamplesForTest() {
+	linkMu.Lock()
+	linkSamples = nil
+	linkLoaded = true // do not read whatever is on disk
+	linkMu.Unlock()
+}

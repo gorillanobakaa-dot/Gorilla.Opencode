@@ -27,7 +27,9 @@ package provider
 
 import (
 	"context"
+	"io"
 	"net"
+	"net/http"
 	"sync/atomic"
 	"time"
 
@@ -97,4 +99,52 @@ func (s *linkSampleSpan) end() {
 		return
 	}
 	config.RecordTransfer(wireBytesIn.Load()-s.startWire, time.Since(s.start))
+}
+
+// linkSampleTransport BRACKETS a request so the sample has a start and an end.
+//
+// WHY THIS EXISTS SEPARATELY FROM THE SOCKET COUNTER, and why its absence was a
+// silent failure: the socket counter (countingConn) supplies the BYTES, but
+// something has to say when a response began and when it finished, or no sample
+// is ever taken. An earlier version counted bytes in a RoundTripper, which was
+// wrong because http.Transport decompresses responses above that layer. Fixing
+// that moved the counting to the socket — and deleted the RoundTripper that was
+// calling beginLinkSample, without replacing it. The build stayed green because
+// an unused unexported function is legal Go and go vet does not flag it, and the
+// tests passed because they called beginLinkSample DIRECTLY and so never asked
+// whether production code reaches it.
+//
+// Result: the whole passive measurement shipped dead in v0.1.108 and v0.1.109.
+// connection.json had no samples key, EstimatedKBps always returned false, the
+// picker said "Nothing measured yet" forever, and the two-rung mismatch trigger
+// could never fire. See TestARealRequestRecordsASample, which drives a request
+// through the transport instead of calling the helper.
+type linkSampleTransport struct{ base http.RoundTripper }
+
+func newLinkSampleTransport(base http.RoundTripper) http.RoundTripper {
+	return &linkSampleTransport{base: base}
+}
+
+func (t *linkSampleTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	span := beginLinkSample()
+	resp, err := t.base.RoundTrip(req)
+	if err != nil || resp == nil || resp.Body == nil {
+		span.end() // nothing will close a body that does not exist
+		return resp, err
+	}
+	resp.Body = &spanClosingBody{ReadCloser: resp.Body, span: span}
+	return resp, nil
+}
+
+// spanClosingBody ends the sample when the body is closed — the only moment both
+// the elapsed time and the wire total are final. A body abandoned early still
+// reports what arrived: those bytes really did take that long.
+type spanClosingBody struct {
+	io.ReadCloser
+	span *linkSampleSpan
+}
+
+func (b *spanClosingBody) Close() error {
+	b.span.end()
+	return b.ReadCloser.Close()
 }

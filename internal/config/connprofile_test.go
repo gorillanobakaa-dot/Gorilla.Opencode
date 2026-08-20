@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -162,5 +163,31 @@ func TestRetryCeilingIsDeclaredPerProfile(t *testing.T) {
 		if p.MaxRetries != w {
 			t.Errorf("%s MaxRetries=%d, want %d", id, p.MaxRetries, w)
 		}
+	}
+}
+
+// Switching profile changes how answers ARRIVE, which the user sees immediately.
+// The confirmation has to say so, and say which way the cost moved — "Connection
+// profile updated" left someone watching replies change behaviour with nothing
+// on screen explaining why.
+func TestSwitchSummarySaysWhatChangedAndWhichWay(t *testing.T) {
+	slowToFast := SwitchSummary(ProfileAustere, ProfileUnconstrained)
+	for _, want := range []string{"Unconstrained", "faster", "more data", "type out"} {
+		if !strings.Contains(slowToFast, want) {
+			t.Errorf("slow->fast summary should mention %q: %q", want, slowToFast)
+		}
+	}
+	fastToSlow := SwitchSummary(ProfileUnconstrained, ProfileAustere)
+	for _, want := range []string{"Austere", "slower", "less data", "one piece", "27x"} {
+		if !strings.Contains(fastToSlow, want) {
+			t.Errorf("fast->slow summary should mention %q: %q", want, fastToSlow)
+		}
+	}
+	if slowToFast == fastToSlow {
+		t.Error("the two directions must not read the same")
+	}
+	// Both must carry the concrete numbers, not just adjectives.
+	if !strings.Contains(fastToSlow, "15m0s") || !strings.Contains(fastToSlow, "0.5 MB") {
+		t.Errorf("summary should carry the actual limits: %q", fastToSlow)
 	}
 }

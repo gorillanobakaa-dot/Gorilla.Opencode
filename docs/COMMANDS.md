@@ -27,6 +27,8 @@ cost before they start. Everything else is local.
 | `/init` | Write the project notes file the AI reads first. |
 | `/model` · `/models` | Choose which AI answers you. |
 | `/connect` · `/connections` | Add or manage your AI accounts and keys. |
+| `/purge` · `/purgemodels` `/purge-models` | Empty the downloaded model lists and start clean. |
+| `/update` · `/updatemodels` `/update-models` `/refresh` | Download fresh model lists from your providers. |
 | `/connection` · `/conn` `/link` | Tell the app how fast your internet is. |
 | `/providers` · `/provider` `/switch` | Switch to a different AI provider. |
 | `/login` | Sign in with your Google account. |
@@ -147,6 +149,22 @@ Bigger models are better at hard problems and cost more; small ones are cheap an
 **Add or manage your AI accounts and keys.**
 
 Where you paste an API key, add a local server such as Ollama or NVIDIA, or turn a connection off without deleting it. Adding a connection makes its models appear in /model. The list shows the servers you have added as well as the ones on offer; press d to remove one of yours for good, or space to just switch it off.
+
+### `/purge`
+
+*Also: `/purgemodels`, `/purge-models`*
+
+**Empty the downloaded model lists and start clean.**
+
+Providers like OpenRouter offer hundreds of models, and the list gets long enough to be useless. This clears the downloaded lists so the picker only shows the models that come with the app. Your own bookmarked list is NOT touched, and neither is anything you hid. Run /update afterwards to fetch the lists again.
+
+### `/update`
+
+*Also: `/updatemodels`, `/update-models`, `/refresh`*
+
+**Download fresh model lists from your providers.**
+
+Asks each provider what it serves today and rebuilds the list, so retired models stop appearing and new ones show up. Models you hid stay hidden - refreshing does not undo that. Pair it with /purge for a clean slate: purge, then update.
 
 ### `/connection`
 

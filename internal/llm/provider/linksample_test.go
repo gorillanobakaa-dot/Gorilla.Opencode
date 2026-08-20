@@ -28,7 +28,7 @@ func (c *fakeConn) Close() error { return nil }
 // The count must happen at the socket, so it sees WIRE bytes rather than the
 // inflated body a RoundTripper would see above Go's response decompression.
 func TestSocketCountingSeesWireBytes(t *testing.T) {
-	before := wireBytesIn.Load()
+	before := wireBytesIn.Load() // delta, so no reset needed here
 	dial := countingDialContext(func(context.Context, string, string) (net.Conn, error) {
 		return &fakeConn{payload: make([]byte, 8*1024)}, nil
 	})
@@ -51,6 +51,12 @@ func TestSocketCountingSeesWireBytes(t *testing.T) {
 // over-report speed, which is the direction that causes failed turns.
 func TestOverlappingRequestsAreNotSampled(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// Reset FIRST. The samples live in a package variable, so without this the
+	// assertion below reads a sample left by whichever test ran before — which
+	// is exactly how this failed once the reachability test was added. Third
+	// instance of shared-state pollution in this session; the state is global,
+	// so every test that reads it must start from a known point.
+	resetLinkStateForTest()
 	a := beginLinkSample()
 	b := beginLinkSample() // overlaps a
 	wireBytesIn.Add(64 * 1024)

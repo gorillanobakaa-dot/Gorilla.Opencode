@@ -75,6 +75,10 @@ var ReopenProviderPortal func() error
 // internal/tui cannot import cmd.
 var ReopenConnectionPicker func() error
 
+// ConnectionSwitchSummary reports what a profile change actually altered. Set by
+// cmd, like ReopenConnectionPicker, because internal/tui cannot import cmd.
+var ConnectionSwitchSummary = func() string { return "" }
+
 // portalExec runs the provider portal while bubbletea has released the
 // terminal. The portal is its own tea.Program and needs the screen to itself;
 // tea.Exec is the same mechanism the editor already uses for $EDITOR.
@@ -1494,6 +1498,29 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					Msg:  "Provider updated — use /models if you want a different model from it.",
 				}
 			})
+		case "purge", "purgemodels", "purge-models":
+			// GORILLA OVERRIDE (2026-08-20): clears the FETCHED catalogues only.
+			// Compiled-in providers, bookmarks and the hidden list all survive -
+			// see internal/llm/models/purge.go for why each is spared.
+			if a.app.CoderAgent != nil && a.app.CoderAgent.IsBusy() {
+				return a, util.ReportWarn("finish or cancel the current turn before purging the model lists")
+			}
+			res := models.PurgeFetchedCatalogues(config.CacheBase())
+			if res.RemovedModels == 0 && len(res.FilesDeleted) == 0 {
+				return a, util.ReportInfo("nothing to purge - no downloaded model lists were present")
+			}
+			return a, util.ReportInfo(fmt.Sprintf(
+				"purged %d downloaded models, %d left. Your bookmarks and hidden list are untouched. Run /update to fetch fresh lists.",
+				res.RemovedModels, res.Kept))
+
+		case "update", "updatemodels", "update-models", "refresh":
+			// Refresh is a network round trip per provider, so it must not run
+			// while a turn is in flight competing for the same link.
+			if a.app.CoderAgent != nil && a.app.CoderAgent.IsBusy() {
+				return a, util.ReportWarn("finish or cancel the current turn before refreshing the model lists")
+			}
+			return a, a.refreshModelCatalogues()
+
 		case "connection", "conn", "link":
 			// GORILLA OVERRIDE (2026-08-20): /connection — the profile picker.
 			// Dispatch happens through this switch, not the palette: a palette
@@ -1509,10 +1536,11 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if err != nil {
 					return util.InfoMsg{Type: util.InfoTypeError, Msg: err.Error()}
 				}
-				return util.InfoMsg{
-					Type: util.InfoTypeInfo,
-					Msg:  "Connection profile updated - it changes waiting and data limits only, not what the AI can do.",
+				msgText := ConnectionSwitchSummary()
+				if msgText == "" {
+					msgText = "Connection profile unchanged."
 				}
+				return util.InfoMsg{Type: util.InfoTypeInfo, Msg: msgText}
 			})
 		case "usage":
 			// GORILLA OVERRIDE: /usage — Antigravity weekly quota. Typed commands
@@ -2993,4 +3021,36 @@ func (a appModel) assemblyWindow() int {
 	// prompt that exactly fills the window leaves no room for the answer, which
 	// is the same mistake the original run made from the other direction.
 	return int(float64(a.app.CoderAgent.Model().ContextWindow) * 0.66)
+}
+
+// refreshModelCatalogues re-fetches every provider catalogue that can be
+// fetched, and reports what changed in the units a user cares about.
+//
+// GORILLA OVERRIDE (2026-08-20): the pair to /purge. Refresh already existed as
+// two separate CLI subcommands (`models refresh`, `models refresh-antigravity`)
+// which meant quitting the session to run them — so in practice nobody did, and
+// the picker showed whatever was cached the day it was first populated,
+// including models the provider had since retired.
+//
+// Hidden models stay hidden across a refresh: the picker filters on
+// config.IsModelHidden at list time, so re-adding an entry to the registry does
+// not put it back in front of someone who rejected it. That is the whole reason
+// hiding is a persisted list rather than a deletion.
+func (a *appModel) refreshModelCatalogues() tea.Cmd {
+	return func() tea.Msg {
+		dir := config.CacheBase()
+		var notes []string
+
+		if res, err := models.RefreshOpenRouter(dir); err != nil {
+			notes = append(notes, fmt.Sprintf("OpenRouter: %v", err))
+		} else {
+			notes = append(notes, fmt.Sprintf("OpenRouter: %d usable, %d added, %d gone",
+				res.Usable, len(res.Added), len(res.Removed)))
+		}
+
+		if n := config.HiddenCount(); n > 0 {
+			notes = append(notes, fmt.Sprintf("%d hidden model(s) stayed hidden - press H in /models to review", n))
+		}
+		return util.InfoMsg{Type: util.InfoTypeInfo, Msg: strings.Join(notes, " | ")}
+	}
 }

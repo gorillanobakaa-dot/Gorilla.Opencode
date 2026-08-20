@@ -290,3 +290,47 @@ func StreamRepliesEnabled() bool {
 	}
 	return CurrentConnProfile().Stream
 }
+
+// SwitchSummary is what to tell the user after they change profile.
+//
+// GORILLA OVERRIDE (2026-08-20): the old confirmation said only "Connection
+// profile updated". The owner switched from austere to unconstrained mid-session
+// and the replies visibly changed behaviour — one arriving whole, the next
+// typing itself out — with nothing on screen connecting the two. A setting that
+// silently changes how answers ARRIVE has to say so at the moment it changes,
+// not only on the screen where it was picked.
+//
+// It names the direction of the cost rather than only the new state, because
+// "Broadband" means nothing on its own; "waits less, allows more data, types
+// live" is the thing the user actually experiences.
+func SwitchSummary(from, to ConnProfileID) string {
+	f, okF := lookupConnProfile(from)
+	t, okT := lookupConnProfile(to)
+	if !okT {
+		return "Connection profile updated."
+	}
+	delivery := "answers type out a word at a time"
+	if !t.Stream {
+		delivery = "answers arrive whole, in one piece - about 27x less data"
+	}
+	base := fmt.Sprintf("Now on %s (%s): waits up to %s, allows %.1f MB per message, and %s.",
+		t.Name, t.Rate, t.FirstByte, t.UploadMB, delivery)
+
+	if !okF || from == to {
+		return base
+	}
+	// Say which way the cost moved. profileIndex is 0 = slowest.
+	fi, ti := profileIndex(from), profileIndex(to)
+	switch {
+	case ti > fi && f.Stream != t.Stream:
+		return base + " That is faster and less patient than " + f.Name +
+			", and it will use more data than before because replies now stream."
+	case ti > fi:
+		return base + " That is faster and less patient than " + f.Name + ", and allows more data per message."
+	case ti < fi && f.Stream != t.Stream:
+		return base + " That is slower and more patient than " + f.Name +
+			", and it will use less data than before because replies no longer stream."
+	default:
+		return base + " That is slower and more patient than " + f.Name + ", and allows less data per message."
+	}
+}

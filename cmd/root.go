@@ -344,6 +344,7 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 		// injected here rather than called directly.
 		tui.ReopenProviderPortal = reopenProviderPortal
 		tui.ReopenConnectionPicker = func() error { runConnectionPicker(); return nil }
+		tui.ConnectionSwitchSummary = TakeSwitchSummary
 		zone.NewGlobal()
 		program := tea.NewProgram(
 			tui.New(app),

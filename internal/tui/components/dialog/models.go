@@ -56,7 +56,13 @@ type modelDialogCmp struct {
 	provider           models.ModelProvider
 	availableProviders []models.ModelProvider
 
-	selectedIdx     int
+	selectedIdx int
+	// GORILLA OVERRIDE (2026-08-20): the marked set for multi-select. Keyed by
+	// ModelID rather than list index so a mark survives a provider change, a
+	// search, and the list being rebuilt underneath it. Marking six models
+	// across four providers and losing them on a column change would make the
+	// feature worse than not having it.
+	marked          map[models.ModelID]bool
 	width           int
 	height          int
 	scrollOffset    int
@@ -107,6 +113,13 @@ type modelKeyMap struct {
 	Search key.Binding
 	// GORILLA OVERRIDE: full detail page for the highlighted model.
 	Details key.Binding
+	// GORILLA OVERRIDE (2026-08-20): multi-select. Mark toggles one, AddMarked
+	// acts on all of them at once, HideMarked removes them from every list until
+	// the user restores them, ShowHidden is that review screen.
+	Mark       key.Binding
+	AddMarked  key.Binding
+	HideMarked key.Binding
+	ShowHidden key.Binding
 }
 
 var modelKeys = modelKeyMap{
@@ -150,6 +163,29 @@ var modelKeys = modelKeyMap{
 		key.WithKeys("l"),
 		key.WithHelp("l", "scroll right"),
 	),
+	// GORILLA OVERRIDE (2026-08-20): a picker needs a way to pick MANY. Until
+	// now the only multi-item mechanism was the bookmark list, toggled one model
+	// at a time — so building a shortlist from a 300-entry provider meant 300
+	// separate decisions and no way to see what you had chosen so far.
+	Mark: key.NewBinding(
+		key.WithKeys("x"),
+		key.WithHelp("x", "mark/unmark"),
+	),
+	AddMarked: key.NewBinding(
+		key.WithKeys("a"),
+		key.WithHelp("a", "add marked to your list"),
+	),
+	// Hiding is reversible and reviewable — see ShowHidden. It is never
+	// automatic: a provider having a bad afternoon is not evidence a model is
+	// retired.
+	HideMarked: key.NewBinding(
+		key.WithKeys("d"),
+		key.WithHelp("d", "hide marked"),
+	),
+	ShowHidden: key.NewBinding(
+		key.WithKeys("H"),
+		key.WithHelp("H", "review hidden"),
+	),
 	Bookmark: key.NewBinding(
 		key.WithKeys(" "),
 		key.WithHelp("space", "bookmark / unbookmark"),
@@ -187,9 +223,16 @@ func (m *modelDialogCmp) visibleRows() int {
 	if n < numVisibleModels {
 		n = numVisibleModels
 	}
-	if n > 30 {
-		n = 30
-	}
+	// GORILLA OVERRIDE (2026-08-20): the 30-row ceiling is gone. It was an
+	// arbitrary cap, not a safety one — the frame can never exceed the window
+	// because n is already height MINUS chrome, which is what
+	// TestFooterMustStaySmallerThanTheWindow actually guards. On a 1600x900
+	// terminal (about 50 rows) the cap threw away seven usable rows and pushed
+	// models behind a scroll, which is the wall this list exists to remove.
+	//
+	// A picker gets the whole window on purpose: a known full-screen budget
+	// removes the wrapping question instead of managing it, and the space that
+	// buys is spent on explaining each model rather than on empty margin.
 	return n
 }
 
@@ -232,6 +275,20 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.hScrollOffset = idx
 			m.setupModelsForProvider(ProviderBookmarks)
+			return m, nil
+		case key.Matches(msg, modelKeys.Mark):
+			return m.toggleMarkCurrent()
+		case key.Matches(msg, modelKeys.AddMarked):
+			return m.addMarkedToBookmarks()
+		case key.Matches(msg, modelKeys.HideMarked):
+			return m.hideMarkedOrCurrent()
+		case key.Matches(msg, modelKeys.ShowHidden):
+			idx := findProviderIndex(m.availableProviders, ProviderHidden)
+			if idx < 0 {
+				return m, util.ReportWarn("nothing is hidden - press d on a model to hide it")
+			}
+			m.hScrollOffset = idx
+			m.setupModelsForProvider(ProviderHidden)
 			return m, nil
 		case key.Matches(msg, modelKeys.Bookmark):
 			return m.toggleBookmarkCurrent()
@@ -340,7 +397,10 @@ func (m *modelDialogCmp) toggleBookmarkCurrent() (tea.Model, tea.Cmd) {
 func (m *modelDialogCmp) openSearch() {
 	m.searchDomain = nil
 	for _, p := range m.availableProviders {
-		if p == ProviderBookmarks {
+		// Both virtual columns are excluded from search: bookmarks because its
+		// entries already appear under their own provider, and hidden because
+		// searching should not surface what the user asked not to see.
+		if p == ProviderBookmarks || p == ProviderHidden {
 			continue
 		}
 		m.searchDomain = append(m.searchDomain, getModelsForProvider(p)...)
@@ -665,6 +725,18 @@ func (m *modelDialogCmp) View() string {
 		if m.provider != ProviderBookmarks && config.IsBookmarked(string(m.models[i].ID)) {
 			label = "* " + label
 		}
+		// GORILLA OVERRIDE (2026-08-20): show the multi-select mark. A marked
+		// set you cannot see is a trap — the user presses "a" and finds out
+		// afterwards what they had selected. ASCII "[x]"/"[ ]" rather than a
+		// tick glyph: box-drawing and symbol characters are ambiguous-width and
+		// silently wrap the frame (internal/tui/styles/ascii.go).
+		if len(m.marked) > 0 {
+			if m.marked[m.models[i].ID] {
+				label = "[x] " + label
+			} else {
+				label = "[ ] " + label
+			}
+		}
 		if r := []rune(label); len(r) > w-1 {
 			label = string(r[:w-4]) + styles.Ellipsis
 		}
@@ -699,9 +771,17 @@ func (m *modelDialogCmp) View() string {
 			{"tab details", true},
 			{"   enter use   esc back to columns", false},
 		}
+	case m.provider == ProviderHidden:
+		// The review column: the only useful action here is getting them back.
+		segs = []hintSeg{
+			{"d RESTORE", true},
+			{"   x mark   a add to your list   ", false},
+			{"tab details", true},
+		}
 	case m.provider == ProviderBookmarks:
 		segs = []hintSeg{
 			{"space remove from bookmarks   ", false},
+			{"x mark   d hide   ", false},
 			{"/ search", true},
 			{"   ", false},
 			{"tab details", true},
@@ -709,12 +789,20 @@ func (m *modelDialogCmp) View() string {
 	default:
 		segs = []hintSeg{
 			{"space * bookmark   ", false},
+			{"x mark", true},
+			{"   a add marked   d hide   ", false},
 			{"b YOUR LIST", true},
 			{"   ", false},
 			{"/ search", true},
 			{"   ", false},
 			{"tab details", true},
 		}
+	}
+	// GORILLA OVERRIDE (2026-08-20): say how many are marked, and say it where
+	// the user is already looking. "a" acting on an invisible set is the failure
+	// this line prevents.
+	if n := len(m.marked); n > 0 {
+		segs = append([]hintSeg{{fmt.Sprintf("%d marked   ", n), true}}, segs...)
 	}
 	if !m.searchActive {
 		if m.hScrollPossible {
@@ -1022,6 +1110,15 @@ func getEnabledProviders(cfg *config.Config) []models.ModelProvider {
 		seen[ProviderBookmarks] = true
 	}
 
+	// GORILLA OVERRIDE (2026-08-20): the review column, present only when
+	// something is hidden. It appears immediately after bookmarks so the two
+	// user-authored lists sit together, and its absence when nothing is hidden
+	// means the feature costs no screen space until it is used.
+	if config.HiddenCount() > 0 {
+		providers = append(providers, ProviderHidden)
+		seen[ProviderHidden] = true
+	}
+
 	// Providers saved in config (added via /connect, or backfilled from env
 	// at Load time).
 	for providerId, provider := range cfg.Providers {
@@ -1080,6 +1177,17 @@ func getEnabledProviders(cfg *config.Config) []models.ModelProvider {
 		if b == ProviderBookmarks && a != ProviderBookmarks {
 			return 1
 		}
+		// GORILLA OVERRIDE (2026-08-20): the hidden column sits second, right
+		// after bookmarks, for the same reason bookmarks sits first — it is a
+		// list the USER authored, and it would otherwise default to 999 and land
+		// at the far right of the carousel where nobody would find what they
+		// hid. Both user lists outrank every provider.
+		if a == ProviderHidden && b != ProviderHidden {
+			return -1
+		}
+		if b == ProviderHidden && a != ProviderHidden {
+			return 1
+		}
 
 		rA := models.ProviderPopularity[a]
 		rB := models.ProviderPopularity[b]
@@ -1112,7 +1220,9 @@ func (m *modelDialogCmp) setupModelsForProvider(provider models.ModelProvider) {
 	selectedModelId := agentCfg.Model
 
 	m.provider = provider
-	if provider == ProviderBookmarks {
+	if provider == ProviderHidden {
+		m.models = hiddenModelsList()
+	} else if provider == ProviderBookmarks {
 		m.models = bookmarkedModels()
 	} else {
 		m.models = getModelsForProvider(provider)
@@ -1176,12 +1286,52 @@ func bookmarkedModels() []models.Model {
 	return out
 }
 
+// hiddenModelsList backs the review column. It resolves ids through the live
+// registry so each row still shows the real name and description — a review
+// screen listing bare ids would ask the user to recognise
+// "nvidia/llama-3.1-nemotron-nano-8b-v1" from memory.
+func hiddenModelsList() []models.Model {
+	var out []models.Model
+	for _, id := range config.HiddenModels() {
+		if m, ok := models.SupportedModels[models.ModelID(id)]; ok {
+			m.Rank = 0
+			m.Provider = ProviderHidden
+			out = append(out, m)
+			continue
+		}
+		// Hidden AND no longer offered: still listed, so restoring it is
+		// possible and so the count on screen matches the file on disk.
+		out = append(out, models.Model{
+			ID:          models.ModelID(id),
+			Name:        string(id),
+			Description: "hidden, and its provider no longer offers it - press d to forget it entirely",
+			Provider:    ProviderHidden,
+		})
+	}
+	return out
+}
+
 func getModelsForProvider(provider models.ModelProvider) []models.Model {
 	var providerModels []models.Model
 	for _, model := range models.SupportedModels {
-		if model.Provider == provider {
-			providerModels = append(providerModels, model)
+		if model.Provider != provider {
+			continue
 		}
+		// GORILLA OVERRIDE (2026-08-20): skip what the user has hidden.
+		//
+		// Filtering happens HERE, where the user browses, rather than by
+		// deleting from models.SupportedModels. Two reasons: a session already
+		// running on a model must keep working if it is hidden mid-session, and
+		// a hidden id must still resolve to a name in the transcript and the
+		// footer. Hiding is a picker concern; the registry stays whole.
+		//
+		// The comment below about not hiding models still stands — it is about
+		// US ranking models out of sight. This is the USER doing it, to their
+		// own list, reversibly, and reviewable with H.
+		if config.IsModelHidden(string(model.ID)) {
+			continue
+		}
+		providerModels = append(providerModels, model)
 	}
 
 	// Coding-usefulness heuristic order — used for unranked models and for
@@ -1269,6 +1419,8 @@ func providerDisplayName(p models.ModelProvider) string {
 		// which is exactly the reading-comprehension tax this list exists to
 		// remove.
 		return "* YOUR BOOKMARKS — the models you picked"
+	case ProviderHidden:
+		return "* HIDDEN — press d to restore, they return to their own provider"
 	}
 	s := string(p)
 	if s == "" {
@@ -1286,4 +1438,124 @@ func providerDisplayName(p models.ModelProvider) string {
 
 func NewModelDialogCmp() ModelDialog {
 	return &modelDialogCmp{}
+}
+
+// ProviderHidden is the virtual column listing what the user has hidden.
+//
+// GORILLA OVERRIDE (2026-08-20): hiding without a way to review it is a
+// one-way door. A model hidden by mistake would be invisible AND unrecoverable
+// except by hand-editing JSON, which the desktop-icon majority effectively
+// cannot do. This column is what makes hiding safe to offer.
+const ProviderHidden models.ModelProvider = "* hidden"
+
+// markedIDs returns the marked ids in the order they appear in the current
+// list, so acting on them is predictable rather than map-random.
+func (m *modelDialogCmp) markedIDs() []models.ModelID {
+	if len(m.marked) == 0 {
+		return nil
+	}
+	out := make([]models.ModelID, 0, len(m.marked))
+	for _, mod := range m.models {
+		if m.marked[mod.ID] {
+			out = append(out, mod.ID)
+		}
+	}
+	// Marks made in other columns are still real; append them so nothing is
+	// silently dropped just because the user navigated away.
+	seen := map[models.ModelID]bool{}
+	for _, id := range out {
+		seen[id] = true
+	}
+	for id := range m.marked {
+		if !seen[id] {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func (m *modelDialogCmp) currentModel() (models.Model, bool) {
+	if m.detail != nil {
+		return *m.detail, true
+	}
+	if len(m.models) == 0 || m.selectedIdx < 0 || m.selectedIdx >= len(m.models) {
+		return models.Model{}, false
+	}
+	return m.models[m.selectedIdx], true
+}
+
+func (m *modelDialogCmp) toggleMarkCurrent() (tea.Model, tea.Cmd) {
+	cur, ok := m.currentModel()
+	if !ok {
+		return m, nil
+	}
+	if m.marked == nil {
+		m.marked = map[models.ModelID]bool{}
+	}
+	if m.marked[cur.ID] {
+		delete(m.marked, cur.ID)
+	} else {
+		m.marked[cur.ID] = true
+	}
+	m.moveSelectionDown() // marking a run of models should not need two keys per model
+	return m, nil
+}
+
+func (m *modelDialogCmp) addMarkedToBookmarks() (tea.Model, tea.Cmd) {
+	ids := m.markedIDs()
+	if len(ids) == 0 {
+		return m, util.ReportWarn("nothing marked - press x to mark models, then a to add them")
+	}
+	added := 0
+	for _, id := range ids {
+		if config.IsBookmarked(string(id)) {
+			continue
+		}
+		if _, err := config.ToggleBookmark(string(id)); err != nil {
+			return m, util.ReportError(err)
+		}
+		added++
+	}
+	m.marked = map[models.ModelID]bool{}
+	m.setupModels()
+	if added == 0 {
+		return m, util.ReportInfo("those were already on your list")
+	}
+	return m, util.ReportInfo(fmt.Sprintf("added %d to your list - press b to see it", added))
+}
+
+// hideMarkedOrCurrent hides the marked models, or the highlighted one when
+// nothing is marked. In the hidden column the same key RESTORES, because a
+// review screen whose only action is "hide harder" would be pointless.
+func (m *modelDialogCmp) hideMarkedOrCurrent() (tea.Model, tea.Cmd) {
+	ids := m.markedIDs()
+	if len(ids) == 0 {
+		if cur, ok := m.currentModel(); ok {
+			ids = []models.ModelID{cur.ID}
+		}
+	}
+	if len(ids) == 0 {
+		return m, nil
+	}
+	strs := make([]string, 0, len(ids))
+	for _, id := range ids {
+		strs = append(strs, string(id))
+	}
+
+	if m.provider == ProviderHidden {
+		if err := config.UnhideModels(strs...); err != nil {
+			return m, util.ReportError(err)
+		}
+		m.marked = map[models.ModelID]bool{}
+		m.setupModels()
+		return m, util.ReportInfo(fmt.Sprintf("restored %d - they are back in their provider lists", len(strs)))
+	}
+
+	if err := config.HideModels(strs...); err != nil {
+		return m, util.ReportError(err)
+	}
+	m.marked = map[models.ModelID]bool{}
+	m.setupModels()
+	return m, util.ReportInfo(fmt.Sprintf(
+		"hid %d - press H to review or restore them", len(strs)))
 }

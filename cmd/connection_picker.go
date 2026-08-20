@@ -153,6 +153,7 @@ func connectionRows() ([]startup.ConnRow, string) {
 // the launch: a picker that cannot run is a nuisance, not a reason to refuse to
 // start.
 func runConnectionPicker() {
+	before := config.CurrentConnProfile().ID
 	rows, measured := connectionRows()
 	choice, err := startup.AskConnection(rows, measured)
 	if err != nil {
@@ -172,6 +173,19 @@ func runConnectionPicker() {
 		return
 	}
 	_ = config.MarkProfileChosen()
+	lastSwitchSummary = config.SwitchSummary(before, config.ConnProfileID(choice.ID))
+}
+
+// lastSwitchSummary carries what changed back to the TUI, which reports it in
+// the conversation. The picker runs with the terminal handed over, so it cannot
+// print there itself without corrupting the frame the TUI is about to redraw.
+var lastSwitchSummary string
+
+// TakeSwitchSummary returns and clears the pending summary.
+func TakeSwitchSummary() string {
+	s := lastSwitchSummary
+	lastSwitchSummary = ""
+	return s
 }
 
 // maybeOfferConnectionPicker applies the trigger policy: first run, or the

@@ -93,7 +93,11 @@ func resilientHTTPClient() *http.Client {
 		// gzip_request.go: Go compresses responses for free but never
 		// requests, and the uploaded conversation is the largest thing we send.
 		// uploadbudget.go: one retry ceiling that is actually the ceiling.
-		Transport: newGzipRequestTransport(newBudgetTransport(transport)),
+		// linkSample is OUTERMOST and only BRACKETS the request; the bytes come
+		// from the socket counter in countingDialContext, below every layer that
+		// could inflate them. Without this wrapper nothing calls beginLinkSample
+		// and no measurement is ever recorded.
+		Transport: newLinkSampleTransport(newGzipRequestTransport(newBudgetTransport(transport))),
 		// Deliberately NO Timeout — see the file comment.
 	}
 }
