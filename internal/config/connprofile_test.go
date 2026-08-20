@@ -145,3 +145,22 @@ func TestStreamEnvOverridesProfile(t *testing.T) {
 		t.Error("env override ignored; a deliberate setting must win")
 	}
 }
+
+// The retry ceiling must follow the profile. It was declared but unread until
+// 2026-08-20, which is exactly the dead-config failure this file warns about
+// twice already: a field that claims to control something and does not.
+func TestRetryCeilingIsDeclaredPerProfile(t *testing.T) {
+	want := map[ConnProfileID]int{
+		ProfileAustere: 2, ProfileConstrained: 3,
+		ProfileModest: 4, ProfileBroadband: 5, ProfileUnconstrained: 5,
+	}
+	for id, w := range want {
+		p, ok := lookupConnProfile(id)
+		if !ok {
+			t.Fatalf("%s missing", id)
+		}
+		if p.MaxRetries != w {
+			t.Errorf("%s MaxRetries=%d, want %d", id, p.MaxRetries, w)
+		}
+	}
+}

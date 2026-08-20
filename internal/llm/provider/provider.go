@@ -12,7 +12,27 @@ import (
 
 type EventType string
 
-const maxRetries = 5
+// retryCeiling is how many attempts a turn gets before it gives up and says so.
+//
+// GORILLA OVERRIDE (2026-08-20): this was `const maxRetries = 5`, a single number
+// for every connection. It now comes from the active connection profile, so a
+// 1-9 KB/s satellite link retries twice and a fibre line retries five times.
+//
+// It is a FUNCTION, not a variable, deliberately: the profile can change
+// mid-session via /connection, and a package-level variable captured at init
+// would silently keep serving the old value — the same class of stale-state bug
+// as an installed binary lagging the repo build.
+//
+// Retrying is not free on the links this program is for. Every attempt
+// re-uploads the whole conversation, so on a metered plan a retry ceiling is a
+// spending limit. The upload budget in uploadbudget.go is the other half of
+// that and counts bytes; this counts attempts.
+func retryCeiling() int {
+	if n := config.CurrentConnProfile().MaxRetries; n > 0 {
+		return n
+	}
+	return 5
+}
 
 const (
 	EventContentStart  EventType = "content_start"

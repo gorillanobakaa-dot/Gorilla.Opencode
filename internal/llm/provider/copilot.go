@@ -341,7 +341,7 @@ func (c *copilotClient) send(ctx context.Context, messages []message.Message, to
 				return nil, retryErr
 			}
 			if retry {
-				logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, maxRetries), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+				logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, retryCeiling()), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
 					return nil, ctx.Err()
@@ -516,12 +516,12 @@ func (c *copilotClient) stream(ctx context.Context, messages []message.Message, 
 			}
 			// shouldRetry is not catching the max retries...
 			// TODO: Figure out why
-			if attempts > maxRetries {
-				logging.Warn("Maximum retry attempts reached for rate limit", "attempts", attempts, "max_retries", maxRetries)
+			if attempts > retryCeiling() {
+				logging.Warn("Maximum retry attempts reached for rate limit", "attempts", attempts, "max_retries", retryCeiling())
 				retry = false
 			}
 			if retry {
-				logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d (paused for %d ms)", attempts, maxRetries, after), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+				logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d (paused for %d ms)", attempts, retryCeiling(), after), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
 					// context cancelled
@@ -595,8 +595,8 @@ func (c *copilotClient) shouldRetry(attempts int, err error) (bool, int64, error
 		logging.Warn("Copilot API returned 500 error, retrying", "error", err)
 	}
 
-	if attempts > maxRetries {
-		return false, 0, fmt.Errorf("maximum retry attempts reached for rate limit: %d retries", maxRetries)
+	if attempts > retryCeiling() {
+		return false, 0, fmt.Errorf("maximum retry attempts reached for rate limit: %d retries", retryCeiling())
 	}
 
 	retryMs := 0

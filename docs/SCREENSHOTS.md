@@ -492,8 +492,8 @@ and why.
 genuinely slow connection — they were built and tested on a fast one, against
 measurements taken on 2026-08-18 with a deliberately broken link
 ([SATELLITE.md](SATELLITE.md)). The byte counts are real and repeatable; the
-choice of timeout values for each band is judgement, not measurement. And each
-profile's retry count is declared but not yet consumed by the provider layer.
+choice of timeout values for each band is judgement, not measurement. The retry ceiling is
+now driven by the profile — two attempts on Austere, five on a fast line.
 
 ---
 

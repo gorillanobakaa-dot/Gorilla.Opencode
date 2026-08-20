@@ -37,11 +37,14 @@ connection failing, sending you to debug a link that was working perfectly. It
 now says the connection is fine and the conversation has grown too big for this
 profile.
 
-**Not done, and said here rather than discovered later:** each profile declares
-how many times to retry, but the program still uses its old fixed five, so that
-number has no effect yet. And none of this has run on a genuinely slow
-connection — it was built and tested on a fast one, against measurements taken
-in August with a deliberately broken link.
+Each profile also sets its own retry ceiling — two attempts on a satellite
+phone, five on a fast line. Retrying is not free on these links: every attempt
+re-uploads the whole conversation, so on a prepaid plan a retry limit is a
+spending limit.
+
+**Not done, and said here rather than discovered later:** none of this has run
+on a genuinely slow connection. It was built and tested on a fast one, against
+measurements taken in August with a deliberately broken link.
 
 ## v0.1.107 — 2026-08-19 — the one I said was fine
 

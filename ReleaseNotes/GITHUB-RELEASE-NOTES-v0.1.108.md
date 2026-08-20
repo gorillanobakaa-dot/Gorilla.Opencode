@@ -132,6 +132,11 @@ you to debug a link that was working perfectly. It now says the connection is
 fine and the conversation has grown too big for this profile, with the remedy
 that actually works.
 
+**Each profile now sets its own retry ceiling** — two attempts on Austere, five
+on a fast line. Retrying is not free on a metered link: every attempt re-uploads
+the whole conversation, so a retry limit is a spending limit. The data ceiling
+per message counts bytes; this counts attempts.
+
 **Everything still works as before.** The agent, its tools and its abilities are
 untouched by all of this.
 
@@ -141,9 +146,6 @@ untouched by all of this.
 
 ## What is NOT done, stated plainly
 
-- **The retry count on each profile is not yet used.** Each profile declares how
-  many times to retry, but the program still uses its old fixed number of five.
-  Nothing is broken by this — the number has no effect yet.
 - **These profiles have never run on a genuinely slow connection.** They were
   built and tested on a fast one. The numbers come from measurements taken in
   August against a deliberately broken link, which is a reasonable basis but is

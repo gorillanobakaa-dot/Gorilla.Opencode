@@ -292,7 +292,7 @@ func (o *openaiClient) send(ctx context.Context, messages []message.Message, too
 				return nil, retryErr
 			}
 			if retry {
-				logging.WarnPersist(fmt.Sprintf("Provider busy (rate-limit/5xx), retrying %d/%d in %.1fs", attempts, maxRetries, float64(after)/1000), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+				logging.WarnPersist(fmt.Sprintf("Provider busy (rate-limit/5xx), retrying %d/%d in %.1fs", attempts, retryCeiling(), float64(after)/1000), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
 					return nil, ctx.Err()
@@ -504,7 +504,7 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 				return
 			}
 			if retry {
-				logging.WarnPersist(fmt.Sprintf("Provider busy (rate-limit/5xx), retrying %d/%d in %.1fs", attempts, maxRetries, float64(after)/1000), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+				logging.WarnPersist(fmt.Sprintf("Provider busy (rate-limit/5xx), retrying %d/%d in %.1fs", attempts, retryCeiling(), float64(after)/1000), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
 					// context cancelled
@@ -635,8 +635,8 @@ func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool)
 		if !busy && !isTransientStreamError(err) {
 			return false, 0, err
 		}
-		if attempts > maxRetries {
-			return false, 0, fmt.Errorf("still failing after %d retries — the provider is busy/rate-limiting or the connection is unstable; wait a moment, lower the request pace in /context, or switch to a smaller model: %w", maxRetries, err)
+		if attempts > retryCeiling() {
+			return false, 0, fmt.Errorf("still failing after %d retries — the provider is busy/rate-limiting or the connection is unstable; wait a moment, lower the request pace in /context, or switch to a smaller model: %w", retryCeiling(), err)
 		}
 		baseMs, capMs := 500, 6000 // transport: 0.5,1,2,4,6...
 		if busy {
@@ -670,8 +670,8 @@ func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool)
 		return false, 0, err
 	}
 
-	if attempts > maxRetries {
-		return false, 0, fmt.Errorf("still failing after %d retries (HTTP %d) — the provider is rate-limiting or unavailable; wait a moment or switch model", maxRetries, apierr.StatusCode)
+	if attempts > retryCeiling() {
+		return false, 0, fmt.Errorf("still failing after %d retries (HTTP %d) — the provider is rate-limiting or unavailable; wait a moment or switch model", retryCeiling(), apierr.StatusCode)
 	}
 
 	// GORILLA OVERRIDE: the old schedule was 2s·2^(n-1) = 2,4,8,16,32,

@@ -224,7 +224,7 @@ func (g *geminiClient) send(ctx context.Context, messages []message.Message, too
 				return nil, retryErr
 			}
 			if retry {
-				logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, maxRetries), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+				logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, retryCeiling()), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
 					return nil, ctx.Err()
@@ -334,7 +334,7 @@ func (g *geminiClient) stream(ctx context.Context, messages []message.Message, t
 						return
 					}
 					if retry {
-						logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, maxRetries), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+						logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, retryCeiling()), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 						select {
 						case <-ctx.Done():
 							if ctx.Err() != nil {
@@ -449,8 +449,8 @@ func (g *geminiClient) stream(ctx context.Context, messages []message.Message, t
 
 func (g *geminiClient) shouldRetry(attempts int, err error) (bool, int64, error) {
 	// Check if error is a rate limit error
-	if attempts > maxRetries {
-		return false, 0, fmt.Errorf("maximum retry attempts reached for rate limit: %d retries", maxRetries)
+	if attempts > retryCeiling() {
+		return false, 0, fmt.Errorf("maximum retry attempts reached for rate limit: %d retries", retryCeiling())
 	}
 
 	// Gemini doesn't have a standard error type we can check against
