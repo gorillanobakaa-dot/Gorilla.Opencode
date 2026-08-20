@@ -60,13 +60,36 @@ release_docs_*/*.json
 checksums.sha256
 
 # Internal Automation & Build Scripts - NEVER UPLOAD TO GITHUB
-/scripts/
+#
+# NOTE the trailing /* rather than a bare /scripts/. Git cannot re-include a
+# file when its PARENT DIRECTORY is excluded, so `/scripts/` plus a `!` negation
+# below is silently inert - the negation looks right, changes nothing, and you
+# only find out by testing. Excluding the CONTENTS leaves the exceptions able to
+# take effect.
+/scripts/*
 /Documentation.Scripts/
 *.py
 # GORILLA: exception — the vendored pfind engine is SOURCE, not a local script.
 # It is embedded into the binary (internal/llm/tools/find.go) and shipped in
 # the .deb; it must be in the repo on every machine that builds it.
 !internal/llm/tools/pfind.py
+
+# GORILLA: exception (2026-08-20) — the two BENCHMARK scripts are published,
+# because the pages that report their numbers tell readers to re-run them.
+#
+# docs/BENCHMARKS.md has said "the script is in this repo" since July and linked
+# to a file that was never tracked: a 404 for every reader, under a heading
+# inviting them to check our work. That is the "transparent in theory, closed
+# door in practice" failure PHILOSOPHY.md exists to prevent, and it was found
+# only when a second page was about to repeat it.
+#
+# ONLY these two, and only because they are safe to publish: standard library
+# only, no credentials (the key comes from the environment), no internal paths,
+# nothing about how this machine is laid out. The build, release and packaging
+# scripts stay untracked — they are automation for here, not evidence for
+# anyone else.
+!/scripts/benchmark-models.py
+!/scripts/benchmark-tool-discipline.py
 *.sh
 
 # Third-party leaked prompts kept LOCAL for study, not redistributed
