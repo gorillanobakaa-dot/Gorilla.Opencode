@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 	"github.com/opencode-ai/opencode/internal/message"
@@ -246,7 +247,51 @@ func (p *baseProvider[C]) StreamResponse(ctx context.Context, messages []message
 		return ch
 	}
 	messages = p.cleanMessages(messages)
+
+	// GORILLA OVERRIDE (2026-08-20): on the slow connection profiles, fetch the
+	// reply in ONE piece and hand it to the caller as a single event, instead of
+	// streaming it token by token.
+	//
+	// WHY. A streamed reply wraps every token in its own JSON envelope. Measured
+	// on the same question, same model, same 60-token answer: 22,256 bytes
+	// streamed against 834 not streamed - 27x. TOKENS ARE IDENTICAL (106 either
+	// way), so this costs the provider nothing and saves the USER's metered
+	// allowance, which on a satellite plan is real money.
+	//
+	// The adapter lives here rather than in each client so every provider gets
+	// it from one place, and callers keep consuming a channel exactly as before
+	// - the TUI never learns which mode it is in.
+	if !config.StreamRepliesEnabled() {
+		return p.sendAsSingleEvent(ctx, messages, tools)
+	}
 	return p.client.stream(ctx, messages, tools)
+}
+
+// sendAsSingleEvent runs the non-streaming path and reports it on a channel, so
+// non-streaming is invisible to every caller.
+func (p *baseProvider[C]) sendAsSingleEvent(ctx context.Context, messages []message.Message, tools []tools.BaseTool) <-chan ProviderEvent {
+	ch := make(chan ProviderEvent, 2)
+	go func() {
+		defer close(ch)
+		resp, err := p.client.send(ctx, messages, tools)
+		if err != nil {
+			ch <- ProviderEvent{Type: EventError, Error: err}
+			return
+		}
+		if resp == nil {
+			ch <- ProviderEvent{Type: EventError, Error: fmt.Errorf("provider returned no response")}
+			return
+		}
+		// One content event so anything rendering incremental text still sees
+		// the text arrive, then the completion event carrying tool calls and
+		// usage. Emitting Complete alone would leave content-only consumers
+		// blank.
+		if resp.Content != "" {
+			ch <- ProviderEvent{Type: EventContentDelta, Content: resp.Content}
+		}
+		ch <- ProviderEvent{Type: EventComplete, Response: resp}
+	}()
+	return ch
 }
 
 func WithAPIKey(apiKey string) ProviderClientOption {
