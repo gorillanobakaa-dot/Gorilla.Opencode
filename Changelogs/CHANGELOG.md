@@ -1290,7 +1290,7 @@ through to the existing `rowStyle` so selection highlight is unaffected.
 ## v0.1.82 — 2026-08-14 — it investigates, and it tells you what that costs
 
 Full dual-track document: [v0.1.82-release-notes.md](v0.1.82-release-notes.md).
-Where this goes next: [ROADMAP.md](../ROADMAP.md).
+Where this goes next: the roadmap, kept with the source rather than published.
 
 **Plain-language version:** There is a new `/research` command. Ask it a
 question and it sends out up to ten helpers, each with a different job — one
