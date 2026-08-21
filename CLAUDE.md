@@ -186,6 +186,22 @@ Before any release, these must exist:
       decision it carries the FULL documentation inline, not links to it. A
       release page that says "see the docs" is the closed door PHILOSOPHY.md
       argues against.
+- [ ] **THE SCREENSHOT PROCEDURE — build and install FIRST, then ask.** Recorded
+      2026-08-21, after a session wrote the docs, then asked for screenshots of
+      a release the owner had no way to run. He does not have the binary; the
+      agent does. The order is not negotiable and it is not "ask for pictures":
+
+      1. Tag, build with the version ldflags, verify `--version`.
+      2. `scripts/build-deb.sh X.Y.Z`, inspect the artefact.
+      3. **Install it on this machine** — `sudo apt install ./Compiled.Builds/...`
+         — and confirm `gorilla-opencode --version` and `dpkg -l` agree.
+      4. THEN ask, nicely, naming the exact screens worth capturing and why
+         each one proves something. He takes them and hands them back.
+      5. Embed them in the release page and `docs/SCREENSHOTS.md`, then publish.
+
+      Asking before step 3 asks him to photograph software that is not on his
+      computer. Every earlier release that "just needed screenshots" was really
+      missing steps 1-3.
 - [ ] Screenshots at full capture resolution in `docs/screenshots/gallery/`,
       written up in `docs/SCREENSHOTS.md`, clickable to the original, never
       thumbnailed (directive §13). **Ask for them.**
