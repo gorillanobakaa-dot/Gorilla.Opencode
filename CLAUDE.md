@@ -1,7 +1,11 @@
-<!-- Version: 1.0.0 · updated 26-08-19-10-02 -->
+<!-- Version: 1.1.0 · updated 26-08-21-13-04 -->
 # Working on gorilla-opencode
 
-> ## ⛔ STOP — read `~/.agents/SETTLED.md` before advising or warning
+> ## ⛔ STOP — check the settled decisions before advising or warning
+>
+> On the maintainer's machine these live in `~/.agents/SETTLED.md`. If that
+> file is not present you are working from a clone: the list below is the
+> whole of it, so use it as written and ask about anything not on it.
 >
 > Decisions already made, implemented, and in most cases shipped years before
 > any LLM was involved: **Microsoft font licensing** (ship the method
@@ -29,9 +33,9 @@ Full lesson: brain atom `Mach_Build_Output_Limited_Under_AI_Agent` (Firefox.154.
 
 opencode build: `go build ... 2>&1 | tee build.log; exit=${PIPESTATUS[0]}`; verify the binary after.
 
-A Go fork of OpenCode: a Bubble Tea TUI coding agent. Target machine is a Sony VAIO
-SVE (i7-3632QM, 16 GB, Intel HD 4000, 1600×900, Debian 13) — assume modest hardware
-and a possibly high-latency link.
+A Go fork of OpenCode: a Bubble Tea TUI coding agent. Build and test against a
+2012-era laptop: a pre-AVX2 quad-core, integrated graphics, a 1600×900 screen,
+current Debian stable. Assume modest hardware and a slow, high-latency link.
 
 ## Who this is for — read before making any design decision
 
@@ -170,11 +174,18 @@ from losing it.
 
 At the moment a bug is UNDERSTOOD (not when the release ships):
 
+On the maintainer's machine, the lesson store is written through these:
+
 ```sh
-B=/home/gorilla/Documents/Scripts.For.Work/brain-management
+B=~/Documents/Scripts.For.Work/brain-management   # maintainer-only path
 python3 $B/brain_scribe.py lesson --payload /tmp/brain_payload.json   # see §14 for the shape
 python3 $B/brain_reader.py "<a phrase from it>"                        # prove it comes back
 ```
+
+Working from a clone, that directory does not exist and there is nothing to
+install. Write the same four fields (summary with the real numbers, detection,
+fix, generalisation) into the commit message and into `LESSONS/` if the fork
+you are working in keeps one. The discipline is the point, not the tool.
 
 Before any release, these must exist:
 
