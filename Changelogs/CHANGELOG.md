@@ -1,3 +1,36 @@
+## v0.1.113 — 2026-08-21 — the menu explains itself
+
+**Plain-language version:** a small release about the first screen anybody sees.
+
+The provider menu had a rule — free sign-ins first, then your own machine, then
+the ones needing a key — and nobody could see it, because Google's three routes
+sat at positions 1, 3 and 9 with other companies in between. An order nobody can
+work out is not an order. Now the easiest ways in come first and companies stay
+together: the three Google rows, then the ChatGPT sign-in, then NVIDIA, then
+everything else free, then the ones needing a card. The Google rows also say
+"Google" in their names, because grouping by position only helps somebody who
+already knows Antigravity is a Google product.
+
+The Gemini key row now tells you how to get a key instead of assuming you have
+one: free, no card, made at aistudio.google.com/apikey with any Google account,
+billing left switched off. Its warning was rewritten too — it used to say free
+keys are "heavily rate-limited", which reads as "do not bother". What actually
+happens is that one busy turn uses up a per-minute allowance and the failure
+looks like a broken key. The row says that now, and points out that the sign-in
+rows spend a separate allowance, so you have two pools rather than one dead end.
+
+/update now reports what its filter threw away — "OpenAI 5 usable, 73 skipped" —
+so a filter that is too greedy shows itself instead of looking like a small
+catalogue. That exists because nobody here has a paid key for Anthropic, OpenAI
+or DeepSeek, so the honest answer to "I cannot check this" is to make the failure
+obvious to whoever can.
+
+Housekeeping: the agent instruction file, the roadmap and the internal bug notes
+are no longer published, and links that pointed at them are plain text so nothing
+leads to a missing page. The Arch package checksum was regenerated for v0.1.112.
+
+Full detail, both tracks: `Changelogs/v0.1.113-release-notes.md`.
+
 ## v0.1.112 — 2026-08-21 — the model lists stop being a lie
 
 **Plain-language version:** somebody picked a model from the menu and got back
