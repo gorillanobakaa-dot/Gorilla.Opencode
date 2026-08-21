@@ -371,7 +371,7 @@ func (c *AntigravityCreds) callAntigravity(ctx context.Context, token, method st
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", AntigravityUserAgent)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := authHTTP().Do(req)
 	if err != nil {
 		return err
 	}

@@ -300,7 +300,7 @@ func postToken(ctx context.Context, form url.Values) (*tokenResponse, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := authHTTP().Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +428,7 @@ func (c *GeminiCreds) callCodeAssist(ctx context.Context, token, method string, 
 	// GORILLA OVERRIDE: identify as Antigravity so loadCodeAssist/onboardUser
 	// return the free tier and provision a managed project. See CodeAssistUserAgent.
 	req.Header.Set("User-Agent", CodeAssistUserAgent)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := authHTTP().Do(req)
 	if err != nil {
 		return err
 	}

@@ -412,7 +412,7 @@ func (c *ChatGPTCreds) ProbeBackend(ctx context.Context) (status int, body strin
 	}
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := authHTTP().Do(req)
 	if err != nil {
 		return 0, "", fmt.Errorf("could not reach %s: %w", ChatGPTBackend, err)
 	}
@@ -446,7 +446,7 @@ func postChatGPTToken(ctx context.Context, form url.Values) (*tokenResponse, err
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("originator", ChatGPTOriginator)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := authHTTP().Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("token request failed: %w", err)
 	}
