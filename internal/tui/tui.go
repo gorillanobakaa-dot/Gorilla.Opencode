@@ -1505,10 +1505,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if err != nil {
 					return util.InfoMsg{Type: util.InfoTypeError, Msg: err.Error()}
 				}
-				return util.InfoMsg{
-					Type: util.InfoTypeInfo,
-					Msg:  "Provider updated — use /models if you want a different model from it.",
-				}
+				return a.adoptPortalModel()
 			})
 		case "purge", "purgemodels", "purge-models":
 			// GORILLA OVERRIDE (2026-08-20): clears the FETCHED catalogues only.
@@ -3025,6 +3022,52 @@ func hardWrap(s string, w int) []string {
 		r = r[w:]
 	}
 	return append(out, string(r))
+}
+
+// adoptPortalModel moves the RUNNING agent onto whatever the provider portal
+// just saved, and says which model is now answering.
+//
+// GORILLA FIX (2026-08-21): without this the portal changed the config and
+// nothing else. The footer reads the config, so it immediately said "Claude
+// Sonnet 4.6 (Antigravity free)" — while app.CoderAgent still held the provider
+// it was built with at startup and kept sending to NVIDIA NIM's Llama 3.3 70B.
+//
+// Reported by the owner, who spotted it from the model's BEHAVIOUR before any
+// label gave it away: he typed "hm" and got an unrequested web_fetch of
+// debian.org, and said "I have a feeling this is not Claude". The transcript's
+// per-message label agreed with him — it read "Llama 3.3 70B" under a footer
+// that read Claude. He was spending NIM quota while believing he was on the free
+// Antigravity tier.
+//
+// /model has done this correctly since 1fecb4c: agent.Update builds the new
+// provider FIRST, and only swaps it in if that succeeds, so a failure leaves the
+// interface telling the truth. The portal simply never called it. This routes
+// the portal through the same atomic path rather than adding a second one.
+func (a appModel) adoptPortalModel() tea.Msg {
+	cfg := config.Get()
+	if cfg == nil || a.app == nil || a.app.CoderAgent == nil {
+		return util.InfoMsg{Type: util.InfoTypeInfo, Msg: "Provider updated."}
+	}
+	want := cfg.Agents[config.AgentCoder].Model
+	if want == "" {
+		return util.InfoMsg{Type: util.InfoTypeInfo, Msg: "Provider updated."}
+	}
+	if a.app.CoderAgent.Model().ID == want {
+		return util.InfoMsg{Type: util.InfoTypeInfo, Msg: "Provider updated — still on " + modelLabel(want) + "."}
+	}
+	if _, err := a.app.CoderAgent.Update(config.AgentCoder, want); err != nil {
+		// Say exactly what is true: the credential is saved, and the session is
+		// NOT on the new model. Silence here is what produced the original bug.
+		return util.InfoMsg{
+			Type: util.InfoTypeError,
+			Msg: fmt.Sprintf("Provider saved, but this session is STILL answering as %s — could not switch to %s: %v",
+				modelLabel(a.app.CoderAgent.Model().ID), modelLabel(want), err),
+		}
+	}
+	return util.InfoMsg{
+		Type: util.InfoTypeInfo,
+		Msg:  "Now answering as " + modelLabel(want) + ". Use /model for a different one from this provider.",
+	}
 }
 
 // shouldEchoNotice decides whether a status notice ALSO belongs in the
