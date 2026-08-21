@@ -161,11 +161,33 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 	curProv := models.SupportedModels[curModel].Provider
 	curEndpoint := models.LocalEndpointFor(curModel) // "" unless a local model
 
+	// GORILLA OVERRIDE (2026-08-21): the order is EASIEST ACCESS FIRST, and
+	// vendor families are kept together.
+	//
+	// It used to be free-sign-ins, then local endpoints, then keys — a real rule
+	// that was invisible on screen, because Google's three routes sat at
+	// positions 1, 3 and 9 with unrelated providers between them. Reported by the
+	// owner looking at his own picker: "if there is a logic in the way they are
+	// displayed I can't see it."
+	//
+	// An order nobody can infer is not an order. So: Google first (two of its
+	// three routes are a Gmail sign-in with no key and no card — the easiest way
+	// in that exists), then the ChatGPT sign-in, then NVIDIA's free key, then
+	// everything else free, then the ones that need a card. Within the Google
+	// block the names now share a "Google" prefix so the grouping is legible
+	// without counting rows.
+	//
+	// Pinned by TestPortalRowOrder in provider_portal_order_test.go, because an
+	// ordering that lives only in the order of a literal is one careless insert
+	// from being scrambled again.
 	rows := []startup.ProviderRow{
+		// Google, all three routes together. Two are a Gmail sign-in with no key
+		// and no card, which is the easiest way in that exists, so the family
+		// leads.
 		{
 			ID:   "antigravity",
 			Free: true,
-			Name: "Antigravity free tier - Claude + GPT-OSS + Gemini (Gmail sign-in)",
+			Name: "Google Antigravity - Claude + GPT-OSS + Gemini (Gmail sign-in)",
 			What: "Signs in with your Google account and uses your free Google " +
 				"Antigravity tier: Claude Sonnet/Opus 4.6, GPT-OSS 120B, and Gemini. " +
 				"No API key, no cost - it is your account's own entitlement.",
@@ -175,6 +197,32 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			Configured: agReady,
 			Active:     curProv == models.ProviderAntigravity,
 		},
+		{
+			ID:   "google-oauth",
+			Free: true,
+			Name: "Google Code Assist - Gemini only (Gmail sign-in, no key)",
+			What: "Signs in with your Google account and uses the free Code Assist " +
+				"tier. Gemini models only. No API key, no cost.",
+			Warning: "Free-tier daily quotas are real and can be small; heavy use can " +
+				"lock the account out for an extended period.",
+			Configured: oauthReady,
+			Active:     curProv == models.ProviderGeminiCA,
+		},
+		{
+			ID:   "gemini-api",
+			Name: "Google Gemini - API key",
+			What: "A Google AI Studio key (AIzaSy...). Different from the Gmail sign-in " +
+				"above.",
+			Warning: "Free-tier keys are heavily rate-limited and can return HTTP 429 " +
+				"with a zero quota. The Gmail sign-in option above is usually the " +
+				"better free route.",
+			NeedsInput:  true,
+			InputPrompt: "Paste your Gemini API key (AIzaSy...).",
+			Secret:      true,
+			Configured:  keyed(models.ProviderGemini),
+			Active:      curProv == models.ProviderGemini,
+		},
+		// The other sign-in: a ChatGPT account, free plan included.
 		{
 			ID:   "chatgpt",
 			Free: true,
@@ -189,17 +237,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			Configured: cgReady,
 			Active:     curProv == models.ProviderChatGPT,
 		},
-		{
-			ID:   "google-oauth",
-			Free: true,
-			Name: "Google - Code Assist free tier (Gemini only, Gmail sign-in, no key)",
-			What: "Signs in with your Google account and uses the free Code Assist " +
-				"tier. Gemini models only. No API key, no cost.",
-			Warning: "Free-tier daily quotas are real and can be small; heavy use can " +
-				"lock the account out for an extended period.",
-			Configured: oauthReady,
-			Active:     curProv == models.ProviderGeminiCA,
-		},
+		// NVIDIA: a free key, pasted once, ~100 models.
 		{
 			ID:   "nvidia-nim",
 			Free: true,
@@ -213,6 +251,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			Configured:  nimReady,
 			Active:      curEndpoint == nimName,
 		},
+		// Everything else that costs nothing: your own machine, then free keys.
 		{
 			ID:   "ollama",
 			Free: true,
@@ -244,40 +283,6 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			Active:       curEndpoint == cloudflareEndpointName,
 		},
 		{
-			ID:          "anthropic",
-			Name:        "Anthropic (Claude) - API key",
-			What:        "Paid API. Requires an ANTHROPIC_API_KEY (sk-ant-...).",
-			NeedsInput:  true,
-			InputPrompt: "Paste your Anthropic API key (sk-ant-...).",
-			Secret:      true,
-			Configured:  keyed(models.ProviderAnthropic),
-			Active:      curProv == models.ProviderAnthropic,
-		},
-		{
-			ID:          "openai",
-			Name:        "OpenAI (GPT / o-series) - API key",
-			What:        "Paid API. Requires an OPENAI_API_KEY (sk-...).",
-			NeedsInput:  true,
-			InputPrompt: "Paste your OpenAI API key (sk-...).",
-			Secret:      true,
-			Configured:  keyed(models.ProviderOpenAI),
-			Active:      curProv == models.ProviderOpenAI,
-		},
-		{
-			ID:   "gemini-api",
-			Name: "Google Gemini - API key",
-			What: "A Google AI Studio key (AIzaSy...). Different from the Gmail sign-in " +
-				"above.",
-			Warning: "Free-tier keys are heavily rate-limited and can return HTTP 429 " +
-				"with a zero quota. The Gmail sign-in option above is usually the " +
-				"better free route.",
-			NeedsInput:  true,
-			InputPrompt: "Paste your Gemini API key (AIzaSy...).",
-			Secret:      true,
-			Configured:  keyed(models.ProviderGemini),
-			Active:      curProv == models.ProviderGemini,
-		},
-		{
 			ID:   "groq",
 			Free: true,
 			Name: "Groq - API key (free tier available)",
@@ -301,6 +306,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			Configured:  keyed(models.ProviderCerebras),
 			Active:      curProv == models.ProviderCerebras,
 		},
+		// Paid. Last, deliberately — see the ordering note above.
 		{
 			ID:          "openrouter",
 			Name:        "OpenRouter - API key (many models, one key)",
@@ -310,6 +316,26 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			Secret:      true,
 			Configured:  keyed(models.ProviderOpenRouter),
 			Active:      curProv == models.ProviderOpenRouter,
+		},
+		{
+			ID:          "anthropic",
+			Name:        "Anthropic (Claude) - API key",
+			What:        "Paid API. Requires an ANTHROPIC_API_KEY (sk-ant-...).",
+			NeedsInput:  true,
+			InputPrompt: "Paste your Anthropic API key (sk-ant-...).",
+			Secret:      true,
+			Configured:  keyed(models.ProviderAnthropic),
+			Active:      curProv == models.ProviderAnthropic,
+		},
+		{
+			ID:          "openai",
+			Name:        "OpenAI (GPT / o-series) - API key",
+			What:        "Paid API. Requires an OPENAI_API_KEY (sk-...).",
+			NeedsInput:  true,
+			InputPrompt: "Paste your OpenAI API key (sk-...).",
+			Secret:      true,
+			Configured:  keyed(models.ProviderOpenAI),
+			Active:      curProv == models.ProviderOpenAI,
 		},
 		{
 			ID:          "xai",
