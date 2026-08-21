@@ -265,6 +265,34 @@ func (o *openaiClient) cacheOptions() []option.RequestOption {
 	return []option.RequestOption{option.WithJSONSet("prompt_cache_key", key)}
 }
 
+// busyNotice is the "backing off" line, and it NAMES WHO is busy.
+//
+// GORILLA FIX (2026-08-21): it used to say only "Provider busy
+// (rate-limit/5xx)". The owner read that during a session whose footer claimed
+// Antigravity and reasonably concluded Google was throttling him — while the
+// requests were in fact going to NVIDIA NIM, because of the stale-provider bug
+// fixed the same day. He had used that Google account for months, so "new
+// account warming up" was a wrong explanation built on a message that could not
+// be checked.
+//
+// The client knows exactly which provider and model it is talking to. Saying so
+// costs nothing and makes the line self-verifying: had it read "NVIDIA NIM
+// (local.meta/llama-3.3-70b-instruct) busy", the mismatch with the footer would
+// have been obvious in one glance instead of taking a behavioural hunch.
+func (o *openaiClient) busyNotice(attempts int, afterMS int64) string {
+	who := string(o.providerOptions.model.Provider)
+	if ep := models.LocalEndpointFor(o.providerOptions.model.ID); ep != "" {
+		// A "local" provider is somebody's own endpoint; the name they gave it
+		// is the only useful identifier.
+		who = ep
+	}
+	if who == "" {
+		who = "provider"
+	}
+	return fmt.Sprintf("%s busy (rate-limit/5xx) on %s, retrying %d/%d in %.1fs",
+		who, o.providerOptions.model.APIModel, attempts, retryCeiling(), float64(afterMS)/1000)
+}
+
 func (o *openaiClient) send(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (response *ProviderResponse, err error) {
 	params := o.preparedParams(o.convertMessages(messages), o.convertTools(tools))
 	// GORILLA OVERRIDE: nil-guard. config.Get() returns nil until Load has run,
@@ -292,7 +320,7 @@ func (o *openaiClient) send(ctx context.Context, messages []message.Message, too
 				return nil, retryErr
 			}
 			if retry {
-				logging.WarnPersist(fmt.Sprintf("Provider busy (rate-limit/5xx), retrying %d/%d in %.1fs", attempts, retryCeiling(), float64(after)/1000), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+				logging.WarnPersist(o.busyNotice(attempts, after), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
 					return nil, ctx.Err()
@@ -504,7 +532,7 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 				return
 			}
 			if retry {
-				logging.WarnPersist(fmt.Sprintf("Provider busy (rate-limit/5xx), retrying %d/%d in %.1fs", attempts, retryCeiling(), float64(after)/1000), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+				logging.WarnPersist(o.busyNotice(attempts, after), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
 					// context cancelled
