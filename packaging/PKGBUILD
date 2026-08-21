@@ -61,7 +61,7 @@ source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gorillanobakaa-dot/Gori
 # Measured against the published v0.1.111 tarball, 17,572,729 bytes.
 # REGENERATE ON EVERY VERSION BUMP - a stale sum fails loudly, which is correct,
 # but it fails the user rather than the person who forgot.
-sha256sums=('0408d175f06a6c32f91a08aca01e71551e0c89bb3485d1a1792d89f14747c55b')
+sha256sums=('f2de57cce32102f61ebb30bdecf80973ceb84d9c4c3f1bbd09edbcd7a67490c9')
 
 build() {
     cd "Gorilla.Opencode-${pkgver}"
