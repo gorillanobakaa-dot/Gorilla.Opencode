@@ -3155,17 +3155,7 @@ func (a *appModel) refreshModelCatalogues() tea.Cmd {
 				notes = append(notes, fmt.Sprintf("%s failed: %v", cat.Label, err))
 				continue
 			}
-			note := fmt.Sprintf("%s %d usable", res.Label, res.Usable)
-			if len(res.Added) > 0 || len(res.Removed) > 0 {
-				note += fmt.Sprintf(" (+%d, -%d)", len(res.Added), len(res.Removed))
-			}
-			// Name the retired ones. A model that vanished from a provider is the
-			// single most useful thing this command can tell you — it is the
-			// difference between "your bookmark is gone" and a 400 next time you
-			// pick it.
-			if len(res.Removed) > 0 {
-				note += " — retired: " + strings.Join(res.Removed, ", ")
-			}
+			note := catalogueNote(res)
 			notes = append(notes, note)
 		}
 
@@ -3191,6 +3181,40 @@ func (a *appModel) refreshModelCatalogues() tea.Cmd {
 		}
 		return refreshSummaryMsg(notes)
 	}
+}
+
+// catalogueNote is one provider's line in the /update report.
+//
+// GORILLA OVERRIDE (2026-08-21): the SKIPPED count is reported, not just the
+// usable one.
+//
+// A fetched catalogue is filtered before it is registered — speech, image,
+// embedding and safety-classifier models are not chat models, and selecting one
+// produces a bare HTTP 400 that reads as a broken key. That filter is a list of
+// substrings, so it can be too greedy, and a too-greedy filter is invisible from
+// the usable count alone: "OpenAI 5 usable" looks like a small catalogue rather
+// than like 73 models thrown away by mistake. Printing both makes the ratio
+// visible at a glance to the first person who runs this with a key.
+//
+// This exists because the release it shipped in could not be tested against a
+// paid provider — nobody here has an Anthropic, OpenAI or DeepSeek key. The
+// honest response to "I cannot verify this" is to make the failure legible to
+// whoever can, rather than to assert it works.
+func catalogueNote(res models.CatalogueResult) string {
+	note := fmt.Sprintf("%s %d usable", res.Label, res.Usable)
+	if len(res.Added) > 0 || len(res.Removed) > 0 {
+		note += fmt.Sprintf(" (+%d, -%d)", len(res.Added), len(res.Removed))
+	}
+	if res.Skipped > 0 {
+		note += fmt.Sprintf(", %d skipped", res.Skipped)
+	}
+	// Name the retired ones. A model that vanished from a provider is the single
+	// most useful thing this command can tell you — it is the difference between
+	// "your bookmark is gone" and a 400 the next time you pick it.
+	if len(res.Removed) > 0 {
+		note += " — retired: " + strings.Join(res.Removed, ", ")
+	}
+	return note
 }
 
 // refreshSummaryMsg packs the per-provider notes into one notice.
