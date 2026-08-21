@@ -27,6 +27,7 @@ import (
 
 var knownHTTPClients = map[string]string{
 	"internal/llm/provider/httpclient.go":    "the AI endpoint the user configured; the model cannot choose the address",
+	"internal/auth/httpclient.go":            "the shared bounded client for provider auth endpoints; every URL is a constant, the model never supplies one",
 	"internal/llm/models/refresh.go":         "the model catalogue, a fixed URL",
 	"internal/llm/models/catalogue_fetch.go": "provider /v1/models listings; the URLs are constants in LiveCatalogues, the model cannot choose one",
 	"internal/llm/models/verify.go":          "verifies a configured provider's endpoint answers",
