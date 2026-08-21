@@ -183,3 +183,8 @@ PRECHECK.json
 # way and had to be reset. Build junk, never source.
 __pycache__/
 *.pyc
+
+# Agent instructions stay on the machine (PUBLISH.BOUNDARY.md, 2026-08-09)
+CLAUDE.md
+AGENTS.md
+GEMINI.md
