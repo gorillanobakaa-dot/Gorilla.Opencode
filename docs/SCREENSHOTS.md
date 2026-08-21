@@ -1,4 +1,4 @@
-<!-- Version: 1.6.0 · updated 26-08-21-14-55 -->
+<!-- Version: 1.7.0 · updated 26-08-21-15-25 -->
 # Gorilla OpenCode — screenshots & proof
 
 Real screenshots from a Debian 13 / GNOME 48 machine running the revived
@@ -21,6 +21,37 @@ downscaled, cropped for tidiness, or re-encoded to save bytes. The reason is the
 philosophy, not vanity: this project's claim is that a non-technical reader can
 CHECK what was built, and a screenshot too small to read destroys exactly that.
 Nothing is staged — the numbers on screen are real runs.
+
+---
+
+## v0.1.114 — the switch reaches the model
+
+Captured 2026-08-21 on Debian 13 / GNOME 48, on the installed v0.1.114 package.
+These three are a verification, not a demonstration: they were taken to prove a
+fix, and the middle one is backed by the saved session record.
+
+### Switching provider now moves the running model
+
+Until this release the menu changed the label and not the model. The bottom bar
+read the settings file, so it updated at once; the part of the program that
+sends the request was never told. The line below is the fix reporting itself.
+
+[![The provider portal after switching to Antigravity, printing the line Now answering as Claude Sonnet 4.6 Thinking Antigravity free, use slash model for a different one from this provider, with the same model shown in the footer](screenshots/gallery/v0114-now-answering-as.png)](screenshots/gallery/v0114-now-answering-as.png)
+
+### The same question, answered by the model the bar claims
+
+Before the fix, the word "hm" produced an unrequested `web_fetch` of debian.org
+from Llama 3.3 70B under a footer reading Claude. After it, a real question gets
+a real answer with no tool call at all — saved parts are `['text', 'finish']`.
+
+[![Claude Sonnet 4.6 on the free Antigravity tier answering a question about banana counts by explaining it has no tool that can check personal inventory, with the reply labelled Claude Sonnet 4.6 Thinking Antigravity free and a cost of zero dollars](screenshots/gallery/v0114-claude-answers-clean.png)](screenshots/gallery/v0114-claude-answers-clean.png)
+
+### Tools still reach the Antigravity path
+
+The check that the previous screenshot invited: ask for a file listing and see
+whether a tool actually runs.
+
+[![The model asked to list all files in the working folder, running the Find tool with a tree view over the Debian kernel work directory and summarising the contents folder by folder, labelled Claude Sonnet 4.6 Thinking Antigravity free](screenshots/gallery/v0114-tools-work-find-tree.png)](screenshots/gallery/v0114-tools-work-find-tree.png)
 
 ---
 

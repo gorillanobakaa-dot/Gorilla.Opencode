@@ -1,3 +1,37 @@
+## v0.1.114 — 2026-08-21 — the switch reaches the model
+
+**Plain-language version:** you pick a provider from the menu, the bar at the
+bottom says the new model, and your message goes to the old one. That was true
+until this release.
+
+Picking a provider wrote your choice into a settings file. The bottom bar reads
+that file, so it updated at once — but the part of the program that actually
+sends your message was never told, and kept using whatever it started with.
+Nothing errored, nothing looked wrong, and you could work for an hour believing
+you were on a free model while every message came off another account's
+allowance.
+
+It was caught by behaviour, not by a test or a label. The owner switched to
+Claude, typed "hm", and got an unrequested attempt to fetch a website: "I have a
+feeling this is not Claude, only Llama does that." He was right — the small grey
+label under the reply read Llama 3.3 70B under a bottom bar reading Claude
+Sonnet 4.6, and the saved record agreed with the label.
+
+Picking a provider now switches the running model too, and says "Now answering
+as ...". If the switch fails it says so and names what you are still on, because
+silence there is what caused the bug. Verified in the saved session record: the
+same question that produced an invented website fetch now produces an answer and
+no tool call at all.
+
+Two smaller repairs. Sign-in calls had no time limit of any kind, so one request
+that never came back could leave "Setting up your free tier..." on screen
+forever; they now give up after 45 seconds and keep the saved sign-in either
+way. And "Provider busy" now names the provider — it used to name nobody, which
+let a NVIDIA rate-limit be mistaken for a Google one, including by me, in
+writing, to the owner.
+
+Full detail, both tracks: `Changelogs/v0.1.114-release-notes.md`.
+
 ## v0.1.113 — 2026-08-21 — the menu explains itself
 
 **Plain-language version:** a small release about the first screen anybody sees.
