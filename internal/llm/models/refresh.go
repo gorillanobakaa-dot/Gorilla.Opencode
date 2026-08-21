@@ -345,6 +345,40 @@ func CatalogueAge(configDir string) (age time.Duration, ok bool) {
 	return time.Since(fi.ModTime()), true
 }
 
+// NewestCatalogueAge reports how long ago ANY provider list was last refreshed,
+// and whether one has ever been.
+//
+// GORILLA FIX (2026-08-21): the startup notice asked CatalogueAge, which stats
+// the OpenRouter cache alone. That was the whole story when OpenRouter was the
+// only fetched list. It is not now — Groq, Cerebras, Anthropic, OpenAI, xAI,
+// DeepSeek and Antigravity each keep their own file, so a user who refreshes
+// every one of them and happens not to use OpenRouter was told their models had
+// NEVER BEEN UPDATED. A warning that fires after the user has already done the
+// thing it asks for teaches people to ignore warnings.
+func NewestCatalogueAge(configDir string) (age time.Duration, ok bool) {
+	newest := time.Time{}
+	entries, err := os.ReadDir(configDir)
+	if err != nil {
+		return 0, false
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), "-models.json") {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().After(newest) {
+			newest = info.ModTime()
+		}
+	}
+	if newest.IsZero() {
+		return 0, false
+	}
+	return time.Since(newest), true
+}
+
 // StaleAfter is how old a refreshed list gets before the startup screen
 // mentions it. Providers retire models continuously, and a retired model does
 // not fail politely - it errors when picked.

@@ -28,6 +28,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -349,7 +350,7 @@ func (m *model) View() string {
 	// project spends most of its effort removing. The cost is stated in seconds
 	// on a slow line, not just kilobytes, because that is the unit someone
 	// waiting actually feels.
-	if note := staleModelsNotice(); note != "" {
+	if note := staleModelsNotice(w); note != "" {
 		b.WriteString("\n\n")
 		// The notice is multiline and can be wider than a narrow terminal. Route
 		// it through the same width-constrained renderer as every other row so
@@ -425,8 +426,21 @@ func AnswerLine(dir string, remembered bool) string {
 const staleModelsHeadline = "BITCH, REMEMBER TO REFRESH YOUR MODELS!"
 
 // staleModelsNotice returns the refresh prompt, or "" when the list is current.
-func staleModelsNotice() string {
-	age, refreshed := models.CatalogueAge(config.CacheBase())
+//
+// w is the width the notice will be rendered into. It has to be passed in
+// because the notice INDENTS its body, and a hand-indented line that is then
+// wrapped by the caller loses the indent on every continuation — which is what
+// the owner photographed on 2026-08-21: a paragraph that started six columns in
+// and dropped its tail at column 0, looking like broken output. Wrapping here,
+// with the indent applied after the wrap, keeps the left edge straight at any
+// width. (CLAUDE.md: lipgloss fails by WRAPPING, silently, in a different place
+// from the cause.)
+func staleModelsNotice(w int) string {
+	// GORILLA FIX (2026-08-21): ask about EVERY provider list, not OpenRouter's
+	// alone. Seven other providers keep their own cache file now, so the old
+	// check told a user who had just refreshed all of them that their models had
+	// NEVER BEEN UPDATED.
+	age, refreshed := models.NewestCatalogueAge(config.CacheBase())
 	switch {
 	case !refreshed:
 		// Never refreshed: they are running whatever shipped with the build.
@@ -443,9 +457,33 @@ func staleModelsNotice() string {
 	//
 	// The wording lives in staleModelsHeadline, one line, deliberately easy to
 	// change before this ships to strangers.
+	return renderStaleNotice(w, age, refreshed)
+}
+
+// renderStaleNotice is the notice itself, separated from the question of whether
+// to show it. Split so the layout can be tested at any width without depending
+// on what happens to be in the cache directory of the machine running the test —
+// the first version of this test skipped itself on a machine whose catalogue was
+// current, which is a test that cannot fail.
+func renderStaleNotice(w int, age time.Duration, refreshed bool) string {
 	shout := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Bold(true)
 	warn := lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
 	body := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+
+	const indent = "      "
+	// Wrap to what is left after the indent, then indent every produced line —
+	// including the ones the wrap created. Measured in DISPLAY COLUMNS, not
+	// bytes: the notice carries a gorilla and an em dash, and len() would count
+	// those as 4 and 3.
+	para := func(style lipgloss.Style, pad, text string) string {
+		wrapWidth := max(12, w-lipgloss.Width(pad))
+		wrapped := lipgloss.NewStyle().Width(wrapWidth).Render(text)
+		lines := strings.Split(wrapped, "\n")
+		for i, l := range lines {
+			lines[i] = pad + style.Render(strings.TrimRight(l, " "))
+		}
+		return strings.Join(lines, "\n")
+	}
 
 	when := "NEVER BEEN UPDATED"
 	if refreshed {
@@ -453,18 +491,22 @@ func staleModelsNotice() string {
 	}
 
 	var b strings.Builder
-	b.WriteString(shout.Render("  🦍  " + staleModelsHeadline))
+	// The headline wraps too. It is 45 columns with its gorilla, and a 40-column
+	// box made it spill — caught by the test, not by reading it.
+	b.WriteString(para(shout, "  ", "🦍  "+staleModelsHeadline))
 	b.WriteString("\n")
-	b.WriteString(shout.Render(fmt.Sprintf("      YOUR MODEL LIST HAS %s — IT GOES OFF WEEKLY.", when)))
+	b.WriteString(para(shout, indent, fmt.Sprintf("YOUR MODEL LIST HAS %s — IT GOES OFF WEEKLY.", when)))
 	b.WriteString("\n")
-	b.WriteString(body.Render("      Providers retire models all the time, and a retired one just errors"))
-	b.WriteString("\n")
-	b.WriteString(body.Render("      when you pick it. Refreshing takes about 650 KB — roughly 80 seconds"))
-	b.WriteString("\n")
-	b.WriteString(body.Render("      even on a very slow line, and it saves a lot of swearing later:"))
+	b.WriteString(para(body, indent, "Providers retire models all the time, and a retired one just errors "+
+		"when you pick it. Refreshing takes about 650 KB — roughly 80 seconds even on a very "+
+		"slow line, and it saves a lot of swearing later. Inside the program, type:"))
 	b.WriteString("\n\n")
-	b.WriteString(warn.Render("      gorilla-opencode models refresh"))
+	// GORILLA FIX (2026-08-21): /update, not `gorilla-opencode models refresh`.
+	// The CLI subcommand means quitting the session to run it, "so in practice
+	// nobody did" — the exact reason /update was added on 2026-08-20. A notice
+	// that asks for a quit is a notice that gets ignored.
+	b.WriteString(indent + warn.Render("/update"))
 	b.WriteString("\n")
-	b.WriteString(body.Render("      No account, nothing sent about you. You're welcome.  🦍"))
+	b.WriteString(para(body, indent, "No account, nothing sent about you. You're welcome.  🦍"))
 	return b.String()
 }
