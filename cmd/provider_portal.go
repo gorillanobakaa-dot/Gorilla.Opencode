@@ -211,16 +211,27 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 		{
 			ID:   "gemini-api",
 			Name: "Google Gemini - API key",
-			What: "A Google AI Studio key (AIzaSy...). Different from the Gmail sign-in " +
-				"above.",
-			Warning: "Free-tier keys are heavily rate-limited and can return HTTP 429 " +
-				"with a zero quota. The Gmail sign-in option above is usually the " +
-				"better free route.",
-			NeedsInput:  true,
-			InputPrompt: "Paste your Gemini API key (AIzaSy...).",
-			Secret:      true,
-			Configured:  keyed(models.ProviderGemini),
-			Active:      curProv == models.ProviderGemini,
+			// GORILLA OVERRIDE (2026-08-21): say WHERE the key comes from and
+			// that it costs nothing. The row named the key and assumed the
+			// reader already had one — but somebody who does not have a key is
+			// exactly who this row is for, and "go and find out how" is the
+			// closed door PHILOSOPHY.md argues against. Confirmed on the owner's
+			// own account the same day: Billing Tier reads "Free tier", with no
+			// card attached and no billing set up.
+			What: "A Google AI Studio key. Free, and it needs no card: make one at " +
+				"aistudio.google.com/apikey with any Google account, and leave billing " +
+				"switched off. It is separate from the Gmail sign-in rows above and has " +
+				"its own allowance, so when one is used up the other still works.",
+			Warning: "The free allowance is limited per minute and per day. A busy turn " +
+				"can use it up, which arrives as HTTP 429 or a bare \"unknown error\" — " +
+				"that is the limit, not a broken key. Wait, or switch to a Google " +
+				"sign-in row above, which spends a different allowance.",
+			NeedsInput: true,
+			InputPrompt: "Paste your Gemini API key (AIzaSy...). Free from " +
+				"aistudio.google.com/apikey - no card needed.",
+			Secret:     true,
+			Configured: keyed(models.ProviderGemini),
+			Active:     curProv == models.ProviderGemini,
 		},
 		// The other sign-in: a ChatGPT account, free plan included.
 		{
