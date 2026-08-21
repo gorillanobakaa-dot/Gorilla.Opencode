@@ -1,4 +1,4 @@
-<!-- Version: 1.4.0 · updated 26-08-20-19-12 -->
+<!-- Version: 1.5.0 · updated 26-08-21-13-05 -->
 # Gorilla OpenCode — screenshots & proof
 
 Real screenshots from a Debian 13 / GNOME 48 machine running the revived
@@ -21,6 +21,76 @@ downscaled, cropped for tidiness, or re-encoded to save bytes. The reason is the
 philosophy, not vanity: this project's claim is that a non-technical reader can
 CHECK what was built, and a screenshot too small to read destroys exactly that.
 Nothing is staged — the numbers on screen are real runs.
+
+---
+
+## v0.1.112 — the model lists stop being a lie
+
+Captured 2026-08-21 on Debian 13 / GNOME 48, model **Llama 3.3 70B** served by
+an NVIDIA NIM key, at 1593–1600 px. Every number on screen is a real run against
+real providers.
+
+### The menu, after the cull
+
+Fourteen rows, every one reachable without a company account. Microsoft Azure,
+GitHub Copilot, Amazon Bedrock and the Google Cloud project row are gone —
+thirty entries that needed a card, a subscription or a billing-enabled cloud
+project. DeepSeek gained a row: it had a provider and a client but no way in
+without editing a config file by hand.
+
+[![The launch provider menu showing fourteen rows — Antigravity, ChatGPT sign-in, Google Code Assist, NVIDIA NIM, Ollama, Cloudflare, Anthropic, OpenAI, Gemini, Groq, Cerebras, OpenRouter, xAI and DeepSeek — with no Microsoft Azure, no GitHub Copilot, no Amazon Bedrock and no Google Cloud project row](screenshots/gallery/v0112-provider-portal-cull.png)](screenshots/gallery/v0112-provider-portal-cull.png)
+
+### `/update` asking the providers what they serve
+
+The heart of the release. Groq reports **8 usable (+8, -0)** — fetched live,
+where the binary used to carry five models Groq had decommissioned. xAI reports
+a refused key, which is the error path working: a dead credential is named as
+refused rather than reported as a broken provider.
+
+The same shot proves the notice fix. The whole report is printed **into the
+transcript**, where it wraps and stays; the blue footer below shows the same
+message cut at `xAI failed: xAI refused the key (HT...`. Long notices used to
+exist only as that truncation.
+
+[![The /update report printed in full in the transcript: OpenRouter 289 usable, Antigravity 20 usable, xAI failed because the key was refused with HTTP 403, Groq 8 usable having fetched them live, Cerebras 2 usable, two configured endpoints re-asked — while the footer below shows the same notice truncated mid-sentence](screenshots/gallery/v0112-update-live-catalogues.png)](screenshots/gallery/v0112-update-live-catalogues.png)
+
+### Purge, then refetch
+
+`/purge` clears the downloaded lists; `/update` brings them back from the
+network — **OpenRouter 289 usable (+289, -0)**. The +289 is the proof that they
+were really cleared and really re-fetched, rather than reappearing from the
+binary.
+
+[![After a purge, /update refetches and reports OpenRouter 289 usable with plus-289 added, proving the models were really cleared and really came back from the network rather than from the binary](screenshots/gallery/v0112-purge-then-update-refetch.png)](screenshots/gallery/v0112-purge-then-update-refetch.png)
+
+### One row per model
+
+`/gpt-oss` returns four rows where it would have returned nine. NVIDIA NIM wins
+GPT-OSS 120B over Cerebras, Groq and OpenRouter — named on the row, not hidden —
+because its limit is per minute where OpenRouter's free tier is 50 requests a
+day without a card. The endpoint is named as the user named it, not as "local".
+
+[![Searching for gpt-oss returns four rows instead of nine: NVIDIA NIM's GPT-OSS 20B marked also on groq and openrouter, NIM's GPT-OSS 120B marked also on cerebras, groq and openrouter, plus Antigravity's separate Medium variant and OpenRouter's safeguard model](screenshots/gallery/v0112-search-duplicates-collapsed.png)](screenshots/gallery/v0112-search-duplicates-collapsed.png)
+
+Wider, across every provider at once — the ChatGPT sign-in winning over
+OpenRouter for GPT-5.5 and GPT-5.4 Mini:
+
+[![A search for gpt across every provider at once, 49 of 386 models matching, with the NVIDIA NIM rows naming their alternatives and the ChatGPT sign-in rows marked also on openrouter](screenshots/gallery/v0112-search-gpt-all-providers.png)](screenshots/gallery/v0112-search-gpt-all-providers.png)
+
+### `/purge` counting honestly
+
+Three numbers, each of which the user can act on: what was cleared, how much
+**ships with the app and returns on restart**, and how much came from their own
+endpoints and re-registers on the next launch.
+
+[![The /purge report reading cleared 421 models, 23 left, then stating that 23 of them ship with the app and come back when you restart and that 102 of them came from configured endpoints and re-register on the next launch](screenshots/gallery/v0112-purge-honest-count.png)](screenshots/gallery/v0112-purge-honest-count.png)
+
+**This one is a retake, and the first version is why the procedure exists.** It
+originally read *38 of them ship with the app*, which was wrong: the count asked
+a variable that a refresh writes into, so models fetched from the network were
+counted as shipping in the binary. Every automated test passed against that bug.
+It was caught by installing the release on the machine and photographing it
+before publishing — which is now step 4 of the release checklist.
 
 ---
 
