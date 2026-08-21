@@ -131,3 +131,42 @@ func TestPurgeSaysHowManyModelsComeBack(t *testing.T) {
 			res.RemovedCompiled, res.RemovedModels)
 	}
 }
+
+// GORILLA FIX (2026-08-21): the compiled-in count must not grow when a refresh
+// runs. Caught by a screenshot of the real binary: /purge reported "38 of them
+// ship with the app" where 23 was the true figure, because applyAntigravity
+// writes FETCHED models back into AntigravityModels and compiledIn() was asking
+// that map at purge time.
+//
+// A binary's contents are fixed when it is built. Anything that answers "does
+// this ship with the app?" from a variable something else can write to is
+// answering a different question.
+func TestCompiledCountIgnoresModelsAddedByARefresh(t *testing.T) {
+	savedAG := make(map[ModelID]Model, len(AntigravityModels))
+	for k, v := range AntigravityModels {
+		savedAG[k] = v
+	}
+	savedModels := make(map[ModelID]Model, len(SupportedModels))
+	for k, v := range SupportedModels {
+		savedModels[k] = v
+	}
+	t.Cleanup(func() {
+		AntigravityModels = savedAG
+		SupportedModels = savedModels
+	})
+
+	const fetched ModelID = "antigravity.some-model-added-by-a-refresh"
+	// Exactly what applyAntigravity does: register into BOTH maps.
+	AntigravityModels[fetched] = Model{ID: fetched, Provider: ProviderAntigravity}
+	SupportedModels[fetched] = Model{ID: fetched, Provider: ProviderAntigravity}
+
+	if compiledIn(SupportedModels[fetched]) {
+		t.Error("a model added by a refresh is being counted as shipping in the binary")
+	}
+
+	res := PurgeFetchedCatalogues(t.TempDir())
+	if res.RemovedCompiled > len(compiledInIDs) {
+		t.Errorf("RemovedCompiled=%d exceeds the %d ids that actually ship — the count is inflated",
+			res.RemovedCompiled, len(compiledInIDs))
+	}
+}

@@ -56,18 +56,37 @@ type PurgeResult struct {
 	RemovedLocal int
 }
 
-// compiledIn reports whether a model is one of the entries registered by an
-// init() — i.e. it ships in the binary and comes back on the next launch
-// whatever a purge does. Checked by identity against the source maps rather than
-// by provider, because two providers contribute BOTH kinds.
-func compiledIn(m Model) (Model, bool) {
-	if orig, ok := OpenRouterGeneratedModels[m.ID]; ok {
-		return orig, true
+// compiledInIDs is the set of model ids that genuinely ship inside the binary,
+// SNAPSHOTTED at init.
+//
+// GORILLA FIX (2026-08-21, same day, caught by a screenshot): this was a live
+// lookup into OpenRouterGeneratedModels and AntigravityModels. That is wrong,
+// because applyAntigravity WRITES FETCHED MODELS BACK INTO AntigravityModels —
+// so after one /update the "compiled-in" map held 20 entries instead of 5, and
+// /purge reported "38 of them ship with the app" when the true figure was 23.
+//
+// The irony is the lesson: the fix for an overstated count shipped with an
+// overstated count, because it asked a mutable variable what the binary
+// contains. A binary's contents are fixed at build time, so the answer must be
+// taken at init and never re-derived.
+//
+// Package-level variables are fully initialised before any init() runs (Go
+// spec), so this sees the literals and nothing else.
+var compiledInIDs = map[ModelID]bool{}
+
+func init() {
+	for id := range OpenRouterGeneratedModels {
+		compiledInIDs[id] = true
 	}
-	if orig, ok := AntigravityModels[m.ID]; ok {
-		return orig, true
+	for id := range AntigravityModels {
+		compiledInIDs[id] = true
 	}
-	return Model{}, false
+}
+
+// compiledIn reports whether a model ships in the binary — i.e. it comes back on
+// the next launch whatever a purge does.
+func compiledIn(m Model) bool {
+	return compiledInIDs[m.ID]
 }
 
 // PurgeFetchedCatalogues deletes the cached provider catalogues and drops the
@@ -104,7 +123,7 @@ func PurgeFetchedCatalogues(configDir string, keep ...ModelID) PurgeResult {
 		// PROVIDER cannot tell them apart — so /purge reported 284 removed when
 		// 279 of those were built into the binary and silently returned on the
 		// next launch. The number was true for about as long as the session was.
-		if _, builtIn := compiledIn(m); builtIn {
+		if compiledIn(m) {
 			res.RemovedCompiled++
 		}
 	}
