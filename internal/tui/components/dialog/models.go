@@ -405,6 +405,11 @@ func (m *modelDialogCmp) openSearch() {
 		}
 		m.searchDomain = append(m.searchDomain, getModelsForProvider(p)...)
 	}
+	// GORILLA OVERRIDE (2026-08-21): one row per model. The same model arrives
+	// through several providers (GPT-OSS 120B via NIM, Groq, Cerebras and
+	// OpenRouter), and four identical-looking rows that differ only in whose
+	// quota they spend is not a choice anyone can make. See duplicates.go.
+	m.searchDomain = collapseDuplicates(m.searchDomain)
 	m.savedIdx, m.savedScroll = m.selectedIdx, m.scrollOffset
 	m.searchActive = true
 	m.query = ""
@@ -851,8 +856,6 @@ func (m *modelDialogCmp) connectionLine() string {
 		return "served through your Google login (Antigravity quota)"
 	case models.ProviderChatGPT:
 		return "served through your ChatGPT login (your plan's limits, not a bill)"
-	case models.ProviderCopilot:
-		return "served through your GitHub Copilot login"
 	}
 	if fp := config.ProviderKeyFingerprint(m.provider); fp != "" {
 		line := fmt.Sprintf("every request below is billed to your %s key %s", m.provider, fp)
@@ -877,8 +880,6 @@ func connectionFor(mod models.Model) string {
 		return "your Google login (Antigravity quota)"
 	case models.ProviderChatGPT:
 		return "your ChatGPT login (your plan's limits, not a bill)"
-	case models.ProviderCopilot:
-		return "your GitHub Copilot login"
 	}
 	if fp := config.ProviderKeyFingerprint(mod.Provider); fp != "" {
 		return fmt.Sprintf("your %s key %s", mod.Provider, fp)

@@ -165,6 +165,44 @@ func UnregisterLocalEndpointByName(name string) int {
 	return n
 }
 
+// PurgeLocalModels drops every model that came from an OpenAI-compatible
+// endpoint (NVIDIA NIM, Ollama, LM Studio, anything added with /connect) and
+// forgets their routes. Returns how many left the picker.
+//
+// GORILLA FIX (2026-08-21): /purge missed these entirely. It cleared OpenRouter
+// and Antigravity because those arrive as cache FILES, and local models arrive
+// over the wire at startup instead — so a purge left the picker holding NVIDIA
+// NIM's ~100 entries, which on this account is the largest single block in it.
+// From the user's side "purge the downloaded model lists" plainly includes the
+// list downloaded from their own endpoint; the storage mechanism is an
+// implementation detail they are not required to know.
+//
+// The endpoint itself is NOT touched. It stays configured, keeps its key, and
+// re-registers on the next launch or /update — the same reversible bargain the
+// fetched catalogues get. Removing it for good is /connection, which is a
+// different decision and asks first.
+// keep names the models an agent is currently pointed at; those survive, so a
+// purge cannot blank out the model you are talking to right now.
+func PurgeLocalModels(keep map[ModelID]bool) int {
+	n := 0
+	for id, m := range SupportedModels {
+		if m.Provider != ProviderLocal || keep[id] {
+			continue
+		}
+		delete(SupportedModels, id)
+		delete(localRoute, id)
+		n++
+	}
+	// A route with no model behind it routes nothing; drop the leftovers rather
+	// than keep a map that outlives the registry it describes.
+	for id := range localRoute {
+		if _, live := SupportedModels[id]; !live {
+			delete(localRoute, id)
+		}
+	}
+	return n
+}
+
 // fetchLocalModels tries the LM Studio beta path first, then the standard
 // OpenAI /v1/models path, against baseURL (authenticating with apiKey).
 func fetchLocalModels(baseURL, apiKey string) []localModel {

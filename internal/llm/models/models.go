@@ -34,21 +34,25 @@ type Model struct {
 	SupportsAttachments bool          `json:"supports_attachments"`
 }
 
-// Model IDs
-const ( // GEMINI
-	// Bedrock
-	BedrockClaude37Sonnet ModelID = "bedrock.claude-3.7-sonnet"
-)
+// GORILLA CULL (2026-08-21): Bedrock, Azure, Copilot and VertexAI were removed
+// — model lists, provider clients and picker rows. Every one of them requires an
+// enterprise account, a paid subscription or a billing-enabled cloud project, so
+// none of them is reachable by the audience this program is built for (CLAUDE.md:
+// "which option works for someone on a 2012 laptop, a metered connection, and no
+// credit card?"). Between them they contributed 30 entries to a picker whose whole
+// problem is that it is too long to read.
+//
+// They were not deleted: the files are in
+// /home/gorilla/Agents.Work.Trash/gorilla-opencode-provider-cull-26-08-21-11-58/
+// should anyone ever want them back.
 
 const (
-	ProviderBedrock ModelProvider = "bedrock"
 	// ForTests
 	ProviderMock ModelProvider = "__mock"
 )
 
-// Providers in order of popularity
+// Providers in order of popularity. Lower sorts first in the picker.
 var ProviderPopularity = map[ModelProvider]int{
-	ProviderCopilot:    1,
 	ProviderAnthropic:  2,
 	ProviderOpenAI:     3,
 	ProviderGemini:     4,
@@ -56,59 +60,16 @@ var ProviderPopularity = map[ModelProvider]int{
 	ProviderCerebras:   5,
 	ProviderOpenRouter: 6,
 	ProviderDeepSeek:   6,
-	ProviderBedrock:    7,
-	ProviderAzure:      8,
-	ProviderVertexAI:   9,
+	ProviderXAI:        7,
 }
 
-var SupportedModels = map[ModelID]Model{
-	//
-	// // GEMINI
-	// GEMINI25: {
-	// 	ID:                 GEMINI25,
-	// 	Name:               "Gemini 2.5 Pro",
-	// 	Provider:           ProviderGemini,
-	// 	APIModel:           "gemini-2.5-pro-exp-03-25",
-	// 	CostPer1MIn:        0,
-	// 	CostPer1MInCached:  0,
-	// 	CostPer1MOutCached: 0,
-	// 	CostPer1MOut:       0,
-	// },
-	//
-	// GRMINI20Flash: {
-	// 	ID:                 GRMINI20Flash,
-	// 	Name:               "Gemini 2.0 Flash",
-	// 	Provider:           ProviderGemini,
-	// 	APIModel:           "gemini-2.0-flash",
-	// 	CostPer1MIn:        0.1,
-	// 	CostPer1MInCached:  0,
-	// 	CostPer1MOutCached: 0.025,
-	// 	CostPer1MOut:       0.4,
-	// },
-	//
-	// // Bedrock
-	BedrockClaude37Sonnet: {
-		ID:                 BedrockClaude37Sonnet,
-		Name:               "Bedrock: Claude 3.7 Sonnet",
-		Provider:           ProviderBedrock,
-		APIModel:           "anthropic.claude-3-7-sonnet-20250219-v1:0",
-		CostPer1MIn:        3.0,
-		CostPer1MInCached:  3.75,
-		CostPer1MOutCached: 0.30,
-		CostPer1MOut:       15.0,
-	},
-}
+var SupportedModels = map[ModelID]Model{}
 
 func init() {
-	maps.Copy(SupportedModels, AnthropicModels)
-	maps.Copy(SupportedModels, OpenAIModels)
+	// What is left compiled in: Gemini (a curated list behind a free, no-card
+	// AI Studio key) and the generated OpenRouter catalogue. Everything else is
+	// either fetched from its provider (catalogue_fetch.go) or registered by an
+	// OAuth sign-in the app itself controls (Antigravity, ChatGPT, Code Assist).
 	maps.Copy(SupportedModels, GeminiModels)
-	maps.Copy(SupportedModels, GroqModels)
-	maps.Copy(SupportedModels, CerebrasModels)
-	maps.Copy(SupportedModels, AzureModels)
 	maps.Copy(SupportedModels, OpenRouterGeneratedModels)
-	maps.Copy(SupportedModels, XAIModels)
-	maps.Copy(SupportedModels, VertexAIGeminiModels)
-	maps.Copy(SupportedModels, DeepSeekModels)
-	maps.Copy(SupportedModels, CopilotModels)
 }

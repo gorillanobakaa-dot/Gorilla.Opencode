@@ -2,6 +2,17 @@
 
 # Gorilla OpenCode
 
+<!-- WHO-THIS-IS-FOR: managed block, do not edit by hand -->
+
+**A terminal AI coding agent.**
+
+Built for the people every other tool prices out: kids with no credit
+card, 15-year-old laptops, data sold by the megabyte. Free forever, by
+design, not as a trial.
+Why, with the numbers: [PHILOSOPHY.md](PHILOSOPHY.md)
+
+<!-- /WHO-THIS-IS-FOR -->
+
 **The original OpenCode, revived.** A terminal AI coding agent — MIT
 licensed, no telemetry, no accounts, no vendor funnel. Bring your own
 API keys or run models on your own machine.

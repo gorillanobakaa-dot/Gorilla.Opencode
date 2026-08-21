@@ -1,3 +1,51 @@
+## v0.1.112 — 2026-08-21 — the model lists stop being a lie
+
+**Plain-language version:** somebody picked a model from the menu and got back
+"this model has been decommissioned". They picked another one. Same answer.
+
+The program carried a hand-typed list of every model each company offers,
+written into the program itself. Companies retire models constantly and nothing
+ever checked, so the list quietly stopped being true — and a retired entry does
+not warn you, it sits in the menu looking selectable and fails the moment you
+choose it. Checked on the day: sixteen entries were dead. All five Groq models,
+the last shut down five days earlier. All seven Anthropic ones. All four xAI
+ones. Those same dead names were also the defaults, so a new user pasting a Groq
+key had everything pointed at a model Groq had already switched off.
+
+The program now asks. The moment you paste a key it asks that company what it
+actually serves, remembers the answer, and asks again on /update — where it
+names anything that has disappeared. Six companies work that way now, and no
+default anywhere names a specific model; they all ask the list.
+
+Four companies were removed outright: Microsoft Azure, GitHub Copilot, Amazon
+Bedrock and Google Cloud. Every one needs a company account, a subscription or a
+billing-enabled cloud project, which is not what this program is for. Thirty
+unreachable entries left a menu whose whole problem is being too long to read.
+Nothing was thrown away; the files are in the quarantine folder.
+
+Menu entries built into the download went from 369 to 45. Most of that is
+OpenRouter, which shipped 279 models of which 261 charge money — the download
+now carries the 18 free ones, and anyone with a key gets the full list from the
+network with /update.
+
+Searching now shows one row per model instead of the same model four times under
+four companies, on the route with the most usable free allowance, naming the
+others. That order is a measurement: OpenRouter's free tier is 50 requests a
+day without a card, NVIDIA's is about 40 a minute. Per-minute slows you down;
+per-day sends you away until tomorrow.
+
+/purge stopped overstating itself — it used to report 284 models removed when
+279 of them shipped inside the program and returned on the next restart, and now
+says so. Long footer messages that used to be cut off mid-sentence are now
+printed into the transcript in full. And /purge had been leaving about a hundred
+NVIDIA models untouched, which is now fixed.
+
+The download is 1.4 MB smaller (50.72 MB to 49.35 MB) — about three minutes at
+8 KB/s. Almost none of that is the model lists; it is the four removed companies
+taking their supporting code with them.
+
+Full detail, both tracks: `Changelogs/v0.1.112-release-notes.md`.
+
 ## v0.1.111 — 2026-08-20 — the meter got its colours back, and a 204 KB file that could eat 420 MB
 
 **Plain-language version:** three repairs, no new features. Two of them undo

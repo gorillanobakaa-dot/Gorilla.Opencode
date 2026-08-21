@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 
@@ -242,6 +241,20 @@ func Load(workingDir string, debug bool) (*Config, error) {
 	// Load and merge local config
 	mergeLocalConfig(workingDir)
 
+	// GORILLA OVERRIDE (2026-08-21): apply the cached provider catalogues —
+	// Groq, Cerebras, Anthropic, OpenAI, xAI, DeepSeek — before the default-model
+	// ladder runs, because that ladder now asks the registry which models a
+	// provider actually has rather than naming a constant that can go stale.
+	//
+	// Disk only, never the network: a slow link must not delay launch. The
+	// network fetch happens on connect and on /update.
+	//
+	// Deliberately silent. configureLogging() has not run yet at this point, so
+	// slog's built-in default handler is still in force and it writes to STDERR
+	// — which the TUI then paints over with no way to clear it. Same trap as the
+	// duplicate-endpoint warnings; see the comment on configureLogging below.
+	models.LoadCachedCatalogues(CacheBase())
+
 	setProviderDefaults()
 
 	// Apply configuration to the struct
@@ -397,175 +410,47 @@ func setProviderDefaults() {
 	if apiKey := os.Getenv("XAI_API_KEY"); apiKey != "" {
 		viper.SetDefault("providers.xai.apiKey", apiKey)
 	}
-	if apiKey := os.Getenv("AZURE_OPENAI_ENDPOINT"); apiKey != "" {
-		// api-key may be empty when using Entra ID credentials – that's okay
-		viper.SetDefault("providers.azure.apiKey", os.Getenv("AZURE_OPENAI_API_KEY"))
-	}
-	if apiKey, err := LoadGitHubToken(); err == nil && apiKey != "" {
-		viper.SetDefault("providers.copilot.apiKey", apiKey)
-		if viper.GetString("providers.copilot.apiKey") == "" {
-			viper.Set("providers.copilot.apiKey", apiKey)
+
+	// Default models, in the order someone is most likely to be able to USE
+	// them: free-with-a-sign-in first, free-with-a-key next, paid last
+	// (directive §8 — this audience mostly has no card).
+	//
+	// GORILLA OVERRIDE (2026-08-21): the fetched providers no longer name a
+	// model constant here. They cannot: their lists come from the provider at
+	// runtime, so there is no compile-time id to point at — which is the whole
+	// reason a hardcoded default like Llama3_3_70BVersatile could sit in this
+	// file for months after Groq shut the model down. Ask the registry instead;
+	// if a provider has no cached list yet, it simply yields nothing and the
+	// next candidate is tried.
+	for _, cand := range []struct {
+		key   string
+		model models.ModelID
+	}{
+		{"providers.gemini.apiKey", models.Gemini36Flash},
+		{"providers.groq.apiKey", models.PreferredCatalogueModel(models.ProviderGROQ)},
+		{"providers.cerebras.apiKey", models.PreferredCatalogueModel(models.ProviderCerebras)},
+		{"providers.openrouter.apiKey", models.OpenRouterNvidiaNemotron3Ultra550bA55bFree},
+		{"providers.anthropic.apiKey", models.PreferredCatalogueModel(models.ProviderAnthropic)},
+		{"providers.openai.apiKey", models.PreferredCatalogueModel(models.ProviderOpenAI)},
+		{"providers.xai.apiKey", models.PreferredCatalogueModel(models.ProviderXAI)},
+		{"providers.deepseek.apiKey", models.PreferredCatalogueModel(models.ProviderDeepSeek)},
+	} {
+		if strings.TrimSpace(viper.GetString(cand.key)) == "" || cand.model == "" {
+			continue
 		}
-	}
-
-	// Use this order to set the default models
-	// 1. Copilot
-	// 2. Anthropic
-	// 3. OpenAI
-	// 4. Google Gemini
-	// 5. Groq
-	// 6. OpenRouter
-	// 7. AWS Bedrock
-	// 8. Azure
-	// 9. Google Cloud VertexAI
-
-	// copilot configuration
-	if key := viper.GetString("providers.copilot.apiKey"); strings.TrimSpace(key) != "" {
-		viper.SetDefault("agents.coder.model", models.CopilotGPT4o)
-		viper.SetDefault("agents.summarizer.model", models.CopilotGPT4o)
-		viper.SetDefault("agents.task.model", models.CopilotGPT4o)
-		viper.SetDefault("agents.title.model", models.CopilotGPT4o)
-		return
-	}
-
-	// Anthropic configuration
-	if key := viper.GetString("providers.anthropic.apiKey"); strings.TrimSpace(key) != "" {
-		viper.SetDefault("agents.coder.model", models.Claude4Sonnet)
-		viper.SetDefault("agents.summarizer.model", models.Claude4Sonnet)
-		viper.SetDefault("agents.task.model", models.Claude4Sonnet)
-		viper.SetDefault("agents.title.model", models.Claude4Sonnet)
-		return
-	}
-
-	// OpenAI configuration
-	if key := viper.GetString("providers.openai.apiKey"); strings.TrimSpace(key) != "" {
-		viper.SetDefault("agents.coder.model", models.GPT41)
-		viper.SetDefault("agents.summarizer.model", models.GPT41)
-		viper.SetDefault("agents.task.model", models.GPT41Mini)
-		viper.SetDefault("agents.title.model", models.GPT41Mini)
-		return
-	}
-
-	// Google Gemini configuration
-	if key := viper.GetString("providers.gemini.apiKey"); strings.TrimSpace(key) != "" {
-		viper.SetDefault("agents.coder.model", models.Gemini36Flash)
-		viper.SetDefault("agents.summarizer.model", models.Gemini36Flash)
-		viper.SetDefault("agents.task.model", models.Gemini35FlashLite)
-		viper.SetDefault("agents.title.model", models.Gemini35FlashLite)
-		return
-	}
-
-	// Groq configuration
-	if key := viper.GetString("providers.groq.apiKey"); strings.TrimSpace(key) != "" {
-		// GORILLA OVERRIDE: default was QWENQwq (qwen-qwq-32b), which
-		// Groq has retired. Use a model Groq actually serves today.
-		viper.SetDefault("agents.coder.model", models.Llama3_3_70BVersatile)
-		viper.SetDefault("agents.summarizer.model", models.Llama3_3_70BVersatile)
-		viper.SetDefault("agents.task.model", models.Llama3_3_70BVersatile)
-		viper.SetDefault("agents.title.model", models.Llama3_3_70BVersatile)
-		return
-	}
-
-	// GORILLA OVERRIDE: Cerebras configuration (native provider).
-	if key := viper.GetString("providers.cerebras.apiKey"); strings.TrimSpace(key) != "" {
-		viper.SetDefault("agents.coder.model", models.CerebrasGLM47)
-		viper.SetDefault("agents.summarizer.model", models.CerebrasGLM47)
-		viper.SetDefault("agents.task.model", models.CerebrasGLM47)
-		viper.SetDefault("agents.title.model", models.CerebrasGLM47)
-		return
-	}
-
-	// OpenRouter configuration
-	if key := viper.GetString("providers.openrouter.apiKey"); strings.TrimSpace(key) != "" {
-		viper.SetDefault("agents.coder.model", models.OpenRouterNvidiaNemotron3Ultra550bA55bFree)
-		viper.SetDefault("agents.summarizer.model", models.OpenRouterNvidiaNemotron3Ultra550bA55bFree)
-		viper.SetDefault("agents.task.model", models.OpenRouterNvidiaNemotron3Ultra550bA55bFree)
-		viper.SetDefault("agents.title.model", models.OpenRouterOpenaiGptOss20bFree)
-		return
-	}
-
-	// XAI configuration
-	if key := viper.GetString("providers.xai.apiKey"); strings.TrimSpace(key) != "" {
-		viper.SetDefault("agents.coder.model", models.XAIGrok3Beta)
-		viper.SetDefault("agents.summarizer.model", models.XAIGrok3Beta)
-		viper.SetDefault("agents.task.model", models.XAIGrok3Beta)
-		viper.SetDefault("agents.title.model", models.XAiGrok3MiniFastBeta)
-		return
-	}
-
-	// AWS Bedrock configuration
-	if hasAWSCredentials() {
-		viper.SetDefault("agents.coder.model", models.BedrockClaude37Sonnet)
-		viper.SetDefault("agents.summarizer.model", models.BedrockClaude37Sonnet)
-		viper.SetDefault("agents.task.model", models.BedrockClaude37Sonnet)
-		viper.SetDefault("agents.title.model", models.BedrockClaude37Sonnet)
-		return
-	}
-
-	// Azure OpenAI configuration
-	if os.Getenv("AZURE_OPENAI_ENDPOINT") != "" {
-		viper.SetDefault("agents.coder.model", models.AzureGPT41)
-		viper.SetDefault("agents.summarizer.model", models.AzureGPT41)
-		viper.SetDefault("agents.task.model", models.AzureGPT41Mini)
-		viper.SetDefault("agents.title.model", models.AzureGPT41Mini)
-		return
-	}
-
-	// Google Cloud VertexAI configuration
-	if hasVertexAICredentials() {
-		viper.SetDefault("agents.coder.model", models.VertexAIGemini25)
-		viper.SetDefault("agents.summarizer.model", models.VertexAIGemini25)
-		viper.SetDefault("agents.task.model", models.VertexAIGemini25Flash)
-		viper.SetDefault("agents.title.model", models.VertexAIGemini25Flash)
+		setAgentDefaults(cand.model, cand.model)
 		return
 	}
 }
 
-// hasAWSCredentials checks if AWS credentials are available in the environment.
-func hasAWSCredentials() bool {
-	// Check for explicit AWS credentials
-	if os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != "" {
-		return true
-	}
-
-	// Check for AWS profile
-	if os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_DEFAULT_PROFILE") != "" {
-		return true
-	}
-
-	// Check for AWS region
-	if os.Getenv("AWS_REGION") != "" || os.Getenv("AWS_DEFAULT_REGION") != "" {
-		return true
-	}
-
-	// Check if running on EC2 with instance profile
-	if os.Getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") != "" ||
-		os.Getenv("AWS_CONTAINER_CREDENTIALS_FULL_URI") != "" {
-		return true
-	}
-
-	return false
-}
-
-// hasVertexAICredentials checks if VertexAI credentials are available in the environment.
-func hasVertexAICredentials() bool {
-	// Check for explicit VertexAI parameters
-	if os.Getenv("VERTEXAI_PROJECT") != "" && os.Getenv("VERTEXAI_LOCATION") != "" {
-		return true
-	}
-	// Check for Google Cloud project and location
-	if os.Getenv("GOOGLE_CLOUD_PROJECT") != "" && (os.Getenv("GOOGLE_CLOUD_REGION") != "" || os.Getenv("GOOGLE_CLOUD_LOCATION") != "") {
-		return true
-	}
-	return false
-}
-
-func hasCopilotCredentials() bool {
-	// Check for explicit Copilot parameters
-	if token, _ := LoadGitHubToken(); token != "" {
-		return true
-	}
-	return false
+// setAgentDefaults points the four agents at a model. Helpers get the cheaper
+// one where a provider has a curated split; passing the same id twice is the
+// normal case for a fetched provider, where no such split is known.
+func setAgentDefaults(main, helper models.ModelID) {
+	viper.SetDefault("agents.coder.model", main)
+	viper.SetDefault("agents.summarizer.model", main)
+	viper.SetDefault("agents.task.model", helper)
+	viper.SetDefault("agents.title.model", helper)
 }
 
 // readConfig handles the result of reading a configuration file.
@@ -821,7 +706,7 @@ func backfillProviderKeysFromEnv() {
 		models.ProviderCerebras:   "CEREBRAS_API_KEY",
 		models.ProviderOpenRouter: "OPENROUTER_API_KEY",
 		models.ProviderXAI:        "XAI_API_KEY",
-		models.ProviderAzure:      "AZURE_OPENAI_API_KEY",
+		models.ProviderDeepSeek:   "DEEPSEEK_API_KEY",
 	}
 	for p, env := range envFor {
 		pc, ok := cfg.Providers[p]
@@ -881,6 +766,23 @@ func Validate() error {
 	return nil
 }
 
+// ProviderAPIKey returns the usable key for a provider: the one saved in
+// config.json, falling back to the environment. Exported because listing a
+// provider's models needs the same credential the chat requests use, and a
+// caller re-deriving "which key applies" is how two answers to one question
+// start to disagree.
+//
+// It returns a CREDENTIAL. Never log or print the result; the fingerprint
+// helper below exists for anything user-facing.
+func ProviderAPIKey(provider models.ModelProvider) string {
+	if cfg != nil {
+		if p, ok := cfg.Providers[provider]; ok && p.APIKey != "" {
+			return p.APIKey
+		}
+	}
+	return getProviderAPIKey(provider)
+}
+
 // getProviderAPIKey gets the API key for a provider from environment variables
 func getProviderAPIKey(provider models.ModelProvider) string {
 	switch provider {
@@ -894,18 +796,10 @@ func getProviderAPIKey(provider models.ModelProvider) string {
 		return os.Getenv("GROQ_API_KEY")
 	case models.ProviderCerebras:
 		return os.Getenv("CEREBRAS_API_KEY")
-	case models.ProviderAzure:
-		return os.Getenv("AZURE_OPENAI_API_KEY")
 	case models.ProviderOpenRouter:
 		return os.Getenv("OPENROUTER_API_KEY")
-	case models.ProviderBedrock:
-		if hasAWSCredentials() {
-			return "aws-credentials-available"
-		}
-	case models.ProviderVertexAI:
-		if hasVertexAICredentials() {
-			return "vertex-ai-credentials-available"
-		}
+	case models.ProviderDeepSeek:
+		return os.Getenv("DEEPSEEK_API_KEY")
 	}
 	return ""
 }
@@ -1032,189 +926,99 @@ func AvailableViaEnv() []models.ModelProvider {
 	return out
 }
 
-// setDefaultModelForAgent sets a default model for an agent based on available providers
+// setDefaultModelForAgent points ONE agent at a model, used when an agent has no
+// entry of its own. Order is the same as setProviderDefaults: free sign-ins,
+// then free keys, then paid.
+//
+// GORILLA OVERRIDE (2026-08-21): this used to be ~180 lines of near-identical
+// blocks, one per provider, each naming a hardcoded model id. That shape is what
+// let Groq's default sit at llama-3.3-70b-versatile long after Groq retired it —
+// the id is only visible at the bottom of a block nobody reads. Fetched providers
+// now resolve through the registry, and no candidate can name a model that is not
+// actually registered.
 func setDefaultModelForAgent(agent AgentName) bool {
-	if hasCopilotCredentials() {
-		maxTokens := int64(5000)
-		if agent == AgentTitle {
-			maxTokens = 80
-		}
-
-		cfg.Agents[agent] = Agent{
-			Model:     models.CopilotGPT4o,
-			MaxTokens: maxTokens,
-		}
-		return true
+	maxTokens := int64(5000)
+	if agent == AgentTitle {
+		maxTokens = 80
 	}
-	// Check providers in order of preference
-	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
-		maxTokens := int64(5000)
-		if agent == AgentTitle {
-			maxTokens = 80
+	helper := agent == AgentTitle || agent == AgentTask || agent == AgentResearch
+
+	// pick returns the model for this agent from a (main, helper) pair.
+	pick := func(main, light models.ModelID) models.ModelID {
+		if helper && light != "" {
+			return light
 		}
-		cfg.Agents[agent] = Agent{
-			Model:     models.Claude37Sonnet,
-			MaxTokens: maxTokens,
-		}
-		return true
+		return main
 	}
 
-	if apiKey := os.Getenv("OPENAI_API_KEY"); apiKey != "" {
-		var model models.ModelID
-		maxTokens := int64(5000)
-		reasoningEffort := ""
-
-		switch agent {
-		case AgentTitle:
-			model = models.GPT41Mini
-			maxTokens = 80
-		case AgentTask, AgentResearch:
-			model = models.GPT41Mini
-		default:
-			model = models.GPT41
+	type candidate struct {
+		available   func() bool
+		main, light models.ModelID
+	}
+	envSet := func(name string) func() bool {
+		return func() bool { return os.Getenv(name) != "" }
+	}
+	fetched := func(p models.ModelProvider, env string) candidate {
+		return candidate{
+			available: envSet(env),
+			main:      models.PreferredCatalogueModel(p),
 		}
+	}
 
-		// Check if model supports reasoning
-		if modelInfo, ok := models.SupportedModels[model]; ok && modelInfo.CanReason {
-			reasoningEffort = "medium"
+	for _, c := range []candidate{
+		// Free, no card, signed in with a Google account.
+		{
+			available: func() bool {
+				creds, _ := auth.LoadGeminiCreds()
+				return creds != nil && creds.AccessToken != ""
+			},
+			// GORILLA OVERRIDE 2026-07-27: Flash, not Pro. Pro models resolve on
+			// the free tier and then answer "you have exhausted your capacity",
+			// so a Pro fallback fails on first use.
+			main: models.GeminiCAFlash, light: models.GeminiCA31FlashLite,
+		},
+		// Free key, no card.
+		{
+			available: envSet("GEMINI_API_KEY"),
+			// GORILLA OVERRIDE 2026-07-27: Flash, not Pro. Reaching for the
+			// $1.25/$10-per-1M Pro alias to name a session spends real money on
+			// work Flash handles.
+			main: models.GeminiFlashLatest, light: models.GeminiFlashLiteLatest,
+		},
+		fetched(models.ProviderGROQ, "GROQ_API_KEY"),
+		fetched(models.ProviderCerebras, "CEREBRAS_API_KEY"),
+		{
+			available: envSet("OPENROUTER_API_KEY"),
+			main:      models.OpenRouterNvidiaNemotron3Ultra550bA55bFree,
+			light:     models.OpenRouterOpenaiGptOss20bFree,
+		},
+		// Paid keys last.
+		fetched(models.ProviderAnthropic, "ANTHROPIC_API_KEY"),
+		fetched(models.ProviderOpenAI, "OPENAI_API_KEY"),
+		fetched(models.ProviderXAI, "XAI_API_KEY"),
+		fetched(models.ProviderDeepSeek, "DEEPSEEK_API_KEY"),
+	} {
+		if !c.available() {
+			continue
 		}
-
+		model := pick(c.main, c.light)
+		if model == "" {
+			// A fetched provider with no cached list yet. Not an error: the list
+			// arrives on the next connect or /update. Try the next candidate
+			// rather than pinning an agent to a model that does not exist.
+			continue
+		}
+		reasoning := ""
+		if info, ok := models.SupportedModels[model]; ok && info.CanReason {
+			reasoning = "medium"
+		}
 		cfg.Agents[agent] = Agent{
 			Model:           model,
 			MaxTokens:       maxTokens,
-			ReasoningEffort: reasoningEffort,
+			ReasoningEffort: reasoning,
 		}
 		return true
 	}
-
-	if apiKey := os.Getenv("OPENROUTER_API_KEY"); apiKey != "" {
-		var model models.ModelID
-		maxTokens := int64(5000)
-		reasoningEffort := ""
-
-		switch agent {
-		case AgentTitle:
-			model = models.OpenRouterOpenaiGptOss20bFree
-			maxTokens = 80
-		case AgentTask, AgentResearch:
-			model = models.OpenRouterNvidiaNemotron3Ultra550bA55bFree
-		default:
-			model = models.OpenRouterNvidiaNemotron3Ultra550bA55bFree
-		}
-
-		// Check if model supports reasoning
-		if modelInfo, ok := models.SupportedModels[model]; ok && modelInfo.CanReason {
-			reasoningEffort = "medium"
-		}
-
-		cfg.Agents[agent] = Agent{
-			Model:           model,
-			MaxTokens:       maxTokens,
-			ReasoningEffort: reasoningEffort,
-		}
-		return true
-	}
-
-	if apiKey := os.Getenv("GEMINI_API_KEY"); apiKey != "" {
-		// GORILLA OVERRIDE 2026-07-27: Flash, not Pro. This is a fallback the
-		// user never chose — reaching for the $1.25/$10-per-1M Pro alias to
-		// summarize a session or name a title spends real money on work the
-		// Flash tier handles. Coder gets Flash too; anyone wanting Pro can
-		// select it explicitly.
-		var model models.ModelID
-		maxTokens := int64(5000)
-
-		if agent == AgentTitle {
-			model = models.GeminiFlashLiteLatest
-			maxTokens = 80
-		} else {
-			model = models.GeminiFlashLatest
-		}
-
-		cfg.Agents[agent] = Agent{
-			Model:     model,
-			MaxTokens: maxTokens,
-		}
-		return true
-	}
-
-	// GORILLA OVERRIDE: Gemini via "Login with Google" (Code Assist free
-	// tier). If the user has signed in, default the background agents
-	// (title/summarizer/task) to the login too, so the whole app runs on
-	// the free tier instead of falling through to a provider whose key may
-	// be missing (that is the "title generation failed on Groq" trap).
-	if creds, _ := auth.LoadGeminiCreds(); creds != nil && creds.AccessToken != "" {
-		// GORILLA OVERRIDE 2026-07-27: default to the Flash tier, not Pro. This
-		// is the free tier: Pro models resolve but answer "you have exhausted
-		// your capacity" on an ordinary account, so a Pro fallback fails on
-		// first use. Flash / Flash-Lite were probed working against cloudcode-pa.
-		model := models.GeminiCAFlash
-		maxTokens := int64(5000)
-		if agent == AgentTitle {
-			model = models.GeminiCA31FlashLite
-			maxTokens = 80
-		}
-		cfg.Agents[agent] = Agent{Model: model, MaxTokens: maxTokens}
-		return true
-	}
-
-	if apiKey := os.Getenv("GROQ_API_KEY"); apiKey != "" {
-		maxTokens := int64(5000)
-		if agent == AgentTitle {
-			maxTokens = 80
-		}
-
-		cfg.Agents[agent] = Agent{
-			Model:     models.Llama3_3_70BVersatile,
-			MaxTokens: maxTokens,
-		}
-		return true
-	}
-
-	if apiKey := os.Getenv("CEREBRAS_API_KEY"); apiKey != "" {
-		maxTokens := int64(5000)
-		if agent == AgentTitle {
-			maxTokens = 80
-		}
-		cfg.Agents[agent] = Agent{
-			Model:     models.CerebrasGLM47,
-			MaxTokens: maxTokens,
-		}
-		return true
-	}
-
-	if hasAWSCredentials() {
-		maxTokens := int64(5000)
-		if agent == AgentTitle {
-			maxTokens = 80
-		}
-
-		cfg.Agents[agent] = Agent{
-			Model:           models.BedrockClaude37Sonnet,
-			MaxTokens:       maxTokens,
-			ReasoningEffort: "medium", // Claude models support reasoning
-		}
-		return true
-	}
-
-	if hasVertexAICredentials() {
-		var model models.ModelID
-		maxTokens := int64(5000)
-
-		if agent == AgentTitle {
-			model = models.VertexAIGemini25Flash
-			maxTokens = 80
-		} else {
-			model = models.VertexAIGemini25
-		}
-
-		cfg.Agents[agent] = Agent{
-			Model:     model,
-			MaxTokens: maxTokens,
-		}
-		return true
-	}
-
 	return false
 }
 
@@ -1655,55 +1459,10 @@ func UpdateTheme(themeName string) error {
 	})
 }
 
-// Tries to load Github token from all possible locations
-func LoadGitHubToken() (string, error) {
-	// First check environment variable
-	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
-		return token, nil
-	}
-
-	// Get config directory
-	var configDir string
-	if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
-		configDir = xdgConfig
-	} else if runtime.GOOS == "windows" {
-		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
-			configDir = localAppData
-		} else {
-			configDir = filepath.Join(os.Getenv("HOME"), "AppData", "Local")
-		}
-	} else {
-		configDir = filepath.Join(os.Getenv("HOME"), ".config")
-	}
-
-	// Try both hosts.json and apps.json files
-	filePaths := []string{
-		filepath.Join(configDir, "github-copilot", "hosts.json"),
-		filepath.Join(configDir, "github-copilot", "apps.json"),
-	}
-
-	for _, filePath := range filePaths {
-		data, err := os.ReadFile(filePath)
-		if err != nil {
-			continue
-		}
-
-		var config map[string]map[string]interface{}
-		if err := json.Unmarshal(data, &config); err != nil {
-			continue
-		}
-
-		for key, value := range config {
-			if strings.Contains(key, "github.com") {
-				if oauthToken, ok := value["oauth_token"].(string); ok {
-					return oauthToken, nil
-				}
-			}
-		}
-	}
-
-	return "", fmt.Errorf("GitHub token not found in standard locations")
-}
+// GORILLA CULL (2026-08-21): LoadGitHubToken and the Copilot credential probe
+// went with the Copilot provider. The Copilot token lives in a GitHub-hosted
+// config that only the Copilot client could use, and there is no Copilot client
+// any more. Kept in the quarantine copy of copilot.go if it is ever wanted back.
 
 // FollowCoderModel moves the helper agents (summarizer, task, title) onto
 // newModel, but ONLY those that were still sitting on prevCoder — i.e. the ones

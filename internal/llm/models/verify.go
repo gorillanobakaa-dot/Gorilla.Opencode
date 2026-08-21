@@ -32,44 +32,50 @@ import (
 // the moment someone picks it. Being able to ask "is my list still true?" is
 // most of the value; rebuilding it is the smaller half.
 
-// CatalogueEndpoint describes where a provider publishes its model list.
-// Providers absent from this map do not publish one at all - Antigravity and
-// Google Code Assist ship fixed lists inside their clients, so there is nothing
-// to check them against.
+// CatalogueEndpoint describes where a provider publishes its model list, for the
+// `models verify` command.
+//
+// GORILLA OVERRIDE (2026-08-21): this used to carry its OWN table of provider
+// URLs beside the one in catalogue_fetch.go. Two lists of the same six endpoints
+// is precisely the shape that drifts — the estate has a launcher-in-three-places
+// incident on record — so the table is now DERIVED from LiveCatalogues, which is
+// the one place a provider's listing URL is written down.
 type CatalogueEndpoint struct {
 	Name     string // human label
-	URL      string // OpenAI-compatible /v1/models
+	URL      string // the provider's model listing
 	NeedsKey bool
 	// Free marks providers with a usable free tier. Directive §8: this audience
 	// mostly has no card, so these are listed first and paid ones last.
 	Free bool
-	// KeyHint tells someone where to get a key when they have none. This
-	// project's users mostly do not have a company card; the free tiers are the
-	// realistic route, so name them rather than assuming.
+	// KeyHint tells someone where to get a key when they have none.
 	KeyHint string
 }
 
-// CatalogueEndpoints is deliberately small. Only providers that publish a
-// machine-readable list appear; the rest cannot be checked and saying so is
-// better than pretending.
-var CatalogueEndpoints = map[ModelProvider]CatalogueEndpoint{
-	ProviderGROQ: {
-		Name: "Groq", URL: "https://api.groq.com/openai/v1/models", NeedsKey: true, Free: true,
-		KeyHint: "free key at console.groq.com",
-	},
-	ProviderCerebras: {
-		Name: "Cerebras", URL: "https://api.cerebras.ai/v1/models", NeedsKey: true, Free: true,
-		KeyHint: "free key at cloud.cerebras.ai",
-	},
-	ProviderOpenAI: {
-		Name: "OpenAI", URL: "https://api.openai.com/v1/models", NeedsKey: true,
-		KeyHint: "platform.openai.com — paid",
-	},
-	ProviderXAI: {
-		Name: "xAI", URL: "https://api.x.ai/v1/models", NeedsKey: true,
-		KeyHint: "console.x.ai — paid",
-	},
+// keyHints are the "where do I get one" lines. Separate from LiveCatalogues
+// because they are advice for a human, not wire configuration.
+var keyHints = map[ModelProvider]string{
+	ProviderGROQ:      "free key at console.groq.com",
+	ProviderCerebras:  "free key at cloud.cerebras.ai",
+	ProviderAnthropic: "console.anthropic.com — paid",
+	ProviderOpenAI:    "platform.openai.com — paid",
+	ProviderXAI:       "console.x.ai — paid",
+	ProviderDeepSeek:  "platform.deepseek.com — paid",
 }
+
+// CatalogueEndpoints is every provider that publishes a machine-readable list.
+// Providers absent from it cannot be checked, and saying so is better than
+// pretending — Antigravity and Google Code Assist ship fixed lists inside their
+// clients, so there is nothing to check them against.
+var CatalogueEndpoints = func() map[ModelProvider]CatalogueEndpoint {
+	out := make(map[ModelProvider]CatalogueEndpoint, len(LiveCatalogues))
+	for p, cat := range LiveCatalogues {
+		out[p] = CatalogueEndpoint{
+			Name: cat.Label, URL: cat.URL, NeedsKey: true,
+			Free: cat.FreeTier, KeyHint: keyHints[p],
+		}
+	}
+	return out
+}()
 
 // VerifyResult is what a check found.
 type VerifyResult struct {
@@ -103,8 +109,15 @@ func VerifyProvider(p ModelProvider, apiKey string) VerifyResult {
 		res.Err = err
 		return res
 	}
+	// Auth style has to match the fetcher's, or verify reports a false failure
+	// on the one provider that does not take a bearer token.
 	if apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+apiKey)
+		if LiveCatalogues[p].Auth == authAnthropicKey {
+			req.Header.Set("x-api-key", apiKey)
+			req.Header.Set("anthropic-version", "2023-06-01")
+		} else {
+			req.Header.Set("Authorization", "Bearer "+apiKey)
+		}
 	}
 	req.Header.Set("Accept", "application/json")
 

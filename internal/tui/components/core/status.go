@@ -24,6 +24,10 @@ import (
 
 type StatusCmp interface {
 	tea.Model
+	// InfoBudget reports how many columns a status message survives here. The
+	// app asks before showing one, because a notice that does not fit must also
+	// be printed into the transcript rather than silently cut in half.
+	InfoBudget() int
 }
 
 type statusCmp struct {
@@ -196,13 +200,37 @@ func formatTokensAndCost(tokens, contextWindow int64, cost float64) string {
 	return fmt.Sprintf("Context: %s, Cost: %s", formattedTokens, formattedCost)
 }
 
-func (m statusCmp) View() string {
-	t := theme.CurrentTheme()
-	modelID := config.Get().Agents[config.AgentCoder].Model
-	model := models.SupportedModels[modelID]
+// statusChrome is everything on the status line that is NOT the message: the
+// help hint, the token/cost box, the helper count, the YOLO warning, the
+// diagnostics and the model name. What is left over is the message's budget.
+//
+// GORILLA OVERRIDE (2026-08-21): extracted from View so the budget has ONE
+// definition. The app needs to know, before rendering, whether a notice will be
+// truncated here — that is what decides whether it is also printed into the
+// transcript. Computing that with a second, parallel expression would be a
+// guess that drifts the first time a widget is added to this line.
+type statusChrome struct {
+	tokens      string
+	diagnostics string
+	helpers     string
+	yolo        string
+	model       string
+	// avail is the columns left for the message region.
+	avail int
+}
 
-	// Initialize the help widget
-	status := getHelpWidget()
+func (m statusCmp) chrome() statusChrome {
+	t := theme.CurrentTheme()
+	// A nil config is startup order, not corruption: the status bar can be
+	// asked for its widths before Load() has run. It used to dereference
+	// straight through and panic. There is nothing to name yet — render the
+	// line without a model rather than take the app down over a label.
+	var model models.Model
+	if cfg := config.Get(); cfg != nil {
+		model = models.SupportedModels[cfg.Agents[config.AgentCoder].Model]
+	}
+
+	c := statusChrome{model: m.model()}
 
 	tokenInfoWidth := 0
 	if m.session.ID != "" {
@@ -222,47 +250,69 @@ func (m statusCmp) View() string {
 			tokensStyle = tokensStyle.Background(t.Warning())
 		}
 		tokenInfoWidth = lipgloss.Width(tokens) + 2
-		status += tokensStyle.Render(tokens)
+		c.tokens = tokensStyle.Render(tokens)
 	}
 
-	diagnostics := styles.Padded().
+	c.diagnostics = styles.Padded().
 		Background(t.BackgroundDarker()).
 		Render(m.projectDiagnostics())
 
 	// GORILLA OVERRIDE: live helper-agent count. Transparency — the user
 	// always sees how many sub-agents are running on their behalf, and that
 	// /tasks can stop them.
-	helpers := ""
 	helpersWidth := 0
 	if n := agent.ActiveSubAgentCount(); n > 0 {
-		helpers = styles.Padded().
+		c.helpers = styles.Padded().
 			Background(t.Warning()).
 			Foreground(t.Background()).
 			Render(fmt.Sprintf("🦍 %d helper(s) | /tasks", n))
-		helpersWidth = lipgloss.Width(helpers)
+		helpersWidth = lipgloss.Width(c.helpers)
 	}
 
 	// GORILLA OVERRIDE: while YOLO is on, say so on every single frame. It
 	// switches off the prompt that stands between an agent and the user's
 	// files, so it must never be something you can forget you enabled — the
 	// same reasoning as the helper count beside it, one step louder.
-	yolo := ""
 	yoloWidth := 0
 	if permission.SessionAutoApproved(m.session.ID) {
-		yolo = styles.Padded().
+		c.yolo = styles.Padded().
 			Background(t.Error()).
 			Foreground(t.Background()).
 			Bold(true).
 			Render("☢ YOLO — auto-approving")
-		yoloWidth = lipgloss.Width(yolo)
+		yoloWidth = lipgloss.Width(c.yolo)
 	}
 
-	availableWidht := max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(m.model())-lipgloss.Width(diagnostics)-tokenInfoWidth-helpersWidth-yoloWidth)
+	c.avail = max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(c.model)-lipgloss.Width(c.diagnostics)-tokenInfoWidth-helpersWidth-yoloWidth)
+	return c
+}
+
+// InfoBudget is how many COLUMNS a status message actually gets before
+// truncateStatusMsg cuts it — the same number View passes to that function, not
+// an estimate of it. Zero or less means "not measurable yet" (no WindowSizeMsg
+// has arrived), which is also the case where View does not truncate at all.
+func (m statusCmp) InfoBudget() int {
+	return m.chrome().avail - infoPadding
+}
+
+// infoPadding is the margin View subtracts from the message region before
+// truncating: the padded style's own two columns plus room for the "..."
+// marker and the widths this line cannot predict (emoji that measure one column
+// and draw two).
+const infoPadding = 10
+
+func (m statusCmp) View() string {
+	t := theme.CurrentTheme()
+	c := m.chrome()
+
+	// Initialize the help widget
+	status := getHelpWidget()
+	status += c.tokens
 
 	if m.info.Msg != "" {
 		infoStyle := styles.Padded().
 			Foreground(t.Background()).
-			Width(availableWidht)
+			Width(c.avail)
 
 		switch m.info.Type {
 		case util.InfoTypeInfo:
@@ -273,21 +323,20 @@ func (m statusCmp) View() string {
 			infoStyle = infoStyle.Background(t.Error())
 		}
 
-		infoWidth := availableWidht - 10
-		msg := truncateStatusMsg(m.info.Msg, infoWidth)
+		msg := truncateStatusMsg(m.info.Msg, c.avail-infoPadding)
 		status += infoStyle.Render(msg)
 	} else {
 		status += styles.Padded().
 			Foreground(t.Text()).
 			Background(t.BackgroundSecondary()).
-			Width(availableWidht).
+			Width(c.avail).
 			Render("")
 	}
 
-	status += yolo
-	status += helpers
-	status += diagnostics
-	status += m.model()
+	status += c.yolo
+	status += c.helpers
+	status += c.diagnostics
+	status += c.model
 
 	return lipgloss.NewStyle().
 		MaxWidth(m.width).
@@ -386,6 +435,9 @@ func (m statusCmp) model() string {
 	t := theme.CurrentTheme()
 
 	cfg := config.Get()
+	if cfg == nil {
+		return "Unknown"
+	}
 
 	coder, ok := cfg.Agents[config.AgentCoder]
 	if !ok {

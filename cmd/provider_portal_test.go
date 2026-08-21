@@ -3,7 +3,9 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/opencode-ai/opencode/internal/config"
@@ -47,8 +49,32 @@ func readCfgFile(t *testing.T) config.Config {
 
 // An API-key selection saves the key and moves every agent onto that provider,
 // persisted to disk — not just held in memory.
+//
+// GORILLA OVERRIDE (2026-08-21): Anthropic's model list is now FETCHED, so this
+// test stubs the fetch. The stub is the point as much as the assertion: a test
+// that reached the real api.anthropic.com would be a network test wearing a unit
+// test's clothes, and would fail on the metered connections this is built for.
 func TestApplyAPIKeyChoicePersists(t *testing.T) {
 	loadCfg(t)
+
+	const listed = "claude-sonnet-5"
+	want := models.ModelID(string(models.ProviderAnthropic) + "." + listed)
+
+	orig := fetchProviderCatalogue
+	fetchProviderCatalogue = func(p models.ModelProvider, apiKey, dir string) (models.CatalogueResult, error) {
+		// A fetch registers the models; the portal then asks the registry which
+		// one to start on. Mirror both halves.
+		models.SupportedModels[want] = models.Model{
+			ID: want, Name: "Claude Sonnet 5", Provider: p, APIModel: listed,
+			ContextWindow: 1_000_000, DefaultMaxTokens: 8192,
+		}
+		return models.CatalogueResult{Provider: p, Label: "Anthropic", Usable: 1}, nil
+	}
+	t.Cleanup(func() {
+		fetchProviderCatalogue = orig
+		delete(models.SupportedModels, want)
+	})
+
 	const key = "sk-ant-testonly-000"
 	err := applyPortalChoice(context.Background(), startup.ProviderChoice{ID: "anthropic", Input: key})
 	if err != nil {
@@ -58,11 +84,35 @@ func TestApplyAPIKeyChoicePersists(t *testing.T) {
 	if got := c.Providers[models.ProviderAnthropic].APIKey; got != key {
 		t.Fatalf("anthropic key not persisted: got %q", got)
 	}
-	if got := c.Agents[config.AgentCoder].Model; got != models.Claude37Sonnet {
-		t.Fatalf("coder not moved to anthropic model: got %q", got)
+	if got := c.Agents[config.AgentCoder].Model; got != want {
+		t.Fatalf("coder not moved to the fetched anthropic model: got %q, want %q", got, want)
 	}
-	if got := c.Agents[config.AgentTitle].Model; got != models.Claude37Sonnet {
+	if got := c.Agents[config.AgentTitle].Model; got != want {
 		t.Fatalf("title not moved: got %q", got)
+	}
+}
+
+// A provider whose listing fails must report it rather than silently leaving the
+// agents pointed somewhere else. The key is still saved — it may be perfectly
+// good and the network simply down — so /update can retry it later.
+func TestApplyAPIKeyChoiceReportsAFailedListing(t *testing.T) {
+	loadCfg(t)
+
+	orig := fetchProviderCatalogue
+	fetchProviderCatalogue = func(models.ModelProvider, string, string) (models.CatalogueResult, error) {
+		return models.CatalogueResult{}, errors.New("connection refused")
+	}
+	t.Cleanup(func() { fetchProviderCatalogue = orig })
+
+	err := applyPortalChoice(context.Background(), startup.ProviderChoice{ID: "groq", Input: "gsk-testonly-000"})
+	if err == nil {
+		t.Fatal("a failed listing was reported as success; the picker would show no Groq models and say nothing")
+	}
+	if !strings.Contains(err.Error(), "saved the key") {
+		t.Errorf("error does not say the key was kept: %q", err)
+	}
+	if got := readCfgFile(t).Providers[models.ProviderGROQ].APIKey; got == "" {
+		t.Error("the key was discarded because the listing failed; /update could never retry it")
 	}
 }
 

@@ -40,6 +40,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"io"
@@ -123,6 +124,19 @@ func goIdent(id string) string {
 }
 
 func main() {
+	// GORILLA OVERRIDE (2026-08-21): compile in the FREE models only.
+	//
+	// Measured on the 2026-08-12 catalogue: of 279 tool-capable models compiled
+	// into the binary, 18 cost nothing and 261 charge money — 94% of the largest
+	// block in the picker unreachable by an audience that mostly has no card
+	// (CLAUDE.md: "a list of 300 items is not access, it is a new cage").
+	//
+	// Nothing is lost. Anyone with an OpenRouter key runs /update and gets the
+	// full live catalogue from the network, cached to disk; this only changes
+	// what ships in the download. Set -all to generate the full list.
+	allModels := flag.Bool("all", false, "compile in paid models too (default: free only)")
+	flag.Parse()
+
 	catalogue, err := fetch()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "openrouter-models:", err)
@@ -134,9 +148,13 @@ func main() {
 		// Batch endpoints are asynchronous bulk jobs - an interactive agent
 		// pointed at one waits indefinitely. Same judgement as the tools filter:
 		// removing entries that cannot do this job, not curating taste.
-		if m.supports("tools") && !models.IsBatchVariant(m.ID) {
-			usable = append(usable, m)
+		if !m.supports("tools") || models.IsBatchVariant(m.ID) {
+			continue
 		}
+		if !*allModels && !m.isFree() {
+			continue
+		}
+		usable = append(usable, m)
 	}
 	if len(usable) == 0 {
 		// Refuse rather than emit an empty file: a generator that silently
@@ -368,9 +386,14 @@ func emit(usable []orModel, rank map[string]int, full map[string]string, total, 
 //
 // Source: %s
 // Generated: %s
-// Catalogue held %d models; %d advertise tool support and are listed here;
-// %d of those are free. Models that cannot call tools are omitted - a coding
-// agent handed one describes edits it cannot make.
+// Catalogue held %d models; %d are listed here (%d free).
+//
+// Two filters, both about reachability rather than taste: models that cannot
+// call tools are omitted (a coding agent handed one describes edits it cannot
+// make), and PAID models are omitted (they cannot be reached at all without a
+// card). Anyone with an OpenRouter key gets the full live catalogue with
+// /update — this is only what ships in the download. Regenerate with -all to
+// compile the paid ones back in.
 //
 // Regenerate deliberately and review the diff: these prices drive the cost
 // display, and a silent change to them is a silent change to what someone is

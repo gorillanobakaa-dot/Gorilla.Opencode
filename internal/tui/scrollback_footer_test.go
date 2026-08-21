@@ -19,6 +19,12 @@ func (s stubStatus) Update(tea.Msg) (tea.Model, tea.Cmd) { return s, nil }
 func (s stubStatus) View() string {
 	return strings.TrimSuffix(strings.Repeat("status\n", s.rows), "\n")
 }
+
+// InfoBudget: the stub has no chrome to measure, so it reports "unmeasurable",
+// which is the state in which nothing is truncated and nothing is echoed. These
+// tests are about footer HEIGHT; the echo rule has its own file.
+func (s stubStatus) InfoBudget() int { return 0 }
+
 func (s stubStatus) SetSize(int, int) tea.Cmd { return nil }
 func (s stubStatus) GetSize() (int, int)      { return 0, s.rows }
 

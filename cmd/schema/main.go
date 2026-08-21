@@ -197,9 +197,9 @@ func generateSchema() map[string]any {
 		string(models.ProviderGemini),
 		string(models.ProviderGROQ),
 		string(models.ProviderOpenRouter),
-		string(models.ProviderBedrock),
-		string(models.ProviderAzure),
-		string(models.ProviderVertexAI),
+		string(models.ProviderCerebras),
+		string(models.ProviderXAI),
+		string(models.ProviderDeepSeek),
 	}
 
 	providerSchema["additionalProperties"].(map[string]any)["properties"].(map[string]any)["provider"] = map[string]any{

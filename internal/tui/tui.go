@@ -721,7 +721,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// only safe way to write above the inline frame, and scrollback is where
 		// the permanent copy belongs; the footer keeps its short flash. Same
 		// dual-channel pattern the quota reading uses.
-		if msg.Echo && a.scrollback && strings.TrimSpace(msg.Msg) != "" {
+		if a.shouldEchoNotice(msg) {
 			t := theme.CurrentTheme()
 			// Bookend the transcript line with util.NoticeDeco (🦍⚠️ ⚠️ 🦍). Drop
 			// the message's own leading gorilla so the bookend supplies them all.
@@ -736,7 +736,19 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Word-wrapping keeps the bookend at the end of the last line where
 			// it belongs. Width 0 means no WindowSizeMsg has arrived yet — leave
 			// it unwrapped rather than render into a zero-width style.
+			// Colour by severity. Every echoed notice used to be Warning
+			// amber, which was right when only the cold-start warning echoed;
+			// now that any oversized notice does, an ordinary /update report
+			// printed in the same amber as a provider failure reads as a
+			// problem. The footer already distinguishes the three — the
+			// transcript copy must agree with it.
 			style := lipgloss.NewStyle().Bold(true).Foreground(t.Warning())
+			switch msg.Type {
+			case util.InfoTypeInfo:
+				style = style.Foreground(t.Info())
+			case util.InfoTypeError:
+				style = style.Foreground(t.Error())
+			}
 			if a.width > 20 {
 				style = style.Width(a.width)
 			}
@@ -1505,13 +1517,42 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.app.CoderAgent != nil && a.app.CoderAgent.IsBusy() {
 				return a, util.ReportWarn("finish or cancel the current turn before purging the model lists")
 			}
-			res := models.PurgeFetchedCatalogues(config.CacheBase())
+			// The models the agents are on survive the purge — see the keep
+			// parameter in models/purge.go.
+			var inUse []models.ModelID
+			for _, ag := range config.Get().Agents {
+				inUse = append(inUse, ag.Model)
+			}
+			res := models.PurgeFetchedCatalogues(config.CacheBase(), inUse...)
 			if res.RemovedModels == 0 && len(res.FilesDeleted) == 0 {
 				return a, util.ReportInfo("nothing to purge - no downloaded model lists were present")
 			}
-			return a, util.ReportInfo(fmt.Sprintf(
-				"purged %d downloaded models, %d left. Your bookmarks and hidden list are untouched. Run /update to fetch fresh lists.",
-				res.RemovedModels, res.Kept))
+			// GORILLA FIX (2026-08-21): say what came from a local endpoint,
+			// separately. Those return by themselves on the next launch because
+			// the connection is still configured, and a user who purged them to
+			// clear the picker needs to know that BEFORE they restart and
+			// conclude the purge did nothing.
+			msgText := fmt.Sprintf(
+				"cleared %d models, %d left. Your bookmarks, hidden list and the models your agents are on are untouched. Run /update to fetch fresh lists.",
+				res.RemovedModels, res.Kept)
+			// GORILLA FIX (2026-08-21): say which ones come BACK. Some of what a
+			// purge clears ships inside the binary and is re-registered by an
+			// init() on the next launch, so "purged" was the wrong word for it —
+			// the picker shrinks now and is full again after a restart, with
+			// nothing having said so. Reported here rather than quietly, because
+			// someone who purged to shorten the list needs to know that BEFORE
+			// they restart and conclude the command did nothing.
+			if res.RemovedCompiled > 0 {
+				msgText += fmt.Sprintf(
+					" %d of them ship with the app and come back when you restart — /connection disables a provider for good, and H hides models permanently.",
+					res.RemovedCompiled)
+			}
+			if res.RemovedLocal > 0 {
+				msgText += fmt.Sprintf(
+					" %d of them came from your configured endpoint(s) — those re-register on the next launch or /update; use /connection to disable an endpoint for good.",
+					res.RemovedLocal)
+			}
+			return a, util.ReportInfo(msgText)
 
 		case "update", "updatemodels", "update-models", "refresh":
 			// Refresh is a network round trip per provider, so it must not run
@@ -2986,6 +3027,32 @@ func hardWrap(s string, w int) []string {
 	return append(out, string(r))
 }
 
+// shouldEchoNotice decides whether a status notice ALSO belongs in the
+// transcript.
+//
+// GORILLA OVERRIDE (2026-08-21): Echo used to be opt-in, and almost nothing
+// opted in — so /update, /purge, the AGENTS.md verdict and every provider error
+// existed only as whatever fraction of themselves fitted the footer. The rule is
+// now the actual reason those notices were lost: if it does not FIT, it is
+// echoed. The footer keeps its flash either way.
+//
+// InfoBudget is the status bar's own truncation budget, not an estimate of it,
+// so the two can never disagree about whether the text was cut. A budget of
+// zero means no WindowSizeMsg has arrived yet — the footer does not truncate in
+// that state either, so neither do we echo. An explicit ReportInfoEcho still
+// echoes at any length, because "important enough to keep" is a separate
+// judgement from "too long to show".
+func (a appModel) shouldEchoNotice(msg util.InfoMsg) bool {
+	if !a.scrollback || strings.TrimSpace(msg.Msg) == "" {
+		return false
+	}
+	if msg.Echo {
+		return true
+	}
+	budget := a.status.InfoBudget()
+	return budget > 0 && ansi.StringWidth(msg.Msg) > budget
+}
+
 // modelLabel is the human name of a model id, falling back to the id itself for
 // anything the catalogue does not know. Used in status notes, where a raw id
 // like "antigravity.gemini-3.6-flash-medium" is not what the user was shown in
@@ -3073,7 +3140,36 @@ func (a *appModel) refreshModelCatalogues() tea.Cmd {
 			}
 		}
 
-		// 3. Every OpenAI-compatible endpoint the user configured - NVIDIA NIM,
+		// 3. Every provider whose list is FETCHED rather than compiled in —
+		// Groq, Cerebras, Anthropic, OpenAI, xAI, DeepSeek. Skipped silently
+		// when no key is on file: "you are not signed in" is not a failure, and
+		// listing eight providers as failed because the user has six of them
+		// unconfigured buries the two that matter.
+		for p, cat := range models.LiveCatalogues {
+			key := config.ProviderAPIKey(p)
+			if strings.TrimSpace(key) == "" {
+				continue
+			}
+			res, err := models.FetchProviderCatalogue(p, key, dir)
+			if err != nil {
+				notes = append(notes, fmt.Sprintf("%s failed: %v", cat.Label, err))
+				continue
+			}
+			note := fmt.Sprintf("%s %d usable", res.Label, res.Usable)
+			if len(res.Added) > 0 || len(res.Removed) > 0 {
+				note += fmt.Sprintf(" (+%d, -%d)", len(res.Added), len(res.Removed))
+			}
+			// Name the retired ones. A model that vanished from a provider is the
+			// single most useful thing this command can tell you — it is the
+			// difference between "your bookmark is gone" and a 400 next time you
+			// pick it.
+			if len(res.Removed) > 0 {
+				note += " — retired: " + strings.Join(res.Removed, ", ")
+			}
+			notes = append(notes, note)
+		}
+
+		// 4. Every OpenAI-compatible endpoint the user configured - NVIDIA NIM,
 		// a local llama.cpp, LM Studio, anything added with /connect. Each is
 		// re-asked what it serves right now, which is the only way a model
 		// retired since the endpoint was added stops being offered.
@@ -3081,17 +3177,35 @@ func (a *appModel) refreshModelCatalogues() tea.Cmd {
 			notes = append(notes, fmt.Sprintf("%d configured endpoint(s) re-asked", n))
 		}
 
-		// 4. Say what CANNOT be refreshed, so silence is not read as success.
-		// Anthropic, OpenAI, Gemini, Groq, Cerebras, Azure, xAI, VertexAI,
-		// DeepSeek, Copilot and ChatGPT ship compiled into the binary. There is
-		// no list to fetch; they change when the app is updated. Without this
-		// line "/update" looks like it refreshed ten providers when it refreshed
-		// the three that have anything to fetch.
-		notes = append(notes, "built-in providers unchanged (they update with the app)")
+		// 5. Say what CANNOT be refreshed, so silence is not read as success.
+		//
+		// GORILLA OVERRIDE (2026-08-21): this list used to name eleven providers.
+		// It is now two — Gemini (API key) and the sign-in providers — because
+		// everything else fetches its own list. Azure, Copilot, Bedrock and
+		// VertexAI are not here at all: they were removed, since none of them is
+		// reachable without an enterprise account or a card.
+		notes = append(notes, "Gemini and the sign-in providers ship with the app and update with it")
 
 		if n := config.HiddenCount(); n > 0 {
 			notes = append(notes, fmt.Sprintf("%d hidden stayed hidden (H to review)", n))
 		}
-		return util.InfoMsg{Type: util.InfoTypeInfo, Msg: strings.Join(notes, " | ")}
+		return refreshSummaryMsg(notes)
+	}
+}
+
+// refreshSummaryMsg packs the per-provider notes into one notice.
+//
+// GORILLA OVERRIDE (2026-08-21): Echo is set. The joined summary is far wider
+// than any terminal — the screenshot that prompted this showed it cut at
+// "2 configured endpoint(s) re-asked | bu...", losing the line whose whole job
+// is to say the built-in providers were NOT refreshed. That is exactly the
+// failure ReportInfoEcho was built for: the footer flashes the head of it, the
+// transcript keeps all of it, scrollable and copyable. A refresh the user has
+// to re-run to find out what it did is not a report.
+func refreshSummaryMsg(notes []string) util.InfoMsg {
+	return util.InfoMsg{
+		Type: util.InfoTypeInfo,
+		Msg:  strings.Join(notes, " | "),
+		Echo: true,
 	}
 }

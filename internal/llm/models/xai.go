@@ -1,61 +1,18 @@
 package models
 
+// GORILLA CULL (2026-08-21): the hand-written xAI model list that lived here
+// is gone. Its models are now FETCHED from xAI itself — see
+// catalogue_fetch.go, which explains why (sixteen entries across three providers
+// were dead on the day this was written, and a dead entry does not fail politely).
+//
+// The old list is kept, not deleted, in
+// /home/gorilla/Agents.Work.Trash/gorilla-opencode-provider-cull-26-08-21-11-58/models/hardcoded-xai.go
+// — it still records the curated descriptions and prices, which are worth
+// harvesting into metadata/ if anyone wants them back on the fetched entries.
+//
+// Only the provider identity stays here; that is not a claim about the world and
+// cannot go stale.
+
 const (
 	ProviderXAI ModelProvider = "xai"
-
-	XAIGrok3Beta         ModelID = "grok-3-beta"
-	XAIGrok3MiniBeta     ModelID = "grok-3-mini-beta"
-	XAIGrok3FastBeta     ModelID = "grok-3-fast-beta"
-	XAiGrok3MiniFastBeta ModelID = "grok-3-mini-fast-beta"
 )
-
-var XAIModels = map[ModelID]Model{
-	XAIGrok3Beta: {
-		ID:                 XAIGrok3Beta,
-		Name:               "Grok3 Beta",
-		Provider:           ProviderXAI,
-		APIModel:           "grok-3-beta",
-		CostPer1MIn:        3.0,
-		CostPer1MInCached:  0,
-		CostPer1MOut:       15,
-		CostPer1MOutCached: 0,
-		ContextWindow:      131_072,
-		DefaultMaxTokens:   20_000,
-	},
-	XAIGrok3MiniBeta: {
-		ID:                 XAIGrok3MiniBeta,
-		Name:               "Grok3 Mini Beta",
-		Provider:           ProviderXAI,
-		APIModel:           "grok-3-mini-beta",
-		CostPer1MIn:        0.3,
-		CostPer1MInCached:  0,
-		CostPer1MOut:       0.5,
-		CostPer1MOutCached: 0,
-		ContextWindow:      131_072,
-		DefaultMaxTokens:   20_000,
-	},
-	XAIGrok3FastBeta: {
-		ID:                 XAIGrok3FastBeta,
-		Name:               "Grok3 Fast Beta",
-		Provider:           ProviderXAI,
-		APIModel:           "grok-3-fast-beta",
-		CostPer1MIn:        5,
-		CostPer1MInCached:  0,
-		CostPer1MOut:       25,
-		CostPer1MOutCached: 0,
-		ContextWindow:      131_072,
-		DefaultMaxTokens:   20_000,
-	},
-	XAiGrok3MiniFastBeta: {
-		ID:                 XAiGrok3MiniFastBeta,
-		Name:               "Grok3 Mini Fast Beta",
-		Provider:           ProviderXAI,
-		APIModel:           "grok-3-mini-fast-beta",
-		CostPer1MIn:        0.6,
-		CostPer1MInCached:  0,
-		CostPer1MOut:       4.0,
-		CostPer1MOutCached: 0,
-		ContextWindow:      131_072,
-		DefaultMaxTokens:   20_000,
-	},
-}

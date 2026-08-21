@@ -52,19 +52,26 @@ var portalProvider = map[string]models.ModelProvider{
 	"cerebras":   models.ProviderCerebras,
 	"openrouter": models.ProviderOpenRouter,
 	"xai":        models.ProviderXAI,
+	"deepseek":   models.ProviderDeepSeek,
 }
 
-// portalDefaults picks the model each provider starts on. Mirrors the choices
-// config.setDefaultModelForAgent already makes for the same providers.
+// portalDefaults picks the model each provider starts on, for the providers
+// whose lists are compiled in. Mirrors config.setDefaultModelForAgent.
+//
+// GORILLA OVERRIDE (2026-08-21): the fetched providers are deliberately absent.
+// Their models are not known until their catalogue has been fetched, so their
+// default is resolved AFTER the fetch, by models.PreferredCatalogueModel. A
+// constant here would be exactly the stale-default bug this change removes —
+// this map used to name Claude 3.7 Sonnet, GPT-4.1 and Grok-3-beta, all three of
+// which were dead by the time anyone noticed.
 var portalDefaults = map[string]struct{ coder, title models.ModelID }{
-	"anthropic":  {models.Claude37Sonnet, models.Claude37Sonnet},
-	"openai":     {models.GPT41, models.GPT41Mini},
 	"gemini-api": {models.GeminiFlashLatest, models.GeminiFlashLiteLatest},
-	"groq":       {models.Llama3_3_70BVersatile, models.Llama3_3_70BVersatile},
-	"cerebras":   {models.CerebrasGLM47, models.CerebrasGLM47},
 	"openrouter": {models.OpenRouterNvidiaNemotron3Ultra550bA55bFree, models.OpenRouterOpenaiGptOss20bFree},
-	"xai":        {models.XAIGrok3Beta, models.XAIGrok3MiniBeta},
 }
+
+// fetchProviderCatalogue is a seam, like registerLocalEndpoint below: it talks to
+// the network, and tests must not.
+var fetchProviderCatalogue = models.FetchProviderCatalogue
 
 // registerLocalEndpoint is a seam: RegisterLocalEndpoint fetches /v1/models
 // over the network, and tests must not.
@@ -315,14 +322,18 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			Active:      curProv == models.ProviderXAI,
 		},
 		{
-			ID:   "gcp-custom",
-			Name: "Google Cloud - your own project id (billing/quota)",
-			What: "The Gmail sign-in, but billed against a specific Google Cloud " +
-				"project you control.",
+			// GORILLA OVERRIDE (2026-08-21): DeepSeek had a provider, a client
+			// and a model list, but no row — so the only route to it was hand-
+			// editing config.json, which the desktop-icon majority does not have
+			// (see the "desktop entry passes NO arguments" trap in CLAUDE.md).
+			ID:          "deepseek",
+			Name:        "DeepSeek - API key",
+			What:        "Paid API, priced well below the US providers. Requires a DEEPSEEK_API_KEY (sk-...).",
 			NeedsInput:  true,
-			InputPrompt: "Enter your Google Cloud project id.",
-			Secret:      false, // a project id is not a credential
-			Active:      false, // indistinguishable from google-oauth by model id
+			InputPrompt: "Paste your DeepSeek API key (sk-...).",
+			Secret:      true,
+			Configured:  keyed(models.ProviderDeepSeek),
+			Active:      curProv == models.ProviderDeepSeek,
 		},
 	}
 
@@ -445,15 +456,6 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 		}
 		return applyAgentModels(models.GeminiCAFlash, models.GeminiCA31FlashLite)
 
-	case "gcp-custom":
-		if err := runGoogleLogin(ctx, c.Input); err != nil {
-			return err
-		}
-		if err := config.UpsertProviderKey(models.ProviderGeminiCA, oauthLoginPlaceholder); err != nil {
-			return err
-		}
-		return applyAgentModels(models.GeminiCAFlash, models.GeminiCA31FlashLite)
-
 	case "nvidia-nim":
 		return applyLocalEndpoint(nimEndpointName, nimBaseURL, c.Input)
 
@@ -471,6 +473,30 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 			if err := config.UpsertProviderKey(prov, c.Input); err != nil {
 				return err
 			}
+		}
+		// GORILLA OVERRIDE (2026-08-21): fetch the provider's list the moment a
+		// key is accepted. This is the point where a key first exists, so it is
+		// the earliest the provider can be asked what it serves — and asking now
+		// means the picker is populated before the user reaches it, rather than
+		// showing an empty provider until the next /update.
+		if _, live := models.LiveCatalogues[prov]; live {
+			key := strings.TrimSpace(c.Input)
+			if key == "" {
+				key = config.ProviderAPIKey(prov)
+			}
+			res, err := fetchProviderCatalogue(prov, key, config.CacheBase())
+			if err != nil {
+				// The key is saved and the endpoint may simply be unreachable
+				// right now. Say what happened rather than failing the whole
+				// selection — /update retries, and a cached list may already be
+				// in place from a previous run.
+				return fmt.Errorf("saved the key, but could not list %s models: %w", prov, err)
+			}
+			model := models.PreferredCatalogueModel(prov)
+			if model == "" {
+				return fmt.Errorf("%s listed %d models, none usable for chat", res.Label, res.Usable)
+			}
+			return applyAgentModels(model, model)
 		}
 		d := portalDefaults[c.ID]
 		return applyAgentModels(d.coder, d.title)

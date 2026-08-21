@@ -26,12 +26,12 @@ import (
 )
 
 var knownHTTPClients = map[string]string{
-	"internal/llm/provider/httpclient.go": "the AI endpoint the user configured; the model cannot choose the address",
-	"internal/llm/provider/copilot.go":    "GitHub Copilot's own token endpoint, a fixed URL",
-	"internal/llm/models/refresh.go":      "the model catalogue, a fixed URL",
-	"internal/llm/models/verify.go":       "verifies a configured provider's endpoint answers",
-	"internal/llm/tools/fetch.go":         "MODEL-CHOSEN: guarded by blockedFetchTarget + dialer Control + CheckRedirect",
-	"internal/llm/tools/websearch.go":     "the SearxNG instance from config; the model supplies the query, not the host",
+	"internal/llm/provider/httpclient.go":    "the AI endpoint the user configured; the model cannot choose the address",
+	"internal/llm/models/refresh.go":         "the model catalogue, a fixed URL",
+	"internal/llm/models/catalogue_fetch.go": "provider /v1/models listings; the URLs are constants in LiveCatalogues, the model cannot choose one",
+	"internal/llm/models/verify.go":          "verifies a configured provider's endpoint answers",
+	"internal/llm/tools/fetch.go":            "MODEL-CHOSEN: guarded by blockedFetchTarget + dialer Control + CheckRedirect",
+	"internal/llm/tools/websearch.go":        "the SearxNG instance from config; the model supplies the query, not the host",
 }
 
 func TestNoUninventoriedHTTPClient(t *testing.T) {

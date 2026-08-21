@@ -15,14 +15,25 @@ import (
 // today's numbers that is inert (the common rejects and the fallbacks all have
 // 1M windows so the clamp never fires), which is exactly why this needs a test
 // rather than an eyeball: the fault only appears once the two windows differ.
+// fixtureWideModel is registered by the test itself — see the note above.
+const fixtureWideModel models.ModelID = "xai.test-fixture-wide-window"
+
 func TestValidateAgentFallbackMaxTokensMatchesFallbackModel(t *testing.T) {
 	// The rejected model must have a LARGER context window than the fallback,
 	// or the buggy clamp produces the same answer as the correct one and the
-	// test cannot fail. GPT41's window is 1047576 against the Gemini
-	// fallback's 1000000, so a clamp computed from the rejected model yields
-	// 523788 — above the fallback's 500000 half-window. Verified by
+	// test cannot fail. The rejected model's window is 1047576 against the
+	// Gemini fallback's 1000000, so a clamp computed from the rejected model
+	// yields 523788 — above the fallback's 500000 half-window. Verified by
 	// re-introducing the fall-through: this test fails, the Gemini-only
 	// version passes.
+	//
+	// UPDATED 2026-08-21: the rejected model is now a FIXTURE this test
+	// registers itself, not a real catalogue entry. It was models.GPT41, then
+	// briefly an OpenRouter id — both of which are exactly the wrong thing to
+	// build a fixture on, because provider catalogues are meant to change under
+	// us now. What this test is about is the arithmetic (the clamp must be
+	// computed from the FALLBACK model, not the rejected one), so it supplies
+	// its own model with a known window and owns its own premise.
 	for _, tc := range []struct {
 		name      string
 		rejected  models.ModelID
@@ -35,9 +46,9 @@ func TestValidateAgentFallbackMaxTokensMatchesFallbackModel(t *testing.T) {
 		// the bug (a provider shown "(ready)" by the portal was reverted by the
 		// validator). With the environment now honoured, the fixture has to pick
 		// a rejected provider that is genuinely unusable.
-		{"modest max-tokens", models.GPT41, 5_000},
-		{"the user's configured 50k", models.GPT41, 50_000},
-		{"wider rejected window, max-tokens above the fallback's half", models.GPT41, 600_000},
+		{"modest max-tokens", fixtureWideModel, 5_000},
+		{"the user's configured 50k", fixtureWideModel, 50_000},
+		{"wider rejected window, max-tokens above the fallback's half", fixtureWideModel, 600_000},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -45,6 +56,15 @@ func TestValidateAgentFallbackMaxTokensMatchesFallbackModel(t *testing.T) {
 				t.Fatalf("Load: %v", err)
 			}
 			c := Get()
+
+			// A wider window than the Gemini fallback's 1000000, so a clamp
+			// computed from the rejected model (523788) lands ABOVE the
+			// fallback's half-window (500000) and the bug is visible.
+			models.SupportedModels[fixtureWideModel] = models.Model{
+				ID: fixtureWideModel, Name: "fixture", Provider: models.ProviderXAI,
+				APIModel: "fixture", ContextWindow: 1_047_576, DefaultMaxTokens: 32_000,
+			}
+			t.Cleanup(func() { delete(models.SupportedModels, fixtureWideModel) })
 
 			rejected := tc.rejected
 			rm, ok := models.SupportedModels[rejected]
@@ -65,7 +85,7 @@ func TestValidateAgentFallbackMaxTokensMatchesFallbackModel(t *testing.T) {
 			// Genuinely unusable: no config key AND no environment key. Without
 			// this the environment would rescue it, which is now correct
 			// behaviour and would leave nothing to fall back FROM.
-			t.Setenv("OPENAI_API_KEY", "")
+			t.Setenv("XAI_API_KEY", "")
 			t.Setenv("GEMINI_API_KEY", "test-key")
 			c.Agents[AgentCoder] = Agent{Model: rejected, MaxTokens: tc.maxTokens}
 

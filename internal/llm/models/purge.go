@@ -13,9 +13,18 @@
 //   - Bookmarks. The whole point of a personal list is that a clean slate does
 //     not touch it. An id that disappears from the registry still renders in the
 //     bookmarks column, marked unavailable, so nothing vanishes silently.
+//   - Models an agent is currently pointed at (passed in by the caller). See
+//     the keep parameter below.
 //   - The hidden list. Purging is about VOLUME; hiding is about a specific
 //     judgement the user made. Conflating them would mean a purge silently
 //     un-hides everything the user rejected.
+//
+// LOCAL ENDPOINTS (added 2026-08-21): models served by a configured
+// OpenAI-compatible endpoint ARE purged — they are a fetched list like any
+// other, they are simply fetched over the wire at startup rather than from a
+// cache file. The endpoint entry itself, its name and its key are untouched, so
+// the list comes back on the next launch or /update. Removing an endpoint for
+// good is /connection.
 //
 // So this is the reversible half of the pair: /purge models clears the fetched
 // lists, /update models fetches them again. The irreversible-feeling half —
@@ -34,12 +43,49 @@ type PurgeResult struct {
 	RemovedModels int
 	FilesDeleted  []string
 	Kept          int
+	// RemovedCompiled is how many of RemovedModels ship inside the binary and
+	// will therefore be back on the next launch. Reported separately because a
+	// purge that says "284 removed" without saying "279 of those return when you
+	// restart" is a number the user cannot act on.
+	RemovedCompiled int
+	// RemovedLocal is how many of RemovedModels came from a configured
+	// OpenAI-compatible endpoint rather than a cache file. Reported separately
+	// because those come BACK by themselves on the next launch — the endpoint is
+	// still configured — and a purge that says "removed 391" without saying
+	// which ones return is a report the user cannot act on.
+	RemovedLocal int
+}
+
+// compiledIn reports whether a model is one of the entries registered by an
+// init() — i.e. it ships in the binary and comes back on the next launch
+// whatever a purge does. Checked by identity against the source maps rather than
+// by provider, because two providers contribute BOTH kinds.
+func compiledIn(m Model) (Model, bool) {
+	if orig, ok := OpenRouterGeneratedModels[m.ID]; ok {
+		return orig, true
+	}
+	if orig, ok := AntigravityModels[m.ID]; ok {
+		return orig, true
+	}
+	return Model{}, false
 }
 
 // PurgeFetchedCatalogues deletes the cached provider catalogues and drops the
 // models they contributed. configDir is CacheBase().
-func PurgeFetchedCatalogues(configDir string) PurgeResult {
+// keep names models that must survive whatever their provider — in practice the
+// ones the agents are currently pointed at. Purging the model you are talking to
+// leaves the footer naming a model the registry no longer has, and the picker
+// with nothing selected; the volume problem /purge exists to solve is not solved
+// any better by including the one entry in use. Variadic so a caller with no
+// live session (a test, a first run) can just omit it.
+func PurgeFetchedCatalogues(configDir string, keep ...ModelID) PurgeResult {
 	res := PurgeResult{}
+	inUse := make(map[ModelID]bool, len(keep))
+	for _, id := range keep {
+		if id != "" {
+			inUse[id] = true
+		}
+	}
 
 	// Which providers came from a fetched file rather than the binary.
 	fetched := map[ModelProvider]bool{
@@ -47,11 +93,36 @@ func PurgeFetchedCatalogues(configDir string) PurgeResult {
 		ProviderAntigravity: true,
 	}
 	for id, m := range SupportedModels {
-		if fetched[m.Provider] {
-			delete(SupportedModels, id)
-			res.RemovedModels++
+		if !fetched[m.Provider] || inUse[id] {
+			continue
+		}
+		delete(SupportedModels, id)
+		res.RemovedModels++
+		// GORILLA FIX (2026-08-21): count what SHIPS separately from what was
+		// downloaded. OpenRouter and Antigravity each have compiled-in models
+		// registered by an init() as well as fetched ones, and purging by
+		// PROVIDER cannot tell them apart — so /purge reported 284 removed when
+		// 279 of those were built into the binary and silently returned on the
+		// next launch. The number was true for about as long as the session was.
+		if _, builtIn := compiledIn(m); builtIn {
+			res.RemovedCompiled++
 		}
 	}
+	// GORILLA FIX (2026-08-21): local endpoint models were being left behind.
+	// They are fetched too, just over the wire at startup instead of from a
+	// cache file, and that distinction means nothing to whoever typed /purge.
+	// See PurgeLocalModels for why the endpoint itself survives.
+	res.RemovedLocal = PurgeLocalModels(inUse)
+	res.RemovedModels += res.RemovedLocal
+
+	// GORILLA OVERRIDE (2026-08-21): the fetched provider catalogues are
+	// downloaded lists too — Groq, Cerebras, Anthropic, OpenAI, xAI, DeepSeek.
+	// They come back on the next connect or /update, same reversible bargain as
+	// OpenRouter's.
+	for p := range LiveCatalogues {
+		res.RemovedModels += PurgeCatalogue(configDir, p, inUse)
+	}
+
 	res.Kept = len(SupportedModels)
 
 	for _, name := range []string{cacheFileName, "antigravity-models.json"} {
