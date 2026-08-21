@@ -1,4 +1,4 @@
-<!-- Version: 1.5.0 · updated 26-08-21-13-05 -->
+<!-- Version: 1.6.0 · updated 26-08-21-14-55 -->
 # Gorilla OpenCode — screenshots & proof
 
 Real screenshots from a Debian 13 / GNOME 48 machine running the revived
@@ -21,6 +21,49 @@ downscaled, cropped for tidiness, or re-encoded to save bytes. The reason is the
 philosophy, not vanity: this project's claim is that a non-technical reader can
 CHECK what was built, and a screenshot too small to read destroys exactly that.
 Nothing is staged — the numbers on screen are real runs.
+
+---
+
+## v0.1.113 — the menu explains itself
+
+Captured 2026-08-21 on Debian 13 / GNOME 48 at 1598 px, on the installed
+v0.1.113 package.
+
+### The provider menu, reordered
+
+Easiest way in first, companies kept together — and the Gemini row selected,
+showing the new text: free, no card, `aistudio.google.com/apikey`, leave billing
+switched off, and a warning that explains what running out actually looks like
+instead of telling you not to bother.
+
+[![The provider menu in the new order: Google Antigravity, Google Code Assist and Google Gemini together at the top, then the ChatGPT sign-in, then NVIDIA NIM, then Ollama, Cloudflare, Groq and Cerebras, then OpenRouter, Anthropic, OpenAI, xAI and DeepSeek — with the Gemini row selected showing that a key is free, needs no card, and comes from aistudio.google.com](screenshots/gallery/v0113-picker-order-gemini-row.png)](screenshots/gallery/v0113-picker-order-gemini-row.png)
+
+Every row carries its own plain-language explanation. The ChatGPT one states
+that a free account is enough and that GPT-5.4 Mini dies on 31 August 2026:
+
+[![The ChatGPT sign-in row selected, explaining that it signs in with a ChatGPT account and uses OpenAI models through the Codex backend, that no API key or credit card is needed, that usage counts against the plan's limits so a free plan hits a cooldown rather than a bill, and that GPT-5.4 Mini is retired by OpenAI on 31 August 2026](screenshots/gallery/v0113-picker-chatgpt-row.png)](screenshots/gallery/v0113-picker-chatgpt-row.png)
+
+The paid ones say so in one line, at the bottom, without apology:
+
+[![The DeepSeek row selected at the bottom of the menu, reading simply that it is a paid API priced well below the US providers and requires a DEEPSEEK_API_KEY](screenshots/gallery/v0113-picker-deepseek-row.png)](screenshots/gallery/v0113-picker-deepseek-row.png)
+
+### A bug caught by photographing the release
+
+This is the startup warning **before** the fix, kept because it is more useful
+than a picture of the corrected version:
+
+[![The folder picker showing the stale-model warning before the fix: it claims the model list has NEVER BEEN UPDATED although the lists had been refreshed an hour earlier, it instructs the reader to quit and run a command-line subcommand, and its wrapped lines lose their indent and start at column zero, giving a ragged left edge that reads as broken output](screenshots/gallery/v0113-stale-notice-before-fix.png)](screenshots/gallery/v0113-stale-notice-before-fix.png)
+
+Three faults at once: it claimed the model list had never been updated an hour
+after it was updated (it only ever looked at OpenRouter's cache, and seven other
+providers keep their own now); it told the reader to quit the session and run a
+command-line subcommand that `/update` had already replaced; and its wrapped
+lines lost their indent, giving the ragged left edge visible above.
+
+All three are fixed, and the layout is now tested at five widths. There is no
+screenshot of the corrected notice: it only appears when a list is over a week
+old, and this machine's lists are current, so photographing it would mean
+staging one.
 
 ---
 
