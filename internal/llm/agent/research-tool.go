@@ -433,6 +433,16 @@ top level. Your reply is parsed. A missing heading is reported as malformed.
 ## ANSWER
 Two to five sentences answering YOUR LANE directly. No preamble.
 
+Then this line, ALWAYS, as the last line of the section:
+BASIS: <the single strongest EVIDENCE below that this answer rests on> | TIER: <tier>
+
+If the answer rests on nothing you actually looked at, say exactly that:
+BASIS: nothing consulted, this is the model's prior knowledge | TIER: unsourced
+
+An answer with no basis line is malformed. This is not bureaucracy: an answer
+is the one sentence anybody reads, and an unsourced one is indistinguishable
+from a checked one once it is written down.
+
 ## FINDINGS
 One bullet per finding, each in this exact shape:
 - CLAIM: <one sentence> | EVIDENCE: <URL, commit, file:line, version, or command output> | TIER: <tier>
@@ -441,7 +451,11 @@ TIER must be one of, strongest first:
   primary_source    a commit, spec, source file, release note, or official doc
   config            a distro build file, package spec, or actual setting on disk
   multiple_reports  several independent reports naming a version
-  single_claim      one README or one forum post. The WEAKEST. Label it honestly.
+  single_claim      one README or one forum post. Weak. Label it honestly.
+  unsourced         nothing was consulted; this is the model's prior knowledge.
+                    THE WEAKEST. It may be perfectly true and it is still not
+                    evidence, because nobody can check it and the model cannot
+                    tell you where it came from.
 
 ## SOURCES TRIED
 One line per source or query consulted, INCLUDING the ones that returned
@@ -763,7 +777,11 @@ var dossierOutputContract = strings.NewReplacer(
   primary_source    a commit, spec, source file, release note, or official doc
   config            a distro build file, package spec, or actual setting on disk
   multiple_reports  several independent reports naming a version
-  single_claim      one README or one forum post. The WEAKEST. Label it honestly.`,
+  single_claim      one README or one forum post. Weak. Label it honestly.
+  unsourced         nothing was consulted; this is the model's prior knowledge.
+                    THE WEAKEST. It may be perfectly true and it is still not
+                    evidence, because nobody can check it and the model cannot
+                    tell you where it came from.`,
 	`GRADE is two characters: source reliability A-F, then information
 credibility 1-6, as defined in DOSSIER DISCIPLINE above. Grade every claim;
 a claim you cannot grade is F6 and belongs in NOT ESTABLISHED.`,
@@ -1247,6 +1265,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 		}
 	}
 	writeResearchReceipt(&out, total, len(roles), ranSessions)
+	writeSynthesisDuty(&out)
 
 	// Report in role order, not completion order, so the output is the same
 	// every run and diffable.
@@ -1599,4 +1618,45 @@ func commas(n int64) string {
 		b.WriteRune(c)
 	}
 	return b.String()
+}
+
+// writeSynthesisDuty tells the model reading this report what it owes the user
+// when it writes the one sentence they will actually read.
+//
+// GORILLA FIX (2026-08-23): the evidence tiers stopped at the findings.
+//
+// The 2026-08-23 run tiered its findings correctly and even refused to repeat
+// an unverified claim eighteen helpers had reported. Then its bottom line said
+// "Pete Holmes is the comedian" flat, with no source and no tier, and the
+// source it actually rested on (a Wikipedia page a helper really did fetch)
+// appeared nowhere in the report. The owner asked the right question: if we did
+// not already know the answer, how would we tell which one is real?
+//
+// From the report as printed, you could not. The machinery for honesty existed
+// and did not reach the one line most people read.
+//
+// The distinction worth teaching the synthesiser is between kinds of claim. A
+// bounded negative ("X is not in this source tree") is checkable by the reader
+// in seconds and is as strong as research gets. An unbounded positive about the
+// world ("who X is") rests entirely on a source, and is worth nothing to a
+// reader who cannot see which one.
+func writeSynthesisDuty(out *strings.Builder) {
+	out.WriteString(`
+## WHEN YOU WRITE THE ANSWER
+
+Carry the evidence into the answer itself, not only into the findings.
+
+- Every load-bearing sentence names its EVIDENCE and TIER, in the sentence or
+  directly after it. A bottom line with no source is the failure this whole
+  format exists to prevent.
+- If a claim rests only on the model's prior knowledge, say so in those words
+  and tier it "unsourced". It may be true. It is still not checkable.
+- Separate what a reader can VERIFY THEMSELVES from what they must take on
+  trust. "Not present in <file>" is a command they can re-run; "X is a Y" is
+  not. Say which is which.
+- Helpers agreeing is NOT corroboration. They share one model, so agreement
+  tells you about the model, not about the world. Only distinct sources count,
+  and a source only counts if it was actually consulted in this run.
+
+`)
 }
