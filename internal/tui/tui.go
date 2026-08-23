@@ -2428,37 +2428,6 @@ func (a appModel) View() string {
 		}
 	}
 
-	if a.showPermissions {
-		overlay := a.permissions.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
-	}
-
-	if a.showFilepicker {
-		overlay := a.filepicker.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
-
-	}
-
 	// Show compacting status overlay
 	if a.isCompacting {
 		t := theme.CurrentTheme()
@@ -2501,21 +2470,6 @@ func (a appModel) View() string {
 		a.help.SetBindings(bindings)
 
 		overlay := a.help.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
-	}
-
-	if a.showQuit {
-		overlay := a.quit.View()
 		row := lipgloss.Height(appView) / 2
 		row -= lipgloss.Height(overlay) / 2
 		col := lipgloss.Width(appView) / 2
@@ -2798,6 +2752,80 @@ func (a appModel) View() string {
 			appView,
 			true,
 		)
+	}
+
+	// GORILLA OVERRIDE (2026-08-23): THE LAST THREE OVERLAYS ARE DRAWN IN REVERSE
+	// KEY-PRIORITY ORDER, and that is the whole point of them being here.
+	//
+	// The bug, reported twice by the owner: with `/tasks` open, tab and esc did
+	// nothing. His words: "the tab button will not allow you to switch anything as
+	// long as your /tasks list is wide enough to cover the buttons of the prompt
+	// underneath. You have to wait for some of the tasks to finish so the tasks
+	// window gets narrower and narrower and it exposes the buttons underneath, and
+	// it is only then when TAB begins to work."
+	//
+	// The cause was an inversion between two orders in this file. In Update, a
+	// visible permission dialog swallows every KeyMsg and returns, so it owns the
+	// keyboard ahead of `/tasks`. In View, it used to be drawn FIRST of sixteen
+	// overlays, so every one of them painted over it. The dialog eating the
+	// keystrokes was underneath the dialog the user could see.
+	//
+	// Permissions is the only overlay that ARRIVES UNBIDDEN. Every other one is
+	// opened by a keystroke, and cannot be opened while permissions is blocking
+	// the keyboard. So a permission prompt lands on top of whatever was already
+	// open, and it must be drawn there too.
+	//
+	// The order below is the exact reverse of the key-handling order at the top of
+	// Update (filepicker, quit, permissions): last drawn is topmost, so the
+	// highest key priority ends up on top. Keeping quit and filepicker ABOVE
+	// permissions is deliberate rather than incidental: they outrank it for keys,
+	// and ctrl+c must keep working while a permission is pending.
+	//
+	// Pinned by TestBlockingOverlaysAreDrawnInReverseKeyOrder.
+	if a.showPermissions {
+		overlay := a.permissions.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(
+			col,
+			row,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
+	if a.showQuit {
+		overlay := a.quit.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(
+			col,
+			row,
+			overlay,
+			appView,
+			true,
+		)
+	}
+
+	if a.showFilepicker {
+		overlay := a.filepicker.View()
+		row := lipgloss.Height(appView) / 2
+		row -= lipgloss.Height(overlay) / 2
+		col := lipgloss.Width(appView) / 2
+		col -= lipgloss.Width(overlay) / 2
+		appView = layout.PlaceOverlay(
+			col,
+			row,
+			overlay,
+			appView,
+			true,
+		)
+
 	}
 
 	return appView
