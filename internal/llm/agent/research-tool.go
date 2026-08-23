@@ -1223,6 +1223,31 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 		}
 	}
 
+	// THE RECEIPT. Printed at the end of every run, for the user AND for the
+	// model reading its own tool result.
+	//
+	// The owner, 2026-08-23, after a run that cost $7.64 and processed almost
+	// twelve million tokens while the footer read $0.01: "we need to print this
+	// as well in the prompt... the total transparency... that should keep
+	// everyone honest."
+	//
+	// Both audiences matter. The user gets a bill they can check. The model
+	// gets told what its own fan-out actually cost, in the same turn, which is
+	// the only moment it can act on it.
+	// COUNTED, not forecast. SupervisedSessions() exists and is accurate, but a
+	// receipt must report what actually ran: a forecast in a bill is how "at 10
+	// helpers the user was billed for two whole sessions that never run" got
+	// printed, per the comment on that very function. An audit that failed or
+	// was killed leaves an empty string here and is correctly not billed as a
+	// session.
+	ranSessions := len(roles)
+	for _, a := range audits {
+		if strings.TrimSpace(a) != "" {
+			ranSessions++
+		}
+	}
+	writeResearchReceipt(&out, total, len(roles), ranSessions)
+
 	// Report in role order, not completion order, so the output is the same
 	// every run and diffable.
 	completed, failed := 0, 0
@@ -1290,7 +1315,12 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 		fmt.Fprintf(&out, dossierDutiesFooter, config.DossierDir())
 	}
 
-	return tools.NewTextResponse(out.String()), nil
+	// The receipt travels as metadata too, so the UI can put the total in red
+	// without parsing prose back out of the report.
+	return tools.WithResponseMetadata(
+		tools.NewTextResponse(out.String()),
+		newResearchReceipt(total, len(roles), ranSessions),
+	), nil
 }
 
 // runHelper spawns one helper in its own session, registered so the user can
@@ -1356,10 +1386,32 @@ func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID st
 	// was burned, so tokens are the only honest signal there is.
 	var spent helperSpend
 	if updated, err := r.sessions.Get(ctx, helperSession.ID); err == nil {
+		// GORILLA FIX (2026-08-23): the CUMULATIVE fields.
+		//
+		// This read PromptTokens/CompletionTokens, which are CURRENT CONTEXT
+		// OCCUPANCY: assigned every turn, never accumulated. So "what this
+		// helper consumed" was really "how big this helper's context was when
+		// it stopped", and summing that across a run produced the total of
+		// eighteen final contexts rather than the tokens actually processed.
+		//
+		// Measured on the 2026-08-23 run: it reported 1,121,961 where the true
+		// figure was 11,935,525. Every token number this tool has published,
+		// and every cost screen derived from one, was low by about 10.6x.
+		//
+		// The distinction is the 2026-08-19 one, and this is the second place
+		// today it was got wrong. An agent loop re-sends its whole context on
+		// every turn, which is exactly why the two numbers diverge by an order
+		// of magnitude and exactly why the cumulative one is what a receipt
+		// must show.
 		spent = helperSpend{
 			cost:      updated.Cost,
-			inTokens:  updated.PromptTokens,
-			outTokens: updated.CompletionTokens,
+			inTokens:  updated.CumulativePromptTokens,
+			outTokens: updated.CumulativeCompletionTokens,
+		}
+		if msgs, err := r.messages.List(ctx, helperSession.ID); err == nil {
+			for _, m := range msgs {
+				spent.toolCalls += int64(len(m.ToolCalls()))
+			}
 		}
 	}
 
@@ -1374,6 +1426,11 @@ func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID st
 // or flat-rate tier it is always 0.00, and a user watching only that number
 // would see a 280,000-token run report nothing at all.
 type helperSpend struct {
+	// toolCalls is how many tool invocations this helper made. Reported
+	// because it is the thing that explains the token count: every tool result
+	// lands in the context and is re-sent on every later turn, so a run with
+	// many calls pays for them repeatedly.
+	toolCalls int64
 	cost      float64
 	inTokens  int64
 	outTokens int64
@@ -1383,6 +1440,7 @@ func (h *helperSpend) add(o helperSpend) {
 	h.cost += o.cost
 	h.inTokens += o.inTokens
 	h.outTokens += o.outTokens
+	h.toolCalls += o.toolCalls
 }
 
 // helperSessionID derives a UNIQUE session id per helper. See the note at the
@@ -1459,5 +1517,86 @@ func researchFleetPrompt(helpers int, toolNames []string) string {
 	b.WriteString("Nothing else is covered: files, commands and every other tool still ask as normal, and this ends when the run ends.\n\n")
 	b.WriteString("**Allow for session** stops the question for later research runs too.\n\n")
 	b.WriteString("**Deny** does not cancel the run. It falls back to asking you separately for each search and each page.")
+	return b.String()
+}
+
+// ResearchReceipt is the machine-readable half of the run receipt, carried in
+// the tool response metadata so the UI can render the total in red without
+// parsing prose back out of the report.
+type ResearchReceipt struct {
+	Helpers        int     `json:"helpers"`
+	Sessions       int     `json:"sessions"`
+	TokensIn       int64   `json:"tokens_in"`
+	TokensOut      int64   `json:"tokens_out"`
+	ToolCalls      int64   `json:"tool_calls"`
+	Cost           float64 `json:"cost"`
+	CostPerMillion float64 `json:"cost_per_million"`
+	Ratio          float64 `json:"ratio"`
+}
+
+func newResearchReceipt(total helperSpend, helpers, sessions int) ResearchReceipt {
+	r := ResearchReceipt{
+		Helpers: helpers, Sessions: sessions,
+		TokensIn: total.inTokens, TokensOut: total.outTokens,
+		ToolCalls: total.toolCalls, Cost: total.cost,
+	}
+	if tokens := total.inTokens + total.outTokens; tokens > 0 {
+		r.CostPerMillion = total.cost / (float64(tokens) / 1e6)
+	}
+	if total.outTokens > 0 {
+		r.Ratio = float64(total.inTokens) / float64(total.outTokens)
+	}
+	return r
+}
+
+// writeResearchReceipt prints the bill.
+//
+// Written into the tool's TEXT, not only the metadata, so the model reading its
+// own result sees what the fan-out cost. A cost the user can see and the model
+// cannot is half a transparency feature.
+//
+// The ratio is included because it is the number that explains the rest: an
+// agent loop re-sends its whole context every turn, so tokens IN dwarf tokens
+// OUT, and a reader who sees only the total has no way to know that most of it
+// was re-reading rather than thinking.
+func writeResearchReceipt(out *strings.Builder, total helperSpend, helpers, sessions int) {
+	r := newResearchReceipt(total, helpers, sessions)
+
+	fmt.Fprintf(out, "\n## WHAT THIS RUN COST\n\n")
+	fmt.Fprintf(out, "| | |\n|---|---|\n")
+	fmt.Fprintf(out, "| helpers | %d (%d sessions incl. supervisors) |\n", r.Helpers, r.Sessions)
+	fmt.Fprintf(out, "| tool calls | %s |\n", commas(r.ToolCalls))
+	fmt.Fprintf(out, "| tokens processed (in) | %s |\n", commas(r.TokensIn))
+	fmt.Fprintf(out, "| tokens written (out) | %s |\n", commas(r.TokensOut))
+	if r.Ratio > 0 {
+		fmt.Fprintf(out, "| ratio | %.0f : 1 |\n", r.Ratio)
+	}
+	if r.CostPerMillion > 0 {
+		fmt.Fprintf(out, "| cost per million tokens | $%.2f |\n", r.CostPerMillion)
+	}
+	fmt.Fprintf(out, "| **TOTAL COST** | **$%.2f** |\n\n", r.Cost)
+
+	if r.Ratio >= 20 {
+		fmt.Fprintf(out, "Most of that was re-reading, not thinking: every turn re-sends the "+
+			"whole context, so tool results are paid for again on each later turn.\n\n")
+	}
+	fmt.Fprintf(out, "Estimated from a static price table. On a free or flat-rate tier the "+
+		"real bill is $0.\n")
+}
+
+// commas groups a number for reading. Twelve million tokens as "11935525" is a
+// number nobody can size at a glance, and the point of a receipt is being read.
+func commas(n int64) string {
+	s := fmt.Sprintf("%d", n)
+	if n < 0 {
+		return s
+	}
+	var b strings.Builder
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			b.WriteByte(',')
+		}
+		b.WriteRune(c)
+	}
 	return b.String()
 }

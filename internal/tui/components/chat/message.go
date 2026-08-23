@@ -736,6 +736,21 @@ func renderToolResponse(toolCall message.ToolCall, response message.ToolResult, 
 		}
 		resultContent = fmt.Sprintf("```%s\n%s\n```", mdFormat, resultContent)
 		return styles.ApplyPanelBackground(toMarkdown(resultContent, true, width))
+	case agent.ResearchToolName:
+		// GORILLA FIX (2026-08-23): the bill, in red.
+		//
+		// The owner's ask after a run that cost $7.64 while the footer read
+		// $0.01: "total transparency... total cost NICELY IN RED... that should
+		// keep everyone honest."
+		//
+		// The report renders as ordinary markdown; only the TOTAL line is
+		// restyled, from the METADATA rather than by matching prose, so a
+		// reworded report cannot quietly stop colouring the number. Colour is
+		// added on top of a line that already reads correctly in monochrome,
+		// per the rule that colour must carry meaning and never be the only
+		// signal.
+		rendered := styles.ApplyPanelBackground(toMarkdown(resultContent, false, width))
+		return highlightResearchTotal(rendered, response.Metadata, width)
 	case tools.FindToolName:
 		return baseStyle.Width(width).Foreground(t.TextMuted()).Render(resultContent)
 	case "glob", "grep", "ls": // retired tools, still present in old transcripts
@@ -936,4 +951,43 @@ func reasoningQuote(thinking string) string {
 		lines[i] = "> " + l
 	}
 	return "> **thinking**\n>\n" + strings.Join(lines, "\n")
+}
+
+// highlightResearchTotal paints the run's total cost red.
+//
+// Driven by the tool's METADATA, not by searching the rendered text for a
+// dollar sign: the report is prose and prose gets reworded. If the metadata is
+// missing or unparseable the report is returned untouched, because a receipt
+// that renders plainly is fine and one that renders wrongly is not.
+func highlightResearchTotal(rendered, metadata string, width int) string {
+	if metadata == "" {
+		return rendered
+	}
+	var r agent.ResearchReceipt
+	if json.Unmarshal([]byte(metadata), &r) != nil || r.Cost <= 0 {
+		return rendered
+	}
+	t := theme.CurrentTheme()
+	// The figure as the receipt itself formatted it, so the match cannot drift
+	// from what was printed.
+	needle := fmt.Sprintf("$%.2f", r.Cost)
+
+	lines := strings.Split(rendered, "\n")
+	for i, line := range lines {
+		if !strings.Contains(line, needle) || !strings.Contains(strings.ToUpper(line), "TOTAL") {
+			continue
+		}
+		// Restyle the whole line rather than splicing colour around the number:
+		// splicing inside an already-rendered line means reasoning about the
+		// ANSI the markdown renderer left there, and getting that wrong is how
+		// a line ends up wider than the terminal.
+		plain := ansi.Strip(line)
+		lines[i] = lipgloss.NewStyle().
+			Foreground(t.Error()).
+			Bold(true).
+			Width(width).
+			Render(plain)
+		break
+	}
+	return strings.Join(lines, "\n")
 }
