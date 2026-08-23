@@ -1,4 +1,4 @@
-<!-- Version: 1.1.0 · updated 26-08-23-13-15 -->
+<!-- Version: 1.2.0 · updated 26-08-23-16-03 -->
 <p align="center"><img src="../internal/assets/icons/gorilla-opencode-256.png" width="96" alt="Gorilla OpenCode"></p>
 
 <h1 align="center">What ten minutes of curiosity actually costs</h1>
@@ -213,9 +213,10 @@ spends from two separate weekly allowances for one user question. Our untouched
 second bar is the falsifiable evidence that this client does not. Anyone can
 check it the same way, by reading both bars before and after a session.
 
-### Where the 10K baseline goes
+### Where the baseline goes
 
-**[measured]**
+This section originally reported the split below, on a 10K baseline measured on
+the owner's machine:
 
 ```
 shipped system prompt (coder-modern)   7,164 bytes   ~1,791 tokens   18%
@@ -223,10 +224,56 @@ project CLAUDE.md (auto-injected)     12,865 bytes   ~3,216 tokens   32%
 remainder                                            ~4,994 tokens   50%
 ```
 
-**[inference]** The remainder is tool schemas, by subtraction, not by direct
-count. If so, tool definitions are the single largest line item on every turn,
-and `/context` already exists to switch them off along with the
-`[[needs tool.x]]` prompt lines that accompany them.
+and labelled the last line **[inference]**: *"The remainder is tool schemas, by
+subtraction, not by direct count."*
+
+**CORRECTION, 2026-08-23. Counted directly, the inference was 41% low.**
+
+**[measured]** With default settings, `go test ./internal/llm/agent/ -run
+TestDefaultToolSchemaCost -v`:
+
+```
+tool schemas, default ON                             ~8,462 tokens   69%
+base system prompt (coder-modern)                    ~1,791 tokens   15%
+prompt blocks, default ON                              ~130 tokens    1%
+                                                     ------------
+per-turn total, before any CLAUDE.md                ~12,174 tokens
+
+largest single rows:
+  tool.find        1,322    replaced glob + grep + ls (~1,485 together)
+  tool.research    1,007    spawns helpers; off under the Nuclear Option
+  tool.bash          962
+  tool.fetch         789
+  tool.edit          759
+  tool.review        759
+  tool.websearch     749
+```
+
+The subtraction was not careless, and the direction of the error is instructive.
+A baseline measured on one machine carries **that machine's loadout**, and the
+owner's has bash, edit, review, diagnostics and the sub-agent tool switched off.
+Subtracting from somebody's configured total tells you about their
+configuration, not about the default a new user actually pays.
+
+The sharper lesson: every per-tool figure **was already being measured**.
+`internal/llm/agent/calibrate.go` marshals each real schema and divides by four,
+and `/context` has been displaying those numbers per row all along. Nothing was
+missing except the decision to add them up. An inference was published beside
+the measurement that would have refuted it.
+
+The conclusion the inference reached survives, and is now on firmer ground: tool
+definitions are the single largest line item on every turn, at roughly seven
+tokens in ten. `/context` switches them off along with the `[[needs tool.x]]`
+prompt lines that accompany them.
+
+Pinned by `internal/llm/agent/schema_cost_test.go`, which fails on drift past
+500 tokens, so this number cannot rot the way the last one did.
+
+**Still approximate, and openly so:** the conversion is schema bytes ÷ 4, not a
+real tokeniser, and the loadout screen says as much on its own header. The
+**bytes are exact**; only the division is a rule of thumb, and it is applied to
+every row equally, so comparisons between rows are sound even where the absolute
+figure is ~10% high.
 
 ### Verification method
 
