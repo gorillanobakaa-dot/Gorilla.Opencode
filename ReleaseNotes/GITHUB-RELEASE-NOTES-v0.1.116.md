@@ -22,10 +22,10 @@ total, take away the parts you know, call the rest tool descriptions.
 Counted directly, it is **8,462**. Nearly double.
 
 ```
-tool schemas, default ON      8,462   69%
-base system prompt            1,791   15%
-prompt blocks, default ON       130    1%
-per-turn total, no CLAUDE.md 12,174
+tool schemas, default ON      8,462   81%
+base system prompt            1,791   17%
+prompt blocks, default ON       133    1%
+per-turn total, no CLAUDE.md 10,386
 
 find 1,322 · research 1,007 · bash 962 · fetch 789 · edit 759 · review 759 · websearch 749
 ```
@@ -64,8 +64,8 @@ Nothing looked broken. It still ran, still switched things off, still showed a
 smaller number. It was simply leaving 759 tokens behind, and only counting the
 schemas directly made it visible.
 
-**From default settings it now saves 37%**, from 12,178 tokens per message down
-to 7,713.
+**From default settings it now saves 43%**, from 10,386 tokens per message down
+to 5,921.
 
 ### And the key itself was wrong
 

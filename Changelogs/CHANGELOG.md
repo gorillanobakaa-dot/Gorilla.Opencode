@@ -18,8 +18,8 @@ code-review tool arrived on 18 August, switched on by default at 759 tokens per
 message, and nobody went back to add it. So the setting built for people on slow
 connections was still shipping a thirty-analyser review tool with every message.
 Nothing looked broken: it still ran, still switched things off, still showed a
-smaller number. From default settings it now saves 37%, down from 12,178 tokens per message to
-7,713. The key itself was also wrong, and the owner's screenshots exposed it. It was
+smaller number. From default settings it now saves 43%, down from 10,386 tokens per message to
+5,921. The key itself was also wrong, and the owner's screenshots exposed it. It was
 written as a preset rather than a subtraction: it switched off its own list, then
 switched everything else back to the factory default, undoing your economies.
 Measured live on his hand-trimmed setup: 8,802 to 8,138, only 8%, because bash,

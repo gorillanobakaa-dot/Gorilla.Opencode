@@ -183,3 +183,46 @@ func TestLowBandwidthOnlyEverSubtracts(t *testing.T) {
 		}
 	}
 }
+
+// THE BASE PROMPT MUST NOT BE COUNTED TWICE. Second instance of one trap.
+//
+// LoadoutActiveTokens() opens with `total := basePromptTokens`, so it ALREADY
+// includes the system prompt. Adding LoadoutBaseTokens() on top counts it again.
+//
+// Found and fixed on 2026-08-14 in ResearchBasisTokens, where it inflated every
+// dollar figure on the /research screen by 3,000 tokens (28%) and made a line
+// labelled "MEASURED" disagree with what /context printed for the same quantity.
+// A warning comment was left at loadout.go:938 saying exactly this.
+//
+// Repeated on 2026-08-23, in the analysis written to CORRECT a different bad
+// number, and published: the release notes quoted a 12,174-token default and a
+// 37% saving, when the true figures are 10,386 and 43%. The absolute saving
+// (4,465) was right both times, which is why nothing looked wrong.
+//
+// The comment did not prevent it, so this is a test instead.
+func TestBasePromptIsNotCountedTwice(t *testing.T) {
+	if _, err := Load(t.TempDir(), false); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	SetBasePromptTokens(1000)
+
+	active := LoadoutActiveTokens()
+	sum := 0
+	for _, c := range LoadoutComponents {
+		if LoadoutEnabled(c.ID) {
+			sum += ComponentTokens(c)
+		}
+	}
+	if want := sum + LoadoutBaseTokens(); active != want {
+		t.Fatalf("LoadoutActiveTokens()=%d, want components(%d) + base(%d) = %d",
+			active, sum, LoadoutBaseTokens(), want)
+	}
+	// The property that matters to a caller: the base is in there ONCE, so
+	// anyone writing ActiveTokens()+BaseTokens() is double counting.
+	SetBasePromptTokens(2000)
+	if grew := LoadoutActiveTokens() - active; grew != 1000 {
+		t.Errorf("raising the base prompt by 1000 moved the active total by %d; "+
+			"it must move by exactly 1000, or the base is counted a number of "+
+			"times other than once", grew)
+	}
+}

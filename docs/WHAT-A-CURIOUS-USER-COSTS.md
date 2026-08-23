@@ -233,11 +233,11 @@ subtraction, not by direct count."*
 TestDefaultToolSchemaCost -v`:
 
 ```
-tool schemas, default ON                             ~8,462 tokens   69%
-base system prompt (coder-modern)                    ~1,791 tokens   15%
-prompt blocks, default ON                              ~130 tokens    1%
+tool schemas, default ON                             ~8,462 tokens   81%
+base system prompt (coder-modern)                    ~1,791 tokens   17%
+prompt blocks, default ON                              ~133 tokens    1%
                                                      ------------
-per-turn total, before any CLAUDE.md                ~12,174 tokens
+per-turn total, before any CLAUDE.md                ~10,386 tokens
 
 largest single rows:
   tool.find        1,322    replaced glob + grep + ls (~1,485 together)
@@ -266,8 +266,25 @@ definitions are the single largest line item on every turn, at roughly seven
 tokens in ten. `/context` switches them off along with the `[[needs tool.x]]`
 prompt lines that accompany them.
 
+**A SECOND CORRECTION, same day.** The first version of this table said 12,174
+and 69%. Both were wrong, and by a mechanism already documented in this codebase:
+`LoadoutActiveTokens()` opens with `total := basePromptTokens`, so it ALREADY
+includes the system prompt, and adding `LoadoutBaseTokens()` on top counts it
+twice. That exact bug was found in `ResearchBasisTokens` on 2026-08-14, where it
+inflated every figure on the `/research` screen by 28%, and a warning comment was
+left at `loadout.go:938` saying so. It was repeated here on 2026-08-23, inside
+the analysis written to correct a different wrong number.
+
+The absolute saving was right both times, which is why nothing looked odd. Only
+the totals and the percentages moved.
+
+The program itself was never affected: both production call sites use
+`LoadoutActiveTokens()` alone, so `/context` and the status bar have always shown
+the right figure. This was an error in the analysis, not in the software.
+
 Pinned by `internal/llm/agent/schema_cost_test.go`, which fails on drift past
-500 tokens, so this number cannot rot the way the last one did.
+500 tokens, and by `TestBasePromptIsNotCountedTwice`, because a comment did not
+prevent the second instance and a test might prevent a third.
 
 **Still approximate, and openly so:** the conversion is schema bytes ÷ 4, not a
 real tokeniser, and the loadout screen says as much on its own header. The

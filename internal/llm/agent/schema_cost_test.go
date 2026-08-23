@@ -112,7 +112,10 @@ func TestDefaultToolSchemaCostIsCounted(t *testing.T) {
 	t.Logf("tool schemas, default ON    %7d", toolsOn)
 	t.Logf("tool schemas, every row     %7d", toolsAll)
 	t.Logf("prompt blocks, default ON   %7d", promptOn)
-	t.Logf("per-turn total (no CLAUDE.md) %5d", config.LoadoutActiveTokens()+base)
+	// NOT LoadoutActiveTokens()+base. That function ALREADY opens with
+	// `total := basePromptTokens`, so adding the base again double-counts it.
+	// Documented at loadout.go:938 since 2026-08-14, and walked into anyway.
+	t.Logf("per-turn total (no CLAUDE.md) %5d", config.LoadoutActiveTokens())
 
 	if d := toolsOn - measuredDefaultToolSchemaTokens; d > schemaDriftAllowance || d < -schemaDriftAllowance {
 		t.Errorf("default tool schemas are %d tokens, recorded as %d (drift %+d).\n"+
@@ -172,8 +175,8 @@ func TestNoSingleToolSchemaRunsAway(t *testing.T) {
 // Recorded 2026-08-23, after tool.review was added to the preset (it had been
 // missing since the tool landed on 2026-08-18):
 //
-//	default   12,174 tokens per turn
-//	low-bw     7,709 tokens per turn   saves 4,465, 37%
+//	default   10,383 tokens per turn
+//	low-bw     5,918 tokens per turn   saves 4,465, 43%
 //
 // 759 of that saving is tool.review alone, which was riding every turn on a
 // satellite link until this was counted.
@@ -183,10 +186,12 @@ func TestLowBandwidthPresetSavingIsMeasured(t *testing.T) {
 	}
 	CalibrateLoadout(nil, nil, nil, nil, nil)
 
-	base := config.LoadoutBaseTokens()
-	before := config.LoadoutActiveTokens() + base
+	// LoadoutActiveTokens() ALREADY includes the base prompt (loadout.go:395).
+	// Adding LoadoutBaseTokens() on top is the double-count fixed on 2026-08-14
+	// and repeated here on 2026-08-23. See the warning at loadout.go:938.
+	before := config.LoadoutActiveTokens()
 	config.ApplyLowBandwidthLoadout()
-	after := config.LoadoutActiveTokens() + base
+	after := config.LoadoutActiveTokens()
 
 	saved := before - after
 	pct := float64(saved) / float64(before) * 100
