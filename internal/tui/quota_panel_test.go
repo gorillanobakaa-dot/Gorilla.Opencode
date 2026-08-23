@@ -52,7 +52,7 @@ var quotaNow = time.Date(2026, 8, 3, 14, 34, 46, 0, time.UTC) // 7d before Gemin
 
 func TestQuotaPanelSaysLeftAndUsedInWords(t *testing.T) {
 	t.Parallel()
-	got := renderQuotaPanel(quotaFixture(), "user@example.com", nil, 80, quotaNow)
+	got := renderQuotaPanel(quotaFixture(), "user@example.com", nil, nil, 80, quotaNow)
 	if strings.Contains(got, "Remaining Remaining") {
 		t.Error("bucket label doubled: the wire's displayName already says Remaining")
 	}
@@ -168,7 +168,7 @@ func TestQuotaPanelRendersBalances(t *testing.T) {
 	t.Parallel()
 	balances := append(balanceFixture(),
 		quota.Reading{Provider: "OpenRouter", Err: "HTTP 401 Unauthorized"})
-	got := renderQuotaPanel(quotaFixture(), "user@example.com", balances, 80, quotaNow)
+	got := renderQuotaPanel(quotaFixture(), "user@example.com", balances, nil, 80, quotaNow)
 	for _, want := range []string{
 		"DEEPSEEK",
 		"110.00 CNY available",
@@ -188,7 +188,7 @@ func TestQuotaPanelRendersBalances(t *testing.T) {
 // A DeepSeek-only user (no Antigravity sign-in) still gets a panel.
 func TestQuotaPanelBalancesWithoutAntigravity(t *testing.T) {
 	t.Parallel()
-	got := renderQuotaPanel(nil, "", balanceFixture(), 80, quotaNow)
+	got := renderQuotaPanel(nil, "", balanceFixture(), nil, 80, quotaNow)
 	if strings.Contains(got, "no quota groups") {
 		t.Fatalf("balances present but panel claims no quota groups:\n%s", got)
 	}
@@ -268,7 +268,7 @@ func TestBarCellScaleRedToGreen(t *testing.T) {
 func TestQuotaPanelNoLineWiderThanWidth(t *testing.T) {
 	t.Parallel()
 	for _, w := range []int{80, 60, 40, 25} {
-		got := renderQuotaPanel(quotaFixture(), "user@example.com", balanceFixture(), w, quotaNow)
+		got := renderQuotaPanel(quotaFixture(), "user@example.com", balanceFixture(), nil, w, quotaNow)
 		for i, line := range strings.Split(got, "\n") {
 			if lw := lipgloss.Width(line); lw > w {
 				t.Errorf("width %d: line %d is %d columns wide: %q", w, i, lw, line)
@@ -285,7 +285,7 @@ func TestQuotaPanelNoLineWiderThanWidth(t *testing.T) {
 func TestQuotaPanelEmptySaysSo(t *testing.T) {
 	t.Parallel()
 	for _, q := range []*auth.QuotaSummary{nil, {}} {
-		if got := renderQuotaPanel(q, "", nil, 80, quotaNow); !strings.Contains(got, "no quota groups") {
+		if got := renderQuotaPanel(q, "", nil, nil, 80, quotaNow); !strings.Contains(got, "no quota groups") {
 			t.Errorf("empty summary must say so, got %q — silence and success must never look alike", got)
 		}
 	}
@@ -298,7 +298,7 @@ func TestQuotaPanelEmptySaysSo(t *testing.T) {
 // a signed-in Google address appearing above a ChatGPT session at 97%.
 func TestAccountHiddenWhenNoQuotaSummary(t *testing.T) {
 	t.Parallel()
-	got := renderQuotaPanel(nil, "user@example.com", balanceFixture(), 80, quotaNow)
+	got := renderQuotaPanel(nil, "user@example.com", balanceFixture(), nil, 80, quotaNow)
 	if strings.Contains(got, "user@example.com") {
 		t.Errorf("account email leaked with no quota summary — the wrong-barrel bug:\n%s", got)
 	}
@@ -306,5 +306,51 @@ func TestAccountHiddenWhenNoQuotaSummary(t *testing.T) {
 	// Headings are upper-cased by the renderer, so match that.
 	if !strings.Contains(got, "DEEPSEEK") {
 		t.Errorf("balances must still show when Antigravity is absent, got %q", got)
+	}
+}
+
+// The completion of the wrong-barrel fix. Gating the Antigravity meter off a
+// ChatGPT session removed a misleading number; this proves the RIGHT number
+// takes its place. Before this, /usage on ChatGPT showed nothing at all while
+// the user sat at 20% of a monthly limit (observed against Codex, 2026-08-23).
+func TestChatGPTMeterRendersWithBananaLadder(t *testing.T) {
+	t.Parallel()
+	cg := &chatGPTMeter{
+		account: "user@example.com",
+		plan:    "Free",
+		quota: &auth.ChatGPTQuota{
+			Primary: &auth.ChatGPTWindow{UsedPercent: 80, WindowMinutes: 43200},
+		},
+	}
+	got := renderQuotaPanel(nil, "", nil, cg, 80, quotaNow)
+	for _, want := range []string{
+		"CHATGPT — user@example.com (Free)",
+		"Monthly limit Remaining",            // label from the WIRE, not hardcoded
+		"20.00%",                             // 80% used inverted to remaining
+		"20% left, 80% used",                 // both numbers in words
+		"🍌 Yeah... just a few bananas left.", // same ladder as every provider
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("ChatGPT panel missing %q\n--- got ---\n%s", want, got)
+		}
+	}
+	// The Antigravity account must not appear on a ChatGPT panel.
+	if strings.Contains(got, "Account:") {
+		t.Errorf("Antigravity account line leaked onto a ChatGPT panel:\n%s", got)
+	}
+}
+
+// Traffic-driven meter: before the session's first request there is no reading,
+// and "not known yet" must be distinguishable from "no meter exists" and from
+// a meter reading zero. A blank or a full bar would both be lies.
+func TestChatGPTMeterSaysWhenNoReadingYet(t *testing.T) {
+	t.Parallel()
+	cg := &chatGPTMeter{account: "user@example.com", quota: &auth.ChatGPTQuota{}}
+	got := renderQuotaPanel(nil, "", nil, cg, 80, quotaNow)
+	if !strings.Contains(got, "No usage reading yet this session") {
+		t.Errorf("an empty meter must say so, not render blank:\n%s", got)
+	}
+	if strings.Contains(got, "100.00%") || strings.Contains(got, "0.00%") {
+		t.Errorf("no reading must not be drawn as a bar:\n%s", got)
 	}
 }

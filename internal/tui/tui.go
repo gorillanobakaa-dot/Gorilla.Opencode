@@ -438,6 +438,9 @@ type quotaLineMsg struct {
 	balances []quota.Reading
 	// fractions seeds/updates the crossing-alert baseline on every reading.
 	fractions map[string]float64
+	// chatgpt is the ACTIVE provider's own meter when the session is signed in
+	// to ChatGPT. Nil for any other provider. /usage-only, like the fields above.
+	chatgpt *chatGPTMeter
 }
 
 // quotaAlertMsg carries banana-tier crossings detected by the post-response
@@ -477,6 +480,23 @@ func coderProvider() models.ModelProvider {
 func antigravityIsActive() bool {
 	p := coderProvider()
 	return p == "" || p == models.ProviderAntigravity
+}
+
+// activeChatGPTMeter returns the ChatGPT meter when ChatGPT is the provider the
+// session actually spends against, else nil.
+func activeChatGPTMeter() *chatGPTMeter {
+	if coderProvider() != models.ProviderChatGPT {
+		return nil
+	}
+	m := &chatGPTMeter{}
+	if creds, _ := auth.LoadChatGPTCreds(); creds != nil {
+		m.account, m.plan = creds.Email, creds.PlanType
+	}
+	m.quota, _ = auth.LoadChatGPTQuota()
+	if m.quota == nil {
+		m.quota = &auth.ChatGPTQuota{}
+	}
+	return m
 }
 
 // quotaTierCheckCmd fetches a fresh quota reading and compares it against the
@@ -547,6 +567,18 @@ func antigravityUsageCmd(quiet bool) tea.Cmd {
 				line = fmt.Sprintf("Antigravity is not the active provider — signed in as %s, weekly quota not fetched.", creds.Email)
 			}
 			msg := quotaLineMsg{line: line, kind: util.InfoTypeInfo}
+			// Show the ACTIVE provider's own meter instead of a blank. Removing
+			// the wrong number without supplying the right one left a user at
+			// 20% of a monthly limit with nothing to look at.
+			if cg := activeChatGPTMeter(); cg != nil {
+				msg.chatgpt = cg
+				if cg.quota.Empty() {
+					line = "No usage reading yet this session — this backend reports usage on its replies."
+				} else if w := cg.quota.Primary; w != nil {
+					line = fmt.Sprintf("%s: %d%% left", w.Label(false), int(w.Remaining()*100+0.5))
+				}
+				msg.line = line
+			}
 			msg.balances = configuredBalances(context.Background())
 			return msg
 		}
@@ -726,8 +758,8 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if a.scrollback {
 			out := formatQuotaScrollbackLine(time.Now(), msg.line)
-			if msg.summary != nil || len(msg.balances) > 0 {
-				out += "\n\n" + renderQuotaPanel(msg.summary, msg.account, msg.balances, a.width, time.Now()) + "\n"
+			if msg.summary != nil || len(msg.balances) > 0 || msg.chatgpt != nil {
+				out += "\n\n" + renderQuotaPanel(msg.summary, msg.account, msg.balances, msg.chatgpt, a.width, time.Now()) + "\n"
 			}
 			cmds = append(cmds, tea.Println(out))
 		}

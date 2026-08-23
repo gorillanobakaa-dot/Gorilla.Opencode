@@ -224,12 +224,76 @@ func quotaResetPhrase(resetTime string, now time.Time) string {
 	}
 }
 
+// chatGPTMeter carries the active ChatGPT session's meter into the pure
+// renderer. A nil pointer means "not the active provider"; a non-nil one with
+// an Empty() quota means "active, but no reading yet this session".
+type chatGPTMeter struct {
+	quota   *auth.ChatGPTQuota
+	account string
+	plan    string
+}
+
+// renderChatGPTSection renders the ChatGPT sign-in usage meter using the SAME
+// banana ladder, colour ramp and bar as every other provider — the whole point
+// of keeping those four functions taking a bare fraction.
+//
+// GORILLA OVERRIDE (2026-08-23): before this, /usage on a ChatGPT session showed
+// the ANTIGRAVITY weekly quota and a Google account email (the wrong barrel).
+// Gating that off left a BLANK, which is its own failure: the user sat at 20%
+// of a monthly limit with no way to see it. This is the number that belongs
+// there. Source is response headers, so it exists only after the session's
+// first request — "not known yet" is a real third state and says so.
+func renderChatGPTSection(q *auth.ChatGPTQuota, account, plan string, cells int,
+	wrapIndent func(string, int) string, now time.Time,
+) string {
+	heading := lipgloss.NewStyle().Bold(true)
+	var b strings.Builder
+	title := "CHATGPT"
+	if account != "" {
+		title += " — " + account
+		if plan != "" {
+			title += " (" + plan + ")"
+		}
+	}
+	b.WriteString(heading.Render(title) + "\n")
+
+	if q.Empty() {
+		b.WriteString(wrapIndent("No usage reading yet this session. This backend "+
+			"reports usage on its replies, so the meter appears after the first "+
+			"question.", 2) + "\n")
+		return b.String()
+	}
+
+	windows := []struct {
+		w   *auth.ChatGPTWindow
+		sec bool
+	}{{q.Primary, false}, {q.Secondary, true}}
+	for _, entry := range windows {
+		if entry.w == nil {
+			continue
+		}
+		f := entry.w.Remaining()
+		left := int(f*100 + 0.5)
+		b.WriteString("\n  " + entry.w.Label(entry.sec) + " Remaining\n")
+		b.WriteString("    " + quotaBar(f, cells) + fmt.Sprintf(" %.2f%%", f*100) + "\n")
+		status := fmt.Sprintf("%s — %d%% left, %d%% used", bananaStatus(f), left, 100-left)
+		if entry.w.ResetAt > 0 {
+			if phrase := quotaResetPhrase(time.Unix(entry.w.ResetAt, 0).UTC().Format(time.RFC3339), now); phrase != "" {
+				status += " | " + phrase
+			}
+		}
+		b.WriteString(wrapIndent(status, 4) + "\n")
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
 // renderQuotaPanel renders the full Models & Quota view for the scrollback:
 // the Antigravity weekly groups (when signed in), then any configured paid
 // providers with a balance endpoint. Pure: no network, no wall clock, no
 // terminal — testable headlessly.
-func renderQuotaPanel(q *auth.QuotaSummary, account string, balances []quota.Reading, width int, now time.Time) string {
-	if (q == nil || len(q.Groups) == 0) && len(balances) == 0 {
+func renderQuotaPanel(q *auth.QuotaSummary, account string, balances []quota.Reading, cg *chatGPTMeter, width int, now time.Time) string {
+	if (q == nil || len(q.Groups) == 0) && len(balances) == 0 && cg == nil {
 		return "  Antigravity: no quota groups reported"
 	}
 	w := width
@@ -311,6 +375,15 @@ func renderQuotaPanel(q *auth.QuotaSummary, account string, balances []quota.Rea
 	}
 	if q != nil && q.Description != "" {
 		b.WriteString("\n" + muted.Render(wrap(q.Description)) + "\n")
+	}
+	// The ACTIVE provider's own meter, when it publishes one. Rendered with the
+	// same bar and banana ladder as everything else.
+	if cg != nil {
+		if !first {
+			b.WriteString("\n")
+		}
+		first = false
+		b.WriteString(renderChatGPTSection(cg.quota, cg.account, cg.plan, cells, wrapIndent, now))
 	}
 	if len(balances) > 0 {
 		if !first {

@@ -287,7 +287,17 @@ func (c *chatgptClient) post(ctx context.Context, body cgRequest) (*http.Respons
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
-	return http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	// GORILLA OVERRIDE (2026-08-23): the usage meter for this backend rides the
+	// RESPONSE, not a queryable endpoint — there is none. Recording it here, at
+	// the one point every ChatGPT request passes through, costs zero extra
+	// requests, which is what §8 demands on a metered link. Best-effort and
+	// silent: failing to note a usage number must never break the request that
+	// carried it. See internal/auth/chatgpt_quota.go.
+	if err == nil && resp != nil {
+		auth.RecordChatGPTQuota(resp.Header)
+	}
+	return resp, err
 }
 
 // chatgptErr turns an error response into something a user can act on. The
