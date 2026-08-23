@@ -189,6 +189,10 @@ claim `single_claim, not verified` and kept it out of the answer.
 It **listed what nobody had established**, including whether a contributor might
 have used the name as a pseudonym, which nothing available could rule out.
 
+[![A research answer showing a per-claim evidence table with tiers of primary source, single claim and config, a Not established or uncorroborated section listing five gaps, an evidence tier summary naming which sources were primary and which were single tertiary, and a bottom line stating that the Wikipedia revision cited by seven of ten helpers contains a net worth figure that Forbes own publication contradicts](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-evidence-tiers-forbes-over-wikipedia.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-evidence-tiers-forbes-over-wikipedia.png)
+
+**Seven of ten helpers agreed and the synthesis overruled them**, on a primary source. That is the whole argument for tiers in one line.
+
 ### And the gap it exposed
 
 Its bottom line said "Pete Holmes is the comedian" with no source and no tier.
@@ -202,6 +206,10 @@ claims resting only on the model's memory, and every report ends by telling the
 synthesiser that **helpers agreeing is not corroboration**, because they all run
 the same model.
 
+[![The end of a research run on the installed v0.1.118 build. A section headed What Nobody Established lists seven specific gaps, an Evidence Integrity Note records that the VERIFIER caught the COST helper fabricating two DOI citations and that five of ten lanes were rejected by their supervisors for mis-tiering Wikipedia as a primary source, and beneath it the run receipt shows 10 helpers, 18 sessions, 76 tool calls, 1,467,867 tokens processed against 16,476 written, a ratio of 89 to 1, and a total cost of zero dollars on a free tier](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-receipt-and-evidence-integrity.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-receipt-and-evidence-integrity.png)
+
+Every figure in that receipt was checked against the session database afterwards: 1,467,867 tokens in, 16,476 out, 76 tool calls (47 searches, 13 finds, 11 fetches, 5 reads), 18 sessions. Four for four, nothing rounded.
+
 ### The 210 to 1
 
 Almost twelve million tokens in, fifty-seven thousand out.
@@ -214,6 +222,29 @@ thinking. It was re-reading.
 Building the receipt that shows this found that **every token figure this tool
 has ever printed was low by about 10.6x**: it had been summing the helpers'
 final context sizes rather than what they actually processed.
+
+---
+
+## You cannot approve what you cannot read
+
+Three times in four minutes, on the owner's own screen, a permission dialog
+asked him to approve a command it had cut in half:
+
+[![The old permission dialog at forty percent of the window width, asking to approve a bash command that reads cd slash home slash gorilla slash Documents slash Debian.Kernel.Work slash Kernel. and then stops, the destination of the command severed mid-path](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-before-bash-command-truncated.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-before-bash-command-truncated.png)
+
+The destination of a `cd` and the pattern of a `find` are exactly the parts
+that decide whether a command is safe, and they were the parts removed. The
+same fault hit the fetch dialog, where it matters more still, because for
+`web_fetch` the host **is** the grant key: approving one URL authorises every
+later page on that host for the session.
+
+[![The old fetch permission dialog showing a Forbes URL truncated to https colon slash slash www.forbes.com slash sites slash forbeswealthteam slash article slash the- with the rest of the address missing](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-before-fetch-url-truncated.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-before-fetch-url-truncated.png)
+
+Fixed by wrapping the text rather than cutting it, and by giving these dialogs
+the same width that edit and write already had, since a command or a URL is
+the entire content of the question being asked:
+
+[![The fetch permission dialog on v0.1.118, twice as wide, showing the complete URL https colon slash slash en.wikipedia.org slash wiki slash A_Wild_Hare with nothing truncated and the Allow, Allow for session and Deny buttons beneath it](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-after-fetch-url-complete.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-after-fetch-url-complete.png)
 
 ---
 
@@ -235,6 +266,28 @@ and asks you to approve it. It named the problem in this release before we did.
 
 No special or year is cited, because that was not checked, and a confident wrong
 citation is worse than none.
+
+---
+
+## Two more from the same evening
+
+The live cost, in the heartbeat, while a run was still spending it. Earlier the
+same day this read `$0.01` for seventeen minutes against a real $7.64. The
+answer below it carries the new BASIS line, citing two files with line numbers
+and a tier:
+
+[![A research run in progress showing heartbeat lines reading Burned ten dollars sixteen cents so far and Burned ten dollars thirty three cents so far, and beneath them an answer ending with a BASIS line citing CLAUDE.md lines twenty to thirty three and KERNEL.BRAIN scripts README.md lines thirty two to thirty five, tagged TIER colon primary_source](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-live-cost-and-answer-basis.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-live-cost-and-answer-basis.png)
+
+And the supervision correcting a fact rather than repeating it. Several helpers
+claimed one figure; the VERIFIER identified that they had conflated two things,
+gave the corrected number, and then labelled its own correction as still
+tertiary:
+
+[![A research report section showing a voice actor table, an Important correction from the VERIFIER explaining that several helpers conflated a 1938 prototype with the 1940 official character so the fifty two year claim should be forty nine years, and an evidence tier line stating that the correction is the VERIFIER's own calculation based on Wikipedia and therefore still tertiary but internally consistent](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-verifier-corrects-a-conflated-fact.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.118/docs/screenshots/gallery/v0118-verifier-corrects-a-conflated-fact.png)
+
+That last line is the one worth reading twice. It corrected the majority **and
+refused to promote its own correction to a higher tier than its source
+deserved.**
 
 ---
 

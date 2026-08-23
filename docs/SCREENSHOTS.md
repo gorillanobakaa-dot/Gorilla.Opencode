@@ -1,3 +1,23 @@
+## v0.1.118 (2026-08-23)
+
+Seven shots, all from live runs on the installed build, none staged.
+
+| file | what it proves |
+|---|---|
+| `v0118-receipt-and-evidence-integrity.png` | the run receipt at the end of a report, and the VERIFIER catching the COST helper fabricating two DOI citations. Five of ten lanes rejected by their supervisors for mis-tiering Wikipedia as a primary source. |
+| `v0118-evidence-tiers-forbes-over-wikipedia.png` | per-claim evidence tiers, a Not-established section, and a bottom line overruling seven of ten helpers on a primary source |
+| `v0118-verifier-corrects-a-conflated-fact.png` | the VERIFIER correcting the majority and refusing to promote its own correction above its source's tier |
+| `v0118-live-cost-and-answer-basis.png` | live cost in the heartbeat, and the BASIS line citing two files with line numbers |
+| `v0118-before-bash-command-truncated.png` | BEFORE: a bash command severed mid-path in the dialog asking to approve it |
+| `v0118-before-fetch-url-truncated.png` | BEFORE: a fetch URL cut, where the host is the grant key |
+| `v0118-after-fetch-url-complete.png` | AFTER: the same dialog at 0.8 width, whole URL visible |
+
+Attribution, because it matters and is easy to get wrong: in the receipt shot
+the helpers and supervisors all ran on `antigravity.gemini-3.6-flash-medium`
+and only the synthesis ran on Claude Sonnet 4.6. **A free flash model
+fabricated the citations and the same free flash model caught them.** The
+value is in the adversarial roles, not the model tier.
+
 <!-- Version: 1.8.0 · updated 26-08-23-15-37 -->
 # Gorilla OpenCode — screenshots & proof
 
