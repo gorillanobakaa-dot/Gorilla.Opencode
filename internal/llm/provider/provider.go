@@ -214,6 +214,12 @@ func (p *baseProvider[C]) cleanMessages(messages []message.Message) (cleaned []m
 	// has superseded, before dropping empties. Shapes the wire only; the session
 	// store is untouched. See supersede.go.
 	messages = supersedeStaleReads(messages)
+	// Then drop results that have simply gone idle: locally reproducible reads
+	// that are many turns old and are not the newest read of their target. See
+	// evict_age.go. Order matters only for tidiness, not correctness:
+	// supersession leaves a short stub, which falls under the size floor here,
+	// so a message cannot be stubbed twice.
+	messages = evictAgedReads(messages)
 	for _, msg := range messages {
 		// The message has no content
 		if len(msg.Parts) == 0 {
