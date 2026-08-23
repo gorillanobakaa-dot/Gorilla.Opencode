@@ -260,8 +260,52 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// model starts over-reporting on trivial changes, suspect the
 		// "blast radius outranks brevity" line first. Probes P6-P8 are
 		// registered in EXPERIMENT-PREREG-2026-08-04.md, amendment 2.
+		// 6941 -> 7164 on 2026-08-22, deliberately. +223 bytes, +3.2%,
+		// ~+56 tokens on EVERY coder turn. Two lines changed, none added.
+		//
+		// Every permissive rule in this prompt was framed as failure handled
+		// gracefully, never as a legitimate completion. "unachievable task:
+		// state blocker directly and stop" tells the model what to do when it
+		// has lost, which leaves the pressure to not lose fully intact. And
+		// "# conduct — finish task" plus "context is not a reason to stop" are
+		// a forced-completion objective sitting four lines below it with
+		// nothing saying which wins. "# precedence" says honesty outranks all,
+		// but "finish task" is phrased as an absolute, and a model resolving
+		// that seam under load will read the absolute.
+		//
+		// There was also no epistemic case anywhere. Every stop condition
+		// covered DOING: unachievable task, 2 attempts max, failed build.
+		// None covered KNOWING. On a kernel or Gecko build an invented cause
+		// is indistinguishable from a diagnosed one in the report, which is
+		// the expensive place for this gap to sit.
+		//
+		// The replacement line was not invented. "# tools — search off is an
+		// answer" already frames a negative as a deliverable rather than a
+		// failure, and it was the only place in the file that did. Generalised
+		// from websearch configuration to the whole prompt:
+		//   "a null result is an answer: unachievable and unestablished are
+		//    finished tasks, not failed ones"
+		// The carve-out was appended to "finish task" itself rather than added
+		// as its own line, so the resolution sits at the seam it settles and
+		// costs no extra rule to classify.
+		//
+		// REJECTED, recorded because it was the original request: framing of
+		// the form "mistakes are acceptable because this is synthetic data".
+		// It is false for users — that premise is about one test machine, not
+		// about shipped software running on other people's work — and it is
+		// the wrong lever. It tolerates error rather than surfacing
+		// uncertainty, which lowers care without buying any candour. What
+		// makes a model declare a null result is that declaring is cheap while
+		// concealing is expensive, and "honesty outranks all" already says so.
+		//
+		// Behaviour is NOT verified. A byte count cannot measure whether a
+		// model actually takes the terminal state rather than manufacturing a
+		// finding to avoid it. Watch for the opposite failure: if models start
+		// declaring "unestablished" on questions they could have answered with
+		// one more tool call, suspect this line first. Not pre-registered as a
+		// probe; see EXPERIMENT-PREREG-2026-08-04.md if it should be.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 6941, "simple question gets direct sentence"},
+			BaseCoderPrompt(models.ProviderLocal), 7164, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {
