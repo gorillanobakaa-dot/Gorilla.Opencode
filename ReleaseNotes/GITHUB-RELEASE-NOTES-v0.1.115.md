@@ -213,9 +213,26 @@ the built binary and the installed copy.
 
 ## Install
 
+**Debian / Ubuntu:**
+
 ```sh
 sudo apt install ./gorilla-opencode_0.1.115_amd64.deb
 ```
 
-`apt` rather than `dpkg -i`, because the package depends on `lynx` and `dpkg`
-resolves nothing. Verify the download against `checksums.txt` first.
+`apt` rather than `dpkg -i`, because the package depends on `lynx`, `python3`
+and `ripgrep`, and `dpkg` resolves nothing.
+
+**Arch / CachyOS**, pre-built, no Go toolchain needed:
+
+```sh
+sudo pacman -U gorilla-opencode-0.1.115-1-x86_64.pkg.tar.zst
+```
+
+Or build it from source with `git clone`, `cd packaging`, `makepkg -si`. The
+PKGBUILD's checksum is real, not `SKIP`, so `makepkg` verifies what it fetched.
+
+**Verify your download first**, in the same directory as the files:
+
+```sh
+sha256sum -c SHA256SUMS-v0.1.115.txt
+```
