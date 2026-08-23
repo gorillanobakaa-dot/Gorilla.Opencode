@@ -90,6 +90,7 @@ checksums.sha256
 # anyone else.
 !/scripts/benchmark-models.py
 !/scripts/benchmark-tool-discipline.py
+!/scripts/measure-network-cost.py
 *.sh
 
 # GORILLA: exception (2026-08-20) — build-arch.sh is PUBLISHED. This narrows the
