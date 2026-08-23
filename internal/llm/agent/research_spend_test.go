@@ -22,6 +22,8 @@ package agent
 import (
 	"context"
 	"testing"
+
+	"github.com/opencode-ai/opencode/internal/session"
 )
 
 // The property, stated directly against the standard library. A cancelled
@@ -90,4 +92,54 @@ func TestLiveSessionsCoverOnlyTheRunInFlight(t *testing.T) {
 			"again turns an under-report into an over-report.", live)
 	}
 	_ = a
+}
+
+// A RUN MUST NOT INFLATE THE CONTEXT GAUGE.
+//
+// Measured 2026-08-23: after an eighteen-helper run, a conversation holding
+// about 14K of real context showed "1.2M (115%)" in the footer and a red
+// "Context: 229%". The rollup had added the helpers' 1,121,961 prompt tokens to
+// PromptTokens, which is CURRENT OCCUPANCY, not a lifetime total.
+//
+// agent.go:819 predicted this in writing three months earlier: "a running total
+// would climb past 100% and sit there showing a false warning". The fields to
+// accumulate into are the Cumulative ones, added by that same fix so a lifetime
+// total could be recorded WITHOUT breaking the gauge.
+//
+// This matters beyond a wrong number: a false context warning invites a user to
+// compact a conversation that is nowhere near full, throwing away history to
+// solve a problem they do not have.
+func TestARunDoesNotInflateTheContextGauge(t *testing.T) {
+	const window = 250_000
+
+	// A small conversation, plus a very large run underneath it.
+	sess := session.Session{
+		PromptTokens:     13504,
+		CompletionTokens: 540,
+	}
+	run := helperSpend{cost: 7.64, inTokens: 1_121_961, outTokens: 17_319}
+
+	// What the rollup does.
+	sess.Cost += run.cost
+	sess.CumulativePromptTokens += run.inTokens
+	sess.CumulativeCompletionTokens += run.outTokens
+
+	gauge := float64(sess.PromptTokens+sess.CompletionTokens) / float64(window) * 100
+	if gauge > 100 {
+		t.Errorf("the context gauge reads %.0f%% for a conversation holding %d tokens "+
+			"in a %d window. The helpers' tokens have been added to CURRENT "+
+			"occupancy; they belong in the Cumulative fields.",
+			gauge, sess.PromptTokens+sess.CompletionTokens, window)
+	}
+
+	// The lifetime total must still be recorded, or the fix trades one wrong
+	// number for a missing one.
+	if sess.CumulativePromptTokens != 1_121_961 {
+		t.Errorf("cumulative prompt tokens %d, want the run's 1121961: the spend "+
+			"has to land SOMEWHERE or a killed ledger is the result",
+			sess.CumulativePromptTokens)
+	}
+	if sess.Cost < 7.6 {
+		t.Errorf("cost %.2f, want the run's 7.64", sess.Cost)
+	}
 }

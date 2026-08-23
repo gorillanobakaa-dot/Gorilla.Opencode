@@ -287,7 +287,22 @@ func (p *permissionDialogCmp) renderBashContent() string {
 	baseStyle := styles.BaseStyle()
 
 	if pr, ok := p.permission.Params.(tools.BashPermissionsParams); ok {
-		content := fmt.Sprintf("```bash\n%s\n```", pr.Command)
+		// GORILLA FIX (2026-08-23): WRAP the command. A fenced code block does
+		// not wrap, it CLIPS, so a command longer than the dialog was silently
+		// cut and the user was asked to approve something they could not read.
+		//
+		// Observed on a live run: "cd /home/gorilla/Documents/Debian.Kernel.Work/
+		// kernel-" and "find /home/gorilla/Documents/Debian.Kernel.Work -name \".",
+		// both severed mid-argument. The destination and the pattern, which are
+		// the only parts that decide whether the command is safe, were the parts
+		// removed.
+		//
+		// This is the worst instance of a class that turned up three times in
+		// one day (the helper spawn notice, the /tasks label, this): text cut to
+		// fit a container instead of the container fitting the text. It is worst
+		// here because this dialog exists for one purpose, which is showing you
+		// what you are about to allow.
+		content := fmt.Sprintf("```bash\n%s\n```", wrapCommand(pr.Command, p.width-14))
 
 		// Use the cache for markdown rendering
 		renderedContent := p.GetOrSetMarkdown(p.permission.ID, func() (string, error) {
@@ -466,8 +481,13 @@ func (p *permissionDialogCmp) SetSize() tea.Cmd {
 	}
 	switch p.permission.ToolName {
 	case tools.BashToolName:
-		p.width = int(float64(p.windowSize.Width) * 0.4)
-		p.height = int(float64(p.windowSize.Height) * 0.3)
+		// GORILLA FIX (2026-08-23): 0.4 was too narrow for the thing it exists
+		// to show. A command is the whole content of this dialog, exactly as a
+		// diff is for edit and write, and those already use 0.8. Wrapping alone
+		// would fix the truncation and leave a tall thin box wrapping every
+		// path over four lines; the width is what makes it readable.
+		p.width = int(float64(p.windowSize.Width) * 0.8)
+		p.height = int(float64(p.windowSize.Height) * 0.4)
 	case tools.EditToolName:
 		p.width = int(float64(p.windowSize.Width) * 0.8)
 		p.height = int(float64(p.windowSize.Height) * 0.8)
@@ -545,4 +565,63 @@ func NewPermissionDialogCmp() PermissionDialogCmp {
 		diffCache:      make(map[string]string),
 		markdownCache:  make(map[string]string),
 	}
+}
+
+// wrapCommand hard-wraps a shell command to width columns.
+//
+// Wrapped rather than truncated, and wrapped BY US rather than left to the
+// markdown renderer, because a fenced code block clips instead of wrapping.
+// Every character of the command reaches the screen or the dialog is lying
+// about what it is asking for.
+//
+// Breaks at whitespace where it can, so arguments stay whole and readable, and
+// mid-token only when a single token is genuinely longer than the line, which a
+// long path can be.
+func wrapCommand(cmd string, width int) string {
+	if width < 20 {
+		width = 20
+	}
+	var out []string
+	for _, line := range strings.Split(cmd, "\n") {
+		for {
+			runes := []rune(line)
+			if lipgloss.Width(line) <= width {
+				break
+			}
+			// Walk runes accumulating DISPLAY columns, and stop at the last
+			// index that still fits. Measuring "the first index that does not
+			// fit" and cutting there is off by one, which is how the first
+			// version of this produced 41-column lines in a 40-column box.
+			fits, lastSpace, w := 0, -1, 0
+			for i, r := range runes {
+				rw := lipgloss.Width(string(r))
+				if w+rw > width {
+					break
+				}
+				w += rw
+				fits = i + 1
+				if r == ' ' {
+					lastSpace = i
+				}
+			}
+			if fits == 0 {
+				fits = 1 // a single rune wider than the box; take it anyway
+			}
+			cut := fits
+			trim := false
+			// Break at whitespace where there is one, so arguments stay whole.
+			// Mid-token only when a single token really is longer than the
+			// line, which a long path often is.
+			if lastSpace > 0 {
+				cut, trim = lastSpace, true
+			}
+			out = append(out, string(runes[:cut]))
+			line = string(runes[cut:])
+			if trim {
+				line = strings.TrimPrefix(line, " ")
+			}
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
 }

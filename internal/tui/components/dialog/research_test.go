@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
 
@@ -192,6 +193,21 @@ func TestFlatRateTierStillShowsARealNumber(t *testing.T) {
 // dialog must now show which inputs are measured, which are published, and
 // which are guesses.
 func TestDialogShowsItsWorking(t *testing.T) {
+	// GORILLA FIX (2026-08-23): isolate the helper-timing store.
+	//
+	// This test read the DEVELOPER'S REAL CACHE. On 2026-08-23 a live research
+	// run wrote eighteen genuine helper durations to
+	// ~/.cache/gorilla-opencode/helper-timing.json, the dialog correctly
+	// switched from ASSUMED to MEASURED, and this test failed. The code was
+	// right and the test was reading state from outside itself.
+	//
+	// It is the same family as the config-isolation guard in
+	// internal/config/main_test.go: a test that depends on a file the user's
+	// own usage writes will pass or fail according to what they did that
+	// afternoon.
+	config.ResetHelperTimingForTest()
+	defer config.ResetHelperTimingForTest()
+
 	m := NewResearchDialogCmp("q")
 	m.SetSize(140, 60)
 	v := m.View()

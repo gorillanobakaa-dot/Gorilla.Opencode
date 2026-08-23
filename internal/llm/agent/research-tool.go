@@ -1184,9 +1184,31 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 		// tied to the lifetime of the work it was accounting for.
 		writeCtx := context.WithoutCancel(ctx)
 		if parent, err := r.sessions.Get(writeCtx, sessionID); err == nil {
+			// GORILLA FIX (2026-08-23): the CUMULATIVE fields, not the gauge.
+			//
+			// This did `parent.PromptTokens += total.inTokens`. Those two
+			// fields are CURRENT CONTEXT OCCUPANCY: assigned, never
+			// accumulated, because the footer and sidebar divide their sum by
+			// the model's context window. The comment at agent.go:819 spells
+			// this out and warns in terms that describe what then happened:
+			// "a running total would climb past 100% and sit there showing a
+			// false warning".
+			//
+			// Measured 2026-08-23 on a run of eighteen helpers: a conversation
+			// holding about 14K of real context reported "1.2M (115%)" in the
+			// footer and a red "Context: 229%". The helpers' 1,121,961 prompt
+			// tokens had been added to the gauge. Nothing was over-full; the
+			// only thing wrong was the number, and a false context warning
+			// invites a user to compact a conversation that does not need it.
+			//
+			// CumulativePromptTokens exists for exactly this: the 2026-08-19
+			// fix separated "what is in the window now" from "what this
+			// conversation has spent in total" precisely so a lifetime total
+			// could be recorded without breaking the gauge. Cost keeps `+=`
+			// because Cost has always been a lifetime total.
 			parent.Cost += total.cost
-			parent.PromptTokens += total.inTokens
-			parent.CompletionTokens += total.outTokens
+			parent.CumulativePromptTokens += total.inTokens
+			parent.CumulativeCompletionTokens += total.outTokens
 			if _, err := r.sessions.Save(writeCtx, parent); err != nil {
 				// Not silent. If the ledger cannot be written the user is
 				// entitled to know the number they are looking at is short.
