@@ -1127,6 +1127,15 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 				SetSubAgentState(entry.ID, SubAgentRunning)
 				reply, spend, err := r.runHelper(hctx, sessionID, call.ID, sup,
 					supervisorPrompt(roles[i], params.Question, results[i].reply), entry.ID)
+				// GORILLA FIX (2026-08-23): bill the spend BEFORE the early
+				// return. A supervisor that failed still burned tokens getting
+				// there, and returning here skipped the add entirely, so its
+				// cost vanished from the receipt. Second leak of the same shape
+				// as runHelper's zeroed error returns, found the same hour.
+				mu.Lock()
+				supervisorSpend.add(spend)
+				mu.Unlock()
+
 				if err != nil {
 					if hctx.Err() != nil {
 						SetSubAgentState(entry.ID, SubAgentKilled)
@@ -1134,14 +1143,11 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 						SetSubAgentState(entry.ID, SubAgentFailed)
 					}
 					// An audit that did not happen must not read as approval.
-					audits[i] = "**SUPERVISION FAILED — this lane is UNAUDITED: " + err.Error() + "**"
+					audits[i] = "**SUPERVISION FAILED: this lane is UNAUDITED: " + err.Error() + "**"
 					return
 				}
 				SetSubAgentState(entry.ID, SubAgentDone)
 				audits[i] = strings.TrimSpace(reply)
-				mu.Lock()
-				supervisorSpend.add(spend)
-				mu.Unlock()
 			}(i)
 		}
 		wg.Wait()
@@ -1394,14 +1400,19 @@ func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID st
 
 	done, err := helper.Run(ctx, helperSession.ID, prompt)
 	if err != nil {
-		return "", helperSpend{}, fmt.Errorf("could not start helper: %w", err)
+		// The session exists, so read what it spent rather than reporting zero.
+		return "", r.spendOf(ctx, helperSession.ID), fmt.Errorf("could not start helper: %w", err)
 	}
 	result := <-done
 	if result.Error != nil {
-		return "", helperSpend{}, fmt.Errorf("helper failed: %w", result.Error)
+		// A HELPER THAT RAN AND FAILED HAS SPENT MONEY, usually more than one
+		// that succeeded: a rate-limit failure means five retries, each paying
+		// for the whole context again. Reporting zero here is what made a
+		// receipt read $3.54 against $10.42 actually spent.
+		return "", r.spendOf(ctx, helperSession.ID), fmt.Errorf("helper failed: %w", result.Error)
 	}
 	if result.Message.Role != message.Assistant {
-		return "", helperSpend{}, fmt.Errorf("helper returned no assistant message")
+		return "", r.spendOf(ctx, helperSession.ID), fmt.Errorf("helper returned no assistant message")
 	}
 
 	// Report the spend; the CALLER adds it up once. Doing the read-modify-write
@@ -1410,36 +1421,7 @@ func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID st
 	//
 	// Tokens travel with the cost: on a free tier the cost is 0.00 however much
 	// was burned, so tokens are the only honest signal there is.
-	var spent helperSpend
-	if updated, err := r.sessions.Get(ctx, helperSession.ID); err == nil {
-		// GORILLA FIX (2026-08-23): the CUMULATIVE fields.
-		//
-		// This read PromptTokens/CompletionTokens, which are CURRENT CONTEXT
-		// OCCUPANCY: assigned every turn, never accumulated. So "what this
-		// helper consumed" was really "how big this helper's context was when
-		// it stopped", and summing that across a run produced the total of
-		// eighteen final contexts rather than the tokens actually processed.
-		//
-		// Measured on the 2026-08-23 run: it reported 1,121,961 where the true
-		// figure was 11,935,525. Every token number this tool has published,
-		// and every cost screen derived from one, was low by about 10.6x.
-		//
-		// The distinction is the 2026-08-19 one, and this is the second place
-		// today it was got wrong. An agent loop re-sends its whole context on
-		// every turn, which is exactly why the two numbers diverge by an order
-		// of magnitude and exactly why the cumulative one is what a receipt
-		// must show.
-		spent = helperSpend{
-			cost:      updated.Cost,
-			inTokens:  updated.CumulativePromptTokens,
-			outTokens: updated.CumulativeCompletionTokens,
-		}
-		if msgs, err := r.messages.List(ctx, helperSession.ID); err == nil {
-			for _, m := range msgs {
-				spent.toolCalls += int64(len(m.ToolCalls()))
-			}
-		}
-	}
+	spent := r.spendOf(ctx, helperSession.ID)
 
 	reply := result.Message.Content().String()
 	if strings.TrimSpace(reply) == "" {
@@ -1693,4 +1675,41 @@ Carry the evidence into the answer itself, not only into the findings.
   and a source only counts if it was actually consulted in this run.
 
 `)
+}
+
+// spendOf reads what one helper session has consumed.
+//
+// GORILLA FIX (2026-08-23): called on the FAILURE paths too, not only on
+// success. Three error returns in runHelper used to hand back an empty
+// helperSpend AFTER the session existed and had already spent money, so a
+// helper that ran and then failed reported zero.
+//
+// That is not an edge case, it is the common case on a free tier. Measured on
+// the 2026-08-23 22:28 run: 20 errors, a receipt reading $3.54, and $10.42
+// actually spent across the helper sessions. Two thirds of the bill invisible,
+// in the very receipt built that afternoon to make the bill visible.
+//
+// Same family as the cancelled-run rollup fixed earlier the same day: money is
+// spent on the way to a failure, and an error path that returns a zeroed
+// accounting struct is the same thing as not writing the ledger at all.
+//
+// The CUMULATIVE fields, because PromptTokens is current context occupancy:
+// see A_Gauge_Is_Not_A_Total. A retry storm is exactly where the two diverge
+// most, since every retry re-sends the whole context.
+func (r *researchTool) spendOf(ctx context.Context, helperSessionID string) helperSpend {
+	updated, err := r.sessions.Get(ctx, helperSessionID)
+	if err != nil {
+		return helperSpend{}
+	}
+	spent := helperSpend{
+		cost:      updated.Cost,
+		inTokens:  updated.CumulativePromptTokens,
+		outTokens: updated.CumulativeCompletionTokens,
+	}
+	if msgs, err := r.messages.List(ctx, helperSessionID); err == nil {
+		for _, m := range msgs {
+			spent.toolCalls += int64(len(m.ToolCalls()))
+		}
+	}
+	return spent
 }

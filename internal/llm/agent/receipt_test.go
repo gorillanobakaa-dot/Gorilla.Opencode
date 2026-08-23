@@ -144,12 +144,18 @@ func TestCommasGroupNumbersForReading(t *testing.T) {
 func TestSpendIsReadFromTheCumulativeFields(t *testing.T) {
 	src := readAgentSource(t, "research-tool.go")
 
-	i := strings.Index(src, "spent = helperSpend{")
+	// Anchored on spendOf, which is now the single place a helper's spend is
+	// read. The first version anchored on an inline "spent = helperSpend{" and
+	// broke when that was extracted into a function so the FAILURE paths could
+	// use it too. A guard that reads source has to be re-aimed when the source
+	// moves; that is the cost of the technique and it is worth paying here,
+	// because nothing else can see which fields are read.
+	i := strings.Index(src, "func (r *researchTool) spendOf(")
 	if i < 0 {
-		t.Fatal("cannot find where helperSpend is built; this guard's anchor needs updating")
+		t.Fatal("cannot find spendOf; this guard's anchor needs updating")
 	}
 	block := src[i:]
-	if j := strings.Index(block, "}"); j > 0 {
+	if j := strings.Index(block, "\n}"); j > 0 {
 		block = block[:j]
 	}
 
@@ -170,4 +176,52 @@ func readAgentSource(t *testing.T, name string) string {
 		t.Fatalf("read %s: %v", name, err)
 	}
 	return string(b)
+}
+
+// A FAILED HELPER STILL COSTS MONEY, and usually more than one that succeeded:
+// a rate-limit failure means five retries, each paying for the whole context
+// again.
+//
+// Measured on the 2026-08-23 22:28 run: 20 errors, a receipt reading $3.54, and
+// $10.42 actually spent across the helper sessions. Two thirds of the bill
+// invisible, in the receipt built that same afternoon to make the bill visible.
+//
+// Three error returns in runHelper handed back an empty helperSpend AFTER the
+// session existed and had spent, and the supervisor wave added its spend AFTER
+// an early return that failures took. Both are the same fault as the cancelled
+// rollup fixed earlier the same day: money is spent on the way to a failure,
+// and an error path that returns a zeroed accounting struct is the same thing
+// as not writing the ledger.
+func TestFailedHelpersAreStillBilled(t *testing.T) {
+	src := readAgentSource(t, "research-tool.go")
+
+	// Only the paths BEFORE a session exists may report zero: nothing has been
+	// spent yet if the agent or the session could not be created.
+	allowed := map[string]bool{
+		`return "", helperSpend{}, fmt.Errorf("could not create helper: %w", err)`:         true,
+		`return "", helperSpend{}, fmt.Errorf("could not create helper session: %w", err)`: true,
+	}
+	for _, line := range strings.Split(src, "\n") {
+		l := strings.TrimSpace(line)
+		if !strings.Contains(l, "helperSpend{}, fmt.Errorf") {
+			continue
+		}
+		if !allowed[l] {
+			t.Errorf("an error path reports ZERO spend after the helper session exists:\n"+
+				"  %s\n\n"+
+				"  A helper that ran and failed has spent money, usually more than one\n"+
+				"  that succeeded. Use r.spendOf(ctx, helperSession.ID).", l)
+		}
+	}
+
+	// The supervisor wave must bill before it can return early.
+	i := strings.Index(src, "supervisorSpend.add(spend)")
+	j := strings.Index(src, `audits[i] = "**SUPERVISION FAILED`)
+	if i < 0 || j < 0 {
+		t.Fatal("anchors missing; this guard needs updating")
+	}
+	if i > j {
+		t.Error("supervisorSpend.add runs AFTER the failure branch, so a supervisor " +
+			"that failed is never billed for the tokens it burned getting there")
+	}
 }
