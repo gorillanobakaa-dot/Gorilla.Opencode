@@ -210,6 +210,10 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 }
 
 func (p *baseProvider[C]) cleanMessages(messages []message.Message) (cleaned []message.Message) {
+	// Collapse the content of read-only tool results that a later identical call
+	// has superseded, before dropping empties. Shapes the wire only; the session
+	// store is untouched. See supersede.go.
+	messages = supersedeStaleReads(messages)
 	for _, msg := range messages {
 		// The message has no content
 		if len(msg.Parts) == 0 {
