@@ -264,7 +264,11 @@ func renderQuotaPanel(q *auth.QuotaSummary, account string, balances []quota.Rea
 	}
 
 	var b strings.Builder
-	if account != "" {
+	// The account belongs to the Antigravity quota, so print it only when a
+	// quota summary is actually being shown. Floating it at the top on its own
+	// is how a signed-in Google address appeared above a session that was
+	// spending a different provider entirely (the wrong-barrel bug).
+	if account != "" && q != nil && len(q.Groups) > 0 {
 		b.WriteString(wrapIndent("Account: "+account, 2) + "\n\n")
 	}
 	first := true

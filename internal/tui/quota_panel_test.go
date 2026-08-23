@@ -290,3 +290,21 @@ func TestQuotaPanelEmptySaysSo(t *testing.T) {
 		}
 	}
 }
+
+// The wrong-barrel regression: when there is no Antigravity summary to show
+// (the session spends a different provider), the Antigravity account email must
+// NOT be printed. It belongs to the quota, not to the session. Floating it at
+// the top over another provider's balances is exactly the bug this guards —
+// a signed-in Google address appearing above a ChatGPT session at 97%.
+func TestAccountHiddenWhenNoQuotaSummary(t *testing.T) {
+	t.Parallel()
+	got := renderQuotaPanel(nil, "user@example.com", balanceFixture(), 80, quotaNow)
+	if strings.Contains(got, "user@example.com") {
+		t.Errorf("account email leaked with no quota summary — the wrong-barrel bug:\n%s", got)
+	}
+	// The paid-provider balances the user genuinely holds must still render.
+	// Headings are upper-cased by the renderer, so match that.
+	if !strings.Contains(got, "DEEPSEEK") {
+		t.Errorf("balances must still show when Antigravity is absent, got %q", got)
+	}
+}

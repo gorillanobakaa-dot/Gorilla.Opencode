@@ -452,11 +452,43 @@ type quotaAlertMsg struct {
 // minute is enough to catch a crossing while it is happening.
 const quotaCheckMinInterval = 30 * time.Second
 
+// coderProvider is the provider the coder agent's model belongs to — the one
+// the session actually spends against. Returns "" when config/model cannot be
+// resolved, which the callers treat as "assume Antigravity" so a user with no
+// resolvable model sees no regression.
+//
+// GORILLA OVERRIDE (2026-08-23): the quota panel keys on this so it never
+// presents the Antigravity weekly meter (or its account email) for a session
+// signed in to a different provider — the wrong-barrel bug where a ChatGPT
+// session showed a Google account at 97%. When Antigravity is not the active
+// provider the fetch is skipped entirely, which also drops the wasted balance
+// round-trips measured the same day.
+func coderProvider() models.ModelProvider {
+	c := config.Get()
+	if c == nil {
+		return ""
+	}
+	return models.SupportedModels[c.Agents[config.AgentCoder].Model].Provider
+}
+
+// antigravityIsActive reports whether the session spends Antigravity quota.
+// An unresolvable provider ("") defaults to true: if we cannot tell, behave as
+// before rather than hiding a meter the user may rely on.
+func antigravityIsActive() bool {
+	p := coderProvider()
+	return p == "" || p == models.ProviderAntigravity
+}
+
 // quotaTierCheckCmd fetches a fresh quota reading and compares it against the
 // previous fractions. Silent on every failure path: an alert system that nags
 // about its own plumbing is worse than none.
 func quotaTierCheckCmd(prev map[string]float64) tea.Cmd {
 	return func() tea.Msg {
+		// Not spending Antigravity quota: do not poll it, and do not raise
+		// banana alerts about a barrel the session is not drawing down.
+		if !antigravityIsActive() {
+			return nil
+		}
 		creds, _ := auth.LoadAntigravityCreds()
 		if creds == nil || creds.AccessToken == "" {
 			return nil
@@ -501,6 +533,23 @@ func configuredBalances(ctx context.Context) []quota.Reading {
 // nothing); quiet=false reports the reason (used by /usage on demand).
 func antigravityUsageCmd(quiet bool) tea.Cmd {
 	return func() tea.Msg {
+		// Antigravity is not the active provider: do not fetch its weekly quota
+		// (that is the wrong barrel, and the fetch costs bandwidth on a metered
+		// link for a number the session is not spending). Say the login exists
+		// without pulling it, and still show any paid-provider balances the user
+		// holds. quiet=true is the session-start line; stay silent there.
+		if !antigravityIsActive() {
+			if quiet {
+				return nil
+			}
+			line := "Antigravity is not the active provider — its weekly quota is not shown."
+			if creds, _ := auth.LoadAntigravityCreds(); creds != nil && creds.Email != "" {
+				line = fmt.Sprintf("Antigravity is not the active provider — signed in as %s, weekly quota not fetched.", creds.Email)
+			}
+			msg := quotaLineMsg{line: line, kind: util.InfoTypeInfo}
+			msg.balances = configuredBalances(context.Background())
+			return msg
+		}
 		creds, _ := auth.LoadAntigravityCreds()
 		if creds == nil || creds.AccessToken == "" {
 			if quiet {
