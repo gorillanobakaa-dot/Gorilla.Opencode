@@ -447,7 +447,7 @@ func getToolAction(name string) string {
 		// No specific special or year is cited here because that detail is not
 		// something this was checked against, and a confident wrong citation is
 		// worse than none.
-		return "Analyzing this... with science..."
+		return "Gorilla is analyzing this... with science..."
 	case tools.WebSearchToolName:
 		return "Searching the web..."
 	case tools.BashToolName:
