@@ -1213,6 +1213,15 @@ func registerLocalEndpoints() {
 	} else if n > 0 {
 		logging.Debug("Applied refreshed Antigravity model list", "models", n)
 	}
+	// Same again for the ChatGPT sign-in list. Disk only, never the network:
+	// launch must not wait on a listing, which is the same bargain the other two
+	// make. A missing cache is the normal first-run state and leaves the
+	// built-in list in chatgpt.go working.
+	if n, err := models.LoadRefreshedChatGPT(CacheBase()); err != nil {
+		logging.Warn("Could not apply refreshed ChatGPT model list", "error", err)
+	} else if n > 0 {
+		logging.Debug("Applied refreshed ChatGPT model list", "models", n)
+	}
 
 	var first models.ModelID
 	for _, url := range order {

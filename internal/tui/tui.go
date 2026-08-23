@@ -3264,6 +3264,30 @@ func (a *appModel) refreshModelCatalogues() tea.Cmd {
 			}
 		}
 
+		// 2b. ChatGPT sign-in. GORILLA OVERRIDE (2026-08-23): this provider used
+		// to be in the "ships with the app" list below, and that is exactly how
+		// it rotted. The owner had Codex running gpt-5.6-luna on the same free
+		// account while this program offered him a model OpenAI retires on 31
+		// Aug 2026. The list is now fetched like everyone else's.
+		if creds, err := auth.LoadChatGPTCreds(); err != nil || creds == nil {
+			notes = append(notes, "ChatGPT skipped (not signed in)")
+		} else if status, body, ferr := creds.ProbeBackend(context.Background()); ferr != nil {
+			notes = append(notes, fmt.Sprintf("ChatGPT failed: %v", ferr))
+		} else if status != 200 {
+			notes = append(notes, fmt.Sprintf("ChatGPT failed (HTTP %d)", status))
+		} else if res, rerr := models.RefreshChatGPT(dir, []byte(body)); rerr != nil {
+			notes = append(notes, fmt.Sprintf("ChatGPT failed: %v", rerr))
+		} else {
+			note := fmt.Sprintf("ChatGPT %d usable", res.Usable)
+			if len(res.Added) > 0 || len(res.Removed) > 0 {
+				note += fmt.Sprintf(" (+%d, -%d)", len(res.Added), len(res.Removed))
+			}
+			if len(res.Removed) > 0 {
+				note += ", retired: " + strings.Join(res.Removed, ", ")
+			}
+			notes = append(notes, note)
+		}
+
 		// 3. Every provider whose list is FETCHED rather than compiled in —
 		// Groq, Cerebras, Anthropic, OpenAI, xAI, DeepSeek. Skipped silently
 		// when no key is on file: "you are not signed in" is not a failure, and
@@ -3298,7 +3322,7 @@ func (a *appModel) refreshModelCatalogues() tea.Cmd {
 		// everything else fetches its own list. Azure, Copilot, Bedrock and
 		// VertexAI are not here at all: they were removed, since none of them is
 		// reachable without an enterprise account or a card.
-		notes = append(notes, "Gemini and the sign-in providers ship with the app and update with it")
+		notes = append(notes, "Gemini ships with the app and updates with it")
 
 		if n := config.HiddenCount(); n > 0 {
 			notes = append(notes, fmt.Sprintf("%d hidden stayed hidden (H to review)", n))

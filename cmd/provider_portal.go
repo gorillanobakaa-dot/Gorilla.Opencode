@@ -477,11 +477,27 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 		if err := config.UpsertProviderKey(models.ProviderChatGPT, oauthLoginPlaceholder); err != nil {
 			return err
 		}
-		// Coder on GPT-5.5; the background agents (title/summarizer/task) on
-		// 5.4 Mini, which is cheaper against the same plan limit — on a free
-		// plan the cooldown is the scarce resource, so do not spend the strong
-		// model on generating conversation titles.
-		return applyAgentModels(models.ChatGPT55, models.ChatGPT54Mini)
+		// GORILLA OVERRIDE (2026-08-23): ask the backend what it serves before
+		// choosing, rather than naming two models here.
+		//
+		// This line used to read applyAgentModels(models.ChatGPT55,
+		// models.ChatGPT54Mini). Two constants, decided once at sign-in, that
+		// then silently governed the whole session. By 2026-08-23 both were
+		// wrong: the backend had been serving GPT-5.6 Terra and Luna above 5.5
+		// in its own ordering, and 5.4-Mini is retired on 31 Aug 2026.
+		//
+		// A failed refresh is not a failed sign-in. The built-in list in
+		// chatgpt.go is still registered, so falling through to it leaves the
+		// user working rather than stranded at a portal step.
+		refreshChatGPTCatalogue(ctx)
+		best, cheap := models.PreferredChatGPTModels()
+		if best == "" {
+			return fmt.Errorf("signed in, but no ChatGPT models are registered")
+		}
+		// The strong model codes; the cheapest one does titles and summaries.
+		// On a free plan the COOLDOWN is the scarce resource rather than money,
+		// so the good model must not be spent generating conversation titles.
+		return applyAgentModels(best, cheap)
 
 	case "google-oauth":
 		if err := runGoogleLogin(ctx, ""); err != nil {
@@ -752,4 +768,30 @@ func applyAgentModels(coder, title models.ModelID) error {
 		}
 	}
 	return config.UpdateAgentModel(config.AgentTitle, title)
+}
+
+// refreshChatGPTCatalogue asks the backend what it currently serves and
+// registers it, best-effort.
+//
+// Best-effort deliberately: this runs immediately after a successful sign-in,
+// and a listing that fails must not turn a working sign-in into an error. The
+// built-in list in internal/llm/models/chatgpt.go stays registered either way,
+// so the fallback is a slightly stale picker rather than an empty one.
+//
+// It costs no extra round trip beyond the one GET the portal would make anyway
+// to confirm the token works.
+func refreshChatGPTCatalogue(ctx context.Context) {
+	creds, err := auth.LoadChatGPTCreds()
+	if err != nil || creds == nil {
+		return
+	}
+	status, body, err := creds.ProbeBackend(ctx)
+	if err != nil || status != 200 {
+		return
+	}
+	res, err := models.RefreshChatGPT(config.CacheBase(), []byte(body))
+	if err != nil || res == nil {
+		return
+	}
+	fmt.Printf("Model list refreshed from OpenAI: %d available.\n", res.Usable)
 }
