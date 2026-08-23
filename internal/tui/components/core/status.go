@@ -175,25 +175,26 @@ func getHelpWidget() string {
 		Render(helpText)
 }
 
-func formatTokensAndCost(tokens, contextWindow int64, cost float64) string {
+// formatTokensAndCost renders the two token facts that are NOT the same thing.
+//
+// GORILLA FIX (2026-08-23): they were sharing one label and one percentage.
+//
+// `context` is what is in the model's window RIGHT NOW, and is the only thing a
+// context percentage may be computed from. `spent` is everything this
+// conversation and its helpers have consumed, which is the true bill and was
+// made visible on 2026-08-17 after a run burning 507,935 tokens across 17
+// helper sessions displayed 44,688.
+//
+// Both are right and they were conflated: `spent` was being divided by the
+// window, so a conversation holding 34.8K of a 250K window reported "169%" in
+// red beside a header correctly reading "14%". Helper tokens were never in this
+// model's window. Photographed on the owner's screen, both numbers at once.
+//
+// Third instance in one day of a TOTAL being used as a GAUGE. See
+// A_Gauge_Is_Not_A_Total.
+func formatTokensAndCost(context, spent, contextWindow int64, cost float64) string {
 	// Format tokens in human-readable format (e.g., 110K, 1.2M)
-	var formattedTokens string
-	switch {
-	case tokens >= 1_000_000:
-		formattedTokens = fmt.Sprintf("%.1fM", float64(tokens)/1_000_000)
-	case tokens >= 1_000:
-		formattedTokens = fmt.Sprintf("%.1fK", float64(tokens)/1_000)
-	default:
-		formattedTokens = fmt.Sprintf("%d", tokens)
-	}
-
-	// Remove .0 suffix if present
-	if strings.HasSuffix(formattedTokens, ".0K") {
-		formattedTokens = strings.Replace(formattedTokens, ".0K", "K", 1)
-	}
-	if strings.HasSuffix(formattedTokens, ".0M") {
-		formattedTokens = strings.Replace(formattedTokens, ".0M", "M", 1)
-	}
+	formattedTokens := humanTokens(context)
 
 	// GORILLA OVERRIDE: the cost is a rough ESTIMATE computed from a
 	// static, possibly-stale price table — it is NOT your actual bill.
@@ -206,13 +207,22 @@ func formatTokensAndCost(tokens, contextWindow int64, cost float64) string {
 		formattedCost = "$0.00"
 	}
 
-	percentage := (float64(tokens) / float64(contextWindow)) * 100
+	// FROM OCCUPANCY, not from the spend. This was the line that printed
+	// "⚠(169%)" in the footer while the header, computing the same thing from
+	// the right field, read "14%".
+	percentage := (float64(context) / float64(contextWindow)) * 100
 	if percentage > 80 {
 		// add the warning icon and percentage
 		formattedTokens = fmt.Sprintf("%s(%d%%)", styles.WarningIcon, int(percentage))
 	}
 
-	return fmt.Sprintf("Context: %s, Cost: %s", formattedTokens, formattedCost)
+	out := fmt.Sprintf("Context: %s", formattedTokens)
+	// Only when the helpers actually added something, so an ordinary chat keeps
+	// the short footer it has always had.
+	if spent > context {
+		out += ", Spent: " + humanTokens(spent)
+	}
+	return out + ", Cost: " + formattedCost
 }
 
 // statusChrome is everything on the status line that is NOT the message: the
@@ -256,11 +266,15 @@ func (m statusCmp) chrome() statusChrome {
 		// discover it. TotalTokens() falls back to the same two fields when no
 		// helpers exist, so an ordinary chat is unaffected.
 		totalTokens := m.session.TotalTokens()
-		tokens := formatTokensAndCost(totalTokens, model.ContextWindow, m.session.Cost+m.liveHelperCost)
+		// THE GAUGE READS OCCUPANCY. totalTokens includes the helpers, which
+		// were never in this model's window; dividing it by the window is what
+		// printed "169%" beside a header saying 14%.
+		contextTokens := m.session.PromptTokens + m.session.CompletionTokens
+		tokens := formatTokensAndCost(contextTokens, totalTokens, model.ContextWindow, m.session.Cost+m.liveHelperCost)
 		tokensStyle := styles.Padded().
 			Background(t.Text()).
 			Foreground(t.BackgroundSecondary())
-		percentage := (float64(totalTokens) / float64(model.ContextWindow)) * 100
+		percentage := (float64(contextTokens) / float64(model.ContextWindow)) * 100
 		if percentage > 80 {
 			tokensStyle = tokensStyle.Background(t.Warning())
 		}
@@ -479,3 +493,19 @@ func NewStatusCmp(lspClients map[string]*lsp.Client) StatusCmp {
 // no run is live, which is why the footer falls straight back to the session's
 // own total the moment a run finishes and the rollup lands.
 type LiveHelperCostMsg float64
+
+// humanTokens renders a token count compactly. Extracted so the context figure
+// and the spend figure cannot drift into two different formats.
+func humanTokens(n int64) string {
+	var s string
+	switch {
+	case n >= 1_000_000:
+		s = fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+	case n >= 1_000:
+		s = fmt.Sprintf("%.1fK", float64(n)/1_000)
+	default:
+		return fmt.Sprintf("%d", n)
+	}
+	s = strings.Replace(s, ".0K", "K", 1)
+	return strings.Replace(s, ".0M", "M", 1)
+}
