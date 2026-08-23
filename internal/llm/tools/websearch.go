@@ -885,9 +885,24 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		Path:        config.WorkingDirectory(),
 		ToolName:    WebSearchToolName,
 		Action:      "search",
-		Description: fmt.Sprintf("Search %s for: %s", source, params.Query),
-		// Grant covers THIS query, not every search in the session.
-		GrantKey: params.Query,
+		Description: webSearchConsent(source, params.Query),
+		// TOOL-WIDE ON PURPOSE. See permission.GrantWholeTool.
+		//
+		// This was params.Query, so "Allow for session" only ever covered a
+		// byte-identical search. Nobody repeats a search word for word, so the
+		// middle button did nothing and Allow-every-time was the only usable
+		// answer. A ten-helper research run asked ten times and answering did
+		// not help, because the eleventh query was a different question again.
+		//
+		// The owner, 2026-08-23: "in order to get a web search either i have to
+		// click ten or twenty times if the search has to restart or what?"
+		//
+		// What the user gives up is real and is stated on the dialog: the model
+		// writes the search terms as it works, so this approves the activity
+		// rather than a list anyone can read in advance. web_fetch keeps its
+		// per-host grain, so this does NOT widen what can be reached, only what
+		// can be searched for.
+		GrantKey: permission.GrantWholeTool,
 		Egress:   true,
 		Params:   params,
 	}) {
@@ -1040,4 +1055,28 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 	// words. See untrusted.go.
 	permission.MarkTainted(sessionID, fmt.Sprintf("web search results for %q", params.Query))
 	return NewUntrustedTextResponse("search results", source, "", sb.String()), nil
+}
+
+// webSearchConsent is the sentence shown on the permission dialog.
+//
+// It describes the OUTCOME, not the string. A search term tells a reader
+// nothing they can act on: you cannot tell from `ath9k rfkill regression`
+// whether allowing it is wise, and reading it more carefully will not help.
+// That is why per-query prompts get clicked through. What a person can actually
+// decide about is what leaves the machine, what can be reached, and what cannot
+// be taken back, so those are what this says.
+//
+// Deliberately not funny. This is the one dialog we want read rather than
+// dismissed, and a joke in it reads as decoration.
+func webSearchConsent(source, query string) string {
+	var b strings.Builder
+	b.WriteString("**Allowing web search for this session.** Worth ten seconds now, and then you are not asked again.\n\n")
+	fmt.Fprintf(&b, "**What happens.** Search terms go to %s and the results come back as text.\n\n", source)
+	b.WriteString("**What it can reach.** The open web, through that one search service. Nothing on this machine: no files, no commands, no keys, no history.\n\n")
+	b.WriteString("**What you cannot take back.** A term that has left the machine has left it, and terms are written by the model from what it is working on, so they can carry details of your conversation.\n\n")
+	b.WriteString("**There is no list to show you.** The model writes each search as it goes. That is what you are approving: the activity, not a set of words anybody can read in advance.\n\n")
+	b.WriteString("Pages are separate. Opening one still asks you, per site.\n\n")
+	fmt.Fprintf(&b, "This search: `%s`\n\n", query)
+	b.WriteString("**Allow** covers this one. **Allow for session** covers every search until you close the session. **Deny** means no search, and the model carries on without it.")
+	return b.String()
 }

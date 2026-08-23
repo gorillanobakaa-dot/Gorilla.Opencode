@@ -45,6 +45,31 @@ const PermissionWait = 10 * time.Minute
 // report can tell the difference between a refusal and an absence.
 var TimedOutError = errors.New("permission request timed out with no answer")
 
+// GrantWholeTool is the GrantKey for a tool whose grants are deliberately
+// tool-wide rather than per-item.
+//
+// GORILLA FIX (2026-08-23): a SENTINEL, not an empty string. An empty key is
+// what a forgotten key looks like, and TestEveryPermissionRequestSetsAGrantKey
+// exists precisely because four tools once forgot theirs. "Chose the whole
+// tool, on purpose" and "nobody thought about it" must not be the same value.
+//
+// WHY ANY TOOL WOULD CHOOSE THIS. The grain of a grant should match what the
+// tool can do harm with, and for some tools the item is not that thing. A
+// search term leaves the machine, comes back as text, and touches nothing you
+// own; pinning the grant to the exact string means "Allow for session" only
+// ever covers a search you are unlikely to repeat, so the button does nothing
+// and the user is asked again every single time. Maximum interruption, zero
+// information transferred, which is how a consent dialog becomes a thing people
+// click through without reading.
+//
+// Compare web_fetch, which keys on scheme://host: a fetch names an arbitrary
+// server, and the server is exactly what a poisoned page would change, so the
+// host is worth pinning. Same mechanism, different grain, chosen per tool.
+//
+// A tool using this MUST say so on its dialog. A grant wider than the sentence
+// the user read is the failure this whole file is trying to avoid.
+const GrantWholeTool = "*"
+
 type CreatePermissionRequest struct {
 	SessionID   string `json:"session_id"`
 	ToolName    string `json:"tool_name"`
@@ -108,6 +133,24 @@ type Service interface {
 	// made in the conversation the USER can see also covers the helper
 	// sessions spawned underneath it. See rootSession.
 	RegisterChildSession(child, parent string)
+	// GrantFleet approves a set of TOOLS for everything under root until
+	// RevokeFleet is called. See the fleetGrants field for why this exists and
+	// what it deliberately gives up.
+	GrantFleet(root string, tools []string)
+	// RevokeFleet ends a fleet grant. The caller that opened one MUST close it,
+	// normally with a defer, or the widening outlives the run.
+	RevokeFleet(root string)
+	// HasFleetGrant reports whether a fleet grant covers this tool, so a caller
+	// can tell "approved for the run" apart from "not asked yet".
+	HasFleetGrant(sessionID, toolName string) bool
+	// IsCovered reports whether an ALREADY PUBLISHED request would now be
+	// approved without asking, because a grant arrived after it was raised.
+	//
+	// GORILLA FIX (2026-08-23): a burst of requests is queued rather than
+	// overwritten, so a queue can hold questions that answering an earlier one
+	// has already settled. Asking them anyway is how "allow for session" came
+	// to mean "and now answer the same thing four more times".
+	IsCovered(p PermissionRequest) bool
 }
 
 type permissionService struct {
@@ -132,6 +175,32 @@ type permissionService struct {
 	// and path still have to match exactly — it only stops the same approval
 	// being re-asked by each sibling helper.
 	childToParent map[string]string
+	// fleetGrants records "asked once for the whole run" approvals: a root
+	// session id to the set of tool names approved for it.
+	//
+	// GORILLA FIX (2026-08-23): ROADMAP item 4, and the owner's explicit call.
+	//
+	// The 2026-08-17 fix above closed the SESSION axis: a grant made in one
+	// helper now covers its siblings. It did not close the GRANT KEY axis, and
+	// for web_search the grant key is the QUERY. Ten helpers run ten different
+	// queries, so they are ten different questions and the user was asked ten
+	// times. No amount of answering made it stop, because being asked once per
+	// query is what b333c23 deliberately built.
+	//
+	// The owner's ruling, 2026-08-23: "in order to get a web search either i
+	// have to click ten or twenty times if the search has to restart... most of
+	// the models will just allow you to accept once and that accept will work
+	// for all the batched models."
+	//
+	// So a fleet grant IS a widening, and it is meant to be one. It is bounded
+	// three ways so that it stays a considered trade rather than a hole:
+	//   - by TOOL: only the tools named in the prompt, never the whole session.
+	//   - by RUN: the research tool revokes it when the run returns, so it
+	//     cannot outlive the thing it was granted for.
+	//   - by DISCLOSURE: the prompt says the run will search for terms the
+	//     model writes later from pages it reads. Consent to a category you
+	//     cannot read in advance is still consent, but only if it says so.
+	fleetGrants map[string]map[string]bool
 	// unattended is set by the non-interactive entry point.
 	unattended bool
 }
@@ -160,6 +229,69 @@ func (s *permissionService) RegisterChildSession(child, parent string) {
 		s.childToParent = make(map[string]string)
 	}
 	s.childToParent[child] = parent
+}
+
+func (s *permissionService) IsCovered(p PermissionRequest) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	root := s.rootSession(p.SessionID)
+	if s.hasFleetGrantLocked(root, p.ToolName) {
+		return true
+	}
+	for _, g := range s.sessionPermissions {
+		if g.ToolName == p.ToolName && g.Action == p.Action &&
+			g.SessionID == root && g.Path == p.Path && g.GrantKey == p.GrantKey {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *permissionService) GrantFleet(root string, tools []string) {
+	if root == "" || len(tools) == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// Resolve to the TREE ROOT, because that is what the lookup in Request
+	// resolves to. Storing under whatever id the caller happened to hold would
+	// file the grant somewhere nothing ever reads, and the symptom would be the
+	// prompt storm the grant exists to stop, with no error anywhere.
+	root = s.rootSession(root)
+	if s.fleetGrants == nil {
+		s.fleetGrants = make(map[string]map[string]bool)
+	}
+	set, ok := s.fleetGrants[root]
+	if !ok {
+		set = make(map[string]bool)
+		s.fleetGrants[root] = set
+	}
+	for _, t := range tools {
+		if t != "" {
+			set[t] = true
+		}
+	}
+}
+
+func (s *permissionService) RevokeFleet(root string) {
+	if root == "" {
+		return
+	}
+	s.mu.Lock()
+	delete(s.fleetGrants, s.rootSession(root))
+	s.mu.Unlock()
+}
+
+// hasFleetGrant assumes the caller holds at least a read lock and that root is
+// already resolved, so Request can do its whole lookup under one acquisition.
+func (s *permissionService) hasFleetGrantLocked(root, toolName string) bool {
+	return s.fleetGrants[root][toolName]
+}
+
+func (s *permissionService) HasFleetGrant(sessionID, toolName string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.hasFleetGrantLocked(s.rootSession(sessionID), toolName)
 }
 
 func (s *permissionService) GrantPersistant(permission PermissionRequest) {
@@ -213,6 +345,7 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	root := s.rootSession(opts.SessionID)
 	grants := slices.Clone(s.sessionPermissions)
 	autoApproved := slices.Contains(s.autoApproveSessions, root) || slices.Contains(s.autoApproveSessions, opts.SessionID)
+	fleet := s.hasFleetGrantLocked(root, opts.ToolName)
 	s.mu.RUnlock()
 
 	// GORILLA FIX (2026-08-19): this used to be an unconditional `return true`
@@ -260,6 +393,17 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 			p.GrantKey == permission.GrantKey {
 			return true
 		}
+	}
+
+	// A fleet grant is checked AFTER the exact-match grants and AFTER the
+	// auto-approve carve-outs, so it changes nothing for a session that never
+	// opened one. It is checked BEFORE publishing, which is the whole point:
+	// the prompt this would have raised is the prompt the user already answered.
+	if fleet {
+		logging.Info("covered by a fleet grant approved for this run",
+			"tool", permission.ToolName, "action", permission.Action,
+			"grant_key", permission.GrantKey, "session", root)
+		return true
 	}
 
 	respCh := make(chan bool, 1)

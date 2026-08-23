@@ -427,6 +427,18 @@ func getToolAction(name string) string {
 	switch name {
 	case agent.AgentToolName:
 		return "Preparing prompt..."
+	case agent.ResearchToolName:
+		// GORILLA FIX (2026-08-23): a research run had no case at all, so the
+		// longest operation in the program showed the generic "Working...".
+		//
+		// The wording is the owner's, and it is here rather than on the
+		// permission dialog on purpose. A status line is where personality is
+		// free: nobody is deciding anything while it spins. A joke on a consent
+		// dialog reads as decoration and gets clicked through, which is the
+		// exact failure the new web_search wording exists to avoid.
+		return "Analyzing this... with science..."
+	case tools.WebSearchToolName:
+		return "Searching the web..."
 	case tools.BashToolName:
 		return "Building command..."
 	case tools.EditToolName:

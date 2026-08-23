@@ -211,6 +211,9 @@ type appModel struct {
 	selectedSession session.Session
 
 	showPermissions bool
+	// permissionQueue holds requests raised while another prompt is on screen.
+	// The dialog shows one at a time; see the pubsub case in Update.
+	permissionQueue []permission.PermissionRequest
 	permissions     dialog.PermissionDialogCmp
 
 	showHelp bool
@@ -894,6 +897,23 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Permission
 	case pubsub.Event[permission.PermissionRequest]:
+		// GORILLA FIX (2026-08-23): QUEUE, do not overwrite.
+		//
+		// This used to be an unconditional SetPermissions, and the dialog holds
+		// exactly one request in a plain field. So a fan-out that raised ten
+		// requests at once painted each over the last, and only the TENTH was
+		// ever seen. The other nine goroutines stayed parked on their channels
+		// with nothing left to republish them, waited out PermissionWait (ten
+		// minutes) and were then DENIED.
+		//
+		// It fails closed, so it was never a security hole. It is worse than
+		// that in one specific way: a request the user was never shown was
+		// recorded as one the user refused, and the visible symptom was a run
+		// that hung for ten minutes and came back blaming the network.
+		if a.showPermissions {
+			a.permissionQueue = append(a.permissionQueue, msg.Payload)
+			return a, nil
+		}
 		a.showPermissions = true
 		return a, a.permissions.SetPermissions(msg.Payload)
 	case dialog.PermissionResponseMsg:
@@ -905,6 +925,15 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.app.Permissions.GrantPersistant(msg.Permission)
 		case dialog.PermissionDeny:
 			a.app.Permissions.Deny(msg.Permission)
+		}
+		// Answering one question can settle others already in the queue: an
+		// "allow for session", or a fleet grant, covers them outright. Grant
+		// those silently rather than asking again for something just approved.
+		next, rest := drainPermissionQueue(a.permissionQueue,
+			a.app.Permissions.IsCovered, a.app.Permissions.Grant)
+		a.permissionQueue = rest
+		if next != nil {
+			return a, a.permissions.SetPermissions(*next)
 		}
 		a.showPermissions = false
 		return a, cmd
@@ -3415,4 +3444,31 @@ func refreshSummaryMsg(notes []string) util.InfoMsg {
 		Msg:  strings.Join(notes, " | "),
 		Echo: true,
 	}
+}
+
+// drainPermissionQueue picks the next question actually worth asking.
+//
+// GORILLA FIX (2026-08-23): extracted from Update so it can be tested. The bug
+// it exists to prevent does not show up in a unit test of the service or of the
+// dialog, because it lived in the seam between them: the dialog holds one
+// request, the service publishes many, and nothing counted.
+//
+// Entries already settled by the answer just given are granted through `grant`
+// and skipped. Returns the first unsettled request, or nil if the queue is
+// exhausted, along with what remains after it.
+func drainPermissionQueue(
+	queue []permission.PermissionRequest,
+	covered func(permission.PermissionRequest) bool,
+	grant func(permission.PermissionRequest),
+) (*permission.PermissionRequest, []permission.PermissionRequest) {
+	for len(queue) > 0 {
+		next := queue[0]
+		queue = queue[1:]
+		if covered(next) {
+			grant(next)
+			continue
+		}
+		return &next, queue
+	}
+	return nil, queue
 }

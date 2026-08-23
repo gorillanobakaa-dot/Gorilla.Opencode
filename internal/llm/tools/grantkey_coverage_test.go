@@ -26,6 +26,11 @@ import (
 var (
 	reRequest  = regexp.MustCompile(`CreatePermissionRequest\{`)
 	reGrantKey = regexp.MustCompile(`GrantKey:`)
+	// GORILLA FIX (2026-08-23): an EMPTY key is what a forgotten key looks
+	// like. A tool that genuinely wants tool-wide grants says so with
+	// permission.GrantWholeTool, so the deliberate choice and the oversight
+	// stop being the same value.
+	reEmptyGrantKey = regexp.MustCompile(`GrantKey:\s*"",`)
 )
 
 func TestEveryPermissionRequestSetsAGrantKey(t *testing.T) {
@@ -72,6 +77,12 @@ func TestEveryPermissionRequestSetsAGrantKey(t *testing.T) {
 			t.Errorf("%s: %d permission request(s) but only %d GrantKey — an unkeyed "+
 				"request means \"allow for session\" grants the WHOLE TOOL, not the thing "+
 				"the user was shown", f, requests, keys)
+		}
+		if n := len(reEmptyGrantKey.FindAll(src, -1)); n > 0 {
+			t.Errorf("%s: %d permission request(s) with an EMPTY GrantKey. An empty key "+
+				"is indistinguishable from a forgotten one, which is the bug this test "+
+				"exists to catch. If the grant really is meant to cover the whole tool, "+
+				"say permission.GrantWholeTool and put the widening on the dialog.", f, n)
 		}
 	}
 

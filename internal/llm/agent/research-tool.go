@@ -1037,6 +1037,37 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 		}
 	}
 
+	// ONE PROMPT FOR THE WHOLE RUN. See permission.fleetGrants.
+	//
+	// ROADMAP item 4. Every helper carries web_search and web_fetch, and both
+	// set a per-item GrantKey (the query, the URL). Ten helpers therefore asked
+	// ten different questions, and answering them did not help, because the
+	// eleventh query was a different question again. The owner's ruling on
+	// 2026-08-23 was that this is ridiculous and one approval should cover the
+	// batch, which is what every comparable tool does.
+	//
+	// Asked BEFORE the first wave, so the cost of declining is one prompt
+	// rather than a half-started run. Declining is NOT declining the run: it
+	// falls back to the old per-query prompts, which is what the wording says.
+	if fleetTools := researchEgressTools(); len(fleetTools) > 0 {
+		if r.permissions.Request(permission.CreatePermissionRequest{
+			SessionID:   sessionID,
+			ToolName:    ResearchToolName,
+			Action:      "egress",
+			Description: researchFleetPrompt(len(roles), fleetTools),
+			// Stable across runs ON PURPOSE: the query would make every run a
+			// new question and put us straight back where we started. This is
+			// what makes "Allow for session" mean "stop asking me about
+			// research runs" rather than "stop asking me about this one".
+			GrantKey: "research:egress",
+			Egress:   true,
+		}) {
+			r.permissions.GrantFleet(sessionID, fleetTools)
+			// The grant must not outlive the run it was granted for.
+			defer r.permissions.RevokeFleet(sessionID)
+		}
+	}
+
 	runWave(firstWave, "")
 
 	// SUPERVISION. One auditor per lane, in parallel, each reading only that
@@ -1352,4 +1383,29 @@ func NewResearchTool(
 		lspClients:  LspClients,
 		permissions: Permissions,
 	}
+}
+
+// researchEgressTools names the tools a fleet grant covers. The list is
+// deliberately explicit rather than derived from the helper loadout: a tool
+// added to helpers later must be a decision to widen this prompt, not a silent
+// consequence of an unrelated change.
+func researchEgressTools() []string {
+	return []string{tools.WebSearchToolName, tools.FetchToolName}
+}
+
+// researchFleetPrompt is the sentence the user actually approves.
+//
+// It states the widening rather than burying it. The searches are written by
+// the model as the run goes, partly from pages the run has just read, so this
+// is consent to a category that cannot be read in advance. That is a real
+// trade and the only honest way to offer it is to say so on the dialog.
+func researchFleetPrompt(helpers int, toolNames []string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "This research run will start **%d helpers**, and each one can search the web and fetch pages.\n\n", helpers)
+	fmt.Fprintf(&b, "Approving here covers **%s** for every helper in this run, so you are asked once instead of once per search.\n\n", strings.Join(toolNames, "` and `"))
+	b.WriteString("**What you are approving.** The search terms and page addresses are written by the model as it works, some of them from pages it reads during the run. So this approves the *activity*, not a list you can read now.\n\n")
+	b.WriteString("Nothing else is covered: files, commands and every other tool still ask as normal, and this ends when the run ends.\n\n")
+	b.WriteString("**Allow for session** stops the question for later research runs too.\n\n")
+	b.WriteString("**Deny** does not cancel the run. It falls back to asking you separately for each search and each page.")
+	return b.String()
 }
