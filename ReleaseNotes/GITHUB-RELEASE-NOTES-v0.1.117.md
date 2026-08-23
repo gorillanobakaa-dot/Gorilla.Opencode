@@ -90,6 +90,16 @@ the three, quoting the phantom window.
 **If you had the old version**, the phantom bar disappears on your next request,
 when the cached reading is rewritten from fresh headers. Nothing to do.
 
+
+**Fixed, on the installed build.** Same account, same panel, no second bar:
+
+[![The usage panel on the installed v0.1.117 build showing the monthly limit at 16 percent remaining standing alone, with no secondary usage limit bar beneath it at all](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/dacfe79270f3cfaa5b46d6f707818f5789540053/docs/screenshots/gallery/v0117-after-monthly-limit-alone.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/dacfe79270f3cfaa5b46d6f707818f5789540053/docs/screenshots/gallery/v0117-after-monthly-limit-alone.png)
+
+The version in frame reads v0.1.117, so the picture carries its own proof of
+which build produced it. That one image is pinned to a commit rather than to the
+tag, because it was taken after the tag was cut: a commit hash is immutable, so
+the picture on this page can never change under it.
+
 ---
 
 ## A note on the two numbers disagreeing
