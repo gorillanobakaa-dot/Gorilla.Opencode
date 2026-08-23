@@ -976,14 +976,40 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		running, longest, _ := agent.HeartbeatState()
 		if running == 0 {
 			// Nothing running: let the chain lapse. It restarts on the next spawn.
+			//
+			// The footer's live figure MUST be cleared here. The research tool
+			// rolls the whole run into the parent session when it returns, so
+			// leaving the live total in place would add the same run twice and
+			// turn an under-report into an over-report, which is not an
+			// improvement.
 			a.heartbeatRunning = false
-			return a, nil
+			return a, util.CmdHandler(core.LiveHelperCostMsg(0))
 		}
 		a.heartbeatBeat++
 		lines := heartbeatLines()
 		line := lines[a.heartbeatBeat%len(lines)]
+		notice := fmt.Sprintf(line, running, longest.Round(time.Second))
+
+		// GORILLA FIX (2026-08-23): say what it has cost SO FAR.
+		//
+		// Measured on a live run: the footer read "spent $0.01" for seventeen
+		// minutes while the database held $6.70 across eighteen helper sessions.
+		// Not a lost figure. Helper turns credit the helper's OWN session, and
+		// the parent is only credited when the research tool returns, so the
+		// true number arrives after the last moment anyone could act on it.
+		//
+		// The heartbeat is the right home for the running total: it already
+		// ticks only while helpers are alive, so this costs one query every 90
+		// seconds during a run and nothing at all at rest.
+		spend := a.liveHelperSpend()
+		if spend > 0 {
+			notice += fmt.Sprintf(" Burned $%.2f so far.", spend)
+		}
 		return a, tea.Batch(
-			util.ReportInfo(fmt.Sprintf(line, running, longest.Round(time.Second))),
+			util.ReportInfo(notice),
+			// The footer carries the same figure, so it is visible without
+			// waiting for the next beat.
+			util.CmdHandler(core.LiveHelperCostMsg(spend)),
 			helperHeartbeatCmd(),
 		)
 
@@ -3548,3 +3574,42 @@ const (
 	// REQUIREMENT, PRIOR ART), so this needs to survive that plus a little.
 	spawnLabelFloor = 24
 )
+
+// liveHelperSpend is what the helpers of the RUN IN FLIGHT have spent so far.
+//
+// Summed from the registry's session ids rather than from "every child of this
+// conversation", and the difference is not cosmetic. When a research tool
+// returns it adds the whole run onto the parent session, so a query that summed
+// every child would count a FINISHED run twice: once inside the parent's own
+// total and again in the children that fed it. The registry holds only the
+// helpers of the run currently in flight and is purged per tool call, so this
+// is correct at every moment rather than only at the end.
+//
+// Best effort. A figure that cannot be read is reported as zero and the notice
+// simply omits it, because a wrong number here is worse than no number: this is
+// the line somebody would use to decide whether to kill a run.
+func (a appModel) liveHelperSpend() float64 {
+	if a.selectedSession.ID == "" {
+		return 0
+	}
+	live := agent.LiveSubAgentSessions(a.selectedSession.ID)
+	if len(live) == 0 {
+		return 0
+	}
+	inFlight := make(map[string]bool, len(live))
+	for _, id := range live {
+		inFlight[id] = true
+	}
+
+	children, err := a.app.Sessions.Children(context.Background(), a.selectedSession.ID)
+	if err != nil {
+		return 0
+	}
+	var total float64
+	for _, c := range children {
+		if inFlight[c.ID] {
+			total += c.Cost
+		}
+	}
+	return total
+}

@@ -36,6 +36,19 @@ type statusCmp struct {
 	messageTTL time.Duration
 	lspClients map[string]*lsp.Client
 	session    session.Session
+	// liveHelperCost is what the helpers of a run IN FLIGHT have spent so far.
+	//
+	// GORILLA FIX (2026-08-23): the footer reads session.Cost, which is ONE
+	// row. Helper turns credit the helper's own session and are only rolled
+	// into the parent when the research tool returns, so during a seventeen
+	// minute run this footer read "$0.01" against a measured $6.70 sitting in
+	// eighteen sibling rows. The money was never lost; it was arriving after
+	// the last moment anyone could act on it.
+	//
+	// Carried separately rather than added into session.Cost, because the
+	// rollup DOES land at the end and adding it here too would then count the
+	// same run twice.
+	liveHelperCost float64
 	// GORILLA OVERRIDE: show the "cost is an estimate" note once per run.
 	costNoticeShown bool
 	// GORILLA FIX (2026-08-18): msgSeq is the generation of the message
@@ -116,6 +129,8 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				TTL:  10 * time.Second,
 			})
 		}
+	case LiveHelperCostMsg:
+		m.liveHelperCost = float64(msg)
 	case util.InfoMsg:
 		m.info = msg
 		m.msgSeq++
@@ -241,7 +256,7 @@ func (m statusCmp) chrome() statusChrome {
 		// discover it. TotalTokens() falls back to the same two fields when no
 		// helpers exist, so an ordinary chat is unaffected.
 		totalTokens := m.session.TotalTokens()
-		tokens := formatTokensAndCost(totalTokens, model.ContextWindow, m.session.Cost)
+		tokens := formatTokensAndCost(totalTokens, model.ContextWindow, m.session.Cost+m.liveHelperCost)
 		tokensStyle := styles.Padded().
 			Background(t.Text()).
 			Foreground(t.BackgroundSecondary())
@@ -459,3 +474,8 @@ func NewStatusCmp(lspClients map[string]*lsp.Client) StatusCmp {
 		lspClients: lspClients,
 	}
 }
+
+// LiveHelperCostMsg carries the in-flight helper spend to the footer. Zero when
+// no run is live, which is why the footer falls straight back to the session's
+// own total the moment a run finishes and the rollup lands.
+type LiveHelperCostMsg float64

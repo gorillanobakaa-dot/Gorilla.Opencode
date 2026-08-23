@@ -56,6 +56,7 @@ import (
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
+	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/lsp"
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/permission"
@@ -1163,11 +1164,40 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 		total.add(o.spend)
 	}
 	if total.cost > 0 || total.inTokens > 0 || total.outTokens > 0 {
-		if parent, err := r.sessions.Get(ctx, sessionID); err == nil {
+		// GORILLA FIX (2026-08-23): the accounting write MUST outlive the
+		// cancellation of the thing being accounted for.
+		//
+		// This used ctx. Killing a run therefore meant Get returned
+		// context.Canceled, err == nil was false, the whole block was skipped,
+		// and the Save error was discarded by `_, _ =` anyway. So pressing X on
+		// a run that had already spent real money erased every trace of it: the
+		// session total stayed where it was and nothing anywhere recorded the
+		// spend.
+		//
+		// Measured 2026-08-23 on a live run: $6.70 across eighteen helper
+		// sessions, none of it yet on the parent. That is what would have been
+		// silently dropped.
+		//
+		// The comment above says under-reporting a run is the worst bug
+		// available to this project. This is that bug through a different door,
+		// and the fix for the first one was what failed: an accounting write
+		// tied to the lifetime of the work it was accounting for.
+		writeCtx := context.WithoutCancel(ctx)
+		if parent, err := r.sessions.Get(writeCtx, sessionID); err == nil {
 			parent.Cost += total.cost
 			parent.PromptTokens += total.inTokens
 			parent.CompletionTokens += total.outTokens
-			_, _ = r.sessions.Save(ctx, parent)
+			if _, err := r.sessions.Save(writeCtx, parent); err != nil {
+				// Not silent. If the ledger cannot be written the user is
+				// entitled to know the number they are looking at is short.
+				logging.Error("could not record what this research run spent",
+					"error", err, "session", sessionID,
+					"cost", total.cost, "in_tokens", total.inTokens,
+					"out_tokens", total.outTokens)
+			}
+		} else {
+			logging.Error("could not load the session to record research spend",
+				"error", err, "session", sessionID, "cost", total.cost)
 		}
 	}
 

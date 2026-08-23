@@ -327,6 +327,11 @@ func (s *service) Children(ctx context.Context, parentID string) ([]Session, err
 			ID: r.ID, Title: r.Title, ParentSessionID: parentID,
 			PromptTokens: r.PromptTokens, CompletionTokens: r.CompletionTokens,
 			CreatedAt: r.CreatedAt,
+			// GORILLA FIX (2026-08-23): carry the cost. It was dropped here,
+			// so every caller asking "what did this run's helpers cost" got
+			// zero from a row that held the answer. That is how the footer
+			// showed $0.01 against a measured $6.70.
+			Cost: r.Cost,
 		})
 	}
 	return out, nil

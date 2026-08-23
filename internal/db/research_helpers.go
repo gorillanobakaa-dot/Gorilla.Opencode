@@ -17,7 +17,7 @@ package db
 import "context"
 
 const listResearchHelpers = `
-SELECT id, title, prompt_tokens, completion_tokens, created_at
+SELECT id, title, prompt_tokens, completion_tokens, created_at, cost
 FROM sessions
 WHERE parent_session_id IS NOT NULL AND title LIKE 'Research: %'
 ORDER BY created_at DESC
@@ -32,6 +32,14 @@ type ResearchHelper struct {
 	PromptTokens     int64
 	CompletionTokens int64
 	CreatedAt        int64
+	// Cost is what this helper session has spent SO FAR. It is live: every
+	// turn a helper takes credits its own session immediately, which is why
+	// this can be read mid-run to answer "what has this cost me so far".
+	//
+	// GORILLA FIX (2026-08-23): added because the footer showed $0.01 for
+	// seventeen minutes of a run that had already spent $6.70. The money was
+	// never lost, it was accruing in eighteen sibling rows nothing looked at.
+	Cost float64
 }
 
 // ListResearchHelpers returns every research helper session, newest first.
@@ -45,7 +53,7 @@ func (q *Queries) ListResearchHelpers(ctx context.Context) ([]ResearchHelper, er
 	var out []ResearchHelper
 	for rows.Next() {
 		var h ResearchHelper
-		if err := rows.Scan(&h.ID, &h.Title, &h.PromptTokens, &h.CompletionTokens, &h.CreatedAt); err != nil {
+		if err := rows.Scan(&h.ID, &h.Title, &h.PromptTokens, &h.CompletionTokens, &h.CreatedAt, &h.Cost); err != nil {
 			return nil, err
 		}
 		out = append(out, h)
@@ -54,7 +62,7 @@ func (q *Queries) ListResearchHelpers(ctx context.Context) ([]ResearchHelper, er
 }
 
 const listChildSessions = `
-SELECT id, title, prompt_tokens, completion_tokens, created_at
+SELECT id, title, prompt_tokens, completion_tokens, created_at, cost
 FROM sessions
 WHERE parent_session_id = ?1
 ORDER BY created_at
@@ -78,7 +86,7 @@ func (q *Queries) ListChildSessions(ctx context.Context, parentID string) ([]Res
 	var out []ResearchHelper
 	for rows.Next() {
 		var h ResearchHelper
-		if err := rows.Scan(&h.ID, &h.Title, &h.PromptTokens, &h.CompletionTokens, &h.CreatedAt); err != nil {
+		if err := rows.Scan(&h.ID, &h.Title, &h.PromptTokens, &h.CompletionTokens, &h.CreatedAt, &h.Cost); err != nil {
 			return nil, err
 		}
 		out = append(out, h)

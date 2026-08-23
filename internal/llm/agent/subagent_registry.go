@@ -403,3 +403,31 @@ func HeartbeatState() (running int, longest time.Duration, quiet time.Duration) 
 	}
 	return running, longest, quiet
 }
+
+// LiveSubAgentSessions returns the session ids of every helper currently in the
+// registry, with the id of the conversation they belong to.
+//
+// GORILLA FIX (2026-08-23): this exists so the footer can show what a research
+// run is costing WHILE IT RUNS.
+//
+// The registry is the right source and a plain "children of this session" query
+// is the wrong one. Helper spend is rolled into the parent when the tool
+// returns, so a query that summed every child would count a FINISHED run twice:
+// once in the parent's own total and again in the children that fed it. The
+// registry holds only the helpers of the run in flight, and is purged per tool
+// call, so summing these and nothing else is correct at every moment.
+func LiveSubAgentSessions(parentSessionID string) []string {
+	subAgentRegMu.Lock()
+	defer subAgentRegMu.Unlock()
+	var out []string
+	for _, e := range subAgentReg {
+		if e.info.SessionID == "" {
+			continue
+		}
+		if parentSessionID != "" && e.info.ParentSessionID != parentSessionID {
+			continue
+		}
+		out = append(out, e.info.SessionID)
+	}
+	return out
+}
