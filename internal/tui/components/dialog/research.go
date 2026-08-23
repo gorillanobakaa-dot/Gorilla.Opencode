@@ -48,6 +48,39 @@ type researchOption struct {
 	short string
 }
 
+// parallelShort and parallelWhat build the parallel mode's wording from the real
+// concurrency cap, so it cannot drift from the code again.
+//
+// The batching sentence is conditional because batching itself is: when the
+// in-flight cap is at least the maximum number of helpers the selector offers,
+// nothing ever queues and saying "in batches" would be inventing a wait the user
+// will not experience.
+// effectiveParallel is how many helpers can ACTUALLY run together: the smaller
+// of the in-flight cap and the most the selector will let you ask for.
+//
+// Quoting the raw cap would be wrong in the opposite direction to the old
+// hardcoded 4. ResearchMaxInFlight is ResearchMaxAgents + 1, and that +1 is
+// deliberate headroom so a full run never queues, not an eleventh helper you can
+// select. Telling the user "up to 11" promises a lane that does not exist.
+func effectiveParallel() int {
+	return min(agent.ResearchMaxAgents, agent.ResearchMaxInFlight)
+}
+
+func parallelShort() string {
+	return fmt.Sprintf("up to %d at a time, same price, much faster", effectiveParallel())
+}
+
+func parallelWhat() string {
+	// No batching when the cap covers every lane the selector offers. Saying "in
+	// batches" would invent a wait the user will not experience.
+	if agent.ResearchMaxInFlight >= agent.ResearchMaxAgents {
+		return fmt.Sprintf("All %d helpers start at once, none of them queued. Same work "+
+			"as sequential, far less waiting.", agent.ResearchMaxAgents)
+	}
+	return fmt.Sprintf("Up to %d helpers at a time, in batches. Same work as sequential, "+
+		"far less waiting.", agent.ResearchMaxInFlight)
+}
+
 var researchOptions = []researchOption{
 	{
 		mode:  "sequential",
@@ -60,14 +93,25 @@ var researchOptions = []researchOption{
 		cost: "NOT cheaper — the same total, spread over a longer wait. Same sessions, lower rate.",
 	},
 	{
-		mode:  "parallel",
-		name:  "Parallel",
-		short: "up to 4 at a time, same price, much faster",
-		// GORILLA FIX: was "All helpers at once (4 in flight)" — self-contradictory
-		// above 4, and the selector goes to 10. Ten lanes are three batches, so
-		// "the time of the slowest one" was wrong too.
-		what: "Up to 4 helpers at a time, in batches. Same work as sequential, far less waiting.",
-		cost: "SAME token cost as sequential. You are buying time, not answers.",
+		mode: "parallel",
+		name: "Parallel",
+		// GORILLA OVERRIDE (2026-08-23): ROADMAP item 3. These two lines said
+		// "up to 4 at a time" and "in batches", as literals.
+		//
+		// Both were already false, not merely at risk of going stale. The cap is
+		// ResearchMaxInFlight, which is ResearchMaxAgents + 1 = 11, so the true
+		// figure was nearly three times the one on screen. And because the
+		// selector stops at 10 helpers while 11 may fly, there are no batches at
+		// all any more: every lane starts at once.
+		//
+		// The earlier GORILLA FIX comment here said "the selector goes to 10, ten
+		// lanes are three batches", which was true when in-flight was 4 and
+		// stopped being true when the cap moved. That is the whole argument for
+		// deriving the sentence instead of typing it: this is the second wrong
+		// number in the same two lines, from the same cause.
+		short: parallelShort(),
+		what:  parallelWhat(),
+		cost:  "SAME token cost as sequential. You are buying time, not answers.",
 	},
 	{
 		mode:  "supervised",
