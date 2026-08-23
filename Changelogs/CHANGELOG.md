@@ -1,3 +1,53 @@
+## v0.1.116 (2026-08-23): what every message costs, counted rather than guessed
+
+**Plain-language version:** nothing here adds a feature. It makes the program
+cheaper to run and removes three things that were quietly untrue.
+
+Every message you send also carries a description of every tool the model can
+use. Every message, not once at the start. That cost was written down as about
+5,000 tokens, and the document said honestly that the number came from
+subtraction rather than counting. Counted directly it is 8,462, nearly double.
+The subtraction had been done against a total measured on one machine with
+several tools switched off, so the leftover described those settings rather than
+what a new user pays. The annoying part: the real figure was already on screen.
+The /context screen has been showing the cost of each tool, individually and
+correctly, the whole time. Nobody had added the rows up.
+
+The economy setting had a hole in it. That list was written on 14 August; the
+code-review tool arrived on 18 August, switched on by default at 759 tokens per
+message, and nobody went back to add it. So the setting built for people on slow
+connections was still shipping a thirty-analyser review tool with every message.
+Nothing looked broken: it still ran, still switched things off, still showed a
+smaller number. It now saves 37%, down from 12,178 tokens per message to 7,713.
+And a tool missing from that list used to mean either "we decided to keep it" or
+"nobody looked", which are indistinguishable from outside, so there are now two
+lists: things dropped, and things deliberately kept with the reason written down.
+
+Files stopped being sent over and over. Read a file at ten and the program was
+still paying to send it at eleven, in every message in between. An old read is
+now replaced with a short note saying the content was dropped and where to find
+it. The note matters more than the saving: a model that simply cannot see
+something fills the gap from memory, while one told plainly that content was
+removed goes and looks again. Only things cheap to fetch again are dropped, never
+anything from the web, and never anything recent.
+
+The petrol gauge can no longer read the wrong tank. v0.1.115 fixed the symptom
+with a check; a check is something somebody has to remember to write. A reading
+now carries the account it belongs to as one thing rather than two, so it cannot
+be shown under another name, and the screen that draws the bars no longer knows
+anything about sign-ins. The same fault turned out to exist in the low-quota
+warnings: they were filed under the name of the limit, so two accounts both
+reporting a "Weekly Limit" would have warned about each other.
+
+One of ours, written down. The file-dropping feature shipped in its first draft
+with a safety rule that read as sensible and was really an off switch: "always
+keep the most recent read of each file". A file read once is the most recent read
+of itself, so it could never be dropped, and that is exactly the case the feature
+was built for. It did nothing. It passed every test asking "did we break
+anything" and failed the one asking "did it actually work".
+
+Full detail, both tracks: `Changelogs/v0.1.116-release-notes.md`.
+
 ## v0.1.115 (2026-08-23): the meter, and the list that had stopped being true
 
 **Plain-language version:** two things in this release were wrong in the same
