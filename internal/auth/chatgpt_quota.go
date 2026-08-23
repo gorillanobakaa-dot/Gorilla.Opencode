@@ -164,15 +164,47 @@ func headerInt(h http.Header, name string) int64 {
 	return n
 }
 
+// parseWindow reads one window's headers.
+//
+// GORILLA OVERRIDE (2026-08-23): a window carrying NOTHING but a zero is not a
+// window, and must not be rendered as a full bar.
+//
+// The owner asked why our panel showed a "Secondary usage limit" at 100% when
+// Codex, on the same free account, shows only the monthly one. Because the
+// backend does send `x-codex-secondary-used-percent: 0`, with no window length
+// and no reset time, and this function accepted it. Remaining() then computed
+// (100-0)/100 = 1.0 and the panel drew a full green bar for a limit that does
+// not exist on this plan.
+//
+// That is precisely the failure internal/quota/balances.go forbids in its own
+// header: unknown and plenty-left must never look alike. A confident full bar
+// for a non-existent allowance is the worse half of that pair.
+//
+// The guard is Codex's own, ported rather than invented
+// (codex-rs/codex-api/src/rate_limits.rs, parse_rate_limit_window):
+//
+//	let has_data = used_percent != 0.0
+//	    || window_minutes.is_some_and(|minutes| minutes != 0)
+//	    || resets_at.is_some();
+//	has_data.then_some(RateLimitWindow { ... })
+//
+// A window is real if ANY of the three says something. Zero used WITH a declared
+// window or reset time is a genuine untouched allowance and is kept; zero used
+// with nothing else is the backend saying "not applicable here".
 func parseWindow(h http.Header, prefix string) *ChatGPTWindow {
 	used, ok := headerFloat(h, prefix+"-used-percent")
 	if !ok {
 		return nil
 	}
+	minutes := headerInt(h, prefix+"-window-minutes")
+	reset := headerInt(h, prefix+"-reset-at")
+	if used == 0 && minutes == 0 && reset == 0 {
+		return nil
+	}
 	return &ChatGPTWindow{
 		UsedPercent:   used,
-		WindowMinutes: headerInt(h, prefix+"-window-minutes"),
-		ResetAt:       headerInt(h, prefix+"-reset-at"),
+		WindowMinutes: minutes,
+		ResetAt:       reset,
 	}
 }
 

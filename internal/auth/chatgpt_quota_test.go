@@ -86,3 +86,70 @@ func TestParseChatGPTQuotaNilWhenAbsent(t *testing.T) {
 		t.Errorf("absent headers must parse to nil, got %+v", q)
 	}
 }
+
+// A window carrying nothing but a zero is not a window.
+//
+// The owner asked why our panel showed a "Secondary usage limit" at 100% when
+// Codex, on the same free account, shows only the monthly one. The backend does
+// send x-codex-secondary-used-percent: 0, with no window length and no reset
+// time. Accepting it made Remaining() return 1.0 and the panel drew a FULL GREEN
+// BAR for an allowance that does not exist on this plan: unknown rendered as
+// plenty-left, which balances.go forbids in its own header.
+//
+// The guard is Codex's own (codex-api/src/rate_limits.rs, parse_rate_limit_window),
+// ported rather than invented.
+func TestAWindowOfNothingButZeroIsNotAWindow(t *testing.T) {
+	// Exactly what a free plan sends: a real monthly primary, and a secondary
+	// that is a bare zero.
+	h := http.Header{}
+	h.Set("x-codex-primary-used-percent", "84")
+	h.Set("x-codex-primary-window-minutes", "43200")
+	h.Set("x-codex-primary-reset-at", "1789495295")
+	h.Set("x-codex-secondary-used-percent", "0")
+
+	q := ParseChatGPTQuota(h)
+	if q == nil || q.Primary == nil {
+		t.Fatal("the real monthly window was lost")
+	}
+	if q.Secondary != nil {
+		t.Errorf("a secondary window with used=0, no window length and no reset was "+
+			"kept: %+v.\n  It renders as a full green bar for an allowance that does "+
+			"not exist. Codex discards it; so must we.", q.Secondary)
+	}
+}
+
+// The guard must not throw away a genuine untouched allowance. Zero used WITH a
+// declared window or a reset time is a real limit nobody has spent yet, and
+// hiding it would be the opposite error.
+func TestAnUntouchedButRealWindowSurvives(t *testing.T) {
+	for name, set := range map[string]func(http.Header){
+		"zero used, but a declared window": func(h http.Header) {
+			h.Set("x-codex-secondary-window-minutes", "10080")
+		},
+		"zero used, but a reset time": func(h http.Header) {
+			h.Set("x-codex-secondary-reset-at", "1789495295")
+		},
+	} {
+		h := http.Header{}
+		h.Set("x-codex-secondary-used-percent", "0")
+		set(h)
+		q := ParseChatGPTQuota(h)
+		if q == nil || q.Secondary == nil {
+			t.Errorf("%s: a real untouched allowance was discarded", name)
+			continue
+		}
+		if got := q.Secondary.Remaining(); got != 1 {
+			t.Errorf("%s: untouched window reports %v remaining, want 1", name, got)
+		}
+	}
+}
+
+// And a response carrying only the empty secondary must parse to nothing at all,
+// so "no meter" stays distinguishable from "meter reads full".
+func TestOnlyAnEmptySecondaryMeansNoReading(t *testing.T) {
+	h := http.Header{}
+	h.Set("x-codex-secondary-used-percent", "0")
+	if q := ParseChatGPTQuota(h); q != nil {
+		t.Errorf("a bare zero secondary produced a reading: %+v", q)
+	}
+}
