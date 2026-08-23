@@ -1,3 +1,45 @@
+## v0.1.117 (2026-08-23): a window of nothing but a zero is not a window
+
+**Plain-language version:** one fix. The usage panel was drawing a full green bar
+for an allowance that does not exist.
+
+Sign in with a ChatGPT account, type /usage, and you got two bars: a monthly limit
+reading 16% left, and underneath it a "Secondary usage limit" at 100%, three
+bananas, full green. There is no secondary limit on a free plan. That bar was
+measuring nothing.
+
+OpenAI's server does send a secondary figure on every reply, but on a free account
+it sends a bare zero with no window length and no reset time attached, which is
+its way of saying not applicable here. Taken off the owner's own account: the
+primary read 84% used over a 30-day window resetting on 15 September, a real
+limit; the secondary read 0% used, no window, no reset, nothing at all. Our code
+took that zero at face value, and zero used means a hundred left, so it drew a
+hundred left.
+
+OpenAI's own program throws that reading away. It counts a limit as real only if
+at least one of the three things says something, and a bare zero fails all three,
+which is why the owner's two screens disagreed.
+
+A blank would have been honest. A confident full green bar is not. This project
+has a rule written into the file that reads balances: unknown and plenty-left must
+never look alike, and a full bar for an allowance that does not exist is the bad
+half of exactly that pair. Somebody could look at it and believe they had a second
+pot in reserve.
+
+The rule is now the same as OpenAI's: a limit is real if it has been used at all,
+or declares how long its window is, or says when it resets. Both directions are
+tested, because a limit reading zero used that DOES carry a window or a reset is a
+genuine untouched allowance and must still show.
+
+On the two numbers disagreeing, ours saying 16% and Codex 18% at the same moment:
+that is not a fault. Both read the same monthly pot, but each updates from its own
+replies, and about 2% had been spent through this program since Codex last looked.
+
+Found the way the last three were found: the owner looked at his own screen,
+compared it with another program, and asked a plain question.
+
+Full detail, both tracks: `Changelogs/v0.1.117-release-notes.md`.
+
 ## v0.1.116 (2026-08-23): what every message costs, counted rather than guessed
 
 **Plain-language version:** nothing here adds a feature. It makes the program
