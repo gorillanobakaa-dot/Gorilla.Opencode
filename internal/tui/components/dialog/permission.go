@@ -361,7 +361,19 @@ func (p *permissionDialogCmp) renderFetchContent() string {
 	baseStyle := styles.BaseStyle()
 
 	if pr, ok := p.permission.Params.(tools.FetchPermissionsParams); ok {
-		content := fmt.Sprintf("```bash\n%s\n```", pr.URL)
+		// GORILLA FIX (2026-08-23): wrap the URL, same as the command.
+		//
+		// FOURTH instance of one fault, caught on the owner's screen after the
+		// bash dialog had already been fixed and this one was not looked at:
+		//
+		//   https://www.forbes.com/sites/forbeswealthteam/article/the-
+		//
+		// A truncated URL is worse here than a truncated command is next door.
+		// For web_fetch the HOST is the grant key: approving one authorises
+		// every later page on that host for the session. So the string the
+		// user is asked to judge is the exact string the grant is built from,
+		// and it was being cut before they could read it.
+		content := fmt.Sprintf("```bash\n%s\n```", wrapCommand(pr.URL, p.width-14))
 
 		// Use the cache for markdown rendering
 		renderedContent := p.GetOrSetMarkdown(p.permission.ID, func() (string, error) {
@@ -495,8 +507,11 @@ func (p *permissionDialogCmp) SetSize() tea.Cmd {
 		p.width = int(float64(p.windowSize.Width) * 0.8)
 		p.height = int(float64(p.windowSize.Height) * 0.8)
 	case tools.FetchToolName:
-		p.width = int(float64(p.windowSize.Width) * 0.4)
-		p.height = int(float64(p.windowSize.Height) * 0.3)
+		// Wider for the same reason as bash: the URL IS the content of this
+		// dialog, and a wrapped URL over four lines in a narrow box is
+		// readable but miserable. See renderFetchContent.
+		p.width = int(float64(p.windowSize.Width) * 0.8)
+		p.height = int(float64(p.windowSize.Height) * 0.4)
 	default:
 		p.width = int(float64(p.windowSize.Width) * 0.7)
 		p.height = int(float64(p.windowSize.Height) * 0.5)

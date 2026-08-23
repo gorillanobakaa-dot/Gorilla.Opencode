@@ -94,3 +94,34 @@ func TestAnAbsurdWidthStillShowsTheWholeCommand(t *testing.T) {
 // squash reduces a string to its non-whitespace characters, so two renderings
 // that differ only in where lines were broken compare equal.
 func squash(s string) string { return strings.Join(strings.Fields(s), "") }
+
+// THE FETCH DIALOG, caught one fix too late. The bash dialog was widened and
+// wrapped; this one was not looked at, and the owner's next screenshot showed:
+//
+//	https://www.forbes.com/sites/forbeswealthteam/article/the-
+//
+// It matters MORE here than next door. For web_fetch the HOST is the grant key,
+// so approving one URL authorises every later page on that host for the whole
+// session. The string being judged is the string the grant is built from.
+func TestALongURLSurvivesTheFetchDialog(t *testing.T) {
+	url := "https://www.forbes.com/sites/forbeswealthteam/article/the-worlds-richest-people-august-2026/"
+	out := wrapCommand(url, 60)
+
+	if squash(out) != squash(url) {
+		t.Errorf("the URL lost characters:\n  in:  %s\n  out: %s", url, out)
+	}
+	// The tail is what says which page, and the host is what the grant keys on.
+	joined := strings.ReplaceAll(out, "\n", "")
+	if !strings.Contains(joined, "forbes.com") {
+		t.Error("the HOST is missing, and the host is the grant key")
+	}
+	if !strings.Contains(joined, "august-2026") {
+		t.Error("the end of the URL was cut, so the user cannot see which page " +
+			"they are approving")
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if lipgloss.Width(line) > 60 {
+			t.Errorf("line overflows at %d columns: %q", lipgloss.Width(line), line)
+		}
+	}
+}

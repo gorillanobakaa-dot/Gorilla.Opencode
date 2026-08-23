@@ -1264,9 +1264,11 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 			ranSessions++
 		}
 	}
-	writeResearchReceipt(&out, total, len(roles), ranSessions)
-	writeSynthesisDuty(&out)
-
+	// The receipt and the synthesis duty are written at the END of this report,
+	// after the lane reports, not here. Placed at the top they landed between
+	// the header and the first lane, which is where the reader is looking for
+	// findings, and the bill scrolled away before the answer existed.
+	//
 	// Report in role order, not completion order, so the output is the same
 	// every run and diffable.
 	completed, failed := 0, 0
@@ -1336,6 +1338,11 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 
 	// The receipt travels as metadata too, so the UI can put the total in red
 	// without parsing prose back out of the report.
+	// LAST. The owner, 2026-08-23: "if I were me, I would actually add all this
+	// AT THE END OF THE RESEARCH... right under the bottom line."
+	writeSynthesisDuty(&out)
+	writeResearchReceipt(&out, total, len(roles), ranSessions)
+
 	return tools.WithResponseMetadata(
 		tools.NewTextResponse(out.String()),
 		newResearchReceipt(total, len(roles), ranSessions),
@@ -1581,26 +1588,53 @@ func newResearchReceipt(total helperSpend, helpers, sessions int) ResearchReceip
 func writeResearchReceipt(out *strings.Builder, total helperSpend, helpers, sessions int) {
 	r := newResearchReceipt(total, helpers, sessions)
 
-	fmt.Fprintf(out, "\n## WHAT THIS RUN COST\n\n")
-	fmt.Fprintf(out, "| | |\n|---|---|\n")
-	fmt.Fprintf(out, "| helpers | %d (%d sessions incl. supervisors) |\n", r.Helpers, r.Sessions)
-	fmt.Fprintf(out, "| tool calls | %s |\n", commas(r.ToolCalls))
-	fmt.Fprintf(out, "| tokens processed (in) | %s |\n", commas(r.TokensIn))
-	fmt.Fprintf(out, "| tokens written (out) | %s |\n", commas(r.TokensOut))
+	// A FENCED BLOCK, NOT A MARKDOWN TABLE.
+	//
+	// GORILLA FIX (2026-08-23): the first version used a markdown table. The
+	// renderer turned it into a full-width bordered box with an empty first
+	// column and a rule stretching the whole terminal, which is the decoration
+	// this project has repeatedly been told not to draw. Photographed on the
+	// owner's screen: a 140-column horizontal rule above two misaligned cells.
+	//
+	// A fenced block is monospaced and preserved exactly, so the alignment here
+	// is the alignment on screen, at any width, with no rules drawn at all.
+	rows := [][2]string{
+		{"helpers", fmt.Sprintf("%d  (%d sessions incl. supervisors)", r.Helpers, r.Sessions)},
+		{"tool calls", commas(r.ToolCalls)},
+		{"tokens processed (in)", commas(r.TokensIn)},
+		{"tokens written (out)", commas(r.TokensOut)},
+	}
 	if r.Ratio > 0 {
-		fmt.Fprintf(out, "| ratio | %.0f : 1 |\n", r.Ratio)
+		rows = append(rows, [2]string{"ratio (in : out)", fmt.Sprintf("%.0f : 1", r.Ratio)})
 	}
 	if r.CostPerMillion > 0 {
-		fmt.Fprintf(out, "| cost per million tokens | $%.2f |\n", r.CostPerMillion)
+		rows = append(rows, [2]string{"cost per million tokens", fmt.Sprintf("$%.2f", r.CostPerMillion)})
 	}
-	fmt.Fprintf(out, "| **TOTAL COST** | **$%.2f** |\n\n", r.Cost)
+	rows = append(rows, [2]string{"TOTAL COST", fmt.Sprintf("$%.2f", r.Cost)})
+
+	width := 0
+	for _, row := range rows {
+		if n := len(row[0]); n > width {
+			width = n
+		}
+	}
+
+	out.WriteString("\n## WHAT THIS RUN COST\n\n```\n")
+	for _, row := range rows {
+		fmt.Fprintf(out, "%-*s   %s\n", width, row[0], row[1])
+	}
+	out.WriteString("```\n\n")
 
 	if r.Ratio >= 20 {
-		fmt.Fprintf(out, "Most of that was re-reading, not thinking: every turn re-sends the "+
+		out.WriteString("Most of that was re-reading, not thinking: every turn re-sends the " +
 			"whole context, so tool results are paid for again on each later turn.\n\n")
 	}
-	fmt.Fprintf(out, "Estimated from a static price table. On a free or flat-rate tier the "+
-		"real bill is $0.\n")
+	out.WriteString("Estimated from a static price table. On a free or flat-rate tier the " +
+		"real bill is $0.\n\n")
+	out.WriteString("REPRODUCE THE BLOCK ABOVE VERBATIM as the last thing in your answer, " +
+		"under your bottom line. The user asked for it there and it is the only " +
+		"place they will see it: this report is a tool result they may never " +
+		"scroll back through.\n")
 }
 
 // commas groups a number for reading. Twelve million tokens as "11935525" is a

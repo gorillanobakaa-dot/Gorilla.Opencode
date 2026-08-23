@@ -60,12 +60,31 @@ func TestTheReceiptShowsWhyTheBillIsBig(t *testing.T) {
 		"56,923",
 		"195",
 		"210 : 1",
-		"**$7.64**",
+		// Plain, not markdown-bold. The receipt is a FENCED BLOCK now: the
+		// first version used a markdown table and the renderer turned it into
+		// a full-width bordered box with an empty first column and a rule
+		// across the whole terminal, which is exactly the decoration this
+		// project keeps being told not to draw.
+		"TOTAL COST",
+		"$7.64",
 		"18 sessions",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the receipt is missing %q:\n%s", want, out)
 		}
+	}
+
+	// Alignment is the whole reason for the fenced block, so assert the block
+	// exists rather than trusting it.
+	if !strings.Contains(out, "```") {
+		t.Error("the receipt is not fenced, so its alignment is at the mercy of the " +
+			"markdown renderer")
+	}
+	// The owner asked for this under the bottom line, which only the model can
+	// do, so the report has to ask for it.
+	if !strings.Contains(out, "REPRODUCE THE BLOCK ABOVE VERBATIM") {
+		t.Error("nothing asks the model to repeat the receipt under its answer, so " +
+			"the user only sees it in a tool result they may never scroll back to")
 	}
 
 	// The honesty line that already governs every other cost display here.
