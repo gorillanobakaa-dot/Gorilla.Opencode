@@ -40,8 +40,17 @@ func (q *QuotaSummary) ToMeter(account string) []quota.Meter {
 	}
 	out := make([]quota.Meter, 0, len(q.Groups))
 	for _, g := range q.Groups {
+		// The GROUP name is the heading, not "ANTIGRAVITY". A Google sign-in
+		// reports several model families under one account ("Gemini Models",
+		// "Claude and GPT Models") and each is its own barrel with its own
+		// number, so collapsing them under one provider heading would print two
+		// identical titles over two different meters.
+		heading := g.DisplayName
+		if heading == "" {
+			heading = AntigravityProviderName
+		}
 		m := quota.Meter{
-			Provider: AntigravityProviderName,
+			Provider: heading,
 			Account:  account,
 			Kind:     quota.KindWindowQuota,
 			Note:     g.Description,
@@ -59,12 +68,13 @@ func (q *QuotaSummary) ToMeter(account string) []quota.Meter {
 				Reset: b.ResetTime,
 			})
 		}
-		// The group name is more specific than the provider heading, so it
-		// becomes the note when the provider gave no description of its own.
-		if m.Note == "" {
-			m.Note = g.DisplayName
-		}
 		out = append(out, m)
+	}
+	// The summary-level description explains the shared weekly limit and is
+	// written once, under the groups it applies to. Attaching it to the last
+	// meter keeps that placement without repeating it per group.
+	if len(out) > 0 && q.Description != "" {
+		out[len(out)-1].Footer = q.Description
 	}
 	return out
 }

@@ -27,8 +27,10 @@ func TestAntigravityMetersCarryTheGoogleAccount(t *testing.T) {
 		if m.Account != "gorilla@example.com" {
 			t.Errorf("meter %q lost its account: %q", m.Provider, m.Account)
 		}
-		if m.Provider != AntigravityProviderName {
-			t.Errorf("provider heading is %q", m.Provider)
+		// The heading is the GROUP name: one Google sign-in reports several
+		// families, each its own barrel, so they must not share one title.
+		if m.Provider == AntigravityProviderName {
+			t.Errorf("meter kept the generic provider heading instead of its group name")
 		}
 		if m.Kind != quota.KindWindowQuota {
 			t.Errorf("an allowance inside a rolling window adapted to %v", m.Kind)
@@ -37,10 +39,9 @@ func TestAntigravityMetersCarryTheGoogleAccount(t *testing.T) {
 			t.Errorf("adapted meter is invalid: %v", err)
 		}
 	}
-	// A group with no description of its own falls back to its name rather than
-	// rendering a headless block.
-	if meters[1].Note == "" {
-		t.Error("a group with no description produced no note at all")
+	if meters[0].Provider != "Gemini Models" || meters[1].Provider != "Claude and GPT Models" {
+		t.Errorf("headings are %q and %q, want the group names",
+			meters[0].Provider, meters[1].Provider)
 	}
 }
 

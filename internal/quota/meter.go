@@ -121,6 +121,10 @@ type Meter struct {
 	// from "no meter" and from "meter says 100%", because blank and full are
 	// both lies.
 	Pending bool
+	// Footer is provider-level prose that belongs AFTER the bars rather than
+	// under the heading: Antigravity explains how its shared weekly limit works
+	// once, below the groups it applies to, not repeated above each one.
+	Footer string
 	// Err is non-empty when the fetch failed. Silence and success must never
 	// look alike.
 	Err string

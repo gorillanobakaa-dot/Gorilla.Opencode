@@ -41,6 +41,12 @@ func quotaFixture() *auth.QuotaSummary {
 	}
 }
 
+// meterFixture adapts the wire fixture through the real adapter, so these tests
+// exercise the same path production does rather than hand-building meters.
+func meterFixture(account string) []quota.Meter {
+	return quotaFixture().ToMeter(account)
+}
+
 func balanceFixture() []quota.Reading {
 	return []quota.Reading{
 		{Provider: "DeepSeek", Text: "110.00 CNY available", Fraction: quota.FractionUnknown},
@@ -52,7 +58,7 @@ var quotaNow = time.Date(2026, 8, 3, 14, 34, 46, 0, time.UTC) // 7d before Gemin
 
 func TestQuotaPanelSaysLeftAndUsedInWords(t *testing.T) {
 	t.Parallel()
-	got := renderQuotaPanel(quotaFixture(), "user@example.com", nil, nil, 80, quotaNow)
+	got := renderQuotaPanel(meterFixture("user@example.com"), nil, 80, quotaNow)
 	if strings.Contains(got, "Remaining Remaining") {
 		t.Error("bucket label doubled: the wire's displayName already says Remaining")
 	}
@@ -116,39 +122,65 @@ func TestBananaLadder(t *testing.T) {
 // (the weekly reset) stays silent, and a never-seen group only seeds.
 func TestBananaAlerts(t *testing.T) {
 	t.Parallel()
-	summary := func(f float64) *auth.QuotaSummary {
-		return &auth.QuotaSummary{Groups: []auth.QuotaGroup{{
+	const acct = "user@example.com"
+	meters := func(f float64) []quota.Meter {
+		return (&auth.QuotaSummary{Groups: []auth.QuotaGroup{{
 			DisplayName: "Claude and GPT models",
-			Buckets:     []auth.QuotaBucket{{RemainingFraction: f}},
-		}}}
+			Buckets:     []auth.QuotaBucket{{DisplayName: "Weekly Limit", RemainingFraction: f}},
+		}}}).ToMeter(acct)
 	}
+	// The baseline is keyed by provider AND account, so two sign-ins reporting
+	// the same window name cannot alert about each other. Built through the
+	// same helper the code uses rather than typed out, or the test would pass
+	// against a keying change that breaks production.
+	seed := func(f float64) map[string]float64 {
+		_, next := bananaAlerts(nil, meters(f))
+		return next
+	}
+
 	// Observed live 2026-08-11: 59% -> 30% in five minutes crossed two tiers
 	// invisibly. The alert must fire and describe the CURRENT tier.
-	alerts, next := bananaAlerts(map[string]float64{"Claude and GPT models": 0.59}, summary(0.2971))
+	alerts, next := bananaAlerts(seed(0.59), meters(0.2971))
 	if len(alerts) != 1 || !strings.Contains(alerts[0], "just a few bananas") ||
 		!strings.Contains(alerts[0], "Claude and GPT models: 30% left") {
 		t.Errorf("59%%->30%% must announce the current tier with the number, got %v", alerts)
 	}
-	if next["Claude and GPT models"] != 0.2971 {
-		t.Errorf("baseline not updated: %v", next)
+	if len(next) != 1 {
+		t.Fatalf("expected one baseline entry, got %v", next)
+	}
+	for k, v := range next {
+		if v != 0.2971 {
+			t.Errorf("baseline not updated: %v", next)
+		}
+		if !strings.Contains(k, acct) {
+			t.Errorf("baseline key %q does not name the account; two sign-ins "+
+				"reporting the same window name would alert about each other", k)
+		}
 	}
 	// Same tier: silent.
-	if alerts, _ := bananaAlerts(map[string]float64{"Claude and GPT models": 0.59}, summary(0.55)); len(alerts) != 0 {
+	if alerts, _ := bananaAlerts(seed(0.59), meters(0.55)); len(alerts) != 0 {
 		t.Errorf("no crossing must mean no alert, got %v", alerts)
 	}
 	// Weekly reset (rise): silent.
-	if alerts, _ := bananaAlerts(map[string]float64{"Claude and GPT models": 0.05}, summary(1)); len(alerts) != 0 {
+	if alerts, _ := bananaAlerts(seed(0.05), meters(1)); len(alerts) != 0 {
 		t.Errorf("a rise must stay silent, got %v", alerts)
 	}
 	// First sighting: seeds, no spurious alert.
-	alerts, next = bananaAlerts(nil, summary(0.1))
-	if len(alerts) != 0 || next["Claude and GPT models"] != 0.1 {
-		t.Errorf("first sighting must seed silently, got alerts=%v next=%v", alerts, next)
+	alerts, next = bananaAlerts(nil, meters(0.1))
+	if len(alerts) != 0 || len(next) != 1 {
+		t.Errorf("a never-seen group must seed silently, got %v / %v", alerts, next)
+	}
+	// A DIFFERENT account at the same tier must not inherit the first one's
+	// baseline. This is the wrong-barrel bug in its alert form.
+	other := (&auth.QuotaSummary{Groups: []auth.QuotaGroup{{
+		DisplayName: "Claude and GPT models",
+		Buckets:     []auth.QuotaBucket{{DisplayName: "Weekly Limit", RemainingFraction: 0.2}},
+	}}}).ToMeter("someone-else@example.com")
+	if alerts, _ := bananaAlerts(seed(0.9), other); len(alerts) != 0 {
+		t.Errorf("one account's drop alerted against another account's baseline: %v", alerts)
 	}
 }
 
-// The footer copy of an alert must carry the words and none of the emoji —
-// the frame is where emoji width mismatches strand debris.
 func TestStripBananaEmoji(t *testing.T) {
 	t.Parallel()
 	in := "🦍 Last banana spotted. Nobody make any sudden prompts. — Claude and GPT models: 3% left"
@@ -168,7 +200,7 @@ func TestQuotaPanelRendersBalances(t *testing.T) {
 	t.Parallel()
 	balances := append(balanceFixture(),
 		quota.Reading{Provider: "OpenRouter", Err: "HTTP 401 Unauthorized"})
-	got := renderQuotaPanel(quotaFixture(), "user@example.com", balances, nil, 80, quotaNow)
+	got := renderQuotaPanel(meterFixture("user@example.com"), balances, 80, quotaNow)
 	for _, want := range []string{
 		"DEEPSEEK",
 		"110.00 CNY available",
@@ -188,7 +220,7 @@ func TestQuotaPanelRendersBalances(t *testing.T) {
 // A DeepSeek-only user (no Antigravity sign-in) still gets a panel.
 func TestQuotaPanelBalancesWithoutAntigravity(t *testing.T) {
 	t.Parallel()
-	got := renderQuotaPanel(nil, "", balanceFixture(), nil, 80, quotaNow)
+	got := renderQuotaPanel(nil, balanceFixture(), 80, quotaNow)
 	if strings.Contains(got, "no quota groups") {
 		t.Fatalf("balances present but panel claims no quota groups:\n%s", got)
 	}
@@ -268,7 +300,7 @@ func TestBarCellScaleRedToGreen(t *testing.T) {
 func TestQuotaPanelNoLineWiderThanWidth(t *testing.T) {
 	t.Parallel()
 	for _, w := range []int{80, 60, 40, 25} {
-		got := renderQuotaPanel(quotaFixture(), "user@example.com", balanceFixture(), nil, w, quotaNow)
+		got := renderQuotaPanel(meterFixture("user@example.com"), balanceFixture(), w, quotaNow)
 		for i, line := range strings.Split(got, "\n") {
 			if lw := lipgloss.Width(line); lw > w {
 				t.Errorf("width %d: line %d is %d columns wide: %q", w, i, lw, line)
@@ -285,8 +317,9 @@ func TestQuotaPanelNoLineWiderThanWidth(t *testing.T) {
 func TestQuotaPanelEmptySaysSo(t *testing.T) {
 	t.Parallel()
 	for _, q := range []*auth.QuotaSummary{nil, {}} {
-		if got := renderQuotaPanel(q, "", nil, nil, 80, quotaNow); !strings.Contains(got, "no quota groups") {
-			t.Errorf("empty summary must say so, got %q — silence and success must never look alike", got)
+		got := renderQuotaPanel(q.ToMeter("user@example.com"), nil, 80, quotaNow)
+		if !strings.Contains(got, "No quota or balance information available") {
+			t.Errorf("nothing to show must SAY so, got %q: silence and success must never look alike", got)
 		}
 	}
 }
@@ -298,7 +331,7 @@ func TestQuotaPanelEmptySaysSo(t *testing.T) {
 // a signed-in Google address appearing above a ChatGPT session at 97%.
 func TestAccountHiddenWhenNoQuotaSummary(t *testing.T) {
 	t.Parallel()
-	got := renderQuotaPanel(nil, "user@example.com", balanceFixture(), nil, 80, quotaNow)
+	got := renderQuotaPanel(nil, balanceFixture(), 80, quotaNow)
 	if strings.Contains(got, "user@example.com") {
 		t.Errorf("account email leaked with no quota summary — the wrong-barrel bug:\n%s", got)
 	}
@@ -315,16 +348,13 @@ func TestAccountHiddenWhenNoQuotaSummary(t *testing.T) {
 // the user sat at 20% of a monthly limit (observed against Codex, 2026-08-23).
 func TestChatGPTMeterRendersWithBananaLadder(t *testing.T) {
 	t.Parallel()
-	cg := &chatGPTMeter{
-		account: "user@example.com",
-		plan:    "Free",
-		quota: &auth.ChatGPTQuota{
-			Primary: &auth.ChatGPTWindow{UsedPercent: 80, WindowMinutes: 43200},
-		},
-	}
-	got := renderQuotaPanel(nil, "", nil, cg, 80, quotaNow)
+	cg := (&auth.ChatGPTQuota{
+		Primary:  &auth.ChatGPTWindow{UsedPercent: 80, WindowMinutes: 43200},
+		PlanType: "Free",
+	}).ToMeter("user@example.com")
+	got := renderQuotaPanel([]quota.Meter{cg}, nil, 80, quotaNow)
 	for _, want := range []string{
-		"CHATGPT — user@example.com (Free)",
+		"CHATGPT - user@example.com (Free)",
 		"Monthly limit Remaining",            // label from the WIRE, not hardcoded
 		"20.00%",                             // 80% used inverted to remaining
 		"20% left, 80% used",                 // both numbers in words
@@ -345,8 +375,8 @@ func TestChatGPTMeterRendersWithBananaLadder(t *testing.T) {
 // a meter reading zero. A blank or a full bar would both be lies.
 func TestChatGPTMeterSaysWhenNoReadingYet(t *testing.T) {
 	t.Parallel()
-	cg := &chatGPTMeter{account: "user@example.com", quota: &auth.ChatGPTQuota{}}
-	got := renderQuotaPanel(nil, "", nil, cg, 80, quotaNow)
+	cg := (&auth.ChatGPTQuota{}).ToMeter("user@example.com")
+	got := renderQuotaPanel([]quota.Meter{cg}, nil, 80, quotaNow)
 	if !strings.Contains(got, "No usage reading yet this session") {
 		t.Errorf("an empty meter must say so, not render blank:\n%s", got)
 	}

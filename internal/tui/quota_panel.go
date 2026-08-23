@@ -8,7 +8,6 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/wordwrap"
-	"github.com/opencode-ai/opencode/internal/auth"
 	"github.com/opencode-ai/opencode/internal/quota"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
@@ -109,21 +108,22 @@ func bananaStatus(remaining float64) string {
 // fractions to store for next time. Rises (the weekly reset) stay silent, and
 // a group never seen before only seeds — announcing a tier on first sight
 // would fire a spurious "alert" at every session start.
-func bananaAlerts(prev map[string]float64, q *auth.QuotaSummary) (alerts []string, next map[string]float64) {
+func bananaAlerts(prev map[string]float64, meters []quota.Meter) (alerts []string, next map[string]float64) {
 	next = make(map[string]float64)
-	if q == nil {
-		return nil, next
-	}
-	for _, g := range q.Groups {
-		if len(g.Buckets) == 0 {
+	for _, m := range meters {
+		if len(m.Bars) == 0 {
 			continue
 		}
-		f := math.Min(1, math.Max(0, g.Buckets[0].RemainingFraction))
-		next[g.DisplayName] = f
-		old, seen := prev[g.DisplayName]
+		// Key by provider AND account. Two sign-ins can both report a "Weekly
+		// Limit"; keying on the label alone would let one account's drop raise
+		// an alert naming the other's.
+		key := m.Provider + "\x00" + m.Account
+		f := math.Min(1, math.Max(0, m.Bars[0].Remaining))
+		next[key] = f
+		old, seen := prev[key]
 		if seen && bananaTier(f) < bananaTier(old) {
-			alerts = append(alerts, fmt.Sprintf("%s — %s: %d%% left",
-				bananaStatus(f), g.DisplayName, int(f*100+0.5)))
+			alerts = append(alerts, fmt.Sprintf("%s: %s: %d%% left",
+				bananaStatus(f), m.Provider, int(f*100+0.5)))
 		}
 	}
 	return alerts, next
@@ -227,74 +227,111 @@ func quotaResetPhrase(resetTime string, now time.Time) string {
 // chatGPTMeter carries the active ChatGPT session's meter into the pure
 // renderer. A nil pointer means "not the active provider"; a non-nil one with
 // an Empty() quota means "active, but no reading yet this session".
-type chatGPTMeter struct {
-	quota   *auth.ChatGPTQuota
-	account string
-	plan    string
-}
-
-// renderChatGPTSection renders the ChatGPT sign-in usage meter using the SAME
-// banana ladder, colour ramp and bar as every other provider — the whole point
-// of keeping those four functions taking a bare fraction.
+// renderMeterSection renders ONE meter: heading, optional note, then a bar per
+// limit, using the same banana ladder and colour ramp as everything else. That
+// shared ladder is why quotaBar, bananaStatus and bananaTier all take a bare
+// fraction.
 //
-// GORILLA OVERRIDE (2026-08-23): before this, /usage on a ChatGPT session showed
-// the ANTIGRAVITY weekly quota and a Google account email (the wrong barrel).
-// Gating that off left a BLANK, which is its own failure: the user sat at 20%
-// of a monthly limit with no way to see it. This is the number that belongs
-// there. Source is response headers, so it exists only after the session's
-// first request — "not known yet" is a real third state and says so.
-func renderChatGPTSection(q *auth.ChatGPTQuota, account, plan string, cells int,
+// A meter that fails Validate() is REPORTED, not drawn. An unnamed reading is
+// precisely the wrong-barrel bug (see internal/quota/meter.go), and silently
+// rendering one would put the type back to being decorative.
+func renderMeterSection(m quota.Meter, inlineAccount bool, cells int,
 	wrapIndent func(string, int) string, now time.Time,
 ) string {
 	heading := lipgloss.NewStyle().Bold(true)
 	var b strings.Builder
-	title := "CHATGPT"
-	if account != "" {
-		title += " — " + account
-		if plan != "" {
-			title += " (" + plan + ")"
+
+	title := strings.ToUpper(m.Provider)
+	if inlineAccount && m.Account != "" {
+		title += " - " + m.Account
+		if m.Plan != "" {
+			title += " (" + m.Plan + ")"
 		}
 	}
 	b.WriteString(heading.Render(title) + "\n")
 
-	if q.Empty() {
+	if err := m.Validate(); err != nil {
+		b.WriteString(wrapIndent("cannot show this meter: "+err.Error(), 2) + "\n")
+		return b.String()
+	}
+	if m.Err != "" {
+		b.WriteString(wrapIndent("could not read usage: "+m.Err, 2) + "\n")
+		return b.String()
+	}
+	// "Not known yet" is a real third state beside "no meter" and "N% left".
+	// Rendering nothing, or 100%, would both be lies.
+	if m.Pending {
 		b.WriteString(wrapIndent("No usage reading yet this session. This backend "+
 			"reports usage on its replies, so the meter appears after the first "+
 			"question.", 2) + "\n")
 		return b.String()
 	}
+	if m.Note != "" {
+		b.WriteString(wrapIndent(m.Note, 2) + "\n")
+	}
 
-	windows := []struct {
-		w   *auth.ChatGPTWindow
-		sec bool
-	}{{q.Primary, false}, {q.Secondary, true}}
-	for _, entry := range windows {
-		if entry.w == nil {
+	for _, bar := range m.Bars {
+		// A limit with no honest denominator gets its amount in words and NO
+		// bar. Unknown and plenty-left must never look alike.
+		if !bar.Drawable(m.Kind) {
+			text := bar.Text
+			if text == "" {
+				text = "no figure reported"
+			}
+			b.WriteString("\n  " + bar.Label + "\n")
+			b.WriteString(wrapIndent(text, 4) + "\n")
 			continue
 		}
-		f := entry.w.Remaining()
+		f := math.Min(1, math.Max(0, bar.Remaining))
 		left := int(f*100 + 0.5)
-		b.WriteString("\n  " + entry.w.Label(entry.sec) + " Remaining\n")
+		// agy 1.1.10 sent "Weekly Limit"; 1.1.11 sends "Weekly Limit
+		// Remaining". Append the word only when the wire did not, or it reads
+		// "Weekly Limit Remaining Remaining" (seen live).
+		name := bar.Label
+		if !strings.HasSuffix(name, "Remaining") {
+			name += " Remaining"
+		}
+		b.WriteString("\n  " + name + "\n")
 		b.WriteString("    " + quotaBar(f, cells) + fmt.Sprintf(" %.2f%%", f*100) + "\n")
-		status := fmt.Sprintf("%s — %d%% left, %d%% used", bananaStatus(f), left, 100-left)
-		if entry.w.ResetAt > 0 {
-			if phrase := quotaResetPhrase(time.Unix(entry.w.ResetAt, 0).UTC().Format(time.RFC3339), now); phrase != "" {
-				status += " | " + phrase
-			}
+		status := fmt.Sprintf("%s: %d%% left, %d%% used", bananaStatus(f), left, 100-left)
+		if phrase := meterResetPhrase(bar.Reset, now); phrase != "" {
+			status += " | " + phrase
 		}
 		b.WriteString(wrapIndent(status, 4) + "\n")
 	}
-	b.WriteString("\n")
+	if m.Footer != "" {
+		muted := lipgloss.NewStyle().Foreground(theme.CurrentTheme().TextMuted())
+		b.WriteString("\n" + muted.Render(wrapIndent(m.Footer, 0)) + "\n")
+	}
 	return b.String()
 }
 
-// renderQuotaPanel renders the full Models & Quota view for the scrollback:
-// the Antigravity weekly groups (when signed in), then any configured paid
-// providers with a balance endpoint. Pure: no network, no wall clock, no
-// terminal — testable headlessly.
-func renderQuotaPanel(q *auth.QuotaSummary, account string, balances []quota.Reading, cg *chatGPTMeter, width int, now time.Time) string {
-	if (q == nil || len(q.Groups) == 0) && len(balances) == 0 && cg == nil {
-		return "  Antigravity: no quota groups reported"
+// meterResetPhrase accepts either an already-worded phrase (the ChatGPT adapter
+// produces "resets in 23d") or a raw timestamp string from the Antigravity wire,
+// which quotaResetPhrase knows how to word. Empty stays empty: a window with no
+// stated reset must not be given an invented one.
+func meterResetPhrase(reset string, now time.Time) string {
+	if reset == "" {
+		return ""
+	}
+	if strings.HasPrefix(reset, "resets") {
+		return reset
+	}
+	return quotaResetPhrase(reset, now)
+}
+
+// renderQuotaPanel renders the full Models & Quota view for the scrollback.
+// Pure: no network, no wall clock, no terminal, so it is testable headlessly.
+//
+// GORILLA OVERRIDE (2026-08-23): this took (*auth.QuotaSummary, account string,
+// *chatGPTMeter) - numbers and the name they belonged to as separate arguments
+// that nothing forced to agree. That is how the ANTIGRAVITY weekly quota came to
+// be printed under a ChatGPT session. It now takes []quota.Meter, where every
+// reading carries its own account, so the mismatch is unrepresentable rather
+// than merely guarded against.
+func renderQuotaPanel(meters []quota.Meter, balances []quota.Reading, width int, now time.Time) string {
+	if len(meters) == 0 && len(balances) == 0 {
+		return "  No quota or balance information available"
 	}
 	w := width
 	if w <= 0 || w > quotaPanelMaxWidth {
@@ -309,15 +346,8 @@ func renderQuotaPanel(q *auth.QuotaSummary, account string, balances []quota.Rea
 		cells = 10
 	}
 
-	t := theme.CurrentTheme()
-	heading := lipgloss.NewStyle().Bold(true)
-	muted := lipgloss.NewStyle().Foreground(t.TextMuted())
 	// wordwrap, not lipgloss .Width(): .Width pads every line to w with trailing
 	// spaces, which the user then drags along when copying from the scrollback.
-	wrap := func(s string) string { return wordwrap.String(s, w) }
-	// wrapIndent keeps continuation lines under the same indent as the first —
-	// without it a wrapped status line dumps its tail ("in 2d") at column 0,
-	// seen in the first live screenshot.
 	wrapIndent := func(s string, indent int) string {
 		pad := strings.Repeat(" ", indent)
 		lines := strings.Split(wordwrap.String(s, w-indent), "\n")
@@ -328,63 +358,41 @@ func renderQuotaPanel(q *auth.QuotaSummary, account string, balances []quota.Rea
 	}
 
 	var b strings.Builder
-	// The account belongs to the Antigravity quota, so print it only when a
-	// quota summary is actually being shown. Floating it at the top on its own
-	// is how a signed-in Google address appeared above a session that was
-	// spending a different provider entirely (the wrong-barrel bug).
-	if account != "" && q != nil && len(q.Groups) > 0 {
-		b.WriteString(wrapIndent("Account: "+account, 2) + "\n\n")
-	}
 	first := true
-	var groups []auth.QuotaGroup
-	if q != nil {
-		groups = q.Groups
+	for i := 0; i < len(meters); {
+		// Consecutive meters sharing one account are one block. Antigravity
+		// reports several model groups under a single Google sign-in, so the
+		// account is stated once above them; a provider reporting a single
+		// meter carries its account inline in the heading instead. Either way
+		// the account appears, which is the invariant that matters.
+		run := 1
+		for i+run < len(meters) && meters[i+run].Account == meters[i].Account {
+			run++
+		}
+		acct := meters[i].Account
+		if run > 1 && acct != "" {
+			if !first {
+				b.WriteString("\n")
+			}
+			first = false
+			line := "Account: " + acct
+			if p := meters[i].Plan; p != "" {
+				line += " (" + p + ")"
+			}
+			b.WriteString(wrapIndent(line, 2) + "\n")
+			// The account line and the first heading under it are one block;
+			// the per-meter separator below supplies the single blank between.
+		}
+		for _, m := range meters[i : i+run] {
+			if !first {
+				b.WriteString("\n")
+			}
+			first = false
+			b.WriteString(renderMeterSection(m, run == 1, cells, wrapIndent, now))
+		}
+		i += run
 	}
-	for _, g := range groups {
-		if len(g.Buckets) == 0 {
-			continue
-		}
-		bk := g.Buckets[0]
-		f := math.Min(1, math.Max(0, bk.RemainingFraction))
-		left := int(f*100 + 0.5)
-		if !first {
-			b.WriteString("\n")
-		}
-		first = false
-		b.WriteString(heading.Render(strings.ToUpper(g.DisplayName)) + "\n")
-		if g.Description != "" {
-			b.WriteString(wrapIndent(g.Description, 2) + "\n")
-		}
-		// agy 1.1.10 sent displayName "Weekly Limit"; 1.1.11 sends "Weekly
-		// Limit Remaining". Append the word only when the wire didn't —
-		// caught live as "Weekly Limit Remaining Remaining".
-		name := bk.DisplayName
-		if name == "" {
-			name = "Limit"
-		}
-		if !strings.HasSuffix(name, "Remaining") {
-			name += " Remaining"
-		}
-		b.WriteString("\n  " + name + "\n")
-		b.WriteString("    " + quotaBar(f, cells) + fmt.Sprintf(" %.2f%%", f*100) + "\n")
-		status := fmt.Sprintf("%s — %d%% left, %d%% used", bananaStatus(f), left, 100-left)
-		if reset := quotaResetPhrase(bk.ResetTime, now); reset != "" {
-			status += " | " + reset
-		}
-		b.WriteString(wrapIndent(status, 4) + "\n")
-	}
-	if q != nil && q.Description != "" {
-		b.WriteString("\n" + muted.Render(wrap(q.Description)) + "\n")
-	}
-	// The ACTIVE provider's own meter, when it publishes one. Rendered with the
-	// same bar and banana ladder as everything else.
-	if cg != nil {
-		if !first {
-			b.WriteString("\n")
-		}
-		first = false
-		b.WriteString(renderChatGPTSection(cg.quota, cg.account, cg.plan, cells, wrapIndent, now))
-	}
+
 	if len(balances) > 0 {
 		if !first {
 			b.WriteString("\n")
@@ -413,7 +421,7 @@ func renderBalanceSections(balances []quota.Reading, cells int, wrapIndent func(
 		if r.Fraction >= 0 {
 			f := math.Min(1, math.Max(0, r.Fraction))
 			b.WriteString("    " + quotaBar(f, cells) + fmt.Sprintf(" %.2f%%", f*100) + "\n")
-			b.WriteString(wrapIndent(fmt.Sprintf("%s — %s", bananaStatus(f), r.Text), 4) + "\n\n")
+			b.WriteString(wrapIndent(fmt.Sprintf("%s: %s", bananaStatus(f), r.Text), 4) + "\n\n")
 			continue
 		}
 		// No denominator (DeepSeek money, OpenRouter free tier): amount only.
