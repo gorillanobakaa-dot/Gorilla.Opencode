@@ -511,6 +511,50 @@ its "render after the work" wording are reasoned from the papers above, not
 tested here. If a small local model starts producing well-formatted wrong
 answers, that section is the first suspect and `/context` turns it off.*
 
+## Context rot, position bias, and premature termination
+
+Added 2026-08-23. These three describe the same underlying problem from
+different angles: a longer context window is not a free win, and what
+degrades is not only accuracy but the model's willingness to keep working.
+
+- **Lost in the Middle: How Language Models Use Long Contexts**, Liu et al.,
+  Stanford (2023). https://arxiv.org/abs/2307.03172
+  The position-bias result. Retrieval accuracy is highest when the relevant
+  information sits at the very start or the very end of the context and sags
+  in the middle, giving the well-known U-shaped curve. The practical reading
+  for a prompt author: placement is not cosmetic. Anything that must survive a
+  long conversation belongs at an edge, not buried at the midpoint.
+
+- **Context Rot**, Chroma research (2025).
+  https://www.trychroma.com/research/context-rot
+  Performance degrades as input length grows even on tasks that are trivially
+  easy at short length, and the degradation is not uniform across models. The
+  useful consequence is that "it fits in the window" and "the model will use it
+  well" are separate claims, and only the first one is checkable by counting.
+
+- **Diagnosing and Mitigating Context Rot in Long-horizon Search**, Xia, Wang,
+  Huang and Liu (2026). https://arxiv.org/abs/2606.29718
+  Names a failure this project should watch for closely: **premature
+  termination**. Under extensive context, models give up or return uncertain
+  incorrect answers *long before exhausting the window*, and the rate rises with
+  context length. The paper also evaluates seven context-management methods and
+  argues they work mainly as test-time scaling, reducing premature termination
+  so more exploration happens.
+
+**Why the third one matters to our own prompt.** On 2026-08-22 we changed
+`# honesty` so that a null result is an explicit successful terminal state
+("unachievable and unestablished are finished tasks, not failed ones"). That
+change targets a real failure, a model manufacturing a cause rather than
+admitting it cannot establish one. But it also makes giving up *cheaper*, and
+this paper says giving up too early is already a measurable failure mode that
+worsens with context length.
+
+The guard was written into the changelog at the time, before we had the term
+for it: *"if models start declaring 'unestablished' on questions they could have
+answered with one more tool call, suspect this line first."* That is premature
+termination. Treat the two as one thing when the effect is next measured, and
+note the interaction is expected to be worse on long sessions than short ones.
+
 ## Reference prompts we learned from
 
 - **asgeirtj/system_prompts_leaks**, observed production system prompts
