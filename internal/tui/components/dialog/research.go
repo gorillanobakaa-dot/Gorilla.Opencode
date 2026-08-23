@@ -476,6 +476,26 @@ func (m ResearchDialogCmp) costLines() []costLine {
 		add(kindMoney, "THIS RUN: about %s  —  %s of running.", total, humanDuration(seconds))
 		add(kindMuted, "   %s x %s per minute = %s", humanDuration(seconds), pmStr, total)
 		add(kindMuted, "   %d sessions, %s each, on %s.", n, amount(parseBack(total)/float64(n)), modelName)
+		// GORILLA OVERRIDE (2026-08-23): ROADMAP item 6. The figure above is
+		// HELPERS ONLY. The turn that launches the run and the turn that reads
+		// every answer back and writes the synthesis both run on the CODER model,
+		// and the synthesis turn carries all the helper output on top of its own
+		// context. On a cheap-helper, expensive-coder setup it can cost more than
+		// the whole fleet. It used to be absent from this screen entirely.
+		//
+		// Shown on its own line rather than folded into the total: this file
+		// guards the property that every figure multiplies out from one anchor,
+		// and helper money and coder money are not the same currency per token.
+		if oc, ocModel, ocPriced := config.ResearchOrchestratorCost(n); ocPriced {
+			add(kindMoney, "PLUS about %s of YOUR OWN model (%s): the launch turn and the",
+				amount(roundSignificant(oc, 3)), ocModel)
+			if !m.compact {
+				add(kindMuted, "   synthesis turn that reads all %d answers back. Not in the figure above.", n)
+			}
+		} else if ocModel != "" && !m.compact {
+			add(kindMuted, "PLUS the launch and synthesis turns on %s, which is not", ocModel)
+			add(kindMuted, "   billed per token. Not in the figure above.")
+		}
 	default:
 		add(kindMuted, "$0.00 metered — %s bills no per-token rate.", modelName)
 		add(kindDanger, "THAT IS NOT FREE.")
@@ -506,7 +526,14 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	// is most of why the arithmetic looked broken.
 	add(kindMuted, "")
 	add(kindHeader, "QUOTA")
+	// Now a real token comparison rather than a rescaled step count: a helper
+	// step carries four tools, an ordinary question carries the coder's thirteen,
+	// so they are not one-for-one. See ResearchQuotaMultiple.
 	add(kindQuota, "WORTH ABOUT %d ORDINARY QUESTIONS in tokens.", config.ResearchQuotaMultiple(n))
+	if !m.compact {
+		add(kindMuted, "   %s per helper step vs %s on one of your own turns.",
+			humanCount(config.ResearchHelperBasisTokens()), humanCount(config.LoadoutActiveTokens()))
+	}
 	if mode == "supervised" {
 		add(kindMuted, "   %d helpers + %d auditors = %d sessions, %d steps each.",
 			m.agents, audited, n, config.ResearchStepsPerHelper)
@@ -535,7 +562,11 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	if !m.compact {
 		add(kindHeader, "HOW THIS IS WORKED OUT")
 	}
-	add(kindMeasured, "MEASURED: %s tokens of context per step (this machine).", humanCount(config.ResearchBasisTokens()))
+	// The HELPER's context, which is not the coder's: helpers carry four tools,
+	// the coder carries thirteen. Using the coder's figure here priced every
+	// helper step at nearly double. See ResearchHelperBasisTokens.
+	add(kindMeasured, "MEASURED: %s tokens of context per helper step (this machine).",
+		humanCount(config.ResearchHelperBasisTokens()))
 	add(kindPublished, "PUBLISHED: the model's own per-1M price.")
 	// GORILLA OVERRIDE (2026-08-23): ROADMAP item 5. The timing half of this line
 	// used to be an assumption on every machine forever. It is now measured from

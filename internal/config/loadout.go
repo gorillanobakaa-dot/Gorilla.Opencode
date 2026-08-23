@@ -12,6 +12,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -718,7 +719,8 @@ func ResearchCost(inFlight int) (perHelper, perMinute, per1MIn float64, modelNam
 	// One source of truth for the basis, and NOT LoadoutActiveTokens() +
 	// LoadoutBaseTokens() — that double-counted the base prompt. See the note on
 	// ResearchBasisTokens.
-	base := ResearchBasisTokens()
+	// The HELPER's basis, not the coder's. See ResearchHelperBasisTokens.
+	base := ResearchHelperBasisTokens()
 	costPerStep := float64(base)/1e6*m.CostPer1MIn + float64(ResearchOutputPerStep)/1e6*m.CostPer1MOut
 	perHelper = costPerStep * ResearchStepsPerHelper
 
@@ -876,7 +878,7 @@ func ResearchPaidEquivalent(helperModel models.Model, inFlight int) (perMin, per
 	if inFlight < 1 {
 		inFlight = 1
 	}
-	base := ResearchBasisTokens()
+	base := ResearchHelperBasisTokens()
 
 	price := func(m models.Model) (float64, float64) {
 		perStep := float64(base)/1e6*m.CostPer1MIn + float64(ResearchOutputPerStep)/1e6*m.CostPer1MOut
@@ -989,6 +991,67 @@ func familyTokens(s string) map[string]bool {
 // Found by an independent audit on 2026-08-14 after three failed attempts to
 // fix this screen by hand. "Measured" has to mean measured; a figure labelled
 // as such and then quietly doubled is worse than an honest estimate.
+// researchHelperTools are the loadout ids a research helper actually carries.
+//
+// Mirrors agent.ResearchAgentTools, which builds fetch, websearch, find and view
+// unconditionally plus diagnostics when a language server is running. config
+// cannot import agent (agent imports config), so the list is restated here and
+// TestHelperToolListMatchesTheRealHelper holds the two in step.
+//
+// Diagnostics is deliberately absent: it is only added when lspClients is
+// non-empty, and pricing a tool the user may not have would put the error back
+// in the same direction this change removes.
+var researchHelperTools = []string{
+	"tool.fetch",
+	"tool.websearch",
+	"tool.find",
+	"tool.view",
+}
+
+// ResearchHelperBasisTokens is the input a RESEARCH HELPER really carries per
+// step: the base prompt plus its own four tools.
+//
+// GORILLA OVERRIDE (2026-08-23): ROADMAP item 6, and the money was nearly double.
+//
+// Every figure on the research cost screen used ResearchBasisTokens, which is
+// LoadoutActiveTokens: the CODER's context, all thirteen tools. A helper does
+// not run the coder's loadout. It runs four tools, so its real per-step input is
+// about half.
+//
+// Measured on this machine, 2026-08-23, at shipped defaults:
+//
+//	base prompt              1,791
+//	fetch 789 + websearch 749 + find 1,322 + view 595 = 3,455
+//	HELPER basis             5,246
+//	CODER basis (was used)  10,380      1.98x overstatement
+//
+// So every per-minute, per-hour and per-run money figure on that screen has been
+// roughly twice what the run actually costs. It errs towards frightening the
+// user rather than surprising them with a bill, which is the safer direction to
+// be wrong in and is still wrong.
+//
+// The numbers are MEASURED, not typed: ComponentTokens returns what
+// calibrate.go got from marshalling each real schema.
+func ResearchHelperBasisTokens() int {
+	total := LoadoutBaseTokens()
+	byID := make(map[string]bool, len(researchHelperTools))
+	for _, id := range researchHelperTools {
+		byID[id] = true
+	}
+	for _, c := range LoadoutComponents {
+		if byID[c.ID] {
+			total += ComponentTokens(c)
+		}
+	}
+	if total <= 0 {
+		// Same conservative floor ResearchBasisTokens uses: a zero would make
+		// the whole forecast read as free, and free is the one wrong answer
+		// nobody questions.
+		return 4000
+	}
+	return total
+}
+
 func ResearchBasisTokens() int {
 	base := LoadoutActiveTokens()
 	if base <= 0 {
@@ -997,13 +1060,49 @@ func ResearchBasisTokens() int {
 	return base
 }
 
-// ResearchQuotaMultiple is how many ORDINARY questions this run is worth in
-// tokens. Derived, not the helper count — see the note in research_agent_test.go.
+// ResearchQuotaMultiple is how many ORDINARY questions this run is worth, in
+// tokens.
+//
+// GORILLA OVERRIDE (2026-08-23): ROADMAP item 6. It now actually counts tokens.
+//
+// It used to return helpers * ResearchStepsPerHelper, and its own comment said
+// "Derived, not the helper count". No token appeared anywhere in it. It was a
+// step count under a label reading "WORTH ABOUT N ORDINARY QUESTIONS in tokens",
+// which is a claim about a unit the arithmetic never touched.
+//
+// Two different things are being compared and they are not the same size:
+//
+//	one ordinary question  = the CODER's context + a reply   (~11,080 tokens)
+//	one helper step        = the HELPER's context + a step   (~5,946 tokens)
+//
+// A helper carries four tools; the coder carries thirteen. So a helper step is
+// roughly half an ordinary question, and treating them as equal inflated the
+// figure by about the same factor as the money. At 10 helpers the screen said 30
+// ordinary questions where the token arithmetic gives about 16.
+//
+// The output side is still ResearchOutputPerStep on both sides of the division,
+// which is one of the two remaining invented constants and is labelled ASSUMED
+// on screen. It appears in both numerator and denominator, so an error in it
+// largely cancels rather than compounding, which is why it is tolerable here
+// while it would not be in a raw total.
 func ResearchQuotaMultiple(helpers int) int {
 	if helpers < 1 {
 		return 0
 	}
-	return helpers * ResearchStepsPerHelper
+	ordinary := LoadoutActiveTokens() + ResearchOutputPerStep
+	if ordinary <= 0 {
+		// Nothing to divide by. Fall back to the old step count rather than
+		// returning 0, which would read as "this run is free".
+		return helpers * ResearchStepsPerHelper
+	}
+	runTokens := helpers * ResearchStepsPerHelper * (ResearchHelperBasisTokens() + ResearchOutputPerStep)
+	multiple := int(math.Round(float64(runTokens) / float64(ordinary)))
+	if multiple < 1 {
+		// A real run is never worth less than one question, and rounding a small
+		// run to zero would read as free.
+		return 1
+	}
+	return multiple
 }
 
 // sharesASubstantiveToken requires a shared word long enough to identify a
@@ -1179,3 +1278,69 @@ const (
 	// The original identifying token, restored by GORILLA_OPENCODE_USER_AGENT=honest.
 	honestUserAgent = "gorilla-opencode/1.0 (+https://github.com/gorillanobakaa-dot/Gorilla.Opencode)"
 )
+
+// ResearchOrchestratorTokens is the input the CODER model spends on a research
+// run: the turn that launches it, and the turn that reads every helper's answer
+// and writes the synthesis.
+//
+// GORILLA OVERRIDE (2026-08-23): ROADMAP item 6, the other half. "THIS RUN"
+// counted helper sessions only.
+//
+// That is not a rounding difference. The synthesis turn carries the coder's full
+// context PLUS every word the helpers produced, and it runs on the CODER model,
+// which is frequently not the helper model. On a cheap-helper, expensive-coder
+// setup, the single synthesis turn can cost more than the entire fleet it is
+// summarising, and the screen said nothing about it at all.
+//
+// Returned separately rather than folded into the run total on purpose. This
+// file already guards the property that every figure on that screen multiplies
+// out from one anchor, and quietly adding a differently-priced model into that
+// anchor would break it: helper money and coder money are not the same currency
+// per token. The UI shows it as its own line, in its own model's name.
+func ResearchOrchestratorTokens(sessions int) (launchIn, synthesisIn int) {
+	if sessions < 1 {
+		sessions = 1
+	}
+	coder := LoadoutActiveTokens()
+	if coder <= 0 {
+		coder = 8000
+	}
+	// The launch turn is an ordinary coder turn: its context, and the question.
+	launchIn = coder
+	// The synthesis turn is that PLUS everything the helpers wrote back. That
+	// second term is the one that grows with the size of the run, and it is why
+	// a bigger fleet does not only cost more in helpers.
+	synthesisIn = coder + sessions*ResearchStepsPerHelper*ResearchOutputPerStep
+	return launchIn, synthesisIn
+}
+
+// ResearchOrchestratorCost prices those two turns on the CODER's model, which is
+// usually not the helper model. priced is false when that model has no rate on
+// record, so the UI can say "unpriced" rather than a confident and wrong $0.00.
+func ResearchOrchestratorCost(sessions int) (dollars float64, modelName string, priced bool) {
+	if cfg == nil {
+		return 0, "", false
+	}
+	agent, ok := cfg.Agents[AgentCoder]
+	if !ok {
+		return 0, "", false
+	}
+	m, ok := models.SupportedModels[agent.Model]
+	if !ok {
+		return 0, string(agent.Model), false
+	}
+	label := m.Name
+	if label == "" {
+		label = string(m.ID)
+	}
+	if m.CostPer1MIn <= 0 && m.CostPer1MOut <= 0 {
+		// Free tier or flat-rate: real, and not billed per token.
+		return 0, label, false
+	}
+	launchIn, synthIn := ResearchOrchestratorTokens(sessions)
+	// Output on both turns is unmeasured; ResearchOutputPerStep is the same
+	// stated assumption used everywhere else on this screen.
+	in := float64(launchIn+synthIn) / 1e6 * m.CostPer1MIn
+	out := float64(2*ResearchOutputPerStep) / 1e6 * m.CostPer1MOut
+	return in + out, label, true
+}

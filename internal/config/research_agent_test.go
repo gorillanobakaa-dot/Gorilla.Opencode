@@ -50,17 +50,51 @@ func TestTheLocalEndpointDefaultLoopStillExists(t *testing.T) {
 
 // The quota multiple must be DERIVED from the token model, not be the helper
 // count. "4 helpers = 4x a question" asserts one helper equals one question,
-// which nothing supports and which understates the real cost.
+// which nothing supports.
+//
+// GORILLA OVERRIDE (2026-08-23): ROADMAP item 6. This test used to assert
+// `got == helpers * ResearchStepsPerHelper`, directly under a comment saying the
+// figure must be derived from the TOKEN model. Those two statements contradict
+// each other: helpers times steps is a step count, and no token appears in it.
+// The test pinned the very thing its own comment called wrong, so it passed for
+// as long as the bug existed and would have failed the fix.
+//
+// Same shape as the /tasks visibility test in this session: a test whose stated
+// intent and whose assertion disagree is worse than no test, because the comment
+// makes the next reader believe the property is covered.
+//
+// It now asserts the PROPERTY, not a formula. A specific number would just be
+// the new formula written twice.
 func TestQuotaMultipleIsDerivedNotTheHelperCount(t *testing.T) {
 	for _, helpers := range []int{4, 10, 20} {
 		got := ResearchQuotaMultiple(helpers)
 		if got == helpers {
 			t.Errorf("%d helpers -> %dx: that is the helper count, not a token-derived figure", helpers, got)
 		}
-		if want := helpers * ResearchStepsPerHelper; got != want {
-			t.Errorf("%d helpers -> %d, want %d", helpers, got, want)
+		if got < 1 {
+			t.Errorf("%d helpers -> %d: a real run is never worth less than one question", helpers, got)
 		}
 	}
+
+	// It must scale with the run. Doubling the fleet must move the figure, or it
+	// is not derived from anything about the fleet.
+	four, eight := ResearchQuotaMultiple(4), ResearchQuotaMultiple(8)
+	if eight <= four {
+		t.Errorf("4 helpers -> %d and 8 -> %d: the figure does not grow with the run", four, eight)
+	}
+
+	// THE DERIVATION ITSELF, checked against the same two quantities the function
+	// uses. Not "helper < coder": that holds at shipped defaults and not on a
+	// loadout the user has trimmed, because a helper keeps its four tools either
+	// way. What must always hold is that the answer IS this division.
+	helperStep := ResearchHelperBasisTokens() + ResearchOutputPerStep
+	ordinary := LoadoutActiveTokens() + ResearchOutputPerStep
+	wantOne := float64(ResearchStepsPerHelper) * float64(helperStep) / float64(ordinary)
+	if got := float64(ResearchQuotaMultiple(20)) / 20; got < wantOne*0.9 || got > wantOne*1.1 {
+		t.Errorf("per-helper multiple is %.2f, want about %.2f from the token model "+
+			"(helper step %d tokens, ordinary question %d)", got, wantOne, helperStep, ordinary)
+	}
+
 	if ResearchQuotaMultiple(0) != 0 {
 		t.Error("zero helpers must cost zero questions")
 	}
@@ -194,5 +228,87 @@ func TestPaidEquivalentStaysInTheFamily(t *testing.T) {
 			t.Errorf("%q priced via %q — only %d shared family words; that is an unrelated model",
 				m.Name, via, shared)
 		}
+	}
+}
+
+// ROADMAP item 6: a helper does not carry the coder's loadout, and pricing it as
+// if it did made every money figure on the research screen nearly double.
+//
+// Measured on the development machine at shipped defaults, 2026-08-23:
+// base 1,791 + fetch 789 + websearch 749 + find 1,322 + view 595 = 5,246,
+// against a coder basis of 10,380. A 1.98x overstatement.
+func TestTheHelperBasisIsTheHelpersOwnToolsNotTheCoders(t *testing.T) {
+	// Assert the DEFINITION, not a comparison against the coder.
+	//
+	// The first version of this test said "helper basis < coder basis", which is
+	// true at shipped defaults and NOT true in general: a helper always gets its
+	// four tools (agent.ResearchAgentTools builds them unconditionally, and the
+	// note there says fetch and websearch are deliberately not loadout-gated),
+	// while the coder's basis shrinks as the user switches things off. A user on
+	// a trimmed loadout would have failed a test asserting a property of the
+	// default configuration. It also broke against a sibling test that leaves the
+	// package-global loadout trimmed, which is how it was caught.
+	want := LoadoutBaseTokens()
+	for _, c := range LoadoutComponents {
+		for _, id := range researchHelperTools {
+			if c.ID == id {
+				want += ComponentTokens(c)
+			}
+		}
+	}
+	if got := ResearchHelperBasisTokens(); got != want {
+		t.Errorf("helper basis %d, want %d (base prompt + the four helper tools).\n"+
+			"  If this is now LoadoutActiveTokens again, every money figure on the\n"+
+			"  research screen is back to pricing helpers on the coder's thirteen\n"+
+			"  tools, which measured 1.98x too high on 2026-08-23.", got, want)
+	}
+	if got := ResearchHelperBasisTokens(); got <= LoadoutBaseTokens() {
+		t.Errorf("helper basis %d is not above the base prompt %d, so no tool schemas "+
+			"are being counted at all", got, LoadoutBaseTokens())
+	}
+}
+
+// The list here mirrors agent.ResearchAgentTools, which config cannot import.
+// Every id must name a real component: a typo would silently price a helper at
+// the bare system prompt and report success.
+func TestHelperToolListNamesRealComponents(t *testing.T) {
+	known := map[string]bool{}
+	for _, c := range LoadoutComponents {
+		known[c.ID] = true
+	}
+	for _, id := range researchHelperTools {
+		if !known[id] {
+			t.Errorf("researchHelperTools names %q, which is not a registered component. "+
+				"A typo here quietly drops a tool from the helper's price.", id)
+		}
+	}
+	if len(researchHelperTools) < 4 {
+		t.Errorf("only %d helper tools listed; agent.ResearchAgentTools builds four "+
+			"unconditionally (fetch, websearch, find, view)", len(researchHelperTools))
+	}
+}
+
+// ROADMAP item 6, the other half: "THIS RUN" counted helpers only. The synthesis
+// turn carries the coder's context PLUS everything the helpers wrote, and runs
+// on the coder's model.
+func TestTheSynthesisTurnGrowsWithTheFleet(t *testing.T) {
+	launch4, synth4 := ResearchOrchestratorTokens(4)
+	launch20, synth20 := ResearchOrchestratorTokens(20)
+
+	if launch4 != launch20 {
+		t.Errorf("the launch turn moved with the fleet size (%d vs %d); it is one "+
+			"ordinary coder turn either way", launch4, launch20)
+	}
+	if synth20 <= synth4 {
+		t.Errorf("synthesis input is %d for 4 helpers and %d for 20; it must grow, "+
+			"because it reads every answer back", synth4, synth20)
+	}
+	if synth4 <= launch4 {
+		t.Errorf("synthesis (%d) is not larger than the launch turn (%d), so the "+
+			"helper output is not being counted", synth4, launch4)
+	}
+	// A zero or negative fleet must not produce a nonsense figure.
+	if l, s := ResearchOrchestratorTokens(0); l <= 0 || s <= 0 {
+		t.Errorf("zero helpers gave (%d, %d); both must stay positive", l, s)
 	}
 }
