@@ -278,9 +278,31 @@ func RegisterLSPComponents(lspNames map[string]bool) {
 }
 
 // lowBandwidthOff lists components switched OFF by ApplyLowBandwidthLoadout.
-// Critical tools (bash/edit/write/view) stay on; optional network/LSP/extra
-// edit surfaces and the LSP prompt blurb drop. Env stays ON — it is cheap
-// after the shallow project_summary change and still useful on remote links.
+// Critical tools (bash/edit/write/view/find) stay on; optional network, LSP and
+// extra edit surfaces drop, along with the LSP prompt blurb.
+//
+// GORILLA OVERRIDE (2026-08-23): tool.review added, four days late.
+//
+// This list was last touched on 2026-08-14. tool.review landed on 2026-08-18,
+// default ON and costing 759 measured tokens, and nobody came back here. So the
+// preset built for someone on a satellite link was still shipping a 30-analyser
+// static-review schema on every turn, when its own docstring says it exists to
+// drop what is "not required for core edit/build loops". A code review is not a
+// core edit/build loop.
+//
+// That is the same shape as the Arch package vanishing for four releases: a new
+// thing lands, an existing list is not updated, and nothing fails. The preset
+// still worked, still saved tokens, still reported a smaller number. It was just
+// quietly leaving 759 of them on the table, and only a direct count found it.
+//
+// The default stays ON, and that is a separate, deliberate decision recorded at
+// the tool.review row: a review capability nobody is told about is not a
+// capability. Being on by default and being dropped on a metered link are not in
+// conflict.
+//
+// Now guarded by TestEveryOptionalComponentHasALowBandwidthDecision, which
+// fails if a default-ON, non-critical component is in neither this map nor
+// lowBandwidthKeep. A new tool must be DECIDED about, not merely forgotten.
 var lowBandwidthOff = map[string]bool{
 	"tool.patch":       true,
 	"tool.fetch":       true,
@@ -288,7 +310,22 @@ var lowBandwidthOff = map[string]bool{
 	"tool.diagnostics": true,
 	"tool.agent":       true,
 	"tool.research":    true,
+	"tool.review":      true,
 	"prompt.lsp":       true,
+}
+
+// lowBandwidthKeep is the other half of the decision: default-ON, non-critical
+// components deliberately KEPT on a metered link, each with the reason.
+//
+// It exists so that "not in lowBandwidthOff" stops being ambiguous. Before this,
+// an entry missing from that map could mean "we decided to keep it" or "nobody
+// looked", and those two are indistinguishable from the outside. That ambiguity
+// is exactly what let tool.review sit unconsidered for four days. A component
+// must now appear in one map or the other.
+var lowBandwidthKeep = map[string]string{
+	"prompt.env": "cheap since the shallow project_summary change (~130 measured " +
+		"tokens) and MORE useful on a remote link, not less: knowing the cwd, OS and " +
+		"git state prevents a wasted round trip, which is the expensive thing here.",
 }
 
 const loadoutFileName = "loadout.json"

@@ -164,3 +164,42 @@ func TestNoSingleToolSchemaRunsAway(t *testing.T) {
 		}
 	}
 }
+
+// TestLowBandwidthPresetSavingIsMeasured reports what the preset really saves,
+// with calibration applied. internal/config cannot do this itself: calibration
+// lives here, and config cannot import agent.
+//
+// Recorded 2026-08-23, after tool.review was added to the preset (it had been
+// missing since the tool landed on 2026-08-18):
+//
+//	default   12,174 tokens per turn
+//	low-bw     7,709 tokens per turn   saves 4,465, 37%
+//
+// 759 of that saving is tool.review alone, which was riding every turn on a
+// satellite link until this was counted.
+func TestLowBandwidthPresetSavingIsMeasured(t *testing.T) {
+	if _, err := config.Load(t.TempDir(), false); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	CalibrateLoadout(nil, nil, nil, nil, nil)
+
+	base := config.LoadoutBaseTokens()
+	before := config.LoadoutActiveTokens() + base
+	config.ApplyLowBandwidthLoadout()
+	after := config.LoadoutActiveTokens() + base
+
+	saved := before - after
+	pct := float64(saved) / float64(before) * 100
+	t.Logf("per-turn, calibrated: default %d -> low-bw %d (saves %d, %.0f%%)", before, after, saved, pct)
+
+	if saved <= 0 {
+		t.Fatalf("the low-bandwidth preset saved nothing: %d -> %d", before, after)
+	}
+	// A preset that saves a rounding error is not worth a keystroke. This is a
+	// floor, not a target: it should be easy to clear and loud if it collapses.
+	if pct < 25 {
+		t.Errorf("the low-bandwidth preset saves only %.0f%% (%d of %d tokens). "+
+			"It exists for metered and satellite links; if it has drifted this low, "+
+			"something default-ON is missing from lowBandwidthOff.", pct, saved, before)
+	}
+}
