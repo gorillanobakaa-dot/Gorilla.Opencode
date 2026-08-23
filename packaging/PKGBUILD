@@ -22,9 +22,9 @@ pkgname=gorilla-opencode
 # PKGBUILD: makepkg succeeds, the package installs, and only the version string
 # betrays it. BUMP THIS WITH EVERY RELEASE; TestPKGBUILDTracksTheCurrentRelease
 # now fails the build if it drifts.
-pkgver=0.1.114
+pkgver=0.1.115
 pkgrel=1
-pkgdesc="Terminal AI coding agent (revived original OpenCode) — bring your own API keys"
+pkgdesc="Terminal AI coding agent (revived original OpenCode), bring your own API keys"
 arch=('x86_64')
 url="https://github.com/gorillanobakaa-dot/Gorilla.Opencode"
 license=('MIT')
@@ -58,15 +58,33 @@ source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gorillanobakaa-dot/Gori
 # nothing is the "transparent in theory, closed door in practice" failure
 # PHILOSOPHY.md exists to prevent.
 #
-# Measured against the published v0.1.111 tarball, 17,572,729 bytes.
-# REGENERATE ON EVERY VERSION BUMP - a stale sum fails loudly, which is correct,
-# but it fails the user rather than the person who forgot.
+# ORDERING, and why this hash always lands in the commit AFTER the tag
+# (recorded 2026-08-23): this sum covers the tarball of the tag, and the tarball
+# of the tag CONTAINS THIS FILE. Writing the correct hash into the file changes
+# the file, which changes the tarball, which changes the hash. It is a fixed
+# point and there is no value that satisfies it.
+#
+# That is not a theoretical problem: v0.1.114 shipped carrying the v0.1.111 sum,
+# so `makepkg -si` on it downloaded the right tarball, compared it against the
+# wrong hash and refused. The failure was loud, which is correct, but it landed
+# on the user rather than on the person who forgot.
+#
+# It is survivable because of WHICH copy Arch users actually run. README install
+# route 1 is `git clone` then `cd packaging` then `makepkg -si`, and a clone
+# checks out the DEFAULT BRANCH, not a tag. So the working recipe is main's, and
+# updating this line on main directly after pushing the tag is both correct and
+# the only thing that can work.
+#
+# Procedure, every release: tag, push the tag, download
+# archive/refs/tags/v${pkgver}.tar.gz, sha256sum it, paste it here, commit to
+# main, then re-download and verify. Do not guess it and do not carry the
+# previous release's value forward.
 sha256sums=('61ca403d5b8769e7228eacd3154671a6a8c01b5090fa0ff567e4ff268b59d4f6')
 
 build() {
     cd "Gorilla.Opencode-${pkgver}"
     # GORILLA OVERRIDE: -s -w strips symbol table and DWARF debug info.
-    # On this project that shrinks the binary from ~66 MB to ~50 MB — roughly
+    # On this project that shrinks the binary from ~66 MB to ~50 MB, roughly
     # 40 minutes on a single-digit-KB/s link at 50 MB vs 90 minutes at 66 MB.
     # Never drop this from a release build.
     CGO_ENABLED=0 go build \
@@ -81,7 +99,7 @@ package() {
     # Binary
     install -Dm755 "${pkgname}" "${pkgdir}/usr/bin/${pkgname}"
 
-    # Icons — hicolor sizes shipped in the repo
+    # Icons: hicolor sizes shipped in the repo
     for size in 128 256 512 1024; do
         install -Dm644 \
             "internal/assets/icons/${pkgname}-${size}.png" \
@@ -91,7 +109,7 @@ package() {
         "internal/assets/icons/${pkgname}.svg" \
         "${pkgdir}/usr/share/icons/hicolor/scalable/apps/${pkgname}.svg"
 
-    # Desktop entry — plain and plain-mode right-click action
+    # Desktop entry: plain and plain-mode right-click action
     install -Dm644 \
         "packaging/gorilla-opencode.desktop" \
         "${pkgdir}/usr/share/applications/${pkgname}.desktop"

@@ -1,3 +1,60 @@
+## v0.1.115 (2026-08-23): the meter, and the list that had stopped being true
+
+**Plain-language version:** two things in this release were wrong in the same
+way, and neither of them looked wrong.
+
+If you signed in with a ChatGPT account and typed `/usage`, you were shown a
+weekly allowance and a Google email that belonged to a different free tier
+entirely. Nothing checked which provider you were on. A meter reading full while
+your tank is nearly empty is not broken, it is misleading, and you would only
+find out when the program stopped answering. Gating it off removed the lie and
+left a blank, and a blank was not good enough: the owner had Codex open on the
+same account showing 20% of a monthly limit, so the number plainly existed.
+
+It turned out there is no page to ask. The figures ride along on the replies to
+requests you were already making. Reading your usage now costs nothing at all,
+which is the right answer on a metered connection. The catch is that there is
+nothing to show until your first reply comes back.
+
+A test then caught something small and nasty. Turning "how much used" into "how
+much left" is a subtraction, and the obvious way to write it is slightly wrong:
+a computer gives `0.19999999999999996` for `1 - 80/100`, which falls just under
+the 20% boundary where the colour scale changes. Somebody with exactly a fifth
+of their allowance left would have been told "Banana emergency". Every warning
+level sat one step too alarming. Written the other way round it lands exactly.
+
+The second thing was the model list, typed out by hand six days earlier. OpenAI
+was serving four models; we showed two, and one of those two is switched off by
+OpenAI on 31 August, eight days from now. The owner caught this from the outside
+too, with Codex running a model on his account that this program said he could
+not have.
+
+Those two better models were not missing by accident. They were deliberately
+excluded, with a confident comment in the source explaining that a flag on them
+meant they would "fail on the first tool call". That was reasoned entirely from
+the name of the flag, and nobody had ever sent a request to check. Reading
+OpenAI's published source showed the flag only tells their own program to hand
+the model a smaller toolkit. Asking the server settled it: all three models
+answer ordinary tool calls correctly, and the best of them went on to chain two
+of them in the shipped build. The wrong paragraph has been left in the source
+with the correction printed underneath, rather than quietly deleted.
+
+The list is now asked for rather than typed, in OpenAI's own order, every time
+you sign in or run `/update`. When next week's retirement lands, the model
+disappears on its own and nobody has to remember. Signing in no longer picks
+your models by name either: it asks which is best and which is cheapest, and
+still gives your conversation titles to the cheap one, because on a free plan
+what you run out of is the cooldown rather than money.
+
+Three smaller repairs. Files the agent reads twice are no longer sent twice, the
+earlier copy being replaced by a one-line note while the full text stays on
+disk. "I could not find it" is now a finished job rather than a failure to be
+pushed through, which matters most on a kernel or browser build where an
+invented cause reads exactly like a diagnosed one. And the research behind all
+of this is now cited with sources instead of paraphrased.
+
+Full detail, both tracks: `Changelogs/v0.1.115-release-notes.md`.
+
 ## v0.1.114 — 2026-08-21 — the switch reaches the model
 
 **Plain-language version:** you pick a provider from the menu, the bar at the

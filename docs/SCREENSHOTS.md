@@ -1,4 +1,4 @@
-<!-- Version: 1.7.0 · updated 26-08-21-15-25 -->
+<!-- Version: 1.8.0 · updated 26-08-23-15-37 -->
 # Gorilla OpenCode — screenshots & proof
 
 Real screenshots from a Debian 13 / GNOME 48 machine running the revived
@@ -21,6 +21,121 @@ downscaled, cropped for tidiness, or re-encoded to save bytes. The reason is the
 philosophy, not vanity: this project's claim is that a non-technical reader can
 CHECK what was built, and a screenshot too small to read destroys exactly that.
 Nothing is staged — the numbers on screen are real runs.
+
+---
+
+## v0.1.115: the meter, and the list that had stopped being true
+
+Captured 2026-08-23 on Debian 13 / GNOME 48, on the installed v0.1.115 package,
+signed in with a **free** ChatGPT account. These are verification shots: every
+one was taken to prove a specific claim in the release notes, and two of them
+are corroborated by a program we did not write.
+
+### The state that started it
+
+Our panel with nothing to say, beside OpenAI's own Codex on the same Google
+account reporting a real number. Whatever was wrong, it was not that the number
+did not exist.
+
+[![The Gorilla OpenCode usage panel showing no ChatGPT figures at all beside OpenAI's Codex status output reporting twenty percent of a monthly limit remaining on the same Google account](screenshots/gallery/v0115-before-codex-shows-20-percent.png)](screenshots/gallery/v0115-before-codex-shows-20-percent.png)
+
+### The meter, reading the right barrel
+
+There is no endpoint to query. The figures ride along on the replies to requests
+already being made, so reading them costs nothing on a metered link. The
+tradeoff is honest and visible: nothing shows until the first reply comes back.
+
+[![The usage panel showing a ChatGPT monthly limit bar reading eighteen percent remaining with the banana emergency label, above a secondary limit bar at one hundred percent](screenshots/gallery/v0115-usage-chatgpt-meter.png)](screenshots/gallery/v0115-usage-chatgpt-meter.png)
+
+### Checked against a client we did not write
+
+The strongest shot in the set, because it is not our arithmetic being shown back
+to us. Both read 18%. Codex prints "resets 19:01 on 15 Sep"; the value we stored
+is `reset_at=1789495295`, which decodes to 2026-09-15 19:01:35 BST, and we
+render it as "resets in 23d".
+
+[![The Gorilla OpenCode usage panel reading eighteen percent of a monthly limit next to OpenAI Codex reporting eighteen percent left resetting at 19:01 on 15 September, the two agreeing exactly](screenshots/gallery/v0115-usage-chatgpt-agrees-with-codex.png)](screenshots/gallery/v0115-usage-chatgpt-agrees-with-codex.png)
+
+### The gate removed the wrong reading, not the right one
+
+The regression check. Antigravity keeps both model groups, the account line and
+the OpenRouter balance.
+
+[![The usage panel on Antigravity showing the Gemini models group at ninety one percent and the Claude and GPT models group at one hundred percent, with the account line and OpenRouter balance intact](screenshots/gallery/v0115-usage-antigravity-unchanged.png)](screenshots/gallery/v0115-usage-antigravity-unchanged.png)
+
+Two more from the same run: the startup line staying silent when the active
+provider is not Antigravity, and `/usage` declining to print another provider's
+figures.
+
+[![The startup sequence on a non Antigravity provider printing no quota line at all where it previously printed the Antigravity weekly allowance](screenshots/gallery/v0115-startup-silent-on-other-provider.png)](screenshots/gallery/v0115-startup-silent-on-other-provider.png)
+
+[![The usage panel on a provider that is not Antigravity, omitting the Antigravity weekly quota section entirely instead of printing figures from an unrelated account](screenshots/gallery/v0115-usage-gated-not-active-provider.png)](screenshots/gallery/v0115-usage-gated-not-active-provider.png)
+
+### The picture that refutes a comment in our own source
+
+Two GPT-5.6 models were kept out of the picker for six days on the written
+prediction that they would "sign in fine and then fail on the first tool call".
+That was reasoned from the name of a flag and never tested.
+
+This is GPT-5.6-Terra, on the free plan, answering one throwaway question with
+**two chained tool calls**: a file view of `SETTLED.md`, then a directory find.
+`spent $0.00`.
+
+It is better evidence than the probe that preceded it, for the same reason a
+photograph beats a log: it is the shipped binary doing the thing, and a reader
+who cannot read Go can still check it.
+
+[![GPT-5.6-Terra on a free ChatGPT sign-in answering a single question by running two tool calls in sequence, a file view of SETTLED.md followed by a directory find, with the status bar showing zero dollars spent](screenshots/gallery/v0115-terra-chains-two-tool-calls.png)](screenshots/gallery/v0115-terra-chains-two-tool-calls.png)
+
+### Four models, in OpenAI's own order
+
+It listed two before. The header reads "4 ranked best-first", and that count
+comes from the backend rather than from anything typed into the source.
+
+[![The ChatGPT model picker listing four models ranked best first, with GPT-5.6-Terra and GPT-5.6-Luna above GPT-5.5 and GPT-5.4-Mini](screenshots/gallery/v0115-picker-four-chatgpt-models.png)](screenshots/gallery/v0115-picker-four-chatgpt-models.png)
+
+### Asked for, not typed
+
+`/update` reporting `ChatGPT 4 usable` beside the providers that already fetched
+their lists, and above it the post-sign-in line "Model list refreshed from
+OpenAI: 4 available." The line that used to read "Gemini and the sign-in
+providers ship with the app" now names only Gemini, because that is now the only
+one it is true of.
+
+[![The update command reporting ChatGPT four usable alongside OpenRouter, Antigravity, Groq and Cerebras, above a line reading model list refreshed from OpenAI four available](screenshots/gallery/v0115-update-fetches-chatgpt-list.png)](screenshots/gallery/v0115-update-fetches-chatgpt-list.png)
+
+The meter still works on the newly reachable model, which is the point of doing
+both halves in one release.
+
+[![The quota panel reading eighteen percent of a monthly limit during a session running GPT-5.6-Terra, showing the meter is not tied to the model that used to be hardcoded](screenshots/gallery/v0115-usage-while-running-terra.png)](screenshots/gallery/v0115-usage-while-running-terra.png)
+
+### What every turn costs you
+
+`/context`, 39 rows, with the per-feature token cost spelled out and a header
+reading `~8,802 tokens sent on EVERY turn`. Four pages because the list does not
+fit one screen at 1600x900, which is the reference display for this project.
+
+[![The context loadout screen listing tools with their per turn token costs and a header reading roughly 8,802 tokens sent on every turn at zero dollars per turn on the free tier](screenshots/gallery/v0115-context-loadout-tools-and-cost.png)](screenshots/gallery/v0115-context-loadout-tools-and-cost.png)
+
+[![The context loadout showing the language server rows each costing about ten tokens and the OSINT all source row marked as costing extra to run](screenshots/gallery/v0115-context-loadout-lsp-and-osint.png)](screenshots/gallery/v0115-context-loadout-lsp-and-osint.png)
+
+[![The context loadout showing the prompt sections including build discipline, change reporting, conduct, delegation and honesty with their individual token costs](screenshots/gallery/v0115-context-loadout-prompt-sections.png)](screenshots/gallery/v0115-context-loadout-prompt-sections.png)
+
+[![The context loadout showing the research helpers row, the sub agent tool switched off, and the view and write tools with warning markers indicating that disabling them cripples the agent](screenshots/gallery/v0115-context-loadout-view-and-write.png)](screenshots/gallery/v0115-context-loadout-view-and-write.png)
+
+### A note on two of these
+
+`v0115-update-fetches-chatgpt-list` and `v0115-usage-while-running-terra` are
+**cropped**, and it is the only cropping anywhere in this document. Both frames
+had the OAuth authorize URL from a fresh sign-in across the top. The band
+carrying it was cut; full width kept, nothing scaled, no evidentiary content
+lost.
+
+Nothing in that URL works on its own (the client id ships inside OpenAI's own
+downloadable client, the code challenge is a hash whose verifier never appeared,
+and the state nonce had already been spent), so there was nothing to rotate. It
+was cut anyway, because a published page is not the place for a string that
+looks like a credential.
 
 ---
 
