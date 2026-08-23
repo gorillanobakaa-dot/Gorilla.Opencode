@@ -117,9 +117,32 @@ func helperHeartbeatCmd() tea.Cmd {
 // which would defeat the entire point of a liveness signal.
 var helperHeartbeatLines = []string{
 	"🦍 Still alive, bitch. %d helper(s) still working, longest %s. Nothing has crashed.",
-	"🦍 Still working — %d helper(s) out, longest %s. A slow model looks EXACTLY like a hang. It is not one.",
-	"🦍 %d helper(s) grinding, longest %s. Welcome to austere: slow model, slow line, quiet screen, real work.",
+	"🦍 Still working: %d helper(s) out, longest %s. A slow model looks EXACTLY like a hang. It is not one.",
 	"🦍 Still here. %d helper(s), longest %s. /tasks to watch them or X to kill the lot.",
+}
+
+// austereHeartbeatLine is shown ONLY on the austere connection profile.
+//
+// GORILLA FIX (2026-08-23): it used to be a fourth entry in the rotation above,
+// so it fired for everybody. The owner, on a fast line by his own explicit
+// choice, was told "welcome to austere: slow model, SLOW LINE, quiet screen".
+//
+// That is the program stating a fact about the user's setup that the user had
+// already contradicted in the settings. It is a small line and it is the same
+// fault as a full green bar for an allowance that does not exist: confident,
+// specific, and not true. A liveness notice exists to stop the user distrusting
+// the screen, so a liveness notice that is wrong about them costs double.
+//
+// The line itself is good and stays, for the people it was written for: the
+// satellite uplink where everything looks broken and almost nothing is.
+const austereHeartbeatLine = "🦍 %d helper(s) grinding, longest %s. Welcome to austere: slow model, slow line, quiet screen, real work."
+
+// heartbeatLines returns the rotation valid for the ACTIVE profile.
+func heartbeatLines() []string {
+	if config.CurrentConnProfile().ID == config.ProfileAustere {
+		return append(append([]string(nil), helperHeartbeatLines...), austereHeartbeatLine)
+	}
+	return helperHeartbeatLines
 }
 
 const (
@@ -957,7 +980,8 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 		a.heartbeatBeat++
-		line := helperHeartbeatLines[a.heartbeatBeat%len(helperHeartbeatLines)]
+		lines := heartbeatLines()
+		line := lines[a.heartbeatBeat%len(lines)]
 		return a, tea.Batch(
 			util.ReportInfo(fmt.Sprintf(line, running, longest.Round(time.Second))),
 			helperHeartbeatCmd(),
@@ -1738,7 +1762,25 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// event itself also triggers a re-render, keeping the /tasks list and
 		// status-bar count live while they're on screen.
 		if msg.Type == pubsub.CreatedEvent {
-			cmds := []tea.Cmd{util.ReportInfo(fmt.Sprintf("🦍 helper %s spawned — %s  (/tasks to view or kill)", msg.Payload.ID, truncatePrompt(msg.Payload.Prompt, 40)))}
+			// GORILLA FIX (2026-08-23): the label budget is the SCREEN, not 40.
+			//
+			// This was truncatePrompt(..., 40), a constant with no relationship
+			// to the terminal. Reported from a 1519px window where the labels
+			// still read "ADVERSARY - what breaks, l...": the number was never
+			// about the screen, so a wide terminal bought nothing. Worse, the
+			// status component truncates AGAIN to fit real columns, so the inner
+			// 40 destroyed text that would have fitted and then handed the
+			// result to something that would have cut it correctly anyway.
+			//
+			// The hint is reserved rather than the label, because "(/tasks to
+			// view or kill)" is the actionable half. A label that runs out of
+			// room loses words; a hint that runs out of room loses the only
+			// instruction telling the user they can kill a runaway helper.
+			//
+			// The em-dashes went too. Directive 1, and this line renders once
+			// per helper, so a ten-helper run put twenty of them on screen.
+			cmds := []tea.Cmd{util.ReportInfo(fmt.Sprintf("🦍 helper %s spawned: %s  (/tasks to view or kill)",
+				msg.Payload.ID, truncatePrompt(msg.Payload.Prompt, spawnLabelBudget(a.width, msg.Payload.ID))))}
 			// Start the "still alive" heartbeat if it is not already ticking.
 			if !a.heartbeatRunning {
 				a.heartbeatRunning = true
@@ -3472,3 +3514,37 @@ func drainPermissionQueue(
 	}
 	return nil, queue
 }
+
+// spawnLabelBudget is how many columns the helper label may use in the spawn
+// notice, given the terminal width.
+//
+// The fixed chrome is measured from the format string rather than counted by
+// hand, so editing the wording cannot silently invalidate the arithmetic. That
+// is the same trap as the constant it replaces: a number that was true once.
+func spawnLabelBudget(width int, id string) int {
+	// Everything in the notice except the label itself. The gorilla is two
+	// columns wide, which is why this is measured and not len()'d.
+	chrome := lipgloss.Width("🦍 helper "+id+" spawned:   (/tasks to view or kill)") +
+		spawnNoticeDecoration
+
+	budget := width - chrome
+	// A floor, because a very narrow terminal should still show SOMETHING of
+	// the role rather than collapsing to an ellipsis. The status line does the
+	// final fit to real columns, so overshooting here is safe and undershooting
+	// is not.
+	if budget < spawnLabelFloor {
+		return spawnLabelFloor
+	}
+	return budget
+}
+
+const (
+	// spawnNoticeDecoration is the width the status component wraps around a
+	// message (the warning gorillas either side). Reserved so the label does
+	// not get cut a second time by something this function cannot see.
+	spawnNoticeDecoration = 24
+	// spawnLabelFloor keeps a recognisable amount of the role visible on a
+	// narrow pane. Roles are distinguished by their FIRST word (ADVERSARY,
+	// REQUIREMENT, PRIOR ART), so this needs to survive that plus a little.
+	spawnLabelFloor = 24
+)
