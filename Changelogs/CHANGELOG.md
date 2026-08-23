@@ -18,7 +18,17 @@ code-review tool arrived on 18 August, switched on by default at 759 tokens per
 message, and nobody went back to add it. So the setting built for people on slow
 connections was still shipping a thirty-analyser review tool with every message.
 Nothing looked broken: it still ran, still switched things off, still showed a
-smaller number. It now saves 37%, down from 12,178 tokens per message to 7,713.
+smaller number. From default settings it now saves 37%, down from 12,178 tokens per message to
+7,713. The key itself was also wrong, and the owner's screenshots exposed it. It was
+written as a preset rather than a subtraction: it switched off its own list, then
+switched everything else back to the factory default, undoing your economies.
+Measured live on his hand-trimmed setup: 8,802 to 8,138, only 8%, because bash,
+the edit tool, environment info and four language servers all came back while the
+web tools went. Run against the old code from a more trimmed start, the test
+reports 6,125 rising to 7,020: 895 tokens MORE per message, from a button
+labelled low bandwidth. It only showed if you had already trimmed harder than the
+defaults, which is exactly what someone on a bad connection does. It now only
+ever subtracts, and r already existed for restoring defaults.
 And a tool missing from that list used to mean either "we decided to keep it" or
 "nobody looked", which are indistinguishable from outside, so there are now two
 lists: things dropped, and things deliberately kept with the reason written down.

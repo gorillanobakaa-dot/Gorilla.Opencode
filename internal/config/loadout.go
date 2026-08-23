@@ -511,16 +511,32 @@ func ResetLoadout() {
 // required for core edit/build loops. Intended for metered, satellite, or
 // high-latency links. Persists like any other loadout change. Returns the
 // new active token estimate (after current calibration overrides).
+//
+// GORILLA OVERRIDE (2026-08-23): SUBTRACT ONLY. It used to reset every component
+// NOT on the drop-list back to c.Default, which meant a key labelled "low-bw"
+// could switch things back ON.
+//
+// Observed live by the owner, on his own hand-trimmed loadout: pressing `l` went
+// from ~8,802 to ~8,138, a mere 8%, because the web tools went away but bash,
+// the edit tool, environment info and four language servers all came BACK. He
+// had turned those off deliberately. On the connection this key exists for, a
+// button that undoes your economies and then reports a smaller number is worse
+// than no button.
+//
+// The old behaviour was defensible in the abstract: a preset is an absolute
+// state, so pressing it twice from different starting points gives the same
+// result. The owner's call, 2026-08-23, was that predictability is worth less
+// than the guarantee, and he is right about who this is for. `r reset` already
+// exists for anyone who wants the shipped defaults back.
+//
+// THE GUARANTEE, now testable: this function can only ever REDUCE the per-turn
+// cost, never raise it. TestLowBandwidthOnlyEverSubtracts pins it from a
+// deliberately awkward starting state.
 func ApplyLowBandwidthLoadout() int {
 	initLoadout()
 	loadoutMu.Lock()
-	for _, c := range LoadoutComponents {
-		if lowBandwidthOff[c.ID] {
-			loadoutState[c.ID] = false
-		} else {
-			// Keep shipped defaults for everything else (including critical tools).
-			loadoutState[c.ID] = c.Default
-		}
+	for id := range lowBandwidthOff {
+		loadoutState[id] = false
 	}
 	loadoutMu.Unlock()
 	saveLoadout()

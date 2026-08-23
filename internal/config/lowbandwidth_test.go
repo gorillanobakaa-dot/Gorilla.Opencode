@@ -129,3 +129,57 @@ func TestLowBandwidthPresetCutsCostWithoutRemovingCoreCapability(t *testing.T) {
 		}
 	}
 }
+
+// THE GUARANTEE. Pressing the low-bandwidth key must never raise the bill.
+//
+// It used to reset every component not on the drop-list back to its shipped
+// default, so on a hand-trimmed loadout it switched things back ON. Measured
+// live by the owner on his own setup, 2026-08-23: ~8,802 to ~8,138, only 8%,
+// because the web tools went but bash, the edit tool, environment info and four
+// language servers all returned. He had switched those off on purpose. A button
+// that undoes your economies and then reports a smaller number is worse than no
+// button, especially on the connection it exists for.
+//
+// The starting state here is deliberately awkward: several default-ON components
+// switched OFF by hand, which is exactly the shape that exposed the bug.
+func TestLowBandwidthOnlyEverSubtracts(t *testing.T) {
+	if _, err := Load(t.TempDir(), false); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	// Trim by hand first, the way a user on a slow link would.
+	var trimmed []string
+	for _, c := range LoadoutComponents {
+		if c.Default && !lowBandwidthOff[c.ID] && !strings.HasPrefix(c.ID, "lsp.") {
+			if LoadoutEnabled(c.ID) {
+				ToggleLoadout(c.ID)
+			}
+			trimmed = append(trimmed, c.ID)
+		}
+	}
+	if len(trimmed) == 0 {
+		t.Skip("no default-ON components outside the drop-list to trim")
+	}
+	before := LoadoutActiveTokens()
+	after := ApplyLowBandwidthLoadout()
+
+	if after > before {
+		t.Errorf("the low-bandwidth key RAISED the per-turn cost: %d -> %d.\n"+
+			"  It must only ever subtract. Resetting non-listed rows to their\n"+
+			"  defaults is what made it switch a hand-trimmed loadout back on.",
+			before, after)
+	}
+	// Nothing the user switched off may come back.
+	for _, id := range trimmed {
+		if LoadoutEnabled(id) {
+			t.Errorf("%s was switched off by hand and the low-bandwidth key turned it "+
+				"back ON. A user pressing this wants less, not their choices undone.", id)
+		}
+	}
+	// And it must still do its job: everything on the drop-list is off.
+	for id := range lowBandwidthOff {
+		if LoadoutEnabled(id) {
+			t.Errorf("%s is on the drop-list and survived the preset", id)
+		}
+	}
+}
