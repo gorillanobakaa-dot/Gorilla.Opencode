@@ -1,3 +1,40 @@
+## v0.1.118 (2026-08-23): stop asking about the string, start asking about the outcome
+
+**Plain-language version:** the program kept asking you questions you could not
+answer, and telling you numbers that were not true. This release fixes both.
+
+You had to click Allow twenty times to run a web search, because the approval
+covered the exact words you searched for and nobody searches the same words
+twice. It asks once now. And the question it asked was useless: it showed you a
+search term, which tells you nothing about whether allowing it is wise. It now
+tells you what actually happens, what it can reach, and what you cannot take
+back.
+
+Nine questions were never shown to you and were recorded as refusals. When ten
+helpers asked at once the box could only hold one, so the other nine waited ten
+minutes and were marked denied. They queue now.
+
+The cost said one penny when it was $7.64. The money was recorded correctly the
+whole time, in eighteen places nothing was looking at, and only added up at the
+end. It now counts while it runs. If you had killed that run, the record of the
+$7.64 would have vanished entirely, because the part that writes down what you
+spent was switched off by the same button that stops the work.
+
+Every run now prints a receipt: helpers, tool calls, tokens in and out, cost per
+million, total in red. Building it found that every token figure the research
+tool has ever printed was ten times too low.
+
+Also: commands were being cut off mid-word in the dialog that asks you to
+approve them; the context bar read 229% on a nearly empty conversation; a
+one-engine search hiccup was being reported as total failure; and an answer can
+no longer be stated without naming the evidence it rests on.
+
+Half of this was found by the owner running one question through the research
+tool and watching his own screen. It cost $7.64 and found seven bugs.
+
+**Not verified:** what age-based context eviction actually saves; whether
+cancelling the main agent kills its sub-agents; any paid ChatGPT plan.
+
 ## v0.1.117 (2026-08-23): a window of nothing but a zero is not a window
 
 **Plain-language version:** one fix. The usage panel was drawing a full green bar

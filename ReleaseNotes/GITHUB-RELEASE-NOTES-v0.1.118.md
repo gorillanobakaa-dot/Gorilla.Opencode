@@ -157,6 +157,66 @@ does not drag the forecast above anything you will ever see.
 
 ---
 
+## The run that found half of this release
+
+One question, put through the research tool: **`who is pete holmes?`** Ten
+helpers, supervised, on a free-tier model.
+
+| | |
+|---|---|
+| cost | **$7.64** |
+| wall clock | 27m 57s |
+| helper sessions | 18 |
+| tool calls | 195 |
+| tokens processed | **11,935,525** |
+| tokens written | 56,923 |
+| ratio | **210 : 1** |
+
+It answered correctly, and it found **seven separate bugs** on the way, every
+one of them spotted by a person watching his own screen. That beat every audit,
+analyser and test suite in this project on the same afternoon.
+
+### What the run got right, which is why it is worth the money
+
+It **verified a load-bearing claim itself** instead of trusting the helpers,
+grepping `CREDITS`, `.mailmap` and the source tree, and reporting that the vault
+is a tarball extract with no git history to search.
+
+It **refused to repeat an unverified claim**. Eighteen helpers reported a
+Facebook connection; the searches behind it were degraded, so it tagged the
+claim `single_claim, not verified` and kept it out of the answer.
+
+It **listed what nobody had established**, including whether a contributor might
+have used the name as a pseudonym, which nothing available could rule out.
+
+### And the gap it exposed
+
+Its bottom line said "Pete Holmes is the comedian" with no source and no tier.
+A helper really had fetched the Wikipedia page, so the claim was well founded.
+The report just never said so.
+
+If you did not already know the answer, you could not tell a checked claim from
+a remembered one. Fixed in this release: every answer must now name its
+strongest evidence and its tier, there is a new weakest tier `unsourced` for
+claims resting only on the model's memory, and every report ends by telling the
+synthesiser that **helpers agreeing is not corroboration**, because they all run
+the same model.
+
+### The 210 to 1
+
+Almost twelve million tokens in, fifty-seven thousand out.
+
+An agent re-sends its entire conversation on every turn, so a helper working
+fifteen turns pays for its context fifteen times, and anything bulky it looked
+at is paid for again on every later turn. Almost none of that spend was
+thinking. It was re-reading.
+
+Building the receipt that shows this found that **every token figure this tool
+has ever printed was low by about 10.6x**: it had been summing the helpers'
+final context sizes rather than what they actually processed.
+
+---
+
 ## Credit
 
 The research progress line now reads:
