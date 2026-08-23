@@ -436,6 +436,17 @@ func getToolAction(name string) string {
 		// free: nobody is deciding anything while it spins. A joke on a consent
 		// dialog reads as decoration and gets clicked through, which is the
 		// exact failure the new web_search wording exists to avoid.
+		//
+		// Credit where it is due: this is a nod to a Pete Holmes stand-up bit,
+		// "I'm gonna analyze this... WITH SCIENCE!". Not a quotation and not
+		// borrowed for the joke's sake either. The bit is funny because it is
+		// the sound of authority with nothing inside it, which is precisely
+		// what a permission dialog does when it shows you a search string and
+		// asks you to approve it. It named the problem before we did.
+		//
+		// No specific special or year is cited here because that detail is not
+		// something this was checked against, and a confident wrong citation is
+		// worse than none.
 		return "Analyzing this... with science..."
 	case tools.WebSearchToolName:
 		return "Searching the web..."
