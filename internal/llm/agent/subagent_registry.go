@@ -195,6 +195,46 @@ func UnregisterSubAgent(id string) {
 	}
 }
 
+// UnregisterSubAgentsForCall removes every entry created by one tool call.
+//
+// GORILLA OVERRIDE (2026-08-23): ROADMAP item 2, the DONE rows that vanished.
+//
+// Each helper goroutine used to carry `defer UnregisterSubAgent(entry.ID)`,
+// which fires the instant the goroutine returns, immediately after its state is
+// set to DONE. The row existed as DONE for microseconds and was then deleted, so
+// /tasks showed a helper finish by making it disappear. The user could never see
+// WHAT had completed, only that the list got shorter.
+//
+// The intent was already written down three functions below this one, in
+// ActiveSubAgentCount: "A finished row lingers in /tasks so the user can see it
+// landed, but it is not still costing them anything and must not be counted as
+// if it were." State.Live() implements exactly that. The defer defeated it.
+//
+// So terminal rows now stay, and the whole call's entries are purged together
+// when the tool that created them returns. That is the right scope: the rows
+// belong to a run, they are useful for as long as the run's result is being
+// read, and they go when the run is finished with rather than when one lane is.
+func UnregisterSubAgentsForCall(toolCallID string) {
+	if toolCallID == "" {
+		return
+	}
+	subAgentRegMu.Lock()
+	var removed []SubAgentInfo
+	for id, e := range subAgentReg {
+		if e.info.ToolCallID == toolCallID {
+			removed = append(removed, e.info)
+			delete(subAgentReg, id)
+		}
+	}
+	subAgentRegMu.Unlock()
+
+	// Published outside the lock: a subscriber that touches the registry would
+	// otherwise deadlock against a mutex this function still holds.
+	for _, info := range removed {
+		subAgentBroker.Publish(pubsub.DeletedEvent, info)
+	}
+}
+
 // ListSubAgents returns a snapshot of all live helpers, oldest first.
 func ListSubAgents() []SubAgentInfo {
 	subAgentRegMu.Lock()

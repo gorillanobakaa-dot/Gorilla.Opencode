@@ -149,6 +149,14 @@ func TestNuclearOptionReachesQueuedHelpers(t *testing.T) {
 
 // A finished helper must stop counting as active without vanishing, so the user
 // can tell "it answered" from "it was never there".
+// SCOPE WARNING, added 2026-08-23. This drives the registry API directly and
+// never a goroutine, so it says nothing about whether a row survives the helper
+// that made it. It passed for the entire life of ROADMAP item 2, while /tasks
+// deleted every finished row microseconds after showing it.
+//
+// It is still worth having: it pins the count-vs-visibility split. But the
+// lifecycle is covered by TestAFinishedHelperRowSurvivesItsOwnGoroutine below,
+// and that is the one that fails if the per-helper unregister comes back.
 func TestFinishedHelpersStopCountingButStayVisible(t *testing.T) {
 	clearRegistry(t)
 

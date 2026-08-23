@@ -839,6 +839,14 @@ func checkContract(reply string) []string {
 }
 
 func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolResponse, error) {
+	// GORILLA OVERRIDE (2026-08-23): ROADMAP item 2. Helper rows survive their
+	// own goroutine and are cleared together here, when the run this user asked
+	// for is over and its result has been handed back. That is the scope that
+	// matches what the rows are FOR: seeing what a run did. Clearing them lane by
+	// lane, as the old per-helper defer did, meant a lane finishing looked
+	// identical to a lane never existing.
+	defer UnregisterSubAgentsForCall(call.ID)
+
 	var params ResearchParams
 	if err := json.Unmarshal([]byte(call.Input), &params); err != nil {
 		return tools.NewTextErrorResponse(fmt.Sprintf("error parsing parameters: %s", err)), nil
@@ -984,7 +992,11 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 				entry := RegisterSubAgentState(
 					helperSessionID(call.ID, roles[i]), sessionID, call.ID,
 					helperLabel(roles[i]), SubAgentQueued, hcancel)
-				defer UnregisterSubAgent(entry.ID)
+				// NO per-helper unregister. It used to fire the instant this
+				// goroutine returned, microseconds after the state was set to
+				// DONE, so a finished lane vanished instead of being shown as
+				// finished. Rows for the whole call are purged together when
+				// Run returns; see UnregisterSubAgentsForCall.
 
 				// Wait for a slot, but stay killable while waiting.
 				select {
@@ -1046,7 +1058,9 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 				entry := RegisterSubAgentState(
 					helperSessionID(call.ID, sup), sessionID, call.ID,
 					helperLabel(sup)+" · "+roles[i].ID, SubAgentQueued, hcancel)
-				defer UnregisterSubAgent(entry.ID)
+				// Same as the helper lanes above: terminal rows stay until the
+				// whole call is purged, so a finished supervisor is visible as
+				// finished rather than simply gone.
 
 				select {
 				case sem <- struct{}{}:
