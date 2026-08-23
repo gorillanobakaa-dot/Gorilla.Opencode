@@ -816,8 +816,37 @@ func (t *webSearchTool) searchSearxNG(ctx context.Context, q string, n int) ([]s
 				" evidence that no results exist", strings.Join(dead, "; "))
 	}
 	if len(dead) > 0 {
-		addSearchWarning(ctx, "SearXNG: %d engine(s) did not answer, results are incomplete: %s",
-			len(dead), strings.Join(dead, "; "))
+		// GORILLA FIX (2026-08-23): report the PROPORTION, not just the failure.
+		//
+		// This used to say "%d engine(s) did not answer, results are
+		// incomplete: %s". Measured on a live research run: one engine hit a
+		// CAPTCHA, fifty-four searches returned results anyway, and the model
+		// reading those warnings concluded and wrote into its final report that
+		// "all web searches failed (SearXNG engines suspended)". It then
+		// downgraded a claim to unverified on that basis.
+		//
+		// Wrong in the safe direction, and still wrong, and the wording invited
+		// it: a bare count of failures with no denominator, followed by the
+		// blanket phrase "results are incomplete", reads as total failure. The
+		// tool knew better. It had the results in hand.
+		//
+		// So: lead with what WORKED, name what did not and why, and say
+		// explicitly that this is reduced coverage rather than absence. The
+		// hard-failure case above already draws the other half of this
+		// distinction ("This is NOT evidence that no results exist") and this
+		// is the same principle applied to the partial case.
+		answered := map[string]bool{}
+		for _, r := range out.Results {
+			if r.Engine != "" {
+				answered[r.Engine] = true
+			}
+		}
+		addSearchWarning(ctx,
+			"SearXNG: %d of %d engines answered and returned %d result(s). "+
+				"These did not: %s. Coverage is REDUCED, not absent: the results below "+
+				"are real and were searched for. Do not report this as a failed search.",
+			len(answered), len(answered)+len(dead), len(out.Results),
+			strings.Join(dead, "; "))
 	}
 
 	hits := make([]searchHit, 0, len(out.Results))
