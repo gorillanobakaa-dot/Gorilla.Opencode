@@ -312,7 +312,26 @@ func renderAssistantMessage(
 				// tool_use with no prose means the model said nothing and went
 				// straight to running something; the tool call and its result are
 				// rendered directly below, so the turn is not empty at all.
-				content = "*No message — the model went straight to running a tool (below).*"
+				//
+				// GORILLA OVERRIDE (2026-08-23): the owner's wording, and the "z"
+				// in stylez is deliberate.
+				//
+				// APPENDED, not substituted. The original sentence is doing a
+				// job and keeps doing it: this used to read "Finished without
+				// output", which looked like a crash and sent the owner hunting
+				// for a bug that did not exist (2026-08-04). The explanation
+				// stays; the joke rides behind it.
+				//
+				// The em-dash became a colon. Directive 1 bans them outright and
+				// this string predates that rule, so it is corrected here rather
+				// than left in the one line users read most often.
+				//
+				// WIDTH IS THE COST, and it is real: this renders on a large
+				// share of turns, so on a pane narrower than the full line it
+				// wraps and takes a second row every single time. See the credit
+				// in getToolAction for whose bit this is.
+				content = "*No message: the model went straight to running a tool (below). " +
+					"Gorilla is analyzing this... with science... Pete Holmes stylez.*"
 			default:
 				content = "*Finished without output*"
 			}
