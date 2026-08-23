@@ -641,14 +641,55 @@ func LoadoutCost() (dollars, per1MIn float64, modelName string, priced bool) {
 // it. They are surfaced in the UI rather than buried so the reader can judge
 // the forecast instead of trusting it.
 //
-// TO REPLACE THEM PROPERLY: record each helper's real duration and token usage
-// when a run finishes, and average over past runs. Until that exists these stay
-// labelled as assumptions.
+// SecondsPerStep IS NOW MEASURED WHERE POSSIBLE (2026-08-23, ROADMAP item 5).
+// helper_timing.go records each helper's real wall-clock duration as it finishes
+// and keeps a rolling median over the last 20; helperStepsPerMinute prefers that
+// over the constant below. The constant survives as the first-run fallback, and
+// the UI says which of the two a reader is looking at.
+//
+// The other two are STILL INVENTED and still labelled as assumptions on screen.
+// StepsPerHelper cannot be recovered from a wall clock, and OutputPerStep needs
+// per-helper token accounting that does not exist yet. Measuring the duration
+// and then dividing by an invented step count would produce a guess wearing a
+// measurement's clothes, which is worse than the honest guess it replaced.
 const (
 	ResearchStepsPerHelper = 3
 	ResearchOutputPerStep  = 700
 	ResearchSecondsPerStep = 15.0
 )
+
+// helperStepsPerMinute is how many billable steps one in-flight helper completes
+// per minute, and it is the ONE place the invented ResearchSecondsPerStep is
+// allowed to appear.
+//
+// GORILLA OVERRIDE (2026-08-23): ROADMAP item 5. When real helper durations have
+// been recorded, the rate is derived from those instead: a helper that really
+// takes S seconds does ResearchStepsPerHelper steps in S seconds, so the steps
+// per minute is (60/S)*ResearchStepsPerHelper.
+//
+// Note what that does and does not remove. It removes the invented SECONDS from
+// the burn rate entirely. ResearchStepsPerHelper is still a guess and still in
+// the arithmetic, because the number being priced is per-step; measuring the
+// wall clock cannot tell you how many billable steps happened inside it. That
+// remains honestly labelled rather than quietly fixed.
+//
+// measured is returned so the caller can say which number the user is looking
+// at. "Not measured yet" and "measured, and it agrees with the guess" must never
+// look alike, which is the same rule balances.go states for quota bars.
+func helperStepsPerMinute() (rate float64, measured bool) {
+	if secs, _, ok := MeasuredSecondsPerHelper(); ok && secs > 0 {
+		return (60.0 / secs) * float64(ResearchStepsPerHelper), true
+	}
+	return 60.0 / ResearchSecondsPerStep, false
+}
+
+// ResearchRateIsMeasured reports whether the burn rate on the cost screen comes
+// from this machine's own runs, and how many samples back it. The UI prints one
+// wording or the other; nothing else should re-derive this.
+func ResearchRateIsMeasured() (samples int, measured bool) {
+	_, n, ok := MeasuredSecondsPerHelper()
+	return n, ok
+}
 
 func ResearchCost(inFlight int) (perHelper, perMinute, per1MIn float64, modelName string, priced bool) {
 	if cfg == nil {
@@ -685,7 +726,8 @@ func ResearchCost(inFlight int) (perHelper, perMinute, per1MIn float64, modelNam
 	if inFlight < 1 {
 		inFlight = 1
 	}
-	perMinute = costPerStep * float64(inFlight) * (60.0 / ResearchSecondsPerStep)
+	stepsPerMin, _ := helperStepsPerMinute()
+	perMinute = costPerStep * float64(inFlight) * stepsPerMin
 
 	return perHelper, perMinute, m.CostPer1MIn, label, true
 }
@@ -838,7 +880,8 @@ func ResearchPaidEquivalent(helperModel models.Model, inFlight int) (perMin, per
 
 	price := func(m models.Model) (float64, float64) {
 		perStep := float64(base)/1e6*m.CostPer1MIn + float64(ResearchOutputPerStep)/1e6*m.CostPer1MOut
-		return perStep * float64(inFlight) * (60.0 / ResearchSecondsPerStep), perStep * ResearchStepsPerHelper
+		spm, _ := helperStepsPerMinute()
+		return perStep * float64(inFlight) * spm, perStep * ResearchStepsPerHelper
 	}
 
 	// Already metered: the real rate IS the answer, no equivalent needed.

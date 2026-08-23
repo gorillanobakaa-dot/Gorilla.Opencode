@@ -537,8 +537,20 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	}
 	add(kindMeasured, "MEASURED: %s tokens of context per step (this machine).", humanCount(config.ResearchBasisTokens()))
 	add(kindPublished, "PUBLISHED: the model's own per-1M price.")
-	add(kindAssumed, "ASSUMED («not measured»): %d steps | %d out | %.0fs per step — the per-minute figure rests on that %.0fs.",
-		config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep, config.ResearchSecondsPerStep)
+	// GORILLA OVERRIDE (2026-08-23): ROADMAP item 5. The timing half of this line
+	// used to be an assumption on every machine forever. It is now measured from
+	// this machine's own finished helpers once there are enough of them, and the
+	// wording changes so a reader can tell which of the two they are looking at.
+	// "Not measured yet" and "measured, and it agrees with the guess" must never
+	// read the same.
+	if secs, n, ok := config.MeasuredSecondsPerHelper(); ok {
+		add(kindMeasured, "MEASURED: %.0fs per helper, median of your last %d (this machine).", secs, n)
+		add(kindAssumed, "ASSUMED («not measured»): %d steps | %d out per step.",
+			config.ResearchStepsPerHelper, config.ResearchOutputPerStep)
+	} else {
+		add(kindAssumed, "ASSUMED («not measured»): %d steps | %d out | %.0fs per step. The per-minute figure rests on that %.0fs until a run has been timed.",
+			config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep, config.ResearchSecondsPerStep)
+	}
 	return lines
 }
 

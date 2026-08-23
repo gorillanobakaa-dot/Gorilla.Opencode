@@ -182,7 +182,16 @@ func (m OsintDialogCmp) moneyLines() []string {
 // assumptionsLine names the three figures the forecast rests on, so the number
 // above can be argued with rather than trusted.
 func assumptionsLine() string {
-	return fmt.Sprintf("Assumptions on screen, arguable: %d steps/helper, ~%d tokens out/step, ~%.0fs/step. Dossiers add a gap round on top.",
+	// GORILLA OVERRIDE (2026-08-23): ROADMAP item 5. The timing figure is measured
+	// from this machine's own finished helpers once enough have been timed, so
+	// this line must stop calling it an assumption when it is not one.
+	if secs, n, ok := config.MeasuredSecondsPerHelper(); ok {
+		return fmt.Sprintf("Assumptions on screen, arguable: %d steps/helper, ~%d tokens out/step. "+
+			"Timing is MEASURED: ~%.0fs/helper, median of your last %d. Dossiers add a gap round on top.",
+			config.ResearchStepsPerHelper, config.ResearchOutputPerStep, secs, n)
+	}
+	return fmt.Sprintf("Assumptions on screen, arguable: %d steps/helper, ~%d tokens out/step, ~%.0fs/step "+
+		"(not yet timed on this machine). Dossiers add a gap round on top.",
 		config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep)
 }
 

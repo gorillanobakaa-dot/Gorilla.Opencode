@@ -846,6 +846,9 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	// lane, as the old per-helper defer did, meant a lane finishing looked
 	// identical to a lane never existing.
 	defer UnregisterSubAgentsForCall(call.ID)
+	// ROADMAP item 5: persist the helper durations this run measured. Once per
+	// run, not once per helper, so ten lanes cost one write.
+	defer config.FlushHelperTiming()
 
 	var params ResearchParams
 	if err := json.Unmarshal([]byte(call.Input), &params); err != nil {

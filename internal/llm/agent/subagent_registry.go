@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 )
@@ -170,11 +171,32 @@ func RegisterSubAgentState(sessionID, parentSessionID, toolCallID, prompt string
 func SetSubAgentState(id string, state SubAgentState) {
 	subAgentRegMu.Lock()
 	entry, ok := subAgentReg[id]
+	var elapsed time.Duration
+	var record bool
 	if ok {
+		// GORILLA OVERRIDE (2026-08-23): ROADMAP item 5. A helper reaching DONE is
+		// the one moment its real duration is knowable, and it was being thrown
+		// away while every per-minute figure on the cost screen rested on an
+		// invented 15.0 seconds. StartedAt is already here; nothing else had to be
+		// added to start measuring.
+		//
+		// DONE only, not Failed or Killed. A helper that died on a rate limit or
+		// was cancelled says nothing about how long the work takes, and folding
+		// those in would drag the forecast down exactly when a run is going badly.
+		// The transition is also guarded on the state actually CHANGING, so a
+		// repeated SetSubAgentState(DONE) cannot record the same helper twice.
+		if state == SubAgentDone && entry.info.State != SubAgentDone {
+			elapsed = time.Since(entry.info.StartedAt)
+			record = true
+		}
 		entry.info.State = state
 	}
 	subAgentRegMu.Unlock()
 
+	// Outside the lock: config takes its own, and this must not nest.
+	if record {
+		config.RecordHelperDuration(elapsed)
+	}
 	if ok {
 		subAgentBroker.Publish(pubsub.UpdatedEvent, entry.info)
 	}
