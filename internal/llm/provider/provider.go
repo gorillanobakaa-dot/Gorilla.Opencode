@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/opencode-ai/opencode/internal/config"
@@ -11,6 +12,25 @@ import (
 )
 
 type EventType string
+
+// ErrEmptyCompletion says the provider replied without a single choice or
+// candidate: a well-formed HTTP 200 carrying nothing to read.
+//
+// GORILLA FIX (2026-08-24): the OpenAI client indexed element [0] of that
+// list without checking it existed, so a backend answering with an empty
+// array, a truncated stream, or a 200 whose body is really an error page
+// killed the whole process:
+//
+//	panic: runtime error: index out of range [0] with length 0
+//
+// Found by driving the Windows build under Wine against a stub server that
+// answered a streaming request with a plain JSON body. Nothing about it is
+// Windows-specific. Any backend can send this, and a provider hiccup must
+// cost the user a turn, not the session.
+//
+// The gemini, antigravity and code_assist clients were checked at the same
+// time and already guard every Candidates[0] read. Only OpenAI was exposed.
+var ErrEmptyCompletion = errors.New("the provider returned a response with no content in it")
 
 // retryCeiling is how many attempts a turn gets before it gives up and says so.
 //

@@ -331,6 +331,12 @@ func (o *openaiClient) send(ctx context.Context, messages []message.Message, too
 			return nil, retryErr
 		}
 
+		// GORILLA FIX (2026-08-24): refuse an empty completion instead of
+		// indexing into it. See ErrEmptyCompletion in provider.go.
+		if len(openaiResponse.Choices) == 0 {
+			return nil, ErrEmptyCompletion
+		}
+
 		content := ""
 		if openaiResponse.Choices[0].Message.Content != "" {
 			content = openaiResponse.Choices[0].Message.Content
@@ -475,9 +481,30 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			openaiStream.Close()
 			if err == nil || errors.Is(err, io.EOF) {
 				// Stream completed successfully
-				finishReason := o.finishReason(string(acc.ChatCompletion.Choices[0].FinishReason))
-				if len(acc.ChatCompletion.Choices[0].Message.ToolCalls) > 0 {
-					toolCalls = append(toolCalls, o.toolCalls(acc.ChatCompletion)...)
+				//
+				// GORILLA FIX (2026-08-24): the accumulator can finish with
+				// no choices at all, and Choices[0] was read unguarded. See
+				// ErrEmptyCompletion in provider.go for how that crashed.
+				//
+				// Two different situations hide behind an empty list, and
+				// they need opposite answers. If no token ever arrived the
+				// turn produced nothing, so report it as an error and let
+				// the caller decide. If tokens DID arrive, the answer is on
+				// screen already and only the closing bookkeeping chunk is
+				// missing: throwing that away would discard work the user
+				// has watched appear, and has paid for.
+				if len(acc.ChatCompletion.Choices) == 0 && currentContent == "" {
+					eventChan <- ProviderEvent{Type: EventError, Error: ErrEmptyCompletion}
+					close(eventChan)
+					return
+				}
+
+				finishReason := message.FinishReasonEndTurn
+				if len(acc.ChatCompletion.Choices) > 0 {
+					finishReason = o.finishReason(string(acc.ChatCompletion.Choices[0].FinishReason))
+					if len(acc.ChatCompletion.Choices[0].Message.ToolCalls) > 0 {
+						toolCalls = append(toolCalls, o.toolCalls(acc.ChatCompletion)...)
+					}
 				}
 				if len(toolCalls) > 0 {
 					finishReason = message.FinishReasonToolUse
