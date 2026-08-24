@@ -81,6 +81,22 @@ what the wire is allowed to contain, so the test has to put those things on a
 wire. Verified non-vacuous by reinstating both reads and confirming the
 original panic returns. Full suite exit 0.
 
+### Evidence
+
+[![A terminal showing the Windows build of gorilla-opencode v0.1.119 running on Debian under Wine. file reports a PE32+ x86-64 Windows console executable, the exe prints v0.1.119, and a run against a local stub server ends with the line Error: agent processing failed: the provider returned a response with no content in it, which is the fix reporting the exact input that used to panic. Below it sqlite3 lists the four tables the Windows binary created inside the Wine C drive, files, goose_db_version, messages and sessions, and selects a real session row titled Non-interactive: say hello](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.119/docs/screenshots/gallery/v0119-windows-build-under-wine-sqlite-works.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.119/docs/screenshots/gallery/v0119-windows-build-under-wine-sqlite-works.png)
+
+The Windows build of this release, running here under Wine against a local stub.
+The line `Error: agent processing failed: the provider returned a response with
+no content in it` is the fix doing its job: that is the precise input that used
+to end the process. Below it, the SQLite database the Windows binary created,
+with its migrations run and a real session row in it.
+
+[![A terminal proving the three new tests are not vacuous. The tests pass as shipped, then a script removes the two guards from openai.go, and the same test command reproduces the original panic, runtime error index out of range 0 with length 0, at openai.go line 492, followed by FAIL. The fix is restored with git checkout and the tests pass again](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.119/docs/screenshots/gallery/v0119-tests-not-vacuous-panic-reproduced.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.119/docs/screenshots/gallery/v0119-tests-not-vacuous-panic-reproduced.png)
+
+A test that cannot fail proves nothing, so here it is failing. The guards are
+removed from `openai.go` in a throwaway worktree, the same test command
+reproduces the original panic on demand, and the fix is restored.
+
 ### Verification
 
 All four artifacts were extracted and their inner binary hashed against the
@@ -112,11 +128,3 @@ sudo pacman -U gorilla-opencode-0.1.119-1-x86_64.pkg.tar.zst
 Anything else: take the raw binary, `chmod +x`, put it on your PATH.
 
 Checksums for all artifacts are in `SHA256SUMS-v0.1.119.txt`.
-
-### A note on screenshots
-
-Releases here ship screenshots as evidence. This one has none, because the
-change is the absence of a crash and there is nothing to photograph. The
-evidence that exists is terminal output, and it is quoted above, including the
-deliberately failing run that proves the tests are not vacuous. Said plainly
-rather than skipped quietly.

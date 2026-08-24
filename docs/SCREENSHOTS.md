@@ -1,3 +1,23 @@
+## v0.1.119 (2026-08-24)
+
+Two shots. Neither is of the interface, because this release has no interface
+change: it is a crash fix, and the evidence for a crash fix is the crash.
+
+| file | what it proves |
+|---|---|
+| `v0119-windows-build-under-wine-sqlite-works.png` | the Windows cross-build of v0.1.119 running on Debian under Wine, and the fix reporting the exact input that used to panic. Also the SQLite database it created inside the Wine C drive, migrations run, a real session row written, which is the pure-Go wazero driver working on Windows |
+| `v0119-tests-not-vacuous-panic-reproduced.png` | the three new tests passing as shipped, then the guards stripped from `openai.go` in a throwaway git worktree and the original panic reproduced on demand at `openai.go:492`, then the fix restored |
+
+Both captured live in a real terminal at the size the window actually was, no
+staging and no re-encoding.
+
+Worth recording: the first draft of the release notes claimed this release had
+nothing to photograph and said so openly instead of skipping quietly. That was
+still wrong, and `TestEveryReleasePageEmbedsItsScreenshots` caught it before a
+human had to. Honest self-exemption is still self-exemption. A release about
+the absence of a crash can photograph the crash, and that turned out to be the
+more convincing picture.
+
 ## v0.1.118 (2026-08-23)
 
 Seven shots, all from live runs on the installed build, none staged.
