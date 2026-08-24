@@ -1,3 +1,49 @@
+## v0.1.119 (2026-08-24): a reply with nothing in it should cost a turn, not the session
+
+**Plain-language version:** sometimes an AI service answers with nothing at all.
+Not an error, not a refusal, just a valid reply containing no words. A safety
+filter removed it, a quota ran out mid-sentence, or something in the middle
+timed out and handed back an empty envelope. Gorilla OpenCode did not know that
+was allowed, and crashed. Not the answer, not the question: the whole program,
+closing the window and taking your conversation with it.
+
+If a run has ever died on you for no visible reason just as an answer was about
+to appear, this may well have been why. It looked like a network fault and was
+not one. The reply arrived perfectly; the program could not cope with it being
+empty.
+
+From this release that turn fails with a message and the session survives. If
+part of the answer had already reached your screen it is kept, because it
+arrived and you paid for it.
+
+It was found by accident. We spent the morning checking whether the program
+could be built for Windows. It can, and the Windows build ran here under a
+compatibility layer against a fake AI service built on this laptop to avoid
+spending money. The fake replied in the wrong format, and that mistake exposed
+a crash that had been sitting in the normal Linux version all along, reachable
+from every AI service the program supports.
+
+**Developer detail:** `openai.go` read `Choices[0]` unguarded on both the
+streaming and non-streaming paths. An empty list arrives three ways: an
+explicit `"choices": []`, a stream ending before the first chunk, and a 200
+carrying an error page. Any of them panicked with `index out of range [0] with
+length 0`, and an unrecovered panic in a goroutine kills the process.
+
+`ErrEmptyCompletion` now names the condition in `provider.go`. The streaming
+repair splits the two situations the empty list conflated: nothing streamed
+means the turn produced nothing and is reported as an error; tokens streamed
+with only the final bookkeeping chunk missing means the answer is on screen and
+billed, so it is kept and reported as a normal end of turn. The
+default-then-override shape is copied from `gemini.go:262`.
+
+Every `[0]` index on a wire-derived list in the provider package was
+enumerated: `gemini.go`, `antigravity.go` and `code_assist.go` already guard
+every `Candidates[0]` read. Only the OpenAI client was exposed.
+
+Three end-to-end `httptest` cases in `empty_completion_test.go`, verified
+non-vacuous by reinstating both reads and confirming the original panic
+returns. Full suite exit 0. All four artifacts carry the same verified binary.
+
 ## v0.1.118 (2026-08-23): stop asking about the string, start asking about the outcome
 
 **Plain-language version:** the program kept asking you questions you could not
