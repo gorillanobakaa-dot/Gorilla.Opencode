@@ -38,7 +38,21 @@ func TestCommandsDocIsUpToDate(t *testing.T) {
 	if err != nil {
 		t.Skipf("cannot run the generator here: %v", err)
 	}
-	if string(out) != string(checkedIn) {
+	// GORILLA OVERRIDE (2026-09-01): compare content, not line endings.
+	//
+	// The generator emits LF; the checked-in file is whatever the working tree
+	// holds, and with core.autocrlf=true — the Windows default — that is CRLF.
+	// So this reported the documentation as out of date with the registry on
+	// every Windows checkout while the two were byte-identical apart from
+	// carriage returns, and the fix it suggested (regenerate the file) would
+	// have produced something git converted straight back.
+	//
+	// .gitattributes now pins the tree to LF, which is the real fix. This stays
+	// because the same mismatch returns for anyone whose editor or git client is
+	// configured differently, and "your documentation is stale" is an expensive
+	// thing to be wrong about.
+	normalise := func(s string) string { return strings.ReplaceAll(s, "\r\n", "\n") }
+	if normalise(string(out)) != normalise(string(checkedIn)) {
 		t.Errorf("docs/COMMANDS.md is out of date with the registry.\n" +
 			"Regenerate it:  go run ./cmd/commands-doc > docs/COMMANDS.md")
 	}

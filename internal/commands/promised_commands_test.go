@@ -16,6 +16,7 @@ package commands
 // promise the program cannot keep is worse than saying nothing.
 
 import (
+	"github.com/opencode-ai/opencode/internal/plaincmd"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -41,6 +42,20 @@ func TestEverySlashCommandNamedInProseActuallyExists(t *testing.T) {
 		for _, a := range c.Aliases {
 			known[a] = true
 		}
+	}
+	// GORILLA OVERRIDE (2026-09-01): plain mode has its OWN dispatcher.
+	//
+	// It is a deliberately small, separate command set (internal/plain), not a
+	// subset of this registry — so /exit, /extras, /show and /hide, which plain
+	// mode's own help text promises and its own switch handles, were reported
+	// here as commands that do not exist. They do. The check was right to look;
+	// it was looking in only one of the two places commands live.
+	//
+	// plaincmd.Names is verified against that switch by
+	// TestCommandNamesMatchesTheSwitch, so this is not a second hand-maintained
+	// list that can quietly drift.
+	for _, n := range plaincmd.Names {
+		known[n] = true
 	}
 
 	// Words that read as commands but are not, in contexts this walk cannot

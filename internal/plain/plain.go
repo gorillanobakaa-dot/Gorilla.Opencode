@@ -406,6 +406,9 @@ func oneLine(s string) string {
 // Deliberately small. A plain-text reimplementation of fifteen dialogs would be a
 // second UI to keep in step with the first; anything not here is honestly
 // reported as TUI-only rather than silently ignored.
+// The commands this dispatcher handles are listed in internal/plaincmd, so the
+// promised-commands check in internal/commands can see them without an import
+// cycle. TestCommandNamesMatchesTheSwitch keeps the two in step.
 func (s *Session) command(ctx context.Context, line string) (stop bool, err error) {
 	fields := strings.Fields(line)
 	name := strings.TrimPrefix(fields[0], "/")

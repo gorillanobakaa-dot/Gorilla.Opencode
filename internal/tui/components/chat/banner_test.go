@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -62,6 +63,16 @@ func TestFooterCarriesTheVersionOnTheRight(t *testing.T) {
 	if _, err := config.Load(t.TempDir(), false); err != nil {
 		t.Fatalf("Load: %v", err)
 	}
+	// GORILLA OVERRIDE (2026-09-01): pin the working directory to something
+	// short, so this measures the LAYOUT rather than the length of a temp path.
+	//
+	// joinWithTrailer drops the trailer rather than truncating it when the
+	// left-hand fields would collide — deliberately, and documented there: half
+	// a version string is worse than none. t.TempDir() on Windows returns
+	// eighty-odd columns under AppData\Local\Temp, which on its own pushed the
+	// footer past 140 and took the version with it. The test was measuring the
+	// temp directory, not the footer.
+	config.Get().WorkingDir = filepath.Join("short", "wd")
 	cmp := infoFor(sessionForBanner(), nil)
 
 	const wide = 140

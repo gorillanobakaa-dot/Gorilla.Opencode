@@ -30,7 +30,21 @@ func readPKGBUILD(t *testing.T) string {
 	if err != nil {
 		t.Skipf("no PKGBUILD: %v", err)
 	}
-	return string(b)
+	// GORILLA OVERRIDE (2026-09-01): strip carriage returns before matching.
+	//
+	// Every assertion in this file is a line-anchored regexp, and "$" in Go's
+	// multiline mode matches before a newline, not before a carriage return plus
+	// newline. With core.autocrlf=true — the Windows default — the working tree
+	// holds CRLF, so a pattern anchored at end-of-line could never match a line
+	// that ends with ")" followed by a carriage return.
+	//
+	// The PKGBUILD declared both depends= and sha256sums= correctly, and these
+	// tests reported both as absent: a false alarm on the one file whose entire
+	// job is telling a packager the truth about dependencies and checksums.
+	//
+	// .gitattributes now pins the tree to LF, which is the real fix. This stays
+	// because a PKGBUILD can also arrive by download or be edited by hand.
+	return strings.ReplaceAll(string(b), "\r\n", "\n")
 }
 
 // latestReleaseNotesVersion is the newest release the repository documents.

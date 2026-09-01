@@ -1,0 +1,54 @@
+# GORILLA OVERRIDE (2026-09-01): this file did not exist, and its absence cost
+# three separate bugs in one afternoon.
+#
+# With core.autocrlf=true — the Windows default — git rewrites LF to CRLF in the
+# working tree on checkout. The repository stores LF, so nothing shows up in
+# `git diff` and the change is invisible. What it broke:
+#
+#   1. The prompt files are //go:embed'd, so the line endings present at BUILD
+#      time are compiled into the binary. A Windows build shipped a different
+#      prompt from a Linux build of identical source. The section splitter then
+#      lost the carriage return from every section boundary when it rejoined —
+#      24 bytes — and the round-trip guard failed while pointing at correct code.
+#      Prompt caching is a prefix match, so this also meant a prompt could not
+#      share a cache with itself across builds.
+#
+#   2. The byte-size guards on the shipped prompts (666, 267) read 678 and 274,
+#      firing on the checkout rather than on any edit to the text they protect.
+#
+#   3. `^depends=\(...\)$` in the PKGBUILD tests never matched, because `$` in Go's
+#      multiline regexp matches before `\n` and a CRLF line ends `)\r`. The
+#      PKGBUILD declared both `depends=` and `sha256sums=` correctly and the
+#      tests reported both as missing.
+#
+# It also makes `gofmt -l` flag every file in the tree, which is how a real
+# formatting problem would hide.
+#
+# eol=lf, not text=auto alone: `auto` still hands Windows CRLF. This project
+# builds a binary whose embedded content must not depend on which machine
+# compiled it, so the working tree is LF everywhere.
+
+* text=auto eol=lf
+
+# Binary formats — never touch these.
+*.png    binary
+*.ico    binary
+*.svg    text eol=lf
+*.syso   binary
+*.gz     binary
+*.zip    binary
+*.db     binary
+*.pdf    binary
+
+# Shell scripts and packaging must be LF or they do not run on the target.
+*.sh        text eol=lf
+PKGBUILD    text eol=lf
+*.desktop   text eol=lf
+
+# Go source and the embedded prompt text: LF, so a build is reproducible
+# whichever platform it happens on.
+*.go   text eol=lf
+*.txt  text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.py   text eol=lf
