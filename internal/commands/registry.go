@@ -126,11 +126,12 @@ var All = []Command{
 	},
 	{
 		Name:    "plain",
-		Aliases: []string{"copy", "copyable"},
+		Aliases: []string{"copyable"},
 		Group:   GroupSession,
 		Summary: "Switch to the interface you can select and copy.",
 		Detail: "This interface draws on a screen your terminal keeps no history of, " +
-			"which is why Ctrl+A selects nothing here. Plain mode writes ordinary " +
+			"which is one reason the terminal's own Select-All cannot reach it. " +
+			"Plain mode writes ordinary " +
 			"text instead, so you can select, copy and search the whole conversation " +
 			"with your terminal's own keys. It has fewer commands. This takes effect " +
 			"next time you start the program \u2014 the current screen is already " +
@@ -225,6 +226,30 @@ var All = []Command{
 			"database; the file only shrinks when it is rebuilt, which is why this " +
 			"reports the actual before-and-after. Ctrl+S sorts by size, so the " +
 			"conversations worth deleting are the ones at the top.",
+	},
+	{
+		Name:    "copy",
+		Aliases: []string{"clip", "selectall"},
+		Group:   GroupSession,
+		Summary: "Copy the whole conversation to the clipboard.",
+		Detail: "Puts the entire session on your clipboard, ready to paste: every " +
+			"message with its date and time, which model answered, the model's " +
+			"reasoning, and every tool it ran with the result. Ctrl+A does the " +
+			"same thing.\n\n" +
+			"This exists because Select-All is not something this program can " +
+			"leave to the terminal on Windows. On Linux your terminal window is " +
+			"a separate program and answers Ctrl+Shift+A itself, before this one " +
+			"sees the key. On Windows the keystroke is handed straight to this " +
+			"program, so the terminal cannot answer it and nothing happens. " +
+			"Copying from here works the same way on both.\n\n" +
+			"It also copies MORE than selecting would: the stored conversation, " +
+			"not the glyphs on screen, so anything already scrolled out of the " +
+			"terminal is still included.\n\n" +
+			"To copy only PART of it, drag over that part with the mouse and " +
+			"press Enter.\n\n" +
+			"Use /export to write the same text to a file instead. On Linux the " +
+			"clipboard needs xclip or xsel installed; if it is missing, /export " +
+			"still works.",
 	},
 	{
 		Name:    "export",

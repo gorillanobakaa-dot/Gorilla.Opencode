@@ -17,9 +17,10 @@ cost before they start. Everything else is local.
 | Type this | What happens |
 |---|---|
 | `/clear` · `/new` | Start a fresh conversation. |
-| `/plain` · `/copy` `/copyable` | Switch to the interface you can select and copy. |
+| `/plain` · `/copyable` | Switch to the interface you can select and copy. |
 | `/resume` · `/continue` `/handoff` | Pick up work that stopped, or work another model started. |
 | `/sessions` · `/history` | Every past conversation: search, reopen, save, erase. |
+| `/copy` · `/clip` `/selectall` | Copy the whole conversation to the clipboard. |
 | `/export` | Save this conversation to a file. |
 | `/compact` · `/summarize` `/summarise` | Squeeze the conversation down so it keeps working. |
 | `/cd [folder]` | Switch to working in one folder. |
@@ -58,11 +59,11 @@ The AI forgets everything said so far. Use this when you move to a different tas
 
 ### `/plain`
 
-*Also: `/copy`, `/copyable`*
+*Also: `/copyable`*
 
 **Switch to the interface you can select and copy.**
 
-This interface draws on a screen your terminal keeps no history of, which is why Ctrl+A selects nothing here. Plain mode writes ordinary text instead, so you can select, copy and search the whole conversation with your terminal's own keys. It has fewer commands. This takes effect next time you start the program — the current screen is already running. Switch back in /settings, or right-click the desktop icon for a one-off.
+This interface draws on a screen your terminal keeps no history of, which is one reason the terminal's own Select-All cannot reach it. Plain mode writes ordinary text instead, so you can select, copy and search the whole conversation with your terminal's own keys. It has fewer commands. This takes effect next time you start the program — the current screen is already running. Switch back in /settings, or right-click the desktop icon for a one-off.
 
 ### `/resume`
 
@@ -91,6 +92,22 @@ Type to search. It looks inside the messages as well as the titles, because titl
 Enter reopens a conversation exactly where it stopped. Ctrl+E saves it to a file — the whole thing: every message with its time, the model's reasoning, and every tool it ran with the result that came back, including the failures. That is what lets you work out afterwards how something ended up published, or deleted.
 
 Ctrl+D erases one for good, along with the helper sessions it spawned, and returns the space to your disk — really returns it, and tells you how much came back. Deleting alone frees nothing on this kind of database; the file only shrinks when it is rebuilt, which is why this reports the actual before-and-after. Ctrl+S sorts by size, so the conversations worth deleting are the ones at the top.
+
+### `/copy`
+
+*Also: `/clip`, `/selectall`*
+
+**Copy the whole conversation to the clipboard.**
+
+Puts the entire session on your clipboard, ready to paste: every message with its date and time, which model answered, the model's reasoning, and every tool it ran with the result. Ctrl+A does the same thing.
+
+This exists because Select-All is not something this program can leave to the terminal on Windows. On Linux your terminal window is a separate program and answers Ctrl+Shift+A itself, before this one sees the key. On Windows the keystroke is handed straight to this program, so the terminal cannot answer it and nothing happens. Copying from here works the same way on both.
+
+It also copies MORE than selecting would: the stored conversation, not the glyphs on screen, so anything already scrolled out of the terminal is still included.
+
+To copy only PART of it, drag over that part with the mouse and press Enter.
+
+Use /export to write the same text to a file instead. On Linux the clipboard needs xclip or xsel installed; if it is missing, /export still works.
 
 ### `/export`
 
