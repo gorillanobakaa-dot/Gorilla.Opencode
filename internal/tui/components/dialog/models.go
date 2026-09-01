@@ -750,6 +750,25 @@ func (m *modelDialogCmp) View() string {
 				label = "[ ] " + label
 			}
 		}
+		// GORILLA OVERRIDE (2026-09-01): say which local models the runtime is
+		// actually HOLDING.
+		//
+		// A runtime lists every model it knows about, not the ones in memory.
+		// Without this the two are indistinguishable, and picking an idle one
+		// makes the runtime load it just-in-time -- eighteen gigabytes, about a
+		// minute, with nothing on screen saying so. The owner hit exactly that:
+		// one model loaded, a different one being talked to, and no way to see
+		// it from here.
+		//
+		// ASCII only, and appended rather than prefixed: prefixes are already
+		// carrying rank, bookmarks and the multi-select mark, and box-drawing
+		// glyphs are ambiguous-width and wrap the frame (styles/ascii.go).
+		switch m.models[i].LocalState {
+		case "loaded":
+			label += "  (loaded)"
+		case "not-loaded":
+			label += "  (on disk)"
+		}
 		if r := []rune(label); len(r) > w-1 {
 			label = string(r[:w-4]) + styles.Ellipsis
 		}
@@ -926,6 +945,21 @@ func (m *modelDialogCmp) renderDetail(w int) string {
 		}
 	}
 	fact("price", price)
+	// GORILLA OVERRIDE (2026-09-01): what picking this will actually cost.
+	switch mod.LocalState {
+	case "loaded":
+		fact("status", "loaded in memory now -- answers start straight away")
+	case "not-loaded":
+		fact("status", "on disk, not loaded -- choosing it makes the runtime "+
+			"load it first, which can take a minute with nothing to see")
+	}
+	if mod.MaxContextWindow > 0 && mod.MaxContextWindow != mod.ContextWindow {
+		// The ceiling the weights allow, against what it is configured for.
+		// A model advertising 262K may be loaded at 20K, and only the second
+		// number governs what you can actually send.
+		fact("model maximum", fmt.Sprintf("%dK tokens if configured for it",
+			mod.MaxContextWindow/1000))
+	}
 	if mod.ContextWindow > 0 {
 		fact("context", fmt.Sprintf("%dK tokens, max output %dK", mod.ContextWindow/1000, mod.DefaultMaxTokens/1000))
 	}

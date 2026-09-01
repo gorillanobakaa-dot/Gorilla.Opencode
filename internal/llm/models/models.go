@@ -32,6 +32,22 @@ type Model struct {
 	DefaultMaxTokens    int64         `json:"default_max_tokens"`
 	CanReason           bool          `json:"can_reason"`
 	SupportsAttachments bool          `json:"supports_attachments"`
+	// GORILLA OVERRIDE (2026-09-01): whether a LOCAL runtime currently holds
+	// this model in memory. "loaded", "not-loaded", or empty when the
+	// endpoint does not say (plain /v1/models) or the model is not local.
+	//
+	// LM Studio's /api/v0/models reports this, and the field was already being
+	// decoded and then thrown away. Throwing it away had a real cost: the
+	// picker listed every model a runtime KNOWS ABOUT with no way to tell
+	// which were resident, so choosing one could silently trigger a
+	// just-in-time load of eighteen gigabytes while the user watched a
+	// spinner say nothing for a minute.
+	LocalState string `json:"local_state,omitempty"`
+	// MaxContextWindow is the ceiling a runtime reports for a model it has
+	// not loaded yet. ContextWindow is what it is actually configured for,
+	// and the two differ a lot: a model advertising 262,144 may be loaded at
+	// 20,224. Zero when unknown.
+	MaxContextWindow int64 `json:"max_context_window,omitempty"`
 }
 
 // GORILLA CULL (2026-08-21): Bedrock, Azure, Copilot and VertexAI were removed

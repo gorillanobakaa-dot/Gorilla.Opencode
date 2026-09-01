@@ -484,6 +484,17 @@ type localModel struct {
 	LoadedContextLength int64  `json:"loaded_context_length"`
 }
 
+// isConversational reports whether a runtime-reported model type can hold a
+// chat. An empty type is accepted: endpoints that do not classify their models
+// must not be filtered to nothing.
+func isConversational(modelType string) bool {
+	switch modelType {
+	case "", "llm", "vlm":
+		return true
+	}
+	return false
+}
+
 func listLocalModels(modelsEndpoint, apiKey string) []localModel {
 	return listLocalModelsWith(localHTTP, modelsEndpoint, apiKey)
 }
@@ -533,7 +544,23 @@ func listLocalModelsWith(client *http.Client, modelsEndpoint, apiKey string) []l
 	var supportedModels []localModel
 	for _, model := range modelList.Data {
 		if strings.HasSuffix(modelsEndpoint, lmStudioBetaModelsPath) {
-			if model.Object != "model" || model.Type != "llm" {
+			// GORILLA FIX (2026-09-01): a vision model is still a model you can
+			// talk to.
+			//
+			// This accepted only type == "llm", so LM Studio's "vlm" -- every
+			// vision-language model -- was dropped without appearing anywhere a
+			// user could see. The owner had Bonsai 27B loaded and asked why the
+			// picker could not see it: type=vlm, filtered out here, while the
+			// picker cheerfully offered an idle model instead.
+			//
+			// Gemma 4, Qwen3 VL and Qwen3.8 are all vlm too, so this hid a large
+			// and growing part of what people actually run. They serve the same
+			// /v1/chat/completions and answer text exactly like any other model;
+			// vision is an ADDITIONAL capability, not a different protocol.
+			//
+			// Embeddings stay excluded, and that is not the same judgement: they
+			// have no chat endpoint at all and selecting one could only fail.
+			if model.Object != "model" || !isConversational(model.Type) {
 				logging.Debug("Skipping unsupported LMStudio model",
 					"endpoint", modelsEndpoint,
 					"id", model.ID,
@@ -573,6 +600,21 @@ func convertLocalModel(model localModel) Model {
 		costOut = meta.CostOut
 		costOutCached = meta.CostOutCached
 	}
+	// GORILLA OVERRIDE (2026-09-01): the ADVERTISED ceiling is deliberately
+	// NOT used as the operating window.
+	//
+	// A model the runtime has not loaded reports LoadedContextLength 0 and a
+	// MaxContextLength of whatever the weights permit -- 262,144 for the ones
+	// on this machine. Believing that number would be worse than the 32K
+	// floor, not better: LM Studio loads a model at ITS OWN saved setting,
+	// which here is 20,224, so we would build a prompt thirteen times larger
+	// than the server will accept and have the request rejected.
+	//
+	// Overstating breaks requests; understating only wastes capacity. So the
+	// ceiling is carried in MaxContextWindow, for the picker to SHOW, and the
+	// operating window stays conservative until the runtime tells us what it
+	// actually loaded. Re-probing after a load would settle it properly and
+	// is not done yet.
 	ctx := cmp.Or(model.LoadedContextLength, metaCtx, 32768)
 	return Model{
 		ID:          ModelID("local." + model.ID),
@@ -599,6 +641,11 @@ func convertLocalModel(model localModel) Model {
 		CostPer1MOut:       costOut,
 		CostPer1MInCached:  costInCached,
 		CostPer1MOutCached: costOutCached,
+		// GORILLA OVERRIDE (2026-09-01): so the picker can say which of these
+		// the runtime is actually holding, and what choosing an idle one will
+		// cost. Empty for endpoints that do not report it.
+		LocalState:       model.State,
+		MaxContextWindow: model.MaxContextLength,
 	}
 }
 
