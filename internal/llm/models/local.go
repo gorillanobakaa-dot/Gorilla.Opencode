@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -228,7 +229,16 @@ func RegisterLocalEndpoint(name, baseURL, apiKey string) (int, ModelID) {
 	for _, m := range raw {
 		model := convertLocalModel(m)
 		if existing, dup := SupportedModels[model.ID]; dup {
-			if r, routed := localRoute[model.ID]; routed && r.BaseURL != baseURL {
+			// GORILLA FIX (2026-09-01): compare CANONICAL urls.
+			//
+			// Raw string comparison treated http://127.0.0.1:1234/v1 and
+			// http://localhost:1234/v1 as two servers, so every model from one LM
+			// Studio was registered twice -- the second copy namespaced under the
+			// endpoint name. The owner saw each model listed twice, as [lmstudio]
+			// and [LM Studio], and asked how to tell them apart. There was nothing
+			// to tell apart.
+			if r, routed := localRoute[model.ID]; routed &&
+				CanonicalEndpointURL(r.BaseURL) != CanonicalEndpointURL(baseURL) {
 				// same model id from a different endpoint -> namespace newcomer
 				model.ID = ModelID("local." + name + "/" + m.ID)
 			}
@@ -773,6 +783,86 @@ func RefreshLocalEndpoints() int {
 		total += n
 	}
 	return total
+}
+
+// PreferredLocalModel returns a locally served model to fall back on, or "" if
+// no local endpoint has any.
+//
+// GORILLA FIX (2026-09-01): a local model is a legitimate answer to "what
+// should this agent use", and until now it was not on the list at all.
+//
+// setDefaultModelForAgent considered nine cloud providers, every one of them
+// gated on an API-key environment variable, and nothing else. So a user whose
+// only models are local -- which is the configuration this project actively
+// steers people toward -- had no fallback whatsoever. When their configured
+// model went away, validation could not substitute anything and the program
+// refused to START, with "no valid provider available for agent title".
+//
+// That is exactly what happened to the owner: a local model was deleted while
+// it was the configured one, and the program became unlaunchable on a machine
+// with a perfectly good model server running on loopback.
+//
+// Selection is deterministic -- lowest rank first, then by id -- so the same
+// machine picks the same model every launch. An agent that silently changed
+// model between runs would be worse than one that failed.
+func PreferredLocalModel() ModelID {
+	best := ModelID("")
+	bestRank := 0
+	for id, m := range SupportedModels {
+		if m.Provider != ProviderLocal {
+			continue
+		}
+		if best == "" {
+			best, bestRank = id, m.Rank
+			continue
+		}
+		// Rank 0 means "not ranked", which must lose to any real rank.
+		switch {
+		case m.Rank > 0 && (bestRank == 0 || m.Rank < bestRank):
+			best, bestRank = id, m.Rank
+		case m.Rank == bestRank && id < best:
+			best = id
+		}
+	}
+	return best
+}
+
+// CanonicalEndpointURL reduces a local endpoint URL to a form that compares
+// equal for endpoints that are actually the same server.
+//
+// GORILLA FIX (2026-09-01): the duplicate check compared raw URL strings, so
+// http://127.0.0.1:1234/v1 and http://localhost:1234/v1 were treated as two
+// different servers. They are the same machine on the same port. The owner's
+// config held exactly that pair, and the result was every local model listed
+// TWICE in the picker -- once as [lmstudio] and once as [LM Studio] -- with no
+// way to tell them apart, because there was nothing to tell apart.
+//
+// It is worse than cosmetic. The second registration is namespaced to avoid an
+// id collision, so the config ends up holding an id like
+// "local.LM Studio/google/gemma-4-e2b" whose validity depends on a duplicate
+// entry continuing to exist.
+//
+// Loopback spellings are folded together, the scheme and host are lowercased,
+// and a trailing slash is dropped. Anything that fails to parse is returned
+// unchanged: an unparseable URL is not this function's problem, and mangling it
+// would turn a listing bug into a routing bug.
+func CanonicalEndpointURL(raw string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Host == "" {
+		return raw
+	}
+	host := strings.ToLower(u.Hostname())
+	switch host {
+	case "localhost", "127.0.0.1", "::1", "0.0.0.0":
+		host = "localhost"
+	}
+	if port := u.Port(); port != "" {
+		host = net.JoinHostPort(host, port)
+	}
+	u.Host = host
+	u.Scheme = strings.ToLower(u.Scheme)
+	u.Path = strings.TrimSuffix(u.Path, "/")
+	return u.String()
 }
 
 func HasLocalModels() bool { return len(localRoute) > 0 }

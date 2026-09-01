@@ -1086,6 +1086,25 @@ func setDefaultModelForAgent(agent AgentName) bool {
 		fetched(models.ProviderOpenAI, "OPENAI_API_KEY"),
 		fetched(models.ProviderXAI, "XAI_API_KEY"),
 		fetched(models.ProviderDeepSeek, "DEEPSEEK_API_KEY"),
+		// GORILLA FIX (2026-09-01): a locally served model, LAST.
+		//
+		// Every candidate above is gated on a cloud API key. A user whose only
+		// models are local therefore had NO fallback at all, so when their
+		// configured model went away validation could substitute nothing and the
+		// program refused to start: "no valid provider available for agent
+		// title". The owner hit precisely that by deleting a local model that
+		// happened to be the configured one -- on a machine with a working model
+		// server listening on loopback the whole time.
+		//
+		// Local models are registered by registerLocalEndpoints(), which Load()
+		// calls before Validate(), so by the time this runs they are known.
+		//
+		// Placed last deliberately. Anyone holding a cloud key keeps exactly the
+		// behaviour they had; this only rescues the case that used to be fatal.
+		{
+			available: models.HasLocalModels,
+			main:      models.PreferredLocalModel(),
+		},
 	} {
 		if !c.available() {
 			continue
@@ -1269,19 +1288,20 @@ func registerLocalEndpoints() {
 		if ep.Disabled || ep.BaseURL == "" {
 			continue
 		}
-		prev, dup := seenURL[ep.BaseURL]
+		key := models.CanonicalEndpointURL(ep.BaseURL)
+		prev, dup := seenURL[key]
 		if !dup {
-			seenURL[ep.BaseURL] = ep
-			order = append(order, ep.BaseURL)
+			seenURL[key] = ep
+			order = append(order, key)
 			continue
 		}
 		// Prefer a keyed entry; between two keyed entries keep the first, so
 		// re-adding a connection cannot silently steal a working route.
 		if prev.APIKey == "" && ep.APIKey != "" {
-			seenURL[ep.BaseURL] = ep
+			seenURL[key] = ep
 		}
 		logging.Warn("ignoring duplicate local endpoint",
-			"kept", seenURL[ep.BaseURL].Name, "ignored", ep.Name, "baseURL", ep.BaseURL)
+			"kept", seenURL[key].Name, "ignored", ep.Name, "baseURL", ep.BaseURL, "canonical", key)
 	}
 
 	// GORILLA OVERRIDE: apply a previously refreshed model catalogue over the
