@@ -120,6 +120,11 @@ type modelKeyMap struct {
 	AddMarked  key.Binding
 	HideMarked key.Binding
 	ShowHidden key.Binding
+	// GORILLA OVERRIDE (2026-09-01): re-scan the local runtimes. Which models
+	// are LOADED changes while this dialog is open -- an idle timer evicts one,
+	// a load finishes, the user starts something in LM Studio -- and a list
+	// read at launch describes a machine that has moved on.
+	RefreshLocal key.Binding
 }
 
 var modelKeys = modelKeyMap{
@@ -185,6 +190,10 @@ var modelKeys = modelKeyMap{
 	ShowHidden: key.NewBinding(
 		key.WithKeys("H"),
 		key.WithHelp("H", "review hidden"),
+	),
+	RefreshLocal: key.NewBinding(
+		key.WithKeys("ctrl+r"),
+		key.WithHelp("ctrl+r", "re-scan local models"),
 	),
 	Bookmark: key.NewBinding(
 		key.WithKeys(" "),
@@ -282,6 +291,29 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.addMarkedToBookmarks()
 		case key.Matches(msg, modelKeys.HideMarked):
 			return m.hideMarkedOrCurrent()
+		// GORILLA OVERRIDE (2026-09-01): re-read the local runtimes on demand.
+		//
+		// This only READS. It never asks a runtime to load or unload anything:
+		// LM Studio's load endpoint is not idempotent and starts a SECOND copy
+		// of an already-resident model, so a refresh that loaded things could
+		// silently double someone's memory use.
+		case key.Matches(msg, modelKeys.RefreshLocal):
+			if !models.HasLocalModels() {
+				return m, util.ReportWarn("no local runtime is connected - use /connect to add one")
+			}
+			n := models.RefreshLocalEndpoints()
+			m.setupModelsForProvider(m.provider)
+			loaded := 0
+			for _, mod := range m.models {
+				if mod.LocalState == "loaded" {
+					loaded++
+				}
+			}
+			if n == 0 {
+				return m, util.ReportWarn("the local runtime answered with no models - is it still running?")
+			}
+			return m, util.ReportInfo(fmt.Sprintf(
+				"re-scanned: %d local models, %d loaded in memory now", n, loaded))
 		case key.Matches(msg, modelKeys.ShowHidden):
 			idx := findProviderIndex(m.availableProviders, ProviderHidden)
 			if idx < 0 {
@@ -829,6 +861,16 @@ func (m *modelDialogCmp) View() string {
 			{"   ", false},
 			{"tab details", true},
 		}
+	}
+	// GORILLA OVERRIDE (2026-09-01): advertise the re-scan, but only on the
+	// column where it does anything.
+	//
+	// This is the one list in the program that can go stale while you are
+	// looking at it, because which models a runtime HOLDS is decided outside
+	// this program and changes on an idle timer. A key nobody knows about is
+	// worth as little as the config file this dialog exists to replace.
+	if m.provider == models.ProviderLocal && !m.searchActive {
+		segs = append(segs, hintSeg{"   ", false}, hintSeg{"ctrl+r re-scan", true})
 	}
 	// GORILLA OVERRIDE (2026-08-20): say how many are marked, and say it where
 	// the user is already looking. "a" acting on an invisible set is the failure

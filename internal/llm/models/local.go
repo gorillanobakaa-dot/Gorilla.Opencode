@@ -739,4 +739,40 @@ func LocalEndpointFor(id ModelID) string { return localRoute[id].Endpoint }
 // model was invisible in the picker. With an NVIDIA NIM key added through
 // /connect that meant 102 working models registered and none selectable, which
 // looks exactly like the key having been rejected.
+// RefreshLocalEndpoints re-reads every local endpoint already registered and
+// updates what is known about each model, returning how many were seen.
+//
+// GORILLA OVERRIDE (2026-09-01): the picker used to read the model list once,
+// at startup, and never again. Which models a runtime is HOLDING changes
+// constantly -- LM Studio evicts on an idle timer, the user loads something
+// else in another window, a just-in-time load finishes -- so a list read at
+// launch describes a machine that has since moved on. The owner hit exactly
+// that: Bonsai loaded, the picker showing a stale world, and the wrong model
+// being talked to as a result.
+//
+// This only RE-READS. It never asks a runtime to load or unload anything.
+// That restraint is deliberate and was learned the hard way: LM Studio's
+// POST /api/v1/models/load is not idempotent, and calling it for a model that
+// is already resident starts a SECOND copy -- two llama-server processes,
+// twice the memory, no warning. A refresh button that could silently double
+// someone's memory use is not a refresh button.
+func RefreshLocalEndpoints() int {
+	type endpoint struct{ name, baseURL, apiKey string }
+	// Distinct by base URL: several model ids share one endpoint, and
+	// re-fetching the same URL once per model would be a burst of identical
+	// requests at a runtime that may be mid-load and slow to answer.
+	seen := make(map[string]endpoint)
+	for _, r := range localRoute {
+		if _, dup := seen[r.BaseURL]; !dup {
+			seen[r.BaseURL] = endpoint{r.Endpoint, r.BaseURL, r.APIKey}
+		}
+	}
+	total := 0
+	for _, e := range seen {
+		n, _ := RegisterLocalEndpoint(e.name, e.baseURL, e.apiKey)
+		total += n
+	}
+	return total
+}
+
 func HasLocalModels() bool { return len(localRoute) > 0 }
