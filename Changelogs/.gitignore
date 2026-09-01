@@ -1,0 +1,5 @@
+# dual_track.py working files — local only, never published
+*.prep.json
+*.filled.json
+PAYLOAD.*
+PRECHECK.json
