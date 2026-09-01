@@ -117,7 +117,7 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	fileInfo, err := os.Stat(filePath)
 	if err == nil {
 		if fileInfo.IsDir() {
-			return NewTextErrorResponse(fmt.Sprintf("Path is a directory, not a file: %s", filePath)), nil
+			return NewTextErrorResponse(fmt.Sprintf("Path is a directory, not a file: %s. Give the full path to a file inside it, creating it if needed.", filePath)), nil
 		}
 
 		modTime := fileInfo.ModTime()

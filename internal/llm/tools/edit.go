@@ -173,7 +173,7 @@ func (e *editTool) createNewFile(ctx context.Context, filePath, content string) 
 	fileInfo, err := os.Stat(filePath)
 	if err == nil {
 		if fileInfo.IsDir() {
-			return NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s", filePath)), nil
+			return NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s. Give the full path to a file inside it.", filePath)), nil
 		}
 		return NewTextErrorResponse(fmt.Sprintf("file already exists: %s", filePath)), nil
 	} else if !os.IsNotExist(err) {
@@ -258,7 +258,7 @@ func (e *editTool) deleteContent(ctx context.Context, filePath, oldString string
 	}
 
 	if fileInfo.IsDir() {
-		return NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s", filePath)), nil
+		return NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s. Give the full path to a file inside it.", filePath)), nil
 	}
 
 	if getLastReadTime(filePath).IsZero() {
@@ -375,7 +375,7 @@ func (e *editTool) replaceContent(ctx context.Context, filePath, oldString, newS
 	}
 
 	if fileInfo.IsDir() {
-		return NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s", filePath)), nil
+		return NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s. Give the full path to a file inside it.", filePath)), nil
 	}
 
 	if getLastReadTime(filePath).IsZero() {

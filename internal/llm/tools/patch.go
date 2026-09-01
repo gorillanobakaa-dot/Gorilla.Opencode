@@ -117,7 +117,7 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		}
 
 		if fileInfo.IsDir() {
-			return NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s", absPath)), nil
+			return NewTextErrorResponse(fmt.Sprintf("path is a directory, not a file: %s. Give the full path to a file inside it.", absPath)), nil
 		}
 
 		modTime := fileInfo.ModTime()

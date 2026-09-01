@@ -164,7 +164,24 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 
 	// Check if it's a directory
 	if fileInfo.IsDir() {
-		return NewTextErrorResponse(fmt.Sprintf("Path is a directory, not a file: %s", filePath)), nil
+		// GORILLA FIX (2026-09-01): say what to do instead, not only what went
+		// wrong.
+		//
+		// Observed live: a local model tried view with view="tree" on the project
+		// directory, got "Path is a directory, not a file", and had to REASON ITS
+		// WAY to the conclusion that view cannot list directories -- spending a
+		// whole round trip on it. On the hardware this program targets a round
+		// trip is a minute or more, so an error that withholds the next step is
+		// expensive in a way it would not be against a fast cloud model.
+		//
+		// The tool that lists a directory is find, so the error names it and gives
+		// the exact argument. A weaker model can then act instead of deducing.
+		return NewTextErrorResponse(fmt.Sprintf(
+			"Path is a directory, not a file: %s\n\n"+
+				"The view tool reads ONE file. To see what is in this directory, use "+
+				"the find tool with path=%q and no query -- that lists the files. "+
+				"Then call view on a specific file from that list.",
+			filePath, filePath)), nil
 	}
 
 	// Check file size
