@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -241,23 +242,91 @@ var embeddedPfind []byte
 // GORILLA OVERRIDE: when python3 is missing this REFUSES rather than falling
 // back to a degraded search. An agent told "no matches" cannot tell that apart
 // from "the search never ran", and will conclude the code does not exist.
+// findPythonExe returns a Python 3 interpreter, and any arguments that must
+// precede the script.
+//
+// GORILLA OVERRIDE (2026-09-01): Windows makes "is python installed" a harder
+// question than it looks, in two ways this handles explicitly.
+//
+// The App Execution Alias: a fresh Windows install ships a zero-byte
+// %LOCALAPPDATA%\Microsoft\WindowsApps\python3.exe that exists purely to open
+// the Microsoft Store. exec.LookPath finds it, every "does python exist" check
+// says yes, and then running it prints "Python was not found; run without
+// arguments to install from the Microsoft Store" to stdout and exits non-zero.
+// The session database has six search failures that are precisely this. The stub
+// is detected by running it, not by trusting the path.
+//
+// The py launcher: py.exe is how a Windows Python is reachable without touching
+// PATH, but bare `py` runs the DEFAULT interpreter, which is Python 2 if one is
+// installed alongside. It is therefore always invoked as `py -3`. Rev 1 verified
+// py.exe with -3 and then ran it without, proving something about an interpreter
+// it did not go on to use.
+func findPythonExe() (string, []string, error) {
+	type candidate struct {
+		name string
+		args []string
+	}
+	candidates := []candidate{{"python3", nil}, {"python", nil}}
+	if runtime.GOOS == "windows" {
+		// py -3 is the most reliable way to reach a real Python 3 on Windows,
+		// but it comes last: an explicit python3/python on PATH is what the
+		// user chose, and choosing for them is how you end up in a different
+		// virtualenv than the one they activated.
+		candidates = append(candidates, candidate{"py", []string{"-3"}})
+	}
+
+	for _, c := range candidates {
+		path, err := exec.LookPath(c.name)
+		if err != nil {
+			continue
+		}
+		if !isWorkingPython3(path, c.args) {
+			continue
+		}
+		return path, c.args, nil
+	}
+	return "", nil, fmt.Errorf("no working python 3 interpreter found")
+}
+
+// isWorkingPython3 runs the candidate and checks it really is a Python 3.
+//
+// Running it is the only reliable test on Windows: the Store stub is a real file
+// at a real path that fails only when executed.
+func isWorkingPython3(path string, preArgs []string) bool {
+	args := append(append([]string{}, preArgs...), "--version")
+	out, err := exec.Command(path, args...).CombinedOutput()
+	if err != nil {
+		return false
+	}
+	text := string(out)
+	// The stub answers successfully in some shells; its giveaway is the text.
+	if strings.Contains(text, "was not found") || strings.Contains(text, "Microsoft Store") {
+		return false
+	}
+	return strings.Contains(text, "Python 3")
+}
+
 func findPfindPath() (string, []string, error) {
 	if env := os.Getenv("GORILLA_PFIND"); env != "" {
 		st, err := os.Stat(env)
 		if err != nil || st.IsDir() {
 			return "", nil, fmt.Errorf("GORILLA_PFIND is set to %q but that is not a readable file", env)
 		}
-		python, err := exec.LookPath("python3")
+		python, preArgs, err := findPythonExe()
 		if err != nil {
 			return "", nil, fmt.Errorf("GORILLA_PFIND points at %s but python3 is not installed", env)
 		}
-		return python, []string{env}, nil
+		return python, append(preArgs, env), nil
 	}
 	if p, err := exec.LookPath("pfind"); err == nil {
 		return p, nil, nil
 	}
-	python, err := exec.LookPath("python3")
+	python, preArgs, err := findPythonExe()
 	if err != nil {
+		// GORILLA OVERRIDE (2026-09-01): this message says "python3" on purpose.
+		// It is the name to install on every platform this runs on, it is what
+		// the packaging test asserts, and softening it to "python" sent Windows
+		// users to the Microsoft Store stub that caused the failure.
 		return "", nil, fmt.Errorf(
 			"the find tool needs python3 (its search engine is a Python program embedded in this binary). " +
 				"Install python3, or install a 'pfind' executable on PATH")
@@ -266,12 +335,61 @@ func findPfindPath() (string, []string, error) {
 	if err != nil {
 		return "", nil, fmt.Errorf("could not extract the embedded search engine: %w", err)
 	}
-	return python, []string{script}, nil
+	return python, append(preArgs, script), nil
 }
 
 // extractEmbeddedPfind writes the embedded engine to the user cache, once per
 // engine version. The filename carries a content hash, so a new binary with a
 // new engine never runs a stale extract, and re-running never rewrites.
+// cacheDirIsPrivate refuses a cache directory that other local users can write
+// to. The file that lands there is about to be EXECUTED, so a directory anyone
+// can drop a file into is a local privilege-escalation path.
+//
+// GORILLA OVERRIDE (2026-09-01): the Unix permission-bit test cannot be run on
+// Windows and must not simply be skipped there.
+//
+// Go's os.Stat reports a synthesised 0777 for every directory on Windows — it
+// does not read the ACL — so the original `perm & 0o022 != 0` test was true for
+// EVERY directory and the find tool refused to run at all. The local session
+// database has two recorded failures reading "cache dir
+// C:\Users\...\AppData\Local\gorilla-opencode is writable by other users;
+// refusing to execute from it", which is that false positive.
+//
+// Rev 1 responded by skipping the check on Windows entirely, which removed the
+// protection instead of translating it. What the check is really asking is "can
+// somebody else put a file here", and on Windows the answer is carried by
+// location rather than by mode bits: %LOCALAPPDATA% lives under the user's own
+// profile, which is ACL'd to that user. So the Windows form of the same question
+// is "is this inside my profile" — a real check, not a waived one.
+func cacheDirIsPrivate(dir string) error {
+	if runtime.GOOS != "windows" {
+		st, err := os.Stat(dir)
+		if err != nil {
+			return err
+		}
+		if st.Mode().Perm()&0o022 != 0 {
+			return fmt.Errorf("cache dir %s is writable by other users; refusing to execute from it", dir)
+		}
+		return nil
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("cannot determine the user profile directory to validate %s: %w", dir, err)
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return err
+	}
+	rel, err := filepath.Rel(home, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf(
+			"cache dir %s is outside your user profile (%s), so other users may be able to write to it; "+
+				"refusing to execute the search engine from there", dir, home)
+	}
+	return nil
+}
+
 func extractEmbeddedPfind() (string, error) {
 	sum := sha256.Sum256(embeddedPfind)
 	cacheRoot, err := os.UserCacheDir()
@@ -291,10 +409,7 @@ func extractEmbeddedPfind() (string, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
-	if st, err := os.Stat(dir); err != nil || st.Mode().Perm()&0o022 != 0 {
-		if err == nil {
-			return "", fmt.Errorf("cache dir %s is writable by other users; refusing to execute from it", dir)
-		}
+	if err := cacheDirIsPrivate(dir); err != nil {
 		return "", err
 	}
 	// Write-then-rename so a concurrent session never executes a half-written file.

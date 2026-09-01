@@ -7,6 +7,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,30 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// viewInput builds the tool's JSON arguments properly.
+//
+// GORILLA OVERRIDE (2026-09-01): these tests used to paste the path straight
+// into a JSON string literal. That is fine while paths look like /tmp/x, and
+// silently wrong the moment they look like C:\Users\...\Temp\...\thing.bin —
+// because "\t" and "\n" ARE legal JSON escapes. The decode then SUCCEEDS and
+// yields a path containing a real tab, so the tool was handed "001<TAB>hing.bin"
+// and failed on a filename the test never meant to write. The test was wrong,
+// not the tool: it cannot be asked to guess which control character used to be
+// a directory separator.
+//
+// Encoding the value instead of interpolating it is the fix, and it is exactly
+// the discipline the tool asks of the model.
+func viewInput(t *testing.T, path string, kv ...any) string {
+	t.Helper()
+	m := map[string]any{"file_path": path}
+	for i := 0; i+1 < len(kv); i += 2 {
+		m[kv[i].(string)] = kv[i+1]
+	}
+	b, err := json.Marshal(m)
+	require.NoError(t, err)
+	return string(b)
+}
 
 func viewOf(t *testing.T, input string) ToolResponse {
 	t.Helper()
@@ -42,7 +67,7 @@ func TestABinaryFileIsRefusedRatherThanDumped(t *testing.T) {
 	} {
 		p := filepath.Join(dir, name)
 		require.NoError(t, os.WriteFile(p, body, 0o644))
-		r := viewOf(t, `{"file_path":"`+p+`"}`)
+		r := viewOf(t, viewInput(t, p))
 		assert.True(t, r.IsError, "%s was not refused: %q", name, r.Content)
 		assert.NotContains(t, r.Content, "\x00", "%s: raw bytes reached the conversation", name)
 		assert.Contains(t, r.Content, "binary", "%s: the refusal does not say why", name)
@@ -64,7 +89,7 @@ func TestOrdinaryTextFilesAreNotMistakenForBinary(t *testing.T) {
 	} {
 		p := filepath.Join(dir, name)
 		require.NoError(t, os.WriteFile(p, []byte(body), 0o644))
-		r := viewOf(t, `{"file_path":"`+p+`"}`)
+		r := viewOf(t, viewInput(t, p))
 		assert.False(t, r.IsError, "%s was wrongly refused: %s", name, r.Content)
 	}
 }
@@ -77,7 +102,7 @@ func TestAnEmptyFileSaysItIsEmpty(t *testing.T) {
 	p := filepath.Join(dir, "empty.txt")
 	require.NoError(t, os.WriteFile(p, nil, 0o644))
 
-	r := viewOf(t, `{"file_path":"`+p+`"}`)
+	r := viewOf(t, viewInput(t, p))
 	assert.False(t, r.IsError, "an empty file is not an error")
 	assert.Contains(t, r.Content, "empty")
 	assert.Contains(t, r.Content, "0 bytes")
@@ -92,7 +117,7 @@ func TestAnOffsetPastTheEndSaysHowLongTheFileIs(t *testing.T) {
 	p := filepath.Join(dir, "l.txt")
 	require.NoError(t, os.WriteFile(p, []byte(strings.Repeat("line\n", 100)), 0o644))
 
-	r := viewOf(t, `{"file_path":"`+p+`","offset":9999}`)
+	r := viewOf(t, viewInput(t, p, "offset", 9999))
 	assert.True(t, r.IsError)
 	assert.Contains(t, r.Content, "100 line", "it must report the real length")
 	assert.Contains(t, r.Content, "past the end")
@@ -103,10 +128,10 @@ func TestAnOffsetPastTheEndSaysHowLongTheFileIs(t *testing.T) {
 // The cases that were already sound, pinned so they stay that way.
 func TestViewStillReportsTheObviousFailuresClearly(t *testing.T) {
 	dir := t.TempDir()
-	r := viewOf(t, `{"file_path":"`+dir+`"}`)
+	r := viewOf(t, viewInput(t, dir))
 	assert.True(t, r.IsError)
 	assert.Contains(t, r.Content, "directory")
 
-	r = viewOf(t, `{"file_path":"`+filepath.Join(dir, "nope.txt")+`"}`)
+	r = viewOf(t, viewInput(t, filepath.Join(dir, "nope.txt")))
 	assert.True(t, r.IsError)
 }

@@ -22,7 +22,10 @@ package tools
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -43,9 +46,29 @@ const maxOCRChars = 20000
 // Checked, never assumed — the entire reason this file exists is a capability
 // that was present and unknown. The counterpart is /arsenal, which tells the
 // USER the same thing.
+// GORILLA OVERRIDE: Checks Windows Program Files paths where Tesseract is typically installed
 func OCRAvailable() bool {
-	_, err := exec.LookPath("tesseract")
-	return err == nil
+	// First try PATH
+	if _, err := exec.LookPath("tesseract"); err == nil {
+		return true
+	}
+
+	// Windows: Check common installation paths
+	if runtime.GOOS == "windows" {
+		windowsPaths := []string{
+			filepath.Join(os.Getenv("ProgramFiles"), "Tesseract-OCR", "tesseract.exe"),
+			filepath.Join(os.Getenv("ProgramFiles(x86)"), "Tesseract-OCR", "tesseract.exe"),
+			"C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
+			"C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe",
+		}
+		for _, p := range windowsPaths {
+			if _, err := os.Stat(p); err == nil {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // OCRResult is what came back, and how much to trust it.
@@ -73,9 +96,29 @@ func OCRImage(ctx context.Context, path string) (OCRResult, error) {
 	runCtx, cancel := context.WithTimeout(ctx, ocrTimeout)
 	defer cancel()
 
+	// Find tesseract binary (handle Windows paths)
+	tess := "tesseract"
+	if runtime.GOOS == "windows" {
+		found := ""
+		for _, p := range []string{
+			filepath.Join(os.Getenv("ProgramFiles"), "Tesseract-OCR", "tesseract.exe"),
+			filepath.Join(os.Getenv("ProgramFiles(x86)"), "Tesseract-OCR", "tesseract.exe"),
+			"C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
+			"C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe",
+		} {
+			if _, err := os.Stat(p); err == nil {
+				found = p
+				break
+			}
+		}
+		if found != "" {
+			tess = found
+		}
+	}
+
 	// "-" sends the text to stdout instead of writing a file next to the
 	// image. Reading a file must never leave anything behind.
-	cmd := exec.CommandContext(runCtx, "tesseract", path, "-")
+	cmd := exec.CommandContext(runCtx, tess, path, "-")
 	var out, errBuf strings.Builder
 	cmd.Stdout = &out
 	cmd.Stderr = &errBuf
@@ -133,14 +176,41 @@ func ocrHeader(path string, res OCRResult) string {
 // It names the capability, the cost and the exact command, in the same voice as
 // /arsenal — because a refusal that does not say how to fix it is how a
 // capability stays missing for months.
+// GORILLA OVERRIDE (2026-09-01, rev 2): cross-platform install instructions that
+// still name every platform.
+//
+// Rev 1 replaced the instructions with ONLY the current platform's, which read
+// as an improvement and was a regression. This message is not written solely for
+// the person at the keyboard: it goes into the transcript, gets pasted into
+// issues, and is read by people helping someone else on a different OS. Dropping
+// the apt and pacman lines on Windows deleted the answer for everyone who was
+// not on Windows, and broke the test that exists to keep this message actionable.
+//
+// The platform we are actually on goes first, because that is the line the
+// reader needs; the others follow, because a refusal is only useful if it says
+// how to fix it, and "how" depends on who is reading.
 func noOCRMessage(path, imageType string) string {
+	const (
+		win   = "    Windows:  scoop install tesseract      (or: choco install tesseract)\n              https://github.com/UB-Mannheim/tesseract/wiki\n"
+		mac   = "    macOS:    brew install tesseract\n"
+		linux = "    Debian:   sudo apt-get install -y tesseract-ocr tesseract-ocr-eng\n              (Arch: sudo pacman -S --needed tesseract tesseract-data-eng)\n"
+	)
+	var order string
+	switch runtime.GOOS {
+	case "windows":
+		order = win + mac + linux
+	case "darwin":
+		order = mac + linux + win
+	default:
+		order = linux + mac + win
+	}
+
 	return fmt.Sprintf(
 		"This is an image (%s), and this machine cannot read text out of images yet.\n\n"+
 			"To fix that, install OCR - it is small, free, needs no account, and runs entirely on\n"+
 			"your machine, so nothing but the words ever leaves it:\n\n"+
-			"    sudo apt-get install -y tesseract-ocr tesseract-ocr-eng\n"+
-			"    (Arch: sudo pacman -S --needed tesseract tesseract-data-eng)\n\n"+
+			"%s\n"+
 			"Then view %s again and the text will come back. Run /arsenal to see what else\n"+
 			"this machine could do and what it would cost.",
-		imageType, path)
+		imageType, order, path)
 }

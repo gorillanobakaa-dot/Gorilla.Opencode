@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -46,6 +47,9 @@ func TestSparseToolInfoIsWellFormed(t *testing.T) {
 }
 
 func TestSparseRejectsBadInput(t *testing.T) {
+	// GORILLA OVERRIDE (2026-09-01): the "nonexistent file" case needs the tool
+	// to reach its filesystem check, which on Windows it correctly never does.
+	// The parsing cases above it run everywhere and still do.
 	if _, err := config.Load(t.TempDir(), false); err != nil {
 		t.Fatalf("config.Load: %v", err)
 	}
@@ -58,6 +62,9 @@ func TestSparseRejectsBadInput(t *testing.T) {
 	})
 
 	t.Run("nonexistent file", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("sparse refuses on Windows before it reaches the filesystem check")
+		}
 		resp := runSparse(t, SparseParams{FilePath: filepath.Join(t.TempDir(), "nope.c")})
 		if !resp.IsError {
 			t.Error("nonexistent file should be an error response")
@@ -82,6 +89,14 @@ func TestSparseRejectsBadInput(t *testing.T) {
 // A missing session id must fail loudly rather than silently skipping the
 // permission gate.
 func TestSparseRequiresSessionID(t *testing.T) {
+	// GORILLA OVERRIDE (2026-09-01): sparse is a Linux kernel semantic checker.
+	// It has no Windows build and never will, so the tool refuses up front there
+	// — which is the correct behaviour and makes the run-time contract below
+	// unreachable. Scoping the test to where the tool exists is honest; loosening
+	// the refusal so a test can pass would not be.
+	if runtime.GOOS == "windows" {
+		t.Skip("sparse does not exist on Windows; the tool refuses before reaching this path")
+	}
 	if _, err := config.Load(t.TempDir(), false); err != nil {
 		t.Fatalf("config.Load: %v", err)
 	}

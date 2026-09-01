@@ -83,8 +83,12 @@ import json
 import lzma
 import math
 import os
-import pwd
-import grp
+try:
+    import pwd
+    import grp
+except ImportError:
+    pwd = None
+    grp = None
 import re
 import shlex
 import shutil
@@ -98,6 +102,28 @@ import zipfile
 from collections import defaultdict
 from difflib import SequenceMatcher
 from pathlib import Path
+
+# GORILLA OVERRIDE (2026-09-01): force UTF-8 on the output streams.
+#
+# On Windows, Python picks the console's legacy code page for stdout — cp1252 on
+# a UK/US install — and pfind's output is full of characters that page cannot
+# represent: the tree connectors, the box-drawing rules, the arrows in the long
+# view. Printing one of them raises
+#
+#   UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-2
+#
+# which kills the whole search. The caller sees "search FAILED", so the failure
+# is at least honest, but the tree view simply did not work on Windows at all.
+#
+# errors="replace" rather than "strict": a single unrepresentable byte in a
+# matched line must never cost the user the entire result set. Guarded because
+# .reconfigure() is Python 3.7+ and the streams may be replaced by a harness.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        if (_stream.encoding or "").lower().replace("-", "") != "utf8":
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 
 # ---------------------------------------------------------------------------
 # Machine & Preset Resolution — NOTHING machine-specific is hardcoded.
@@ -1818,11 +1844,11 @@ def render_long_table(paths, content_hits, git_cache, args, use_color):
                 user_str, group_str = str(st.st_uid), str(st.st_gid)
             else:
                 try:
-                    user_str = pwd.getpwuid(st.st_uid).pw_name
+                    user_str = pwd.getpwuid(st.st_uid).pw_name if pwd else str(st.st_uid)
                 except (KeyError, AttributeError):
                     user_str = str(st.st_uid)
                 try:
-                    group_str = grp.getgrgid(st.st_gid).gr_name
+                    group_str = grp.getgrgid(st.st_gid).gr_name if grp else str(st.st_gid)
                 except (KeyError, AttributeError):
                     group_str = str(st.st_gid)
             # --smart-group: show the group only when it differs from the owner

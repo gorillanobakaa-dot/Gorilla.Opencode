@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"unicode"
 )
@@ -88,12 +91,30 @@ var (
 )
 
 // lynxPath reports where lynx is, or "" if it is not installed.
+// GORILLA OVERRIDE: On Windows, checks multiple fallback paths since lynx is rare
 func lynxPath() string {
-	p, err := exec.LookPath("lynx")
-	if err != nil {
-		return ""
+	// First try PATH
+	if p, err := exec.LookPath("lynx"); err == nil {
+		return p
 	}
-	return p
+
+	// Windows: Check common installation paths
+	if runtime.GOOS == "windows" {
+		windowsPaths := []string{
+			filepath.Join(os.Getenv("ProgramFiles"), "Git", "usr", "bin", "lynx.exe"),
+			filepath.Join(os.Getenv("ProgramFiles(x86)"), "Git", "usr", "bin", "lynx.exe"),
+			"C:\\cygwin64\\bin\\lynx.exe",
+			"C:\\cygwin\\bin\\lynx.exe",
+			filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local", "lynx", "lynx.exe"),
+		}
+		for _, p := range windowsPaths {
+			if _, err := os.Stat(p); err == nil {
+				return p
+			}
+		}
+	}
+
+	return ""
 }
 
 // looksLikeURLText reports whether a link's text is really a displayed address

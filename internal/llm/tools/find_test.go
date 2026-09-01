@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -323,22 +324,27 @@ func TestFindRefusesWhenEngineUnavailable(t *testing.T) {
 // no pfind on PATH, no override, an empty cache — the tool must extract its
 // embedded engine and complete a real search using nothing but python3.
 func TestFindEmbeddedEngineWorksOnACleanMachine(t *testing.T) {
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 not installed")
+	if _, _, err := findPythonExe(); err != nil {
+		t.Skip("no working python 3 interpreter installed")
 	}
 	t.Setenv("GORILLA_PFIND", "")
-	t.Setenv("PATH", "/usr/bin:/bin") // python3 yes; no user-installed pfind
+	// GORILLA OVERRIDE (2026-09-01): "a clean machine" cannot be spelled
+	// "/usr/bin:/bin". That PATH has no meaning on Windows, so this test — and
+	// the portability claim it exists to prove — could only ever fail there,
+	// which is precisely the platform whose portability was in doubt.
+	// systemOnlyPATH() names the same idea in the local dialect.
+	t.Setenv("PATH", systemOnlyPATH(t))
 	if _, err := exec.LookPath("pfind"); err == nil {
-		t.Skip("a system pfind exists in /usr/bin; embedded path not reachable")
+		t.Skip("a system pfind exists on the system PATH; embedded path not reachable")
 	}
 	cache := t.TempDir()
-	t.Setenv("XDG_CACHE_HOME", cache)
+	setUserCacheDir(t, cache)
 
 	bin, prefix, err := findPfindPath()
 	require.NoError(t, err)
-	assert.Contains(t, bin, "python3")
-	require.Len(t, prefix, 1)
-	assert.Contains(t, prefix[0], cache, "engine must be extracted into the cache, not run from a repo path")
+	assert.True(t, looksLikePython(bin), "engine must be run by a python interpreter, got %q", bin)
+	require.NotEmpty(t, prefix)
+	assert.Contains(t, prefix[len(prefix)-1], cache, "engine must be extracted into the cache, not run from a repo path")
 
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.go"), []byte("package a // clean_machine_marker\n"), 0o644))
@@ -379,22 +385,22 @@ func TestVendoredPfindMatchesDevCopy(t *testing.T) {
 }
 
 func TestFindHonoursGorillaPfindEnv(t *testing.T) {
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 not installed")
+	if _, _, err := findPythonExe(); err != nil {
+		t.Skip("no working python 3 interpreter installed")
 	}
 	dir := t.TempDir()
 	fake := filepath.Join(dir, "pfind.py")
 	require.NoError(t, os.WriteFile(fake, []byte("print('ok')\n"), 0o644))
 
-	t.Setenv("PATH", dir) // no 'pfind' executable here, but python3 lookup needs a real PATH
-	t.Setenv("PATH", os.Getenv("PATH")+string(os.PathListSeparator)+"/usr/bin:/bin")
+	// no 'pfind' executable in dir, but the python3 lookup needs a real PATH
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+systemOnlyPATH(t))
 	t.Setenv("GORILLA_PFIND", fake)
 
 	bin, prefix, err := findPfindPath()
 	require.NoError(t, err)
-	assert.Contains(t, bin, "python3")
-	require.Len(t, prefix, 1)
-	assert.Equal(t, fake, prefix[0])
+	assert.True(t, looksLikePython(bin), "engine must be run by a python interpreter, got %q", bin)
+	require.NotEmpty(t, prefix)
+	assert.Equal(t, fake, prefix[len(prefix)-1])
 }
 
 // ── The full-arsenal surface (owner's decision, 2026-08-17) ──────────────────
@@ -715,4 +721,64 @@ func TestInsideGitRepoDetection(t *testing.T) {
 	assert.True(t, insideGitRepo(wt), "a worktree, where .git is a file")
 
 	assert.False(t, insideGitRepo(t.TempDir()), "a plain directory")
+}
+
+// GORILLA OVERRIDE (2026-09-01): cross-platform helpers for the tests above.
+//
+// They used to hardcode "/usr/bin:/bin" for "a machine with python and nothing
+// else", and to assert the interpreter's path contained the literal "python3".
+// Neither survives contact with Windows, where the interpreter can legitimately
+// be py.exe invoked as `py -3`, and where those directories do not exist. The
+// tests were therefore guaranteed failures on Windows rather than checks of it.
+
+// systemOnlyPATH is a PATH holding a Python interpreter and the OS's own tool
+// directories, and nothing else the user has added — the local spelling of "a
+// machine with python3 and no user-installed pfind".
+//
+// It is derived from where the interpreter actually is rather than hardcoded,
+// because there is no fixed directory that answers this on every platform:
+// Python may be in /usr/bin, in a Homebrew prefix, in a Scoop shim directory, or
+// beside py.exe in the Windows directory. Hardcoding "/usr/bin:/bin" made the
+// portability tests unrunnable on the one platform whose portability was in
+// question.
+func systemOnlyPATH(t *testing.T) string {
+	t.Helper()
+	python, _, err := findPythonExe()
+	if err != nil {
+		t.Skip("no working python 3 interpreter installed")
+	}
+	dirs := []string{filepath.Dir(python)}
+	if runtime.GOOS == "windows" {
+		root := os.Getenv("SystemRoot")
+		if root == "" {
+			root = filepath.Join("C:", "Windows")
+		}
+		dirs = append(dirs, filepath.Join(root, "System32"), root)
+	} else {
+		dirs = append(dirs, "/usr/bin", "/bin")
+	}
+	return strings.Join(dirs, string(os.PathListSeparator))
+}
+
+// looksLikePython reports whether a resolved binary path is a Python
+// interpreter, under any of the names one legitimately goes by.
+func looksLikePython(bin string) bool {
+	b := strings.ToLower(filepath.Base(bin))
+	return strings.HasPrefix(b, "python") || strings.HasPrefix(b, "py.") || b == "py"
+}
+
+// setUserCacheDir points os.UserCacheDir at dir for the duration of a test.
+//
+// GORILLA OVERRIDE (2026-09-01): setting XDG_CACHE_HOME alone was a Unix
+// assumption. On Windows os.UserCacheDir reads %LocalAppData% and ignores XDG
+// entirely, so the test asserted the engine had been extracted into a temporary
+// directory while it was in fact being extracted into the user's real cache —
+// failing for a reason that had nothing to do with what it was testing.
+func setUserCacheDir(t *testing.T, dir string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Setenv("LocalAppData", dir)
+		return
+	}
+	t.Setenv("XDG_CACHE_HOME", dir)
 }

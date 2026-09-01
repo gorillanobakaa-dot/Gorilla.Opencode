@@ -44,6 +44,31 @@ func UnmarshalToolInput(raw string, into any) error {
 		return nil
 	}
 
+	// GORILLA OVERRIDE (2026-09-01): repair unescaped Windows paths.
+	//
+	// A model working on Windows writes what it sees, and what it sees is
+	// C:\Users\someone\project\main.go. Put in JSON unescaped, "\U" is not a
+	// legal escape, the decode fails with
+	//
+	//	invalid escape sequence `\U` in string
+	//
+	// and the tool returns that to the model — which reads it, forms the same
+	// call again, and loops. This is the identical failure mode this file was
+	// written for (quoted numbers), in the identical shape, and it fires on the
+	// single most-used tool in the product: `view` accounts for 92 of the 130
+	// tool calls in the local session database.
+	//
+	// The repair is narrow on purpose. It runs only after a strict decode has
+	// already failed, it only touches backslashes INSIDE string literals, and it
+	// only doubles a backslash that is not already starting a legal JSON escape
+	// — so "\n" stays a newline and "\\" stays an escaped backslash. A path is
+	// recovered; nothing else is reinterpreted.
+	if repaired, ok := escapeLoneBackslashes([]byte(raw)); ok {
+		if err := json.Unmarshal(repaired, into); err == nil {
+			return nil
+		}
+	}
+
 	coerced, ok := coerceScalarStrings([]byte(raw), into)
 	if !ok {
 		return strictErr
@@ -173,4 +198,76 @@ func jsonKey(f reflect.StructField) string {
 		return f.Name
 	}
 	return tag
+}
+
+// escapeLoneBackslashes doubles any backslash inside a JSON string literal that
+// is not already introducing a legal escape sequence. Reports false when there
+// was nothing to change, so the caller can keep the original error.
+//
+// The legal escapes are the eight in the JSON grammar: " \ / b f n r t, plus u
+// followed by four hex digits. A backslash before anything else — U, s, p, a
+// digit, a space — cannot be valid JSON, so doubling it is the only reading that
+// could have been meant.
+func escapeLoneBackslashes(raw []byte) ([]byte, bool) {
+	out := make([]byte, 0, len(raw)+16)
+	inString := false
+	changed := false
+
+	for i := 0; i < len(raw); i++ {
+		c := raw[i]
+
+		if !inString {
+			if c == '"' {
+				inString = true
+			}
+			out = append(out, c)
+			continue
+		}
+
+		if c == '"' {
+			inString = false
+			out = append(out, c)
+			continue
+		}
+
+		if c != '\\' {
+			out = append(out, c)
+			continue
+		}
+
+		// A trailing backslash cannot be repaired into anything sensible.
+		if i+1 >= len(raw) {
+			out = append(out, c)
+			continue
+		}
+
+		next := raw[i+1]
+		switch next {
+		case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
+			// A legal two-character escape: copy both, and skip the second so a
+			// literal \\ is never mistaken for an escape of the character after it.
+			out = append(out, c, next)
+			i++
+		case 'u':
+			if i+5 < len(raw) && isHex(raw[i+2]) && isHex(raw[i+3]) && isHex(raw[i+4]) && isHex(raw[i+5]) {
+				out = append(out, raw[i:i+6]...)
+				i += 5
+			} else {
+				out = append(out, '\\', '\\')
+				changed = true
+			}
+		default:
+			out = append(out, '\\', '\\')
+			changed = true
+		}
+	}
+
+	if !changed {
+		return nil, false
+	}
+	return out, true
+}
+
+func isHex(b byte) bool {
+	return (b >= '0' && b <= '9') || (b >= 'a' && b <= 'f') || (b >= 'A' && b <= 'F')
 }

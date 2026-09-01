@@ -33,6 +33,7 @@ var knownHTTPClients = map[string]string{
 	"internal/llm/models/verify.go":          "verifies a configured provider's endpoint answers",
 	"internal/llm/tools/fetch.go":            "MODEL-CHOSEN: guarded by blockedFetchTarget + dialer Control + CheckRedirect",
 	"internal/llm/tools/websearch.go":        "the SearxNG instance from config; the model supplies the query, not the host",
+	"internal/llm/models/local.go":           "OpenAI-compatible /v1/models listings for endpoints the USER configured (or the two default local ports); the model never supplies the address",
 }
 
 func TestNoUninventoriedHTTPClient(t *testing.T) {

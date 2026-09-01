@@ -42,6 +42,35 @@ import (
 	"github.com/opencode-ai/opencode/internal/permission"
 )
 
+// getPythonBinary reports a Python 3 interpreter to run the toolkit with.
+//
+// GORILLA OVERRIDE (2026-09-01, rev 2): this delegates to the find tool's
+// detector rather than keeping a second one.
+//
+// Rev 1 wrote its own, and the two disagreed in the way that mattered. find.go's
+// version rejects Windows' App Execution Alias — the zero-byte %LOCALAPPDATA%\
+// Microsoft\WindowsApps\python3.exe stub that opens the Microsoft Store instead
+// of running anything. This one did not, so `review` would pick the stub, run
+// it, and get back "Python was not found; run without arguments to install from
+// the Microsoft Store" as if it were toolkit output. The local session database
+// has six recorded failures of exactly that shape.
+//
+// It also verified py.exe with `-3` and then invoked it WITHOUT `-3`, so the
+// check proved something about an interpreter it then did not use.
+//
+// One detector, one answer. See findPythonExe in find.go.
+func getPythonBinary() (string, []string, error) {
+	python, preArgs, err := findPythonExe()
+	if err == nil {
+		return python, preArgs, nil
+	}
+	return "", nil, fmt.Errorf("Python 3 not found. Install Python 3:\n" +
+		"  Windows: https://python.org — tick \"Add python.exe to PATH\" in the installer,\n" +
+		"           or install from the Microsoft Store and re-open your terminal\n" +
+		"  Linux:   sudo apt install python3   (Arch: sudo pacman -S python)\n" +
+		"  macOS:   brew install python3")
+}
+
 const (
 	ReviewToolName = "review"
 
@@ -223,7 +252,12 @@ func (r *reviewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 	runCtx, cancel := context.WithTimeout(ctx, reviewTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(runCtx, "python3", args...)
+	python, preArgs, err := getPythonBinary()
+	if err != nil {
+		return NewTextErrorResponse(fmt.Sprintf("Review failed - Python 3 not found: %s", err.Error())), nil
+	}
+
+	cmd := exec.CommandContext(runCtx, python, append(append([]string{}, preArgs...), args...)...)
 	cmd.Dir = filepath.Dir(script)
 	out, runErr := cmd.Output()
 	if len(out) == 0 {
@@ -247,7 +281,12 @@ func runDoctor(ctx context.Context, script, target string) (string, bool) {
 	dctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(dctx, "python3", script, target, "--doctor")
+	python, preArgs, err := getPythonBinary()
+	if err != nil {
+		return "Doctor cannot run: Python 3 not found - " + err.Error(), false
+	}
+
+	cmd := exec.CommandContext(dctx, python, append(append([]string{}, preArgs...), script, target, "--doctor")...)
 	cmd.Dir = filepath.Dir(script)
 	out, err := cmd.Output()
 	text := strings.TrimSpace(string(out))

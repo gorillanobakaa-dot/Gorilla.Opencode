@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -113,6 +114,22 @@ func (s *sparseTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 	}
 	if params.FilePath == "" {
 		return NewTextErrorResponse("file_path is required"), nil
+	}
+
+	// GORILLA OVERRIDE (2026-09-01, rev 2): sparse is a Linux kernel tool.
+	//
+	// The platform check sits AFTER input validation on purpose. Rev 1 returned
+	// before parsing anything, which meant a malformed call — a missing
+	// file_path, unparseable JSON — was answered on Windows with "sparse is not
+	// available on Windows" instead of with what was actually wrong. A caller
+	// told the wrong thing about its own mistake fixes the wrong thing, and the
+	// contract that bad input is reported as bad input should not depend on
+	// which machine the tool happens to be running on.
+	if runtime.GOOS == "windows" {
+		return NewTextErrorResponse(
+			"sparse is a Linux kernel semantic checker and does not exist on Windows. " +
+				"It is only useful for Linux kernel development; on this machine, use the " +
+				"review tool instead."), nil
 	}
 
 	// sparse is a binary the user may not have installed. Say so plainly with
