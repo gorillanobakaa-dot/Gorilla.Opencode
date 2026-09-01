@@ -16,6 +16,8 @@ package config
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/llm/models"
@@ -365,12 +367,19 @@ var Settings = []Setting{
 
 	// ─── Files and shell ─────────────────────────────────────────────
 	{
-		ID:      "shell.path",
-		Group:   GroupFiles,
-		Name:    "Shell used for commands",
-		Layman:  "Which shell runs the commands the AI asks for. Change this only if your shell lives somewhere unusual — a wrong value breaks every command the AI tries to run.",
-		Kind:    KindString,
-		Default: "/bin/bash",
+		ID:     "shell.path",
+		Group:  GroupFiles,
+		Name:   "Shell used for commands",
+		Layman: "Which shell runs the commands the AI asks for. Change this only if your shell lives somewhere unusual — a wrong value breaks every command the AI tries to run.",
+		Kind:   KindString,
+		// GORILLA OVERRIDE (2026-09-01): the default is platform-dependent.
+		//
+		// It was the literal "/bin/bash", which does not exist on Windows — so
+		// restoring this setting to its own default FAILED there with
+		// "/bin/bash does not exist", and the settings round-trip test could
+		// never pass. Worse, the value it was offering to restore was the exact
+		// value that made the bash tool unusable on Windows in the first place.
+		Default: defaultShellPath(),
 		Get: func() any {
 			if cfg == nil {
 				return ""
@@ -395,7 +404,10 @@ var Settings = []Setting{
 			if info.IsDir() {
 				return fmt.Errorf("%s is a directory, not a shell", s)
 			}
-			if info.Mode().Perm()&0o111 == 0 {
+			// GORILLA OVERRIDE (2026-09-01): Windows has no executable bit. Go
+			// synthesises 0666 for every ordinary file there, so this check
+			// rejected powershell.exe and every other perfectly good shell.
+			if runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
 				return fmt.Errorf("%s is not executable — the AI would not be able to run any commands", s)
 			}
 			set := func(c *Config) { c.Shell.Path = s }
@@ -750,4 +762,23 @@ func CurrentModelSummary() string {
 		return fmt.Sprintf("%s (%s)", m.Name, a.Model)
 	}
 	return string(a.Model)
+}
+
+// defaultShellPath is the shell this machine would use when none is configured.
+//
+// GORILLA OVERRIDE (2026-09-01): kept in step with shell.resolveShellPath, which
+// does the real detection. This cannot call it — that package imports this one —
+// so it answers the same question in the same order for the value the settings
+// screen offers to restore.
+func defaultShellPath() string {
+	if runtime.GOOS != "windows" {
+		return "/bin/bash"
+	}
+	if p, err := exec.LookPath("pwsh.exe"); err == nil {
+		return p
+	}
+	if p, err := exec.LookPath("powershell.exe"); err == nil {
+		return p
+	}
+	return "powershell.exe"
 }

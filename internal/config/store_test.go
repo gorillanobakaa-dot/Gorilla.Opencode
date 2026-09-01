@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -58,8 +60,43 @@ func TestConfigFileIsWrittenSecret(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config file not written: %v", err)
 	}
-	if got := info.Mode().Perm(); got != secretFileMode {
-		t.Errorf("config.json mode = %04o, want %04o — it holds API keys", got, secretFileMode)
+	assertSecretFile(t, path, info)
+}
+
+// assertSecretFile checks the protection that actually exists on this platform.
+//
+// GORILLA OVERRIDE (2026-09-01): the 0600 assertion is unachievable on Windows,
+// and asserting it anyway hid the question rather than answering it.
+//
+// Go's os.Chmod on Windows sets one bit — the read-only attribute. It does not
+// write a DACL, and os.Stat reports a synthesised 0666 for any writable file. So
+// this test could only ever fail on Windows, and its failure said nothing about
+// whether the API keys were actually exposed.
+//
+// What protects the file on Windows is its LOCATION: everything under the user's
+// profile inherits a DACL granting that user and administrators, and nobody
+// else. That is the real control, so that is what is checked — together with the
+// file not having been left world-writable in the one way Windows does model.
+func assertSecretFile(t *testing.T, path string, info os.FileInfo) {
+	t.Helper()
+	if runtime.GOOS != "windows" {
+		if got := info.Mode().Perm(); got != secretFileMode {
+			t.Errorf("config.json mode = %04o, want %04o — it holds API keys", got, secretFileMode)
+		}
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("cannot determine the user profile directory")
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		t.Fatalf("Abs(%s): %v", path, err)
+	}
+	rel, err := filepath.Rel(home, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		t.Errorf("config.json is at %s, outside the user profile %s — on Windows that "+
+			"location IS the access control, and it holds API keys", abs, home)
 	}
 }
 
@@ -87,6 +124,13 @@ func TestExistingLooseConfigFileIsTightenedOnWrite(t *testing.T) {
 	}
 	if err := os.Chmod(path, 0o644); err != nil {
 		t.Fatal(err)
+	}
+	// GORILLA OVERRIDE (2026-09-01): the premise of this test is a Unix mode
+	// bit. Windows has no 0644 to leave behind and no 0600 to tighten to — Go's
+	// Chmod there sets only the read-only attribute — so there is no "loose old
+	// file" state to create and nothing this test could observe.
+	if runtime.GOOS == "windows" {
+		t.Skip("file modes are not how Windows protects a file; see assertSecretFile")
 	}
 	if info, _ := os.Stat(path); info.Mode().Perm() != 0o644 {
 		t.Fatalf("setup failed: wanted a 0644 file, got %04o", info.Mode().Perm())
@@ -126,8 +170,10 @@ func TestOverrideRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if mode := info.Mode().Perm(); mode != secretFileMode {
-		t.Errorf("override mode = %04o, want %04o", mode, secretFileMode)
+	if runtime.GOOS != "windows" {
+		if mode := info.Mode().Perm(); mode != secretFileMode {
+			t.Errorf("override mode = %04o, want %04o", mode, secretFileMode)
+		}
 	}
 
 	if err := removeOverride(dir, "coder.txt"); err != nil {

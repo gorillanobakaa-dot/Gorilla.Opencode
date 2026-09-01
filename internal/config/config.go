@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -268,6 +269,17 @@ func Load(workingDir string, debug bool) (*Config, error) {
 	// value would disable a provider whose real key lives in the env file.
 	backfillProviderKeysFromEnv()
 
+	// GORILLA OVERRIDE (2026-09-01): drop credentials that cannot legally be
+	// sent, BEFORE anything decides whether a provider is configured.
+	//
+	// Readiness is tested all over the codebase as `p.APIKey != ""`, so a key
+	// made of NUL bytes counted as "ready": the provider showed a green marker
+	// in the portal, was offered in the picker, was selected — and then every
+	// single request failed inside net/http with `invalid header field value`.
+	// Sanitising here means one answer to "is this provider usable", given
+	// before anyone asks.
+	sanitiseProviderKeys()
+
 	applyDefaultValues()
 
 	// GORILLA OVERRIDE: point the logger at its file BEFORE any of the steps
@@ -346,13 +358,29 @@ func setDefaults(debug bool) {
 	viper.SetDefault("tui.theme", "opencode")
 	viper.SetDefault("autoCompact", true)
 
-	// Set default shell from environment or fallback to /bin/bash
-	shellPath := os.Getenv("SHELL")
-	if shellPath == "" {
-		shellPath = "/bin/bash"
+	// GORILLA OVERRIDE (2026-09-01): do NOT default shell.path here.
+	//
+	// This block used to set shell.path to $SHELL (or /bin/bash) and shell.args
+	// to {"-l"} on every platform, unconditionally. Because viper defaults are
+	// indistinguishable from a real setting, cfg.Shell.Path was NEVER empty —
+	// which meant the shell package's `if shellPath == "" { detect() }` branch
+	// was dead code in the running application. It only ever executed in unit
+	// tests, where config is nil.
+	//
+	// On Windows the consequence was total: the bash tool tried to start
+	// "/bin/bash" with "-l", that path does not exist, newPersistentShell
+	// returned nil, and EVERY bash call in the session failed with "Shell could
+	// not be started" — 10 of 10 recorded calls in the local session database,
+	// plus three nil-dereference panics. The carefully written PowerShell
+	// detection and wrapper downstream of it were never reached once.
+	//
+	// Leaving these unset lets shell.resolveShellPath() do the platform-aware
+	// detection it was written for, while an explicit "shell.path" in config.json
+	// still wins — which is the only behaviour anyone actually relied on.
+	if os.Getenv("SHELL") != "" && runtime.GOOS != "windows" {
+		viper.SetDefault("shell.path", os.Getenv("SHELL"))
+		viper.SetDefault("shell.args", []string{"-l"})
 	}
-	viper.SetDefault("shell.path", shellPath)
-	viper.SetDefault("shell.args", []string{"-l"})
 
 	if debug {
 		viper.SetDefault("debug", true)
@@ -776,11 +804,72 @@ func Validate() error {
 // helper below exists for anything user-facing.
 func ProviderAPIKey(provider models.ModelProvider) string {
 	if cfg != nil {
-		if p, ok := cfg.Providers[provider]; ok && p.APIKey != "" {
-			return p.APIKey
+		if p, ok := cfg.Providers[provider]; ok {
+			if k := SanitiseAPIKey(p.APIKey); k != "" {
+				return k
+			}
 		}
 	}
-	return getProviderAPIKey(provider)
+	return SanitiseAPIKey(getProviderAPIKey(provider))
+}
+
+// sanitiseProviderKeys rewrites every stored credential through SanitiseAPIKey,
+// so an unusable one reads as absent everywhere rather than as configured-but-
+// broken. Local endpoint keys go through it too: the same paste can corrupt them.
+func sanitiseProviderKeys() {
+	if cfg == nil {
+		return
+	}
+	for name, p := range cfg.Providers {
+		clean := SanitiseAPIKey(p.APIKey)
+		if clean == p.APIKey {
+			continue
+		}
+		if clean == "" && p.APIKey != "" {
+			logging.Warn("ignoring unusable API key (contains control characters)", "provider", name)
+		}
+		p.APIKey = clean
+		cfg.Providers[name] = p
+	}
+	for i, e := range cfg.LocalEndpoints {
+		cfg.LocalEndpoints[i].APIKey = SanitiseAPIKey(e.APIKey)
+	}
+}
+
+// SanitiseAPIKey strips whitespace and refuses a key containing control
+// characters.
+//
+// GORILLA OVERRIDE (2026-09-01): found in a real config.json on Windows, where
+// the gemini provider's key was stored as nine NUL bytes — JSON "" nine
+// times over. A key like that is not merely wrong, it is
+// unusable in a way that produces a baffling error a long way from the cause:
+// Go's net/http refuses to send a header containing control bytes, so every
+// request died with
+//
+//	net/http: invalid header field value for "X-Goog-Api-Key"
+//
+// which reads like a bug in the HTTP layer rather than "your saved key is
+// garbage". A key of only control characters is treated as absent, so the
+// provider falls back to the environment and, failing that, reports itself
+// unconfigured — which is the truth and is actionable.
+//
+// Trailing whitespace is stripped rather than rejected: a key pasted from a
+// browser or read from a file almost always carries a newline, that is the
+// user's most likely single mistake, and silently working is the right
+// behaviour there.
+func SanitiseAPIKey(key string) string {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ""
+	}
+	for _, r := range key {
+		// Anything below space (NUL, embedded newlines, tabs mid-key) or DEL
+		// cannot legally travel in an HTTP header value.
+		if r < 0x20 || r == 0x7F {
+			return ""
+		}
+	}
+	return key
 }
 
 // getProviderAPIKey gets the API key for a provider from environment variables
@@ -1228,6 +1317,32 @@ func registerLocalEndpoints() {
 		ep := seenURL[url]
 		if n, id := models.RegisterLocalEndpoint(ep.Name, ep.BaseURL, ep.APIKey); n > 0 && first == "" {
 			first = id
+		}
+	}
+
+	// GORILLA OVERRIDE (2026-09-01): if the user has configured no local endpoint
+	// at all, look for the two that are worth looking for.
+	//
+	// Ollama and LM Studio are running on a great many developer machines and
+	// serve an OpenAI-compatible API on a well-known port. Someone who has one
+	// running and no cloud key configured would otherwise be told this program
+	// has no models — while a perfectly good one is listening on loopback.
+	//
+	// Deliberately conditional on the list being EMPTY. Probing is never allowed
+	// to interfere with, reorder, or duplicate a setup somebody made on purpose;
+	// this is a first-run courtesy, not a background scanner. Nothing is written
+	// to config.json, so it also cannot accumulate stale entries.
+	if len(order) == 0 {
+		for _, name := range models.DiscoverLocalRuntimes() {
+			logging.Info("using a local model server found on its default port", "name", name)
+		}
+		if first == "" {
+			for id := range models.SupportedModels {
+				if models.SupportedModels[id].Provider == models.ProviderLocal {
+					first = id
+					break
+				}
+			}
 		}
 	}
 	// Default the agents to a local model only if nothing else set one.
