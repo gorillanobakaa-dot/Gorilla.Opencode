@@ -47,6 +47,7 @@ type keyMap struct {
 	Models          key.Binding
 	SwitchTheme     key.Binding
 	ToggleSelection key.Binding
+	CopyTranscript  key.Binding
 }
 
 // ReopenProviderPortal reopens the every-launch provider picker from inside a
@@ -189,6 +190,16 @@ var keys = keyMap{
 	ToggleSelection: key.NewBinding(
 		key.WithKeys("ctrl+y"),
 		key.WithHelp("ctrl+y", "toggle selection mode"),
+	),
+	// GORILLA OVERRIDE (2026-09-01): Ctrl+A copies the conversation.
+	//
+	// On Windows this keystroke reaches the program rather than the
+	// console, so the console can never answer it and the program has to.
+	// Binding the key the user already presses costs nothing and is the
+	// only way select-all can exist here at all. See copyTranscript.
+	CopyTranscript: key.NewBinding(
+		key.WithKeys("ctrl+a"),
+		key.WithHelp("ctrl+a", "copy the whole conversation"),
 	),
 }
 
@@ -1575,12 +1586,17 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		case "export":
 			return a, a.openExportDialog()
+		// GORILLA OVERRIDE (2026-09-01): /copy is the clipboard counterpart
+		// of /export. On Windows the terminal cannot select-all for us, so
+		// the program has to. See copyTranscript in export.go.
+		case "copy", "clip", "selectall":
+			return a, a.copyTranscript()
 		// GORILLA OVERRIDE: /plain switches to the copyable interface. It cannot
 		// take effect now — the renderer is already running and owns the screen —
 		// so it records the preference and says plainly that it applies next
 		// launch, rather than appearing to do nothing. The preference is what makes
 		// the mode reachable from the desktop icon, which passes no flags.
-		case "plain", "copy", "copyable":
+		case "plain", "copyable":
 			if err := config.SetInterfaceMode(config.InterfacePlain); err != nil {
 				return a, util.ReportError(err)
 			}
@@ -2051,7 +2067,22 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, a.themeDialog.Init()
 			}
 			return a, nil
+		case key.Matches(msg, keys.CopyTranscript):
+			return a, a.copyTranscript()
+		// GORILLA FIX (2026-09-01): Ctrl+Y must not turn mouse tracking ON.
+		//
+		// This pairing was written for the alternate screen. Outside it we
+		// never ask for mouse events in the first place (mouseOption in
+		// cmd/root.go skips WithMouseCellMotion precisely so that dragging to
+		// select keeps working). So the first Ctrl+Y disabled tracking that
+		// was never on, and the SECOND one enabled it — breaking the drag
+		// selection that had worked by default, while reporting the opposite.
+		// Someone hunting for a way to copy text is exactly the person who
+		// presses this key.
 		case key.Matches(msg, keys.ToggleSelection):
+			if a.scrollback {
+				return a, util.ReportInfo("Selection is already native here — drag with the mouse to select, then press Enter to copy. Ctrl+A copies the whole conversation.")
+			}
 			a.selectionMode = !a.selectionMode
 			if a.selectionMode {
 				fmt.Print("\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l")
@@ -2502,6 +2533,54 @@ func clampToWidth(view string, width int) string {
 	return strings.Join(lines, "\n")
 }
 
+// placeOverlay composites one dialog onto the frame, centred, growing the canvas
+// when the dialog does not fit.
+//
+// GORILLA FIX (2026-09-01): this replaced twenty-eight hand-copied blocks that
+// each recomputed the same centring arithmetic. They were identical, so a fix
+// applied to one of them was a fix applied to one twenty-eighth of the program.
+//
+// The growth is the point. PlaceOverlay CLAMPS an overlay to its background, so
+// a canvas shorter than the dialog silently truncates it — and in scrollback
+// mode the canvas is deliberately short, because it is only the footer. Growing
+// upward keeps the footer at the bottom, where the cursor belongs, and puts the
+// dialog directly above it: the frame is then exactly as tall as the dialog
+// needs, and the printed conversation above it stays on screen.
+//
+// Growing an INLINE frame is safe. The extra rows scroll the conversation up
+// into the terminal's own scrollback, intact, and shrinking back erases only
+// rows the frame itself drew. That is the whole reason dialogs no longer switch
+// to the alternate screen — see bufferCmd in overlay_state.go.
+func (a appModel) placeOverlay(overlay, bg string) string {
+	oh := lipgloss.Height(overlay)
+
+	width := a.width
+	if width <= 0 {
+		width = lipgloss.Width(bg)
+	}
+	col := width/2 - lipgloss.Width(overlay)/2
+	if col < 0 {
+		col = 0
+	}
+
+	if a.scrollback {
+		// Grow by the dialog's FULL height and sit it at the top, so the footer
+		// keeps the rows below it. Growing by only the shortfall would centre the
+		// dialog in a canvas the footer already occupies and draw over it, taking
+		// the prompt and the session numbers off screen for as long as the dialog
+		// was up.
+		return layout.PlaceOverlay(col, 0, overlay, strings.Repeat("\n", oh)+bg, true)
+	}
+
+	// On the alternate screen the canvas is already a whole screen, so the
+	// dialog is centred in it as it always was.
+	row := lipgloss.Height(bg)/2 - oh/2
+	if row < 0 {
+		row = 0
+	}
+	return layout.PlaceOverlay(col, row, overlay, bg, true)
+}
+
 func (a appModel) View() string {
 	// GORILLA OVERRIDE: with the alternate screen off and no dialog open, the frame
 	// is only the footer. Rendering the full-screen layout here would paint a whole
@@ -2511,13 +2590,32 @@ func (a appModel) View() string {
 		return a.footerView()
 	}
 
-	components := []string{
-		a.pages[a.currentPage].View(),
+	// GORILLA FIX (2026-09-01): in scrollback mode the canvas under a dialog is
+	// the FOOTER, not the page.
+	//
+	// The conversation here is PRINTED into the terminal, not drawn, so the
+	// page's message area is empty by construction. Rendering the page under a
+	// dialog therefore paints a screen of blank over text the user can still
+	// see, which is exactly what the owner reported on 2026-09-01.
+	//
+	// The old answer was to switch to the alternate screen for the duration.
+	// That is what destroyed the transcript: bubbletea tracks linesRendered
+	// across BOTH buffers and never resets it on exit, so the tall alt-screen
+	// frame made the next inline erase walk sixty-odd rows up into the printed
+	// conversation. See TO.DO.TO.FIX/BUG-ALTSCREEN-ERASE.md.
+	//
+	// placeOverlay grows this canvas to whatever the dialog needs and no
+	// further, so a short dialog leaves the conversation visible above it and a
+	// full-screen one (/arsenal, /osint) still gets its whole screen.
+	var appView string
+	if a.scrollback {
+		appView = a.footerView()
+	} else {
+		appView = lipgloss.JoinVertical(lipgloss.Top,
+			a.pages[a.currentPage].View(),
+			a.status.View(),
+		)
 	}
-
-	components = append(components, a.status.View())
-
-	appView := lipgloss.JoinVertical(lipgloss.Top, components...)
 
 	// GORILLA FIX (2026-08-19), from a screenshot of a real run: pad the
 	// background to the terminal height BEFORE compositing any overlay.
@@ -2532,7 +2630,7 @@ func (a appModel) View() string {
 	// This is the mirror image of the bug the clamp exists to prevent, and it
 	// only appears in scrollback mode — which is the mode this project steers
 	// older machines toward, so it is the mode most users are in.
-	if a.height > 0 {
+	if !a.scrollback && a.height > 0 {
 		if h := lipgloss.Height(appView); h < a.height {
 			appView += strings.Repeat("\n", a.height-h)
 		}
@@ -2550,17 +2648,7 @@ func (a appModel) View() string {
 			Foreground(t.Text())
 
 		overlay := style.Render("Summarizing\n" + a.compactingMessage)
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showHelp {
@@ -2580,288 +2668,122 @@ func (a appModel) View() string {
 		a.help.SetBindings(bindings)
 
 		overlay := a.help.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showSessionDialog {
 		overlay := a.sessionDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showModelDialog {
 		overlay := a.modelDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showLoadoutDialog {
 		overlay := a.loadoutDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showTasksDialog {
 		overlay := a.tasksDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showCommandHelp {
 		overlay := a.commandHelp.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.loginURL != "" {
 		overlay := a.loginURLOverlay()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showExportDialog {
 		overlay := a.exportDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showAddDirDialog {
 		overlay := a.addDirDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showPromptsDialog {
 		overlay := a.promptsDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showResetDialog {
 		overlay := a.resetDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showSettingsDialog {
 		overlay := a.settingsDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(col, row, overlay, appView, true)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showConnectDialog {
 		overlay := a.connectDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showCommandDialog {
 		overlay := a.commandDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showModelFollowDialog {
 		overlay := a.modelFollowDialog.View()
-		appView = layout.PlaceOverlay(
-			a.width/2-lipgloss.Width(overlay)/2,
-			a.height/2-lipgloss.Height(overlay)/2,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showResearchDialog {
 		overlay := a.researchDialog.View()
-		appView = layout.PlaceOverlay(
-			a.width/2-lipgloss.Width(overlay)/2,
-			a.height/2-lipgloss.Height(overlay)/2,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showOsintDialog {
 		overlay := a.osintDialog.View()
-		appView = layout.PlaceOverlay(
-			a.width/2-lipgloss.Width(overlay)/2,
-			a.height/2-lipgloss.Height(overlay)/2,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showSessionsMgr {
 		overlay := a.sessionsMgr.View()
-		appView = layout.PlaceOverlay(
-			a.width/2-lipgloss.Width(overlay)/2,
-			a.height/2-lipgloss.Height(overlay)/2,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showOsintRecover {
 		overlay := a.osintRecover.View()
-		appView = layout.PlaceOverlay(
-			a.width/2-lipgloss.Width(overlay)/2,
-			a.height/2-lipgloss.Height(overlay)/2,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showOsintPage {
 		overlay := a.osintPage.View()
-		appView = layout.PlaceOverlay(
-			a.width/2-lipgloss.Width(overlay)/2,
-			a.height/2-lipgloss.Height(overlay)/2,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showArsenal {
 		overlay := a.arsenalPage.View()
-		appView = layout.PlaceOverlay(
-			a.width/2-lipgloss.Width(overlay)/2,
-			a.height/2-lipgloss.Height(overlay)/2,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showInitDialog {
 		overlay := a.initDialog.View()
-		appView = layout.PlaceOverlay(
-			a.width/2-lipgloss.Width(overlay)/2,
-			a.height/2-lipgloss.Height(overlay)/2,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showThemeDialog {
 		overlay := a.themeDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showMultiArgumentsDialog {
 		overlay := a.multiArgumentsDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	// GORILLA OVERRIDE (2026-08-23): THE LAST THREE OVERLAYS ARE DRAWN IN REVERSE
@@ -2894,47 +2816,17 @@ func (a appModel) View() string {
 	// Pinned by TestBlockingOverlaysAreDrawnInReverseKeyOrder.
 	if a.showPermissions {
 		overlay := a.permissions.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showQuit {
 		overlay := a.quit.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 	}
 
 	if a.showFilepicker {
 		overlay := a.filepicker.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		appView = a.placeOverlay(overlay, appView)
 
 	}
 

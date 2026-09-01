@@ -55,29 +55,41 @@ func (a appModel) anyOverlayOpen() bool {
 	return false
 }
 
-// bufferCmd returns the command that keeps the terminal buffer in step with the
-// dialogs, given whether an overlay was open before this update.
+// bufferCmd used to switch the terminal between the main and alternate screen
+// buffers as dialogs opened and closed. It now never switches, and returns nil.
 //
-// This is deliberately a named function rather than inline logic in Update: it is
-// the whole rule, and a test that reimplemented it would pass while the program
-// was wrong. Tests call this.
+// GORILLA FIX (2026-09-01). The switch was destroying the conversation, and it
+// could not be made safe from outside bubbletea.
+//
+// bubbletea's standard renderer tracks r.linesRendered and assigns it in exactly
+// one place: r.linesRendered = len(newLines), the height of the frame it last
+// drew. That counter is shared by both buffers. exitAltScreen calls repaint(),
+// which clears lastRender and lastRenderedLines but NOT linesRendered. So after
+// a dialog had been drawn full-screen on the alternate buffer, the first inline
+// flush back on the main buffer ran
+//
+//	} else if r.linesRendered > 1 {
+//	        buf.WriteString(ansi.CursorUp(r.linesRendered - 1))
+//
+// with linesRendered still holding the alt-screen height — walking the cursor
+// sixty-odd rows UP into the printed conversation and drawing the short footer
+// over it. The owner reported it as a blank screen at every permission prompt
+// followed by "the past messages are gone", and that is exactly what it was.
+//
+// There is no public lever that resets linesRendered; clearScreen() only calls
+// repaint() too. So the fix is not to switch buffers at all. Dialogs are now
+// composited inline by placeOverlay in tui.go, on a canvas grown to the dialog's
+// own height. Inline growth scrolls the conversation up into the terminal's
+// scrollback intact, and the shrink back erases only rows the frame itself drew,
+// because linesRendered then describes rows that really are the frame's.
+//
+// Kept as a function, rather than deleted with its call site, because this is
+// where the decision is documented and where a future exception would have to be
+// argued for. The tests below pin the rule.
+//
+// See TO.DO.TO.FIX/BUG-ALTSCREEN-ERASE.md for the full write-up.
 func (a appModel) bufferCmd(wasOpen bool) tea.Cmd {
-	if !a.scrollback {
-		return nil
-	}
-	nowOpen := a.anyOverlayOpen()
-	if nowOpen == wasOpen {
-		// No change. Returning a command here would switch buffers on every
-		// keystroke, which flickers and loses the printed conversation from view.
-		return nil
-	}
-	if nowOpen {
-		return tea.EnterAltScreen
-	}
-	// Leaving discards everything drawn in the alternate screen, which is exactly
-	// right: the dialog leaves no trace, and the printed conversation underneath was
-	// never in that buffer to begin with.
-	return tea.ExitAltScreen
+	return nil
 }
 
 // overlayFlagNames is used by tests to report what was discovered, so a failure
