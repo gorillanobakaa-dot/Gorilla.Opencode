@@ -132,7 +132,12 @@ This session's shell is PowerShell on Windows. Write PowerShell, not POSIX shell
 - '2>/dev/null' does not exist; use '2>$null'. There is no /dev/null, /tmp, or ~ — use $env:TEMP and $env:USERPROFILE.
 - Bash control flow ('if [ -f x ]', 'for x in *', backtick substitution) is a parse error. Use 'if (Test-Path x)', 'foreach ($x in ...)', '$(cmd)'.
 - Never use Read-Host, Get-Credential, or any command that waits for console input: this shell has no interactive terminal and the command will hang until it times out.
-- ConvertFrom-Json returns a PSCustomObject, not a hashtable.`
+- ConvertFrom-Json returns a PSCustomObject, not a hashtable.
+- There is NO Unix userland here. bc, awk, sed, jq, make, tar, less and friends are
+  not installed. Do not reach for one because the task looks Unix-shaped; if you
+  genuinely need an external program, check it first with Get-Command <name>.
+- For arithmetic, do NOT shell out at all. PowerShell evaluates expressions itself:
+  write $(2 + 2 * 989), not 'echo ... | bc'.`
 
 func bashDescription() string {
 	bannedCommandsStr := strings.Join(bannedCommands, ", ")
