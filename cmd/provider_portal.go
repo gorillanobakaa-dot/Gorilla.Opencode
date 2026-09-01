@@ -29,6 +29,15 @@ const (
 	ollamaEndpointName = "Ollama"
 	ollamaBaseURL      = "http://localhost:11434/v1"
 
+	// GORILLA OVERRIDE (2026-09-01): LM Studio had no row at all. It was
+	// reachable only by typing a URL into the custom-endpoint form in /connect,
+	// which is precisely the manual step the people this is built for cannot
+	// take. It is one of the two most common ways to run a model locally and it
+	// is free, private and needs no account — so it belongs in the picker beside
+	// Ollama, not behind a form.
+	lmStudioEndpointName = "LM Studio"
+	lmStudioBaseURL      = "http://localhost:1234/v1"
+
 	// Cloudflare Workers AI. The base URL embeds the account id, so it is built
 	// per-user from what they paste rather than being a constant.
 	cloudflareEndpointName = "Cloudflare Workers AI"
@@ -143,7 +152,18 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 
 	nimEp, nimReady := endpointFor(nimBaseURL)
 	ollamaEp, _ := endpointFor(ollamaBaseURL)
+	lmStudioEp, _ := endpointFor(lmStudioBaseURL)
 	nimReady = nimReady && nimEp.APIKey != ""
+
+	// GORILLA OVERRIDE (2026-09-01): ask the two local runtimes what they are
+	// serving, before drawing the menu.
+	//
+	// Both probes run concurrently against loopback with a 1.5s ceiling, and a
+	// port with nothing behind it refuses instantly — so the common case costs
+	// no measurable time. What it buys is a row that tells the truth: "running -
+	// 3 models (qwen2.5-coder...)" instead of a readiness tick that means
+	// nothing until you select it and it fails.
+	localProbes := models.ProbeDefaultLocalRuntimes()
 
 	// The user's own name for each endpoint, so "Active" compares like with like.
 	// Falls back to ours when they have no entry for that URL yet.
@@ -154,6 +174,10 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 	ollamaName := ollamaEndpointName
 	if ollamaEp.Name != "" {
 		ollamaName = ollamaEp.Name
+	}
+	lmStudioName := lmStudioEndpointName
+	if lmStudioEp.Name != "" {
+		lmStudioName = lmStudioEp.Name
 	}
 
 	// Which row is the session currently on?
@@ -263,15 +287,27 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			Active:      curEndpoint == nimName,
 		},
 		// Everything else that costs nothing: your own machine, then free keys.
-		{
-			ID:   "ollama",
-			Free: true,
-			Name: "Local Ollama (no key)",
-			What: "Models running on this machine at localhost:11434. Free and private; " +
-				"speed depends on this machine. Ollama must already be running.",
-			Configured: true, // nothing to enter; reachability is checked on apply
-			Active:     curEndpoint == ollamaName,
-		},
+		//
+		// GORILLA OVERRIDE (2026-09-01): both local rows now report what is
+		// ACTUALLY there. See localRuntimeRow.
+		localRuntimeRow(localRuntimeSpec{
+			id:      "ollama",
+			label:   "Ollama",
+			probe:   localProbes["ollama"],
+			active:  curEndpoint == ollamaName,
+			port:    "11434",
+			getIt:   "Install it free from ollama.com, then run: ollama pull qwen2.5-coder",
+			startIt: "Start Ollama (it runs in the background / system tray), then re-open this menu.",
+		}),
+		localRuntimeRow(localRuntimeSpec{
+			id:      "lmstudio",
+			label:   "LM Studio",
+			probe:   localProbes["lmstudio"],
+			active:  curEndpoint == lmStudioName,
+			port:    "1234",
+			getIt:   "Install it free from lmstudio.ai, download a model, then start its local server.",
+			startIt: "Open LM Studio, load a model, and turn on the local server (the Developer tab), then re-open this menu.",
+		}),
 		{
 			ID:   "cloudflare",
 			Free: true,
@@ -514,6 +550,8 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 
 	case "ollama":
 		return applyLocalEndpoint(ollamaEndpointName, ollamaBaseURL, "")
+	case "lmstudio":
+		return applyLocalEndpoint(lmStudioEndpointName, lmStudioBaseURL, "")
 	case "cloudflare":
 		return applyCloudflare(c.Input, c.Input2)
 
@@ -559,6 +597,69 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 // applyLocalEndpoint saves the endpoint, registers its models, and points the
 // agents at the first one. An empty key keeps whatever key is already stored,
 // which is what Enter-on-a-ready-row means.
+// localRuntimeSpec describes one on-this-machine model server for the picker.
+type localRuntimeSpec struct {
+	id      string
+	label   string
+	probe   models.LocalProbe
+	active  bool
+	port    string
+	getIt   string // what to do when it is not installed
+	startIt string // what to do when it is installed but not running
+}
+
+// localRuntimeRow builds a picker row that states what is actually on this
+// machine right now.
+//
+// GORILLA OVERRIDE (2026-09-01): the Ollama row used to be a flat
+// `Configured: true` with the comment "reachability is checked on apply". That
+// gave a local server that was not running the SAME readiness marker as a
+// working cloud key. A user picked it, the apply failed, and nothing in the
+// interface had given them a reason to expect that — so the honest reading was
+// "this program is broken", not "I need to start Ollama".
+//
+// PHILOSOPHY.md's whole argument is that a closed door must say how to open it.
+// So the row now distinguishes the three states that need three different
+// actions, and says which one you are in before you commit:
+//
+//	running        -> how many models, and the first couple by name
+//	not running    -> the exact thing to click, and where the setting is
+//	not installed  -> where to get it, free, and the one command after that
+//
+// Marked Configured only when it is genuinely usable, so the readiness column
+// means one thing everywhere in this menu.
+func localRuntimeRow(s localRuntimeSpec) startup.ProviderRow {
+	name := fmt.Sprintf("%s on this machine - %s", s.label, s.probe.Summary())
+
+	what := fmt.Sprintf(
+		"Models running on your own computer at localhost:%s. Free, private, and it "+
+			"works with no internet: nothing you type leaves the machine. Speed depends "+
+			"on your computer rather than on a subscription.", s.port)
+
+	var warning string
+	if s.probe.Running && s.probe.Count > 0 {
+		what += fmt.Sprintf("\n\nReady now: %d model(s) available - %s.",
+			s.probe.Count, strings.Join(s.probe.Names, ", "))
+	} else {
+		// Not reachable. Say both things, because from here we cannot tell
+		// "installed but switched off" from "never installed", and guessing
+		// wrong sends the reader to the wrong fix.
+		warning = s.label + " is not answering on port " + s.port + " right now.\n" +
+			"  If it IS installed: " + s.startIt + "\n" +
+			"  If it is NOT installed: " + s.getIt
+	}
+
+	return startup.ProviderRow{
+		ID:         s.id,
+		Free:       true,
+		Name:       name,
+		What:       what,
+		Warning:    warning,
+		Configured: s.probe.Running && s.probe.Count > 0,
+		Active:     s.active,
+	}
+}
+
 func applyLocalEndpoint(name, baseURL, key string) error {
 	key = strings.TrimSpace(key)
 

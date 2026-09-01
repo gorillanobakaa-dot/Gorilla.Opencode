@@ -1062,9 +1062,22 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, quotaTierCheckCmd(prev))
 			}
 			model := a.app.CoderAgent.Model()
-			contextWindow := model.ContextWindow
 			tokens := a.selectedSession.CompletionTokens + a.selectedSession.PromptTokens
-			if (tokens >= int64(float64(contextWindow)*0.95)) && config.Get().AutoCompact {
+			// GORILLA OVERRIDE (2026-09-01): compact against the room that is
+			// actually usable, and do it sooner.
+			//
+			// This was `tokens >= 0.95 * contextWindow`, which is two problems.
+			// It measured against the FULL window, leaving nothing for the reply;
+			// and 95% of a 15K local model is 14.3K, so the trigger sat 700
+			// tokens from the edge — less than a single `view` of a source file.
+			//
+			// `tokens` here is also the last completed response's usage, which is
+			// always behind: the tool results of the current turn are not in it.
+			// That lag is what the hard guard in agent/contextbudget.go exists to
+			// catch. This threshold's job is to make that guard rare, so it fires
+			// at 85% of the USABLE window rather than 95% of the total.
+			usable := agent.UsableWindow(model)
+			if usable > 0 && tokens >= int64(float64(usable)*0.85) && config.Get().AutoCompact {
 				cmds = append(cmds, util.CmdHandler(startCompactSessionMsg{}))
 			}
 		}

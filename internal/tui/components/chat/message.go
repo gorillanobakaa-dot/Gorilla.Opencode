@@ -15,6 +15,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
+	"github.com/opencode-ai/opencode/internal/llm/tools/shell"
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
@@ -416,6 +417,16 @@ func toolName(name string) string {
 	case agent.AgentToolName:
 		return "Task"
 	case tools.BashToolName:
+		// GORILLA OVERRIDE (2026-09-01): name the shell that actually ran it.
+		//
+		// The transcript line read "Bash: cd C:\Users\... && git status" on a
+		// machine where the command went to PowerShell. That is not a cosmetic
+		// mismatch: the reader is shown a command, in a syntax, attributed to a
+		// shell - and on Windows two of those three were wrong, which makes a
+		// failing command impossible to reason about.
+		if shell.IsWindowsPowerShell() {
+			return "PowerShell"
+		}
 		return "Bash"
 	case tools.EditToolName:
 		return "Edit"

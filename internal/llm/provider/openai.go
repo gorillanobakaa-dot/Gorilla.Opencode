@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -629,6 +630,58 @@ func explainAPIStatus(status int, modelName string) string {
 	return ""
 }
 
+// contextOverflowRe pulls the two numbers out of a "too long" rejection.
+//
+// Every OpenAI-compatible server words this differently — llama.cpp and LM
+// Studio say "request (18545 tokens) exceeds the available context size (15104
+// tokens)", Ollama says "context length exceeded", OpenAI says "maximum context
+// length is N tokens, however you requested M". The numbers are what matter and
+// they always appear in that order, so the first two integers in the message are
+// taken rather than trying to parse each vendor's sentence.
+var contextOverflowRe = regexp.MustCompile(`(\d[\d,]{2,})`)
+
+// explainContextOverflow turns a provider's "too many tokens" rejection into a
+// sentence that says what to do about it.
+//
+// GORILLA OVERRIDE (2026-09-01): this arrived as a wall of nested JSON. Measured
+// from a real session on a local model — the whole thing, on one line, in the
+// status bar:
+//
+//	received error while streaming: {"message":"Engine protocol predict request
+//	returned 400: {\"error\":{\"code\":400,\"message\":\"request (18545 tokens)
+//	exceeds the available context size (15104 tokens), try increasing it\",
+//	\"type\":\"exceed_context_size_error\",\"n_prompt_tokens\":18545,
+//	\"n_ctx\":15104}}"}
+//
+// Six recorded occurrences in one local session database. The information the
+// user needs is in there — 18545 against 15104 — but it is behind two levels of
+// escaping, and the advice it offers ("try increasing it") is addressed to
+// whoever configured the server, which for a local model IS the user, but they
+// have no way to know that from here.
+//
+// This is a recoverable condition, not a crash: /compact reclaims the room, and
+// for a local model the context length is a slider in Ollama or LM Studio.
+func explainContextOverflow(msg string) string {
+	low := strings.ToLower(msg)
+	overflow := strings.Contains(low, "exceed_context_size") ||
+		strings.Contains(low, "exceeds the available context") ||
+		strings.Contains(low, "maximum context length") ||
+		strings.Contains(low, "context length exceeded") ||
+		strings.Contains(low, "too many tokens")
+	if !overflow {
+		return ""
+	}
+
+	sizes := ""
+	if nums := contextOverflowRe.FindAllString(msg, 2); len(nums) == 2 {
+		sizes = fmt.Sprintf(" (needed %s tokens, the model holds %s)", nums[0], nums[1])
+	}
+	return "This conversation is now bigger than the model can hold" + sizes + ". " +
+		"Run /compact to summarise the history and free up room, or /new to start fresh. " +
+		"If this is a model on your own machine, you can also raise its context length " +
+		"in Ollama or LM Studio and restart it."
+}
+
 func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool) (bool, int64, error) {
 	var apierr *openai.Error
 	if !errors.As(err, &apierr) {
@@ -644,6 +697,21 @@ func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool)
 			// A retry restarts the stream from scratch; retrying mid-answer
 			// would duplicate output. Never safe once content has streamed.
 			return false, 0, err
+		}
+		// GORILLA OVERRIDE (2026-09-01): a context-window rejection reaches here
+		// as a PLAIN stream error, not an *openai.Error, because llama.cpp and
+		// LM Studio report it in-band on the SSE stream wrapped in their own
+		// envelope. That is how six of these ended up in the session database as
+		// two levels of nested JSON in the status bar.
+		//
+		// It must be caught before the busy/transient classification below:
+		// "Engine protocol predict request returned 400" contains neither a
+		// recognisable status nor anything transient, so it would fall through
+		// to a bare return — and if a future edit made it look retryable, every
+		// retry would re-upload the same oversized request for the same answer.
+		if plain := explainContextOverflow(err.Error()); plain != "" {
+			logging.Error("request exceeded the model's context window", "err", err)
+			return false, 0, fmt.Errorf("%s  ⟨%w⟩", plain, err)
 		}
 		// GORILLA OVERRIDE: two recoverable classes reach here as plain
 		// (non-*openai.Error) stream errors:
@@ -708,6 +776,15 @@ func (o *openaiClient) shouldRetry(attempts int, err error, contentEmitted bool)
 	// Retry on rate-limit (429) and server-side errors (500/503) and the
 	// "overloaded" 529 some providers use.
 	if apierr.StatusCode != 429 && apierr.StatusCode != 500 && apierr.StatusCode != 503 && apierr.StatusCode != 529 {
+		// GORILLA OVERRIDE (2026-09-01): "the conversation is too big" is a
+		// recoverable condition with an obvious remedy, and it must not be
+		// retried — every retry re-uploads the same oversized request and gets
+		// the same rejection. Checked before the status table because it is a
+		// plain 400, which that table has nothing useful to say about.
+		if plain := explainContextOverflow(err.Error()); plain != "" {
+			logging.Error("request exceeded the model's context window", "err", err)
+			return false, 0, fmt.Errorf("%s  ⟨%w⟩", plain, err)
+		}
 		if plain := explainAPIStatus(apierr.StatusCode, o.providerOptions.model.Name); plain != "" {
 			logging.Error("provider rejected the request", "status", apierr.StatusCode, "err", err)
 			// GORILLA FIX: explain AND show, never explain INSTEAD of showing.

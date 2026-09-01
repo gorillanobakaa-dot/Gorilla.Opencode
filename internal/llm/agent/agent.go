@@ -353,9 +353,33 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 			// the second is 429'd, which triggered a retry storm on a
 			// plain "yo". Wait for the main request to finish first so we
 			// only ever have one request in flight.
-			deadline := time.Now().Add(120 * time.Second)
+			deadline := time.Now().Add(titleWaitBudget())
 			for a.IsSessionBusy(sessionID) && time.Now().Before(deadline) {
 				time.Sleep(150 * time.Millisecond)
+			}
+			// GORILLA OVERRIDE (2026-09-01): if the wait ran out, ABANDON the
+			// title. Do not fire it anyway.
+			//
+			// The loop above exists so the title request never runs beside the
+			// user's own — that concurrency caused a 429 retry storm on capped
+			// providers. But when the deadline expired the code proceeded
+			// regardless, which produces exactly the thing the wait was written
+			// to prevent, just 120 seconds later.
+			//
+			// Nobody noticed because on a cloud model a turn finishes well
+			// inside the budget. On a local model it does not: measured on this
+			// machine, one turn spends 6-8 minutes in prompt processing alone,
+			// so the deadline ALWAYS expired and the title always fired into a
+			// busy single-slot server — visible in the LM Studio log as a second
+			// /v1/chat/completions arriving mid-turn and queueing behind the
+			// real work. The user waits twice for a cosmetic string.
+			//
+			// A session without a generated title is not broken; it keeps the
+			// default one. Losing that is much cheaper than doubling every turn.
+			if a.IsSessionBusy(sessionID) {
+				logging.Info("skipping title generation: the session is still busy",
+					"session", sessionID, "waited", titleWaitBudget())
+				return
 			}
 			titleErr := a.generateTitle(context.Background(), sessionID, content)
 			if titleErr != nil {
@@ -430,6 +454,30 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 		if (agentMessage.FinishReason() == message.FinishReasonToolUse) && toolResults != nil {
 			// We are not done, we need to respond with the tool response
 			msgHistory = append(msgHistory, agentMessage, *toolResults)
+
+			// GORILLA OVERRIDE (2026-09-01): check the request FITS before
+			// spending a round trip discovering that it does not.
+			//
+			// This is the exact point where a conversation overflows: the tool
+			// results just appended can be thousands of tokens (a `view` of a
+			// large file), and nothing else measures them. The footer is derived
+			// from the last completed response's usage, so it is still showing a
+			// number from before these results existed — 9.7K, in the session
+			// where the request that followed was 18.5K against a 15.1K window.
+			//
+			// Catching it here rather than at the provider means the user gets
+			// one clear sentence naming the fix, instead of two levels of nested
+			// vendor JSON after a wasted upload. The turn's work is not lost:
+			// everything up to this point is already recorded, so /compact
+			// carries it forward.
+			if over := ContextOverflowMessage(
+				EstimateRequestTokens(a.provider.SystemPrompt(), msgHistory, a.getTools()),
+				a.provider.Model(),
+			); over != "" {
+				agentMessage.AddFinish(message.FinishReasonError)
+				a.messages.Update(context.Background(), agentMessage)
+				return a.err(errors.New(over))
+			}
 			continue
 		}
 		return AgentEvent{

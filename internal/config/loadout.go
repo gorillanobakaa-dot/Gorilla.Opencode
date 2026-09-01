@@ -15,6 +15,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -1343,4 +1344,132 @@ func ResearchOrchestratorCost(sessions int) (dollars float64, modelName string, 
 	in := float64(launchIn+synthIn) / 1e6 * m.CostPer1MIn
 	out := float64(2*ResearchOutputPerStep) / 1e6 * m.CostPer1MOut
 	return in + out, label, true
+}
+
+// LoadoutContextShare reports what fraction of the selected model's context
+// window the always-on loadout occupies, before the user has typed anything.
+//
+// GORILLA OVERRIDE (2026-09-01): the /context screen prices everything in
+// dollars, which is the right unit for a cloud model and completely the wrong
+// one for a model running on your own machine. There the suffix reads
+// "free / flat-rate tier" and the screen gives the reader no reason to care.
+//
+// But the loadout is NOT free on a local model — it is just billed in a
+// different currency. Measured on this machine: 11,142 tokens of system prompt
+// and tool schemas against a 20,224-token window is 55% of the context gone
+// before the first word, and at the ~20-28 tokens/second a laptop manages on
+// prompt processing, six to eight minutes of waiting on EVERY turn. Both of
+// those are things a person would act on, and neither was on screen.
+//
+// share is 0 when there is no model or it declares no window, so callers can
+// omit the line rather than print a meaningless zero.
+func LoadoutContextShare() (tokens, window int, modelName string, share float64) {
+	tokens = LoadoutActiveTokens()
+	if cfg == nil {
+		return tokens, 0, "", 0
+	}
+	agent, ok := cfg.Agents[AgentCoder]
+	if !ok {
+		return tokens, 0, "", 0
+	}
+	m, ok := models.SupportedModels[agent.Model]
+	if !ok || m.ContextWindow <= 0 {
+		return tokens, 0, string(agent.Model), 0
+	}
+	name := m.Name
+	if name == "" {
+		name = string(m.ID)
+	}
+	return tokens, int(m.ContextWindow), name, float64(tokens) / float64(m.ContextWindow)
+}
+
+// LoadoutCrowdsTheContext reports whether the always-on loadout takes so much of
+// the window that the conversation itself is squeezed.
+//
+// A third is the threshold: below it the loadout is an ordinary overhead, above
+// it the user will start hitting "this conversation is too big" on short
+// conversations and have no idea why — because the thing filling the window is
+// not anything they said.
+func LoadoutCrowdsTheContext() bool {
+	_, window, _, share := LoadoutContextShare()
+	return window > 0 && share >= 0.33
+}
+
+// LoadoutCut is one component worth switching off, with what it would save.
+type LoadoutCut struct {
+	Name   string
+	Tokens int
+}
+
+// LoadoutBiggestCuts names the switchable components currently ON that would
+// free the most context, largest first, skipping the ones marked Critical.
+//
+// GORILLA OVERRIDE (2026-09-01): this screen lists every component and its cost
+// and then leaves the arithmetic to the reader. Someone who already understands
+// token budgets can do it; the person this program is built for reads a list of
+// eighteen rows, has no idea which of them they are actually using, and closes
+// the screen having changed nothing.
+//
+// Critical components are excluded on purpose. Bash and Edit are the two most
+// expensive rows on the screen, and recommending them would be arithmetically
+// correct and practically ruinous — an agent that cannot run a command or change
+// a file is not a cheaper agent, it is a broken one. Advice that has to be
+// ignored to keep the program working is worse than no advice.
+func LoadoutBiggestCuts(n int) (cuts []LoadoutCut, total int) {
+	type candidate struct {
+		name   string
+		tokens int
+	}
+	var all []candidate
+	for _, c := range LoadoutComponents {
+		if c.Critical || !LoadoutEnabled(c.ID) {
+			continue
+		}
+		t := ComponentTokens(c)
+		if t <= 0 {
+			continue
+		}
+		all = append(all, candidate{c.Name, t})
+	}
+	sort.SliceStable(all, func(i, j int) bool { return all[i].tokens > all[j].tokens })
+
+	for i, c := range all {
+		if i >= n {
+			break
+		}
+		cuts = append(cuts, LoadoutCut{Name: c.name, Tokens: c.tokens})
+		total += c.tokens
+	}
+	return cuts, total
+}
+
+// GORILLA OVERRIDE (2026-09-01): the shell row is not called "Bash" on Windows.
+//
+// Found by a user reading this very screen: "do I need the bash tool on in a
+// Windows environment?" It is the most reasonable question in the world and the
+// honest answer to what the screen SAYS is no — nobody on Windows uses bash. The
+// honest answer to what the row DOES is that it is the single most important
+// tool in the program, marked Critical, and switching it off leaves an agent
+// that cannot build, test, run git, or execute anything at all.
+//
+// The row was named when the tool only ever drove bash. It now drives PowerShell
+// on Windows (see internal/llm/tools/shell), so on that platform the label was
+// actively inviting people to cripple their own install. A name that makes the
+// correct action look wrong is worse than no name.
+//
+// Only the DISPLAY name changes. The ID stays "tool.bash": it is a persisted
+// config key and the gate every caller checks, so renaming it would silently
+// reset the setting for everyone who has already chosen.
+func init() {
+	if runtime.GOOS != "windows" {
+		return
+	}
+	for i := range LoadoutComponents {
+		if LoadoutComponents[i].ID != "tool.bash" {
+			continue
+		}
+		LoadoutComponents[i].Name = "Shell tool (PowerShell)"
+		LoadoutComponents[i].Tradeoff = "agent can't run ANY commands — no build, no test, no git, nothing. " +
+			"On Windows this runs PowerShell, not bash"
+	}
 }

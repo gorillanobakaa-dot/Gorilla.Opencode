@@ -357,6 +357,36 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	accuracy := base.Foreground(t.TextMuted()).Width(w).
 		Render(fitLine("estimates, ~10% high: schema bytes / 4, not a real tokeniser"))
 
+	// GORILLA OVERRIDE (2026-09-01): say what the number MEANS, and name the
+	// rows worth cutting.
+	//
+	// The screen listed eighteen rows and their token costs and left the
+	// arithmetic to the reader. Someone who already thinks in token budgets can
+	// do it. The person this program is written for reads a long list, has no
+	// idea which of those things they actually use, and closes the screen having
+	// changed nothing — which is how a 10,000-token loadout survives on a
+	// machine where it costs six minutes a turn.
+	//
+	// Two lines, and only when they are earned: the consequence in the unit the
+	// reader pays in, and the three specific rows that would give back the most.
+	// Both are omitted entirely when the loadout is not actually crowding
+	// anything, because advice that is always on screen stops being read.
+	var advice []string
+	if _, window, _, share := config.LoadoutContextShare(); window > 0 && share >= 0.25 {
+		advice = append(advice, base.Foreground(t.Warning()).Width(w).Render(fitLine(
+			"Everything switched ON here is re-read by the AI before it answers — "+
+				"every single time you press enter.")))
+		if cuts, saved := config.LoadoutBiggestCuts(3); saved > 0 {
+			names := make([]string, 0, len(cuts))
+			for _, c := range cuts {
+				names = append(names, fmt.Sprintf("%s (~%s)", c.Name, commaInt(c.Tokens)))
+			}
+			advice = append(advice, base.Foreground(t.Warning()).Width(w).Render(fitLine(
+				fmt.Sprintf("Turn off what you do not use. Biggest right now: %s — ~%s tokens back.",
+					strings.Join(names, ", "), commaInt(saved)))))
+		}
+	}
+
 	// rowStyle applies the shared selected / disabled styling to any row.
 	rowStyle := func(selected, muted bool) lipgloss.Style {
 		s := base.Width(w)
@@ -509,7 +539,14 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	if !compact {
 		// The subtitle and the context-size line explain; they are not state you
 		// act on, so they are the first to go on a short terminal.
-		parts = append(parts, sub, fixed, accuracy, "")
+		parts = append(parts, sub, fixed, accuracy)
+		// GORILLA OVERRIDE (2026-09-01): the advice goes AFTER the estimate
+		// caveat and before the blank line, so it reads as the conclusion of the
+		// header rather than as another statistic. It is already conditional on
+		// the loadout actually crowding the context, so on a large-context model
+		// this block is empty and the screen is unchanged.
+		parts = append(parts, advice...)
+		parts = append(parts, "")
 	}
 	parts = append(parts,
 		dialHeader,
@@ -545,6 +582,32 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 // Empty string if we can't price it and there is nothing useful to add.
 func loadoutCostSuffix() string {
 	dollars, per1MIn, name, priced := config.LoadoutCost()
+
+	// GORILLA OVERRIDE (2026-09-01): say what it costs in the unit the reader
+	// actually pays in.
+	//
+	// This screen priced everything in dollars, which is right for a cloud model
+	// and useless for a model running on the reader's own machine: there the
+	// line said "~ $0.00/turn (free / flat-rate tier)" and gave them no reason
+	// to change anything. The loadout is not free there — it is billed in
+	// CONTEXT and in TIME. Measured on a laptop running Qwen3 Coder 30B: 11,142
+	// tokens of loadout against a 20,224 window is 55% of the conversation gone
+	// before the first word, and six to eight minutes of prompt processing on
+	// every single turn.
+	//
+	// So when the model costs nothing in money, the suffix reports the share of
+	// the context window instead. Both are the same sentence — "here is what
+	// this screen is spending on your behalf" — in the currency that applies.
+	if per1MIn <= 0 || !priced {
+		if _, window, ctxName, share := config.LoadoutContextShare(); window > 0 {
+			if ctxName != "" {
+				name = ctxName
+			}
+			return fmt.Sprintf(" — %.0f%% of %s's %s-token context, before you type anything",
+				share*100, name, commaInt(window))
+		}
+	}
+
 	if !priced {
 		if name != "" {
 			return fmt.Sprintf(" — unpriced (%s: no price table entry)", name)

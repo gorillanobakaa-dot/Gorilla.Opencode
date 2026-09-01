@@ -96,6 +96,10 @@ type Provider interface {
 	StreamResponse(ctx context.Context, messages []message.Message, tools []tools.BaseTool) <-chan ProviderEvent
 
 	Model() models.Model
+
+	// SystemPrompt is what this provider prepends to every request. Needed to
+	// size a request before sending it; see internal/llm/agent/contextbudget.go.
+	SystemPrompt() string
 }
 
 type providerClientOptions struct {
@@ -262,6 +266,18 @@ func (p *baseProvider[C]) SendMessages(ctx context.Context, messages []message.M
 
 func (p *baseProvider[C]) Model() models.Model {
 	return p.options.model
+}
+
+// SystemPrompt returns the system message this provider sends with every
+// request.
+//
+// GORILLA OVERRIDE (2026-09-01): exposed so the agent can size a request BEFORE
+// sending it. The system prompt is re-sent in full on every single turn and is
+// substantial, so a budget that omits it under-counts by a constant that grows
+// with the prompt — which is exactly the direction that loses a turn rather than
+// costing an early compaction. See internal/llm/agent/contextbudget.go.
+func (p *baseProvider[C]) SystemPrompt() string {
+	return p.options.systemMessage
 }
 
 func (p *baseProvider[C]) StreamResponse(ctx context.Context, messages []message.Message, tools []tools.BaseTool) <-chan ProviderEvent {

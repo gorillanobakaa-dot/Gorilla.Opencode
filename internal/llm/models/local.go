@@ -3,10 +3,13 @@ package models
 import (
 	"cmp"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 	"unicode"
 
 	"github.com/opencode-ai/opencode/internal/logging"
@@ -33,6 +36,168 @@ type localRouteInfo struct {
 }
 
 var localRoute = map[ModelID]localRouteInfo{}
+
+// localHTTP is the bounded client used to ask an endpoint what it serves.
+//
+// GORILLA OVERRIDE (2026-09-01): this was http.DefaultClient, which has NO
+// timeout. Listing runs during config load, before the TUI takes the screen, so
+// one endpoint that accepts a connection and then never answers — a model server
+// still loading weights is the everyday case — hung the whole program at startup
+// with nothing on screen to say why. A local listing that has not answered in
+// five seconds is not going to.
+var localHTTP = &http.Client{Timeout: 5 * time.Second}
+
+// DefaultLocalRuntimes are the two local model servers common enough to be worth
+// looking for without being asked: Ollama and LM Studio, on their default ports.
+//
+// GORILLA OVERRIDE (2026-09-01): this replaces a separate DetectOllama/
+// DetectLMStudio pair that lived in internal/llm/provider, had no callers at
+// all, built a second HTTP client outside the egress inventory, and reimplemented
+// — less completely — the endpoint registration that already exists in this file.
+// Discovery belongs where registration is: everything downstream (model listing,
+// per-model routing, context windows, chat-model preference, cost metadata) is
+// then had for free instead of being written twice.
+var DefaultLocalRuntimes = []struct{ Name, BaseURL string }{
+	{"ollama", "http://127.0.0.1:11434/v1"},
+	{"lmstudio", "http://127.0.0.1:1234/v1"},
+}
+
+// DiscoverLocalRuntimes registers any default-port local model server that is
+// actually running and answering. It returns the endpoints it registered.
+//
+// Only called when the user has configured no local endpoints of their own, so
+// it can never fight an explicit setup. Endpoints that are not running cost one
+// refused TCP connection to loopback, which is immediate.
+func DiscoverLocalRuntimes() []string {
+	var found []string
+	for _, rt := range DefaultLocalRuntimes {
+		n, _ := RegisterLocalEndpoint(rt.Name, rt.BaseURL, "")
+		if n > 0 {
+			logging.Info("discovered a local model server", "name", rt.Name, "models", n)
+			found = append(found, rt.Name)
+		}
+	}
+	return found
+}
+
+// LocalProbe is what a local model server said when asked what it serves.
+type LocalProbe struct {
+	Running bool     // the port answered with a usable model list
+	Count   int      // how many models it offers
+	Names   []string // the first few, for display
+}
+
+// Summary renders the probe as the half-sentence a picker row needs.
+func (p LocalProbe) Summary() string {
+	if !p.Running {
+		return "not running"
+	}
+	switch p.Count {
+	case 0:
+		return "running, but no models installed"
+	case 1:
+		return "running - " + p.Names[0]
+	}
+	shown := p.Names
+	if len(shown) > 2 {
+		shown = shown[:2]
+	}
+	return fmt.Sprintf("running - %d models (%s...)", p.Count, strings.Join(shown, ", "))
+}
+
+// probeHTTP is separate from localHTTP because it runs on the LAUNCH path, in
+// front of a person waiting for a menu to appear.
+//
+// GORILLA OVERRIDE (2026-09-01): 1.5 seconds, not five. A refused connection to
+// loopback is instant, so this budget is only ever spent on a server that IS
+// listening but is busy loading weights — and in that case the honest answer is
+// "not running yet", delivered immediately, rather than a menu that hangs.
+var probeHTTP = &http.Client{Timeout: 1500 * time.Millisecond}
+
+// ProbeLocalEndpoint asks a local model server what it serves, WITHOUT
+// registering anything.
+//
+// GORILLA OVERRIDE (2026-09-01): the provider picker needs to say whether Ollama
+// is actually running before the user commits to it. Before this, the Ollama row
+// was hardcoded Configured:true with the comment "reachability is checked on
+// apply" — so it displayed the same readiness marker as a working cloud key,
+// the user selected it, and only THEN found out nothing was listening. For an
+// audience that does not know what a port is, "it said it was ready" followed by
+// a failure is indistinguishable from the program being broken.
+func ProbeLocalEndpoint(baseURL, apiKey string) LocalProbe {
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return LocalProbe{}
+	}
+	// An explicit client, NOT a swapped package var: ProbeDefaultLocalRuntimes
+	// runs these concurrently, and mutating shared state from two goroutines is
+	// a data race that would show up as a mystery timeout once in a hundred
+	// launches.
+	raw := fetchLocalModelsWith(probeHTTP, base.String(), apiKey)
+	if len(raw) == 0 {
+		return LocalProbe{}
+	}
+
+	// GORILLA OVERRIDE (2026-09-01): count only models that can actually hold a
+	// conversation.
+	//
+	// A local server commonly serves embedders and rerankers alongside chat
+	// models — a stock LM Studio install has nomic-embed-text sitting right next
+	// to the coder model. Counting those means telling someone "3 models
+	// available" when the picker will only ever offer them two, and selecting an
+	// embedder answers a chat request with a bare HTTP 400. The same cannotChat
+	// list already governs which model is preferred on first connect; this makes
+	// the number the user is shown agree with it.
+	p := LocalProbe{Running: true}
+	for _, m := range raw {
+		if isNotAChatModel(m.ID) {
+			continue
+		}
+		p.Count++
+		if len(p.Names) < 3 {
+			p.Names = append(p.Names, friendlyModelName(m.ID))
+		}
+	}
+	if p.Count == 0 {
+		// The server is up but serves nothing you could talk to. Running, but
+		// not usable — and those need different advice, so they stay distinct.
+		p.Running = true
+	}
+	return p
+}
+
+// ProbeDefaultLocalRuntimes probes Ollama and LM Studio concurrently and returns
+// the results keyed by runtime name. Concurrent because two sequential 1.5s
+// timeouts in front of the launch menu is three seconds of nothing.
+func ProbeDefaultLocalRuntimes() map[string]LocalProbe {
+	out := make(map[string]LocalProbe, len(DefaultLocalRuntimes))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, rt := range DefaultLocalRuntimes {
+		wg.Add(1)
+		go func(name, baseURL string) {
+			defer wg.Done()
+			p := ProbeLocalEndpoint(baseURL, "")
+			mu.Lock()
+			out[name] = p
+			mu.Unlock()
+		}(rt.Name, rt.BaseURL)
+	}
+	wg.Wait()
+	return out
+}
+
+// isNotAChatModel reports whether an id names an embedder, reranker or
+// classifier rather than something you can converse with.
+func isNotAChatModel(id string) bool {
+	low := strings.ToLower(id)
+	for _, pat := range cannotChat {
+		if strings.Contains(low, pat) {
+			return true
+		}
+	}
+	return false
+}
 
 // LocalRouteFor returns the endpoint baseURL + apiKey a given local model
 // should be reached with. ok is false for non-local / unknown models.
@@ -206,6 +371,12 @@ func PurgeLocalModels(keep map[ModelID]bool) int {
 // fetchLocalModels tries the LM Studio beta path first, then the standard
 // OpenAI /v1/models path, against baseURL (authenticating with apiKey).
 func fetchLocalModels(baseURL, apiKey string) []localModel {
+	return fetchLocalModelsWith(localHTTP, baseURL, apiKey)
+}
+
+// fetchLocalModelsWith is the same listing with an explicit client, so a caller
+// on the launch path can use a shorter deadline without mutating shared state.
+func fetchLocalModelsWith(client *http.Client, baseURL, apiKey string) []localModel {
 	base, err := url.Parse(baseURL)
 	if err != nil {
 		logging.Debug("Failed to parse local endpoint", "error", err, "endpoint", baseURL)
@@ -214,7 +385,7 @@ func fetchLocalModels(baseURL, apiKey string) []localModel {
 	try := func(path string) []localModel {
 		u := *base
 		u.Path = path
-		return listLocalModels(u.String(), apiKey)
+		return listLocalModelsWith(client, u.String(), apiKey)
 	}
 	models := try(lmStudioBetaModelsPath)
 	if len(models) == 0 {
@@ -314,6 +485,10 @@ type localModel struct {
 }
 
 func listLocalModels(modelsEndpoint, apiKey string) []localModel {
+	return listLocalModelsWith(localHTTP, modelsEndpoint, apiKey)
+}
+
+func listLocalModelsWith(client *http.Client, modelsEndpoint, apiKey string) []localModel {
 	req, err := http.NewRequest(http.MethodGet, modelsEndpoint, nil)
 	if err != nil {
 		logging.Debug("Failed to build local models request",
@@ -328,7 +503,7 @@ func listLocalModels(modelsEndpoint, apiKey string) []localModel {
 	if apiKey != "" {
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		logging.Debug("Failed to list local models",
 			"error", err,

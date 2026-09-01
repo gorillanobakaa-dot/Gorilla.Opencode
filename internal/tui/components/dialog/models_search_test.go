@@ -37,6 +37,36 @@ func mockCatalogue(t *testing.T) {
 		models.ProviderMock: {APIKey: "mk-test-0123456789abcdef0123456789"},
 	}
 
+	// GORILLA OVERRIDE (2026-09-01): evict models discovered from THIS MACHINE.
+	//
+	// Clearing cfg.Providers is not enough. Local endpoints are a separate path
+	// — they live in cfg.LocalEndpoints and register under ProviderLocal — so
+	// config.Load above contacts whatever OpenAI-compatible server happens to be
+	// running on the developer's laptop and registers its models into the global
+	// SupportedModels. The picker then shows them alongside the mocks and the
+	// count assertions fail.
+	//
+	// Found for real: with LM Studio running, these tests failed with "4 of 4
+	// models match" against three mocks, the fourth being "[lmstudio] Qwen3
+	// Coder". A test whose result depends on which applications are open is not
+	// measuring what it claims to.
+	prevEndpoints := cfg.LocalEndpoints
+	cfg.LocalEndpoints = nil
+	t.Cleanup(func() { cfg.LocalEndpoints = prevEndpoints })
+
+	evicted := map[models.ModelID]models.Model{}
+	for id, m := range models.SupportedModels {
+		if m.Provider == models.ProviderLocal {
+			evicted[id] = m
+			delete(models.SupportedModels, id)
+		}
+	}
+	t.Cleanup(func() {
+		for id, m := range evicted {
+			models.SupportedModels[id] = m
+		}
+	})
+
 	mocks := []models.Model{
 		{
 			ID: "mock.alpha", Name: "Alpha Coder",
