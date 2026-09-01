@@ -106,7 +106,6 @@ func getEnvironmentInfo() string {
 	cwd := roots[0]
 	isGit := isGitRepo(cwd)
 	platform := runtime.GOOS
-	date := time.Now().Format("1/2/2006")
 	summary := projectSummary(cwd, isGit)
 
 	// GORILLA OVERRIDE: additional roots from /add-dir are advertised here, or
@@ -134,12 +133,11 @@ func getEnvironmentInfo() string {
 Working directory: %s
 Is directory a git repo: %s
 Platform: %s
-Today's date: %s
 %s</env>
 <project_summary>
 %s
 </project_summary>
-%s`, cwd, boolToYesNo(isGit), platform, date, userDirs(), summary, extra)
+%s`, cwd, boolToYesNo(isGit), platform, userDirs(), summary, extra)
 }
 
 // userDirs tells the model where this machine actually keeps pictures,
@@ -234,10 +232,25 @@ func projectSummary(cwd string, isGit bool) string {
 	var b strings.Builder
 	b.WriteString("Top-level (depth 1, not a full tree — use the find tool for deeper paths):\n")
 	b.WriteString(listTopLevelBrief(cwd, maxTopLevelEntries))
+	// GORILLA OVERRIDE (2026-09-01): the branch NAME stays; `git status` goes.
+	//
+	// See getEnvironmentInfo for the measurement behind this. The branch is
+	// stable for hours at a time and worth its handful of tokens. The
+	// working-tree status changes on every edit the agent itself makes, and it
+	// sits near the front of a ~6,500-token prompt, so each change threw away
+	// the KV cache for everything after it.
+	//
+	// It was also the most misleading line in the prompt. It is captured once,
+	// when the system prompt is built, and is stale the moment the agent writes
+	// a file — so a model reading it late in a turn was being told the state of
+	// the tree from before its own last several edits, presented as current.
+	//
+	// Nothing is lost that cannot be had accurately: `git status` through the
+	// shell tool answers for the moment it is asked.
 	if isGit {
-		if g := gitStatusBrief(cwd, maxGitStatusLines); g != "" {
-			b.WriteString("\nGit status (short, capped):\n")
-			b.WriteString(g)
+		if br := gitBranchBrief(cwd); br != "" {
+			b.WriteString("\n")
+			b.WriteString(br)
 		}
 	}
 	return strings.TrimSpace(b.String())
@@ -373,6 +386,25 @@ func collapseVersionFamilies(files []string) []string {
 		out = append(out, f)
 	}
 	return out
+}
+
+// gitBranchBrief returns just the current branch name.
+//
+// GORILLA OVERRIDE (2026-09-01): split out of gitStatusBrief so the STABLE half
+// of that information can ride the prompt while the volatile half does not. See
+// projectSummary. Failures are silent: no git, a detached HEAD or a fresh repo
+// with no commits must never break the system prompt.
+func gitBranchBrief(dir string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--abbrev-ref", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	if b := strings.TrimSpace(string(out)); b != "" {
+		return "branch: " + b
+	}
+	return ""
 }
 
 // gitStatusBrief returns `git status --short` (plus branch name) with a
