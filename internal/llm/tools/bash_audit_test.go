@@ -8,9 +8,13 @@ package tools
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/opencode-ai/opencode/internal/llm/tools/shell"
 
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/pubsub"
@@ -90,11 +94,30 @@ func TestTheShellRecoversAfterACommandCallsExit(t *testing.T) {
 // exits 1 for "no match" and test exits 1 for "false", and flagging those would
 // turn correct answers into errors.
 func TestOrdinaryFailuresReportTheRealErrorAndExitCode(t *testing.T) {
-	for _, c := range []struct{ name, cmd, wantOut, wantCode string }{
+	// GORILLA OVERRIDE (2026-09-01): the expected strings now come from the
+	// shell actually in use.
+	//
+	// They used to hardcode bash's vocabulary — "No such file", "Exit code 2",
+	// "command not found", "Exit code 127". Those are not universal truths about
+	// failing commands; they are one shell's wording and one shell's exit-code
+	// convention. On Windows the tool correctly drives PowerShell, which says
+	// "Cannot find path ... because it does not exist" and exits 1, so this test
+	// failed while the behaviour it exists to protect was perfectly intact.
+	//
+	// The PROPERTY is what must hold everywhere: the real diagnostic survives, a
+	// non-zero status survives, and neither is reported as a tool error.
+	cases := []struct{ name, cmd, wantOut, wantCode string }{
 		{"missing path", `ls /definitely-not-here-xyz`, "No such file", "Exit code 2"},
 		{"grep no match", `echo hello | grep zzz`, "", "Exit code 1"},
 		{"command not found", `definitely-not-a-real-cmd-xyz`, "command not found", "Exit code 127"},
-	} {
+	}
+	if shell.IsWindowsPowerShell() {
+		cases = []struct{ name, cmd, wantOut, wantCode string }{
+			{"missing path", `Get-ChildItem nosuchpath-definitely-not-here-xyz`, "does not exist", "Exit code 1"},
+			{"command not found", `definitely-not-a-real-cmd-xyz`, "is not recognized", "Exit code 1"},
+		}
+	}
+	for _, c := range cases {
 		r, _ := bashRun(t, c.cmd)
 		assert.False(t, r.IsError, "%s: a non-zero exit is not necessarily a tool failure", c.name)
 		if c.wantOut != "" {
@@ -108,7 +131,21 @@ func TestOrdinaryFailuresReportTheRealErrorAndExitCode(t *testing.T) {
 // exists for, and the one the honesty rules in the prompt depend on.
 func TestAFailingBuildShowsItsDiagnostics(t *testing.T) {
 	dir := t.TempDir()
-	r, _ := bashRun(t, `cd `+dir+` && printf 'package main\nfunc main(){ undefinedThing }\n' > b.go && go vet b.go`)
+	// GORILLA OVERRIDE (2026-09-01): build the command for the shell in use.
+	//
+	// The original chained with '&&' and interpolated t.TempDir() unquoted.
+	// Windows PowerShell 5.1 has no '&&' — it is a parse error — and a Windows
+	// temp path is full of backslashes that bash then eats as escape sequences.
+	// So this test could only ever fail on Windows, and did: it hung for the
+	// full 60-second timeout because the mangled 'cd' left the shell somewhere
+	// the build could never run.
+	src := "package main\nfunc main(){ undefinedThing }\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "b.go"), []byte(src), 0o644))
+	build := "cd '" + dir + "' && go vet b.go"
+	if shell.IsWindowsPowerShell() {
+		build = "Set-Location -LiteralPath '" + dir + "'; go vet b.go"
+	}
+	r, _ := bashRun(t, build)
 	assert.Contains(t, r.Content, "undefined", "the compiler's message was lost")
 	assert.Contains(t, r.Content, "Exit code")
 }
