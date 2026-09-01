@@ -62,3 +62,37 @@ func TestLookalikeDirectoryNamesAreNotCaught(t *testing.T) {
 		}
 	}
 }
+
+// GORILLA OVERRIDE (2026-09-01): the Windows hole, kept closed.
+//
+// filepath.IsAbs is false for "/home/user/.ssh/id_rsa" on Windows — Windows
+// calls that rooted-but-volume-relative. The guard therefore joined it onto the
+// project directory, found the result inside the workspace (which is exempt),
+// and allowed the read. A path being rooted must never be mistaken for a path
+// being relative, on any platform: that is the difference between "somewhere
+// else on this machine" and "inside the project the user chose".
+func TestRootedPathsAreNotTreatedAsProjectRelative(t *testing.T) {
+	for _, p := range []string{
+		"/home/gorilla/.ssh/id_rsa",
+		"/root/.aws/credentials",
+		"/etc/ssl/private/server.key",
+	} {
+		if why := RefuseSensitiveRead(p); why == "" {
+			t.Errorf("ALLOWED %s — a rooted path was resolved as if it were inside the project, "+
+				"which exempts it from the credential guard entirely", p)
+		}
+	}
+}
+
+// The exemption itself must still work: a fixture inside the project is readable
+// even when its name looks alarming. Removing that would cost the tool its job.
+func TestWorkspaceFixturesAreStillExempt(t *testing.T) {
+	wd := config.WorkingDirectory()
+	if wd == "" {
+		t.Skip("no workspace")
+	}
+	p := filepath.Join(wd, "testdata", "server.pem")
+	if why := RefuseSensitiveRead(p); why != "" {
+		t.Errorf("refused a file inside the workspace: %s\n%s", p, why)
+	}
+}

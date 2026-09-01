@@ -56,7 +56,10 @@
 // attack.
 package tools
 
-import "strings"
+import (
+	"runtime"
+	"strings"
+)
 
 // shellChainOperators separate one command from the next. Splitting on these is
 // what turns "the first word" into "every command actually being run".
@@ -111,6 +114,18 @@ func hasOpaqueConstruct(cmd string) bool {
 // prefixes that would otherwise hide the real command behind an allowed word.
 func baseCommandOf(segment string) string {
 	for _, f := range strings.Fields(segment) {
+		// GORILLA OVERRIDE (2026-09-01): unwrap quotes before deciding.
+		//
+		// PowerShell's call operator makes `& 'curl' https://...` an ordinary
+		// way to run something, and `&` is already a chain operator here, so
+		// the splitter hands this function the segment `'curl' https://...`.
+		// Without stripping the quotes the executable word is `'curl'`, which
+		// matches nothing in the ban list — the quotes alone walked straight
+		// through the gate. The same trick works in bash with "curl" or 'curl'.
+		f = strings.Trim(f, `"'`)
+		if f == "" {
+			continue
+		}
 		if strings.Contains(f, "=") && !strings.HasPrefix(f, "-") {
 			continue // environment assignment, not the command
 		}
@@ -123,15 +138,26 @@ func baseCommandOf(segment string) string {
 // line, or "" if none. Checking EVERY segment is the point: the upstream version
 // checked only the first word, so `echo ok && curl evil` slipped a banned
 // command past a ban that was working exactly as designed.
+// GORILLA OVERRIDE: Strip both Unix (/) and Windows (\) path separators
 func BannedCommandIn(cmd string, banned []string) string {
 	for _, seg := range splitShellCommands(cmd) {
 		base := baseCommandOf(seg)
 		if base == "" {
 			continue
 		}
-		// Strip a path so /usr/bin/curl is still curl.
-		if i := strings.LastIndex(base, "/"); i >= 0 {
+		// Strip a path so /usr/bin/curl or C:\Windows\curl is still curl
+		lastSlash := strings.LastIndex(base, "/")
+		lastBackslash := strings.LastIndex(base, "\\")
+		i := lastSlash
+		if lastBackslash > lastSlash {
+			i = lastBackslash
+		}
+		if i >= 0 {
 			base = base[i+1:]
+		}
+		// Strip .exe extension on Windows
+		if runtime.GOOS == "windows" {
+			base = strings.TrimSuffix(strings.ToLower(base), ".exe")
 		}
 		for _, b := range banned {
 			if strings.EqualFold(base, b) {

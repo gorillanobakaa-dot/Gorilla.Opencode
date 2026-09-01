@@ -2,7 +2,6 @@ package permission
 
 import (
 	"errors"
-	"path/filepath"
 	"slices"
 	"sync"
 	"time"
@@ -606,7 +605,19 @@ func (s *permissionService) mustAskAnyway(opts CreatePermissionRequest, root str
 		reason, _ := TaintOf(root)
 		return "this turn has already read untrusted content (" + reason.Reason + ")"
 	}
-	if p := opts.Path; p != "" && p != "." && filepath.IsAbs(p) {
+	// GORILLA OVERRIDE (2026-09-01): the filepath.IsAbs precondition is gone.
+	//
+	// It made this whole check unreachable on Windows for exactly the paths it
+	// exists to catch. filepath.IsAbs("/etc/hosts") is FALSE there — Windows
+	// calls that rooted, not absolute — so the carve-out skipped the root test
+	// and auto-approved the write. The repo's own carve-out test says it plainly:
+	// "YOLO authorised a write outside every workspace root without asking".
+	//
+	// config.RootFor now resolves rooted paths against the volume rather than
+	// against the project, so it can answer for any spelling. A genuinely
+	// relative path still resolves inside the primary root and is still
+	// auto-approved, which is the behaviour ordinary work depends on.
+	if p := opts.Path; p != "" && p != "." {
 		if _, inRoot := config.RootFor(p); !inRoot {
 			return "this targets " + p + ", which is outside every workspace root"
 		}

@@ -33,6 +33,7 @@ package tools
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/config"
@@ -65,11 +66,7 @@ var sensitiveSuffixes = []string{".pem", ".key", ".p12", ".pfx", ".jks", ".keyst
 // a test fixture named key.pem, and the user chose to work there. The risk being
 // addressed is reaching OUT of the workspace for credentials.
 func RefuseSensitiveRead(path string) string {
-	abs := path
-	if !filepath.IsAbs(abs) {
-		abs = filepath.Join(config.WorkingDirectory(), abs)
-	}
-	abs = filepath.Clean(abs)
+	abs := resolveForGuard(path)
 
 	// Inside the workspace the user has already chosen this ground.
 	if _, ok := config.RootFor(abs); ok {
@@ -104,6 +101,38 @@ func RefuseSensitiveRead(path string) string {
 		}
 	}
 	return ""
+}
+
+// resolveForGuard turns a requested path into the absolute path this guard
+// should judge.
+//
+// GORILLA OVERRIDE (2026-09-01): a rooted path must not be mistaken for a
+// relative one. This was a real hole in the credential guard on Windows.
+//
+// filepath.IsAbs("/home/user/.ssh/id_rsa") is FALSE on Windows, because Windows
+// calls that "rooted but volume-relative", not absolute. The guard therefore
+// treated it as a path relative to the PROJECT, joined it to the working
+// directory, and got C:\project\home\user\.ssh\id_rsa — which is inside the
+// workspace, and the workspace is explicitly exempt on the grounds that the user
+// has already chosen that ground. So the check returned "allowed" for
+// id_rsa, .aws/credentials, .netrc, secring.gpg and .kube/config alike: all nine
+// paths the test asserts, waved through, with the refusal never reached.
+//
+// The fix is to resolve a rooted path against the working directory's VOLUME
+// rather than against the working directory. C:\home\user\.ssh\id_rsa is then
+// outside the workspace and is judged on its merits, which is what the caller
+// meant and what the guard is for.
+func resolveForGuard(path string) string {
+	if filepath.IsAbs(path) {
+		return filepath.Clean(path)
+	}
+	if runtime.GOOS == "windows" && (strings.HasPrefix(path, "/") || strings.HasPrefix(path, `\`)) {
+		if vol := filepath.VolumeName(config.WorkingDirectory()); vol != "" {
+			return filepath.Clean(vol + filepath.FromSlash(path))
+		}
+		return filepath.Clean(filepath.FromSlash(path))
+	}
+	return filepath.Clean(filepath.Join(config.WorkingDirectory(), path))
 }
 
 func reason(path, why string) string {

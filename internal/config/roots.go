@@ -20,8 +20,51 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
+
+// AbsFor resolves a requested path to the absolute path the workspace rules
+// should be applied to.
+//
+// GORILLA OVERRIDE (2026-09-01): a ROOTED path must never be treated as a
+// project-relative one. On Windows it was, and that quietly disabled two
+// different security controls.
+//
+// filepath.IsAbs("/etc/passwd") is FALSE on Windows: Windows calls a path with a
+// leading separator and no drive letter "rooted", not absolute. Every caller
+// here used `if !filepath.IsAbs(p) { p = filepath.Join(WorkingDir, p) }`, so
+// "/etc/passwd" became "C:\my\project\etc\passwd" — a path INSIDE the workspace.
+// Two things then followed, both measured by the repo's own tests:
+//
+//   - the permission carve-out auto-approved writes to it, because it looked
+//     like a file in the project ("YOLO authorised a write outside every
+//     workspace root without asking");
+//   - the credential guard in tools/sensitive.go exempted it for the same
+//     reason, so ~/.ssh/id_rsa, ~/.aws/credentials and .netrc were all readable.
+//
+// Resolving a rooted path against the working directory's VOLUME instead keeps
+// it where the caller meant it — outside the project — so both controls see it
+// for what it is. Genuinely relative paths still resolve against the project.
+func AbsFor(path string) string {
+	if path == "" {
+		return ""
+	}
+	if filepath.IsAbs(path) {
+		return filepath.Clean(path)
+	}
+	wd := ""
+	if cfg != nil {
+		wd = cfg.WorkingDir
+	}
+	if runtime.GOOS == "windows" && (strings.HasPrefix(path, "/") || strings.HasPrefix(path, `\`)) {
+		if vol := filepath.VolumeName(wd); vol != "" {
+			return filepath.Clean(vol + filepath.FromSlash(path))
+		}
+		return filepath.Clean(filepath.FromSlash(path))
+	}
+	return filepath.Clean(filepath.Join(wd, path))
+}
 
 // containsPath reports whether path is root itself or lies beneath it.
 //
@@ -114,10 +157,7 @@ func RootFor(path string) (string, bool) {
 	if cfg == nil || path == "" {
 		return "", false
 	}
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(cfg.WorkingDir, path)
-	}
-	path = filepath.Clean(path)
+	path = AbsFor(path)
 	for _, root := range Roots() {
 		if containsPath(root, path) {
 			return root, true
