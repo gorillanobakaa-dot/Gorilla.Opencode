@@ -42,7 +42,24 @@ func TestGetContextFromPaths(t *testing.T) {
 	InvalidateContextCache()
 
 	context := getContextFromPaths()
-	expectedContext := fmt.Sprintf("# From:%s/file.txt\nfile.txt: test content\n# From:%s/directory/file_a.txt\ndirectory/file_a.txt: test content\n# From:%s/directory/file_b.txt\ndirectory/file_b.txt: test content\n# From:%s/directory/file_c.txt\ndirectory/file_c.txt: test content", tmpDir, tmpDir, tmpDir, tmpDir)
+
+	// GORILLA OVERRIDE (2026-09-01): build the expected paths the way the code
+	// builds them. The expectation was assembled by string concatenation with
+	// forward slashes while getContextFromPaths uses filepath.Join — so on
+	// Windows it compared `...\001/file.txt` against `...\001\file.txt` and
+	// could never pass, while saying nothing about whether context loading
+	// actually worked.
+	//
+	// The label after "# From:" is a real path and should look like one on the
+	// platform it names. The relative header inside each file keeps its forward
+	// slashes, because that is what the fixture writes into the file.
+	j := func(rel string) string { return filepath.Join(tmpDir, filepath.FromSlash(rel)) }
+	expectedContext := fmt.Sprintf(
+		"# From:%s\nfile.txt: test content\n"+
+			"# From:%s\ndirectory/file_a.txt: test content\n"+
+			"# From:%s\ndirectory/file_b.txt: test content\n"+
+			"# From:%s\ndirectory/file_c.txt: test content",
+		j("file.txt"), j("directory/file_a.txt"), j("directory/file_b.txt"), j("directory/file_c.txt"))
 	assert.Equal(t, expectedContext, context)
 }
 

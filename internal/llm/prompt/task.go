@@ -3,7 +3,6 @@ package prompt
 import (
 	_ "embed"
 	"fmt"
-	"strings"
 
 	"github.com/opencode-ai/opencode/internal/llm/models"
 )
@@ -18,7 +17,7 @@ import (
 var baseTaskPrompt string
 
 // BaseTaskPrompt is the shipped default instruction fragment (no env block).
-func BaseTaskPrompt() string { return strings.TrimSpace(baseTaskPrompt) }
+func BaseTaskPrompt() string { return normaliseNewlines(baseTaskPrompt) }
 
 func TaskPrompt(_ models.ModelProvider) string {
 	return fmt.Sprintf("%s\n%s\n", BaseTaskPrompt(), getEnvironmentInfo())

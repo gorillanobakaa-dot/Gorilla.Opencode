@@ -43,15 +43,39 @@ var PromptDisplayName = map[PromptID]string{
 func Factory(id PromptID) string {
 	switch id {
 	case PromptCoder:
-		return strings.TrimSpace(baseModernCoderPrompt)
+		return normaliseNewlines(baseModernCoderPrompt)
 	case PromptSummarizer:
-		return strings.TrimSpace(baseSummarizerPrompt)
+		return normaliseNewlines(baseSummarizerPrompt)
 	case PromptTask:
-		return strings.TrimSpace(baseTaskPrompt)
+		return normaliseNewlines(baseTaskPrompt)
 	case PromptTitle:
-		return strings.TrimSpace(baseTitlePrompt)
+		return normaliseNewlines(baseTitlePrompt)
 	}
 	return ""
+}
+
+// normaliseNewlines strips carriage returns and trims, so a prompt is the same
+// bytes whichever platform the binary was built on.
+//
+// GORILLA OVERRIDE (2026-09-01): the prompt files are //go:embed'd, so whatever
+// line endings the working tree happens to have at BUILD time are compiled into
+// the binary. Git checks text files out with CRLF on Windows, so a Windows build
+// embedded CR LF where a Linux build embedded LF — the same source producing two
+// different prompts.
+//
+// That is not merely cosmetic. The section splitter rejoins bodies with a bare
+// blank line, so on a CRLF checkout the rejoined prompt lost the carriage return
+// from every section boundary: 24 bytes on the coder prompt. The round-trip
+// guard — whose entire job is "splitting and rejoining must not lose a single
+// byte" — then failed while pointing at code that was correct.
+//
+// It matters for prompt caching too. A cache is a prefix match, so a prompt that
+// differs only in line endings between two builds shares no cache with itself.
+//
+// Normalised here rather than in ParseSections because this is the one place the
+// embedded bytes enter the program.
+func normaliseNewlines(s string) string {
+	return strings.TrimSpace(strings.ReplaceAll(s, "\r\n", "\n"))
 }
 
 // overrideCache avoids re-reading four files on every prompt render. Prompts are

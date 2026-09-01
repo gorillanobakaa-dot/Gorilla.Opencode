@@ -2,7 +2,6 @@ package prompt
 
 import (
 	_ "embed"
-	"strings"
 
 	"github.com/opencode-ai/opencode/internal/llm/models"
 )
@@ -20,6 +19,6 @@ var baseSummarizerPrompt string
 
 // BaseSummarizerPrompt is the shipped default, exported so the override layer
 // and tests can compare against it.
-func BaseSummarizerPrompt() string { return strings.TrimSpace(baseSummarizerPrompt) }
+func BaseSummarizerPrompt() string { return normaliseNewlines(baseSummarizerPrompt) }
 
 func SummarizerPrompt(_ models.ModelProvider) string { return BaseSummarizerPrompt() }

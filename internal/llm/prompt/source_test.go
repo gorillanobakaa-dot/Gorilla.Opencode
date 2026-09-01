@@ -3,6 +3,7 @@ package prompt
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -59,8 +60,24 @@ func TestSaveAndResetOverrideRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat override: %v", err)
 	}
-	if perm := info.Mode().Perm(); perm != 0o600 {
-		t.Errorf("override mode = %04o, want 0600", perm)
+	// GORILLA OVERRIDE (2026-09-01): the mode check is POSIX-only.
+	//
+	// The writer passes 0o600 and that is right. But Windows Chmod sets one bit
+	// (read-only), writes no DACL, and os.Stat reports a synthesised 0666 for
+	// any writable file - so this could only fail there while saying nothing
+	// about whether the override was exposed. On Windows what protects it is the
+	// ACL inherited from the config directory, so containment under the user
+	// profile is the check that means something.
+	if runtime.GOOS != "windows" {
+		if perm := info.Mode().Perm(); perm != 0o600 {
+			t.Errorf("override mode = %04o, want 0600", perm)
+		}
+	} else if home, err := os.UserHomeDir(); err == nil {
+		abs, _ := filepath.Abs(OverridePath(PromptCoder))
+		if rel, err := filepath.Rel(home, abs); err != nil || rel == ".." ||
+			strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			t.Errorf("override written to %s, outside the user profile %s - it lives beside API keys", abs, home)
+		}
 	}
 
 	if err := ResetPrompt(PromptCoder); err != nil {
