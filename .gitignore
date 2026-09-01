@@ -74,6 +74,21 @@ checksums.sha256
 # the .deb; it must be in the repo on every machine that builds it.
 !internal/llm/tools/pfind.py
 
+# GORILLA: exception (2026-09-01) — the vendored code-review toolkit is SOURCE
+# for exactly the same reason, and this exception was missing.
+#
+# Commit 042422b vendored the toolkit and wired /review to it, but `*.py` above
+# swallowed the engine itself, so code_review.py was never committed. The tree
+# has toolkit/configs/ and toolkit/rule_docs/ and no engine — which is why
+# TestEveryModuleTheToolkitImportsIsEmbedded fails with
+# "open toolkit/code_review.py: file does not exist", and why /review cannot
+# work from a fresh clone at all.
+#
+# The rule is fixed here so the file is committable. The FILE still has to be
+# re-vendored: it is not on this machine either, so nothing can restore it from
+# the repo.
+!internal/llm/tools/codereview/toolkit/**/*.py
+
 # GORILLA: exception (2026-08-20) — the two BENCHMARK scripts are published,
 # because the pages that report their numbers tell readers to re-run them.
 #

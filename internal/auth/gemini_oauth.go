@@ -31,6 +31,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -468,6 +469,9 @@ func emailFromIDToken(idToken string) string {
 // openBrowser tries the common Linux/macOS openers; failure is non-fatal
 // because the URL is also printed for manual paste.
 func openBrowser(u string) error {
+	if runtime.GOOS == "windows" {
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", u).Start()
+	}
 	for _, opener := range []string{"xdg-open", "open", "sensible-browser"} {
 		if path, err := exec.LookPath(opener); err == nil {
 			return exec.Command(path, u).Start()

@@ -1,3 +1,8 @@
+//go:build !windows
+
+// GORILLA OVERRIDE (2026-09-01): tagged !windows along with the .desktop entry
+// itself. A freedesktop.org application entry is a Linux artifact; Windows uses
+// .lnk shortcuts, which install_windows.go creates and its own tests cover.
 package cmd
 
 import (

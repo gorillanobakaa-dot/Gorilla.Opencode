@@ -1,0 +1,66 @@
+{
+  "RT_GROUP_ICON": {
+    "APP": {
+      "0000": [
+        "icons/icon-256.png",
+        "icons/icon-128.png",
+        "icons/icon-64.png",
+        "icons/icon-48.png",
+        "icons/icon-32.png",
+        "icons/icon-24.png",
+        "icons/icon-16.png"
+      ]
+    }
+  },
+  "RT_MANIFEST": {
+    "#1": {
+      "0409": {
+        "identity": {
+          "name": "",
+          "version": ""
+        },
+        "description": "",
+        "minimum-os": "win7",
+        "execution-level": "asInvoker",
+        "ui-access": false,
+        "auto-elevate": false,
+        "dpi-awareness": "system",
+        "disable-theming": false,
+        "disable-window-filtering": false,
+        "high-resolution-scrolling-aware": false,
+        "ultra-high-resolution-scrolling-aware": false,
+        "long-path-aware": true,
+        "printer-driver-isolation": false,
+        "gdi-scaling": false,
+        "segment-heap": false,
+        "use-common-controls-v6": false
+      }
+    }
+  },
+  "RT_VERSION": {
+    "#1": {
+      "0000": {
+        "fixed": {
+          "file_version": "0.1.120.0",
+          "product_version": "0.1.120.0"
+        },
+        "info": {
+          "0409": {
+            "Comments": "",
+            "CompanyName": "Gorilla OpenCode",
+            "FileDescription": "Gorilla OpenCode - terminal AI coding agent",
+            "FileVersion": "0.1.120.0",
+            "InternalName": "gorilla-opencode",
+            "LegalCopyright": "MIT licensed",
+            "LegalTrademarks": "",
+            "OriginalFilename": "gorilla-opencode.exe",
+            "PrivateBuild": "",
+            "ProductName": "Gorilla OpenCode",
+            "ProductVersion": "0.1.120.0",
+            "SpecialBuild": ""
+          }
+        }
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -534,6 +535,11 @@ func setupSubscriptions(app *app.App, parentCtx context.Context) (chan tea.Msg, 
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
+		if runtime.GOOS == "windows" {
+			fmt.Println("\n[Gorilla OpenCode] An error occurred. Press Enter to exit...")
+			var b = make([]byte, 1)
+			os.Stdin.Read(b)
+		}
 		os.Exit(1)
 	}
 }
