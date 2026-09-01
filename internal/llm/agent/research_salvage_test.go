@@ -11,16 +11,32 @@ package agent
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
+// tempHome redirects os.UserHomeDir at a temporary directory for one test.
+//
+// GORILLA OVERRIDE (2026-09-01): set the variable this PLATFORM reads.
+//
+// It set only HOME. os.UserHomeDir reads USERPROFILE on Windows and ignores
+// HOME entirely, so the redirection silently did nothing there — and the guard
+// below, which exists precisely to stop a test writing into somebody's real
+// home directory, correctly refused to run. The guard was right; the helper was
+// Unix-shaped. Every research-recovery test in this package was blocked by it.
 func tempHome(t *testing.T) string {
 	t.Helper()
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", home)
+	} else {
+		t.Setenv("HOME", home)
+	}
+	// Kept as a hard failure rather than a skip: a test that writes findings
+	// files into a real home directory is worse than a test that does not run.
 	if got, _ := os.UserHomeDir(); got != home {
-		t.Fatalf("HOME redirection failed (got %q) — refusing to run a test that would write to the real home", got)
+		t.Fatalf("home redirection failed (got %q) — refusing to run a test that would write to the real home", got)
 	}
 	return home
 }
@@ -106,6 +122,24 @@ func TestSaveFailureIsSurvivable(t *testing.T) {
 		t.Skipf("cannot make the home unwritable here: %v", err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(home, 0o700) })
+
+	// GORILLA OVERRIDE (2026-09-01): verify the premise before asserting on it.
+	//
+	// os.Chmod SUCCEEDS on Windows and changes nothing that matters: the only
+	// bit it can set is read-only, and a read-only directory is still writable
+	// there. So the chmod above returned nil, the directory stayed writable, the
+	// save succeeded, and the test failed while reporting that the code was
+	// wrong. It was not — the test could not build the situation it was testing.
+	//
+	// Probing is better than a blanket GOOS skip: if a future Windows Go release
+	// makes Chmod meaningful, or the test runs somewhere it does bite, the test
+	// resumes doing its job on its own.
+	probe := filepath.Join(home, ".writable-probe")
+	if err := os.WriteFile(probe, []byte("x"), 0o600); err == nil {
+		os.Remove(probe)
+		t.Skip("this platform's Chmod cannot make a directory unwritable, so the " +
+			"disk-refuses path cannot be exercised here")
+	}
 
 	if got := writeRawFindings("q", []researchRole{{ID: "local", Title: "LOCAL"}}, []string{"x"}, nil, "dossier"); got != "" {
 		t.Errorf("expected an empty path when the disk refuses, got %q", got)

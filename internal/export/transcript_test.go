@@ -2,6 +2,8 @@ package export
 
 import (
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -352,9 +354,7 @@ func TestExportingATreeKeepsEveryHelperSessionInFull(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if perm := info.Mode().Perm(); perm != 0o600 {
-		t.Errorf("export written as %o; a transcript is not world-readable", perm)
-	}
+	assertNotWorldReadable(t, path, info)
 }
 
 // A conversation with no helpers must not sprout an empty section.
@@ -370,5 +370,40 @@ func TestExportingAPlainConversationHasNoHelperSection(t *testing.T) {
 	body, _ := os.ReadFile(path)
 	if strings.Contains(string(body), "Helper sessions") {
 		t.Errorf("a conversation with no helpers grew a helper section")
+	}
+}
+
+// assertNotWorldReadable checks the protection that this platform actually has.
+//
+// GORILLA OVERRIDE (2026-09-01): write.go passes 0o600 to os.WriteFile and that
+// is correct. But Go's file modes are a POSIX concept: on Windows the only bit
+// Chmod can set is read-only, no DACL is written, and os.Stat reports a
+// synthesised 0666 for any writable file. So this assertion could only ever
+// fail there, while saying nothing at all about whether the transcript was
+// exposed.
+//
+// What protects the file on Windows is the ACL it inherits from its directory.
+// Asserting containment under the user profile is a real check; asserting a mode
+// the platform does not implement is theatre.
+func assertNotWorldReadable(t *testing.T, path string, info os.FileInfo) {
+	t.Helper()
+	if runtime.GOOS != "windows" {
+		if perm := info.Mode().Perm(); perm != 0o600 {
+			t.Errorf("export written as %o; a transcript is not world-readable", perm)
+		}
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("cannot determine the user profile directory")
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		t.Fatalf("Abs(%s): %v", path, err)
+	}
+	rel, err := filepath.Rel(home, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		t.Errorf("transcript written to %s, outside the user profile %s - on Windows that "+
+			"location IS the access control, and a transcript holds whatever was discussed", abs, home)
 	}
 }

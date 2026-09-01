@@ -36,6 +36,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -175,14 +176,45 @@ func DetectEntry(e Entry) Status {
 type PackageManager string
 
 const (
-	APT     PackageManager = "apt"
-	Pacman  PackageManager = "pacman"
+	APT    PackageManager = "apt"
+	Pacman PackageManager = "pacman"
+	// GORILLA OVERRIDE (2026-09-01): Scoop, so /arsenal is not inert on Windows.
+	//
+	// Before this, DetectPackageManager could only return apt, pacman or
+	// Unknown, so on Windows every entry reported "no supported package manager
+	// found" and InstallCommand returned "". The screen listed thirty-three
+	// capabilities and could not tell you how to obtain a single one of them -
+	// which is the exact failure /arsenal exists to prevent: a capability that
+	// is available and unknown.
+	//
+	// Scoop rather than winget or choco because it needs no administrator
+	// rights, which matches this program's decision not to require elevation
+	// (see winres.json). Package names were verified against the real main and
+	// extras buckets on a Windows machine, not recalled - 24 of the 33 entries
+	// have one, and the nine that do not are left absent so UnavailableNote can
+	// say so honestly rather than offering a name that does not resolve.
+	Scoop   PackageManager = "scoop"
 	Unknown PackageManager = ""
 )
 
 // DetectPackageManager looks for the tool rather than reading /etc/os-release,
 // because what matters is what can actually be run here.
 func DetectPackageManager() PackageManager {
+	if runtime.GOOS == "windows" {
+		// scoop is a PowerShell function on a shim, so LookPath finds
+		// scoop.cmd / scoop.ps1 rather than an .exe. Checking the shim
+		// directory as well means a working Scoop is not missed just because
+		// PATH has not been refreshed in this shell yet.
+		if _, err := exec.LookPath("scoop"); err == nil {
+			return Scoop
+		}
+		if home, err := os.UserHomeDir(); err == nil {
+			if _, err := os.Stat(filepath.Join(home, "scoop", "shims", "scoop.cmd")); err == nil {
+				return Scoop
+			}
+		}
+		return Unknown
+	}
 	if _, err := exec.LookPath("apt-get"); err == nil {
 		return APT
 	}
@@ -245,6 +277,24 @@ func InstallCommand(pkgs []string, pm PackageManager) string {
 		return "sudo apt-get install -y " + strings.Join(pkgs, " ")
 	case Pacman:
 		return "sudo pacman -S --needed " + strings.Join(pkgs, " ")
+	case Scoop:
+		// No sudo: Scoop installs into the user's own profile, which is the
+		// reason it was chosen over winget and choco. A package written
+		// "extras/name" lives outside the default bucket, so the command that
+		// adds it comes first - otherwise the install fails with a bucket error
+		// that says nothing about buckets.
+		needsExtras := false
+		for _, p := range pkgs {
+			if strings.HasPrefix(p, "extras/") {
+				needsExtras = true
+				break
+			}
+		}
+		cmd := "scoop install " + strings.Join(pkgs, " ")
+		if needsExtras {
+			return "scoop bucket add extras; " + cmd
+		}
+		return cmd
 	}
 	return ""
 }
@@ -290,6 +340,13 @@ func MeasureCost(pkgs []string, pm PackageManager) Cost {
 		return measureAPT(pkgs)
 	case Pacman:
 		return measurePacman(pkgs)
+	case Scoop:
+		// Scoop has no equivalent of `apt-get --print-uris`: sizes live inside
+		// each manifest's architecture block and are often absent entirely.
+		// Reporting an unmeasured 0 here would read as FREE next to "not
+		// installed", which is the trap the rest of this file is written
+		// against - so it says plainly that it does not know.
+		return Cost{Note: "scoop does not report download size before installing"}
 	}
 	return Cost{Note: "no supported package manager found on this machine"}
 }

@@ -168,7 +168,8 @@ func TestNothingSelectedGivesAnInstructionNotAnError(t *testing.T) {
 func TestTheInstallPlanCostsNoTokens(t *testing.T) {
 	m := NewArsenalCmp()
 	m.SetSize(120, 40)
-	m.toggle([]string{"zbar"})
+	id, _ := installableEntry(t, m)
+	m.toggle([]string{id})
 	if cmd := m.showPlan(); cmd != nil {
 		t.Fatal("showing the install plan returned a command — it must render locally, for nothing")
 	}
@@ -185,15 +186,48 @@ func TestTheInstallPlanCostsNoTokens(t *testing.T) {
 func TestThePlanShowsTheExactCommand(t *testing.T) {
 	m := NewArsenalCmp()
 	m.SetSize(140, 50)
-	m.toggle([]string{"zbar"})
+
+	// GORILLA OVERRIDE (2026-09-01): assert against THIS machine's package
+	// manager. The test hardcoded the zbar entry, its Debian package name
+	// ("zbar-tools"), and an apt-or-pacman command — so on Windows it asserted
+	// the presence of a package with no Scoop equivalent and a command that does
+	// not exist there. It could only ever fail, while saying nothing about
+	// whether the plan screen actually worked.
+	id, pkgs := installableEntry(t, m)
+	m.toggle([]string{id})
 	m.showPlan()
 	view := m.View()
-	if !strings.Contains(view, "zbar-tools") {
-		t.Errorf("the package name is not on the plan:\n%s", view)
+
+	for _, want := range pkgs {
+		if !strings.Contains(view, want) {
+			t.Errorf("package %q is not on the plan:\n%s", want, view)
+		}
 	}
-	if !strings.Contains(view, "apt-get install") && !strings.Contains(view, "pacman") {
-		t.Errorf("no install command on the install plan:\n%s", view)
+	if cmd := arsenal.InstallCommand(pkgs, m.pm); !strings.Contains(view, cmd) {
+		t.Errorf("the exact install command %q is not on the plan:\n%s", cmd, view)
 	}
+}
+
+// installableEntry returns an entry this machine's package manager can actually
+// install, with its package names. Skips when there is nothing to show.
+func installableEntry(t *testing.T, m ArsenalCmp) (string, []string) {
+	t.Helper()
+	if m.pm == arsenal.Unknown {
+		t.Skip("no supported package manager here; the plan has nothing to offer")
+	}
+	man, err := arsenal.Load()
+	if err != nil {
+		t.Fatalf("arsenal.Load: %v", err)
+	}
+	for _, s := range man.Series {
+		for _, e := range s.Entries {
+			if arsenal.Available(e, m.pm) {
+				return e.ID, arsenal.PackagesFor(e, m.pm)
+			}
+		}
+	}
+	t.Skipf("no entry is installable with %q", m.pm)
+	return "", nil
 }
 
 // Saving without loading would be half the feature: the POINT of a tagfile is

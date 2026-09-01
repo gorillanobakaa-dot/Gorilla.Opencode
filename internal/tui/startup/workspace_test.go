@@ -3,6 +3,7 @@ package startup
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -215,7 +216,11 @@ func TestEscQuitsWithoutChoosing(t *testing.T) {
 
 func TestResolveDir(t *testing.T) {
 	home, project, _ := tree(t)
-	t.Setenv("HOME", home)
+	// GORILLA OVERRIDE (2026-09-01): os.UserHomeDir reads USERPROFILE on Windows
+	// and HOME everywhere else. Setting only HOME meant the tilde expanded to the
+	// real profile on Windows, so this test could not have passed there whatever
+	// the code did.
+	setHome(t, home)
 
 	file := filepath.Join(project, "a.txt")
 	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
@@ -252,5 +257,51 @@ func TestDontAskAgainToggles(t *testing.T) {
 	}
 	if !strings.Contains(m.View(), "[x]") {
 		t.Error("the checkbox does not reflect the toggle")
+	}
+}
+
+// setHome redirects os.UserHomeDir for the duration of a test, on any platform.
+func setHome(t *testing.T, dir string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", dir)
+		return
+	}
+	t.Setenv("HOME", dir)
+}
+
+// GORILLA OVERRIDE (2026-09-01): `~/` and `~\` must both expand.
+//
+// The check used filepath.Separator, which is `\` on Windows, so only `~\`
+// matched there. `~/` is what people actually type - it is the universal
+// convention and what every piece of documentation shows - and a Windows user
+// typing `~/Documents/my-project` got "does not exist" naming a path with a
+// literal tilde in it, with no hint that the tilde was the problem.
+func TestTildeExpandsWithEitherSeparator(t *testing.T) {
+	home, project, _ := tree(t)
+	setHome(t, home)
+
+	for _, form := range []string{"~/Documents/my-project", `~\Documents\my-project`} {
+		got, err := ResolveDir(form)
+		if err != nil {
+			t.Errorf("ResolveDir(%q) failed: %v", form, err)
+			continue
+		}
+		if got != project {
+			t.Errorf("ResolveDir(%q) = %q, want %q", form, got, project)
+		}
+	}
+}
+
+// A bare "~" is the home directory itself.
+func TestBareTildeIsHome(t *testing.T) {
+	home, _, _ := tree(t)
+	setHome(t, home)
+	got, err := ResolveDir("~")
+	if err != nil {
+		t.Fatalf("ResolveDir(\"~\") failed: %v", err)
+	}
+	if got != home {
+		t.Errorf("ResolveDir(\"~\") = %q, want %q", got, home)
 	}
 }

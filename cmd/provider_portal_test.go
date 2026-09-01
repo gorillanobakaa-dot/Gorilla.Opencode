@@ -212,6 +212,16 @@ func TestApplyLocalEndpointEmptyKeyReusesStored(t *testing.T) {
 // structurally so no OAuth/network side effect runs.
 func TestEveryPortalRowIsHandled(t *testing.T) {
 	loadCfg(t)
+	// Rows whose apply step is a `case` in applyPortalChoice rather than an
+	// entry in portalProvider have to be listed here by hand — the loop below
+	// can only discover the map-driven ones.
+	//
+	// GORILLA OVERRIDE (2026-09-01): "lmstudio" was missing, and this test is
+	// exactly the thing that caught it. The row was added to the picker and its
+	// handler was written, but a hand-maintained allowlist is precisely the kind
+	// of thing an author forgets — which is why the test exists and why it is
+	// worth keeping rather than replacing with something automatic that could
+	// not tell a deliberately unhandled row from a forgotten one.
 	handled := map[string]bool{
 		"antigravity":  true,
 		"chatgpt":      true,
@@ -219,6 +229,7 @@ func TestEveryPortalRowIsHandled(t *testing.T) {
 		"gcp-custom":   true,
 		"nvidia-nim":   true,
 		"ollama":       true,
+		"lmstudio":     true,
 		"cloudflare":   true,
 	}
 	for id := range portalProvider {

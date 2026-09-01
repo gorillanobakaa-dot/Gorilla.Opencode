@@ -513,11 +513,23 @@ func (m ArsenalCmp) planLines() []arsLine {
 	for _, l := range wrapPlain(arsenal.InstallCommand(pkgs, m.pm), maxInt(30, m.width-12)) {
 		out = append(out, arsLine{"on", "  " + l})
 	}
+	// GORILLA OVERRIDE (2026-09-01): the closing note names the package manager
+	// in play. It said "apt can be interrupted and resumed" unconditionally,
+	// which is a statement about a program that is not installed on Windows and
+	// was never true for pacman either.
+	tail := "read it, and run it when you want to. apt can be interrupted and resumed, so a long download on a bad line is not lost work."
+	switch m.pm {
+	case arsenal.Pacman:
+		tail = "read it, and run it when you want to. pacman can be interrupted and resumed, so a long download on a bad line is not lost work."
+	case arsenal.Scoop:
+		tail = "read it, and run it when you want to. scoop installs into your own user folder, so it needs no administrator rights."
+	}
 	out = append(out,
 		arsLine{"", ""},
-		arsLine{"mute", "This program will not run it and will never ask for your password. Copy it,"},
-		arsLine{"mute", "read it, and run it when you want to. apt can be interrupted and resumed, so a"},
-		arsLine{"mute", "long download on a bad line is not lost work."})
+		arsLine{"mute", "This program will not run it and will never ask for your password. Copy it,"})
+	for _, l := range wrapPlain(tail, maxInt(30, m.width-12)) {
+		out = append(out, arsLine{"mute", l})
+	}
 	return out
 }
 

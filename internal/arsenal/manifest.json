@@ -29,6 +29,9 @@
             ],
             "pacman": [
               "poppler"
+            ],
+            "scoop": [
+              "poppler"
             ]
           },
           "needs": {
@@ -61,6 +64,9 @@
             "pacman": [
               "tesseract",
               "tesseract-data-eng"
+            ],
+            "scoop": [
+              "tesseract"
             ]
           },
           "needs": {
@@ -89,6 +95,9 @@
               "ripgrep"
             ],
             "pacman": [
+              "ripgrep"
+            ],
+            "scoop": [
               "ripgrep"
             ]
           },
@@ -120,6 +129,9 @@
             ],
             "pacman": [
               "sqlite"
+            ],
+            "scoop": [
+              "sqlite"
             ]
           },
           "needs": {
@@ -148,6 +160,9 @@
               "jq"
             ],
             "pacman": [
+              "jq"
+            ],
+            "scoop": [
               "jq"
             ]
           },
@@ -182,6 +197,9 @@
             ],
             "pacman": [
               "imagemagick"
+            ],
+            "scoop": [
+              "imagemagick"
             ]
           },
           "needs": {
@@ -213,6 +231,9 @@
             ],
             "pacman": [
               "p7zip"
+            ],
+            "scoop": [
+              "7zip"
             ]
           },
           "needs": {
@@ -278,6 +299,9 @@
             ],
             "pacman": [
               "pandoc-cli"
+            ],
+            "scoop": [
+              "pandoc"
             ]
           },
           "needs": {
@@ -311,6 +335,10 @@
             "pacman": [
               "ghostscript",
               "qpdf"
+            ],
+            "scoop": [
+              "ghostscript",
+              "qpdf"
             ]
           },
           "needs": {
@@ -341,6 +369,9 @@
             ],
             "pacman": [
               "perl-image-exiftool"
+            ],
+            "scoop": [
+              "exiftool"
             ]
           },
           "needs": {
@@ -403,6 +434,9 @@
             ],
             "pacman": [
               "libreoffice-still"
+            ],
+            "scoop": [
+              "extras/libreoffice"
             ]
           },
           "needs": {
@@ -442,6 +476,9 @@
             ],
             "pacman": [
               "ffmpeg"
+            ],
+            "scoop": [
+              "ffmpeg"
             ]
           },
           "needs": {
@@ -471,6 +508,9 @@
               "yt-dlp"
             ],
             "pacman": [
+              "yt-dlp"
+            ],
+            "scoop": [
               "yt-dlp"
             ]
           },
@@ -508,6 +548,9 @@
             ],
             "pacman": [
               "shellcheck"
+            ],
+            "scoop": [
+              "shellcheck"
             ]
           },
           "needs": {
@@ -537,6 +580,9 @@
             "apt": [],
             "pacman": [
               "ast-grep"
+            ],
+            "scoop": [
+              "ast-grep"
             ]
           },
           "needs": {
@@ -565,6 +611,9 @@
               "hyperfine"
             ],
             "pacman": [
+              "hyperfine"
+            ],
+            "scoop": [
               "hyperfine"
             ]
           },
@@ -633,6 +682,9 @@
             ],
             "pacman": [
               "testdisk"
+            ],
+            "scoop": [
+              "extras/testdisk"
             ]
           },
           "needs": {
@@ -694,6 +746,9 @@
               "sleuthkit"
             ],
             "pacman": [
+              "sleuthkit"
+            ],
+            "scoop": [
               "sleuthkit"
             ]
           },
@@ -764,6 +819,9 @@
             ],
             "pacman": [
               "android-tools"
+            ],
+            "scoop": [
+              "adb"
             ]
           },
           "needs": {
@@ -800,6 +858,9 @@
             "pacman": [
               "android-tools",
               "jadx"
+            ],
+            "scoop": [
+              "apktool"
             ]
           },
           "needs": {
@@ -829,6 +890,9 @@
               "scrcpy"
             ],
             "pacman": [
+              "scrcpy"
+            ],
+            "scoop": [
               "scrcpy"
             ]
           },
@@ -1003,6 +1067,9 @@
             ],
             "pacman": [
               "lynx"
+            ],
+            "scoop": [
+              "lynx"
             ]
           },
           "needs": {
@@ -1066,6 +1133,9 @@
               "gnupg"
             ],
             "pacman": [
+              "gnupg"
+            ],
+            "scoop": [
               "gnupg"
             ]
           },

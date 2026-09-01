@@ -231,12 +231,24 @@ func ResolveDir(raw string) (string, error) {
 		return "", fmt.Errorf("no path given")
 	}
 	// Shell tilde expansion never happened: nothing here went through a shell.
-	if dir == "~" || strings.HasPrefix(dir, "~"+string(filepath.Separator)) {
+	//
+	// GORILLA OVERRIDE (2026-09-01): match BOTH separators, not filepath.Separator.
+	//
+	// filepath.Separator is `\` on Windows, so this only ever matched `~\`. But
+	// `~/` is what people actually type — it is the universal convention, it is
+	// what every piece of documentation shows, and Windows itself accepts
+	// forward slashes everywhere else. So a Windows user typing
+	// `~/Documents/my-project` at the workspace prompt got "does not exist",
+	// naming a path with a literal `~` in it, and no hint that the tilde was the
+	// problem.
+	if dir == "~" || strings.HasPrefix(dir, "~/") || strings.HasPrefix(dir, `~\`) {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return "", fmt.Errorf("cannot expand ~: %v", err)
 		}
-		dir = filepath.Join(home, strings.TrimPrefix(dir, "~"))
+		// FromSlash so the remainder uses this platform's separator once joined.
+		rest := filepath.FromSlash(strings.TrimPrefix(dir, "~"))
+		dir = filepath.Join(home, rest)
 	}
 	abs, err := filepath.Abs(dir)
 	if err != nil {
