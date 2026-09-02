@@ -370,6 +370,22 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 		// Tea owns, where it can never be cleared.
 		tui.SetProgram(program)
 
+		// GORILLA OVERRIDE (2026-09-02): watch for a resize ourselves on Windows.
+		//
+		// bubbletea reads the terminal size once at startup and never again
+		// there, because Windows has no SIGWINCH -- its listenForResize is an
+		// empty function under a windows build tag. A console launched from the
+		// shortcut starts at conhost's stored default and is then maximised, so
+		// the program spends the whole session drawing for a window less than half
+		// the size of the one it is in: lines wrap early and the frame lands in
+		// the middle of the screen.
+		//
+		// A no-op on every other platform, where bubbletea's own SIGWINCH handler
+		// already does this. See internal/tui/resize_windows.go.
+		stopResize := make(chan struct{})
+		go tui.WatchTerminalResize(program, stopResize)
+		defer close(stopResize)
+
 		// Setup the subscriptions, this will send services events to the TUI
 		ch, cancelSubs := setupSubscriptions(app, ctx)
 
