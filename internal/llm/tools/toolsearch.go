@@ -575,7 +575,13 @@ func DeferredCatalogueBlock(all []BaseTool) string {
 		info := t.Info()
 		fmt.Fprintf(&b, "  %-14s %s\n", info.Name, oneLineOf(firstParagraph(info.Description), 100))
 	}
-	b.WriteString("\nNever tell the user a capability is missing without searching for it first.\n")
+	b.WriteString("\nTwo rules about this list.\n\n" +
+		"Never tell the user a capability is missing without searching for it first.\n\n" +
+		"And if one of these does the job, LOAD IT rather than doing the work by hand " +
+		"with view and bash. Reading a file tells you what is in it; these tools tell " +
+		"you things reading cannot — whether a patch actually applies, what an analyser " +
+		"finds, what a database holds. An answer assembled by eye from a file looks like " +
+		"the real thing and is not.\n")
 	return b.String()
 }
 
