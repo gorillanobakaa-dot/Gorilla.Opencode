@@ -37,6 +37,11 @@ type CommandHelpDialog interface {
 	layout.Bindings
 	Init() tea.Cmd
 	SetSize(width, height int)
+	// FocusCommand opens the reference already showing one command, so
+	// `/port help` can explain itself instead of leaving the user to find it
+	// in a list of thirty. Unknown names fall back to the whole list rather
+	// than to an empty screen.
+	FocusCommand(name string)
 }
 
 // row is either a group heading or a command.
@@ -80,6 +85,43 @@ func (m *commandHelpCmp) Init() tea.Cmd {
 	return nil
 }
 
+// FocusCommand selects one command by name and scrolls to it, so the
+// explanation block underneath is that command's.
+//
+// It matches the NAME exactly rather than reusing the search filter. The
+// filter matches substrings across the detail text too, so focusing "port"
+// selected /sessions — whose explanation mentions exporting. Close enough for
+// a search someone is watching, wrong for a jump that is supposed to land on
+// one specific command.
+//
+// Leaving the full list in place is also the better answer: the surrounding
+// commands stay visible, so `/port help` shows what it does AND what else is
+// nearby, rather than a single row in an otherwise empty frame.
+func (m *commandHelpCmp) FocusCommand(name string) {
+	m.Init()
+	name = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(name)), "/")
+	for i, r := range m.rows {
+		if r.cmd == nil {
+			continue
+		}
+		if strings.EqualFold(r.cmd.Name, name) {
+			m.selectedIdx = i
+			m.ensureVisible()
+			return
+		}
+		for _, alias := range r.cmd.Aliases {
+			if strings.EqualFold(alias, name) {
+				m.selectedIdx = i
+				m.ensureVisible()
+				return
+			}
+		}
+	}
+	// No such command: leave the reference as Init left it, showing everything
+	// from the top. That is a worse answer than the right command and a much
+	// better one than a blank screen.
+}
+
 func (m *commandHelpCmp) SetSize(width, height int) {
 	m.width, m.height = width, height
 	m.ensureVisible()
@@ -114,6 +156,17 @@ func (m *commandHelpCmp) rebuild() {
 
 func (m *commandHelpCmp) selectable(i int) bool {
 	return i >= 0 && i < len(m.rows) && m.rows[i].cmd != nil
+}
+
+// hasAnyCommand distinguishes "the filter matched nothing" from "the first
+// command sits at index 0", which firstCommand cannot: it returns 0 for both.
+func (m *commandHelpCmp) hasAnyCommand() bool {
+	for i := range m.rows {
+		if m.selectable(i) {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *commandHelpCmp) firstCommand() int {

@@ -124,7 +124,8 @@ func unknownPortOptionMessage(unknown []string) string {
 		"/port does not understand %s.\n\nIt takes: inspect, forward-port, backport, "+
 			"rebase, refresh, series — plus --onto REF, --series DIR, --patch FILE, "+
 			"--build CMD, --test CMD, and a folder.\n\nExample:\n"+
-			"  /port forward-port --series ../patches --onto v6.12 --build \"make -j8\"",
+			"  /port forward-port --series ../patches --onto v6.12 --build \"make -j8\"\n\n"+
+			"Full explanation:  /port help",
 		strings.Join(unknown, ", "))
 }
 

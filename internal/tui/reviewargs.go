@@ -111,7 +111,8 @@ func parseReviewArgs(raw string) reviewRequest {
 // running the wrong one wastes real time.
 func unknownReviewOptionMessage(unknown []string) string {
 	return "Don't know the option " + strings.Join(unknown, " ") +
-		". Try: /review --quick, --security, --full, --diff HEAD, or a path."
+		". Try: /review --quick, --security, --full, --diff HEAD, or a path." +
+		"  Full explanation: /review help"
 }
 
 // reviewPrompt turns the parsed request into the instruction the agent runs.

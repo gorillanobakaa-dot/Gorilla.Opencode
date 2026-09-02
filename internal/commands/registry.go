@@ -209,7 +209,8 @@ var All = []Command{
 			"will say so rather than let you think otherwise.\n" +
 			"  /port forward-port --onto v6.12 --build \"make -j8\"\n\n" +
 			"Anything that changes your tree asks first. /port inspect never does, " +
-			"because it only reads.",
+			"because it only reads.\n\n" +
+			"Type /port help to read this again at any time.",
 	},
 	{
 		Name:    "resume",

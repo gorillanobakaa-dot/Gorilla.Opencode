@@ -334,6 +334,8 @@ So it tells you which of those happened for every patch, and shows you the diff 
 
 Anything that changes your tree asks first. /port inspect never does, because it only reads.
 
+Type /port help to read this again at any time.
+
 ### `/yolo`
 
 *Also: `/auto`, `/autopilot`, `/goal`*

@@ -1495,6 +1495,12 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// are also OUT of this switch on purpose, because a nested switch
 			// here reads to TestEveryDispatchedCommandIsDocumented as three new
 			// slash commands called /quick, /security and /full.
+			// `/review help` explains instead of running. Someone reaching for
+			// help wants to know what the command DOES before spending twenty
+			// minutes of analysers finding out.
+			if wantsCommandHelp(msg.Args) {
+				return a, a.explainCommand("review")
+			}
 			req := parseReviewArgs(msg.Args)
 			if len(req.Unknown) > 0 {
 				return a, util.ReportWarn(unknownReviewOptionMessage(req.Unknown))
@@ -1510,6 +1516,9 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// "applied" and stopped would be the looks-complete-is-half failure the
 		// tool's own description warns about.
 		case "port", "patch", "backport", "forwardport":
+			if wantsCommandHelp(msg.Args) {
+				return a, a.explainCommand("port")
+			}
 			req := parsePortArgs(msg.Args)
 			if len(req.Unknown) > 0 {
 				return a, util.ReportWarn(unknownPortOptionMessage(req.Unknown))
