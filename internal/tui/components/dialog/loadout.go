@@ -101,6 +101,10 @@ type loadoutKeyMap struct {
 	Up, Down, Left, Right, Toggle, Reset, LowBW, RateDown, RateUp, LeashDown, LeashUp, Escape key.Binding
 	// AllLSP is the bulk language-server switch. GORILLA OVERRIDE.
 	AllLSP key.Binding
+	// UndoLowBW puts back exactly what the low-bandwidth preset switched
+	// off. GORILLA OVERRIDE: the preset was one-way, and a user lost
+	// /review to it without ever being told which setting had done it.
+	UndoLowBW key.Binding
 }
 
 var loadoutKeys = loadoutKeyMap{
@@ -118,7 +122,8 @@ var loadoutKeys = loadoutKeyMap{
 	// GORILLA OVERRIDE: bulk switch for the language servers. Nine configured
 	// servers meant nine toggles to get to a quiet session; granular control is
 	// only usable with an "all" beside it.
-	AllLSP: key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "all LSPs on/off")),
+	AllLSP:    key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "all LSPs on/off")),
+	UndoLowBW: key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "undo low-bandwidth")),
 	// Legacy power-user shortcuts (still work regardless of what's selected).
 	RateDown:  key.NewBinding(key.WithKeys("-", "_")),
 	RateUp:    key.NewBinding(key.WithKeys("+", "=")),
@@ -263,7 +268,17 @@ func (m *loadoutDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			n := config.ApplyLowBandwidthLoadout()
 			return m, tea.Batch(
 				util.CmdHandler(LoadoutChangedMsg{}),
-				util.ReportInfo(fmt.Sprintf("Low-bandwidth loadout applied (~%s tokens/turn%s)", commaInt(n), loadoutCostSuffix())),
+				util.ReportInfo(fmt.Sprintf("Low-bandwidth loadout applied (~%s tokens/turn%s) — press u to undo", commaInt(n), loadoutCostSuffix())),
+			)
+		case key.Matches(msg, loadoutKeys.UndoLowBW):
+			if config.LowBandwidthUndoCount() == 0 {
+				return m, util.ReportInfo("Nothing to undo: the low-bandwidth preset has not switched anything off.")
+			}
+			restored := config.UndoLowBandwidthLoadout()
+			return m, tea.Batch(
+				util.CmdHandler(LoadoutChangedMsg{}),
+				util.ReportInfo(fmt.Sprintf("Switched %d component(s) back on (~%s tokens/turn%s)",
+					restored, commaInt(config.LoadoutActiveTokens()), loadoutCostSuffix())),
 			)
 		// Legacy direct shortcuts (work regardless of selection).
 		case key.Matches(msg, loadoutKeys.RateDown):

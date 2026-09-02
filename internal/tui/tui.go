@@ -1501,6 +1501,9 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if wantsCommandHelp(msg.Args) {
 				return a, a.explainCommand("review")
 			}
+			if cmd := a.requireTool("tool.review", "/review"); cmd != nil {
+				return a, cmd
+			}
 			req := parseReviewArgs(msg.Args)
 			if len(req.Unknown) > 0 {
 				return a, util.ReportWarn(unknownReviewOptionMessage(req.Unknown))
@@ -1518,6 +1521,9 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "port", "patch", "backport", "forwardport":
 			if wantsCommandHelp(msg.Args) {
 				return a, a.explainCommand("port")
+			}
+			if cmd := a.requireTool("tool.patch_port", "/port"); cmd != nil {
+				return a, cmd
 			}
 			req := parsePortArgs(msg.Args)
 			if len(req.Unknown) > 0 {

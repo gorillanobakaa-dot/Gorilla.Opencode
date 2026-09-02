@@ -387,9 +387,12 @@ func ComponentTokens(c LoadoutComponent) int {
 }
 
 var (
-	loadoutOnce  sync.Once
-	loadoutState map[string]bool // id -> enabled (only entries that differ or are set)
-	loadoutMu    sync.RWMutex
+	loadoutOnce sync.Once
+	// lowBandwidthUndo remembers what the last low-bandwidth trim switched
+	// off, so it can be switched back on without resetting everything else.
+	lowBandwidthUndo = map[string]bool{}
+	loadoutState     map[string]bool // id -> enabled (only entries that differ or are set)
+	loadoutMu        sync.RWMutex
 )
 
 // GORILLA OVERRIDE: Gorilla-specific config lives under a "gorilla-opencode"
@@ -422,6 +425,11 @@ func initLoadout() {
 				}
 			}
 		}
+		// What the last low-bandwidth trim switched off, so the undo survives
+		// a restart. Without this the offer to put things back would vanish
+		// the moment the program closed -- which is exactly when someone
+		// notices their tools are missing.
+		loadLowBandwidthUndo()
 	})
 }
 
@@ -556,12 +564,103 @@ func ResetLoadout() {
 func ApplyLowBandwidthLoadout() int {
 	initLoadout()
 	loadoutMu.Lock()
+	// Record what was ON before, so this can be undone.
+	//
+	// It used to be one-way, and that cost a user their /review. The trim
+	// switched off seven components, wrote them to disk, and nothing put them
+	// back -- the connection profile returned to unconstrained while review,
+	// research, web search and fetch stayed off for days. The only symptom was
+	// a model saying it did not have the tool, which reads as the model being
+	// broken rather than as a setting.
+	//
+	// Only components this call actually CHANGES are recorded. Anything the
+	// user had already switched off themselves stays off on restore: undoing
+	// the trim must not silently switch on something they turned off on
+	// purpose.
+	undo := map[string]bool{}
 	for id := range lowBandwidthOff {
+		if enabledLocked(id) {
+			undo[id] = true
+		}
 		loadoutState[id] = false
+	}
+	if len(undo) > 0 {
+		lowBandwidthUndo = undo
 	}
 	loadoutMu.Unlock()
 	saveLoadout()
+	saveLowBandwidthUndo()
 	return LoadoutActiveTokens()
+}
+
+// LowBandwidthUndoCount reports how many components the last trim switched off
+// and could put back. Zero means there is nothing to undo.
+func LowBandwidthUndoCount() int {
+	initLoadout()
+	loadoutMu.RLock()
+	defer loadoutMu.RUnlock()
+	return len(lowBandwidthUndo)
+}
+
+// UndoLowBandwidthLoadout switches back on exactly what the last trim switched
+// off, and nothing else. Returns how many were restored.
+//
+// Deliberately not ResetLoadout: that returns EVERY component to its shipped
+// default, discarding whatever else the user had configured. Someone who wants
+// their web search back should not lose their prompt-section choices to get it.
+func UndoLowBandwidthLoadout() int {
+	initLoadout()
+	loadoutMu.Lock()
+	n := 0
+	for id := range lowBandwidthUndo {
+		if !loadoutState[id] {
+			loadoutState[id] = true
+			n++
+		}
+	}
+	lowBandwidthUndo = map[string]bool{}
+	loadoutMu.Unlock()
+	saveLoadout()
+	saveLowBandwidthUndo()
+	return n
+}
+
+// enabledLocked is LoadoutEnabled without taking the lock, for callers that
+// already hold it. Calling the exported one here would deadlock.
+func enabledLocked(id string) bool {
+	if v, ok := loadoutState[id]; ok {
+		return v
+	}
+	for _, c := range LoadoutComponents {
+		if c.ID == id {
+			return c.Default
+		}
+	}
+	return false
+}
+
+const lowBandwidthUndoFileName = "loadout-lowbw-undo.json"
+
+func lowBandwidthUndoPath() string {
+	return filepath.Join(filepath.Dir(loadoutPath()), lowBandwidthUndoFileName)
+}
+
+func saveLowBandwidthUndo() {
+	loadoutMu.RLock()
+	data, _ := json.MarshalIndent(lowBandwidthUndo, "", " ")
+	loadoutMu.RUnlock()
+	_ = writeSecretFile(lowBandwidthUndoPath(), data)
+}
+
+func loadLowBandwidthUndo() {
+	data, err := os.ReadFile(lowBandwidthUndoPath())
+	if err != nil {
+		return
+	}
+	m := map[string]bool{}
+	if json.Unmarshal(data, &m) == nil {
+		lowBandwidthUndo = m
+	}
 }
 
 func saveLoadout() {
