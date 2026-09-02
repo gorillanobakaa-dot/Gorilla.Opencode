@@ -381,11 +381,28 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	}
 	fitLine := func(line string) string { return fitTo(line, w) }
 
-	total := config.LoadoutActiveTokens()
+	// GORILLA FIX (2026-09-02): with deferred loading on, an enabled tool is
+	// not necessarily a SENT tool. Quoting the sum of everything enabled
+	// overstated the real cost by several thousand tokens on the one screen
+	// built to price a turn, and hid the saving exactly where it should have
+	// been most visible.
+	//
+	// Both numbers are shown because both are true. The first is what leaves
+	// the machine before the model has discovered anything; the second is what
+	// it becomes if it loads every withheld tool. Real usage sits between them
+	// and climbs through a session.
+	upfront, ceiling := config.LoadoutTokenRange()
+	total := upfront
 	header := base.Foreground(t.Primary()).Bold(true).Width(w).
 		Render(fitLine("Context loadout — what every turn costs"))
-	sub := base.Foreground(t.TextMuted()).Width(w).
-		Render(fitLine(fmt.Sprintf("~%s tokens sent on EVERY turn, even to say \"yo\"%s.", commaInt(total), loadoutCostSuffix())))
+	costLine := fmt.Sprintf("~%s tokens sent on EVERY turn, even to say \"yo\"%s.",
+		commaInt(total), loadoutCostSuffix())
+	if ceiling > upfront {
+		costLine = fmt.Sprintf("~%s tokens sent on EVERY turn, even to say \"yo\"%s — "+
+			"rising to ~%s if the model loads every deferred tool.",
+			commaInt(upfront), loadoutCostSuffix(), commaInt(ceiling))
+	}
+	sub := base.Foreground(t.TextMuted()).Width(w).Render(fitLine(costLine))
 	fixed := base.Foreground(t.TextMuted()).Width(w).
 		Render(fitLine(fmt.Sprintf("(base system prompt ~%s is always on; the rest is yours to cut)", commaInt(config.LoadoutBaseTokens()))))
 	// GORILLA FIX (2026-08-19): say how good these numbers are.

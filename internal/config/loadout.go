@@ -718,15 +718,67 @@ func saveLoadout() {
 // LoadoutActiveTokens is the approximate per-turn overhead of everything
 // currently switched on, including the always-present base system prompt.
 func LoadoutActiveTokens() int {
+	up, _ := LoadoutTokenRange()
+	return up
+}
+
+// LoadoutTokenRange reports what a turn costs NOW and what it would cost with
+// every deferred tool loaded.
+//
+// GORILLA FIX (2026-09-02): this used to sum every enabled component, which
+// stopped being true the moment deferred loading shipped. A deferred tool is
+// enabled and NOT SENT, so /context was quoting a number several thousand
+// tokens above what actually goes on the wire -- on the one screen that exists
+// to tell you what a turn costs. The feature was invisible exactly where it
+// should have been most visible.
+//
+// Two numbers rather than one, because both are true and neither alone is
+// honest. The floor is what is sent before the model discovers anything; the
+// ceiling is what it becomes if it loads everything. Real usage lands between
+// them and moves upward through a session.
+func LoadoutTokenRange() (upfront, ceiling int) {
 	tokenOverrideMu.RLock()
-	total := basePromptTokens
+	base := basePromptTokens
 	tokenOverrideMu.RUnlock()
+
+	upfront, ceiling = base, base
+	deferring := LoadoutEnabled(ToolSearchComponentID)
 	for _, c := range LoadoutComponents {
-		if LoadoutEnabled(c.ID) {
-			total += ComponentTokens(c)
+		if !LoadoutEnabled(c.ID) {
+			continue
 		}
+		n := ComponentTokens(c)
+		ceiling += n
+		if deferring && deferredComponentIDs[c.ID] {
+			continue // enabled, but withheld until the model asks
+		}
+		upfront += n
 	}
-	return total
+	if deferring {
+		// The index that makes the withheld tools discoverable is sent every
+		// turn and has to be counted, or this trades one wrong number for
+		// another.
+		upfront += deferredIndexTokens
+		ceiling += deferredIndexTokens
+	}
+	return upfront, ceiling
+}
+
+// deferredComponentIDs is registered by the agent, which owns the tool list.
+// config cannot import internal/llm/tools -- tools imports config.
+var (
+	deferredComponentIDs = map[string]bool{}
+	deferredIndexTokens  int
+)
+
+// SetDeferredComponents records which loadout rows correspond to tools that are
+// withheld until searched for, plus the measured cost of the index that
+// advertises them.
+func SetDeferredComponents(ids map[string]bool, indexTokens int) {
+	loadoutMu.Lock()
+	deferredComponentIDs = ids
+	deferredIndexTokens = indexTokens
+	loadoutMu.Unlock()
 }
 
 // LoadoutBaseTokens is the fixed, non-switchable overhead (base prompt).

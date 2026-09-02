@@ -105,13 +105,57 @@ func CoderAgentTools(
 		// toolset, so a tool added above appears in the index without anyone
 		// maintaining a second list — the kind of second list that goes stale
 		// and leaves a tool undiscoverable.
-		prompt.SetDeferredCatalogue(tools.DeferredCatalogueBlock(snapshot))
+		block := tools.DeferredCatalogueBlock(snapshot)
+		prompt.SetDeferredCatalogue(block)
+
+		// Tell /context which rows are enabled-but-withheld, so the per-turn
+		// figure is what actually goes on the wire. Without this the screen
+		// that exists to price a turn quotes the cost of schemas nobody sends.
+		//
+		// Mapped from tool NAME to loadout ID here, because this is the only
+		// place that knows both.
+		deferredIDs := map[string]bool{}
+		for _, t := range snapshot {
+			if !tools.IsDeferrable(t.Info().Name) {
+				continue
+			}
+			if id, ok := loadoutIDForTool(t.Info().Name); ok {
+				deferredIDs[id] = true
+			}
+		}
+		config.SetDeferredComponents(deferredIDs, len(block)/4)
 	} else {
 		// Cleared, not left behind: advertising tools that are all loaded
 		// anyway would tell the model to search for things it already has.
 		prompt.SetDeferredCatalogue("")
+		config.SetDeferredComponents(nil, 0)
 	}
 	return full
+}
+
+// loadoutIDForTool maps a tool's wire name to its /context row.
+//
+// A table rather than a naming rule, because the two genuinely differ:
+// web_fetch is tool.fetch and web_search is tool.websearch. A rule would have
+// silently failed on exactly those two and under-reported the saving.
+func loadoutIDForTool(name string) (string, bool) {
+	switch name {
+	case tools.ReviewToolName:
+		return "tool.review", true
+	case tools.PatchPortToolName:
+		return "tool.patch_port", true
+	case tools.BioDataToolName:
+		return "tool.bio_lookup", true
+	case tools.SparseToolName:
+		return "tool.sparse", true
+	case tools.WebSearchToolName:
+		return "tool.websearch", true
+	case tools.FetchToolName:
+		return "tool.fetch", true
+	case AgentToolName:
+		return "tool.agent", true
+	}
+	return "", false
 }
 
 // ResearchAgentTools is what a research helper gets. It is TaskAgentTools plus
