@@ -17,7 +17,13 @@
 // called "security".
 package tui
 
-import "strings"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/opencode-ai/opencode/internal/config"
+)
 
 // reviewRequest is what /review resolves to.
 type reviewRequest struct {
@@ -102,8 +108,58 @@ func parseReviewArgs(raw string) reviewRequest {
 		}
 	}
 
+	// A bare depth word is a depth, not a folder.
+	//
+	// `/review quick` used to build a prompt saying path="quick", so the model
+	// went looking for a directory of that name and reviewed nothing. The dash
+	// is the difference between --quick and quick, and nobody types the dash
+	// reliably -- least of all for a word that reads as an adverb.
+	//
+	// Guarded by an existence check, because "full" and "audit" are perfectly
+	// plausible directory names. A folder that is really there always wins: the
+	// depth reading only applies when the alternative is reviewing something
+	// that does not exist.
+	if len(positional) == 1 && req.Focus == "" {
+		word := strings.ToLower(positional[0])
+		if depth, ok := focusAliases[word]; ok && !reviewPathExists(positional[0]) {
+			req.Focus = depth
+			positional = nil
+		}
+	}
+
 	req.Path = strings.Join(positional, " ")
 	return req
+}
+
+// reviewPathExists is a variable so tests can decide what is on disk instead of
+// creating directories named "quick" and "full" to find out.
+var reviewPathExists = func(p string) bool {
+	if _, err := os.Stat(p); err == nil {
+		return true
+	}
+	// Relative to the working directory too: /review quick is typed from
+	// wherever the user happens to be.
+	//
+	// config.WorkingDirectory panics when no config is loaded, which is the
+	// normal state in a parser unit test. Recovering is right here rather than
+	// making the parser require a loaded config: not knowing the working
+	// directory means "cannot confirm this path exists", which is exactly the
+	// false this returns.
+	if wd := workingDirOrEmpty(); wd != "" {
+		if _, err := os.Stat(filepath.Join(wd, p)); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func workingDirOrEmpty() (dir string) {
+	defer func() {
+		if recover() != nil {
+			dir = ""
+		}
+	}()
+	return config.WorkingDirectory()
 }
 
 // unknownReviewOptionMessage names the typo and the options that do exist.

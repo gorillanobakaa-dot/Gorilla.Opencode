@@ -43,11 +43,15 @@ func TestEveryOptionalComponentHasALowBandwidthDecision(t *testing.T) {
 			}
 			continue
 		}
-		// A component that ships OFF costs nothing by default, so the preset has
-		// nothing to decide about it.
-		if !c.Default {
-			continue
-		}
+		// A component that ships OFF used to be skipped here, on the reasoning
+		// that it costs nothing by default. True of the DEFAULT, and beside the
+		// point: the person pressing this button has ARMED something and is now
+		// asking for a smaller loadout. Four components reached 2026-09-02
+		// undecided because of this skip -- bio_lookup, dossier, sparse and
+		// localtools -- and the preset would have left every one of them running.
+		//
+		// So default-OFF components are held to the same rule: decide, in one
+		// list or the other.
 		if lowBandwidthOff[c.ID] {
 			continue
 		}

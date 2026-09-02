@@ -72,14 +72,48 @@ func TestReviewArgumentsAreParsedNotTreatedAsAPath(t *testing.T) {
 
 // A directory really can be called "security". A bare word is a path; only a
 // dash makes it a flag.
-func TestABareWordIsAPathEvenWhenItLooksLikeAFlagName(t *testing.T) {
-	for _, word := range []string{"security", "quick", "deep", "audit"} {
+// REVISED 2026-09-02. This used to assert that a bare "quick" or "security" is
+// ALWAYS a path, never a depth. The reasoning was sound — somebody may well
+// have a directory called security, and reviewing the wrong thing is worse than
+// needing a dash.
+//
+// What it missed is the far commoner case. A user typed /review quick, the
+// prompt went out saying path="quick", and the model went looking for a folder
+// that did not exist. The dash is the only thing separating --quick from quick
+// and nobody types it reliably for a word that reads as an adverb.
+//
+// So the rule is now conditional rather than reversed: a directory that REALLY
+// EXISTS still wins, and the depth reading applies only when the alternative is
+// reviewing something that is not there. This test keeps the original
+// guarantee — that is what the existsOnDisk half asserts — and adds the case
+// the original could not express.
+func TestABareWordIsAPathWhenThatPathExists(t *testing.T) {
+	restore := reviewPathExists
+	defer func() { reviewPathExists = restore }()
+
+	words := []string{"security", "quick", "deep", "audit"}
+
+	// The original guarantee: a real directory is reviewed, not reinterpreted.
+	reviewPathExists = func(string) bool { return true }
+	for _, word := range words {
 		got := parseReviewArgs(word)
 		if got.Path != word {
-			t.Errorf("%q was read as %q rather than as a path", word, got.Path)
+			t.Errorf("%q exists on disk but was read as %q rather than as a path", word, got.Path)
 		}
 		if got.Focus != "" {
-			t.Errorf("%q set focus=%q; a bare word must not be a flag", word, got.Focus)
+			t.Errorf("%q exists on disk but set focus=%q", word, got.Focus)
+		}
+	}
+
+	// The case that sent a user's review at a folder that was not there.
+	reviewPathExists = func(string) bool { return false }
+	for _, word := range words {
+		got := parseReviewArgs(word)
+		if got.Path != "" {
+			t.Errorf("%q does not exist, yet became path=%q", word, got.Path)
+		}
+		if got.Focus == "" {
+			t.Errorf("%q does not exist and set no depth; it would review nothing", word)
 		}
 	}
 }

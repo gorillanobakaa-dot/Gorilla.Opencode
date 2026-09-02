@@ -13,6 +13,26 @@ fail() { echo "FAIL: $1"; FAILS=$((FAILS+1)); }
 pass() { echo "ok:   $1"; }
 skip() { echo "skip: $1"; }
 
+# Every invocation of the binary is bounded.
+#
+# These checks are about how the program FAILS -- the message, the exit code,
+# whether it dumps usage. None of them wants a real answer from a model. But
+# with a local endpoint reachable, `-p hi` is a genuine inference request, and
+# on 2026-09-02 it hung the whole suite waiting for a model that was still
+# loading. A test that can hang is a test nobody runs.
+#
+# 25s is generous for "did it print the right refusal" and far short of a real
+# generation. Exit 124 is timeout's own code and is reported as such, so a hang
+# shows up as a hang instead of as a wrong answer.
+BIN_TIMEOUT="${BIN_TIMEOUT:-25}"
+runbin() {
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$BIN_TIMEOUT" "$@"
+  else
+    "$@"
+  fi
+}
+
 # A check that cannot run here is not a check that failed. Reporting it as a
 # failure trains everyone to ignore the whole suite, which costs more than the
 # coverage it pretends to have.
@@ -33,7 +53,7 @@ for port in 1234 8080 11434 8000; do
 done
 
 # 1. No provider configured: friendly, actionable, no usage dump, nonzero exit.
-OUT="$(cd "$TMP" && env -i HOME="$TMP" PATH="$PATH" TERM=dumb "$BIN" -p hi -q 2>&1)"; RC=$?
+OUT="$(cd "$TMP" && env -i HOME="$TMP" PATH="$PATH" TERM=dumb runbin "$BIN" -p hi -q 2>&1)"; RC=$?
 if [ "$LOCAL_UP" = yes ]; then
   # A local endpoint is up, so a provider IS configured and this path is
   # unreachable. Two checks below still hold regardless: whatever happens,
@@ -52,13 +72,13 @@ echo "$OUT" | grep -q "Usage:" \
 
 # 2. Runtime provider error in -p mode: error visible, no usage dump.
 OUT="$(cd "$TMP" && env -i HOME="$TMP" PATH="$PATH" TERM=dumb \
-  LOCAL_ENDPOINT=http://127.0.0.1:9 LOCAL_ENDPOINT_API_KEY=x "$BIN" -p hi -q 2>&1)"; RC=$?
+  LOCAL_ENDPOINT=http://127.0.0.1:9 LOCAL_ENDPOINT_API_KEY=x runbin "$BIN" -p hi -q 2>&1)"; RC=$?
 echo "$OUT" | grep -q "Usage:" \
   && fail "-p connection error dumps usage text" || pass "-p error path has no usage dump"
 [ "$RC" -ne 0 ] || [ -n "$OUT" ] && pass "-p error is not silent" || fail "-p failed silently"
 
 # 3. Version stamp.
-V="$("$BIN" -v 2>/dev/null | tail -1)"
+V="$(runbin "$BIN" -v 2>/dev/null | tail -1)"
 if [ -n "$EXPECT_VERSION" ]; then
   [ "$V" = "$EXPECT_VERSION" ] && pass "version stamped: $V" || fail "version is '$V', expected '$EXPECT_VERSION'"
 else
@@ -66,14 +86,14 @@ else
 fi
 
 # 4. Branding: help says gorilla-opencode, never bare 'opencode' as the command.
-HELP="$("$BIN" --help 2>&1)"
+HELP="$(runbin "$BIN" --help 2>&1)"
 echo "$HELP" | grep -q "gorilla-opencode" \
   && pass "help uses gorilla-opencode" || fail "help missing gorilla-opencode"
 echo "$HELP" | grep -qE '(^|\s)opencode(\s|$)' \
   && fail "help still says bare 'opencode'" || pass "no bare 'opencode' in help"
 
 # 5. FZF warning must not pollute non-interactive output.
-OUT="$(cd "$TMP" && env -i HOME="$TMP" PATH="/usr/bin:/bin" TERM=dumb "$BIN" -p hi -q 2>&1)"
+OUT="$(cd "$TMP" && env -i HOME="$TMP" PATH="/usr/bin:/bin" TERM=dumb runbin "$BIN" -p hi -q 2>&1)"
 echo "$OUT" | grep -q "FZF not found" \
   && fail "FZF warning still prints in non-interactive mode" || pass "no FZF noise"
 

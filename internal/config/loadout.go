@@ -39,10 +39,10 @@ type LoadoutComponent struct {
 // (measured from description/schema sizes, ~4 chars/token) and exist to
 // inform a decision, not to bill anyone.
 var LoadoutComponents = []LoadoutComponent{
-	{"tool.bash", "Bash tool", "agent can't run shell commands (build, test, git, run anything)", 1200, true, true},
-	{"tool.edit", "Edit tool", "agent can't modify files in place", 1300, true, true},
-	{"tool.write", "Write tool", "agent can't create or overwrite files", 350, true, true},
-	{"tool.view", "View tool", "agent can't read file contents", 500, true, true},
+	{"tool.bash", "Bash tool", "agent can't run shell commands (build, test, git, run anything)", 1402, true, true},
+	{"tool.edit", "Edit tool", "agent can't modify files in place", 759, true, true},
+	{"tool.write", "Write tool", "agent can't create or overwrite files", 359, true, true},
+	{"tool.view", "View tool", "agent can't read file contents", 595, true, true},
 	// GORILLA OVERRIDE: tool.ls, tool.grep and tool.glob (450+600+400 as
 	// estimated here, ~1,485 measured) are replaced by one find tool. Three
 	// descriptions repeating WHEN TO USE / HOW TO USE / LIMITATIONS / TIPS is
@@ -51,12 +51,24 @@ var LoadoutComponents = []LoadoutComponent{
 	// anything. find is deliberately NOT as small as it could be: smaller
 	// models were failing to search big trees at all, so its description
 	// teaches the narrowing arguments (type, path, glob) with worked examples.
-	// It still costs roughly a third of the three it replaces. The old
+	//
+	// CORRECTED 2026-09-02: "roughly a third" was wrong, and had been for a
+	// while. find measures 1,322 tokens against the ~1,485 of the three it
+	// replaced -- a saving of about 160, not two thirds. The row said 520
+	// because nobody re-measured after the description grew to teach those
+	// narrowing arguments, which is the very thing that made it bigger.
+	//
+	// The change was still right, on the arguments that do not depend on this
+	// number: one tool instead of three removes a tool-choice mistake small
+	// models kept making, and find returns matching LINES where grep returned
+	// paths, which removes the second turn and the whole-file view behind it.
+	// That saving is measured in turns, not tokens, and it is much larger.
+	// The old
 	// components are gone from this registry, not from the tree.
-	{"tool.find", "Find tool (search + list + glob)", "agent can't search code, find files, or list directories — it is blind to the tree", 520, true, true},
-	{"tool.patch", "Patch tool", "agent loses multi-hunk patch edits (edit/write still work)", 900, true, false},
-	{"tool.fetch", "Fetch a web page", "agent can't open a link you give it", 300, true, false},
-	{"tool.websearch", "Find sources + web search", "agent can't look anything up — only what you paste in", 300, true, false},
+	{"tool.find", "Find tool (search + list + glob)", "agent can't search code, find files, or list directories — it is blind to the tree", 1322, true, true},
+	{"tool.patch", "Patch tool", "agent loses multi-hunk patch edits (edit/write still work)", 308, true, false},
+	{"tool.fetch", "Fetch a web page", "agent can't open a link you give it", 789, true, false},
+	{"tool.websearch", "Find sources + web search", "agent can't look anything up — only what you paste in", 846, true, false},
 	{"tool.diagnostics", "Diagnostics tool", "agent can't read LSP errors/warnings", 400, true, false},
 	{"tool.agent", "Sub-agent tool", "agent can't spawn read-only search sub-agents", 200, true, false},
 	// GORILLA OVERRIDE: multi-role research (4-10 helpers in fixed lanes).
@@ -86,7 +98,7 @@ var LoadoutComponents = []LoadoutComponent{
 	// kernel work, meaningless everywhere else, so its schema should not ride
 	// every request for a user who never touches the kernel. Turn it on when
 	// starting kernel patches.
-	{"tool.sparse", "Sparse checker (kernel)", "agent can't check kernel semantics (__user pointers, endianness, lock imbalance) — needs a build to catch them instead", 180, false, false},
+	{"tool.sparse", "Sparse checker (kernel)", "agent can't check kernel semantics (__user pointers, endianness, lock imbalance) — needs a build to catch them instead", 340, false, false},
 	// GORILLA OVERRIDE (2026-08-18): the code-review toolkit — ~30 static
 	// analysers embedded in the binary. ON by default: a review capability
 	// nobody is told about is not a capability, and this is the one feature no
@@ -333,6 +345,16 @@ var lowBandwidthOff = map[string]bool{
 	"tool.review":      true,
 	"tool.patch_port":  true,
 	"prompt.lsp":       true,
+
+	// Components that ship OFF still belong here. The coverage test used to
+	// skip them, reasoning that something off by default costs nothing -- true
+	// of the DEFAULT, and irrelevant to the person who armed it and then asked
+	// for a smaller loadout. Each of these was undecided until 2026-09-02 and
+	// would have survived the preset untouched.
+	"tool.bio_lookup":   true, // eleven remote scientific APIs
+	"tool.dossier":      true, // /osint runs 4-10 full model sessions; the worst thing to leave armed on a metered link
+	"tool.sparse":       true, // kernel-only static checker, and 180 tokens every turn to nobody else
+	"prompt.localtools": true, // hints about local binaries; useful, never load-bearing
 }
 
 // lowBandwidthKeep is the other half of the decision: default-ON, non-critical
