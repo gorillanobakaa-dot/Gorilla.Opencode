@@ -214,11 +214,141 @@ TOOLS = [
          "gitleaks", per_file=False,
          install="https://github.com/gitleaks/gitleaks",
          note="secrets; without it nothing here looked for leaked credentials"),
+    # ── Linux kernel ────────────────────────────────────────────────────────
+    # checkpatch is the gate every kernel patch passes through, and it is Perl,
+    # so unlike the rest of this group it does run on Windows given perl.
+    Tool("checkpatch", "checkpatch.pl", ["c"], 2,
+         ["--no-tree", "--terse", "--no-summary", "-f"], "gcc_like",
+         install="scripts/checkpatch.pl in any kernel tree (needs perl)",
+         note="the kernel's own gate; more useful on a patch than every general linter combined"),
+    Tool("sparse", "sparse", ["c"], 2, [], "gcc_like",
+         install="apt install sparse   (Linux only)",
+         note="kernel semantics: __user pointers, endianness, lock context. LINUX ONLY"),
+    Tool("smatch", "smatch", ["c"], 3, [], "gcc_like",
+         install="https://repo.or.cz/w/smatch.git   (Linux only)",
+         note="flow analysis built for kernel idioms. LINUX ONLY"),
+    Tool("coccinelle", "spatch", ["c"], 3,
+         ["--very-quiet", "--no-show-diff"], "gcc_like", per_file=False,
+         install="apt install coccinelle   (Linux only)",
+         note="semantic patches; `make coccicheck` runs ~60 of them. LINUX ONLY"),
+
+    # ── Firefox / Gecko ─────────────────────────────────────────────────────
+    Tool("mach lint", "mach", ["*"], 2, ["lint"], "gcc_like", per_file=False,
+         install="ships in the Firefox tree (./mach)",
+         note="Mozilla's own lint stack, ~30 linters; the real gate for Gecko"),
+    Tool("rustfmt", "rustfmt", ["rust"], 1, ["--check"], "gcc_like",
+         install="rustup component add rustfmt"),
+    Tool("stylelint", "stylelint", ["*"], 1, ["--formatter", "json"], "eslint",
+         install="npm i -g stylelint"),
+
+    # ── Security, beyond the two already present ────────────────────────────
+    Tool("trivy", "trivy", ["*"], 2, ["fs", "--quiet", "--format", "json"],
+         "trivy", per_file=False, install="https://trivy.dev/",
+         note="known-vulnerable dependencies; nothing else here checks them"),
+    Tool("osv-scanner", "osv-scanner", ["*"], 2, ["--format", "json", "-r"],
+         "osv", per_file=False,
+         install="go install github.com/google/osv-scanner/cmd/osv-scanner@latest",
+         note="the OSV vulnerability database"),
+
+    # ── General quality ─────────────────────────────────────────────────────
+    Tool("codespell", "codespell", ["*"], 1, [], "gcc_like",
+         install="pip install codespell"),
+    Tool("yamllint", "yamllint", ["yaml"], 1, ["-f", "parsable"], "gcc_like",
+         install="pip install yamllint"),
+
     Tool("semgrep", "semgrep", ["*"], 3,
          ["--json", "--quiet", "--config", "auto"], "semgrep", per_file=False,
          install="pip install semgrep",
          note="security; the deep cross-language pass"),
 ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Profiles
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# A profile is an ANSWER TO A QUESTION, not a preset. "What kind of review do
+# you want" has genuinely different answers -- looking for leaked credentials is
+# not the same job as looking for undefined behaviour -- and they need different
+# tools, cost different amounts to install, and take different lengths of time.
+#
+# Naming them lets the doctor say something useful instead of a flat list: you
+# have 11 of 42 tools, and for a SECURITY review specifically you are missing the
+# four that matter. That is actionable. "31 tools missing" is not.
+#
+# approx_mb is a rough download size, for telling someone on a metered or slow
+# connection what they are agreeing to before it starts. It is an estimate and
+# is labelled as one wherever it is shown.
+
+PROFILES = {
+    "quick": {
+        "title": "Quick pass -- formatters and fast linters",
+        "detail": "Seconds. Finds style problems and obvious defects. Cannot find "
+                  "a buffer overrun, an injection or a leaked credential, and says so.",
+        "stages": [0, 1],
+        "wants": ["gofmt", "ruff", "pyflakes", "eslint", "shellcheck"],
+        "approx_mb": 60,
+    },
+    "bugs": {
+        "title": "Bug hunt -- static analysis that finds real defects",
+        "detail": "Minutes. Type errors, nil dereferences, dead stores, undefined "
+                  "behaviour. The default for 'is this code correct'.",
+        "stages": [0, 1, 2],
+        "wants": ["go vet", "staticcheck", "mypy", "cppcheck", "clang-tidy",
+                  "clippy", "tsc", "sparse"],
+        "approx_mb": 400,
+    },
+    "security": {
+        "title": "Security review -- secrets, injections, unsafe patterns",
+        "detail": "Minutes. Leaked credentials, command injection, unsafe "
+                  "deserialisation, known-vulnerable dependencies. Without these "
+                  "tools a review says NOTHING about security -- it does not say "
+                  "the code is safe.",
+        "stages": [0, 2, 3],
+        "wants": ["gitleaks", "semgrep", "bandit", "gosec", "trivy", "osv-scanner"],
+        "approx_mb": 350,
+    },
+    "kernel": {
+        "title": "Linux kernel -- checkpatch, sparse, smatch, coccinelle",
+        "detail": "The kernel's own tooling. checkpatch alone will tell you more "
+                  "about a patch than every general-purpose linter combined. "
+                  "MOSTLY LINUX-ONLY: sparse, smatch and coccinelle do not build "
+                  "on Windows, so kernel review belongs on a Linux machine.",
+        "stages": [0, 1, 2, 3],
+        "wants": ["checkpatch", "sparse", "smatch", "coccinelle", "cppcheck",
+                  "clang-tidy", "gcc"],
+        "approx_mb": 250,
+        "platform_note": "sparse, smatch and coccinelle are Linux-only in practice.",
+    },
+    "firefox": {
+        "title": "Firefox / Gecko -- mozlint, clang-tidy, clippy, eslint",
+        "detail": "Mozilla's own lint stack plus the Rust and JS toolchains. "
+                  "./mach lint is the real gate; the rest catch what it does not.",
+        "stages": [0, 1, 2, 3],
+        "wants": ["mach", "clang-tidy", "clippy", "rustfmt", "eslint", "stylelint",
+                  "ruff", "cppcheck"],
+        "approx_mb": 900,
+    },
+    "full": {
+        "title": "Everything installed, every stage",
+        "detail": "Slowest and most complete. Still only as good as what is on "
+                  "the machine.",
+        "stages": [0, 1, 2, 3],
+        "wants": [],   # empty means "every tool that applies to the languages found"
+        "approx_mb": 0,
+    },
+}
+
+
+def profile_stages(name, deep, no_stage3):
+    """Stages this run may use. Explicit flags still win over the profile."""
+    prof = PROFILES.get(name) or PROFILES["bugs"]
+    stages = set(prof["stages"])
+    if no_stage3:
+        stages -= {2, 3}
+    if deep:
+        stages |= {0, 1, 2, 3}
+    return stages
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -440,11 +570,48 @@ def parse_semgrep(tool, raw):
     return out
 
 
+def parse_trivy(tool, raw):
+    doc = _json_or_empty(raw, dict)
+    out = []
+    for res in doc.get("Results") or []:
+        target = res.get("Target", "")
+        for v in (res.get("Vulnerabilities") or []):
+            out.append({
+                "tool": tool, "file": target, "line": 1,
+                "severity": normalise_severity(v.get("Severity", "medium")),
+                "message": "%s in %s %s: %s" % (
+                    v.get("VulnerabilityID", "vulnerability"),
+                    v.get("PkgName", "?"), v.get("InstalledVersion", "?"),
+                    (v.get("Title") or "")[:120]),
+                "rule": v.get("VulnerabilityID", ""),
+            })
+    return out
+
+
+def parse_osv(tool, raw):
+    doc = _json_or_empty(raw, dict)
+    out = []
+    for res in doc.get("results") or []:
+        src = (res.get("source") or {}).get("path", "")
+        for pkg in res.get("packages") or []:
+            name = ((pkg.get("package") or {}).get("name")) or "?"
+            for v in pkg.get("vulnerabilities") or []:
+                out.append({
+                    "tool": tool, "file": src, "line": 1, "severity": "high",
+                    "message": "%s affects %s: %s" % (
+                        v.get("id", "vulnerability"), name,
+                        (v.get("summary") or "")[:120]),
+                    "rule": v.get("id", ""),
+                })
+    return out
+
+
 PARSERS = {
     "gcc_like": parse_gcc_like, "filelist": parse_filelist, "ruff": parse_ruff,
     "bandit": parse_bandit, "eslint": parse_eslint, "shellcheck": parse_shellcheck,
     "cppcheck": parse_cppcheck, "gosec": parse_gosec, "golangci": parse_golangci,
     "gitleaks": parse_gitleaks, "semgrep": parse_semgrep,
+    "trivy": parse_trivy, "osv": parse_osv,
 }
 
 
@@ -621,15 +788,30 @@ def corroborate(findings):
     return out
 
 
-def plan(langs, deep, no_stage3):
-    """Which tools apply, and at which stage."""
-    max_stage = 1 if no_stage3 else (3 if deep else 2)
+def plan(langs, profile, deep, no_stage3):
+    """Which tools apply: the profile decides the stages AND narrows the set.
+
+    A profile that only picked stages would be cosmetic -- `--profile security`
+    would have run every stage-2 tool including the formatters, and the report
+    would have looked identical to a bug hunt. It has to narrow the tools too,
+    or the word means nothing.
+
+    `full` deliberately has an empty want-list, which means "everything that
+    applies to the languages found" rather than "nothing".
+    """
+    stages = profile_stages(profile, deep, no_stage3)
+    prof = PROFILES.get(profile) or PROFILES["bugs"]
+    wants = set(prof["wants"])
+
     chosen = []
     for t in TOOLS:
-        if t.stage > max_stage:
+        if t.stage not in stages:
             continue
-        if "*" in t.langs or (t.langs & set(langs)):
-            chosen.append(t)
+        if not ("*" in t.langs or (t.langs & set(langs))):
+            continue
+        if wants and t.name not in wants:
+            continue
+        chosen.append(t)
     return chosen
 
 
@@ -637,37 +819,83 @@ def plan(langs, deep, no_stage3):
 #  Doctor
 # ─────────────────────────────────────────────────────────────────────────────
 
-def doctor(target):
+def doctor(target, want_profile=""):
+    """Report what this machine can actually check, per profile, with the deal.
+
+    The owner's brief, near enough verbatim: the program cannot magic a review
+    out of thin air, so it should say what it scanned, what it found, what each
+    kind of review would need, and what installing that would cost -- and then
+    let a person choose.
+
+    ASCII only. This is printed to a Windows console, where cp1252 turns an
+    em-dash into a question mark, and a capability report that renders as
+    punctuation noise teaches nobody anything.
+    """
     files, langs = collect_files(target, 0, "")
-    lines = ["Code review — what this machine can actually check", ""]
-    lines.append("target: %s" % os.path.abspath(target))
-    lines.append("%d file(s), languages: %s" % (len(files), ", ".join(langs) or "none detected"))
-    lines.append("")
+    on_windows = os.name == "nt"
 
     relevant = [t for t in TOOLS if "*" in t.langs or (t.langs & set(langs))]
-    present = [t for t in relevant if find_binary(t.binary)]
-    absent = [t for t in relevant if not find_binary(t.binary)]
+    have = {t.name for t in relevant if find_binary(t.binary)}
 
-    if present:
-        lines.append("INSTALLED (%d):" % len(present))
-        for t in present:
-            lines.append("  %-16s stage %d  %s" % (t.name, t.stage, ", ".join(sorted(t.langs))))
-    else:
-        lines.append("INSTALLED: none")
-    lines.append("")
+    out = []
+    out.append("Code review capability report")
+    out.append("=" * 60)
+    out.append("target    : %s" % os.path.abspath(target))
+    out.append("files     : %d" % len(files))
+    out.append("languages : %s" % (", ".join(langs) or "none detected"))
+    out.append("platform  : %s" % ("Windows" if on_windows else os.name))
+    out.append("")
+    out.append("I cannot conjure a review out of nothing. I drive real analysers,")
+    out.append("and this machine has %d of the %d that apply here." % (len(have), len(relevant)))
+    out.append("")
 
+    # Per profile: what it needs, what is present, what it would cost.
+    out.append("WHAT KIND OF REVIEW DO YOU WANT?")
+    out.append("-" * 60)
+    for key, prof in PROFILES.items():
+        wants = prof["wants"] or [t.name for t in relevant]
+        applicable = [w for w in wants if any(t.name == w for t in relevant)]
+        if not applicable:
+            continue
+        got = [w for w in applicable if w in have]
+        missing = [w for w in applicable if w not in have]
+        ready = "READY" if not missing else "%d/%d" % (len(got), len(applicable))
+        out.append("")
+        out.append("  --profile %-9s [%s]  %s" % (key, ready, prof["title"]))
+        out.append("      %s" % prof["detail"])
+        if missing:
+            out.append("      missing: %s" % ", ".join(missing))
+            if prof["approx_mb"]:
+                out.append("      download to fix: roughly %d MB (an estimate, not a quote)"
+                           % prof["approx_mb"])
+        if on_windows and prof.get("platform_note"):
+            out.append("      NOTE ON THIS MACHINE: %s" % prof["platform_note"])
+
+    # The install commands, gathered, so a person can act without hunting.
+    absent = [t for t in relevant if t.name not in have]
     if absent:
-        lines.append("NOT INSTALLED (%d) — the code they cover will be UNREVIEWED:" % len(absent))
+        out.append("")
+        out.append("HOW TO INSTALL WHAT IS MISSING")
+        out.append("-" * 60)
         for t in absent:
-            extra = ("  [%s]" % t.note) if t.note else ""
-            lines.append("  %-16s %s%s" % (t.name, t.install or "see the tool's own docs", extra))
-        lines.append("")
-        lines.append("A review that runs none of these is not a clean review.")
-        lines.append("It is a review that did not happen.")
+            out.append("  %-14s %s" % (t.name, t.install or "see the tool's own documentation"))
+            if t.note:
+                out.append("  %-14s   ^ %s" % ("", t.note))
 
-    print("\n".join(lines))
+    out.append("")
+    out.append("-" * 60)
+    if not have:
+        out.append("NOTHING IS INSTALLED THAT APPLIES HERE.")
+        out.append("A review now would return an empty report, and an empty report")
+        out.append("looks exactly like a clean one. So nothing will be run at all.")
+    else:
+        out.append("A review will run the %d installed tool(s) and will state, in its" % len(have))
+        out.append("own output, which subject areas went unexamined. A finding of")
+        out.append("'nothing' from a tool that is not installed is not a finding.")
+
+    print(chr(10).join(out))
     # Exit 3 is the documented "nothing to run" signal the caller checks for.
-    return 0 if present else 3
+    return 0 if have else 3
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -680,7 +908,8 @@ def main(argv):
     ap.add_argument("--audience", default="human")
     ap.add_argument("--diff", default="")
     ap.add_argument("--max-files", type=int, default=0)
-    ap.add_argument("--profile", default="default")
+    ap.add_argument("--profile", default="bugs",
+                    choices=sorted(PROFILES) + ["default"])
     ap.add_argument("--deep", action="store_true")
     ap.add_argument("--no-stage3", action="store_true")
     ap.add_argument("--doctor", action="store_true")
@@ -690,12 +919,15 @@ def main(argv):
         print("target does not exist: %s" % args.target, file=sys.stderr)
         return 2
 
+    if args.profile == "default":
+        args.profile = "bugs"
+
     if args.doctor:
-        return doctor(args.target)
+        return doctor(args.target, args.profile)
 
     started = time.time()
     files, langs = collect_files(args.target, args.max_files, args.diff)
-    chosen = plan(langs, args.deep, args.no_stage3)
+    chosen = plan(langs, args.profile, args.deep, args.no_stage3)
 
     ran, errored, missing, timed_out, no_parser = [], [], [], [], []
     findings = []
