@@ -43,6 +43,7 @@ cost before they start. Everything else is local.
 | `/research <question>` | Send helper agents to investigate, each on one angle. |
 | `/osint <question>` · `/dossier` | The serious one. Professional dossier. Burns real money. |
 | `/review [--quick|--security|--full] [--diff REF] [folder]` · `/audit` `/codereview` | Run 30 real analysers over your code and report honestly. |
+| `/port [operation] [--onto REF] [--series DIR] [--build CMD]` · `/patch` `/backport` `/forwardport` | Move patches to another version of the code. |
 | `/yolo` · `/auto` `/autopilot` `/goal` | Approve everything for this conversation. No more prompts. |
 | `/tasks` · `/task` `/agents` `/kill` | See and stop background helpers. |
 | `/help` · `/commands` `/?` | This list. |
@@ -307,6 +308,31 @@ These combine, and the order does not matter: /review --security --diff HEAD int
 It also flags every line that two or more DIFFERENT tools complained about independently. Those are the ones worth reading first.
 
 What it cannot do: find wrong logic, a broken assumption, or an error quietly ignored. No static tool can. This is half a review and it says so — the AI still has to read the code, and should tell you it did.
+
+### `/port [operation] [--onto REF] [--series DIR] [--build CMD]`
+
+*Also: `/patch`, `/backport`, `/forwardport`*
+
+**Move patches to another version of the code.**
+
+For work written against one version of a tree that has to live on another. The kernel and Firefox loop: old tree, existing patches, new upstream version, rebase, conflicts, resolve, build, test.
+
+**What it does:**
+  /port inspect                  read the tree and patches, change NOTHING. Start here.
+  /port forward-port --onto REF  carry patches onto a NEWER base
+  /port backport --onto REF      carry them onto an OLDER base
+  /port rebase --onto REF        move this branch's own commits
+  /port refresh --patch FILE     regenerate a patch so it applies again
+  /port series --series DIR      a whole numbered series, in order
+
+**Why the answer is longer than yes or no.** A patch can land four different ways and they are not equivalent. Applied clean means it matched exactly. Applied three-way means the context had moved and git merged it using real history. Applied WITH FUZZ means the hunk was relocated by searching for the lines around it — and if those lines appear twice in the file, the change can land in the wrong place and still report success. Already-present means upstream has it and the patch should be dropped, not forced in twice.
+
+So it tells you which of those happened for every patch, and shows you the diff for anything fuzzed.
+
+**Add --build to actually verify.** Without a build command nothing is compiled: the patches applying is not evidence the result works, and it will say so rather than let you think otherwise.
+  /port forward-port --onto v6.12 --build "make -j8"
+
+Anything that changes your tree asks first. /port inspect never does, because it only reads.
 
 ### `/yolo`
 

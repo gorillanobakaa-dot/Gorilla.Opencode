@@ -179,6 +179,39 @@ var All = []Command{
 			"so — the AI still has to read the code, and should tell you it did.",
 	},
 	{
+		Name:    "port",
+		Aliases: []string{"patch", "backport", "forwardport"},
+		Group:   GroupHelpers,
+		Args:    "[operation] [--onto REF] [--series DIR] [--build CMD]",
+		Summary: "Move patches to another version of the code.",
+		Detail: "For work written against one version of a tree that has to live on " +
+			"another. The kernel and Firefox loop: old tree, existing patches, new " +
+			"upstream version, rebase, conflicts, resolve, build, test.\n\n" +
+			"**What it does:**\n" +
+			"  /port inspect                  read the tree and patches, change NOTHING. Start here.\n" +
+			"  /port forward-port --onto REF  carry patches onto a NEWER base\n" +
+			"  /port backport --onto REF      carry them onto an OLDER base\n" +
+			"  /port rebase --onto REF        move this branch's own commits\n" +
+			"  /port refresh --patch FILE     regenerate a patch so it applies again\n" +
+			"  /port series --series DIR      a whole numbered series, in order\n\n" +
+			"**Why the answer is longer than yes or no.** A patch can land four " +
+			"different ways and they are not equivalent. Applied clean means it " +
+			"matched exactly. Applied three-way means the context had moved and git " +
+			"merged it using real history. Applied WITH FUZZ means the hunk was " +
+			"relocated by searching for the lines around it — and if those lines " +
+			"appear twice in the file, the change can land in the wrong place and " +
+			"still report success. Already-present means upstream has it and the " +
+			"patch should be dropped, not forced in twice.\n\n" +
+			"So it tells you which of those happened for every patch, and shows you " +
+			"the diff for anything fuzzed.\n\n" +
+			"**Add --build to actually verify.** Without a build command nothing is " +
+			"compiled: the patches applying is not evidence the result works, and it " +
+			"will say so rather than let you think otherwise.\n" +
+			"  /port forward-port --onto v6.12 --build \"make -j8\"\n\n" +
+			"Anything that changes your tree asks first. /port inspect never does, " +
+			"because it only reads.",
+	},
+	{
 		Name:    "resume",
 		Aliases: []string{"continue", "handoff"},
 		Group:   GroupSession,

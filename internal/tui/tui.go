@@ -1501,6 +1501,21 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, util.CmdHandler(chat.SendMsg{Text: reviewPrompt(req)})
 
+		// GORILLA (2026-09-02): /port reaches the patch-porting half of the
+		// embedded toolkit. It shipped inside the binary with nothing able to
+		// call it, which is the same as not shipping it.
+		//
+		// Routed through the AGENT like /review: applying a patch is mechanical,
+		// deciding whether the result is right is not. A command that printed
+		// "applied" and stopped would be the looks-complete-is-half failure the
+		// tool's own description warns about.
+		case "port", "patch", "backport", "forwardport":
+			req := parsePortArgs(msg.Args)
+			if len(req.Unknown) > 0 {
+				return a, util.ReportWarn(unknownPortOptionMessage(req.Unknown))
+			}
+			return a, util.CmdHandler(chat.SendMsg{Text: portPrompt(req)})
+
 		case "sessions", "history":
 			if cmd := a.openSessionsManager(); cmd != nil {
 				return a, cmd

@@ -388,8 +388,17 @@ func (m *commandHelpCmp) renderAt(listRows int, withDetail, withSubtitle bool) s
 			name += " " + r.cmd.Args
 		}
 		// Two columns, so the eye can run down the names.
+		//
+		// TRUNCATED, not wrapped. lipgloss's Width() wraps anything longer, so a
+		// command with a long Args used more than one SCREEN line while
+		// listCapacity still counted it as one ROW. The two disagreed, the list
+		// overflowed its budget, and the rows at the bottom were pushed out of
+		// the frame entirely — /help became unreachable by scrolling the moment
+		// /port was added, and /review had already been quietly costing two
+		// lines before that. One row is now one line no matter what anyone puts
+		// in Args, so the height budget cannot be wrong again.
 		row := padRight(name, 18) + r.cmd.Summary
-		b = append(b, line("  "+row, rowStyle(base, t, i == m.selectedIdx)))
+		b = append(b, line(truncateToWidth("  "+row, w), rowStyle(base, t, i == m.selectedIdx)))
 	}
 
 	// The selected command's full explanation, in place. This is the part the

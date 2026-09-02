@@ -34,12 +34,16 @@ import (
 	"github.com/opencode-ai/opencode/internal/config"
 )
 
-// Measured 2026-08-23 with default settings, `go test` on a clean config.
+// Measured 2026-09-02 with default settings, `go test` on a clean config.
+// (Was 8462 on 2026-08-23. +734 of the rise is tool.patch_port, added that
+// day; the remaining ~440 is descriptions that grew since without anyone
+// re-measuring -- tool.review alone drifted from a recorded 475 to 759.
+// Which is the whole point of this test.)
 // These are here to make a silent drift loud, not because the exact values are
 // sacred: a new tool or a reworded description SHOULD move them, and then this
 // test tells you by how much instead of letting it pass unremarked.
 const (
-	measuredDefaultToolSchemaTokens = 8462
+	measuredDefaultToolSchemaTokens = 9636
 	measuredBasePromptTokens        = 1791
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.

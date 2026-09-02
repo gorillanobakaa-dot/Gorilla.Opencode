@@ -81,6 +81,10 @@ func CoderAgentTools(
 	// free and most turns are not reviews — but ON by default, because a
 	// review capability nobody knows about is not a capability.
 	add("tool.review", tools.NewReviewTool(permissions))
+	// Ported patches are the other half of the embedded toolkit. Same
+	// loadout gating and the same reason: most turns are not ports, but a
+	// capability nobody can reach is not a capability.
+	add("tool.patch_port", tools.NewPatchPortTool(permissions))
 	return append(coderTools, otherTools...)
 }
 

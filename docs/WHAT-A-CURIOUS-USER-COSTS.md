@@ -229,15 +229,23 @@ subtraction, not by direct count."*
 
 **CORRECTION, 2026-08-23. Counted directly, the inference was 41% low.**
 
+**RE-MEASURED, 2026-09-02: 8,462 → 9,636.** Two causes, worth separating.
+`tool.patch_port` was added that day and costs 734 tokens a turn — a real new
+bill, and it can be switched off in `/context` if patch porting is not what
+you use this for. The other ~440 is drift nobody chose: descriptions grew and
+their recorded costs did not follow, `tool.review` alone having gone from a
+recorded 475 to an actual 759. That second kind is the reason the drift test
+exists.
+
 **[measured]** With default settings, `go test ./internal/llm/agent/ -run
 TestDefaultToolSchemaCost -v`:
 
 ```
-tool schemas, default ON                             ~8,462 tokens   81%
-base system prompt (coder-modern)                    ~1,791 tokens   17%
-prompt blocks, default ON                              ~133 tokens    1%
+tool schemas, default ON                             ~9,636 tokens   84%
+base system prompt (coder-modern)                    ~1,791 tokens   16%
+prompt blocks, default ON                               ~94 tokens    1%
                                                      ------------
-per-turn total, before any CLAUDE.md                ~10,386 tokens
+per-turn total, before any CLAUDE.md                ~11,521 tokens
 
 largest single rows:
   tool.find        1,322    replaced glob + grep + ls (~1,485 together)

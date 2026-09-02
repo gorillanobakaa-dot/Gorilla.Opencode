@@ -93,9 +93,17 @@ var LoadoutComponents = []LoadoutComponent{
 	// other coding agent ships. Its description is deliberately long because it
 	// has to say what static analysis CANNOT find; a short description here
 	// would produce reviews that claim to be complete and are half a review.
-	// 475 is MEASURED (toolTokens), not estimated — the first hand-written
+	// 759 is MEASURED (toolTokens), not estimated -- re-measured 2026-09-02,
+	// having drifted up from 475 as the description grew — the first hand-written
 	// guess here was 320, out by 48%, and calibrate_test.go caught it.
-	{"tool.review", "Code review — /review", "agent loses the 30 static-analysis and security tools; it can still read your code, but nothing mechanically checks for memory errors, injection, leaked secrets or unchecked errors", 475, true, false},
+	{"tool.review", "Code review — /review", "agent loses the 30 static-analysis and security tools; it can still read your code, but nothing mechanically checks for memory errors, injection, leaked secrets or unchecked errors", 759, true, false},
+	// GORILLA (2026-09-02): the porting half of the same embedded toolkit.
+	// 734 is MEASURED with toolTokens, like the line above, and calibrate
+	// overwrites it at startup. Default ON: it was shipped inside the binary
+	// for a while with no tool and no command able to reach it, which is the
+	// same as not shipping it. Turn it off in /context if the per-turn cost
+	// matters more than having it.
+	{"tool.patch_port", "Patch porting -- forward-port, backport, rebase", "agent loses forward-porting, backporting, rebasing, patch refresh and series porting; it can still run git by hand, but nothing tells it whether a patch applied cleanly, was merged three-way, or was RELOCATED by fuzz -- and those are not the same thing", 734, true, false},
 	// GORILLA OVERRIDE: env estimate was 150 when the block was a recursive
 	// 1000-file tree dump (real cost often 10k–30k). After the shallow
 	// project_summary refactor it really is ~100–200 tokens; calibrate
@@ -313,6 +321,7 @@ var lowBandwidthOff = map[string]bool{
 	"tool.agent":       true,
 	"tool.research":    true,
 	"tool.review":      true,
+	"tool.patch_port":  true,
 	"prompt.lsp":       true,
 }
 

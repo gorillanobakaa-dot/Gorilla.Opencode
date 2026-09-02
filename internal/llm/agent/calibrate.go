@@ -73,6 +73,7 @@ func CalibrateLoadout(
 	config.SetLoadoutTokens(config.DossierComponentID, DossierSchemaTokens())
 	set("tool.sparse", tools.NewSparseTool(permissions))
 	set("tool.review", tools.NewReviewTool(permissions))
+	set("tool.patch_port", tools.NewPatchPortTool(permissions))
 	// GORILLA OVERRIDE: measure diagnostics unconditionally. This was guarded on
 	// having LSP clients, but the tool's SCHEMA is static — the clients only affect
 	// what it returns at call time, not what it costs to declare. With every

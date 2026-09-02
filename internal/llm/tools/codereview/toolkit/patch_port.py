@@ -948,7 +948,11 @@ def main(argv):
                 "or test command given passed. If no build command was given, "
                 "NOTHING was built and this port is unverified. A patch reported as "
                 "applied-three-way was placed by merge rather than by exact match "
-                "and must be read before it is trusted."
+                "and must be read before it is trusted. A patch reported as "
+                "applied-with-fuzz is weaker still: its hunks were RELOCATED by "
+                "searching for surrounding context, so if that context appears more "
+                "than once in the file the change can land in the wrong place and "
+                "still report success. Read every fuzzed hunk against the original."
             ),
             "log": captured,
         }, sys.stdout, indent=None)
