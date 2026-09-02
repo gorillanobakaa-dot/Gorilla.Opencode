@@ -114,6 +114,10 @@ type SubAgentInfo struct {
 type subAgentEntry struct {
 	info   SubAgentInfo
 	cancel context.CancelFunc
+	// seq is the registration order. StartedAt alone cannot order two
+	// helpers registered in the same clock tick, and the clock on Windows
+	// is coarse enough that this is routine rather than rare.
+	seq int
 }
 
 var (
@@ -155,7 +159,7 @@ func RegisterSubAgentState(sessionID, parentSessionID, toolCallID, prompt string
 		StartedAt:       time.Now(),
 		State:           state,
 	}
-	subAgentReg[id] = &subAgentEntry{info: info, cancel: cancel}
+	subAgentReg[id] = &subAgentEntry{info: info, cancel: cancel, seq: subAgentSeq}
 	subAgentRegMu.Unlock()
 
 	subAgentBroker.Publish(pubsub.CreatedEvent, info)
@@ -261,12 +265,33 @@ func UnregisterSubAgentsForCall(toolCallID string) {
 func ListSubAgents() []SubAgentInfo {
 	subAgentRegMu.Lock()
 	out := make([]SubAgentInfo, 0, len(subAgentReg))
+	seq := make(map[string]int, len(subAgentReg))
 	for _, e := range subAgentReg {
 		out = append(out, e.info)
+		seq[e.info.ID] = e.seq
 	}
 	subAgentRegMu.Unlock()
 
-	sort.Slice(out, func(i, j int) bool { return out[i].StartedAt.Before(out[j].StartedAt) })
+	// GORILLA FIX (2026-09-02): stable, because two helpers registered in the
+	// same clock tick have no order otherwise.
+	//
+	// sort.Slice is not stable, and StartedAt.Before is false in both
+	// directions for equal timestamps -- so the comparator says nothing and
+	// the result is whatever the sort happened to do. On Linux this almost
+	// never bites, because time.Now() there is fine-grained enough that two
+	// consecutive calls differ. On Windows the system clock is far coarser
+	// and two registrations microseconds apart routinely share a timestamp,
+	// which is why TestListSubAgentsOrdered fails here and not on Linux.
+	//
+	// SliceStable keeps the order they were appended in, which is the order
+	// they were registered -- the answer the caller wanted from a timestamp
+	// sort in the first place.
+	sort.SliceStable(out, func(i, j int) bool {
+		if !out[i].StartedAt.Equal(out[j].StartedAt) {
+			return out[i].StartedAt.Before(out[j].StartedAt)
+		}
+		return seq[out[i].ID] < seq[out[j].ID]
+	})
 	return out
 }
 
