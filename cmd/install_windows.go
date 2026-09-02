@@ -157,6 +157,23 @@ func createShortcut(lnkPath, target, iconPath, description string) error {
 		"$s.Arguments = " + psQuote(args),
 		"$s.WorkingDirectory = " + psQuote(workDir),
 		"$s.Description = " + psQuote(description),
+		// GORILLA FIX (2026-09-02): open maximised.
+		//
+		// A console launched from a shortcut starts at conhost stored default,
+		// which on the owner machine is 120 columns by 30 rows. bubbletea reads
+		// the terminal size ONCE on Windows -- it has no SIGWINCH and its
+		// listenForResize is an empty function there -- so the program then drew
+		// for 120x30 for the whole session no matter how large the window was.
+		// internal/tui/resize_windows.go now corrects that after the fact; this
+		// stops it happening in the first place, so the very first frame is the
+		// right size rather than being fixed a quarter of a second later.
+		//
+		// 3 is SW_SHOWMAXIMIZED. The two other values a .lnk accepts are 1
+		// (normal) and 7 (minimised); there is no "remember what the user last
+		// did", so this is a choice between a small window every launch and a
+		// large one. A terminal application with a footer, a prompt and a
+		// transcript wants the room.
+		"$s.WindowStyle = 3",
 		// ",0" selects the FIRST icon group in the file. The resource built by
 		// winres puts 256x256 first, which is what Windows 11 wants for large
 		// tiles; it picks the smaller entries out of the same group by itself.
