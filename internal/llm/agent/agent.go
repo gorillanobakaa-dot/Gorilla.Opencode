@@ -54,6 +54,11 @@ type Service interface {
 	Cancel(sessionID string)
 	IsSessionBusy(sessionID string) bool
 	IsBusy() bool
+	// LastUsage is the most recent turn's token usage, so /context can report
+	// how much of the prompt was served from cache. Zero means either no turn
+	// has completed or the provider reports no cache figures -- see
+	// UsageReportsCache, which is not the same question.
+	LastUsage() provider.TokenUsage
 	Update(agentName config.AgentName, modelID models.ModelID) (models.Model, error)
 	Summarize(ctx context.Context, sessionID string) error
 	// GORILLA OVERRIDE: swap the active tool set at runtime so context
@@ -77,9 +82,27 @@ type agent struct {
 	sessions  session.Service
 	messages  message.Service
 
-	tools    []tools.BaseTool
-	toolsMu  sync.RWMutex
-	provider provider.Provider
+	tools []tools.BaseTool
+
+	// lastUsage is the most recent turn's token usage, kept so /context can
+	// report how much of the prompt was served from cache.
+	//
+	// GORILLA OVERRIDE (2026-09-02): TrackUsage sums the three input figures
+	// into sess.PromptTokens -- input + cache creation + cache read -- which is
+	// correct for the context gauge and destroys the one number that says
+	// whether prompt caching is working at all. Cache reuse was worth 8m14s to
+	// 15s on this project's own hardware and nothing in the interface showed
+	// it, so a regression would have been invisible exactly as the original
+	// fault was.
+	//
+	// In memory rather than in the session row: /context reports the LIVE
+	// session, sqlc is not installed here so a schema change would mean
+	// hand-editing generated code, and a number that resets on restart is the
+	// honest shape for something describing the turn that just happened.
+	lastUsage   provider.TokenUsage
+	lastUsageMu sync.RWMutex
+	toolsMu     sync.RWMutex
+	provider    provider.Provider
 
 	titleProvider     provider.Provider
 	summarizeProvider provider.Provider
@@ -862,7 +885,25 @@ func (a *agent) toolNames() []string {
 	return names
 }
 
+// LastUsage reports the most recent turn's token usage, so the interface can
+// show how much of the prompt was served from cache.
+//
+// The zero value means no turn has completed yet. A provider that does not
+// report cache figures leaves CacheReadTokens and CacheCreationTokens at zero,
+// which is NOT the same as "nothing was cached" -- LM Studio, measured on
+// 2026-09-02, sends no prompt_tokens_details at all while demonstrably reusing
+// the prefix. Callers must distinguish the two; see UsageReportsCache.
+func (a *agent) LastUsage() provider.TokenUsage {
+	a.lastUsageMu.RLock()
+	defer a.lastUsageMu.RUnlock()
+	return a.lastUsage
+}
+
 func (a *agent) TrackUsage(ctx context.Context, sessionID string, model models.Model, usage provider.TokenUsage) error {
+	a.lastUsageMu.Lock()
+	a.lastUsage = usage
+	a.lastUsageMu.Unlock()
+
 	sess, err := a.sessions.Get(ctx, sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)

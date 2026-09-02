@@ -1608,6 +1608,24 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.selectedSession = session.Session{}
 			return a, util.CmdHandler(chat.NewSessionMsg{})
 		case "context", "loadout", "tokens":
+			// GORILLA OVERRIDE (2026-09-02): hand the dialog the live cache
+			// figures as it opens.
+			//
+			// Read here rather than held by the dialog, so the numbers are those
+			// of the turn that just happened rather than whenever the dialog was
+			// last constructed.
+			//
+			// reported distinguishes "the provider told us nothing" from
+			// "nothing was cached". They look identical in the numbers and mean
+			// opposite things: LM Studio reports no cache figures at all while
+			// demonstrably reusing the prefix, so a bare zero would report
+			// working caching as broken.
+			if a.app != nil && a.app.CoderAgent != nil {
+				u := a.app.CoderAgent.LastUsage()
+				reported := u.CacheReadTokens > 0 || u.CacheCreationTokens > 0
+				a.loadoutDialog.SetLastUsage(u.InputTokens, u.CacheReadTokens,
+					u.CacheCreationTokens, reported)
+			}
 			a.showLoadoutDialog = true
 			return a, nil
 		// GORILLA OVERRIDE: /yolo — grant once, then let the helpers run.

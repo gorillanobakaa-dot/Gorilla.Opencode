@@ -37,9 +37,20 @@ type LoadoutChangedMsg struct{}
 type LoadoutDialog interface {
 	tea.Model
 	layout.Bindings
+	// SetLastUsage hands the dialog the most recent turn's token usage so it
+	// can report cache reuse. reported says whether the provider gave any
+	// cache figures at all, which is a different question from whether
+	// anything was cached.
+	SetLastUsage(input, cacheRead, cacheCreate int64, reported bool)
 }
 
 type loadoutDialogCmp struct {
+	// Last turn's token usage, for the cache-reuse line. See SetLastUsage.
+	usageInput       int64
+	usageCacheRead   int64
+	usageCacheCreate int64
+	usageReported    bool
+
 	selectedIdx int
 	termWidth   int
 	// GORILLA OVERRIDE: the terminal HEIGHT, which this dialog previously never
@@ -164,6 +175,26 @@ func extraAtRow(idx int) (config.Extra, bool) {
 		return config.Extra{}, false
 	}
 	return config.Extras[i], true
+}
+
+// SetLastUsage hands the dialog the most recent turn's token usage, so it can
+// report how much of the prompt was served from cache.
+//
+// GORILLA OVERRIDE (2026-09-02): prompt caching was worth 8m14s down to 15s on
+// this project's own hardware, measured, and NOTHING in the interface showed it.
+// The fault that caused it -- a timestamp inside the cached prefix -- went
+// unnoticed for exactly that reason, and a future one would too.
+//
+// reported says whether the provider gave any cache figures at all. That is a
+// different question from whether anything was cached, and conflating them
+// would be worse than showing nothing: LM Studio sends no prompt_tokens_details
+// whatever (measured 2026-09-02) while demonstrably reusing the prefix, so a
+// bare "0 cached" would report working caching as broken.
+func (m *loadoutDialogCmp) SetLastUsage(input, cacheRead, cacheCreate int64, reported bool) {
+	m.usageInput = input
+	m.usageCacheRead = cacheRead
+	m.usageCacheCreate = cacheCreate
+	m.usageReported = reported
 }
 
 func NewLoadoutDialogCmp() LoadoutDialog { return &loadoutDialogCmp{} }
@@ -354,6 +385,38 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	// which rows to switch off — and neither is good enough to be quoted as a
 	// bill. A screen whose whole purpose is honesty about cost cannot present
 	// an estimate in the typography of a measurement.
+	// GORILLA OVERRIDE (2026-09-02): say whether the prompt was reused.
+	//
+	// Everything above this line is what a turn COSTS. This is what the cache
+	// GAVE BACK, and until now it appeared nowhere in the interface. On this
+	// project's own hardware prefix reuse was worth 8m14s down to 15s, measured;
+	// the fault that had been destroying it -- a timestamp inside the cached
+	// prefix -- survived unnoticed precisely because no screen showed the
+	// number. internal/llm/prompt/prompt_stability_test.go now fails if volatile
+	// content returns, and this is the other half: a person can see it too.
+	cacheLine := ""
+	switch {
+	case !m.usageReported:
+		// NOT the same as "nothing was cached". LM Studio sends no
+		// prompt_tokens_details at all (measured 2026-09-02) while demonstrably
+		// reusing the prefix, so reporting 0 here would call working caching
+		// broken.
+		cacheLine = "cache reuse: this endpoint does not report it (local runtimes usually do not)"
+	case m.usageCacheRead == 0 && m.usageCacheCreate == 0:
+		cacheLine = "cache reuse: none on the last turn — the whole prompt was processed fresh"
+	default:
+		total := m.usageInput + m.usageCacheRead + m.usageCacheCreate
+		pct := 0
+		if total > 0 {
+			pct = int(float64(m.usageCacheRead) / float64(total) * 100)
+		}
+		cacheLine = fmt.Sprintf(
+			"cache reuse: %s of %s prompt tokens served from cache (%d%%), %s written",
+			commaInt(int(m.usageCacheRead)), commaInt(int(total)), pct,
+			commaInt(int(m.usageCacheCreate)))
+	}
+	cache := base.Foreground(t.TextMuted()).Width(w).Render(fitLine(cacheLine))
+
 	accuracy := base.Foreground(t.TextMuted()).Width(w).
 		Render(fitLine("estimates, ~10% high: schema bytes / 4, not a real tokeniser"))
 
@@ -539,7 +602,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	if !compact {
 		// The subtitle and the context-size line explain; they are not state you
 		// act on, so they are the first to go on a short terminal.
-		parts = append(parts, sub, fixed, accuracy)
+		parts = append(parts, sub, fixed, accuracy, cache)
 		// GORILLA OVERRIDE (2026-09-01): the advice goes AFTER the estimate
 		// caveat and before the blank line, so it reads as the conclusion of the
 		// header rather than as another statistic. It is already conditional on
