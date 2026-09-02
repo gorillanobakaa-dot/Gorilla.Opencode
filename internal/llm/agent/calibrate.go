@@ -79,6 +79,20 @@ func CalibrateLoadout(
 	// correctly -- the catalogue affects what it FINDS, never what it costs to
 	// declare.
 	set(config.ToolSearchComponentID, tools.NewToolSearchTool(func() []tools.BaseTool { return nil }))
+
+	// Register which rows are withheld-but-enabled, here as well as in
+	// CoderAgentTools.
+	//
+	// /context asks config for the per-turn cost, and config can only subtract
+	// the deferred schemas if something has told it which they are. That used to
+	// happen ONLY when the agent built its toolset, so the number was right by
+	// luck of ordering: render /context before that and it reported a figure
+	// HIGHER than deferral off, with no range and no explanation. Measured at
+	// 12,460 against a true 9,331.
+	//
+	// Calibration runs at startup and already walks every tool, so doing it here
+	// too removes the ordering dependency entirely.
+	registerDeferredComponents()
 	// GORILLA OVERRIDE: measure diagnostics unconditionally. This was guarded on
 	// having LSP clients, but the tool's SCHEMA is static — the clients only affect
 	// what it returns at call time, not what it costs to declare. With every

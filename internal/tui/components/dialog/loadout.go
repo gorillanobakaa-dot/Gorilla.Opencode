@@ -398,9 +398,16 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	costLine := fmt.Sprintf("~%s tokens sent on EVERY turn, even to say \"yo\"%s.",
 		commaInt(total), loadoutCostSuffix())
 	if ceiling > upfront {
-		costLine = fmt.Sprintf("~%s tokens sent on EVERY turn, even to say \"yo\"%s — "+
-			"rising to ~%s if the model loads every deferred tool.",
-			commaInt(upfront), loadoutCostSuffix(), commaInt(ceiling))
+		// The RANGE goes first, before anything that can be truncated.
+		//
+		// This used to read "~8,207 tokens ... — rising to ~12,659 if the model
+		// loads every deferred tool", and on a normal-width terminal the line
+		// was cut at "rising to". So the flattering number survived and the
+		// caveat was the part that vanished, which is precisely backwards for a
+		// screen whose job is to tell someone what they are about to spend.
+		costLine = fmt.Sprintf("~%s-%s tokens sent on EVERY turn, even to say \"yo\"%s "+
+			"(the low figure until the model loads a deferred tool, the high one after).",
+			commaInt(upfront), commaInt(ceiling), loadoutCostSuffix())
 	}
 	sub := base.Foreground(t.TextMuted()).Width(w).Render(fitLine(costLine))
 	fixed := base.Foreground(t.TextMuted()).Width(w).

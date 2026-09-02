@@ -193,3 +193,37 @@ func TaskAgentTools(lspClients map[string]*lsp.Client, permissions permission.Se
 	add("tool.view", tools.NewViewTool(lspClients))
 	return taskTools
 }
+
+// registerDeferredComponents tells config which loadout rows are enabled but
+// withheld, so /context can price a turn by what is actually sent.
+//
+// Called from both CoderAgentTools and CalibrateLoadout. Either alone would
+// leave the figure depending on which ran first.
+func registerDeferredComponents() {
+	if !config.LoadoutEnabled(config.ToolSearchComponentID) {
+		config.SetDeferredComponents(nil, 0)
+		return
+	}
+	ids := map[string]bool{}
+	for name := range deferredToolNames() {
+		if id, ok := loadoutIDForTool(name); ok {
+			ids[id] = true
+		}
+	}
+	config.SetDeferredComponents(ids, len(prompt.DeferredCatalogue())/4)
+}
+
+// deferredToolNames is the set of tool names withheld by default.
+func deferredToolNames() map[string]bool {
+	out := map[string]bool{}
+	for _, name := range []string{
+		tools.ReviewToolName, tools.PatchPortToolName, tools.BioDataToolName,
+		tools.SparseToolName, tools.WebSearchToolName, tools.FetchToolName,
+		AgentToolName,
+	} {
+		if tools.IsDeferrable(name) {
+			out[name] = true
+		}
+	}
+	return out
+}
