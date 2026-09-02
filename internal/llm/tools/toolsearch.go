@@ -145,18 +145,55 @@ func IsDeferrable(name string) bool {
 //
 // This is the whole saving. It runs above the providers, so the schemas of
 // undiscovered tools are never serialised for any of them.
+// The ORDER is not incidental. Stable tools come first, in their original
+// order, and anything discovered is APPENDED after them.
+//
+// Tool definitions are part of the cached prompt prefix on every provider that
+// caches one — Anthropic explicitly, OpenAI and Gemini implicitly. Returning
+// the discovered tool in its original position would insert it in the MIDDLE,
+// shifting every definition after it and invalidating the cache from that point
+// on every single discovery.
+//
+// That would have been a bad trade and an invisible one: 4,298 tokens saved per
+// turn, paid for by re-reading the entire prefix at full price whenever the
+// model searched. Worst for exactly the people this helps most — someone on a
+// free tier, where a cache miss is not a rounding error.
+//
+// Appending keeps every byte before the last stable tool identical from turn to
+// turn, so the cached prefix survives a discovery. This is the same shape as
+// Anthropic's server-side design, whose docs say the prefix is untouched
+// precisely so that caching is preserved.
 func VisibleTools(all []BaseTool, sessionID string, enabled bool) []BaseTool {
 	if !enabled {
 		return all
 	}
-	out := make([]BaseTool, 0, len(all))
+	stable := make([]BaseTool, 0, len(all))
+	found := make([]BaseTool, 0, 4)
 	for _, t := range all {
 		name := t.Info().Name
-		if !IsDeferrable(name) || IsDiscovered(sessionID, name) {
-			out = append(out, t)
+		switch {
+		case !IsDeferrable(name):
+			stable = append(stable, t)
+		case IsDiscovered(sessionID, name):
+			found = append(found, t)
 		}
 	}
-	return out
+	return append(stable, found...)
+}
+
+// StableToolCount reports how many of a visible set are the always-present
+// ones. The prompt-cache breakpoint belongs on the last of these: everything
+// after it can change mid-conversation, and a breakpoint there would be
+// re-cached on every discovery.
+func StableToolCount(visible []BaseTool) int {
+	n := 0
+	for _, t := range visible {
+		if IsDeferrable(t.Info().Name) {
+			break
+		}
+		n++
+	}
+	return n
 }
 
 // ── the search tool ─────────────────────────────────────────────────────────

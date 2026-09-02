@@ -135,6 +135,27 @@ func (a *anthropicClient) convertMessages(messages []message.Message) (anthropic
 func (a *anthropicClient) convertTools(tools []toolsPkg.BaseTool) []anthropic.ToolUnionParam {
 	anthropicTools := make([]anthropic.ToolUnionParam, len(tools))
 
+	// GORILLA (2026-09-02): cache at the last STABLE tool, not the last tool.
+	//
+	// With deferred loading on, the tail of this slice grows as the model
+	// discovers tools. A breakpoint on the final entry would therefore move on
+	// every discovery, and everything before it would be re-cached — the cache
+	// would be invalidated by the very mechanism meant to make turns cheaper,
+	// and the loss would land hardest on someone paying per token or living
+	// inside a free tier's limits.
+	//
+	// tools.VisibleTools guarantees the stable ones come first and discoveries
+	// are appended, so the prefix up to this index is byte-identical from turn
+	// to turn. Anthropic's own guidance is the same shape: "Put the cache
+	// breakpoint on a non-deferred tool."
+	//
+	// With deferral off, every tool is stable and this is the last index, which
+	// is exactly the previous behaviour.
+	cacheAt := toolsPkg.StableToolCount(tools) - 1
+	if cacheAt < 0 || cacheAt >= len(tools) {
+		cacheAt = len(tools) - 1
+	}
+
 	for i, tool := range tools {
 		info := tool.Info()
 		toolParam := anthropic.ToolParam{
@@ -146,7 +167,7 @@ func (a *anthropicClient) convertTools(tools []toolsPkg.BaseTool) []anthropic.To
 			},
 		}
 
-		if i == len(tools)-1 && !a.options.disableCache {
+		if i == cacheAt && !a.options.disableCache {
 			toolParam.CacheControl = anthropic.CacheControlEphemeralParam{
 				Type: "ephemeral",
 			}
