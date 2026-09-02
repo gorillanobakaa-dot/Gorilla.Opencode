@@ -103,17 +103,48 @@ func TestEveryModuleTheToolkitImportsIsEmbedded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The toolkit's own modules are imported by bare name; stdlib is not our
-	// problem. Anything that has a matching .py beside it must be present.
-	for _, name := range []string{
-		"tools_registry", "findings", "heuristics", "rules",
-		"baseline", "doctor", "local_tier", "llm_client",
-	} {
-		if !strings.Contains(string(entry), name) {
-			continue // not imported by the entry point; nothing to assert
+	// GORILLA FIX (2026-09-02): match real IMPORT STATEMENTS, not any
+	// occurrence of the word.
+	//
+	// This used to ask whether the entry point CONTAINED the module name
+	// anywhere, and every candidate name is also an ordinary English word a
+	// code-review script is certain to use: findings, rules, doctor. A
+	// single-file rewrite that imports nothing therefore failed three
+	// assertions for writing the word "findings" in a comment.
+	//
+	// The question the test means to ask is whether the import graph is
+	// CLOSED inside what was embedded. So it now reads the import statements
+	// and checks those, which is both stricter -- it catches a module the
+	// hard-coded list never anticipated -- and correct.
+	imports := map[string]bool{}
+	for _, line := range strings.Split(string(entry), "\n") {
+		line = strings.TrimSpace(line)
+		var mod string
+		switch {
+		case strings.HasPrefix(line, "import "):
+			mod = strings.TrimPrefix(line, "import ")
+		case strings.HasPrefix(line, "from "):
+			mod = strings.TrimPrefix(line, "from ")
+		default:
+			continue
 		}
-		if _, err := toolkitFS.ReadFile("toolkit/" + name + ".py"); err != nil {
-			t.Errorf("code_review.py refers to %s but %s.py is not embedded", name, name)
+		// "import os, sys" and "from x import y" both reduce to the first word.
+		if i := strings.IndexAny(mod, " ,."); i >= 0 {
+			mod = mod[:i]
+		}
+		if mod != "" {
+			imports[mod] = true
+		}
+	}
+	for mod := range imports {
+		// A sibling .py is one of ours; anything else is the standard library
+		// or a third-party package, and neither is this test's business.
+		if _, err := toolkitFS.ReadFile("toolkit/" + mod + ".py"); err == nil {
+			continue // present, as required
+		}
+		if _, err := os.Stat(filepath.Join("toolkit", mod+".py")); err == nil {
+			t.Errorf("code_review.py imports %s, and %s.py exists on disk but is "+
+				"NOT embedded, so the shipped toolkit will fail on import", mod, mod)
 		}
 	}
 
