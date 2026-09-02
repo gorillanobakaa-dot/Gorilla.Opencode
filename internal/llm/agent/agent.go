@@ -176,8 +176,65 @@ func (a *agent) getTools() []tools.BaseTool {
 // Off by default, in which case this returns the full set unchanged and costs
 // one map lookup.
 func (a *agent) visibleTools(sessionID string) []tools.BaseTool {
-	return tools.VisibleTools(a.getTools(), sessionID,
-		config.LoadoutEnabled(config.ToolSearchComponentID))
+	all := a.getTools()
+	if !config.LoadoutEnabled(config.ToolSearchComponentID) {
+		return all
+	}
+
+	// STOP DEFERRING once it has stopped paying.
+	//
+	// Deferral buys back schema tokens and charges two permanent ones: the
+	// tool_search schema and the catalogue index. Measured on this toolset that
+	// is 486 tokens a turn. Early in a session the withheld schemas are worth
+	// far more than that, so it is a clear saving. But every discovery hands
+	// some of that saving back, and after the fourth tool the overhead is all
+	// that is left -- from then on the mechanism costs MORE than never having
+	// had it, for the rest of the conversation, and nothing says so.
+	//
+	// That is a silent leak, and this program is used by people for whom a
+	// leak is not an annoyance. So the rule is absolute: deferral must never
+	// cost more than not deferring. When what remains withheld is worth less
+	// than the overhead, the mechanism switches itself off for this session --
+	// every tool is sent, and tool_search is dropped because there is nothing
+	// left worth finding.
+	//
+	// It costs one cache miss at the moment of the switch. That is a single
+	// one-off against a permanent per-turn loss, and it only happens in
+	// sessions that were about to start losing anyway.
+	if !a.deferralStillPays(all, sessionID) {
+		return withoutToolSearch(all)
+	}
+	return tools.VisibleTools(all, sessionID, true)
+}
+
+// deferralStillPays compares what is still being withheld against what the
+// mechanism costs to run.
+func (a *agent) deferralStillPays(all []tools.BaseTool, sessionID string) bool {
+	withheld, overhead := 0, len(prompt.DeferredCatalogue())/4
+	for _, t := range all {
+		name := t.Info().Name
+		if name == tools.ToolSearchToolName {
+			overhead += toolTokens(t)
+			continue
+		}
+		if tools.IsDeferrable(name) && !tools.IsDiscovered(sessionID, name) {
+			withheld += toolTokens(t)
+		}
+	}
+	return withheld > overhead
+}
+
+// withoutToolSearch returns the full toolset with the search tool removed.
+// Offering a way to find tools the model already has is pure cost.
+func withoutToolSearch(all []tools.BaseTool) []tools.BaseTool {
+	out := make([]tools.BaseTool, 0, len(all))
+	for _, t := range all {
+		if t.Info().Name == tools.ToolSearchToolName {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
 }
 
 func (a *agent) ReloadTools(newTools []tools.BaseTool) {

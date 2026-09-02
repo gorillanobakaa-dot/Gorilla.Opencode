@@ -193,9 +193,24 @@ func TestLowBandwidthPresetSavingIsMeasured(t *testing.T) {
 	// LoadoutActiveTokens() ALREADY includes the base prompt (loadout.go:395).
 	// Adding LoadoutBaseTokens() on top is the double-count fixed on 2026-08-14
 	// and repeated here on 2026-08-23. See the warning at loadout.go:938.
-	before := config.LoadoutActiveTokens()
+	//
+	// GORILLA FIX (2026-09-02): measure the CEILING, and reset first.
+	//
+	// This used to read LoadoutActiveTokens, which now means "what is sent up
+	// front" rather than "everything enabled". With deferred loading on, that
+	// already excludes review, fetch, websearch and the rest -- the very
+	// components the preset then switches off -- so their saving was counted
+	// zero and the preset appeared to have collapsed from 43% to 19%.
+	//
+	// The two mechanisms are orthogonal: the preset removes COMPONENTS, and
+	// deferral withholds SCHEMAS of components that are still enabled. Measure
+	// the preset against the full enabled set and it is not confounded by
+	// whichever way deferral happens to be switched. The reset also stops this
+	// depending on what another test in this package left behind.
+	config.ResetLoadout()
+	_, before := config.LoadoutTokenRange()
 	config.ApplyLowBandwidthLoadout()
-	after := config.LoadoutActiveTokens()
+	_, after := config.LoadoutTokenRange()
 
 	saved := before - after
 	pct := float64(saved) / float64(before) * 100

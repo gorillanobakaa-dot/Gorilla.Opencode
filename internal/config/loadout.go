@@ -1688,3 +1688,7 @@ func init() {
 			"On Windows this runs PowerShell, not bash"
 	}
 }
+
+// IsLowBandwidthOff reports whether the preset switches a component off.
+// Exported so a test can explain WHY the preset saves what it saves.
+func IsLowBandwidthOff(id string) bool { return lowBandwidthOff[id] }
