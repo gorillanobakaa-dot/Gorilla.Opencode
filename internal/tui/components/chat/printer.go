@@ -73,6 +73,42 @@ const (
 	thinkingCloseMarker = "🦍🦍🦍 done thinking (hard job...) 💪"
 )
 
+// printLine is tea.Println with a leading carriage return.
+//
+// GORILLA FIX (2026-09-02): without it the FIRST printed line after a frame
+// lands at the wrong column.
+//
+// bubbletea's renderer paints a frame by writing each line followed by "\rn",
+// except the LAST, which is written bare -- so when the paint finishes the
+// cursor is sitting at the end of that line, at roughly the terminal width. The
+// next flush repositions with
+//
+//	buf.WriteString(ansi.CursorUp(r.linesRendered - 1))
+//
+// and CursorUp moves the cursor UP without changing its COLUMN. The queued
+// Println lines are then written straight out:
+//
+//	buf.WriteString(line)
+//	buf.WriteString("\rn")
+//
+// with the carriage return AFTER the text, not before it. So the first line
+// starts wherever the previous frame happened to end, wraps, and overwrites the
+// row. The renderer does emit a "\r" for the frame itself, but only under
+// `i == 0 && r.lastRender == ""`, which covers the frame and never the queued
+// lines.
+//
+// The owner caught it on 2026-09-02: a footer stranded mid-screen reading
+// "odel Gemma 4 E" -- the leading "m" of "model" clipped, which is exactly what
+// a write starting one column too far right leaves behind.
+//
+// A leading "\r" at column 0 is a no-op, so this is safe on every line and
+// costs one byte. Printing is irreversible: a line written to the wrong column
+// cannot be taken back and repainted, which is why this is fixed at the source
+// rather than compensated for afterwards.
+func printLine(text string) tea.Cmd {
+	return tea.Println("\r" + text)
+}
+
 // completeReasoningLines splits reasoning into the lines that will never change
 // again.
 //
@@ -147,7 +183,7 @@ func (m *messagesCmp) emitReasoning(msg message.Message, upto []string) []tea.Cm
 	var cmds []tea.Cmd
 	if !m.reasoningOpened[msg.ID] {
 		m.reasoningOpened[msg.ID] = true
-		cmds = append(cmds, tea.Println(""), tea.Println(styleReasoning(thinkingOpenMarker)))
+		cmds = append(cmds, printLine(""), printLine(styleReasoning(thinkingOpenMarker)))
 		// Match the gap the closing marker gets, WITHOUT relying on the provider.
 		// Nemotron's reasoning happens to begin with a newline, which is why this
 		// end already looked right; another provider's would not, and spacing
@@ -155,7 +191,7 @@ func (m *messagesCmp) emitReasoning(msg message.Message, upto []string) []tea.Cm
 		// the blank when the reasoning does not already start with one, so the
 		// two cases converge on the same result instead of doubling up.
 		if len(upto) == 0 || strings.TrimSpace(upto[0]) != "" {
-			cmds = append(cmds, tea.Println(""))
+			cmds = append(cmds, printLine(""))
 		}
 	}
 	from := m.reasonedLines[msg.ID]
@@ -166,7 +202,7 @@ func (m *messagesCmp) emitReasoning(msg message.Message, upto []string) []tea.Cm
 		// The watermark counts SOURCE lines, not printed ones, so wrapping one
 		// source line into several printed lines cannot desynchronise it.
 		for _, wrapped := range wrapReasoning(line, m.width) {
-			cmds = append(cmds, tea.Println(styleReasoning(wrapped)))
+			cmds = append(cmds, printLine(styleReasoning(wrapped)))
 		}
 	}
 	m.reasonedLines[msg.ID] = len(upto)
@@ -211,9 +247,9 @@ func (m *messagesCmp) flushReasoning(msg message.Message) []tea.Cmd {
 	// gap is emitted HERE rather than left to the model's trailing newlines,
 	// which are stripped above, so the spacing is the same for every provider.
 	cmds = append(cmds,
-		tea.Println(""),
-		tea.Println(styleReasoning(thinkingCloseMarker)),
-		tea.Println(""),
+		printLine(""),
+		printLine(styleReasoning(thinkingCloseMarker)),
+		printLine(""),
 	)
 	delete(m.reasonedLines, msg.ID)
 	delete(m.reasoningOpened, msg.ID)
@@ -247,7 +283,7 @@ func reasoningSwitchedOffNotice() []tea.Cmd {
 	}
 	var cmds []tea.Cmd
 	reasoningOffNoticed.Do(func() {
-		cmds = append(cmds, tea.Println(styleReasoning(
+		cmds = append(cmds, printLine(styleReasoning(
 			"🦍 no thinking to show — \"Ask the model to think out loud\" is off in "+
 				"/context. \"Show that thinking on screen\" only displays reasoning "+
 				"the model was asked to produce. Some models reason anyway; most do not.")))
@@ -287,7 +323,7 @@ func (m *messagesCmp) printPending() []tea.Cmd {
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
-		cmds = append(cmds, tea.Println(text))
+		cmds = append(cmds, printLine(text))
 	}
 	return cmds
 }
