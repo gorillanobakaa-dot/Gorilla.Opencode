@@ -1,1035 +1,1108 @@
 #!/usr/bin/env python3
 """
-code_review.py — an orchestrator for real static analysers, and a method.
+code_review.py
+---------------
+Point this at a directory (or a single file). It will:
 
-WHAT THIS IS, AND WHAT IT IS NOT
-================================
+  1. Figure out what kind of project it's looking at (a mozilla-central
+     checkout, a Linux kernel tree, a Go module, a Rust crate, a Python
+     project, or just "generic").
+  2. Work out which files are actually in scope (git-tracked files by
+     default, or just your uncommitted/recent changes with --diff).
+  3. Run every relevant *safe-to-automate* tool in parallel, stage by
+     stage, each one's raw output going to its own log file in a results
+     folder.
+  4. Watch what stage 1/2 found -- if anything looks security-flavored,
+     automatically escalate to a stage 3 deep-dive on just those files.
+  5. Print a rolling status line as each tool finishes, then write a full
+     JSON + Markdown report.
+  6. For anything that genuinely needs a project-specific build context
+     (Firefox's mach, the kernel's own make targets, valgrind, scan-build)
+     it prints the exact command to run by hand instead of guessing.
+  7. Optionally, hand the whole aggregate to any LLM (local or remote,
+     any vendor) for a prioritized, plain-English synthesis.
 
-This script does not review code. It cannot: no program that fits in one file
-knows whether your pointer arithmetic is sound. What it does is drive the
-analysers that DO know — cppcheck, clang-tidy, bandit, semgrep, gitleaks,
-clippy, golangci-lint, gosec, shellcheck, ruff, mypy and others — normalise
-their very different outputs into one shape, verify that what they reported is
-still true of the file on disk, and then report, first and loudest, WHAT DID NOT
-RUN.
+Examples:
+    python3 code_review.py ~/src/gorilla-opencode
+    python3 code_review.py ~/src/chroma --diff origin/main
+    python3 code_review.py ~/src/firefox/dom/canvas/WebGLContext.cpp
+    python3 code_review.py ~/src/linux --profile linux-kernel --diff HEAD~1
+    python3 code_review.py ~/src/myproj --llm-endpoint http://localhost:11434/v1/chat/completions \\
+                           --llm-model llama3 --llm-api-style openai
 
-That last part is the whole reason this exists.
-
-A report full of "not installed" looks exactly like a report that found no
-problems. Both are short. Both are green. A reader in a hurry, and every
-language model, will read the second meaning into the first unless something
-stops them. So the JSON this emits leads with a `trust` block, the caller prints
-that block before any finding, and the word MISSING appears before the word
-clean.
-
-THE METHOD, WHICH IS THE PART WORTH COPYING
-===========================================
-
-Written down because a reviewer — human or model — who follows these five rules
-will outperform one who runs more tools.
-
-1. ABSENCE OF EVIDENCE IS NOT EVIDENCE OF ABSENCE.
-   If bandit is not installed, this review says nothing whatever about Python
-   security. Not "no issues found" — nothing. Every stage records which tools
-   ran, which were missing, which errored and which timed out, and the caller
-   is expected to say so out loud.
-
-2. VERIFY THE FINDING AGAINST THE FILE.
-   Analysers report line numbers against the file as it was when they read it.
-   Between the run and the report the file may have moved on, and a stale line
-   number points at innocent code. Every finding here is re-read from disk and
-   dropped if the line no longer exists. The count of dropped findings is
-   reported, because a silent drop is its own kind of lie.
-
-3. AGREEMENT IS EVIDENCE; A SINGLE OPINION IS A LEAD.
-   When two independent analysers flag the same line, that is worth acting on.
-   When one does, it is worth looking at. These are separated in the output —
-   `corroborated` and `findings` — because ranking them together invites acting
-   on a lint preference with the same urgency as a buffer overrun.
-
-4. SEVERITY IS A CLAIM, NOT A FACT.
-   Every tool grades on its own curve. Normalising them into one scale is
-   necessary and slightly dishonest, so the original rule id travels with each
-   finding and the reader can go and check.
-
-5. SAY WHAT YOU DID NOT LOOK AT.
-   A quick pass that does not announce it skipped the security stage is the same
-   lie as an uninstalled analyser. Depth is reported, not implied.
-
-WINDOWS
-=======
-
-This runs on Windows first. It assumes no Unix userland: no grep, no find, no
-awk, no /bin/sh. Tool discovery goes through shutil.which, which honours PATHEXT
-and so finds .exe, .cmd and .bat wrappers — the form most Node- and Python-based
-analysers take on Windows. Every subprocess is spawned without a shell, so paths
-containing spaces (C:\\Program Files\\...) need no quoting and cannot be
-re-interpreted. Nothing here shells out to a POSIX utility.
-
-USAGE
-=====
-
-    python code_review.py TARGET --audience agent [--diff REF] [--max-files N]
-                                 [--profile NAME] [--deep | --no-stage3]
-    python code_review.py TARGET --doctor
-
-The first prints one JSON object on stdout, schema code-review/agent/1.
-The second prints a human-readable capability report and exits 3 if this
-machine cannot review the target at all.
-
-Exit codes:  0 ran   2 bad usage   3 nothing installed to run
+Nothing here calls any cloud API unless you explicitly pass --llm-endpoint.
 """
 
-from __future__ import annotations
-
 import argparse
+import concurrent.futures
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
-from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Dict, List, Optional, Set
 
-SCHEMA = "code-review/agent/1"
-
-# How long any single analyser may take before it is abandoned. A tool that
-# hangs must not take the review with it: a partial report that says which tool
-# timed out is worth more than no report at all.
-TOOL_TIMEOUT_SECONDS = 120
-
-# Upper bound on files handed to any one analyser invocation. Command lines have
-# limits — about 32k characters on Windows — and exceeding them fails in a way
-# that looks like the tool being broken.
-FILES_PER_INVOCATION = 40
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  Languages
-# ─────────────────────────────────────────────────────────────────────────────
-
-EXT_LANG = {
-    ".c": "c", ".h": "c",
-    ".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", ".hpp": "cpp", ".hh": "cpp",
-    ".py": "python", ".pyi": "python",
-    ".go": "go",
-    ".rs": "rust",
-    ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript",
-    ".ts": "typescript", ".tsx": "typescript",
-    ".sh": "shell", ".bash": "shell",
-    ".ps1": "powershell", ".psm1": "powershell",
-    ".rb": "ruby",
-    ".php": "php",
-    ".java": "java",
-    ".cs": "csharp",
-    ".json": "json", ".yaml": "yaml", ".yml": "yaml", ".toml": "toml",
-    ".md": "markdown",
-}
-
-# Directories never worth reviewing. Reviewing a vendored dependency wastes the
-# run and buries your own findings under someone else's.
-SKIP_DIRS = {
-    ".git", ".svn", ".hg", "node_modules", "vendor", "target", "dist", "build",
-    "__pycache__", ".venv", "venv", ".tox", ".mypy_cache", ".pytest_cache",
-    ".idea", ".vscode", "bin", "obj", ".next", ".cache", "site-packages",
-}
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  The analyser registry
-# ─────────────────────────────────────────────────────────────────────────────
-#
-# stage 0  recon        — cheap, always
-# stage 1  fast linters — seconds; style and obvious defects
-# stage 2  static + security — the ones that find real bugs
-# stage 3  deep         — slow, thorough; skipped unless asked
-#
-# `parser` names the output shape. Adding a tool means adding a row here and, if
-# its output is not already one of the known shapes, one parser function. It
-# does NOT mean touching the orchestration.
-
-class Tool:
-    def __init__(self, name, binary, langs, stage, args, parser,
-                 per_file=True, install=None, note=None):
-        self.name = name
-        self.binary = binary
-        self.langs = set(langs)
-        self.stage = stage
-        self.args = args
-        self.parser = parser
-        self.per_file = per_file
-        self.install = install or ""
-        self.note = note or ""
-
-
-TOOLS = [
-    Tool("ruff", "ruff", ["python"], 1,
-         ["check", "--output-format", "json"], "ruff",
-         install="pip install ruff"),
-    Tool("mypy", "mypy", ["python"], 2,
-         ["--no-error-summary", "--no-color-output"], "gcc_like",
-         install="pip install mypy"),
-    Tool("bandit", "bandit", ["python"], 2,
-         ["-f", "json", "-q"], "bandit",
-         install="pip install bandit",
-         note="security; without it this review says NOTHING about Python security"),
-    Tool("pyflakes", "pyflakes", ["python"], 1, [], "gcc_like",
-         install="pip install pyflakes"),
-
-    Tool("gofmt", "gofmt", ["go"], 1, ["-l"], "filelist"),
-    Tool("go vet", "go", ["go"], 2, ["vet"], "gcc_like", per_file=False,
-         install="ships with Go"),
-    Tool("staticcheck", "staticcheck", ["go"], 2, [], "gcc_like",
-         install="go install honnef.co/go/tools/cmd/staticcheck@latest"),
-    Tool("golangci-lint", "golangci-lint", ["go"], 3,
-         ["run", "--out-format", "json"], "golangci", per_file=False,
-         install="https://golangci-lint.run/usage/install/"),
-    Tool("gosec", "gosec", ["go"], 2, ["-fmt=json", "-quiet"], "gosec",
-         per_file=False, install="go install github.com/securego/gosec/v2/cmd/gosec@latest",
-         note="security; without it this review says NOTHING about Go security"),
-
-    Tool("cppcheck", "cppcheck", ["c", "cpp"], 2,
-         ["--enable=warning,style,performance,portability",
-          "--template={file}:{line}:{severity}:{id}:{message}", "--quiet"],
-         "cppcheck", install="https://cppcheck.sourceforge.io/"),
-    Tool("clang-tidy", "clang-tidy", ["c", "cpp"], 3, [], "gcc_like",
-         install="part of LLVM"),
-
-    Tool("clippy", "cargo", ["rust"], 2,
-         ["clippy", "--message-format", "short"], "gcc_like", per_file=False,
-         install="rustup component add clippy"),
-
-    Tool("eslint", "eslint", ["javascript", "typescript"], 1,
-         ["--format", "json"], "eslint",
-         install="npm i -g eslint"),
-    Tool("tsc", "tsc", ["typescript"], 2, ["--noEmit", "--pretty", "false"],
-         "gcc_like", per_file=False, install="npm i -g typescript"),
-
-    Tool("shellcheck", "shellcheck", ["shell"], 1, ["--format", "json"],
-         "shellcheck", install="https://www.shellcheck.net/"),
-
-    Tool("gitleaks", "gitleaks", ["*"], 2,
-         ["detect", "--no-banner", "--report-format", "json", "--report-path", "-"],
-         "gitleaks", per_file=False,
-         install="https://github.com/gitleaks/gitleaks",
-         note="secrets; without it nothing here looked for leaked credentials"),
-    # ── Linux kernel ────────────────────────────────────────────────────────
-    # checkpatch is the gate every kernel patch passes through, and it is Perl,
-    # so unlike the rest of this group it does run on Windows given perl.
-    Tool("checkpatch", "checkpatch.pl", ["c"], 2,
-         ["--no-tree", "--terse", "--no-summary", "-f"], "gcc_like",
-         install="scripts/checkpatch.pl in any kernel tree (needs perl)",
-         note="the kernel's own gate; more useful on a patch than every general linter combined"),
-    Tool("sparse", "sparse", ["c"], 2, [], "gcc_like",
-         install="apt install sparse   (Linux only)",
-         note="kernel semantics: __user pointers, endianness, lock context. LINUX ONLY"),
-    Tool("smatch", "smatch", ["c"], 3, [], "gcc_like",
-         install="https://repo.or.cz/w/smatch.git   (Linux only)",
-         note="flow analysis built for kernel idioms. LINUX ONLY"),
-    Tool("coccinelle", "spatch", ["c"], 3,
-         ["--very-quiet", "--no-show-diff"], "gcc_like", per_file=False,
-         install="apt install coccinelle   (Linux only)",
-         note="semantic patches; `make coccicheck` runs ~60 of them. LINUX ONLY"),
-
-    # ── Firefox / Gecko ─────────────────────────────────────────────────────
-    Tool("mach lint", "mach", ["*"], 2, ["lint"], "gcc_like", per_file=False,
-         install="ships in the Firefox tree (./mach)",
-         note="Mozilla's own lint stack, ~30 linters; the real gate for Gecko"),
-    Tool("rustfmt", "rustfmt", ["rust"], 1, ["--check"], "gcc_like",
-         install="rustup component add rustfmt"),
-    Tool("stylelint", "stylelint", ["*"], 1, ["--formatter", "json"], "eslint",
-         install="npm i -g stylelint"),
-
-    # ── Security, beyond the two already present ────────────────────────────
-    Tool("trivy", "trivy", ["*"], 2, ["fs", "--quiet", "--format", "json"],
-         "trivy", per_file=False, install="https://trivy.dev/",
-         note="known-vulnerable dependencies; nothing else here checks them"),
-    Tool("osv-scanner", "osv-scanner", ["*"], 2, ["--format", "json", "-r"],
-         "osv", per_file=False,
-         install="go install github.com/google/osv-scanner/cmd/osv-scanner@latest",
-         note="the OSV vulnerability database"),
-
-    # ── General quality ─────────────────────────────────────────────────────
-    Tool("codespell", "codespell", ["*"], 1, [], "gcc_like",
-         install="pip install codespell"),
-    Tool("yamllint", "yamllint", ["yaml"], 1, ["-f", "parsable"], "gcc_like",
-         install="pip install yamllint"),
-
-    Tool("semgrep", "semgrep", ["*"], 3,
-         ["--json", "--quiet", "--config", "auto"], "semgrep", per_file=False,
-         install="pip install semgrep",
-         note="security; the deep cross-language pass"),
-]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  Profiles
-# ─────────────────────────────────────────────────────────────────────────────
-#
-# A profile is an ANSWER TO A QUESTION, not a preset. "What kind of review do
-# you want" has genuinely different answers -- looking for leaked credentials is
-# not the same job as looking for undefined behaviour -- and they need different
-# tools, cost different amounts to install, and take different lengths of time.
-#
-# Naming them lets the doctor say something useful instead of a flat list: you
-# have 11 of 42 tools, and for a SECURITY review specifically you are missing the
-# four that matter. That is actionable. "31 tools missing" is not.
-#
-# approx_mb is a rough download size, for telling someone on a metered or slow
-# connection what they are agreeing to before it starts. It is an estimate and
-# is labelled as one wherever it is shown.
-
-PROFILES = {
-    "quick": {
-        "title": "Quick pass -- formatters and fast linters",
-        "detail": "Seconds. Finds style problems and obvious defects. Cannot find "
-                  "a buffer overrun, an injection or a leaked credential, and says so.",
-        "stages": [0, 1],
-        "wants": ["gofmt", "ruff", "pyflakes", "eslint", "shellcheck"],
-        "approx_mb": 60,
-    },
-    "bugs": {
-        "title": "Bug hunt -- static analysis that finds real defects",
-        "detail": "Minutes. Type errors, nil dereferences, dead stores, undefined "
-                  "behaviour. The default for 'is this code correct'.",
-        "stages": [0, 1, 2],
-        "wants": ["go vet", "staticcheck", "mypy", "cppcheck", "clang-tidy",
-                  "clippy", "tsc", "sparse"],
-        "approx_mb": 400,
-    },
-    "security": {
-        "title": "Security review -- secrets, injections, unsafe patterns",
-        "detail": "Minutes. Leaked credentials, command injection, unsafe "
-                  "deserialisation, known-vulnerable dependencies. Without these "
-                  "tools a review says NOTHING about security -- it does not say "
-                  "the code is safe.",
-        "stages": [0, 2, 3],
-        "wants": ["gitleaks", "semgrep", "bandit", "gosec", "trivy", "osv-scanner"],
-        "approx_mb": 350,
-    },
-    "kernel": {
-        "title": "Linux kernel -- checkpatch, sparse, smatch, coccinelle",
-        "detail": "The kernel's own tooling. checkpatch alone will tell you more "
-                  "about a patch than every general-purpose linter combined. "
-                  "MOSTLY LINUX-ONLY: sparse, smatch and coccinelle do not build "
-                  "on Windows, so kernel review belongs on a Linux machine.",
-        "stages": [0, 1, 2, 3],
-        "wants": ["checkpatch", "sparse", "smatch", "coccinelle", "cppcheck",
-                  "clang-tidy", "gcc"],
-        "approx_mb": 250,
-        "platform_note": "sparse, smatch and coccinelle are Linux-only in practice.",
-    },
-    "firefox": {
-        "title": "Firefox / Gecko -- mozlint, clang-tidy, clippy, eslint",
-        "detail": "Mozilla's own lint stack plus the Rust and JS toolchains. "
-                  "./mach lint is the real gate; the rest catch what it does not.",
-        "stages": [0, 1, 2, 3],
-        "wants": ["mach", "clang-tidy", "clippy", "rustfmt", "eslint", "stylelint",
-                  "ruff", "cppcheck"],
-        "approx_mb": 900,
-    },
-    "full": {
-        "title": "Everything installed, every stage",
-        "detail": "Slowest and most complete. Still only as good as what is on "
-                  "the machine.",
-        "stages": [0, 1, 2, 3],
-        "wants": [],   # empty means "every tool that applies to the languages found"
-        "approx_mb": 0,
-    },
-}
-
-
-def profile_stages(name, deep, no_stage3):
-    """Stages this run may use. Explicit flags still win over the profile."""
-    prof = PROFILES.get(name) or PROFILES["bugs"]
-    stages = set(prof["stages"])
-    if no_stage3:
-        stages -= {2, 3}
-    if deep:
-        stages |= {0, 1, 2, 3}
-    return stages
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  Discovery
-# ─────────────────────────────────────────────────────────────────────────────
-
-def find_binary(name):
-    """Locate an executable, honouring Windows PATHEXT.
-
-    shutil.which consults PATHEXT on Windows, so `eslint` finds `eslint.cmd`
-    and `ruff` finds `ruff.exe`. Most Node-based analysers exist ONLY as .cmd
-    shims there, and a naive existence check for the bare name finds nothing
-    and reports a perfectly installed tool as missing.
-    """
-    return shutil.which(name)
-
-
-def collect_files(target, max_files, diff_ref):
-    """Return (files, languages). Never follows into SKIP_DIRS."""
-    target = os.path.abspath(target)
-    files = []
-
-    if diff_ref:
-        changed = git_changed_files(target, diff_ref)
-        if changed is not None:
-            files = [f for f in changed if os.path.isfile(f)]
-
-    if not files:
-        if os.path.isfile(target):
-            files = [target]
-        else:
-            for root, dirs, names in os.walk(target):
-                dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
-                for n in names:
-                    ext = os.path.splitext(n)[1].lower()
-                    if ext in EXT_LANG:
-                        files.append(os.path.join(root, n))
-
-    files.sort()
-    if max_files and len(files) > max_files:
-        files = files[:max_files]
-
-    langs = sorted({EXT_LANG[os.path.splitext(f)[1].lower()]
-                    for f in files if os.path.splitext(f)[1].lower() in EXT_LANG})
-    return files, langs
-
-
-def git_changed_files(target, ref):
-    """Files changed against ref, or None if git cannot answer.
-
-    Returns None rather than [] on failure. They mean different things: [] is
-    "nothing changed", None is "we could not find out", and treating the second
-    as the first would silently review nothing and call it clean.
-    """
-    git = find_binary("git")
-    if not git:
-        return None
-    root = target if os.path.isdir(target) else os.path.dirname(target)
-    try:
-        out = subprocess.run(
-            [git, "diff", "--name-only", ref],
-            cwd=root, capture_output=True, text=True,
-            timeout=30, errors="replace",
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if out.returncode != 0:
-        return None
-    return [os.path.join(root, line.strip())
-            for line in out.stdout.splitlines() if line.strip()]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  Output parsers
-# ─────────────────────────────────────────────────────────────────────────────
-#
-# Each returns a list of dicts: tool, file, line, severity, message, rule.
-# A parser that cannot understand its input returns [] and the caller records
-# the tool under `tools_without_parser` — visibly, because a tool whose output
-# we silently failed to read is indistinguishable from one that found nothing.
-
-GCC_LIKE = re.compile(
-    r"^(?P<file>(?:[A-Za-z]:)?[^:]+):(?P<line>\d+)(?::(?P<col>\d+))?:\s*"
-    r"(?P<sev>error|warning|note|info)?:?\s*(?P<msg>.*)$"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from tools_registry import (  # noqa: E402
+    TOOLS, TOOLS_BY_ID, EXTENSION_LANGUAGE, MAKEFILE_NAMES,
+    DEFAULT_IGNORE_DIRS, ESCALATION_KEYWORDS, Tool, unparsed_tool_ids,
 )
+import llm_client  # noqa: E402
+import findings as fnd  # noqa: E402
+import rules  # noqa: E402
+import local_tier  # noqa: E402
+import doctor  # noqa: E402
+import baseline  # noqa: E402
 
+TOOLKIT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def parse_gcc_like(tool, raw):
-    out = []
-    for line in raw.splitlines():
-        m = GCC_LIKE.match(line.strip())
-        if not m:
-            continue
-        out.append({
-            "tool": tool, "file": m.group("file"), "line": int(m.group("line")),
-            "severity": normalise_severity(m.group("sev") or "warning"),
-            "message": m.group("msg").strip(), "rule": "",
-        })
-    return out
+# Our own log header is "$ cd <cwd> && <argv>" followed by a blank line. Every
+# reader below skips exactly this many lines, because the header contains the
+# tool's command line -- and matching keywords against that is how a clean
+# semgrep run used to escalate itself for mentioning "security".
+LOG_HEADER_LINES = 2
 
-
-def parse_filelist(tool, raw):
-    """gofmt -l prints only the names of files that need reformatting."""
-    return [{"tool": tool, "file": ln.strip(), "line": 1, "severity": "low",
-             "message": "file is not formatted (gofmt -l listed it)", "rule": "gofmt"}
-            for ln in raw.splitlines() if ln.strip()]
-
-
-def parse_ruff(tool, raw):
-    out = []
-    for it in _json_or_empty(raw, list):
-        out.append({
-            "tool": tool, "file": it.get("filename", ""),
-            "line": int((it.get("location") or {}).get("row", 1)),
-            "severity": "medium", "message": it.get("message", ""),
-            "rule": it.get("code") or "",
-        })
-    return out
-
-
-def parse_bandit(tool, raw):
-    doc = _json_or_empty(raw, dict)
-    out = []
-    for it in doc.get("results", []):
-        out.append({
-            "tool": tool, "file": it.get("filename", ""),
-            "line": int(it.get("line_number", 1)),
-            "severity": normalise_severity(it.get("issue_severity", "medium")),
-            "message": it.get("issue_text", ""),
-            "rule": it.get("test_id", ""),
-        })
-    return out
-
-
-def parse_eslint(tool, raw):
-    out = []
-    for f in _json_or_empty(raw, list):
-        for m in f.get("messages", []):
-            out.append({
-                "tool": tool, "file": f.get("filePath", ""),
-                "line": int(m.get("line", 1)),
-                "severity": "high" if m.get("severity") == 2 else "low",
-                "message": m.get("message", ""), "rule": m.get("ruleId") or "",
-            })
-    return out
-
-
-def parse_shellcheck(tool, raw):
-    return [{
-        "tool": tool, "file": it.get("file", ""), "line": int(it.get("line", 1)),
-        "severity": normalise_severity(it.get("level", "warning")),
-        "message": it.get("message", ""), "rule": "SC%s" % it.get("code", ""),
-    } for it in _json_or_empty(raw, list)]
-
-
-def parse_cppcheck(tool, raw):
-    out = []
-    for line in raw.splitlines():
-        parts = line.split(":", 4)
-        if len(parts) < 5:
-            continue
-        # Windows paths start "C:\..." so the drive letter splits first.
-        if len(parts[0]) == 1 and parts[0].isalpha():
-            parts = [parts[0] + ":" + parts[1]] + parts[2:]
-            if len(parts) < 5:
-                continue
-        try:
-            ln = int(parts[1])
-        except ValueError:
-            continue
-        out.append({"tool": tool, "file": parts[0], "line": ln,
-                    "severity": normalise_severity(parts[2]),
-                    "message": parts[4].strip(), "rule": parts[3]})
-    return out
-
-
-def parse_gosec(tool, raw):
-    doc = _json_or_empty(raw, dict)
-    return [{
-        "tool": tool, "file": it.get("file", ""),
-        "line": int(str(it.get("line", "1")).split("-")[0]),
-        "severity": normalise_severity(it.get("severity", "medium")),
-        "message": it.get("details", ""), "rule": it.get("rule_id", ""),
-    } for it in doc.get("Issues", [])]
-
-
-def parse_golangci(tool, raw):
-    doc = _json_or_empty(raw, dict)
-    out = []
-    for it in (doc.get("Issues") or []):
-        pos = it.get("Pos") or {}
-        out.append({"tool": tool, "file": pos.get("Filename", ""),
-                    "line": int(pos.get("Line", 1)), "severity": "medium",
-                    "message": it.get("Text", ""), "rule": it.get("FromLinter", "")})
-    return out
-
-
-def parse_gitleaks(tool, raw):
-    return [{
-        "tool": tool, "file": it.get("File", ""), "line": int(it.get("StartLine", 1)),
-        "severity": "critical",
-        "message": "possible secret: %s" % it.get("Description", "credential detected"),
-        "rule": it.get("RuleID", ""),
-    } for it in _json_or_empty(raw, list)]
-
-
-def parse_semgrep(tool, raw):
-    doc = _json_or_empty(raw, dict)
-    out = []
-    for it in doc.get("results", []):
-        extra = it.get("extra") or {}
-        out.append({
-            "tool": tool, "file": it.get("path", ""),
-            "line": int((it.get("start") or {}).get("line", 1)),
-            "severity": normalise_severity(extra.get("severity", "medium")),
-            "message": (extra.get("message") or "").strip(),
-            "rule": it.get("check_id", ""),
-        })
-    return out
-
-
-def parse_trivy(tool, raw):
-    doc = _json_or_empty(raw, dict)
-    out = []
-    for res in doc.get("Results") or []:
-        target = res.get("Target", "")
-        for v in (res.get("Vulnerabilities") or []):
-            out.append({
-                "tool": tool, "file": target, "line": 1,
-                "severity": normalise_severity(v.get("Severity", "medium")),
-                "message": "%s in %s %s: %s" % (
-                    v.get("VulnerabilityID", "vulnerability"),
-                    v.get("PkgName", "?"), v.get("InstalledVersion", "?"),
-                    (v.get("Title") or "")[:120]),
-                "rule": v.get("VulnerabilityID", ""),
-            })
-    return out
-
-
-def parse_osv(tool, raw):
-    doc = _json_or_empty(raw, dict)
-    out = []
-    for res in doc.get("results") or []:
-        src = (res.get("source") or {}).get("path", "")
-        for pkg in res.get("packages") or []:
-            name = ((pkg.get("package") or {}).get("name")) or "?"
-            for v in pkg.get("vulnerabilities") or []:
-                out.append({
-                    "tool": tool, "file": src, "line": 1, "severity": "high",
-                    "message": "%s affects %s: %s" % (
-                        v.get("id", "vulnerability"), name,
-                        (v.get("summary") or "")[:120]),
-                    "rule": v.get("id", ""),
-                })
-    return out
-
-
-PARSERS = {
-    "gcc_like": parse_gcc_like, "filelist": parse_filelist, "ruff": parse_ruff,
-    "bandit": parse_bandit, "eslint": parse_eslint, "shellcheck": parse_shellcheck,
-    "cppcheck": parse_cppcheck, "gosec": parse_gosec, "golangci": parse_golangci,
-    "gitleaks": parse_gitleaks, "semgrep": parse_semgrep,
-    "trivy": parse_trivy, "osv": parse_osv,
+KERNEL_FIREFOX_MANUAL_IDS = {
+    "firefox-mach-lint", "firefox-mach-static-analysis",
+    "kernel-checkpatch", "kernel-clang-tidy", "kernel-clang-analyzer",
+    "kernel-sparse", "kernel-coccicheck",
 }
 
+# Tools whose checks are redundant with (or actively conflict with) a tree's
+# own bundled tooling, so we skip the generic version under that profile.
+SKIP_FOR_PROFILE = {
+    "firefox": {"eslint", "prettier-check", "cpplint"},
+    "linux-kernel": {"cpplint"},
+}
 
-def _json_or_empty(raw, want):
-    """Parse JSON, tolerating the preamble some tools print before it."""
-    raw = raw.strip()
-    if not raw:
-        return want()
+SYSTEM_PROMPT = """You are the review-synthesis stage of a local, offline code-review pipeline.
+You are NOT running any tools yourself -- everything you need is already in the message below,
+which was produced by real static-analysis/lint/security tools (cppcheck, clang-tidy, pylint,
+flake8, mypy, bandit, eslint, stylelint, cargo clippy, golangci-lint, gosec, staticcheck,
+semgrep, gitleaks, shellcheck, etc.) run directly against the user's source tree.
+
+Follow these rules exactly, in order:
+
+1. Only report findings that are literally present in the text you were given. Do not invent
+   file names, line numbers, function names, or issues that aren't in the tool output. If you
+   are not sure a finding is real, say so instead of guessing.
+2. Group findings by severity, not by tool:
+     P0 - security or correctness issues multiple different tools flagged in the same file/area
+          (these are the highest-confidence real problems)
+     P1 - security findings from a single tool (bandit/gosec/semgrep/gitleaks/cargo-audit)
+     P2 - correctness/logic warnings from static analyzers (cppcheck/clang-tidy/mypy/staticcheck)
+     P3 - style/formatting only (black/isort/prettier/clang-format/eslint style rules)
+3. For each P0/P1 item, state which file, which tool(s) flagged it, and in one plain sentence
+   what the risk actually is -- explain it to the developer who wrote the code, don't just
+   recite the tool's own jargon back at them.
+4. Merge duplicate findings across tools instead of repeating them ("confirmed by clang-tidy
+   and cppcheck", once).
+5. If a whole category found nothing, say so in one short line instead of omitting it silently.
+6. End with a "fix first" list of at most 5 items, ordered by actual risk, not by output volume.
+7. Keep the reply under ~600 words unless there are genuinely more than 5 P0 findings, in which
+   case list all P0s but keep everything else terse.
+
+You will be given: which project profile was detected, a recon summary, per-tool finding
+counts, and raw-output excerpts for anything that found issues. Clean tools are only named,
+not quoted in full.
+"""
+
+JOB_TIMEOUT_DEFAULT = 600
+
+
+# ---------------------------------------------------------------------------
+# small process helper (mirrors install_tools.py's, kept independent on purpose
+# so this file has no import-time dependency on install_tools.py)
+# ---------------------------------------------------------------------------
+
+def run(cmd, timeout=30, cwd=None):
     try:
-        doc = json.loads(raw)
-    except ValueError:
-        start = raw.find("[" if want is list else "{")
-        if start < 0:
-            return want()
-        try:
-            doc = json.loads(raw[start:])
-        except ValueError:
-            return want()
-    return doc if isinstance(doc, want) else want()
+        # check=False is deliberate and explicit: every caller inspects the
+        # return code itself (127 = not installed, 124 = timed out, non-zero
+        # with no findings = the tool broke). Raising here would collapse
+        # those distinctions, which are the ones this toolkit cares most about.
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
+                           cwd=cwd, check=False)
+        return p.returncode, p.stdout, p.stderr
+    except FileNotFoundError:
+        return 127, "", "not found"
+    except subprocess.TimeoutExpired:
+        return 124, "", "timed out"
+    except Exception as e:
+        return 1, "", str(e)
 
 
-SEVERITY_MAP = {
-    "critical": "critical", "error": "high", "high": "high", "danger": "high",
-    "warning": "medium", "medium": "medium", "style": "low", "info": "low",
-    "note": "low", "low": "low", "performance": "low", "portability": "low",
-    "convention": "low", "refactor": "low",
-}
-SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+def sanitize(s: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", s)[-140:]
 
 
-def normalise_severity(s):
-    return SEVERITY_MAP.get(str(s).strip().lower(), "medium")
+def classify(path: str) -> Optional[str]:
+    base = os.path.basename(path)
+    if base in MAKEFILE_NAMES:
+        return "make"
+    ext = os.path.splitext(path)[1].lower()
+    return EXTENSION_LANGUAGE.get(ext)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  Running
-# ─────────────────────────────────────────────────────────────────────────────
+def languages_of(files: List[str]) -> Set[str]:
+    """The set of languages present in `files`, unknown extensions excluded.
 
-def run_tool(tool, binary, files, target):
-    """Run one analyser. Returns (findings, status) where status is one of
-    ok / errored / timed_out / no_parser."""
-    parser = PARSERS.get(tool.parser)
-    if parser is None:
-        return [], "no_parser"
-
-    batches = [[]] if not tool.per_file else [
-        files[i:i + FILES_PER_INVOCATION]
-        for i in range(0, len(files), FILES_PER_INVOCATION)
-    ]
-
-    findings, status = [], "ok"
-    for batch in batches:
-        cmd = [binary] + list(tool.args) + (batch if tool.per_file else [target])
-        try:
-            proc = subprocess.run(
-                cmd,
-                capture_output=True, text=True, errors="replace",
-                timeout=TOOL_TIMEOUT_SECONDS,
-                cwd=target if os.path.isdir(target) else os.path.dirname(target),
-                # shell=False deliberately: a path containing spaces needs no
-                # quoting and cannot be re-interpreted by a shell that is not
-                # there. C:\Program Files\... is the common case on Windows.
-                shell=False,
-            )
-        except subprocess.TimeoutExpired:
-            return findings, "timed_out"
-        except (OSError, subprocess.SubprocessError):
-            return findings, "errored"
-
-        raw = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
-        try:
-            got = parser(tool.name, raw)
-        except Exception:
-            # A parser that throws must not take the review with it. The tool is
-            # recorded as unparsed, which is visible in the trust block, rather
-            # than silently contributing nothing.
-            return findings, "no_parser"
-        findings.extend(got)
-
-    return findings, status
-
-
-def verify_positions(findings, dropped_counter):
-    """Drop findings whose line no longer exists, and attach an excerpt.
-
-    RULE 2 of the method. An analyser reports against the file as it read it; by
-    the time anyone reads the report the file may have changed, and a stale line
-    number points at innocent code. Re-reading is cheap and the alternative is
-    confidently wrong.
+    classify() returns None for anything we don't recognise, so building the set
+    and then discarding None (as four separate call sites used to do) produced a
+    Set[Optional[str]] that only *looked* like a Set[str] -- which then made
+    `sorted()` on it a latent crash the moment an unrecognised file appeared
+    alongside a recognised one. Filtering inside the comprehension is both
+    correct and says what it means.
     """
-    cache, kept = {}, []
-    for f in findings:
-        path = f.get("file") or ""
-        if not path:
-            continue
-        if path not in cache:
-            try:
-                with open(path, "r", encoding="utf-8", errors="replace") as fh:
-                    cache[path] = fh.read().splitlines()
-            except OSError:
-                cache[path] = None
-        lines = cache[path]
-        if lines is None:
-            # Unreadable is not the same as stale. Keep it, with no excerpt,
-            # rather than deleting a finding we merely could not confirm.
-            f["excerpt"] = ""
-            kept.append(f)
-            continue
-        n = f.get("line") or 1
-        if n < 1 or n > len(lines):
-            dropped_counter[0] += 1
-            continue
-        f["excerpt"] = lines[n - 1].strip()[:200]
-        kept.append(f)
-    return kept
+    return {lang for lang in (classify(f) for f in files) if lang is not None}
 
 
-def flag_suspicious_uniformity(findings, files, notes):
-    """Notice when one tool flags nearly everything, which usually means the
-    tool is measuring something environmental rather than the code.
+# ---------------------------------------------------------------------------
+# project profile detection
+# ---------------------------------------------------------------------------
 
-    This is judgement a naive runner does not apply, and it is the difference
-    between a report a person trusts and one they learn to ignore.
+def detect_profile(target_dir: str) -> str:
+    def exists(*parts):
+        return os.path.exists(os.path.join(target_dir, *parts))
 
-    The case that motivated it: on a Windows checkout with CRLF line endings,
-    `gofmt -l` lists EVERY Go file. Twenty-seven findings, all real in the sense
-    that gofmt really did print those names, and all worthless -- the files are
-    correctly formatted and only the line endings differ. A reviewer who reports
-    that as twenty-seven defects has buried whatever else was found.
-
-    So: if a single tool accounts for most of the findings AND touches most of
-    the files, say so beside the findings rather than deleting them. Deleting
-    would be a judgement this script is not entitled to make; staying silent
-    would be worse.
-    """
-    if not findings or not files:
-        return
-    by_tool = defaultdict(set)
-    for f in findings:
-        by_tool[f["tool"]].add(f["file"])
-    total_files = len(set(files))
-    for tool, touched in by_tool.items():
-        share = len(touched) / float(total_files)
-        if share >= 0.75 and len(touched) > 3:
-            notes.append(
-                "%s flagged %d of %d files (%.0f%%). A tool that flags nearly "
-                "everything is usually measuring the environment, not the code -- "
-                "line endings, a missing config, or the wrong working directory. "
-                "Confirm one finding by hand before believing the rest."
-                % (tool, len(touched), total_files, share * 100))
+    if exists("mach") and exists("python", "mozbuild"):
+        return "firefox"
+    if exists("Kconfig") and exists("MAINTAINERS") and exists("scripts", "checkpatch.pl"):
+        return "linux-kernel"
+    if exists("go.mod"):
+        return "go"
+    if exists("Cargo.toml"):
+        return "rust"
+    if exists("pyproject.toml") or exists("setup.py") or exists("requirements.txt"):
+        return "python"
+    return "generic"
 
 
-def corroborate(findings):
-    """Group findings that two or more DIFFERENT tools put on the same line.
+# ---------------------------------------------------------------------------
+# file discovery
+# ---------------------------------------------------------------------------
 
-    RULE 3. Agreement between independent analysers is the strongest signal this
-    script can produce, and it is kept apart from the single-opinion list so a
-    reader cannot mistake a style preference for two tools agreeing.
-    """
-    by_pos = defaultdict(list)
-    for f in findings:
-        by_pos[(f["file"], f["line"])].append(f)
+def is_git_repo(path: str) -> bool:
+    return run(["git", "-C", path, "rev-parse", "--is-inside-work-tree"], timeout=10)[0] == 0
+
+
+def discover_files(target: str, target_is_file: bool, args) -> List[str]:
+    if target_is_file:
+        return [target]
+
+    if args.diff:
+        if not is_git_repo(target):
+            print(f"ERROR: --diff was given but {target} is not a git repository.")
+            sys.exit(1)
+        rc, out, err = run(["git", "-C", target, "diff", "--name-only", args.diff], timeout=30)
+        if rc != 0:
+            print(f"ERROR: `git diff --name-only {args.diff}` failed: {err.strip()}")
+            sys.exit(1)
+        rels = [l for l in out.splitlines() if l.strip()]
+        return [os.path.join(target, r) for r in rels if os.path.isfile(os.path.join(target, r))]
+
+    if not args.all_files and is_git_repo(target):
+        rc, out, _ = run(["git", "-C", target, "ls-files"], timeout=60)
+        rels = [l for l in out.splitlines() if l.strip()]
+        return [os.path.join(target, r) for r in rels if os.path.isfile(os.path.join(target, r))]
 
     out = []
-    for (path, line), group in by_pos.items():
-        tools = sorted({g["tool"] for g in group})
-        if len(tools) < 2:
-            continue
-        out.append({
-            "file": path, "line": line, "tools": tools,
-            "messages": [g["message"] for g in group][:6],
-        })
-    out.sort(key=lambda c: (-len(c["tools"]), c["file"], c["line"]))
+    for root, dirs, fnames in os.walk(target):
+        dirs[:] = [d for d in dirs if d not in DEFAULT_IGNORE_DIRS and not d.startswith(".")]
+        for fn in fnames:
+            out.append(os.path.join(root, fn))
     return out
 
 
-def plan(langs, profile, deep, no_stage3):
-    """Which tools apply: the profile decides the stages AND narrows the set.
+# ---------------------------------------------------------------------------
+# job construction / execution
+# ---------------------------------------------------------------------------
 
-    A profile that only picked stages would be cosmetic -- `--profile security`
-    would have run every stage-2 tool including the formatters, and the report
-    would have looked identical to a bug hunt. It has to narrow the tools too,
-    or the word means nothing.
+@dataclass
+class Job:
+    tool_id: str
+    target_path: str
+    argv: List[str]
+    log_path: str
+    cwd: str
 
-    `full` deliberately has an empty want-list, which means "everything that
-    applies to the languages found" rather than "nothing".
+@dataclass
+class JobResult:
+    job: Job
+    returncode: int
+    duration: float
+    issue_count: int = 0
+    findings: List[fnd.Finding] = field(default_factory=list)
+
+
+def build_ctx(target_dir: str, results_dir: str, args, rel_path: str = "",
+              profile: str = "generic") -> dict:
+    def any_exists(names):
+        return any(os.path.exists(os.path.join(target_dir, n)) for n in names)
+
+    return {
+        "target": target_dir,
+        "results_dir": results_dir,
+        # Some checks are only meaningful under a specific tree layout (Firefox
+        # unified builds, kernel locking). Their build_cmd returns None when the
+        # profile doesn't match, which is the registry's skip signal.
+        "profile": profile,
+        "compile_commands_dir": args.compile_commands_dir,
+        "has_own_eslint_config": any_exists(
+            [".eslintrc", ".eslintrc.js", ".eslintrc.cjs", ".eslintrc.json",
+             ".eslintrc.yml", ".eslintrc.yaml", "eslint.config.js", "eslint.config.mjs"]),
+        "eslint_fallback_config": os.path.join(TOOLKIT_DIR, "configs", "eslintrc.fallback.json"),
+        "has_own_stylelint_config": any_exists(
+            [".stylelintrc", ".stylelintrc.json", ".stylelintrc.js", "stylelint.config.js"]),
+        "stylelint_fallback_config": os.path.join(TOOLKIT_DIR, "configs", "stylelintrc.fallback.json"),
+        "semgrep_language_packs": [],
+        "rel_path": rel_path,
+        "kernel_subdir": "",
+    }
+
+
+def make_job(tool: Tool, path: str, argv: List[str], results_dir: str, cwd: str) -> Job:
+    rel = os.path.relpath(path, start=cwd) if os.path.isabs(path) else path
+    if rel in (".", ""):
+        rel = "PROJECT"
+    log_name = f"{tool.id}__{sanitize(rel)}.txt"
+    return Job(tool_id=tool.id, target_path=path, argv=argv,
+               log_path=os.path.join(results_dir, log_name), cwd=cwd)
+
+
+def build_jobs(files: List[str], target_dir: str, profile: str, results_dir: str,
+               ctx: dict, stages) -> List[Job]:
+    jobs = []
+    langs_present: Set[str] = languages_of(files)
+    skip_ids = SKIP_FOR_PROFILE.get(profile, set())
+
+    for tool in TOOLS:
+        if tool.scope not in ("auto-file", "auto-project") or tool.stage not in stages:
+            continue
+        if tool.id in skip_ids:
+            continue
+
+        if "*" in tool.languages:
+            if tool.build_cmd is None:
+                continue
+            argv = tool.build_cmd(target_dir, ctx)
+            if argv:
+                jobs.append(make_job(tool, target_dir, argv, results_dir, target_dir))
+            continue
+
+        if tool.scope == "auto-project":
+            if tool.build_cmd is not None and (set(tool.languages) & langs_present):
+                argv = tool.build_cmd(target_dir, ctx)
+                if argv:
+                    jobs.append(make_job(tool, target_dir, argv, results_dir, target_dir))
+            continue
+
+        # auto-file
+        if tool.build_cmd is None:
+            continue
+        for f in files:
+            if classify(f) not in tool.languages:
+                continue
+            argv = tool.build_cmd(f, ctx)
+            if argv:
+                jobs.append(make_job(tool, f, argv, results_dir, target_dir))
+    return jobs
+
+
+def build_stage3_jobs(files: List[str], target_dir: str, results_dir: str, ctx: dict,
+                       hit_files: Set[str], deep: bool) -> List[Job]:
+    jobs = []
+    langs_present: Set[str] = languages_of(files)
+
+    for tool in TOOLS:
+        if tool.stage != 3 or tool.scope not in ("auto-file", "auto-project"):
+            continue
+        if tool.scope == "auto-project":
+            if tool.build_cmd is None:
+                continue
+            if "*" in tool.languages or (set(tool.languages) & langs_present):
+                if deep or hit_files:
+                    argv = tool.build_cmd(target_dir, ctx)
+                    if argv:
+                        jobs.append(make_job(tool, target_dir, argv, results_dir, target_dir))
+            continue
+        if tool.build_cmd is None:
+            continue
+        candidates = files if deep else [f for f in files if f in hit_files]
+        for f in candidates:
+            if classify(f) not in tool.languages:
+                continue
+            argv = tool.build_cmd(f, ctx)
+            if argv:
+                jobs.append(make_job(tool, f, argv, results_dir, target_dir))
+    return jobs
+
+
+def run_job(job: Job, timeout: int) -> JobResult:
+    t0 = time.time()
+    header = f"$ cd {job.cwd} && {' '.join(job.argv)}\n\n"
+    try:
+        with open(job.log_path, "w") as f:
+            f.write(header)
+            f.flush()
+            # check=False: an analyser exiting non-zero usually means it FOUND
+            # something, which is success from our side. execute_jobs()
+            # interprets the code.
+            proc = subprocess.run(job.argv, cwd=job.cwd, stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT, text=True,
+                                   timeout=timeout, check=False)
+            f.write(proc.stdout or "")
+        rc = proc.returncode
+    except subprocess.TimeoutExpired:
+        rc = 124
+        with open(job.log_path, "a") as f:
+            f.write(f"\n[TIMED OUT after {timeout}s]\n")
+    except FileNotFoundError:
+        rc = 127
+        with open(job.log_path, "a") as f:
+            f.write("\n[TOOL BINARY NOT FOUND -- run install_tools.py first]\n")
+    except Exception as e:
+        rc = 1
+        with open(job.log_path, "a") as f:
+            f.write(f"\n[UNEXPECTED ERROR: {e}]\n")
+    return JobResult(job=job, returncode=rc, duration=time.time() - t0)
+
+
+def read_log_body(log_path: str) -> str:
+    """A tool's output with our own command-line header stripped off."""
+    try:
+        with open(log_path, errors="replace") as f:
+            return "\n".join(f.read().splitlines()[LOG_HEADER_LINES:])
+    except OSError:
+        return ""
+
+
+def parse_job_findings(result: JobResult) -> List[fnd.Finding]:
+    """Normalised findings for one job.
+
+    Uses the tool's own parser when the registry has one, otherwise the marker
+    heuristic that every tool used before findings.py -- so a tool without a
+    parser behaves exactly as it did, and adding one is never a regression.
     """
-    stages = profile_stages(profile, deep, no_stage3)
-    prof = PROFILES.get(profile) or PROFILES["bugs"]
-    wants = set(prof["wants"])
+    tool = TOOLS_BY_ID.get(result.job.tool_id)
+    if not tool:
+        return []
+    body = read_log_body(result.job.log_path)
+    if not body.strip():
+        return []
+    cwd = result.job.cwd
+    ctx = {
+        "tool_id": tool.id,
+        "cwd": cwd,
+        "target_path": os.path.relpath(result.job.target_path, start=cwd)
+                       if os.path.isabs(result.job.target_path) else result.job.target_path,
+        "severity_markers": tool.severity_markers,
+    }
+    parser = tool.parse_output or fnd.parse_marker_fallback
+    try:
+        out = parser(body, ctx)
+    except Exception as e:
+        # A parser bug must never take the run down or -- worse -- silently
+        # report zero findings, which is indistinguishable from "clean".
+        print(f"  ! parser for {tool.id} failed ({e}); falling back to marker heuristic")
+        out = fnd.parse_marker_fallback(body, ctx)
+    return fnd.finalize(out, cwd=cwd)
 
-    chosen = []
-    for t in TOOLS:
-        if t.stage not in stages:
-            continue
-        if not ("*" in t.langs or (t.langs & set(langs))):
-            continue
-        if wants and t.name not in wants:
-            continue
-        chosen.append(t)
-    return chosen
+
+def execute_jobs(jobs: List[Job], max_workers: int, timeout: int) -> List[JobResult]:
+    if not jobs:
+        return []
+    results = []
+    total = len(jobs)
+    done = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(run_job, j, timeout): j for j in jobs}
+        for fut in concurrent.futures.as_completed(futures):
+            j = futures[fut]
+            r = fut.result()
+            r.findings = parse_job_findings(r)
+            r.issue_count = len(r.findings)
+            done += 1
+            if r.returncode == 127:
+                tag = "MISSING"
+            elif r.returncode == 124:
+                tag = "TIMEOUT"
+            elif r.issue_count > 0:
+                tag = "ISSUES"
+            elif r.returncode != 0:
+                # exited non-zero but we didn't parse any findings from its output --
+                # more likely a crash / bad config / network failure than "all clean".
+                tag = "ERROR"
+            else:
+                tag = "CLEAN"
+            rel = os.path.relpath(j.target_path, start=j.cwd) if os.path.isabs(j.target_path) else j.target_path
+            print(f"  [{done:>4}/{total}] {tag:<8} {j.tool_id:<24} {rel:<48} "
+                  f"{r.issue_count:>4} finding(s)  ({r.duration:5.1f}s)")
+            results.append(r)
+    return results
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  Doctor
-# ─────────────────────────────────────────────────────────────────────────────
+def find_escalation_hits(results: List[JobResult]) -> Set[str]:
+    """Files whose stage 1/2 output looked security-shaped, for stage 3.
 
-def doctor(target, want_profile=""):
-    """Report what this machine can actually check, per profile, with the deal.
-
-    The owner's brief, near enough verbatim: the program cannot magic a review
-    out of thin air, so it should say what it scanned, what it found, what each
-    kind of review would need, and what installing that would cost -- and then
-    let a person choose.
-
-    ASCII only. This is printed to a Windows console, where cp1252 turns an
-    em-dash into a question mark, and a capability report that renders as
-    punctuation noise teaches nobody anything.
+    Reads the log BODY only. Reading the whole file used to include our own
+    "$ cd ... && semgrep --config p/security-audit" header, so any tool whose
+    command line happened to contain "security" or "secret" escalated its own
+    target on a completely clean run.
     """
-    files, langs = collect_files(target, 0, "")
-    on_windows = os.name == "nt"
+    hits = set()
+    for r in results:
+        if r.returncode in (124, 127):
+            continue
+        content = read_log_body(r.job.log_path).lower()
+        if not content:
+            continue
+        if any(k.lower() in content for k in ESCALATION_KEYWORDS):
+            hits.add(r.job.target_path)
+    return hits
 
-    relevant = [t for t in TOOLS if "*" in t.langs or (t.langs & set(langs))]
-    have = {t.name for t in relevant if find_binary(t.binary)}
 
+# ---------------------------------------------------------------------------
+# manual-tier tools (things this script deliberately does NOT auto-run)
+# ---------------------------------------------------------------------------
+
+def select_manual_tools(profile: str, files: List[str]) -> List[Tool]:
+    langs_present: Set[str] = languages_of(files)
     out = []
-    out.append("Code review capability report")
-    out.append("=" * 60)
-    out.append("target    : %s" % os.path.abspath(target))
-    out.append("files     : %d" % len(files))
-    out.append("languages : %s" % (", ".join(langs) or "none detected"))
-    out.append("platform  : %s" % ("Windows" if on_windows else os.name))
-    out.append("")
-    out.append("I cannot conjure a review out of nothing. I drive real analysers,")
-    out.append("and this machine has %d of the %d that apply here." % (len(have), len(relevant)))
-    out.append("")
-
-    # Per profile: what it needs, what is present, what it would cost.
-    out.append("WHAT KIND OF REVIEW DO YOU WANT?")
-    out.append("-" * 60)
-    for key, prof in PROFILES.items():
-        wants = prof["wants"] or [t.name for t in relevant]
-        applicable = [w for w in wants if any(t.name == w for t in relevant)]
-        if not applicable:
+    for tool in TOOLS:
+        if tool.scope != "manual":
             continue
-        got = [w for w in applicable if w in have]
-        missing = [w for w in applicable if w not in have]
-        ready = "READY" if not missing else "%d/%d" % (len(got), len(applicable))
-        out.append("")
-        out.append("  --profile %-9s [%s]  %s" % (key, ready, prof["title"]))
-        out.append("      %s" % prof["detail"])
-        if missing:
-            out.append("      missing: %s" % ", ".join(missing))
-            if prof["approx_mb"]:
-                out.append("      download to fix: roughly %d MB (an estimate, not a quote)"
-                           % prof["approx_mb"])
-        if on_windows and prof.get("platform_note"):
-            out.append("      NOTE ON THIS MACHINE: %s" % prof["platform_note"])
-
-    # The install commands, gathered, so a person can act without hunting.
-    absent = [t for t in relevant if t.name not in have]
-    if absent:
-        out.append("")
-        out.append("HOW TO INSTALL WHAT IS MISSING")
-        out.append("-" * 60)
-        for t in absent:
-            out.append("  %-14s %s" % (t.name, t.install or "see the tool's own documentation"))
-            if t.note:
-                out.append("  %-14s   ^ %s" % ("", t.note))
-
-    out.append("")
-    out.append("-" * 60)
-    if not have:
-        out.append("NOTHING IS INSTALLED THAT APPLIES HERE.")
-        out.append("A review now would return an empty report, and an empty report")
-        out.append("looks exactly like a clean one. So nothing will be run at all.")
-    else:
-        out.append("A review will run the %d installed tool(s) and will state, in its" % len(have))
-        out.append("own output, which subject areas went unexamined. A finding of")
-        out.append("'nothing' from a tool that is not installed is not a finding.")
-
-    print(chr(10).join(out))
-    # Exit 3 is the documented "nothing to run" signal the caller checks for.
-    return 0 if have else 3
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  Main
-# ─────────────────────────────────────────────────────────────────────────────
-
-def main(argv):
-    ap = argparse.ArgumentParser(add_help=True, description=__doc__)
-    ap.add_argument("target")
-    ap.add_argument("--audience", default="human")
-    ap.add_argument("--diff", default="")
-    ap.add_argument("--max-files", type=int, default=0)
-    ap.add_argument("--profile", default="bugs",
-                    choices=sorted(PROFILES) + ["default"])
-    ap.add_argument("--deep", action="store_true")
-    ap.add_argument("--no-stage3", action="store_true")
-    ap.add_argument("--doctor", action="store_true")
-    args = ap.parse_args(argv)
-
-    if not os.path.exists(args.target):
-        print("target does not exist: %s" % args.target, file=sys.stderr)
-        return 2
-
-    if args.profile == "default":
-        args.profile = "bugs"
-
-    if args.doctor:
-        return doctor(args.target, args.profile)
-
-    started = time.time()
-    files, langs = collect_files(args.target, args.max_files, args.diff)
-    chosen = plan(langs, args.profile, args.deep, args.no_stage3)
-
-    ran, errored, missing, timed_out, no_parser = [], [], [], [], []
-    findings = []
-
-    for tool in sorted(chosen, key=lambda t: t.stage):
-        binary = find_binary(tool.binary)
-        if not binary:
-            missing.append(tool.name)
-            continue
-        applicable = files if "*" in tool.langs else [
-            f for f in files
-            if EXT_LANG.get(os.path.splitext(f)[1].lower()) in tool.langs
-        ]
-        if tool.per_file and not applicable:
-            continue
-        got, status = run_tool(tool, binary, applicable, args.target)
-        if status == "ok":
-            ran.append(tool.name)
-            findings.extend(got)
-        elif status == "timed_out":
-            timed_out.append(tool.name)
-            findings.extend(got)      # partial output is still evidence
-        elif status == "no_parser":
-            no_parser.append(tool.name)
+        if tool.id in KERNEL_FIREFOX_MANUAL_IDS:
+            if profile in tool.profiles:
+                out.append(tool)
         else:
-            errored.append(tool.name)
+            if "*" in tool.languages or (set(tool.languages) & langs_present):
+                out.append(tool)
+    return out
 
-    notes = []
-    dropped = [0]
-    findings = verify_positions(findings, dropped)
-    findings.sort(key=lambda f: (SEVERITY_RANK.get(f["severity"], 9), f["file"], f["line"]))
 
-    flag_suspicious_uniformity(findings, files, notes)
-    caveat = build_caveat(ran, missing, errored, timed_out, no_parser, langs)
+def render_manual_block(tool: Tool, ctx: dict) -> str:
+    # Every scope="manual" tool defines manual_cmd, but the field is Optional on
+    # the dataclass, so say what happens if one ever doesn't rather than raising
+    # a TypeError deep inside report rendering.
+    cmd_text = tool.manual_cmd(ctx) if tool.manual_cmd else "(no command defined for this tool)"
+    lines = [f"### {tool.label}"]
+    if tool.notes:
+        lines.append(f"_{tool.notes}_")
+    lines.append("")
+    lines.append("**Step 1 -- run this exactly:**")
+    lines.append("```bash")
+    lines.append(cmd_text)
+    lines.append("```")
+    lines.append("**Step 2 -- save the output instead of letting it scroll past:**")
+    first_line = cmd_text.strip().splitlines()[0]
+    lines.append("```bash")
+    lines.append(f"({first_line}) > {os.path.join(ctx['results_dir'], tool.id + '.txt')} 2>&1")
+    lines.append("```")
+    lines.append(f"**Step 3** -- once it finishes, open `{tool.id}.txt` and search first for "
+                  f"the words `error`, `warning`, or `FAIL`.")
+    return "\n".join(lines)
 
-    report = {
-        "schema": SCHEMA,
-        "target": os.path.abspath(args.target),
-        "profile": args.profile,
+
+def render_checklist_block(tool: Tool) -> str:
+    lines = [f"### {tool.label}"]
+    if tool.notes:
+        lines.append(f"_{tool.notes}_")
+    lines.append("")
+    for item in (tool.checklist or []):
+        lines.append(f"- [ ] {item}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# report building
+# ---------------------------------------------------------------------------
+
+def build_digest(all_results: List[JobResult], profile: str, max_chars: int = 60000) -> str:
+    lines = [f"Detected project profile: {profile}", ""]
+    clean, dirty, errored, missing = [], [], [], []
+    for r in all_results:
+        if r.returncode == 127:
+            missing.append(r)
+        elif r.issue_count > 0:
+            dirty.append(r)
+        elif r.returncode not in (0, 124):
+            errored.append(r)
+        else:
+            clean.append(r)
+    lines.append(f"{len(dirty)} tool run(s) found something; {len(clean)} were genuinely clean; "
+                 f"{len(errored)} FAILED TO RUN PROPERLY (do not treat these as clean -- e.g. a "
+                 f"network-blocked ruleset download); {len(missing)} tool(s) were not installed.")
+    lines.append("")
+    if errored:
+        lines.append("Tools that errored (exit code nonzero, no findings parsed -- likely a real "
+                     "problem, NOT a clean pass): " + ", ".join(
+                         sorted({f"{r.job.tool_id} ({os.path.basename(r.job.log_path)})" for r in errored})))
+        lines.append("")
+    if clean:
+        lines.append("Clean (no findings): " + ", ".join(
+            sorted({f"{r.job.tool_id}" for r in clean})))
+        lines.append("")
+    # Corroboration is now a computed fact rather than something the model has
+    # to notice in prose, so hand it over pre-chewed. These are the P0s.
+    groups = fnd.corroborated([f for r in all_results for f in r.findings])
+    if groups:
+        lines.append("Places flagged INDEPENDENTLY BY MORE THAN ONE TOOL (treat as the "
+                     "highest-confidence findings -- computed by exact file:line "
+                     "match, not inferred; style/formatting findings are excluded "
+                     "so this is not just two linters agreeing about whitespace):")
+        for g in groups[:40]:
+            tools = ", ".join(sorted({f.tool for f in g}))
+            lines.append(f"  {g[0].file}:{g[0].line}  [{tools}]  {g[0].message[:160]}")
+        lines.append("")
+
+    dirty.sort(key=lambda r: -r.issue_count)
+    budget = max_chars
+    for r in dirty:
+        rel = os.path.relpath(r.job.target_path, start=r.job.cwd) if os.path.isabs(r.job.target_path) else r.job.target_path
+        header = f"--- {r.job.tool_id} on {rel} ({r.issue_count} findings) ---\n"
+        body_lines = read_log_body(r.job.log_path).splitlines()
+        body = "\n".join(body_lines[:60])
+        block = header + body + "\n\n"
+        if len(block) > budget:
+            break
+        lines.append(block)
+        budget -= len(block)
+    return "\n".join(lines)
+
+
+def write_reports(results_dir: str, target: str, profile: str, files: List[str],
+                   all_results: List[JobResult], manual_tools: List[Tool],
+                   checklist_tools: List[Tool], ctx: dict, llm_synthesis: Optional[str]) -> str:
+    all_findings = fnd.finalize([f for r in all_results for f in r.findings])
+    groups = fnd.corroborated(all_findings)
+    style_only = fnd.style_agreements(all_findings)
+    errored_ids = sorted({r.job.tool_id for r in all_results
+                          if r.issue_count == 0 and r.returncode not in (0, 124, 127)})
+    missing_ids = sorted({r.job.tool_id for r in all_results if r.returncode == 127})
+
+    json_report = {
+        "generated": datetime.now().isoformat(),
+        "target": target,
+        "profile": profile,
+        "files_scanned": len(files),
+        # The findings themselves, not just how many there were. This is what an
+        # agent consumes; everything else here is provenance for it.
+        "findings": [f.to_dict() for f in all_findings],
+        # Same place flagged by more than one tool -- computed, not inferred.
+        # Style-only agreements are counted separately, not listed: two linters
+        # agreeing about line length is not evidence of a bug.
+        "corroborated_excludes_style": True,
+        "style_only_agreements": style_only,
+        "corroborated": [
+            {"file": g[0].file, "line": g[0].line,
+             "tools": sorted({f.tool for f in g}),
+             "messages": [f.message for f in g]}
+            for g in groups
+        ],
+        # Trust metadata. A consumer needs to know that an empty findings list
+        # can mean "clean", "the tool crashed", or "the tool isn't installed" --
+        # and these are emphatically not the same thing.
+        "trust": {
+            "tools_errored": errored_ids,
+            "tools_missing": missing_ids,
+            "tools_without_parser": [t for t in unparsed_tool_ids()
+                                     if t in {r.job.tool_id for r in all_results}],
+        },
+        "jobs": [
+            {
+                "tool": r.job.tool_id,
+                "path": r.job.target_path,
+                "returncode": r.returncode,
+                "issue_count": r.issue_count,
+                "duration_s": round(r.duration, 2),
+                "log": r.job.log_path,
+            } for r in all_results
+        ],
+        "manual_tools": [t.id for t in manual_tools],
+        "checklist_tools": [t.id for t in checklist_tools],
+    }
+    json_path = os.path.join(results_dir, "report.json")
+    with open(json_path, "w") as f:
+        json.dump(json_report, f, indent=2)
+
+    md = ["# Code Review Report", "", f"- Target: `{target}`", f"- Detected profile: **{profile}**",
+          f"- Files in scope: {len(files)}", f"- Generated: {datetime.now().isoformat()}", ""]
+
+    md.append("## Findings by tool")
+    md.append("")
+    md.append("| Tool | Findings | Files touched | Log files |")
+    md.append("|---|---|---|---|")
+    by_tool: Dict[str, List[JobResult]] = {}
+    for r in all_results:
+        by_tool.setdefault(r.job.tool_id, []).append(r)
+    for tool_id, rs in sorted(by_tool.items(), key=lambda kv: -sum(r.issue_count for r in kv[1])):
+        total_issues = sum(r.issue_count for r in rs)
+        md.append(f"| {tool_id} | {total_issues} | {len(rs)} | see `.code_review/.../{tool_id}__*.txt` |")
+    md.append("")
+
+    errored = [r for r in all_results if r.issue_count == 0 and r.returncode not in (0, 124, 127)]
+    if errored:
+        md.append("## ⚠ Tool runs that failed (do NOT read these as \"clean\")")
+        md.append("")
+        for r in errored:
+            md.append(f"- `{r.job.tool_id}` exited with code {r.returncode} and produced no parseable "
+                      f"findings -- check `{os.path.basename(r.job.log_path)}` (common cause: a "
+                      f"registry/ruleset download was blocked, or a real config error).")
+        md.append("")
+
+    if manual_tools:
+        md.append("## Manual steps (need project-specific build context)")
+        md.append("")
+        for t in manual_tools:
+            md.append(render_manual_block(t, ctx))
+            md.append("")
+
+    if checklist_tools:
+        md.append("## Manual review checklists")
+        md.append("")
+        for t in checklist_tools:
+            md.append(render_checklist_block(t))
+            md.append("")
+
+    if llm_synthesis:
+        md.append("## LLM synthesis")
+        md.append("")
+        md.append(llm_synthesis)
+        md.append("")
+
+    md_path = os.path.join(results_dir, "REPORT.md")
+    with open(md_path, "w") as f:
+        f.write("\n".join(md))
+
+    return md_path
+
+
+# ---------------------------------------------------------------------------
+# agent-facing output
+#
+# The Markdown report is written for a person: prose, tables, tick-boxes, "run
+# this exactly". An agent needs the opposite -- the findings themselves, plus
+# enough honesty about what DIDN'T run that it can't mistake silence for a
+# clean bill of health. That distinction is the entire reason this exists as a
+# separate function rather than a flag on the Markdown writer.
+# ---------------------------------------------------------------------------
+
+def emit_agent_json(results_dir, target, profile, files, all_results,
+                    manual_tools, checklist_tools, ctx, pos_report,
+                    diff_summary=None, suppressed_n=0,
+                    baseline_problems=None) -> None:
+    baseline_problems = baseline_problems or []
+    all_findings = fnd.finalize([f for r in all_results for f in r.findings])
+    groups = fnd.corroborated(all_findings)
+    style_only = fnd.style_agreements(all_findings)
+
+    errored = sorted({r.job.tool_id for r in all_results
+                      if r.issue_count == 0 and r.returncode not in (0, 124, 127)})
+    missing = sorted({r.job.tool_id for r in all_results if r.returncode == 127})
+    timed_out = sorted({r.job.tool_id for r in all_results if r.returncode == 124})
+    ran_ids = {r.job.tool_id for r in all_results}
+
+    langs = sorted(languages_of(files))
+
+    doc = {
+        "schema": "code-review/agent/1",
+        "generated": datetime.now().isoformat(),
+        "target": target,
+        "profile": profile,
         "files_scanned": len(files),
         "languages": langs,
-        "results_dir": "",
-        "duration_seconds": round(time.time() - started, 1),
-        "findings": findings,
-        "corroborated": corroborate(findings),
+
+        "findings": [f.to_dict() for f in all_findings],
+
+        # Highest-confidence findings: same file:line, two or more DIFFERENT
+        # tools, style severity excluded. Start here.
+        "corroborated": [
+            {"file": g[0].file, "line": g[0].line,
+             "tools": sorted({f.tool for f in g}),
+             "severities": sorted({f.severity for f in g}),
+             "messages": [f.message for f in g]}
+            for g in groups
+        ],
+        "corroborated_excludes_style": True,
+        "style_only_agreements": style_only,
+
+        # Present only when --diff was used. Read `note` before assuming the
+        # findings are limited to the change under review -- they are not.
+        "diff": diff_summary,
+
+        # Findings this project has examined and accepted (.code-review-baseline
+        # .json). They remain in `findings` with suppressed=true and a written
+        # reason; they are excluded from corroboration and should not be
+        # re-reported as new problems.
+        "suppressed_by_baseline": suppressed_n,
+        "baseline_problems": baseline_problems,
+
+        # Read this before concluding anything from an empty findings list.
         "trust": {
-            "tools_ran": ran,
+            "tools_ran": sorted(ran_ids),
             "tools_errored": errored,
             "tools_missing": missing,
             "tools_timed_out": timed_out,
-            "tools_without_parser": no_parser,
-            "position_checked": True,
-            "findings_dropped_by_position_check": dropped[0],
-            "caveat": (caveat + " " + " ".join(notes)).strip(),
+            "tools_without_parser": [t for t in unparsed_tool_ids() if t in ran_ids],
+            "position_checked": pos_report is not None,
+            "findings_dropped_by_position_check":
+                len(pos_report.dropped) if pos_report else 0,
+            "caveat": (
+                "An empty findings list is NOT the same as clean code. Tools in "
+                "tools_missing never ran; tools in tools_errored failed to run and "
+                "produced nothing parseable. Only treat a language as reviewed if "
+                "its tools appear in tools_ran and not in the other lists. Findings "
+                "from tools_without_parser may lack precise line numbers. Static "
+                "analysers do not find semantic bugs -- wrong logic, broken "
+                "invariants, swallowed errors -- so read the changed code yourself "
+                "as well as this list."
+            ),
         },
-        "manual_steps": notes + manual_steps(langs, missing),
+
+        # Review know-how for the languages present, so the reader knows what to
+        # look for in the code that no tool here can check.
+        "review_rules": rules.rules_for_languages(langs),
+
+        # Things this toolkit deliberately refuses to auto-run, as literal
+        # commands. An agent CAN run these -- it has a shell -- so they are
+        # offered rather than merely described.
+        "manual_steps": [
+            {"id": t.id, "label": t.label, "why": t.notes,
+             "command": t.manual_cmd(ctx) if t.manual_cmd else ""}
+            for t in manual_tools
+        ],
+        "checklists": [
+            {"id": t.id, "label": t.label, "items": t.checklist or []}
+            for t in checklist_tools
+        ],
+
+        "logs_dir": results_dir,
+        "human_report": os.path.join(results_dir, "REPORT.md"),
     }
-    json.dump(report, sys.stdout, indent=None)
+    json.dump(doc, sys.stdout, indent=2)
     sys.stdout.write("\n")
-    return 0
 
 
-def build_caveat(ran, missing, errored, timed_out, no_parser, langs):
-    """One sentence a reader cannot skip past. RULE 1 and RULE 5."""
-    if not ran:
-        return ("NOTHING RAN. No analyser for %s is installed on this machine, so "
-                "this report is empty for that reason and not because the code is "
-                "clean." % (", ".join(langs) or "these files"))
-    bits = ["%d analyser(s) ran" % len(ran)]
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def parse_args():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("target", nargs="?", default=".",
+                     help="directory or single file to review (default: current directory)")
+    ap.add_argument("--doctor", action="store_true",
+                     help="check whether this machine can actually review anything: which "
+                          "analysers are present per language, what's missing, how much needs "
+                          "downloading, how much disk that takes, and how to fix it. "
+                          "Reviews nothing; exits 3 if no analyser is installed.")
+    ap.add_argument("--profile", default="auto",
+                     choices=["auto", "firefox", "linux-kernel", "go", "rust", "python", "generic"])
+    ap.add_argument("--diff", default=None, metavar="REF",
+                     help="only review files changed vs this git ref (e.g. HEAD~1, origin/main)")
+    ap.add_argument("--all-files", action="store_true",
+                     help="walk the whole tree instead of using `git ls-files` (includes untracked/build dirs)")
+    ap.add_argument("--max-files", type=int, default=2000,
+                     help="safety cap on files scanned in one run when not using --diff (default 2000)")
+    ap.add_argument("--jobs", type=int, default=os.cpu_count() or 4, help="parallel workers")
+    ap.add_argument("--timeout", type=int, default=JOB_TIMEOUT_DEFAULT, help="per-job timeout in seconds")
+    ap.add_argument("--deep", action="store_true", help="force stage 3 deep-dive tools on everything")
+    ap.add_argument("--no-stage3", action="store_true", help="never auto-escalate to stage 3")
+    ap.add_argument("--skip-preflight", action="store_true",
+                    help="run even if the preflight finds NO analysis tools installed (not recommended)")
+    ap.add_argument("--compile-commands-dir", default=None,
+                     help="directory containing compile_commands.json, enables clang-tidy")
+    ap.add_argument("--results-dir", default=None, help="override where logs/reports are written")
+    ap.add_argument("--audience", default="human", choices=["human", "agent"],
+                     help="'agent' prints the normalised findings as JSON on stdout and keeps "
+                          "all progress chatter on stderr, so a coding agent can consume this "
+                          "tool directly instead of parsing per-tool log files")
+    ap.add_argument("--no-position-check", action="store_true",
+                     help="keep findings whose file/line can't be verified (not recommended)")
+    ap.add_argument("--local-glue", action="store_true",
+                     help="use a small LOCAL model (ollama etc) for the two jobs such a model "
+                          "can actually do: rephrasing tool jargon into plain English, and "
+                          "flagging probable noise. It never finds, drops or reorders findings.")
+    ap.add_argument("--local-endpoint", default=local_tier.DEFAULT_ENDPOINT,
+                     help=f"local OpenAI-compatible endpoint (default {local_tier.DEFAULT_ENDPOINT})")
+    ap.add_argument("--local-model", default=local_tier.DEFAULT_MODEL,
+                     help=f"local model name (default {local_tier.DEFAULT_MODEL})")
+    ap.add_argument("--llm-endpoint", default=None, help="full URL, e.g. http://localhost:11434/v1/chat/completions")
+    ap.add_argument("--llm-model", default=None, help="model name as your endpoint expects it")
+    ap.add_argument("--llm-api-style", default="none", choices=["openai", "anthropic", "none"])
+    ap.add_argument("--llm-api-key-env", default=None,
+                     help="name of an env var holding your API key, if your endpoint needs one")
+    return ap.parse_args()
+
+
+# ---------------------------------------------------------------------------
+# preflight: verify the tools that WOULD run are actually installed BEFORE we
+# do any work. Without this, running against a machine with no tools installed
+# produces an all-"MISSING" report that a low-reasoning caller can mistake for
+# "no problems found" -- the most dangerous possible false negative.
+# ---------------------------------------------------------------------------
+
+def tool_available(tool) -> bool:
+    """True if the tool's binary exists. Reuses each tool's own check_cmd; a
+    return code of 127 (or FileNotFound, which run() maps to 127) means the
+    command isn't on PATH. Any other code means it's installed."""
+    if not tool.check_cmd:
+        return True  # recon/manual placeholders have no binary to check
+    rc, _, _ = run(tool.check_cmd, timeout=15)
+    return rc != 127
+
+
+def relevant_tools(profile: str, files: List[str], stages=(0, 1, 2)) -> List[Tool]:
+    """The auto-run tools that WOULD fire for this profile + the languages
+    actually present in scope -- i.e. exactly what build_jobs would select."""
+    langs = languages_of(files)
+    skip = SKIP_FOR_PROFILE.get(profile, set())
+    out = []
+    for t in TOOLS:
+        if t.scope not in ("auto-file", "auto-project") or t.stage not in stages:
+            continue
+        if t.id in skip:
+            continue
+        if "*" in t.languages or (set(t.languages) & langs):
+            out.append(t)
+    return out
+
+
+def preflight(profile: str, files: List[str], skip_gate: bool, target_dir: str = "") -> None:
+    """Report which relevant tools are installed. If NONE of the actual
+    analysis tools (everything except pure recon) are present, refuse to run
+    unless the caller explicitly passed --skip-preflight."""
+    rel = relevant_tools(profile, files)
+    present = [t for t in rel if tool_available(t)]
+    missing = [t for t in rel if t not in present]
+    # Only EXTERNAL analysers count towards "this machine can review something".
+    # Our own heuristics.py entries are always available, so counting them
+    # would let a machine with no third-party tools installed pass the gate --
+    # exactly the false negative this gate exists to prevent.
+    analysis_present = [t for t in present if t.category != "recon" and t.check_cmd]
+    langs_for_doctor = languages_of(files)
+
+    print(f"Preflight: {len(present)}/{len(rel)} relevant tools installed"
+          f" ({len(analysis_present)} analysis tool(s) ready).")
     if missing:
-        bits.append("%d were NOT INSTALLED and their subject areas are unreviewed" % len(missing))
-    if errored:
-        bits.append("%d failed" % len(errored))
-    if timed_out:
-        bits.append("%d timed out and reported only partial results" % len(timed_out))
-    if no_parser:
-        bits.append("%d produced output this script could not read" % len(no_parser))
-    return "; ".join(bits) + "."
+        print("  Not installed: " + ", ".join(sorted(t.id for t in missing)))
+
+    if not analysis_present:
+        # Hand off to the doctor rather than repeating a shorter, worse version
+        # of what it says: it knows the per-language breakdown, the download
+        # size and whether there's even disk space for the fix.
+        print("\n" + "!" * 70)
+        print("PREFLIGHT FAILED: no analyser for this project is installed.")
+        print("Running now would inspect NOTHING, and an empty result must NOT be")
+        print("read as 'no problems found'. Full breakdown follows.")
+        print("!" * 70)
+        doctor.report(target_dir, langs_for_doctor)
+        print("  Override (NOT recommended): pass --skip-preflight.\n")
+        if not skip_gate:
+            sys.exit(3)
 
 
-def manual_steps(langs, missing):
-    """What a person should do that no analyser here can do for them."""
-    steps = []
-    if missing:
-        steps.append("Install the missing analysers listed above, then run the review "
-                     "again; until then their subject areas are unreviewed.")
-    steps.append("Read the corroborated findings first: two independent tools agreeing "
-                 "on one line is the strongest signal in this report.")
-    steps.append("Treat every severity as the reporting tool's opinion. The rule id "
-                 "travels with each finding so it can be checked.")
-    if "c" in langs or "cpp" in langs:
-        steps.append("No static analyser proves memory safety. Lifetimes, aliasing and "
-                     "concurrent access still need a person.")
-    if "go" in langs:
-        steps.append("Run `go test ./...` and `go test -race ./...`; neither is a "
-                     "static check and neither is covered here.")
-    steps.append("Nothing here executed your tests. A green review is not a green build.")
-    return steps
+def main():
+    args = parse_args()
+    agent_mode = args.audience == "agent"
+
+    # In agent mode stdout must carry NOTHING but the final JSON document, so
+    # every progress line goes to stderr. Swapping the stream once here beats
+    # threading a `file=` argument through every print in the file, and it also
+    # catches prints from helpers we don't own.
+    real_stdout = sys.stdout
+    if agent_mode:
+        sys.stdout = sys.stderr
+
+    target = os.path.abspath(args.target)
+    if not os.path.exists(target):
+        print(f"ERROR: {target} does not exist.")
+        sys.exit(1)
+
+    # --doctor answers "can this machine review anything, and what would it
+    # cost me" and then stops. It must come before any file discovery so it
+    # still works on a machine where nothing is installed.
+    if args.doctor:
+        langs = doctor.languages_in(target)
+        summary = doctor.report(target, langs)
+        sys.exit(0 if summary["ready"] else 3)
+    target_is_file = os.path.isfile(target)
+    target_dir = os.path.dirname(target) if target_is_file else target
+
+    profile = args.profile if args.profile != "auto" else detect_profile(target_dir)
+
+    print(f"\n{'='*70}")
+    print(f" Code review: {target}")
+    print(f" Detected profile: {profile}")
+    print(f"{'='*70}\n")
+
+    files = discover_files(target, target_is_file, args)
+    if not files:
+        print("No files found in scope. Nothing to do.")
+        sys.exit(0)
+
+    if len(files) > args.max_files and not args.diff and not target_is_file:
+        print(f"NOTE: {len(files)} files in scope -- capping at --max-files {args.max_files} "
+              f"(most recently modified first). Use --diff <ref> to review just your changes, "
+              f"or pass --max-files to raise this.")
+        files.sort(key=lambda f: -os.path.getmtime(f))
+        files = files[: args.max_files]
+
+    print(f"Files in scope: {len(files)}")
+
+    # Gate: make sure the tools we're about to rely on actually exist, so an
+    # empty run can never be mistaken for a clean one.
+    preflight(profile, files, args.skip_preflight, target_dir)
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    results_dir = args.results_dir or os.path.join(target_dir, ".code_review", ts)
+    os.makedirs(results_dir, exist_ok=True)
+    print(f"Results directory: {results_dir}\n")
+
+    ctx = build_ctx(target_dir, results_dir, args, profile=profile)
+
+    print("-- Stage 0: recon --")
+    jobs0 = build_jobs(files, target_dir, profile, results_dir, ctx, stages=(0,))
+    results0 = execute_jobs(jobs0, args.jobs, args.timeout)
+
+    print("\n-- Stage 1-2: fast lint + standard static analysis / security --")
+    jobs12 = build_jobs(files, target_dir, profile, results_dir, ctx, stages=(1, 2))
+    print(f"Launching {len(jobs12)} job(s) across {args.jobs} worker(s)...")
+    results12 = execute_jobs(jobs12, args.jobs, args.timeout)
+
+    all_results = results0 + results12
+
+    hit_files = find_escalation_hits(results12) if not args.no_stage3 else set()
+    results3 = []
+    if not args.no_stage3 and (args.deep or hit_files):
+        print(f"\n-- Stage 3: deep-dive ({'forced by --deep' if args.deep else f'{len(hit_files)} file(s) flagged security-shaped hints'}) --")
+        jobs3 = build_stage3_jobs(files, target_dir, results_dir, ctx, hit_files, args.deep)
+        print(f"Launching {len(jobs3)} job(s)...")
+        results3 = execute_jobs(jobs3, args.jobs, args.timeout)
+    all_results += results3
+
+    # ---- position check -------------------------------------------------
+    # Pure Python, no model. Every finding either points at a line that really
+    # exists (and now carries that line's source) or it doesn't ship.
+    pos_report = None
+    if not args.no_position_check:
+        collected = [f for r in all_results for f in r.findings]
+        pos_report = fnd.verify_positions(collected, root=target_dir)
+        print(f"\n-- {pos_report.summary()} --")
+        for f in pos_report.dropped[:10]:
+            print(f"   dropped {f.tool} {f.file}:{f.line} -- "
+                  f"{pos_report.reasons.get(f.fingerprint, 'unverifiable')}")
+        kept = {id(f) for f in pos_report.kept}
+        for r in all_results:
+            r.findings = [f for f in r.findings if id(f) in kept]
+            r.issue_count = len(r.findings)
+
+    # ---- accepted findings (project baseline) ----------------------------
+    accepted, baseline_problems = baseline.load(target_dir)
+    suppressed_n = 0
+    if accepted or baseline_problems:
+        live = [f for r in all_results for f in r.findings]
+        suppressed_n = baseline.apply(live, accepted)
+        print(f"\n-- baseline: {len(accepted)} accepted rule(s), "
+              f"{suppressed_n} finding(s) suppressed --")
+        for prob in baseline_problems:
+            print(f"   ! {prob}")
+
+    # ---- diff scoping ----------------------------------------------------
+    # Project-wide tools cannot be pointed at a file list: `go vet ./...`,
+    # `cargo clippy`, `golangci-lint run` and `staticcheck ./...` analyse the
+    # whole module by design, and for Go that is EVERY tool in the registry.
+    # So `--diff` narrowed file discovery to 13 files and then reported 319
+    # findings across 80 files -- 92% of them in code the caller never touched.
+    # Nothing is discarded (a real bug outside the diff is still a real bug),
+    # but each finding is now labelled so a consumer can lead with the changes
+    # under review instead of the whole repository.
+    diff_summary = None
+    if args.diff:
+        in_scope = {os.path.relpath(p, start=target_dir) if os.path.isabs(p) else p
+                    for p in files}
+        inside = outside = 0
+        for r in all_results:
+            for fi in r.findings:
+                fi.in_diff_scope = fi.file in in_scope
+                inside += fi.in_diff_scope
+                outside += not fi.in_diff_scope
+        diff_summary = {
+            "ref": args.diff,
+            "files_changed": len(files),
+            "findings_in_changed_files": inside,
+            "findings_elsewhere": outside,
+            "note": (
+                "Tools that analyse a whole module (go vet, cargo clippy, "
+                "golangci-lint, staticcheck, semgrep on a directory) cannot be "
+                "restricted to a file list, so they report on the entire "
+                "project even in --diff mode. Findings with in_diff_scope=false "
+                "are real but are NOT part of the change under review -- lead "
+                "with in_diff_scope=true."
+            ),
+        }
+        print(f"\n-- diff scope: {inside} finding(s) in the {len(files)} changed file(s), "
+              f"{outside} elsewhere in the project --")
+
+    # ---- local glue tier (optional, offline) -----------------------------
+    if args.local_glue:
+        print(f"\n-- local glue: {args.local_model} @ {args.local_endpoint} --")
+        why = local_tier.probe(args.local_endpoint, args.local_model)
+        if why:
+            print(f"   unavailable, continuing without it: {why}")
+        else:
+            live = [f for r in all_results for f in r.findings]
+            n = local_tier.phrase_findings(live, args.local_endpoint, args.local_model)
+            m = local_tier.triage_findings(live, args.local_endpoint, args.local_model)
+            print(f"   {n} message(s) rephrased, {m} flagged as probable noise "
+                  f"(advisory only -- nothing dropped)")
+
+    # select_manual_tools() already returns only scope="manual" entries, so the
+    # old re-filter here was a no-op and the first checklist_tools comprehension
+    # could never match anything -- it was immediately overwritten anyway.
+    langs_in_scope = languages_of(files)
+    manual_tools = select_manual_tools(profile, files)
+    checklist_tools = [t for t in TOOLS if t.scope == "checklist"
+                       and (set(t.languages) & langs_in_scope)]
+
+    llm_synthesis = None
+    if args.llm_api_style != "none" and args.llm_endpoint and args.llm_model:
+        print(f"\n-- Sending aggregate findings to LLM ({args.llm_api_style} @ {args.llm_endpoint}) --")
+        digest = build_digest(all_results, profile)
+        try:
+            llm_synthesis = llm_client.chat(
+                SYSTEM_PROMPT, digest, endpoint=args.llm_endpoint, model=args.llm_model,
+                api_style=args.llm_api_style, api_key_env=args.llm_api_key_env, timeout=180,
+            )
+            print("LLM synthesis received.")
+        except llm_client.LLMError as e:
+            print(f"LLM synthesis failed (continuing without it): {e}")
+
+    md_path = write_reports(results_dir, target, profile, files, all_results,
+                             manual_tools, checklist_tools, ctx, llm_synthesis)
+
+    if agent_mode:
+        sys.stdout = real_stdout
+        emit_agent_json(results_dir, target, profile, files, all_results,
+                        manual_tools, checklist_tools, ctx, pos_report,
+                        diff_summary, suppressed_n, baseline_problems)
+        return
+
+    total_issues = sum(r.issue_count for r in all_results)
+    print(f"\n{'='*70}")
+    print(f" Done. {len(all_results)} job(s) run, {total_issues} total finding(s).")
+    if manual_tools:
+        print(f" {len(manual_tools)} manual step(s) need your attention -- see {md_path}")
+    if checklist_tools:
+        print(f" {len(checklist_tools)} manual checklist(s) included in the report.")
+    print(f" Full report: {md_path}")
+    print(f" Raw logs:    {results_dir}/")
+    print(f"{'='*70}\n")
 
 
 if __name__ == "__main__":
-    try:
-        sys.exit(main(sys.argv[1:]))
-    except KeyboardInterrupt:
-        sys.exit(130)
+    main()

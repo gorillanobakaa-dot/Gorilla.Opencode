@@ -17,6 +17,7 @@ import (
 	"crypto/sha256"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -99,53 +100,42 @@ func TestVendoredToolkitMatchesDevCopy(t *testing.T) {
 // import graph is closed inside what was embedded, without needing the dev copy
 // — so it protects a machine that only has this repository.
 func TestEveryModuleTheToolkitImportsIsEmbedded(t *testing.T) {
-	entry, err := toolkitFS.ReadFile("toolkit/code_review.py")
+	// GORILLA FIX (2026-09-02, second attempt): import the real thing.
+	//
+	// Two earlier versions of this check were both vacuous, in different ways.
+	//
+	// The first asked whether the entry point CONTAINED a module name anywhere,
+	// and every candidate is an ordinary English word a review script is certain
+	// to use -- findings, rules, doctor -- so it failed on prose.
+	//
+	// The second parsed import statements but then only complained when a module
+	// was absent from the embed AND STILL PRESENT ON DISK. Deleting a module made
+	// both conditions false and the test passed. Proved by hiding findings.py:
+	// the suite stayed green while the shipped toolkit could not have imported.
+	//
+	// So this now unpacks what would actually ship and asks Python to import it.
+	// A missing module, a syntax error or a circular import all fail here, and
+	// none of them can be faked by a substring.
+	dir := t.TempDir()
+	script, err := Unpack(dir)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Unpack: %v", err)
 	}
-	// GORILLA FIX (2026-09-02): match real IMPORT STATEMENTS, not any
-	// occurrence of the word.
-	//
-	// This used to ask whether the entry point CONTAINED the module name
-	// anywhere, and every candidate name is also an ordinary English word a
-	// code-review script is certain to use: findings, rules, doctor. A
-	// single-file rewrite that imports nothing therefore failed three
-	// assertions for writing the word "findings" in a comment.
-	//
-	// The question the test means to ask is whether the import graph is
-	// CLOSED inside what was embedded. So it now reads the import statements
-	// and checks those, which is both stricter -- it catches a module the
-	// hard-coded list never anticipated -- and correct.
-	imports := map[string]bool{}
-	for _, line := range strings.Split(string(entry), "\n") {
-		line = strings.TrimSpace(line)
-		var mod string
-		switch {
-		case strings.HasPrefix(line, "import "):
-			mod = strings.TrimPrefix(line, "import ")
-		case strings.HasPrefix(line, "from "):
-			mod = strings.TrimPrefix(line, "from ")
-		default:
-			continue
-		}
-		// "import os, sys" and "from x import y" both reduce to the first word.
-		if i := strings.IndexAny(mod, " ,."); i >= 0 {
-			mod = mod[:i]
-		}
-		if mod != "" {
-			imports[mod] = true
+	py := ""
+	for _, cand := range []string{"python3", "python", "py"} {
+		if p, err := exec.LookPath(cand); err == nil {
+			py = p
+			break
 		}
 	}
-	for mod := range imports {
-		// A sibling .py is one of ours; anything else is the standard library
-		// or a third-party package, and neither is this test's business.
-		if _, err := toolkitFS.ReadFile("toolkit/" + mod + ".py"); err == nil {
-			continue // present, as required
-		}
-		if _, err := os.Stat(filepath.Join("toolkit", mod+".py")); err == nil {
-			t.Errorf("code_review.py imports %s, and %s.py exists on disk but is "+
-				"NOT embedded, so the shipped toolkit will fail on import", mod, mod)
-		}
+	if py == "" {
+		t.Skip("no python on this machine; cannot verify the import graph")
+	}
+	cmd := exec.Command(py, "-c", "import code_review")
+	cmd.Dir = filepath.Dir(script)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Errorf("the unpacked toolkit cannot import itself, so /review would fail "+
+			"on a clean machine: %v -- %s", err, string(out))
 	}
 
 	// The rule documents are what the review advice is read from; an empty
