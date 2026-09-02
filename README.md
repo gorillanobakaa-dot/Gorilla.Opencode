@@ -284,6 +284,34 @@ self-contained tool.
 
 ## Install
 
+Builds are per-platform and are **not** interchangeable. Go compiles one
+operating system at a time, so the Windows `.exe` contains no Linux code and
+the Linux binary contains no Windows code. Take the one for the machine you
+are on.
+
+### Windows
+
+Download `gorilla-opencode.exe` from the [releases page](../../releases) — the
+asset marked **windows-amd64** — then, in PowerShell:
+
+```powershell
+.\gorilla-opencode.exe install
+```
+
+That creates a Desktop shortcut and a Start menu entry, installs the icon, and
+adds itself to your PATH. **No administrator rights are needed**; if something
+asks for an admin password, it is not this program. `gorilla-opencode.exe
+uninstall` removes exactly what `install` created.
+
+The shell tool runs **PowerShell** on Windows, not bash. It is still named
+`bash` so existing configuration keeps working, and switching it off leaves the
+agent unable to run anything at all.
+
+Tested on Windows 10 and 11. No Unix tooling is required: no WSL, Git Bash,
+MSYS or Cygwin.
+
+### Linux and macOS
+
 **One command** (the binary installs itself: PATH, icons, desktop entry):
 
 ```sh
