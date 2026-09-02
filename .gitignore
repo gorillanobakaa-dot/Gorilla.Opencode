@@ -206,3 +206,6 @@ AGENTS.md
 GEMINI.md
 ROADMAP.md
 TODO.readme.md
+
+# built toolkit bundles -- artifacts, rebuildable with package.py
+internal/llm/tools/codereview/toolkit/dist/
