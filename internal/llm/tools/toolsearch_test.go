@@ -149,8 +149,23 @@ func TestAMissListsWhatCanBeLoaded(t *testing.T) {
 	if !strings.Contains(resp.Content, "review") {
 		t.Errorf("a miss did not list the available tools:\n%s", resp.Content)
 	}
-	if !strings.Contains(resp.Content, "does not exist") {
-		t.Error("a miss should say plainly that the capability is absent")
+	// Assert what the message has to ACHIEVE, not the words it uses. The
+	// original pinned the literal "does not exist" and broke the moment the
+	// wording improved, which tells you nothing about whether the message
+	// still works.
+	//
+	// A miss has three jobs: show what IS available, say how to load one, and
+	// stop the model announcing that something is impossible while a tool for
+	// it is on screen. That last one is not hypothetical -- it is what Gemma
+	// did before this message was rewritten.
+	if !strings.Contains(resp.Content, "select:") {
+		t.Error("a miss must say how to load a tool by name")
+	}
+	if !strings.Contains(resp.Content, "not exist") {
+		t.Error("a miss should leave open that the capability may genuinely be absent")
+	}
+	if !strings.Contains(resp.Content, "impossible") {
+		t.Error("a miss must warn against declaring a task impossible while a tool is listed")
 	}
 }
 
