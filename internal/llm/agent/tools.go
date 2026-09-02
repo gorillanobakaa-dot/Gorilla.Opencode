@@ -5,6 +5,7 @@ import (
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/history"
+	"github.com/opencode-ai/opencode/internal/llm/prompt"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 	"github.com/opencode-ai/opencode/internal/lsp"
 	"github.com/opencode-ai/opencode/internal/message"
@@ -86,7 +87,31 @@ func CoderAgentTools(
 	// capability nobody can reach is not a capability.
 	add("tool.patch_port", tools.NewPatchPortTool(permissions))
 	add("tool.bio_lookup", tools.NewBioDataTool(permissions))
-	return append(coderTools, otherTools...)
+
+	full := append(coderTools, otherTools...)
+
+	// tool_search is appended LAST and is never itself deferred: it is the only
+	// way back to everything that is. It closes over `full`, so its catalogue is
+	// the real toolset rather than a second list that could drift out of step
+	// with this one.
+	//
+	// Deliberately NOT wrapped in add(): a loadout that could switch this off
+	// while deferral stayed on would hide tools with no way to find them. The
+	// deferral mechanism is gated instead, one row, in config.
+	if config.LoadoutEnabled(config.ToolSearchComponentID) {
+		snapshot := full
+		full = append(full, tools.NewToolSearchTool(func() []tools.BaseTool { return snapshot }))
+		// Tell the system prompt what it may advertise. Computed from the real
+		// toolset, so a tool added above appears in the index without anyone
+		// maintaining a second list — the kind of second list that goes stale
+		// and leaves a tool undiscoverable.
+		prompt.SetDeferredCatalogue(tools.DeferredCatalogueBlock(snapshot))
+	} else {
+		// Cleared, not left behind: advertising tools that are all loaded
+		// anyway would tell the model to search for things it already has.
+		prompt.SetDeferredCatalogue("")
+	}
+	return full
 }
 
 // ResearchAgentTools is what a research helper gets. It is TaskAgentTools plus

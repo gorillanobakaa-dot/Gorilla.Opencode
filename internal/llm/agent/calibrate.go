@@ -75,6 +75,10 @@ func CalibrateLoadout(
 	set("tool.review", tools.NewReviewTool(permissions))
 	set("tool.patch_port", tools.NewPatchPortTool(permissions))
 	set("tool.bio_lookup", tools.NewBioDataTool(permissions))
+	// The search tool's own schema is fixed, so an empty catalogue measures it
+	// correctly -- the catalogue affects what it FINDS, never what it costs to
+	// declare.
+	set(config.ToolSearchComponentID, tools.NewToolSearchTool(func() []tools.BaseTool { return nil }))
 	// GORILLA OVERRIDE: measure diagnostics unconditionally. This was guarded on
 	// having LSP clients, but the tool's SCHEMA is static — the clients only affect
 	// what it returns at call time, not what it costs to declare. With every

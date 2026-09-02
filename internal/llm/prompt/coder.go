@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
@@ -73,7 +74,19 @@ func CoderPrompt(provider models.ModelProvider) string {
 		lspInfo = lspInformation()
 	}
 
-	return fmt.Sprintf("%s\n\n%s\n%s", BaseCoderPrompt(provider), envInfo, lspInfo)
+	// The index of tools that exist but are not loaded. Without it the model has
+	// no idea what to search for, and deferral degrades into tools that are
+	// simply missing — which is how a user came to be told "I do not have access
+	// to a tool named review".
+	//
+	// Set by the agent when it builds the toolset, because this package cannot
+	// import internal/llm/tools without a cycle.
+	deferred := ""
+	if config.LoadoutEnabled(config.ToolSearchComponentID) {
+		deferred = DeferredCatalogue()
+	}
+
+	return fmt.Sprintf("%s\n\n%s\n%s\n%s", BaseCoderPrompt(provider), envInfo, lspInfo, deferred)
 }
 
 // GORILLA OVERRIDE: two 2023-era prompt constants (baseOpenAICoderPrompt at
@@ -477,4 +490,29 @@ func boolToYesNo(b bool) string {
 		return "Yes"
 	}
 	return "No"
+}
+
+// ── deferred tool catalogue ─────────────────────────────────────────────────
+//
+// A setter rather than a direct call: internal/llm/tools sits below this
+// package's siblings and the reverse edge would be an import cycle. The agent
+// owns the toolset, so the agent tells the prompt what is in it.
+
+var (
+	deferredCatalogueMu sync.RWMutex
+	deferredCatalogue   string
+)
+
+// SetDeferredCatalogue records the one-line index of withheld tools.
+func SetDeferredCatalogue(block string) {
+	deferredCatalogueMu.Lock()
+	deferredCatalogue = block
+	deferredCatalogueMu.Unlock()
+}
+
+// DeferredCatalogue returns the current index, or "" when nothing is deferred.
+func DeferredCatalogue() string {
+	deferredCatalogueMu.RLock()
+	defer deferredCatalogueMu.RUnlock()
+	return deferredCatalogue
 }

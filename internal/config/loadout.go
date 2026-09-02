@@ -124,6 +124,16 @@ var LoadoutComponents = []LoadoutComponent{
 	// never look up a protein. A 506-token schema on every turn of every
 	// conversation to serve a minority is the drift this loadout exists to
 	// stop. Anyone who wants it arms it in /context, once.
+	// GORILLA (2026-09-02): deferred tool loading. Cheap to declare (the
+	// search tool plus a one-line index) and it withholds several thousand
+	// tokens of schema until something needs them.
+	//
+	// Ships OFF. It changes how the agent reaches its own tools, and the
+	// cost lands hardest exactly where the benefit does: a small local model
+	// on a slow endpoint saves the most tokens and is the least likely to
+	// reliably notice it should search first. Try it, measure it, keep it if
+	// your model handles it.
+	{ToolSearchComponentID, "Deferred tool loading (tool_search)", "every tool schema is sent on every turn again -- simpler and more reliable for small models, but several thousand tokens more per turn, and adding tools keeps making it worse", 287, false, false},
 	{"tool.bio_lookup", "Biology & chemistry databases", "agent loses direct lookup of proteins, genes, structures, compounds, drug labels and pathways; it can still search papers ABOUT them with /research, but it cannot fetch the record itself and will be guessing at accessions and formulas", 506, false, false},
 	{"tool.patch_port", "Patch porting -- forward-port, backport, rebase", "agent loses forward-porting, backporting, rebasing, patch refresh and series porting; it can still run git by hand, but nothing tells it whether a patch applied cleanly, was merged three-way, or was RELOCATED by fuzz -- and those are not the same thing", 734, true, false},
 	// GORILLA OVERRIDE: env estimate was 150 when the block was a recursive
@@ -179,6 +189,13 @@ func RegisterLoadoutComponents(extra []LoadoutComponent) {
 // can never drift apart).
 const (
 	DossierComponentID = "tool.dossier"
+
+	// ToolSearchComponentID gates deferred tool loading. When it is on, the
+	// specialised tools are withheld until the model searches for them, and
+	// tool_search is added so it can. When it is off, every tool is sent as
+	// before and tool_search is not present at all -- a search tool with nothing
+	// to find is pure cost.
+	ToolSearchComponentID = "tool.tool_search"
 	// GORILLA FIX (2026-08-17): "EXPENSIVE" left the NAME. It sat beside the
 	// per-turn token column and read as a claim about that number — which is
 	// the smallest on the screen, because arming this only adds a paragraph to
@@ -366,6 +383,12 @@ var lowBandwidthOff = map[string]bool{
 // is exactly what let tool.review sit unconsidered for four days. A component
 // must now appear in one map or the other.
 var lowBandwidthKeep = map[string]string{
+	ToolSearchComponentID: "this is the one row the preset would like to switch ON " +
+		"and cannot. Deferred loading REMOVES several thousand tokens a turn, so a " +
+		"metered link wants it more, not less -- but the preset is guaranteed to " +
+		"only ever subtract (TestLowBandwidthOnlyEverSubtracts) and that guarantee " +
+		"is worth more than this exception. Left untouched, and the /context row " +
+		"says what it does for anyone on a slow link who wants it.",
 	"prompt.env": "cheap since the shallow project_summary change (~130 measured " +
 		"tokens) and MORE useful on a remote link, not less: knowing the cwd, OS and " +
 		"git state prevents a wasted round trip, which is the expensive thing here.",

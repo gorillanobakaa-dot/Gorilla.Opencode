@@ -167,6 +167,19 @@ func (a *agent) getTools() []tools.BaseTool {
 	return a.tools
 }
 
+// visibleTools is what actually goes on the wire.
+//
+// The filter sits here, above every provider, because deferral for a local
+// endpoint means NOT SENDING the schema -- there is no server to do it for us.
+// One implementation covers Anthropic, OpenAI, Gemini and llama.cpp alike.
+//
+// Off by default, in which case this returns the full set unchanged and costs
+// one map lookup.
+func (a *agent) visibleTools(sessionID string) []tools.BaseTool {
+	return tools.VisibleTools(a.getTools(), sessionID,
+		config.LoadoutEnabled(config.ToolSearchComponentID))
+}
+
 func (a *agent) ReloadTools(newTools []tools.BaseTool) {
 	a.toolsMu.Lock()
 	a.tools = newTools
@@ -522,7 +535,7 @@ func (a *agent) createUserMessage(ctx context.Context, sessionID, content string
 
 func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msgHistory []message.Message) (message.Message, *message.Message, error) {
 	ctx = context.WithValue(ctx, tools.SessionIDContextKey, sessionID)
-	eventChan := a.provider.StreamResponse(ctx, msgHistory, a.getTools())
+	eventChan := a.provider.StreamResponse(ctx, msgHistory, a.visibleTools(sessionID))
 
 	assistantMsg, err := a.messages.Create(ctx, sessionID, message.CreateMessageParams{
 		Role:  message.Assistant,
