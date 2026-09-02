@@ -632,6 +632,22 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 				logging.Warn("repaired a malformed tool name from the model",
 					"sent", toolCall.Name, "resolved", resolved, "agent", string(a.agentName))
 			}
+			// GORILLA FIX (2026-09-02): tell the model when it sent a parameter
+			// this tool does not have.
+			//
+			// json.Unmarshal drops unknown fields without a word, so a malformed
+			// call and a correct one look identical from the model's side. Gemma 4
+			// called view with view="tree", which does not exist, and a turn later
+			// was still guessing about it -- there was no way for it to find out.
+			//
+			// Computed BEFORE the call so the note survives whatever the tool
+			// returns, and appended rather than substituted: the work still
+			// happened and its result is still what the model asked for.
+			unknown := tools.UnknownParams(tool.Info(), toolCall.Input)
+			if len(unknown) > 0 {
+				logging.Warn("tool call carried parameters the tool does not declare",
+					"tool", toolCall.Name, "unknown", unknown, "agent", string(a.agentName))
+			}
 			toolResult, toolErr := tool.Run(ctx, tools.ToolCall{
 				ID:    toolCall.ID,
 				Name:  toolCall.Name,
@@ -679,6 +695,15 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 				Content:    toolResult.Content,
 				Metadata:   toolResult.Metadata,
 				IsError:    toolResult.IsError,
+			}
+			// The note travels with the RESULT, not to the log: a log line is not
+			// something the model can read, and the model is who needs to know.
+			if len(unknown) > 0 {
+				toolResults[i].Content += fmt.Sprintf(
+					"\n\nnote: %s ignored the unknown parameter(s) %v. It accepts "+
+						"only %v. The result above came from the parameters it did "+
+						"understand.",
+					toolCall.Name, unknown, tools.DeclaredParams(tool.Info()))
 			}
 		}
 	}

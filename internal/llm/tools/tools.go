@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 )
 
 type ToolInfo struct {
@@ -11,6 +12,59 @@ type ToolInfo struct {
 	Description string
 	Parameters  map[string]any
 	Required    []string
+}
+
+// UnknownParams returns the parameter names a tool call sent that the tool does
+// not declare, sorted, or nil when every name is known.
+//
+// GORILLA FIX (2026-09-02): a parameter the tool has never heard of used to be
+// dropped in silence.
+//
+// Observed live: Gemma 4 called view with {"file_path": "<a directory>",
+// "view": "tree"}. There is no "view" parameter -- the tool takes file_path,
+// offset and limit -- so it was discarded without a word. The only feedback the
+// model got was "path is a directory", and a turn later it was still theorising
+// about the parameter it had invented: "or the tool defaults to reading a single
+// file if no specific file is named".
+//
+// It had no way to learn otherwise. json.Unmarshal ignores unknown fields, so a
+// malformed call and a correct one are indistinguishable from the model's side.
+//
+// This is reported rather than rejected. A hard error would teach faster but a
+// model that keeps attaching a harmless field would then loop forever, unable to
+// complete a call that would otherwise have worked. Doing the work and saying
+// what was ignored costs one line and cannot deadlock.
+func UnknownParams(info ToolInfo, rawInput string) []string {
+	if len(info.Parameters) == 0 || rawInput == "" {
+		// A tool that declares no schema cannot judge what is foreign to it.
+		return nil
+	}
+	var sent map[string]any
+	if err := json.Unmarshal([]byte(rawInput), &sent); err != nil {
+		// Malformed JSON is the tool's own problem to report; guessing at
+		// parameter names inside something that does not parse would only
+		// add noise to whatever error it is about to produce.
+		return nil
+	}
+	var unknown []string
+	for name := range sent {
+		if _, declared := info.Parameters[name]; !declared {
+			unknown = append(unknown, name)
+		}
+	}
+	sort.Strings(unknown)
+	return unknown
+}
+
+// DeclaredParams lists a tool's parameter names, sorted, for telling a model
+// what it should have sent.
+func DeclaredParams(info ToolInfo) []string {
+	names := make([]string, 0, len(info.Parameters))
+	for name := range info.Parameters {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 type toolResponseType string
