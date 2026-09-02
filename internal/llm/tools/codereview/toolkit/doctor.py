@@ -70,16 +70,37 @@ def tool_present(tool) -> bool:
     return _run_check(tool.check_cmd) != 127
 
 
+PLATFORM = os.name          # "posix" on Linux/macOS, "nt" on Windows
+PLATFORM_LABEL = {"nt": "Windows", "posix": "Linux/Unix"}.get(PLATFORM, PLATFORM)
+
+
 def install_route(tool) -> str:
-    """How this tool would be obtained, for the report."""
+    """How this tool would be obtained ON THIS MACHINE, for the report.
+
+    Platform-aware because the previous version was not, and an install route
+    that cannot work here is worse than none: an agent reads "apt", runs it on
+    Windows, gets "apt is not recognized", and has learned nothing about why.
+    Fourteen of the forty-three tools were apt-only, so on Windows that was the
+    common case rather than an edge one.
+    """
     i = tool.install
-    for attr, label in (("apt", "apt"), ("pip", "pip/pipx"), ("npm", "npm -g"),
-                        ("cargo_component", "rustup"), ("cargo_install", "cargo"),
-                        ("go_install", "go install"),
-                        ("installer_script", "download")):
-        if getattr(i, attr, None):
-            return label
+    routes = i.routes_for("windows" if PLATFORM == "nt" else "posix")
+    if routes:
+        label, _ = routes[0]
+        return label
     return "manual"
+
+
+def unavailable_here(tool) -> bool:
+    """True if this tool cannot exist on this platform at all.
+
+    Distinct from "not installed", and the distinction is the whole point.
+    "Missing" invites an agent to install the thing. "Not available on this
+    platform" tells it to stop asking -- and, for the kernel analysers, that the
+    work belongs on a different machine. Reporting the second as the first sends
+    a reader hunting for a package that was never going to exist.
+    """
+    return not tool.runs_on(PLATFORM)
 
 
 # Manual tools that only make sense inside a particular tree. Kept here rather
@@ -174,7 +195,9 @@ def report(target: str = "", langs=None, stream=sys.stdout) -> dict:
               if t.scope == "manual" and _manual_applies(t, profile)]
 
     present = [t for t in auto if tool_present(t)]
-    missing = [t for t in auto if t not in present]
+    # THREE states, not two. See unavailable_here().
+    unavailable = [t for t in auto if t not in present and unavailable_here(t)]
+    missing = [t for t in auto if t not in present and t not in unavailable]
     # Our own checks need no install; counting them as "installed analysers"
     # would let a bare machine look equipped when it has no third-party tools.
     external_present = [t for t in present if t.check_cmd]
@@ -193,6 +216,11 @@ def report(target: str = "", langs=None, stream=sys.stdout) -> dict:
     w("are not here, a review inspects NOTHING -- and an empty result is not the\n")
     w("same as clean code.\n\n")
 
+    # Say what machine this is BEFORE anything is called missing. An agent
+    # reading a list of absent tools will otherwise try to install them with
+    # whatever package manager it last saw, and on the wrong OS every one of
+    # those attempts fails in a way that looks like a broken toolkit.
+    w(f"Platform: {PLATFORM_LABEL}\n")
     if scoped:
         w(f"Scope: {target}\n")
         w(f"Languages found: {', '.join(sorted(langs)) or '(none detected)'}\n\n")
@@ -215,8 +243,14 @@ def report(target: str = "", langs=None, stream=sys.stdout) -> dict:
             tool_langs = t.languages
         for lang in tool_langs:
             key = "all languages" if lang == "*" else lang
-            by_lang.setdefault(key, {"present": [], "missing": []})
-            by_lang[key]["present" if t in present else "missing"].append(t.id)
+            by_lang.setdefault(key, {"present": [], "missing": [], "unavailable": []})
+            if t in present:
+                bucket = "present"
+            elif t in unavailable:
+                bucket = "unavailable"
+            else:
+                bucket = "missing"
+            by_lang[key][bucket].append(t.id)
 
     w("PER LANGUAGE\n")
     w("-" * 72 + "\n")
@@ -227,7 +261,28 @@ def report(target: str = "", langs=None, stream=sys.stdout) -> dict:
         w(f"  [{mark}] {lang:<16} {n_ok} ready, {n_no} missing\n")
         if d["missing"]:
             w(f"         missing: {', '.join(sorted(d['missing']))}\n")
+        # Reported apart from "missing" on purpose. These cannot be installed
+        # here at all, so telling someone to install them wastes their time
+        # and, if the someone is an agent, produces a failed command it cannot
+        # explain. For the kernel analysers the useful advice is not a package
+        # name -- it is "do this on a Linux machine".
+        if d["unavailable"]:
+            w(f"         NOT AVAILABLE on {PLATFORM_LABEL}: "
+              f"{', '.join(sorted(d['unavailable']))}\n")
     w("\n")
+
+    if unavailable:
+        w("NOT AVAILABLE ON THIS PLATFORM\n")
+        w("-" * 72 + "\n")
+        w(f"These {len(unavailable)} do not exist for {PLATFORM_LABEL}. That is not a\n")
+        w("missing install -- there is nothing to install. Do not try.\n\n")
+        for t in sorted(unavailable, key=lambda x: x.id):
+            w(f"  {t.id:<24} {t.label}\n")
+        if any(t.id.startswith("kernel-") for t in unavailable):
+            w("\n")
+            w("  The kernel analysers are Linux programs. A kernel review belongs\n")
+            w("  on a Linux machine; nothing here substitutes for them.\n")
+        w("\n")
 
     # ---- what it would cost ---------------------------------------------
     w("WHAT INSTALLING THE MISSING TOOLS COSTS\n")
@@ -293,6 +348,14 @@ def report(target: str = "", langs=None, stream=sys.stdout) -> dict:
         w("  configured kernel .config, a bootstrapped mach environment, a\n")
         w("  compiled binary for valgrind). They're printed as exact commands in\n")
         w(f"  the report instead of being guessed at: {', '.join(sorted(t.id for t in manual))[:52]}\n")
+        # A manual tool that cannot run here at all is worth saying separately.
+        # "Needs a human" and "needs a different operating system" are different
+        # problems, and only one of them can be solved at this keyboard.
+        blocked = [t for t in manual if unavailable_here(t)]
+        if blocked:
+            w(f"  Of those, {len(blocked)} cannot run on {PLATFORM_LABEL} at all: "
+              f"{', '.join(sorted(t.id for t in blocked))}\n")
+            w("  Those belong on a Linux machine. Nothing here substitutes.\n")
 
     w("\n  Whatever the verdict: these are STATIC analysers. They do not find\n")
     w("  wrong logic, broken invariants or swallowed errors. A clean run means\n")

@@ -761,6 +761,11 @@ def emit_agent_json(results_dir, target, profile, files, all_results,
                 "invariants, swallowed errors -- so read the changed code yourself "
                 "as well as this list."
             ),
+            # A tool objecting to nearly every file is usually measuring the
+            # environment, not the code. Reported here so it sits beside the
+            # other reasons a reader should not take the list at face value.
+            "uniformity_warnings": fnd.uniformity_warnings(
+                all_findings, len(files) if files else 0),
         },
 
         # Review know-how for the languages present, so the reader knows what to

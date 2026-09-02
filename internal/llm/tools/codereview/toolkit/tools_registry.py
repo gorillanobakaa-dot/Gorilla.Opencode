@@ -104,7 +104,45 @@ class InstallSpec:
     cargo_install: Optional[str] = None  # `cargo install <this>`
     go_install: Optional[str] = None     # `go install <this>@latest`
     installer_script: Optional[str] = None  # name of a function in install_tools.py's SCRIPT_INSTALLERS
+    winget: Optional[str] = None         # Windows: `winget install <this>`
+    scoop: Optional[str] = None          # Windows: `scoop install <this>`
+    choco: Optional[str] = None          # Windows: `choco install <this>`
     manual_notes: str = ""               # shown if every automatic method is unavailable
+
+    def routes_for(self, plat: str) -> list:
+        """Install routes that can actually work on `plat`.
+
+        Without this the report tells a Windows user to `apt install cppcheck`,
+        which is not a small inconvenience: an agent reads it, runs it, gets
+        "apt is not recognized", and has learned nothing about why. The
+        cross-platform routes -- pip, npm, cargo, go -- work everywhere and are
+        always offered; the OS package managers are offered only where they
+        exist.
+        """
+        routes = []
+        if self.pip:
+            routes.append(("pip", self.pip))
+        if self.npm:
+            routes.append(("npm", self.npm))
+        if self.cargo_component:
+            routes.append(("rustup component", self.cargo_component))
+        if self.cargo_install:
+            routes.append(("cargo install", self.cargo_install))
+        if self.go_install:
+            routes.append(("go install", self.go_install))
+        if plat == "windows":
+            for label, val in (("winget", self.winget), ("scoop", self.scoop),
+                               ("choco", self.choco)):
+                if val:
+                    routes.append((label, val))
+        else:
+            for label, val in (("apt", self.apt), ("dnf", self.dnf),
+                               ("pacman", self.pacman)):
+                if val:
+                    routes.append((label, val))
+        if self.installer_script:
+            routes.append(("script", self.installer_script))
+        return routes
 
 
 @dataclass
@@ -128,7 +166,23 @@ class Tool:
     parse_output: Optional[Callable[[str, dict], list]] = None
     severity_markers: List[str] = field(default_factory=lambda: ["error", "warning"])
     profiles: List[str] = field(default_factory=lambda: ["generic"])
+    # Operating systems this tool can run on AT ALL, as opposed to merely not
+    # being installed yet. Empty means "anywhere".
+    #
+    # The distinction is the point. "missing" invites an agent to install the
+    # thing; "not available on this platform" tells it to stop asking and, for
+    # the kernel tools, that the work belongs on a different machine. Without
+    # the difference a model reads `missing: sparse` on Windows, tries to
+    # install it, fails, and has learned nothing about why.
+    #
+    # Values are os.name-style: "posix", "nt". Use platforms=["posix"] for
+    # anything that does not build on Windows.
+    platforms: List[str] = field(default_factory=list)
     notes: str = ""
+
+    def runs_on(self, plat_os_name: str) -> bool:
+        """Whether this tool could exist on this platform at all."""
+        return not self.platforms or plat_os_name in self.platforms
     included_in: Optional[str] = None   # informational: "this tool's checks overlap with <id>"
 
 
@@ -342,7 +396,7 @@ TOOLS: List[Tool] = [
         id="cloc", label="cloc (line/language census)", languages=["*"],
         category="recon", stage=0, scope="auto-project",
         check_cmd=["cloc", "--version"],
-        install=InstallSpec(size_mb=6, apt="cloc"),
+        install=InstallSpec(size_mb=6, apt="cloc", winget="AlDanial.Cloc"),
         build_cmd=_cloc_cmd,
         notes="Not a reviewer -- just gives you a lay of the land before anything else runs.",
     ),
@@ -362,7 +416,7 @@ TOOLS: List[Tool] = [
         id="cppcheck", label="cppcheck", languages=["c", "cpp"],
         category="static-analysis", stage=1, scope="auto-file",
         check_cmd=["cppcheck", "--version"],
-        install=InstallSpec(size_mb=40, apt="cppcheck"),
+        install=InstallSpec(size_mb=40, apt="cppcheck", winget="Cppcheck.Cppcheck"),
         build_cmd=_cppcheck_cmd,
         severity_markers=["error", "warning", "style", "performance", "portability"],
         profiles=["generic", "linux-kernel", "firefox"],
@@ -371,7 +425,7 @@ TOOLS: List[Tool] = [
         id="cppcheck-deep", label="cppcheck (--enable=all, inconclusive)", languages=["c", "cpp"],
         category="static-analysis", stage=3, scope="auto-file",
         check_cmd=["cppcheck", "--version"],
-        install=InstallSpec(size_mb=40, apt="cppcheck"),
+        install=InstallSpec(size_mb=40, apt="cppcheck", winget="Cppcheck.Cppcheck"),
         build_cmd=_cppcheck_deep_cmd,
         severity_markers=["error", "warning"],
         included_in="cppcheck",
@@ -380,7 +434,7 @@ TOOLS: List[Tool] = [
         id="clang-format-check", label="clang-format --dry-run", languages=["c", "cpp"],
         category="format", stage=1, scope="auto-file",
         check_cmd=["clang-format", "--version"],
-        install=InstallSpec(size_mb=70, apt="clang-format"),
+        install=InstallSpec(size_mb=70, apt="clang-format", winget="LLVM.LLVM"),
         build_cmd=_clang_format_check_cmd,
         severity_markers=["warning", "error"],
         profiles=["generic"],  # NOT firefox/kernel -- they have their own formatting entry points
@@ -397,7 +451,7 @@ TOOLS: List[Tool] = [
         id="clang-tidy", label="clang-tidy (needs compile_commands.json)", languages=["c", "cpp"],
         category="static-analysis", stage=2, scope="auto-file",
         check_cmd=["clang-tidy", "--version"],
-        install=InstallSpec(size_mb=180, apt="clang-tidy"),
+        install=InstallSpec(size_mb=180, apt="clang-tidy", winget="LLVM.LLVM"),
         build_cmd=_clang_tidy_cmd,
         severity_markers=["warning:", "error:"],
         notes="Only runs if you point --compile-commands-dir at a directory containing "
@@ -411,6 +465,7 @@ TOOLS: List[Tool] = [
         check_cmd=["valgrind", "--version"],
         install=InstallSpec(size_mb=70, apt="valgrind"),
         manual_cmd=_valgrind_cmd,
+        platforms=["posix"],
         notes="Needs an already-compiled, runnable binary plus real invocation args -- "
               "there's no safe generic way to guess those, so this is always manual.",
     ),
@@ -418,7 +473,7 @@ TOOLS: List[Tool] = [
         id="scan-build", label="clang static analyzer (scan-build)", languages=["c", "cpp"],
         category="static-analysis", stage=3, scope="manual",
         check_cmd=["scan-build", "--help"],
-        install=InstallSpec(size_mb=180, apt="clang-tools"),
+        install=InstallSpec(size_mb=180, apt="clang-tools", winget="LLVM.LLVM"),
         manual_cmd=_scan_build_cmd,
         notes="Wraps your normal build command and needs a full rebuild -- run it manually "
               "when you have time to spare (can take as long as the underlying build).",
@@ -613,7 +668,7 @@ TOOLS: List[Tool] = [
         id="shellcheck", label="shellcheck", languages=["shell"],
         category="lint", stage=1, scope="auto-file",
         check_cmd=["shellcheck", "--version"],
-        install=InstallSpec(size_mb=25, apt="shellcheck"),
+        install=InstallSpec(size_mb=25, apt="shellcheck", winget="koalaman.shellcheck"),
         build_cmd=_shellcheck_cmd,
         severity_markers=["error", "warning", "note"],
     ),
@@ -683,6 +738,7 @@ TOOLS: List[Tool] = [
         install=InstallSpec(apt="sparse"),
         manual_cmd=_kernel_sparse_cmd,
         profiles=["linux-kernel"],
+        platforms=["posix"],
         notes="Catches address-space/endianness/locking-context mistakes clang-tidy won't.",
     ),
     Tool(
@@ -692,6 +748,7 @@ TOOLS: List[Tool] = [
         install=InstallSpec(apt="coccinelle"),
         manual_cmd=_kernel_coccicheck_cmd,
         profiles=["linux-kernel"],
+        platforms=["posix"],
     ),
 
     # ---- in-house heuristics ----------------------------------------------------------

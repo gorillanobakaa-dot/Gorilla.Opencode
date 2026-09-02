@@ -859,6 +859,48 @@ def verify_positions(items: List[Finding], root: str, drift_window: int = 3) -> 
 CORROBORATION_SEVERITIES = (SEV_ERROR, SEV_WARNING, SEV_INFO)
 
 
+def uniformity_warnings(findings, files_scanned: int) -> list:
+    """Notice when one tool flags nearly every file, and say so.
+
+    A tool that objects to 90% of a tree is almost never describing 90% defects.
+    It is usually measuring something environmental: line endings, a config it
+    could not find, the wrong working directory, a formatter disagreeing with
+    the project's own settings.
+
+    The case that motivated this, from a real run: on a Windows checkout with
+    CRLF line endings, `gofmt -l` lists EVERY Go file. Twenty-seven findings,
+    every one true in the narrow sense that gofmt did print those names, and
+    every one worthless -- the files are correctly formatted and only the line
+    endings differ. A reviewer who reports that as twenty-seven defects has
+    buried whatever else the run found.
+
+    Warnings, not deletions. Which of those findings is real is a judgement
+    about the project, and this function does not have the standing to make it.
+    Staying silent, though, is not neutral: it lets the noise pass as signal.
+    """
+    if not findings or files_scanned <= 0:
+        return []
+    touched = {}
+    for f in findings:
+        tool = getattr(f, "tool", None) or getattr(f, "tool_id", "")
+        path = getattr(f, "file", "") or getattr(f, "path", "")
+        if tool and path:
+            touched.setdefault(tool, set()).add(path)
+
+    out = []
+    for tool, paths in sorted(touched.items()):
+        share = len(paths) / float(files_scanned)
+        if share >= 0.75 and len(paths) > 3:
+            out.append(
+                "%s flagged %d of %d files (%.0f%%). A tool that objects to nearly "
+                "everything is usually measuring the environment rather than the "
+                "code -- line endings, a config it could not find, or the wrong "
+                "working directory. Confirm one of its findings by hand before "
+                "acting on the rest."
+                % (tool, len(paths), files_scanned, share * 100))
+    return out
+
+
 def corroborated(findings: List[Finding],
                  severities=CORROBORATION_SEVERITIES) -> List[List[Finding]]:
     """Groups of findings at the same place from DIFFERENT tools.
