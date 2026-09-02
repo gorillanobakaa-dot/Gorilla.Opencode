@@ -49,7 +49,7 @@ const ToolSearchToolName = "tool_search"
 
 // minSearchScore is the relevance floor below which a match is treated as no
 // match. See the measurement in searchCatalogue.
-const minSearchScore = 1.2
+var scoreFloor = 1.2
 
 // deferredByDefault names the tools withheld until asked for.
 //
@@ -130,6 +130,37 @@ func ForgetSession(sessionID string) {
 	discoveredMu.Lock()
 	delete(discovered, sessionID)
 	discoveredMu.Unlock()
+	lastQueryMu.Lock()
+	delete(lastQuery, sessionID)
+	lastQueryMu.Unlock()
+}
+
+// lastQuery remembers what a session searched for most recently, so an
+// identical repeat can be recognised.
+//
+// A model that searches, misses, and searches the SAME thing again is stuck.
+// Observed on Gemma 4 E2B: it searched for its task subject ("official Go
+// release notes for generics"), missed, repeated the query word for word,
+// then told the user the capability did not exist -- while web_search sat in
+// the miss message it had just been shown twice. Two wasted round trips and a
+// wrong answer.
+var (
+	lastQueryMu sync.Mutex
+	lastQuery   = map[string]string{}
+)
+
+// repeatedQuery reports whether this session just asked the same thing, and
+// records the query either way.
+func repeatedQuery(sessionID, q string) bool {
+	if sessionID == "" {
+		return false
+	}
+	q = strings.ToLower(strings.TrimSpace(q))
+	lastQueryMu.Lock()
+	defer lastQueryMu.Unlock()
+	same := lastQuery[sessionID] == q
+	lastQuery[sessionID] = q
+	return same
 }
 
 // IsDeferrable reports whether a tool is withheld by default.
@@ -275,11 +306,40 @@ func (t *toolSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, 
 	}
 
 	matches := searchCatalogue(candidates, query, limit)
+
+	// A repeated identical search means the model is stuck, and leaving it
+	// stuck is how it ends up telling the user a capability does not exist
+	// while the tool sits in the miss message it has just been shown twice.
+	//
+	// So on the second try, the relevance floor is relaxed and the single best
+	// candidate is loaded. Not the top five -- one, because this is a rescue
+	// and not a licence to spend. If nothing scores at all it still returns a
+	// miss, which is the honest answer.
+	if len(matches) == 0 && repeatedQuery(sessionID, query) {
+		if best := searchCatalogueRelaxed(candidates, query, 1); len(best) > 0 {
+			MarkDiscovered(sessionID, best[0].Info().Name)
+			info := best[0].Info()
+			return NewTextResponse(fmt.Sprintf(
+				"That search did not match, and it is the second time you have run it.\n\n"+
+					"Loaded the closest tool instead: %s.\n\n%s\n\n"+
+					"If this is not what you needed, load one BY NAME with "+
+					"query=\"select:<name>\" — do not run the same search a third time.",
+				info.Name, firstParagraph(info.Description))), nil
+		}
+	}
+
 	if len(matches) == 0 {
 		return NewTextResponse(fmt.Sprintf(
-			"Nothing matched %q.\n\nTools that can be loaded here:\n%s\n\n"+
-				"If none of these do what you need, that capability does not exist in this "+
-				"agent — say so plainly rather than describing what you would do if it did.",
+			"Nothing scored highly enough for %q.\n\n"+
+				"You may have searched for the SUBJECT of your task rather than for a "+
+				"CAPABILITY. Search for what you need to DO — \"search the web\" — not "+
+				"for what you hope to find.\n\n"+
+				"These can be loaded right now. If one of them does what you need, load it "+
+				"BY NAME and do not repeat the same search:\n%s\n"+
+				"  tool_search  query=\"select:<name>\"\n\n"+
+				"Only if none of these fits does the capability genuinely not exist here. "+
+				"Do not tell the user something is impossible while a tool for it is "+
+				"listed above.",
 			query, catalogueListing(candidates))), nil
 	}
 
@@ -388,7 +448,7 @@ func searchCatalogue(candidates []BaseTool, query string, limit int) []BaseTool 
 		// the model tools that do not do what it wants. It also trims the tail
 		// on good queries, so a search for patch porting stops dragging in the
 		// two tools that merely mention patches.
-		if score >= minSearchScore {
+		if score >= scoreFloor {
 			ranked = append(ranked, scored{c, score})
 		}
 	}
@@ -406,6 +466,20 @@ func searchCatalogue(candidates []BaseTool, query string, limit int) []BaseTool 
 		out = append(out, r.tool)
 	}
 	return out
+}
+
+// searchCatalogueRelaxed is searchCatalogue without the relevance floor.
+//
+// Used only to rescue a model that has run the same failing search twice. The
+// floor exists because a nonsense query otherwise loads three tools nobody
+// wanted; dropping it here is acceptable because the alternative -- observed,
+// not hypothetical -- was the model abandoning the task with the right tool
+// one word away.
+func searchCatalogueRelaxed(candidates []BaseTool, query string, limit int) []BaseTool {
+	saved := scoreFloor
+	scoreFloor = 0
+	defer func() { scoreFloor = saved }()
+	return searchCatalogue(candidates, query, limit)
 }
 
 func cutPrefixFold(s, prefix string) (string, bool) {

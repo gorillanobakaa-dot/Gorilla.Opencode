@@ -230,3 +230,83 @@ func containsName(hay []string, needle string) bool {
 	}
 	return false
 }
+
+// The observed failure, now guarded: search for the task SUBJECT, miss, repeat
+// the identical query, and give up while the right tool is one word away.
+//
+// Gemma 4 E2B did exactly this with "official Go release notes for generics",
+// twice, then told the user it could not search the web. web_search was listed
+// in both misses.
+func TestARepeatedFailingSearchRescuesRatherThanStrands(t *testing.T) {
+	const sid = "stuck-session"
+	ForgetSession(sid)
+	defer ForgetSession(sid)
+
+	ctx := context.WithValue(context.Background(), SessionIDContextKey, sid)
+	ctx = context.WithValue(ctx, MessageIDContextKey, "m1")
+	tool := NewToolSearchTool(catalogue)
+	q := `{"query":"official Go release notes for generics"}`
+
+	first, err := tool.Run(ctx, ToolCall{Input: q})
+	if err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	if IsDiscovered(sid, WebSearchToolName) {
+		t.Fatal("the first miss loaded something; the relevance floor is not holding")
+	}
+	if !strings.Contains(first.Content, "web_search") {
+		t.Error("the miss did not list web_search, so the model had nothing to act on")
+	}
+	if !strings.Contains(first.Content, "select:") {
+		t.Error("the miss did not tell the model how to load a tool by name")
+	}
+
+	second, err := tool.Run(ctx, ToolCall{Input: q})
+	if err != nil {
+		t.Fatalf("second: %v", err)
+	}
+	if !IsDiscovered(sid, WebSearchToolName) {
+		t.Errorf("the repeated search still loaded nothing; the model would give up here.\n%s",
+			second.Content)
+	}
+	if !strings.Contains(second.Content, "second time") {
+		t.Error("the rescue did not say why it loaded something")
+	}
+}
+
+// The rescue must not become a licence to spend: one tool, not five.
+func TestTheRescueLoadsExactlyOneTool(t *testing.T) {
+	const sid = "stuck-once"
+	ForgetSession(sid)
+	defer ForgetSession(sid)
+
+	ctx := context.WithValue(context.Background(), SessionIDContextKey, sid)
+	ctx = context.WithValue(ctx, MessageIDContextKey, "m1")
+	tool := NewToolSearchTool(catalogue)
+	q := `{"query":"something vague and unmatched entirely"}`
+	tool.Run(ctx, ToolCall{Input: q})
+	tool.Run(ctx, ToolCall{Input: q})
+	if n := DiscoveredCount(sid); n > 1 {
+		t.Errorf("the rescue loaded %d tools; it must load at most one", n)
+	}
+}
+
+// A different query is not a repeat, or the rescue would fire on ordinary
+// browsing of the catalogue.
+func TestADifferentQueryIsNotARepeat(t *testing.T) {
+	const sid = "not-a-repeat"
+	ForgetSession(sid)
+	defer ForgetSession(sid)
+	if repeatedQuery(sid, "alpha") {
+		t.Error("the first query counted as a repeat")
+	}
+	if repeatedQuery(sid, "beta") {
+		t.Error("a different query counted as a repeat")
+	}
+	if !repeatedQuery(sid, "beta") {
+		t.Error("the same query twice was not detected")
+	}
+	if !repeatedQuery(sid, "  BETA  ") {
+		t.Error("case and spacing should not defeat repeat detection")
+	}
+}
