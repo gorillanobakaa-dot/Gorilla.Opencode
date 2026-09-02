@@ -18,6 +18,7 @@ import (
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/permission"
+	"github.com/opencode-ai/opencode/internal/politehttp"
 )
 
 // ---------------------------------------------------------------------------
@@ -111,12 +112,17 @@ func newSafeClient(timeout time.Duration) *http.Client {
 	}
 	return &http.Client{
 		Timeout: timeout,
-		Transport: &http.Transport{
+		// Wrapped in the politeness limiter so a burst of research helpers
+		// paces itself per HOST instead of earning the 429 that once cornered
+		// a model into fabricating citations. The SSRF guards below and in
+		// DialContext are untouched: politehttp only decides WHEN a request
+		// leaves, never where it goes.
+		Transport: politehttp.NewTransport(&http.Transport{
 			DialContext:           dialer.DialContext,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ResponseHeaderTimeout: timeout,
 			ForceAttemptHTTP2:     true,
-		},
+		}),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return fmt.Errorf("stopped after 10 redirects")

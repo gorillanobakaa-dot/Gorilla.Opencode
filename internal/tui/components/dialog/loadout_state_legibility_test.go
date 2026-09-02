@@ -62,19 +62,33 @@ func TestLoadoutToggleVisiblyFlipsTheBadge(t *testing.T) {
 	}
 	d, before := renderLoadout(t)
 
+	// Find the first row that ships ENABLED, rather than assuming row 0 does.
+	//
+	// It used to take rows[0] outright, which held until a component shipped
+	// default-OFF and sorted to the top (tool.bio_lookup, 2026-09-02). The
+	// premise then broke and the failure read as a bug in the toggle, which it
+	// was not. What this test is actually about is that pressing space flips
+	// the badge the user is looking at — any ON row demonstrates that.
 	rows := sortedLoadout()
-	target := rows[0] // first feature row; ships enabled (critical tools all do)
-	if !config.LoadoutEnabled(target.ID) {
-		t.Fatalf("test premise broken: %s ships disabled", target.ID)
+	idx := -1
+	for i, r := range rows {
+		if config.LoadoutEnabled(r.ID) {
+			idx = i
+			break
+		}
 	}
+	if idx < 0 {
+		t.Fatal("no component ships enabled; there is nothing to toggle OFF")
+	}
+	target := rows[idx]
 	offBefore := strings.Count(before, " OFF ")
 
-	d.selectedIdx = numDials
+	d.selectedIdx = numDials + idx
 	d.Update(tea.KeyMsg{Type: tea.KeySpace})
 	after := d.View()
 	defer config.ToggleLoadout(target.ID) // restore for the rest of the package
 
 	if got := strings.Count(after, " OFF "); got != offBefore+1 {
-		t.Errorf("toggling row 0 changed OFF-badge count %d -> %d; want exactly one more — the text the user sees did not flip", offBefore, got)
+		t.Errorf("toggling the first enabled row changed OFF-badge count %d -> %d; want exactly one more — the text the user sees did not flip", offBefore, got)
 	}
 }

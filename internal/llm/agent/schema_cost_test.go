@@ -43,7 +43,7 @@ import (
 // sacred: a new tool or a reworded description SHOULD move them, and then this
 // test tells you by how much instead of letting it pass unremarked.
 const (
-	measuredDefaultToolSchemaTokens = 9636
+	measuredDefaultToolSchemaTokens = 9733
 	measuredBasePromptTokens        = 1791
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.

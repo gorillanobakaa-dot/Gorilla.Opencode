@@ -85,6 +85,7 @@ func CoderAgentTools(
 	// loadout gating and the same reason: most turns are not ports, but a
 	// capability nobody can reach is not a capability.
 	add("tool.patch_port", tools.NewPatchPortTool(permissions))
+	add("tool.bio_lookup", tools.NewBioDataTool(permissions))
 	return append(coderTools, otherTools...)
 }
 

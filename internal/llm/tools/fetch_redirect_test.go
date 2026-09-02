@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/opencode-ai/opencode/internal/politehttp"
 )
 
 // GORILLA OVERRIDE: these tests exist because TestBlockedFetchTarget passed
@@ -25,10 +27,28 @@ import (
 
 // permissiveDial replaces only the dialer, so a test can reach a loopback
 // httptest server while leaving CheckRedirect under test.
+//
+// It unwraps the politeness limiter first. newSafeClient wraps its transport in
+// politehttp.Transport, and this used to assert straight to *http.Transport,
+// which panicked the moment that wrapper appeared. Unwrapping keeps the test
+// asserting what it was written to assert — that the REDIRECT guard and the
+// dialer Control stop an SSRF — rather than accidentally testing the rate
+// limiter, and it keeps the limiter in the path so the two are known to
+// compose.
 func permissiveDial(c *http.Client) *http.Client {
-	tr := c.Transport.(*http.Transport).Clone()
+	inner := c.Transport
+	polite, wrapped := inner.(*politehttp.Transport)
+	if wrapped {
+		inner = polite.Base
+	}
+	tr := inner.(*http.Transport).Clone()
 	tr.DialContext = (&net.Dialer{Timeout: 5 * time.Second}).DialContext
-	c.Transport = tr
+	if wrapped {
+		polite.Base = tr
+		c.Transport = polite
+	} else {
+		c.Transport = tr
+	}
 	return c
 }
 

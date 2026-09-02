@@ -139,6 +139,11 @@ source:
                      must ask the user rather than guess a URL.
   scholar (default)  OpenAlex — all disciplines, ~250M works
   medical            Europe PMC — indexes MEDLINE/PubMed
+  preprints          bioRxiv, medRxiv and other preprints, via Europe PMC's
+                     preprint index. NOT PEER REVIEWED — say so whenever you
+                     cite one. Use it for work too recent to be published, and
+                     check whether a preprint has since appeared in a journal
+                     before treating it as the final word.
   crossref           Crossref — DOI metadata across publishers
   openaccess         a DOI goes to Unpaywall ("is there a legal free copy of
                      THIS?"); keywords go to DOAJ. Use it at any paywall.
@@ -275,7 +280,7 @@ func (t *webSearchTool) Info() ToolInfo {
 			"source": map[string]any{
 				"type":        "string",
 				"description": "Which index to search. Defaults to scholar. 'web' needs a self-hosted SearXNG.",
-				"enum":        []string{"web", "scholar", "medical", "crossref", "openaccess", "books", "reference", "news", "worldbank", "humanitarian", "sec", "all"},
+				"enum":        []string{"web", "scholar", "medical", "preprints", "crossref", "openaccess", "books", "reference", "news", "worldbank", "humanitarian", "sec", "all"},
 			},
 			"max_results": map[string]any{
 				"type":        "number",
@@ -430,6 +435,63 @@ func (t *webSearchTool) searchEuropePMC(ctx context.Context, q string, n int) ([
 			Title: r.Title, Authors: r.AuthorString, Year: r.PubYear,
 			Venue: r.JournalTitle, DOI: r.DOI, URL: link,
 			Abstract: r.AbstractText, Backend: "Europe PMC",
+		})
+	}
+	return hits, nil
+}
+
+// searchPreprints finds work that has not been through peer review yet:
+// bioRxiv, medRxiv, arXiv-hosted preprints and the rest of what Europe PMC
+// indexes under SRC:PPR.
+//
+// It goes through Europe PMC rather than bioRxiv's own API on purpose.
+// api.biorxiv.org offers exactly two things -- list everything in a date
+// range, and look up one DOI -- and no keyword search at all. A "search"
+// built on it would have to pull whole days of postings and filter them
+// here, which is slow, unbounded, and silently incomplete the moment the
+// range is wrong. Europe PMC already indexes those same preprints and does
+// support a query, so this asks the index that can answer.
+//
+// The results are LABELLED as preprints rather than blended into the
+// scholarly hits, because "not peer reviewed" is the single most important
+// thing about them and a model summarising a citation list will not infer it.
+func (t *webSearchTool) searchPreprints(ctx context.Context, q string, n int) ([]searchHit, error) {
+	u := fmt.Sprintf("%s?query=%s&format=json&pageSize=%d&resultType=core",
+		europePMCAPI, url.QueryEscape("(SRC:PPR) AND ("+q+")"), n)
+	var out struct {
+		ResultList struct {
+			Result []struct {
+				Title        string `json:"title"`
+				AuthorString string `json:"authorString"`
+				PubYear      string `json:"pubYear"`
+				DOI          string `json:"doi"`
+				ID           string `json:"id"`
+				AbstractText string `json:"abstractText"`
+				Publisher    string `json:"publisher"`
+			} `json:"result"`
+		} `json:"resultList"`
+	}
+	if err := t.getJSON(ctx, u, &out); err != nil {
+		return nil, err
+	}
+	hits := make([]searchHit, 0)
+	for _, r := range out.ResultList.Result {
+		link := ""
+		if r.DOI != "" {
+			link = "https://doi.org/" + r.DOI
+		} else if r.ID != "" {
+			link = "https://europepmc.org/article/PPR/" + r.ID
+		}
+		venue := r.Publisher
+		if venue == "" {
+			venue = "preprint"
+		} else {
+			venue += " (preprint)"
+		}
+		hits = append(hits, searchHit{
+			Title: r.Title, Authors: r.AuthorString, Year: r.PubYear,
+			Venue: venue, DOI: r.DOI, URL: link,
+			Abstract: r.AbstractText, Backend: "Europe PMC preprints",
 		})
 	}
 	return hits, nil
@@ -963,6 +1025,8 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		chosen = []backend{{"Europe PMC", t.searchEuropePMC}}
 	case "crossref":
 		chosen = []backend{{"Crossref", t.searchCrossref}}
+	case "preprints":
+		chosen = []backend{{"Europe PMC preprints", t.searchPreprints}}
 	case "openaccess":
 		// A DOI routes to Unpaywall ("is there a legal free copy of THIS?"),
 		// keywords to DOAJ ("find me things that are free by construction").
@@ -988,7 +1052,7 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		chosen = []backend{{"OpenAlex", t.searchOpenAlex}, {"Europe PMC", t.searchEuropePMC}, {"Crossref", t.searchCrossref}}
 	default:
 		return NewTextErrorResponse(
-			"source must be one of: web, scholar, medical, crossref, openaccess, books, reference, news, worldbank, humanitarian, sec, all"), nil
+			"source must be one of: web, scholar, medical, preprints, crossref, openaccess, books, reference, news, worldbank, humanitarian, sec, all"), nil
 	}
 
 	// Degradation short of failure is collected here and surfaced as PARTIAL

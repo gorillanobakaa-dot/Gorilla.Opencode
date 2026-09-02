@@ -134,7 +134,7 @@ func TestNewSourcesAreDeclaredEverywhere(t *testing.T) {
 	for _, e := range enum {
 		set[e] = true
 	}
-	for _, want := range []string{"news", "worldbank", "humanitarian", "sec"} {
+	for _, want := range []string{"news", "worldbank", "humanitarian", "sec", "preprints"} {
 		if !set[want] {
 			t.Errorf("source %q missing from the schema enum", want)
 		}

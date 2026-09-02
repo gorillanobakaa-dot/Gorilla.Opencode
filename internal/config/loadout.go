@@ -103,6 +103,16 @@ var LoadoutComponents = []LoadoutComponent{
 	// for a while with no tool and no command able to reach it, which is the
 	// same as not shipping it. Turn it off in /context if the per-turn cost
 	// matters more than having it.
+	// GORILLA (2026-09-02): structured biology and chemistry records — UniProt,
+	// Ensembl, PDB, AlphaFold, PubChem, ChEMBL, InterPro, ClinVar, openFDA,
+	// STRING, Reactome. 506 tokens, MEASURED with toolTokens.
+	//
+	// Default OFF, unlike /review and /port. Those are for what this program is
+	// FOR; this is for one kind of user, and most people asking about code will
+	// never look up a protein. A 506-token schema on every turn of every
+	// conversation to serve a minority is the drift this loadout exists to
+	// stop. Anyone who wants it arms it in /context, once.
+	{"tool.bio_lookup", "Biology & chemistry databases", "agent loses direct lookup of proteins, genes, structures, compounds, drug labels and pathways; it can still search papers ABOUT them with /research, but it cannot fetch the record itself and will be guessing at accessions and formulas", 506, false, false},
 	{"tool.patch_port", "Patch porting -- forward-port, backport, rebase", "agent loses forward-porting, backporting, rebasing, patch refresh and series porting; it can still run git by hand, but nothing tells it whether a patch applied cleanly, was merged three-way, or was RELOCATED by fuzz -- and those are not the same thing", 734, true, false},
 	// GORILLA OVERRIDE: env estimate was 150 when the block was a recursive
 	// 1000-file tree dump (real cost often 10k–30k). After the shallow

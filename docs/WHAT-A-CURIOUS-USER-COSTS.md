@@ -241,11 +241,11 @@ exists.
 TestDefaultToolSchemaCost -v`:
 
 ```
-tool schemas, default ON                             ~9,636 tokens   84%
+tool schemas, default ON                             ~9,733 tokens   84%
 base system prompt (coder-modern)                    ~1,791 tokens   16%
 prompt blocks, default ON                               ~94 tokens    1%
                                                      ------------
-per-turn total, before any CLAUDE.md                ~11,521 tokens
+per-turn total, before any CLAUDE.md                ~11,618 tokens
 
 largest single rows:
   tool.find        1,322    replaced glob + grep + ls (~1,485 together)
