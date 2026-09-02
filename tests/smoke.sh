@@ -11,20 +11,44 @@ FAILS=0
 
 fail() { echo "FAIL: $1"; FAILS=$((FAILS+1)); }
 pass() { echo "ok:   $1"; }
+skip() { echo "skip: $1"; }
+
+# A check that cannot run here is not a check that failed. Reporting it as a
+# failure trains everyone to ignore the whole suite, which costs more than the
+# coverage it pretends to have.
 
 [ -x "$BIN" ] || { echo "build first: go build -o gorilla-opencode ."; exit 2; }
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
+# Is a local model server reachable? Gorilla auto-discovers those on purpose,
+# so on a developer machine running LM Studio or llama.cpp there IS a provider
+# configured and the no-provider path below genuinely cannot be exercised.
+# `env -i` clears the environment but cannot clear a listening socket.
+LOCAL_UP=no
+for port in 1234 8080 11434 8000; do
+  if command -v curl >/dev/null 2>&1; then
+    curl -s -m 1 -o /dev/null "http://127.0.0.1:$port/v1/models" 2>/dev/null && LOCAL_UP=yes && break
+  fi
+done
+
 # 1. No provider configured: friendly, actionable, no usage dump, nonzero exit.
 OUT="$(cd "$TMP" && env -i HOME="$TMP" PATH="$PATH" TERM=dumb "$BIN" -p hi -q 2>&1)"; RC=$?
-echo "$OUT" | grep -q "no AI provider is configured" \
-  && pass "no-provider message is friendly" || fail "friendly no-provider message missing"
+if [ "$LOCAL_UP" = yes ]; then
+  # A local endpoint is up, so a provider IS configured and this path is
+  # unreachable. Two checks below still hold regardless: whatever happens,
+  # it must not be the cryptic error and must not dump usage text.
+  skip "no-provider message (a local model server is running on this machine)"
+  skip "nonzero exit on no-provider (same reason)"
+else
+  echo "$OUT" | grep -q "no AI provider is configured" \
+    && pass "no-provider message is friendly" || fail "friendly no-provider message missing"
+  [ "$RC" -ne 0 ] && pass "nonzero exit ($RC)" || fail "exit code is 0 on failure"
+fi
 echo "$OUT" | grep -q "agent coder not found" \
   && fail "cryptic 'agent coder not found' still surfaces" || pass "cryptic error gone"
 echo "$OUT" | grep -q "Usage:" \
   && fail "runtime error still dumps usage text" || pass "no usage dump on runtime error"
-[ "$RC" -ne 0 ] && pass "nonzero exit ($RC)" || fail "exit code is 0 on failure"
 
 # 2. Runtime provider error in -p mode: error visible, no usage dump.
 OUT="$(cd "$TMP" && env -i HOME="$TMP" PATH="$PATH" TERM=dumb \
@@ -56,11 +80,26 @@ echo "$OUT" | grep -q "FZF not found" \
 # 6. Desktop launch parity: the .deb and the self-installer must BOTH
 #    use the `launch` wrapper, or GUI launches flash-die (v0.1.1 bug:
 #    only the self-installer was fixed).
-DEB_EXEC="$(grep -A20 'opencode-dino.desktop\|gorilla-opencode.desktop' "$ROOT/scripts/build-deb.sh" | grep '^Exec=' | head -1)"
-echo "$DEB_EXEC" | grep -q 'launch' \
-  && pass ".deb desktop entry uses launch wrapper" || fail ".deb desktop entry missing 'launch' (GUI flash-die)"
-grep -q 'Exec=` + appBinName + ` launch' "$ROOT/cmd/install.go" \
-  && pass "self-installer desktop entry uses launch wrapper" || fail "self-installer missing 'launch'"
+# scripts/ was deliberately removed from the repository (commit ebfb718,
+# "security: remove scripts/ and Documentation.Scripts/"), so this check has
+# nothing to read on this branch. Skip rather than fail: the file's absence is
+# the intended state, not a regression.
+if [ -f "$ROOT/scripts/build-deb.sh" ]; then
+  DEB_EXEC="$(grep -A20 'opencode-dino.desktop\|gorilla-opencode.desktop' "$ROOT/scripts/build-deb.sh" | grep '^Exec=' | head -1)"
+  echo "$DEB_EXEC" | grep -q 'launch' \
+    && pass ".deb desktop entry uses launch wrapper" || fail ".deb desktop entry missing 'launch' (GUI flash-die)"
+else
+  skip ".deb desktop entry (scripts/build-deb.sh is not part of this repo)"
+fi
+
+# The desktop entry moved to cmd/install_unix.go when install.go was split into
+# platform halves. Look in both, so this keeps working whichever side it lives
+# on, and is not a false alarm the next time the file is reorganised.
+if grep -qs 'Exec=` + appBinName + ` launch' "$ROOT/cmd/install_unix.go" "$ROOT/cmd/install.go"; then
+  pass "self-installer desktop entry uses launch wrapper"
+else
+  fail "self-installer missing 'launch'"
+fi
 
 # 7. launch self-heals: creates the key file if missing (so .deb users
 #    who never run `install` still get onboarded, not flash-died).

@@ -208,4 +208,6 @@ ROADMAP.md
 TODO.readme.md
 
 # built toolkit bundles -- artifacts, rebuildable with package.py
-internal/llm/tools/codereview/toolkit/dist/
+
+# built toolkit bundles (now outside the embedded tree)
+internal/llm/tools/codereview/dist/

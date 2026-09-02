@@ -39,7 +39,14 @@ import (
 	"strings"
 )
 
-//go:embed all:toolkit
+// Deliberately NOT `all:toolkit`. The all: prefix would also embed names
+// beginning with _ or . -- which on a machine where anyone has run the
+// toolkit's tests means __pycache__, silently baking stale .pyc files into
+// the binary and, because Version() hashes everything embedded, changing
+// the version depending on whether the tests happened to run before the
+// build. Nothing here legitimately starts with _ or . , so the plain form
+// is both smaller and reproducible.
+//go:embed toolkit
 var toolkitFS embed.FS
 
 // Version is a content hash of everything embedded. It names the unpack

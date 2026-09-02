@@ -340,9 +340,23 @@ def main():
                     help="build just one bundle (default: both)")
     ap.add_argument("--version", default=DEFAULT_VERSION)
     ap.add_argument("--src", default=HERE, help="source tree to package")
-    ap.add_argument("--dist", default=os.path.join(HERE, "dist"))
+    # Default OUTSIDE this directory. The toolkit tree is embedded into the
+    # Gorilla binary wholesale, so bundles written beside the source would
+    # be compiled into it -- a binary carrying a zip of itself, and a
+    # content hash that changes every time someone rebuilds the bundles.
+    ap.add_argument("--dist",
+                    default=os.path.join(os.path.dirname(HERE), "dist"))
     args = ap.parse_args()
 
+    dist = os.path.abspath(args.dist)
+    if os.path.commonpath([dist, HERE]) == HERE:
+        sys.stderr.write(
+            "refusing to build into %s\n"
+            "That is inside the toolkit tree, which is embedded into the\n"
+            "Gorilla binary wholesale -- the bundles would be compiled into\n"
+            "it. Pick a --dist outside the toolkit directory.\n" % dist)
+        return 2
+    args.dist = dist
     if os.path.isdir(args.dist):
         shutil.rmtree(args.dist)
     os.makedirs(args.dist)
