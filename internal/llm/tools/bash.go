@@ -315,7 +315,24 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		EndTime:   time.Now().UnixMilli(),
 	}
 	if stdout == "" {
-		return WithResponseMetadata(NewTextResponse("no output"), metadata), nil
+		// GORILLA FIX (2026-09-02): state the exit code, do not leave success
+		// as an absence for the model to infer.
+		//
+		// A command that succeeds silently -- go build, mkdir, a passing test
+		// runner -- returned the bare words "no output". Observed live: Gemma 4
+		// ran `go build .`, got "no output", and reasoned "I must assume success
+		// unless subsequent steps indicate failure". It assumed correctly, but it
+		// ASSUMED, and the next thing it said -- the name of the binary -- was
+		// wrong for the same reason.
+		//
+		// A non-zero exit already appends "Exit code N" above, so failure was
+		// always stated. Only success was silent, which is the wrong way round:
+		// silence is exactly what the PowerShell wrapper used to report for
+		// failures too, and a model that has learned to read silence as success
+		// is one bad wrapper away from believing a lie.
+		return WithResponseMetadata(
+			NewTextResponse("no output (exit code 0 — the command succeeded and printed nothing)"),
+			metadata), nil
 	}
 	return WithResponseMetadata(NewTextResponse(stdout), metadata), nil
 }
