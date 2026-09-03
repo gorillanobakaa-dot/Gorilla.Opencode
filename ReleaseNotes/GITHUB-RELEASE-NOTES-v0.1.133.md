@@ -79,44 +79,68 @@ unmeasured, and switched on**.
 
 ### The six that stay on
 
-Three concern what the AI writes down about you: open a file before saying you
-do not have it; do not record your own inference as something the user said;
-one mention of something is not a preference.
+**First, a word you will see a lot below.** A **token** is roughly three-quarters
+of a word — it is the unit AI services count and charge by, and the unit your
+data allowance disappears in. Everything the AI is told gets re-sent on every
+single message, so a line added to its instructions is not a one-off cost. It is
+a standing charge, on every message, forever. That is why this page prices each
+change instead of just listing it.
+
+Three of the six concern what the AI writes down about you: open a file before
+claiming not to have the answer; never record its own guess as though you had
+said it; one passing mention of something is not a preference.
 
 One concerns what happens when you push back: correct a real error and move on,
 rather than folding and abandoning a correct answer because you sounded annoyed.
 
 Two concern verification, and both name a bug this program has actually shipped:
 
-- **Check the artifact, not the signal.** A pipeline's exit status is the *last*
-  command's. `build | head` reports whether `head` succeeded. This has printed
-  "BUILD OK" over a failed build in this repository more than once.
-- **Missing means missing.** Never write a placeholder so a task can proceed. It
-  turns a failure you would have seen into one you would not.
+- **Check the thing itself, not the message about it.** When you run a command
+  and feed its output through a second command, the "did it work?" answer you
+  get back belongs to the *second* one. So a build can fail while the terminal
+  cheerfully reports success. That has printed **"BUILD OK" over a failed
+  build** in this repository more than once. The AI was already told to verify
+  its work; it was never told *where to look*. Now it is: open the file and see
+  if the thing is actually there.
+- **Missing means missing.** If something the AI expected is not there, it must
+  say so — never quietly write an empty stand-in file so the job can carry on.
+  That converts a problem you would have noticed into one you would not.
 
 Cost: 84 tokens per message for the verification pair, 161 for the rest.
 
 ### The five that are an experiment
 
-`/context` has a new row, **Scope restraint**, worth **212 measured tokens per
-message**. It tells the AI not to widen a task by inference: an imported or
-adjacent file is not in scope, "it saves time later" is not authorisation, do
-not recursively enumerate a tree nobody asked about, prefer moving something to
-a labelled holding place over deleting it, and assume your actual machine rather
-than an imagined average one.
+`/context` has a new row, **Scope restraint**, costing **212 tokens on every
+message**. In plain terms, it tells the AI to stay on the job you gave it:
+
+- A file being nearby, or already open, or mentioned by the file you asked
+  about, does not make it part of the task.
+- "It would save time later" is not permission.
+- Do not go reading through a whole folder tree nobody asked about.
+- Move something to a clearly labelled holding place rather than deleting it.
+- Assume the machine you actually have — its speed, its screen, its connection —
+  rather than an imagined average one.
 
 **Read this part carefully, because it is the honest bit.**
 
-These five lines have **never been measured**. No trial has shown that a model
-scans less with them than without them. They ship switched on anyway, for one
-reason: a rule nobody runs produces no evidence, so leaving it off guaranteed it
-stayed unproven forever. 212 tokens against a roughly 2,250-token prompt was
-judged affordable for one release in exchange for finding out.
+These five lines have **never been tested**. Not once. We have no evidence that
+an AI reads around less with them than without them — only a reasonable belief
+that it should.
 
-**The expected failure is too much restraint, not too little.** Suspect these
-lines first if the AI starts asking permission for reads it used to just do,
-stops batching independent commands, or reports something blocked where it would
-previously have looked one directory across.
+They are switched on anyway, for one reason: a rule nobody ever runs can never
+be proven or disproven, so leaving it off would have kept it a guess forever.
+212 tokens on top of roughly 2,250 was judged a fair price for one release in
+exchange for finding out.
+
+**If it goes wrong, it will go wrong by being too careful — not too reckless.**
+Watch for the AI:
+
+- asking permission for things it used to simply do,
+- running commands one at a time that it used to send together, making it
+  slower and costing you more,
+- or telling you it is stuck when it could have looked in the next folder along.
+
+Any of those, and it is probably these five lines.
 
 **It is one keypress to switch off.** Open `/context`, find *Scope restraint*,
 press space. Nothing else changes, and you get the 212 tokens back on every
@@ -177,13 +201,54 @@ certutil -hashfile gorilla-opencode.exe SHA256
 
 ## Not done, and said rather than implied
 
-- **macOS.** Never built, never run. Nothing here changes that.
-- **Deferred tool loading still ships off.** Measured over 26 runs against a
-  small local model, it silently cost the AI two of its four specialised tools.
-  The cause is understood, the fix is not.
-- **The Scope restraint rules are unmeasured.** Stated above and repeated here
-  because a release page that buries this is doing the thing this program is
-  built not to do.
+### macOS
+
+Never built for, never run on it. Nothing here changes that.
+
+### A saving we found, tested, and could not make safe
+
+There is a switch called **Deferred tool loading**, and it is still off.
+
+Here is what it is. The AI has tools — searching the web, reviewing code,
+porting patches, looking up scientific records. It does not know they exist
+unless it is told, so a written description of every tool is sent along with
+your message, **every single time you press enter**. Those descriptions are the
+bulk of what gets sent. You pay for them whether or not the AI uses a single one.
+
+The switch holds back the descriptions of the specialist tools and sends a short
+index instead, letting the AI ask for the full description only when it wants
+one. That saves roughly **2,900 tokens per conversation** — genuinely worth
+having if you are paying by the megabyte or living inside a free daily limit.
+
+**We ran it 26 times against a small AI on an ordinary laptop.** Two of its four
+specialist tools were never reached — the AI never thought to ask for them. And
+it did not stop and say "I can't do this." It answered from whatever it could
+read, and sounded completely confident doing it.
+
+**We know why it happens:** a small AI does not reliably work out that it should
+go looking for a tool before deciding it does not have one. **We do not yet know
+how to make it reliably do that.** Until we do, a saving that occasionally
+removes an ability without telling you is not a saving worth switching on for
+everyone.
+
+If you use a larger AI it may well work fine. Turn it on in `/context` and watch
+how yours copes. It cannot cost you more than leaving it off — that part is
+guaranteed and tested.
+
+### The new Scope restraint rules have not been proven to do anything
+
+Said in the section above and repeated here, because this is the part most
+likely to affect you and the last place you might look before downloading.
+
+**"Unmeasured" means exactly what it sounds like.** We have not run a single
+test showing that these five lines change how the AI behaves. They might make it
+tidier. They might make it timid. They might do nothing at all and cost you 212
+tokens a message for the privilege.
+
+They are switched on so that we — and you — can find out, on a version where
+that is written on the box rather than discovered later. If the AI starts asking
+permission for things it used to just get on with, that is these rules, and
+`/context` → *Scope restraint* → space removes them.
 
 ---
 
