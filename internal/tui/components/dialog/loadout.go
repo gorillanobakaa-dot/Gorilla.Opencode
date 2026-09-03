@@ -87,10 +87,16 @@ func (m *loadoutDialogCmp) width() int {
 	if m.termWidth <= 0 {
 		return loadoutMinWidth
 	}
+	// GORILLA OVERRIDE (2026-09-03): no upper cap.
+	//
+	// loadoutMaxWidth held this to 140 columns. Reported from a 200-column
+	// screen: the panel stopped well short of the edge and the rows that
+	// explain what switching a tool OFF actually costs you were truncated to
+	// "...", which is the one column on this screen a person needs to read
+	// before deciding. The cap was justified as readable line length, and that
+	// argument is right for prose and wrong here: these are name / cost /
+	// consequence columns, so extra width lands entirely in the consequence.
 	w := m.termWidth - loadoutSidePadding
-	if w > loadoutMaxWidth {
-		w = loadoutMaxWidth
-	}
 	if w < loadoutHardMinWidth {
 		w = loadoutHardMinWidth
 	}
@@ -321,6 +327,36 @@ func (m *loadoutDialogCmp) adjustSelected(dir int) tea.Cmd {
 // recorded the terminal height, so it asked for 37 rows and was silently cut off on
 // an 80x24 screen. layout.FitHeight brings the feature window down until the whole
 // dialog genuinely fits.
+// budgetHeight is the vertical space this dialog may actually use.
+//
+// GORILLA OVERRIDE (2026-09-03): it is NOT the terminal height.
+//
+// This dialog is drawn by placeOverlay, and in scrollback mode that grows the
+// canvas by the overlay's FULL height and then renders the prompt and the
+// footer BELOW it. A frame as tall as the terminal therefore overflows by
+// exactly the footer, the view scrolls, and what leaves the screen is the TOP:
+// the title, the cost line, and the red LOW-BANDWIDTH MODE banner. Reported
+// from a screenshot where the switches all looked right and the banner had
+// simply gone, with a stranded row of panel background left under the footer.
+//
+// The same fault and the same fix as the command reference, which had it first.
+// Fixing one and not the other is how this pair drifts apart, so the reserve is
+// the same number for the same reason: counted from a real 200x45 screen, where
+// the app draws a blank, the prompt, a blank, two status lines and the key hint
+// underneath the overlay.
+const loadoutFooterReserve = 6
+
+func (m *loadoutDialogCmp) budgetHeight() int {
+	if m.termHeight <= 0 {
+		return m.termHeight
+	}
+	// A very short terminal has nothing to spare; a cramped panel beats none.
+	if h := m.termHeight - loadoutFooterReserve; h > 12 {
+		return h
+	}
+	return m.termHeight
+}
+
 func (m *loadoutDialogCmp) View() string {
 	total := max(1, len(config.LoadoutComponents))
 	// Progressively leaner, in priority order: the switches are the point of this
@@ -329,14 +365,14 @@ func (m *loadoutDialogCmp) View() string {
 	for i, compact := range []bool{false, true} {
 		// The scroll note appears and disappears with the selection, so it counts.
 		key := uint64(m.selectedIdx)*1315423911 + uint64(i)
-		view := m.fitter.Fit(m.termHeight, total, 1, key, func(rows int) string {
+		view := m.fitter.Fit(m.budgetHeight(), total, 1, key, func(rows int) string {
 			return m.renderAt(rows, compact)
 		})
-		if m.termHeight <= 0 || lipgloss.Height(view) <= m.termHeight {
+		if m.termHeight <= 0 || lipgloss.Height(view) <= m.budgetHeight() {
 			return view
 		}
 	}
-	return m.fitter.Fit(m.termHeight, total, 1, uint64(m.selectedIdx)*1315423911+99,
+	return m.fitter.Fit(m.budgetHeight(), total, 1, uint64(m.selectedIdx)*1315423911+99,
 		func(rows int) string { return m.renderAt(rows, true) })
 }
 
@@ -638,6 +674,37 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	}
 
 	parts := []string{header}
+
+	// GORILLA OVERRIDE (2026-09-03): say, persistently, that the low-bandwidth
+	// preset is currently applied.
+	//
+	// Reported from the live screen: pressing `l` looked like it did nothing.
+	// It had done exactly what it promises -- seven components off, written to
+	// disk -- but six of the seven sat below the visible window, so no row the
+	// user was looking at changed. The only acknowledgement was a toast that
+	// fires once and fades, and a state you are still IN cannot be announced by
+	// a message that has already gone.
+	//
+	// This is the third instance of one trap in this dialog family: the arsenal
+	// `toggle()` fix (2026-08-19) and the empty-selection notice were the same
+	// shape. Directive 3 arriving in a UI -- silence and success must not look
+	// alike -- and the fix is the same each time: when the effect is invisible,
+	// SAY it, do not just do it.
+	//
+	// Deliberately OUTSIDE the `if !compact` block. Everything in there is
+	// explanation and is dropped first on a short terminal; this is state the
+	// user acts on, and it names the key that undoes it. It costs a row only
+	// while the preset is applied, so a normal loadout renders exactly as before.
+	if n := config.LowBandwidthUndoCount(); n > 0 {
+		word := "components"
+		if n == 1 {
+			word = "component"
+		}
+		parts = append(parts, base.Foreground(t.Error()).Bold(true).Width(w).
+			Render(fitLine(fmt.Sprintf(
+				"LOW-BANDWIDTH MODE: %d %s switched off. Press u to put them back.", n, word))))
+	}
+
 	if !compact {
 		// The subtitle and the context-size line explain; they are not state you
 		// act on, so they are the first to go on a short terminal.
@@ -671,10 +738,13 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	}
 	parts = append(parts, help)
 	content := lipgloss.JoinVertical(lipgloss.Left, parts...)
+	// GORILLA OVERRIDE (2026-09-03): no border, same reasoning as the command
+	// reference. At full width it draws a rounded box just inside an edge the
+	// terminal already has, spending 2 columns and 2 rows of a fixed budget on
+	// it, and box-drawing characters are East Asian Ambiguous so they measure 2
+	// columns instead of 1 on a CJK-configured terminal. CLAUDE.md 4a, and the
+	// standing instruction is no lines.
 	return base.Padding(1, 2).
-		Border(lipgloss.RoundedBorder()).
-		BorderBackground(styles.PanelBackground()).
-		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)
 }

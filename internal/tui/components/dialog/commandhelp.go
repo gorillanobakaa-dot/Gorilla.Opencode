@@ -63,6 +63,9 @@ type commandHelpCmp struct {
 
 type commandHelpKeyMap struct {
 	Up, Down, Filter, Escape, Backspace key.Binding
+	// Column jumps between the two columns, the way the old Slackware installer
+	// moved between panes. GORILLA OVERRIDE (2026-09-03).
+	Column key.Binding
 }
 
 var commandHelpKeys = commandHelpKeyMap{
@@ -71,6 +74,9 @@ var commandHelpKeys = commandHelpKeyMap{
 	Filter:    key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 	Escape:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
 	Backspace: key.NewBinding(key.WithKeys("backspace")),
+	// left/right too: the columns are side by side, so that is the arrow a
+	// person reaches for. Binding only tab would be correct and undiscoverable.
+	Column: key.NewBinding(key.WithKeys("tab", "left", "right"), key.WithHelp("tab", "other column")),
 }
 
 // NewCommandHelpCmp builds the reference dialog.
@@ -198,9 +204,107 @@ func (m *commandHelpCmp) move(delta int) {
 	}
 }
 
-// fixedLines is the chrome that is always present: border (2), padding (2),
-// title, subtitle, and the blank line under them.
-const commandHelpFixedLines = 2 + 2 + 3
+// columnHeight is how many rows go in EACH column, given the vertical space the
+// list has been granted. GORILLA OVERRIDE (2026-09-03).
+//
+// When everything left to show fits on screen the columns are BALANCED rather
+// than filled in order. Filling in order is the obvious reading of a
+// newspaper layout and it looks broken here: with 37 rows in a 45-row terminal
+// the first column swallows all of them and the second is an empty half of the
+// screen, which is the "wastes the window" complaint this change exists to fix,
+// merely moved to the right-hand side.
+//
+// Once there is more than one screenful, columns fill completely and the list
+// scrolls, because a balanced split of a scrolling list would reflow every row
+// on every keypress.
+func (m *commandHelpCmp) columnHeight(listRows int) int {
+	cols := m.columns()
+	if cols == 1 || listRows <= 0 {
+		return max(listRows, 0)
+	}
+	remaining := len(m.rows) - m.scrollTop
+	if remaining <= 0 {
+		return listRows
+	}
+	if remaining <= listRows*cols {
+		return (remaining + cols - 1) / cols // ceiling: the last column may be short
+	}
+	return listRows
+}
+
+// jumpColumn moves the selection to the other column, keeping the same vertical
+// position. GORILLA OVERRIDE (2026-09-03).
+//
+// The list is laid out newspaper-style: the left column holds the first
+// listCapacity rows of the window and the right column the next listCapacity, so
+// the sideways step is exactly listCapacity rows.
+//
+// It searches OUTWARD from the landing row rather than only forwards. Landing on
+// a group heading is common, headings are not selectable, and a forwards-only
+// scan would skid past several commands to the next one, or fall off the end and
+// do nothing at all. Nothing is worse than the wrong thing here: a key that
+// sometimes does nothing reads as broken, which is the lesson the low-bandwidth
+// banner was written for.
+func (m *commandHelpCmp) jumpColumn() {
+	if m.columns() < 2 || len(m.rows) == 0 {
+		return
+	}
+	step := m.columnHeight(m.listCapacity())
+	target := m.selectedIdx + step
+	if target >= len(m.rows) {
+		target = m.selectedIdx - step
+	}
+	if target < 0 {
+		return
+	}
+	for off := 0; off < step; off++ {
+		for _, cand := range [2]int{target + off, target - off} {
+			if m.selectable(cand) {
+				m.selectedIdx = cand
+				m.ensureVisible()
+				return
+			}
+		}
+	}
+}
+
+// overlayFooterReserve is the rows this dialog must NOT use.
+//
+// GORILLA OVERRIDE (2026-09-03): it is drawn by placeOverlay, and in scrollback
+// mode that grows the canvas by the overlay's FULL height and then renders the
+// prompt and the footer BELOW it. So the real budget is the terminal minus
+// whatever the app draws underneath, and a dialog that takes the whole terminal
+// height overflows by exactly that much. The view scrolls, and what leaves the
+// screen is the TOP: the title and the line saying how many commands exist.
+//
+// Counted from a real 200x45 screen, where the app draws a blank, the prompt
+// line, a blank, two status lines and the key hint under the overlay. Six is
+// that count. It is deliberately a whole-number reserve rather than a measured
+// handshake with the parent, because being one row too cautious costs one row
+// of list and being one row too greedy costs the header.
+const overlayFooterReserve = 6
+
+// budgetHeight is the vertical space this dialog may actually use.
+func (m *commandHelpCmp) budgetHeight() int {
+	if m.height <= 0 {
+		return m.height
+	}
+	if h := m.height - overlayFooterReserve; h > minListRows+commandHelpFixedLines {
+		return h
+	}
+	// On a very short terminal there is nothing sensible to reserve: showing a
+	// cramped reference beats showing none.
+	return m.height
+}
+
+// fixedLines is the chrome that is always present: padding (2), title, subtitle,
+// and the blank line under them.
+//
+// GORILLA OVERRIDE (2026-09-03): the border's 2 rows came out of this when the
+// border was removed. Chrome is SUBTRACTED from a fixed budget, so a stale
+// constant here does not look like a stale constant: it looks like the list
+// losing two rows for no reason, in a place nobody connects to a border.
+const commandHelpFixedLines = 2 + 3
 
 // maxDetailLines caps the explanation so a long one cannot crush the list. The
 // text is written to fit.
@@ -223,7 +327,7 @@ func (m *commandHelpCmp) detailBlock(w int) []string {
 	// the layout.
 	allowed := maxDetailLines
 	if m.height > 0 {
-		allowed = m.height - commandHelpFixedLines - minListRows
+		allowed = m.budgetHeight() - commandHelpFixedLines - minListRows
 	}
 	if allowed < 2 {
 		return nil // no room to explain anything; the list alone is more useful
@@ -258,7 +362,7 @@ func (m *commandHelpCmp) listCapacity() int {
 	if m.height <= 0 {
 		return 12
 	}
-	budget := m.height - commandHelpFixedLines - len(m.detailBlock(m.contentWidth()))
+	budget := m.budgetHeight() - commandHelpFixedLines - len(m.detailBlock(m.contentWidth()))
 	if budget < minListRows {
 		return minListRows
 	}
@@ -266,7 +370,11 @@ func (m *commandHelpCmp) listCapacity() int {
 }
 
 func (m *commandHelpCmp) ensureVisible() {
-	cap := m.listCapacity()
+	// GORILLA OVERRIDE (2026-09-03): the window is visibleRows, not
+	// listCapacity. With two columns those differ by a factor of two, and
+	// scrolling in the smaller unit would drag the view every time the
+	// selection entered the right-hand column, which is already on screen.
+	cap := m.visibleRows()
 	if m.selectedIdx < m.scrollTop {
 		m.scrollTop = m.selectedIdx
 	}
@@ -321,6 +429,8 @@ func (m *commandHelpCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.move(-1)
 		case key.Matches(msg, commandHelpKeys.Down):
 			m.move(+1)
+		case key.Matches(msg, commandHelpKeys.Column):
+			m.jumpColumn()
 		case key.Matches(msg, commandHelpKeys.Filter):
 			m.filtering = true
 		case key.Matches(msg, commandHelpKeys.Escape):
@@ -338,17 +448,67 @@ func (m *commandHelpCmp) BindingKeys() []key.Binding {
 	}
 }
 
-// contentWidth is the usable width inside the border.
+// GORILLA OVERRIDE (2026-09-03): use the WHOLE window.
+//
+// This capped itself at 84 columns. On a 200-column terminal that is a narrow
+// panel floating in the middle of the screen, with the list showing a dozen of
+// forty-odd commands and nothing to suggest the rest exist. Reported from the
+// live screen: "normal users would not be aware that there are more commands
+// out there or that they can scroll."
+//
+// A reference nobody can see the extent of is a menu that hides its own menu.
+// Full width plus two columns roughly quadruples what is on screen at once,
+// which is the actual fix; making the scrollbar more obvious would only have
+// made the cage easier to see.
+//
+// chrome is the horizontal padding only. The border is gone (see renderAt), so
+// there is nothing else to subtract, and it is counted here rather than guessed.
 func (m *commandHelpCmp) contentWidth() int {
 	const (
-		chrome    = 6
-		preferred = 84
-		minimum   = 24
+		chrome   = 4 // Padding(1,2): 2 columns each side, INSIDE the styled width
+		minimum  = 24
+		fallback = 84 // only before the first WindowSizeMsg
 	)
 	if m.width <= 0 {
-		return preferred
+		return fallback
 	}
-	return max(minimum, min(preferred, m.width-chrome))
+	return max(minimum, m.width-chrome)
+}
+
+// twoColumnMinWidth is the content width at which a second column starts
+// helping rather than hurting. Below it each column is too narrow to hold a
+// command name plus a summary worth reading, and two cramped columns are worse
+// than one honest one.
+const twoColumnMinWidth = 100
+
+// columnGap separates the two columns. Two spaces, not a drawn rule: a vertical
+// line here would be a box-drawing character in every row of the list, and those
+// are East Asian Ambiguous, so they measure 1 column normally and 2 on a
+// terminal configured for CJK. See CLAUDE.md 4a.
+const columnGap = 2
+
+// columns is how many command columns fit.
+func (m *commandHelpCmp) columns() int {
+	if m.contentWidth() >= twoColumnMinWidth {
+		return 2
+	}
+	return 1
+}
+
+// columnWidth is the width of ONE column, gap already subtracted.
+func (m *commandHelpCmp) columnWidth() int {
+	cols := m.columns()
+	if cols == 1 {
+		return m.contentWidth()
+	}
+	return (m.contentWidth() - columnGap) / cols
+}
+
+// visibleRows is how many commands are on screen at once: the height of a
+// column times the number of columns. Scrolling and selection both work in
+// this unit, or the second column becomes a place the cursor can never reach.
+func (m *commandHelpCmp) visibleRows() int {
+	return m.listCapacity() * m.columns()
 }
 
 // View renders the dialog at a size that is MEASURED to fit, not predicted.
@@ -379,16 +539,16 @@ func (m *commandHelpCmp) View() string {
 		// The explanation block's length depends on the selection, and the search
 		// hint on the filter, so both belong in the key.
 		key := uint64(m.selectedIdx)*1315423911 + uint64(len(m.filter))*31 + uint64(i)
-		view := m.fitter.Fit(m.height, len(m.rows), 1, key, func(rows int) string {
+		view := m.fitter.Fit(m.budgetHeight(), len(m.rows), 1, key, func(rows int) string {
 			return m.renderAt(rows, v.detail, v.subtitle)
 		})
-		if m.height <= 0 || lipgloss.Height(view) <= m.height {
+		if m.height <= 0 || lipgloss.Height(view) <= m.budgetHeight() {
 			return view
 		}
 	}
 	// Nothing fits: return the leanest form rather than nothing at all. A clipped
 	// dialog is still usable; an empty one is not.
-	return m.fitter.Fit(m.height, len(m.rows), 1,
+	return m.fitter.Fit(m.budgetHeight(), len(m.rows), 1,
 		uint64(m.selectedIdx)*1315423911+uint64(len(m.filter))*31+99,
 		func(rows int) string { return m.renderAt(rows, false, false) })
 }
@@ -415,11 +575,32 @@ func (m *commandHelpCmp) renderAt(listRows int, withDetail, withSubtitle bool) s
 	// the user needs to see and dropping it would look like the search broke.
 	searching := m.filtering || m.filter != ""
 	if withSubtitle || searching {
+		// GORILLA OVERRIDE (2026-09-03): say how many there are, and name the
+		// key that reaches the rest.
+		//
+		// The old hint offered search, up/down and close, and never said the
+		// list continued past the visible rows. Someone who does not already
+		// know a reference is scrollable reads the bottom row as the end of the
+		// program's abilities. The count is the honest fix: "of 43" tells you
+		// there is more without needing a scrollbar to be noticed.
 		sub := "type / to search | up/down to read | esc to close"
+		if n := m.commandCount(); n > 0 {
+			shown := min(m.visibleRows(), len(m.rows)-m.scrollTop)
+			pos := "showing " + itoa(shown) + " of " + itoa(len(m.rows)) + " lines, " + itoa(n) + " commands"
+			nav := "up/down to read"
+			if m.columns() > 1 {
+				nav = "up/down to read | tab for the other column"
+			}
+			sub = pos + " | " + nav + " | / to search | esc to close"
+		}
 		if searching {
 			sub = "search: " + m.filter + "_"
 		}
-		b = append(b, line(sub, base.Foreground(t.TextMuted())))
+		// TRUNCATED. This line grew when the count and the tab hint were added
+		// to it, and at 80 columns lipgloss WRAPPED it to two screen rows while
+		// commandHelpFixedLines still counted one. That is the documented trap:
+		// the symptom is height, in a different place from the cause.
+		b = append(b, line(truncateToWidth(sub, w), base.Foreground(t.TextMuted())))
 		if withSubtitle {
 			b = append(b, line("", base))
 		}
@@ -429,29 +610,31 @@ func (m *commandHelpCmp) renderAt(listRows int, withDetail, withSubtitle bool) s
 		b = append(b, line("Nothing matches "+m.filter, base.Foreground(t.TextMuted())))
 	}
 
-	end := min(m.scrollTop+listRows, len(m.rows))
-	for i := m.scrollTop; i < end; i++ {
-		r := m.rows[i]
-		if r.heading != "" {
-			b = append(b, line(r.heading, base.Bold(true).Foreground(t.Text())))
-			continue
+	// GORILLA OVERRIDE (2026-09-03): lay the list out in columns.
+	//
+	// Newspaper order, not row-major: the left column is the first listRows of
+	// the window and the right column the next listRows. Reading straight down a
+	// column is how a grouped list is read, and it keeps a group's commands
+	// together instead of interleaving two groups line by line.
+	cols := m.columns()
+	cw := m.columnWidth()
+	colH := m.columnHeight(listRows)
+	// Only the rows actually used. Padding out to listRows would push the
+	// explanation block down the screen behind a wall of blanks, and on a tall
+	// terminal off it entirely.
+	for r := 0; r < colH; r++ {
+		cells := make([]string, 0, cols)
+		for c := 0; c < cols; c++ {
+			// Past the bottom of a balanced column this is out of range and
+			// renderCell returns blank padding of the right width, so the row
+			// below still lines up.
+			i := -1
+			if r < colH {
+				i = m.scrollTop + c*colH + r
+			}
+			cells = append(cells, m.renderCell(i, cw, base, t))
 		}
-		name := "/" + r.cmd.Name
-		if r.cmd.Args != "" {
-			name += " " + r.cmd.Args
-		}
-		// Two columns, so the eye can run down the names.
-		//
-		// TRUNCATED, not wrapped. lipgloss's Width() wraps anything longer, so a
-		// command with a long Args used more than one SCREEN line while
-		// listCapacity still counted it as one ROW. The two disagreed, the list
-		// overflowed its budget, and the rows at the bottom were pushed out of
-		// the frame entirely — /help became unreachable by scrolling the moment
-		// /port was added, and /review had already been quietly costing two
-		// lines before that. One row is now one line no matter what anyone puts
-		// in Args, so the height budget cannot be wrong again.
-		row := padRight(name, 18) + r.cmd.Summary
-		b = append(b, line(truncateToWidth("  "+row, w), rowStyle(base, t, i == m.selectedIdx)))
+		b = append(b, line(strings.Join(cells, strings.Repeat(" ", columnGap)), base))
 	}
 
 	// The selected command's full explanation, in place. This is the part the
@@ -470,12 +653,107 @@ func (m *commandHelpCmp) renderAt(listRows int, withDetail, withSubtitle bool) s
 		b = append(b, line(l, st))
 	}
 
+	// GORILLA OVERRIDE (2026-09-03): no border.
+	//
+	// This is a full-window reference now, so a rounded box drawn around the
+	// whole screen frames nothing: it spends 2 columns and 2 rows of a fixed
+	// budget to draw a line just inside the edge of the terminal, which already
+	// has an edge. It is also box-drawing, and those characters are East Asian
+	// Ambiguous, so they measure 1 column normally and 2 on a terminal set up
+	// for CJK: the one decoration here that can change width on somebody else's
+	// machine. CLAUDE.md 4a, and the owner's standing instruction is NO LINES.
+	// GORILLA OVERRIDE (2026-09-03), second pass: do NOT pad this to the full
+	// terminal height.
+	//
+	// The first version did, on the reasoning that a full-window reference
+	// should BE the window. That is wrong for this dialog specifically. It is
+	// drawn by placeOverlay, and in scrollback mode that grows the canvas by the
+	// overlay's FULL height and then puts the prompt and the footer BELOW it. A
+	// frame exactly as tall as the terminal therefore produces terminal height
+	// plus footer, the whole thing scrolls, and the rows that leave the screen
+	// are the ones at the TOP: the title and the line saying how many commands
+	// there are. Caught on a real screenshot, where the list looked right and
+	// the header was simply gone.
+	//
+	// So height is left to the fitter, which already sizes to fit, and the
+	// widening is horizontal only. That was the actual complaint.
+
 	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(t.Primary()).
 		Background(styles.PanelBackground()).
 		Padding(1, 2).
 		Render(lipgloss.JoinVertical(lipgloss.Left, b...))
+}
+
+// commandCount is how many of the rows are commands rather than group headings.
+// The list length overstates what a user is looking for by the number of groups.
+func (m *commandHelpCmp) commandCount() int {
+	n := 0
+	for i := range m.rows {
+		if m.selectable(i) {
+			n++
+		}
+	}
+	return n
+}
+
+// itoa keeps the subtitle free of a fmt import for one integer.
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	var d []byte
+	for n > 0 {
+		d = append([]byte{byte('0' + n%10)}, d...)
+		n /= 10
+	}
+	if neg {
+		return "-" + string(d)
+	}
+	return string(d)
+}
+
+// renderCell renders one list slot: a heading, a command, or blank padding when
+// the column has run past the end of the rows. GORILLA OVERRIDE (2026-09-03).
+//
+// It always returns EXACTLY cw display columns. A short cell would let the row
+// to its right slide leftwards and the second column would stop being a column,
+// and a long one would make lipgloss wrap the joined line into two SCREEN rows
+// while the height budget still counted it as one. That disagreement is the
+// documented cause of the list overflowing its frame, so the width is padded and
+// truncated here rather than trusted.
+func (m *commandHelpCmp) renderCell(i, cw int, base lipgloss.Style, t theme.Theme) string {
+	if i < 0 || i >= len(m.rows) {
+		return base.Width(cw).MaxWidth(cw).Render("")
+	}
+	r := m.rows[i]
+	if r.heading != "" {
+		return base.Bold(true).Foreground(t.Text()).
+			Width(cw).MaxWidth(cw).Render(truncateToWidth(r.heading, cw))
+	}
+	name := "/" + r.cmd.Name
+	if r.cmd.Args != "" {
+		name += " " + r.cmd.Args
+	}
+	// TRUNCATED, not wrapped. lipgloss's Width() wraps anything longer, so a
+	// command with a long Args used more than one SCREEN line while listCapacity
+	// still counted it as one ROW. The two disagreed, the list overflowed its
+	// budget, and the rows at the bottom were pushed out of the frame entirely:
+	// /help became unreachable by scrolling the moment /port was added. One row
+	// is one line no matter what anyone puts in Args.
+	//
+	// The name column is narrower in two-column mode because there is less room,
+	// but never so narrow that "/port [operation]" loses its operation.
+	nameW := 18
+	if m.columns() > 1 {
+		nameW = 17
+	}
+	row := "  " + padRight(name, nameW) + r.cmd.Summary
+	return rowStyle(base, t, i == m.selectedIdx).
+		Width(cw).MaxWidth(cw).Render(truncateToWidth(row, cw))
 }
 
 // rowStyle is the style for one command row. Extracted so the invariant that

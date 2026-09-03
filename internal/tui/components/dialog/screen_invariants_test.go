@@ -81,8 +81,12 @@ var knownSmallOverflow = map[string]int{
 	// 106-column frame into a narrow terminal, and every headline and hint now
 	// truncates instead of being handed raw to a wrapping style. Both changes
 	// pull rows out of the tightest terminals.
-	"/context 60x10": 18,
-	"/context 40x8":  18,
+	//
+	// GORILLA (2026-09-03): 18 -> 16. Dropping the rounded border returns its 2
+	// rows to the content, which on a 10-row terminal is a fifth of the screen.
+	// Decoration is subtracted from a fixed budget, and here is the receipt.
+	"/context 60x10": 16,
+	"/context 40x8":  16,
 	// The two /osint screens, entering the ratchet with measured figures rather
 	// than silently. The gate is prose-heavy by design — it is the one screen
 	// that must state what a run costs before it starts — and sheds that prose

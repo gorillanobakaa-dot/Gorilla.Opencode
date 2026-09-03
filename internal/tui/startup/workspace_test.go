@@ -281,7 +281,18 @@ func TestTildeExpandsWithEitherSeparator(t *testing.T) {
 	home, project, _ := tree(t)
 	setHome(t, home)
 
-	for _, form := range []string{"~/Documents/my-project", `~\Documents\my-project`} {
+	// GORILLA OVERRIDE (2026-09-03), first Linux run: the backslash form is a
+	// WINDOWS expectation and must not be asserted here. On Linux `\` is an
+	// ordinary character in a filename, so `~\Documents\my-project` is one
+	// segment literally named `\Documents\my-project` — and ResolveDir is right
+	// to leave it alone. Rewriting it to `/` on Linux would break anyone who
+	// genuinely has a backslash in a name. Both platforms keep `~/`.
+	forms := []string{"~/Documents/my-project"}
+	if runtime.GOOS == "windows" {
+		forms = append(forms, `~\Documents\my-project`)
+	}
+
+	for _, form := range forms {
 		got, err := ResolveDir(form)
 		if err != nil {
 			t.Errorf("ResolveDir(%q) failed: %v", form, err)

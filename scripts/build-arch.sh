@@ -128,6 +128,7 @@ license = MIT
 depend = lynx
 depend = python
 depend = ripgrep
+depend = xclip
 EOF
 
 # Generate .MTREE using bsdtar

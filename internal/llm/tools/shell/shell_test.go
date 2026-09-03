@@ -45,9 +45,20 @@ func exec1(t *testing.T, s *PersistentShell, cmd string) (string, string, int) {
 // This is the one that mattered most: with the BOM bug, EVERY command came back
 // 0 because Sscanf could not parse "\xEF\xBB\xBF7". A failing test suite, a
 // failing build and a failing deploy all looked like success.
+// GORILLA OVERRIDE (2026-09-03), first Linux run: the POSIX arm used a bare
+// `exit 7`, which is the one command that CANNOT report its own code here. The
+// shell is persistent and the command runs in it, so `exit` ends the session,
+// the status file is never written, and shell.go deliberately returns 1 with an
+// explanation (see the 2026-08-19 fix there). The test was asserting against a
+// documented behaviour of the tool rather than against the round trip it means
+// to guard, and it could only ever fail on Linux.
+//
+// The Windows arm never had the problem because `cmd /c "exit 7"` is already a
+// subprocess. `(exit 7)` is the POSIX equivalent: a subshell, whose status is 7
+// and whose exit does not take the session with it.
 func TestExitCodeIsTheCommandsOwn(t *testing.T) {
 	s := newTestShell(t)
-	cmd := "exit 7"
+	cmd := "(exit 7)"
 	if s.isPowerShell {
 		cmd = "cmd /c \"exit 7\""
 	}

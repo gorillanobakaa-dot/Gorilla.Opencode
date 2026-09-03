@@ -22,7 +22,7 @@ pkgname=gorilla-opencode
 # PKGBUILD: makepkg succeeds, the package installs, and only the version string
 # betrays it. BUMP THIS WITH EVERY RELEASE; TestPKGBUILDTracksTheCurrentRelease
 # now fails the build if it drifts.
-pkgver=0.1.119
+pkgver=0.1.132
 pkgrel=1
 pkgdesc="Terminal AI coding agent (revived original OpenCode), bring your own API keys"
 arch=('x86_64')
@@ -44,7 +44,23 @@ license=('MIT')
 #              without it. Declared anyway to match the .deb: per the 2026-08-09
 #              lynx decision, a promise that only holds for people who install
 #              the expert way is not a promise.
-depends=('lynx' 'python' 'ripgrep')
+#   xclip    - HARD, added 2026-09-03. /copy is a documented command in /help
+#              and it could not work on a default install: no clipboard utility
+#              was declared anywhere, so the program correctly reported "could
+#              not reach the clipboard" on a freshly installed machine. That is
+#              the lynx situation again, recorded above: a promise that only
+#              holds for people who already installed the right thing is not a
+#              promise, and the person who cannot fix it is exactly this
+#              project's user.
+#
+#              The library (atotto/clipboard) accepts xsel, xclip or
+#              wl-clipboard. pacman has no alternation syntax, so this names
+#              one: xclip, because it serves X11 and, through XWayland, almost
+#              every Wayland desktop as well. 62 KB installed. A pure Wayland
+#              session with no XWayland wants wl-clipboard instead; the error
+#              message names it, which is the honest fallback for a case a
+#              single dependency cannot express.
+depends=('lynx' 'python' 'ripgrep' 'xclip')
 makedepends=('go>=1.21')
 # GORILLA: source is the tagged tarball from GitHub. The sha256sum covers the
 # archive as downloaded; regenerate with `makepkg -g` after a version bump.
@@ -79,7 +95,7 @@ source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gorillanobakaa-dot/Gori
 # archive/refs/tags/v${pkgver}.tar.gz, sha256sum it, paste it here, commit to
 # main, then re-download and verify. Do not guess it and do not carry the
 # previous release's value forward.
-sha256sums=('d13d56049654d3369b5121c1f2f8825b65d91570804ddb521148a22b94b949f5')
+sha256sums=('479e191e0ecd401c9ad68e2e8bee117abfe91c7af17ec93e878bfdd341d6c830')
 
 build() {
     cd "Gorilla.Opencode-${pkgver}"

@@ -1,3 +1,36 @@
+## v0.1.132 (2026-09-03): the Linux build, and what running it for the first time found
+
+**Plain-language version:** version 0.1.130 was the Windows build. It compiled
+for Linux and passed the automatic checks there, and that was the whole of the
+evidence, because nobody had ever run it. This is that same work executed on
+Linux for the first time.
+
+The test suite failed in six places and not one of them was a fault in the
+program. Every failure was a test making an assumption that could only be true
+on Windows, and the program itself needed no changes at all. Three of the six
+were worse than an ordinary failure: they had been passing for weeks while
+testing nothing, because the way they started the program was broken and they
+were quietly grading the resulting error message instead.
+
+Then three faults were found by photographing the running program, which no
+test had caught. The command list showed about a dozen of thirty-one commands
+in a narrow panel and said nothing about the rest, so if you did not already
+know it scrolled, the bottom row looked like the end of what the program could
+do; it now uses the whole window in two columns with everything visible at
+once. The cost screen was cut short at a fixed width, truncating the one column
+that says what switching a tool off will cost you. And low-bandwidth mode
+announced itself once in a message that faded, while six of the seven things it
+switched off sat below the visible part of the list, so it looked exactly like
+a key that did nothing; it now says so, in red, for as long as it lasts.
+
+/copy could not work on a fresh install: copying to the clipboard on Linux needs
+a small helper program and the package never asked for one, so the command was
+dead on a newly set up machine. It now asks.
+
+One of the faults fixed here was introduced earlier in this same release while
+fixing something else, and was found the same way: by looking at a picture of
+the screen.
+
 ## v0.1.119 (2026-08-24): a reply with nothing in it should cost a turn, not the session
 
 **Plain-language version:** sometimes an AI service answers with nothing at all.
