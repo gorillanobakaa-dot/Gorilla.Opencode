@@ -53,7 +53,7 @@ for port in 1234 8080 11434 8000; do
 done
 
 # 1. No provider configured: friendly, actionable, no usage dump, nonzero exit.
-OUT="$(cd "$TMP" && env -i HOME="$TMP" PATH="$PATH" TERM=dumb runbin "$BIN" -p hi -q 2>&1)"; RC=$?
+OUT="$(cd "$TMP" && runbin env -i HOME="$TMP" PATH="$PATH" TERM=dumb "$BIN" -p hi -q 2>&1)"; RC=$?
 if [ "$LOCAL_UP" = yes ]; then
   # A local endpoint is up, so a provider IS configured and this path is
   # unreachable. Two checks below still hold regardless: whatever happens,
@@ -71,8 +71,8 @@ echo "$OUT" | grep -q "Usage:" \
   && fail "runtime error still dumps usage text" || pass "no usage dump on runtime error"
 
 # 2. Runtime provider error in -p mode: error visible, no usage dump.
-OUT="$(cd "$TMP" && env -i HOME="$TMP" PATH="$PATH" TERM=dumb \
-  LOCAL_ENDPOINT=http://127.0.0.1:9 LOCAL_ENDPOINT_API_KEY=x runbin "$BIN" -p hi -q 2>&1)"; RC=$?
+OUT="$(cd "$TMP" && runbin env -i HOME="$TMP" PATH="$PATH" TERM=dumb \
+  LOCAL_ENDPOINT=http://127.0.0.1:9 LOCAL_ENDPOINT_API_KEY=x "$BIN" -p hi -q 2>&1)"; RC=$?
 echo "$OUT" | grep -q "Usage:" \
   && fail "-p connection error dumps usage text" || pass "-p error path has no usage dump"
 [ "$RC" -ne 0 ] || [ -n "$OUT" ] && pass "-p error is not silent" || fail "-p failed silently"
@@ -93,23 +93,43 @@ echo "$HELP" | grep -qE '(^|\s)opencode(\s|$)' \
   && fail "help still says bare 'opencode'" || pass "no bare 'opencode' in help"
 
 # 5. FZF warning must not pollute non-interactive output.
-OUT="$(cd "$TMP" && env -i HOME="$TMP" PATH="/usr/bin:/bin" TERM=dumb runbin "$BIN" -p hi -q 2>&1)"
+OUT="$(cd "$TMP" && runbin env -i HOME="$TMP" PATH="/usr/bin:/bin" TERM=dumb "$BIN" -p hi -q 2>&1)"
 echo "$OUT" | grep -q "FZF not found" \
   && fail "FZF warning still prints in non-interactive mode" || pass "no FZF noise"
 
 # 6. Desktop launch parity: the .deb and the self-installer must BOTH
 #    use the `launch` wrapper, or GUI launches flash-die (v0.1.1 bug:
 #    only the self-installer was fixed).
-# scripts/ was deliberately removed from the repository (commit ebfb718,
-# "security: remove scripts/ and Documentation.Scripts/"), so this check has
-# nothing to read on this branch. Skip rather than fail: the file's absence is
-# the intended state, not a regression.
+# scripts/ is deliberately untracked local-only tooling, so on a clone there is
+# nothing to read. Skip rather than fail: the file's absence is the intended
+# state, not a regression.
+#
+# GORILLA OVERRIDE (2026-09-03), first Linux run: follow the entry to where it
+# actually lives. This grepped build-deb.sh for an INLINED `Exec=` line — and
+# that inlined third copy is precisely what the v0.1.44 fix deleted, because
+# maintaining the launcher in three places is how the .deb shipped without the
+# plain-mode action. The script now installs the TRACKED
+# packaging/gorilla-opencode.desktop, so the old grep could only ever fail, and
+# it failed by demanding the return of the bug.
+#
+# The check the concept is really making is unchanged: whatever desktop entry
+# the .deb ends up carrying must use the `launch` wrapper, or a GUI launch
+# flash-dies. So resolve the file the script installs, then assert on that.
 if [ -f "$ROOT/scripts/build-deb.sh" ]; then
-  DEB_EXEC="$(grep -A20 'opencode-dino.desktop\|gorilla-opencode.desktop' "$ROOT/scripts/build-deb.sh" | grep '^Exec=' | head -1)"
-  echo "$DEB_EXEC" | grep -q 'launch' \
-    && pass ".deb desktop entry uses launch wrapper" || fail ".deb desktop entry missing 'launch' (GUI flash-die)"
+  if grep -q 'packaging/gorilla-opencode.desktop' "$ROOT/scripts/build-deb.sh"; then
+    DEB_DESKTOP="$ROOT/packaging/gorilla-opencode.desktop"
+  else
+    DEB_DESKTOP=""
+  fi
+  if [ -n "$DEB_DESKTOP" ] && [ -f "$DEB_DESKTOP" ]; then
+    grep '^Exec=' "$DEB_DESKTOP" | grep -qv 'launch' \
+      && fail ".deb desktop entry has an Exec= without 'launch' (GUI flash-die)" \
+      || pass ".deb desktop entry uses launch wrapper"
+  else
+    fail ".deb desktop entry: build-deb.sh installs no tracked .desktop file"
+  fi
 else
-  skip ".deb desktop entry (scripts/build-deb.sh is not part of this repo)"
+  skip ".deb desktop entry (scripts/build-deb.sh is local-only tooling)"
 fi
 
 # The desktop entry moved to cmd/install_unix.go when install.go was split into

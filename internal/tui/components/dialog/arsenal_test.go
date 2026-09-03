@@ -219,14 +219,24 @@ func installableEntry(t *testing.T, m ArsenalCmp) (string, []string) {
 	if err != nil {
 		t.Fatalf("arsenal.Load: %v", err)
 	}
+	// GORILLA OVERRIDE (2026-09-03), first Linux run: also require the entry to
+	// be ABSENT. toggle() deliberately skips anything already installed — that
+	// is the 2026-08-19 fix in arsenal.go — so on a machine that HAS the first
+	// available package (this Linux box has poppler-utils; the Windows box had
+	// nothing) the helper handed back an entry that selects nothing, showPlan()
+	// correctly refused to open a plan for an empty selection, and both plan
+	// tests failed while describing the symptom rather than the cause.
+	//
+	// A bare-machine assumption, not a platform one: it would have failed the
+	// same way on any Windows box with the tools already on it.
 	for _, s := range man.Series {
 		for _, e := range s.Entries {
-			if arsenal.Available(e, m.pm) {
+			if arsenal.Available(e, m.pm) && !m.status[e.ID].Present {
 				return e.ID, arsenal.PackagesFor(e, m.pm)
 			}
 		}
 	}
-	t.Skipf("no entry is installable with %q", m.pm)
+	t.Skipf("nothing installable and not already present with %q", m.pm)
 	return "", nil
 }
 
