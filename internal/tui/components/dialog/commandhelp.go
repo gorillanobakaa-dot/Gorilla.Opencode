@@ -268,6 +268,35 @@ func (m *commandHelpCmp) jumpColumn() {
 	}
 }
 
+// overlayFooterReserve is the rows this dialog must NOT use.
+//
+// GORILLA OVERRIDE (2026-09-03): it is drawn by placeOverlay, and in scrollback
+// mode that grows the canvas by the overlay's FULL height and then renders the
+// prompt and the footer BELOW it. So the real budget is the terminal minus
+// whatever the app draws underneath, and a dialog that takes the whole terminal
+// height overflows by exactly that much. The view scrolls, and what leaves the
+// screen is the TOP: the title and the line saying how many commands exist.
+//
+// Counted from a real 200x45 screen, where the app draws a blank, the prompt
+// line, a blank, two status lines and the key hint under the overlay. Six is
+// that count. It is deliberately a whole-number reserve rather than a measured
+// handshake with the parent, because being one row too cautious costs one row
+// of list and being one row too greedy costs the header.
+const overlayFooterReserve = 6
+
+// budgetHeight is the vertical space this dialog may actually use.
+func (m *commandHelpCmp) budgetHeight() int {
+	if m.height <= 0 {
+		return m.height
+	}
+	if h := m.height - overlayFooterReserve; h > minListRows+commandHelpFixedLines {
+		return h
+	}
+	// On a very short terminal there is nothing sensible to reserve: showing a
+	// cramped reference beats showing none.
+	return m.height
+}
+
 // fixedLines is the chrome that is always present: padding (2), title, subtitle,
 // and the blank line under them.
 //
@@ -298,7 +327,7 @@ func (m *commandHelpCmp) detailBlock(w int) []string {
 	// the layout.
 	allowed := maxDetailLines
 	if m.height > 0 {
-		allowed = m.height - commandHelpFixedLines - minListRows
+		allowed = m.budgetHeight() - commandHelpFixedLines - minListRows
 	}
 	if allowed < 2 {
 		return nil // no room to explain anything; the list alone is more useful
@@ -333,7 +362,7 @@ func (m *commandHelpCmp) listCapacity() int {
 	if m.height <= 0 {
 		return 12
 	}
-	budget := m.height - commandHelpFixedLines - len(m.detailBlock(m.contentWidth()))
+	budget := m.budgetHeight() - commandHelpFixedLines - len(m.detailBlock(m.contentWidth()))
 	if budget < minListRows {
 		return minListRows
 	}
@@ -510,16 +539,16 @@ func (m *commandHelpCmp) View() string {
 		// The explanation block's length depends on the selection, and the search
 		// hint on the filter, so both belong in the key.
 		key := uint64(m.selectedIdx)*1315423911 + uint64(len(m.filter))*31 + uint64(i)
-		view := m.fitter.Fit(m.height, len(m.rows), 1, key, func(rows int) string {
+		view := m.fitter.Fit(m.budgetHeight(), len(m.rows), 1, key, func(rows int) string {
 			return m.renderAt(rows, v.detail, v.subtitle)
 		})
-		if m.height <= 0 || lipgloss.Height(view) <= m.height {
+		if m.height <= 0 || lipgloss.Height(view) <= m.budgetHeight() {
 			return view
 		}
 	}
 	// Nothing fits: return the leanest form rather than nothing at all. A clipped
 	// dialog is still usable; an empty one is not.
-	return m.fitter.Fit(m.height, len(m.rows), 1,
+	return m.fitter.Fit(m.budgetHeight(), len(m.rows), 1,
 		uint64(m.selectedIdx)*1315423911+uint64(len(m.filter))*31+99,
 		func(rows int) string { return m.renderAt(rows, false, false) })
 }
@@ -633,19 +662,21 @@ func (m *commandHelpCmp) renderAt(listRows int, withDetail, withSubtitle bool) s
 	// Ambiguous, so they measure 1 column normally and 2 on a terminal set up
 	// for CJK: the one decoration here that can change width on somebody else's
 	// machine. CLAUDE.md 4a, and the owner's standing instruction is NO LINES.
-	// Fill the window. GORILLA OVERRIDE (2026-09-03): this is a full-screen
-	// reference, so the panel must actually BE the screen. Without this the
-	// frame ends wherever the content happens to end and the terminal shows
-	// the conversation behind it, which reads as a half-drawn dialog.
+	// GORILLA OVERRIDE (2026-09-03), second pass: do NOT pad this to the full
+	// terminal height.
 	//
-	// Padding(1,2) contributes the 2 rows subtracted here, counted rather than
-	// guessed. Never pad PAST the height: a frame taller than the window
-	// scrolls the terminal and strands rows in the transcript.
-	if m.height > 0 {
-		for len(b)+2 < m.height {
-			b = append(b, line("", base))
-		}
-	}
+	// The first version did, on the reasoning that a full-window reference
+	// should BE the window. That is wrong for this dialog specifically. It is
+	// drawn by placeOverlay, and in scrollback mode that grows the canvas by the
+	// overlay's FULL height and then puts the prompt and the footer BELOW it. A
+	// frame exactly as tall as the terminal therefore produces terminal height
+	// plus footer, the whole thing scrolls, and the rows that leave the screen
+	// are the ones at the TOP: the title and the line saying how many commands
+	// there are. Caught on a real screenshot, where the list looked right and
+	// the header was simply gone.
+	//
+	// So height is left to the fitter, which already sizes to fit, and the
+	// widening is horizontal only. That was the actual complaint.
 
 	return lipgloss.NewStyle().
 		Background(styles.PanelBackground()).

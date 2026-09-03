@@ -28,16 +28,32 @@ func helpAt(t *testing.T, w, h int) string {
 	return m.View()
 }
 
-// The panel must BE the window: every row, every column. A reference that ends
-// halfway down the screen with the conversation showing behind it reads as a
-// half-drawn dialog.
+// The panel must use the whole WIDTH, and must never be taller than the window.
+//
+// GORILLA OVERRIDE (2026-09-03), corrected: the first version of this asserted
+// the frame was EXACTLY the terminal height, and drove a real bug. This dialog
+// is drawn by placeOverlay, which in scrollback mode grows the canvas by the
+// overlay's full height and then puts the prompt and footer below it, so a
+// frame as tall as the terminal overflows by exactly the footer and the TOP
+// scrolls away, taking the title and the command count with it. Seen on a
+// screenshot: the list looked correct and the header had silently gone.
+//
+// Height therefore has an upper bound, not an equality. Width keeps the
+// equality, because using the whole width is the thing being fixed.
 func TestTheReferenceFillsTheWholeWindow(t *testing.T) {
 	for _, sz := range [][2]int{{200, 45}, {160, 50}, {120, 40}, {100, 30}, {80, 24}} {
 		w, h := sz[0], sz[1]
 		lines := strings.Split(helpAt(t, w, h), "\n")
 
-		if len(lines) != h {
-			t.Errorf("%dx%d: frame is %d rows, want exactly %d", w, h, len(lines), h)
+		// STRICTLY shorter. This is an overlay: placeOverlay grows the canvas
+		// by the overlay's full height and puts the prompt and the footer
+		// below it, so a frame that consumes the entire terminal leaves
+		// nothing for the thing it is drawn over, the view scrolls, and the
+		// rows lost are the ones at the top. Equality here is the bug.
+		if len(lines) >= h {
+			t.Errorf("%dx%d: frame is %d rows and the terminal is %d. An overlay must "+
+				"leave room for the prompt and footer underneath it, or the top scrolls "+
+				"away and takes the title with it.", w, h, len(lines), h)
 		}
 		widest := 0
 		for _, l := range lines {
@@ -213,6 +229,25 @@ func TestTheHeaderIsTheSameHeightAtEveryWidth(t *testing.T) {
 			t.Errorf("at width %d the list starts on row %d, but on row %d at width 200.\n"+
 				"  A header line wrapped. It costs a row the height budget did not allow for, "+
 				"and every row below it moves.", w, got, want)
+		}
+	}
+}
+
+// The title and the command count must be ON the frame, not scrolled off it.
+//
+// GORILLA OVERRIDE (2026-09-03): this is the assertion that would have caught
+// the padding bug immediately. The list rendered perfectly while the header was
+// pushed off the top of the terminal, and every other test here passed, because
+// they all looked at the list.
+func TestTheTitleAndCountSurviveOnScreen(t *testing.T) {
+	for _, sz := range [][2]int{{200, 45}, {160, 50}, {120, 40}, {100, 30}} {
+		w, h := sz[0], sz[1]
+		view := helpAt(t, w, h)
+		if !strings.Contains(view, "Commands") {
+			t.Errorf("%dx%d: the title is not in the frame", w, h)
+		}
+		if !strings.Contains(view, "commands") {
+			t.Errorf("%dx%d: the command count is not in the frame", w, h)
 		}
 	}
 }

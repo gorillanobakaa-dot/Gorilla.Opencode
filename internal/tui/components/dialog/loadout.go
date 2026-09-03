@@ -87,10 +87,16 @@ func (m *loadoutDialogCmp) width() int {
 	if m.termWidth <= 0 {
 		return loadoutMinWidth
 	}
+	// GORILLA OVERRIDE (2026-09-03): no upper cap.
+	//
+	// loadoutMaxWidth held this to 140 columns. Reported from a 200-column
+	// screen: the panel stopped well short of the edge and the rows that
+	// explain what switching a tool OFF actually costs you were truncated to
+	// "...", which is the one column on this screen a person needs to read
+	// before deciding. The cap was justified as readable line length, and that
+	// argument is right for prose and wrong here: these are name / cost /
+	// consequence columns, so extra width lands entirely in the consequence.
 	w := m.termWidth - loadoutSidePadding
-	if w > loadoutMaxWidth {
-		w = loadoutMaxWidth
-	}
 	if w < loadoutHardMinWidth {
 		w = loadoutHardMinWidth
 	}
@@ -702,10 +708,13 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	}
 	parts = append(parts, help)
 	content := lipgloss.JoinVertical(lipgloss.Left, parts...)
+	// GORILLA OVERRIDE (2026-09-03): no border, same reasoning as the command
+	// reference. At full width it draws a rounded box just inside an edge the
+	// terminal already has, spending 2 columns and 2 rows of a fixed budget on
+	// it, and box-drawing characters are East Asian Ambiguous so they measure 2
+	// columns instead of 1 on a CJK-configured terminal. CLAUDE.md 4a, and the
+	// standing instruction is no lines.
 	return base.Padding(1, 2).
-		Border(lipgloss.RoundedBorder()).
-		BorderBackground(styles.PanelBackground()).
-		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)
 }
