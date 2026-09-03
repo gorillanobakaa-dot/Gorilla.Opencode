@@ -638,6 +638,37 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	}
 
 	parts := []string{header}
+
+	// GORILLA OVERRIDE (2026-09-03): say, persistently, that the low-bandwidth
+	// preset is currently applied.
+	//
+	// Reported from the live screen: pressing `l` looked like it did nothing.
+	// It had done exactly what it promises -- seven components off, written to
+	// disk -- but six of the seven sat below the visible window, so no row the
+	// user was looking at changed. The only acknowledgement was a toast that
+	// fires once and fades, and a state you are still IN cannot be announced by
+	// a message that has already gone.
+	//
+	// This is the third instance of one trap in this dialog family: the arsenal
+	// `toggle()` fix (2026-08-19) and the empty-selection notice were the same
+	// shape. Directive 3 arriving in a UI -- silence and success must not look
+	// alike -- and the fix is the same each time: when the effect is invisible,
+	// SAY it, do not just do it.
+	//
+	// Deliberately OUTSIDE the `if !compact` block. Everything in there is
+	// explanation and is dropped first on a short terminal; this is state the
+	// user acts on, and it names the key that undoes it. It costs a row only
+	// while the preset is applied, so a normal loadout renders exactly as before.
+	if n := config.LowBandwidthUndoCount(); n > 0 {
+		word := "components"
+		if n == 1 {
+			word = "component"
+		}
+		parts = append(parts, base.Foreground(t.Error()).Bold(true).Width(w).
+			Render(fitLine(fmt.Sprintf(
+				"LOW-BANDWIDTH MODE: %d %s switched off. Press u to put them back.", n, word))))
+	}
+
 	if !compact {
 		// The subtitle and the context-size line explain; they are not state you
 		// act on, so they are the first to go on a short terminal.
