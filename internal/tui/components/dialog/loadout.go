@@ -327,6 +327,36 @@ func (m *loadoutDialogCmp) adjustSelected(dir int) tea.Cmd {
 // recorded the terminal height, so it asked for 37 rows and was silently cut off on
 // an 80x24 screen. layout.FitHeight brings the feature window down until the whole
 // dialog genuinely fits.
+// budgetHeight is the vertical space this dialog may actually use.
+//
+// GORILLA OVERRIDE (2026-09-03): it is NOT the terminal height.
+//
+// This dialog is drawn by placeOverlay, and in scrollback mode that grows the
+// canvas by the overlay's FULL height and then renders the prompt and the
+// footer BELOW it. A frame as tall as the terminal therefore overflows by
+// exactly the footer, the view scrolls, and what leaves the screen is the TOP:
+// the title, the cost line, and the red LOW-BANDWIDTH MODE banner. Reported
+// from a screenshot where the switches all looked right and the banner had
+// simply gone, with a stranded row of panel background left under the footer.
+//
+// The same fault and the same fix as the command reference, which had it first.
+// Fixing one and not the other is how this pair drifts apart, so the reserve is
+// the same number for the same reason: counted from a real 200x45 screen, where
+// the app draws a blank, the prompt, a blank, two status lines and the key hint
+// underneath the overlay.
+const loadoutFooterReserve = 6
+
+func (m *loadoutDialogCmp) budgetHeight() int {
+	if m.termHeight <= 0 {
+		return m.termHeight
+	}
+	// A very short terminal has nothing to spare; a cramped panel beats none.
+	if h := m.termHeight - loadoutFooterReserve; h > 12 {
+		return h
+	}
+	return m.termHeight
+}
+
 func (m *loadoutDialogCmp) View() string {
 	total := max(1, len(config.LoadoutComponents))
 	// Progressively leaner, in priority order: the switches are the point of this
@@ -335,14 +365,14 @@ func (m *loadoutDialogCmp) View() string {
 	for i, compact := range []bool{false, true} {
 		// The scroll note appears and disappears with the selection, so it counts.
 		key := uint64(m.selectedIdx)*1315423911 + uint64(i)
-		view := m.fitter.Fit(m.termHeight, total, 1, key, func(rows int) string {
+		view := m.fitter.Fit(m.budgetHeight(), total, 1, key, func(rows int) string {
 			return m.renderAt(rows, compact)
 		})
-		if m.termHeight <= 0 || lipgloss.Height(view) <= m.termHeight {
+		if m.termHeight <= 0 || lipgloss.Height(view) <= m.budgetHeight() {
 			return view
 		}
 	}
-	return m.fitter.Fit(m.termHeight, total, 1, uint64(m.selectedIdx)*1315423911+99,
+	return m.fitter.Fit(m.budgetHeight(), total, 1, uint64(m.selectedIdx)*1315423911+99,
 		func(rows int) string { return m.renderAt(rows, true) })
 }
 
