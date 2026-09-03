@@ -177,38 +177,38 @@ with no scrolling at all.
 
 ## Screenshots
 
-<!-- SCREENSHOTS PENDING.
-     This section is deliberately empty and the release guard is deliberately
-     failing because of it. Directive 13: screenshots are part of the
-     deliverable, and a release page without them is incomplete work.
+[![The command reference filling a 200 column terminal in two balanced columns, headed Commands what each one does and showing 37 of 37 lines, 31 commands, with every command from slash clear through to slash help visible at once and no scrolling needed](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.132/docs/screenshots/gallery/v0132-help-two-columns-full-window.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.132/docs/screenshots/gallery/v0132-help-two-columns-full-window.png)
 
-     Each one goes in as a linked image, pinned to the tag v0.1.132, pointing at
-     docs/screenshots/gallery/NAME.png on raw.githubusercontent.com, wrapped in a
-     link to that same URL so it opens full size. Never a width attribute, never
-     a /main/ path, and the alt text describes what the picture PROVES.
+Every command in the program, on one screen. The header counts them, so the size of
+the list is a fact you can read rather than something you find out by scrolling. This
+replaces an 84-column panel that showed about a dozen of them and said nothing about
+the rest.
 
-     Three to capture, and what each has to prove:
+---
 
-       v0132-low-bandwidth-mode-line.png
-         /context with the preset applied, the red LOW-BANDWIDTH MODE line
-         visible at the top and the tool list below it.
+[![The context loadout screen with the low bandwidth preset applied, showing a red line reading LOW-BANDWIDTH MODE 7 components switched off press u to put them back, above the per-turn cost of 8,441 tokens and the list of tools with their individual costs](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.132/docs/screenshots/gallery/v0132-low-bandwidth-mode-line.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.132/docs/screenshots/gallery/v0132-low-bandwidth-mode-line.png)
 
-       v0132-patch-port-inspect-no-prompt.png
-         patch_port running an inspect and reporting how each patch would apply,
-         with no permission prompt, because it cannot change anything.
+The red line is the whole point. Pressing `l` switches seven things off, and six of
+them sit below the visible part of a 42-row list, so the screen you are looking at
+does not change. The state now says so for as long as it lasts, and names the key
+that undoes it, instead of a message that appears once and fades.
 
-       v0132-patch-port-permission-prompt.png
-         the same tool asked for a forward-port, stopping on the permission
-         dialog, with the tree path and the operation named in it.
+---
 
-       v0132-help-two-columns-full-window.png
-         /help on a wide terminal, filling it, both columns populated, the
-         header line showing the command count. The point it proves is that
-         the whole reference is visible without scrolling.
+[![The patch port tool running an inspect operation and reporting inspect completed, naming the tree, its kind and branch, and the single patch found with its hunk and file count, with no permission dialog anywhere on screen](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.132/docs/screenshots/gallery/v0132-patch-port-inspect-no-prompt.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.132/docs/screenshots/gallery/v0132-patch-port-inspect-no-prompt.png)
 
-     The A/B of the last two is the argument: the gate is not "does it prompt",
-     it is "it prompts for exactly the operations that can write".
--->
+`inspect` reads and reports. It reaches the tree through exactly one call,
+`git apply --check`, which asks git whether a patch would apply and writes nothing, so
+it does not ask permission. Compare with the next one.
+
+---
+
+[![The same patch port tool asked to forward-port instead, stopped on a Permission Required dialog naming the tool, the full path of the git tree it would modify, the operation and the patch series, offering Allow, Allow for session and Deny](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.132/docs/screenshots/gallery/v0132-patch-port-permission-prompt.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.132/docs/screenshots/gallery/v0132-patch-port-permission-prompt.png)
+
+`forward-port` can rewrite the tree, so it stops and says which tree and which
+operation before touching anything. The pair is the argument: the gate is not "does
+it prompt", it is "it prompts for exactly the operations that can write". Six tests
+hold it there, and denying actually aborts.
 
 ---
 
