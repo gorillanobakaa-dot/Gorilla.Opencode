@@ -1,3 +1,43 @@
+## v0.1.133 (2026-09-03) — the brakes on the research tool, photographed
+
+All three taken on **Gemma 4 E**, a small free model, against the shipped
+v0.1.133 build. Every one shows `spent $0.00` in the status bar, which is the
+point of the set: these are the safeguards working, not the tool working.
+
+### The helper limit refuses the run rather than overspending
+
+Asked for ten helpers with the leash set to three. The run does not start, the
+error says how to raise the limit, and — the part that matters — the model then
+declines to invent a dossier to cover the gap. It reports the failure instead:
+*"I cannot generate the full dossier product as requested."*
+
+A tool that quietly produced a thinner answer here would look better and be
+worth less. Note the spend: the brake engaged before the money did.
+
+[![Gorilla OpenCode refusing a research run that asked for ten helper agents when the configured limit is three, showing the error that the helper-leash allows three and how to raise it, followed by the model explicitly declining to produce a partial or speculative dossier, with total spend showing zero dollars](screenshots/gallery/v0133-research-leash-refuses-ten-agents.png)](screenshots/gallery/v0133-research-leash-refuses-ten-agents.png)
+
+### Eight helpers, each named by the angle it attacks from
+
+Adversary, requirement, history, sidestep, cost, prior art, local, primary
+source. Every one is killable individually, and `X` kills all of them.
+
+Also visible in the reasoning above the panel: the user has told the model its
+limit was raised and to "DO NOT LIE", and the model holds the line — *"I must
+adhere to the established constraints and tool limitations unless explicitly
+told otherwise or if the system state actually changes (which it hasn't)."*
+
+[![Eight helper agents running at once inside Gorilla OpenCode, each labelled with the angle it is attacking the question from — adversary, requirement, history, sidestep, cost, prior art, local and primary source — with a running timer on each and keyboard controls to kill one or all of them](screenshots/gallery/v0133-research-eight-helpers-named-angles.png)](screenshots/gallery/v0133-research-eight-helpers-named-angles.png)
+
+### The permission dialog admits what it cannot show you
+
+Most consent dialogs overstate their own precision. This one does the opposite:
+it says the search terms do not exist yet, because the model writes them as it
+works, some from pages it reads mid-run. So you are approving an **activity**,
+not a list. It also states what is not covered, that denying does not cancel the
+run, and where the approval ends.
+
+[![The permission dialog for a research run, explaining that the run will start ten helpers which can each search the web and fetch pages, that approving covers every helper in this run so you are asked once, that the search terms are written by the model as it works and so you are approving an activity rather than a list you can read now, and that denying does not cancel the run but falls back to asking per search](screenshots/gallery/v0133-research-permission-explains-scope.png)](screenshots/gallery/v0133-research-permission-explains-scope.png)
+
 ## v0.1.119 (2026-08-24)
 
 Two shots. Neither is of the interface, because this release has no interface

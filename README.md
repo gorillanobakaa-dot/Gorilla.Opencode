@@ -24,6 +24,9 @@ API keys or run models on your own machine.
 > Every command, with what it does and what it costs: **[docs/COMMANDS.md](docs/COMMANDS.md)**.
 > Lost a session to a power cut, or run out of disk? **[docs/SESSIONS-AND-STORAGE.md](docs/SESSIONS-AND-STORAGE.md)**.
 > Thirty static-analysis and security tools, built in: **[docs/CODE-REVIEW.md](docs/CODE-REVIEW.md)**.
+> **It also does intelligence work** — a team of AI researchers sent at one
+> question from different angles, and a graded, sourced dossier at the end:
+> **[jump to it](#it-is-not-only-a-coding-agent-it-does-intelligence-work)**.
 > Will it run on my machine? Measured RAM, disk and network: **[docs/FOOTPRINT.md](docs/FOOTPRINT.md)**.
 >
 > What happens when the connection drops, in plain language: **[docs/SATELLITE.md](docs/SATELLITE.md)**.
@@ -99,6 +102,99 @@ API keys or run models on your own machine.
 > Counted 20 August 2026 at v0.1.111, and reproducible — `a33e13b` is upstream's
 > final commit:
 > `git diff --shortstat a33e13b HEAD -- '*.go' ':(exclude)*_test.go'`
+
+## It is not only a coding agent: it does intelligence work
+
+This is the part of the program nobody expects, and it has been buried in the
+documentation instead of said here. Two commands turn Gorilla OpenCode into an
+**all-source intelligence tool** — one that sends out a team of AI researchers,
+makes them argue with each other, and hands you a graded, sourced assessment
+instead of a confident paragraph.
+
+### `/research` — send helpers at a question from different angles
+
+The everyday one. It splits a question across several helper agents, each given
+a **different angle to attack from**, then a verifier attacks their conclusions.
+
+You can watch them work, and kill any of them at any moment:
+
+[![Eight helper agents running at once inside Gorilla OpenCode, each labelled with the angle it is attacking the question from — adversary, requirement, history, sidestep, cost, prior art, local and primary source — with a running timer on each and keyboard controls to kill one or all of them](docs/screenshots/gallery/v0133-research-eight-helpers-named-angles.png)](docs/screenshots/gallery/v0133-research-eight-helpers-named-angles.png)
+
+Those eight names are the point. Ask most AI a question and you get one answer
+from one point of view. Here the same question is worked by a helper looking for
+**what breaks or leaks**, another asking **what the thing actually requires**,
+another on **how it got this way**, another asking **whether the whole approach
+can be avoided**, another on **what it would cost you**, another hunting for
+**someone who already solved it**, another checking **what already exists on
+your machine**, and one going to the **primary sources** rather than commentary
+about them.
+
+### `/osint` — the heavy machine, for when being wrong is expensive
+
+`/osint` runs a full intelligence cycle against hundreds of free public sources
+and produces a **dossier**: bottom line first, every claim graded for
+confidence, the sources it tried, an explicit list of **what it could not
+establish**, and a recommended action.
+
+That last part is the unusual one. Most tools tell you what they found. This one
+also tells you what it looked for and *failed* to find, because a gap you know
+about is worth more than a confident guess.
+
+**Where the method comes from.** It is a civilian translation of published,
+declassified intelligence doctrine — US Army FM 2-0, ADP 2-0 and ATP 2-22.9 —
+with the military content stripped and the procedures kept, and it follows the
+same professional structure as the UK's
+[Professional Development Framework for All-Source Intelligence Assessment](https://www.gov.uk/government/publications/intelligence-analysis-professional-development-framework/the-professional-development-framework-for-all-source-intelligence-assessment).
+"OSINT" means open-source intelligence: answering a question using only material
+anyone can legally access. No hacking, no secrets.
+
+### It costs real money, so it is wrapped in brakes
+
+A helper agent is a complete separate AI session, and every message in it is
+billed to you. So:
+
+**It ships switched off.** `/osint` does not exist until you arm it yourself in
+`/context`. Nobody trips over it by accident.
+
+**There is a hard limit on helpers, and it refuses rather than overspending.**
+Ask for ten when your leash is set to three and the run does not start — and
+the AI does not invent a dossier to cover the gap either:
+
+[![Gorilla OpenCode refusing a research run that asked for ten helper agents when the configured limit is three, showing the error that the helper-leash allows three and how to raise it, followed by the model explicitly declining to produce a partial or speculative dossier, with total spend showing zero dollars](docs/screenshots/gallery/v0133-research-leash-refuses-ten-agents.png)](docs/screenshots/gallery/v0133-research-leash-refuses-ten-agents.png)
+
+Note the bottom of that screen: **`spent $0.00`**. The brake engaged before the
+money did. And the model said *"I cannot generate the full dossier product as
+requested"* rather than producing something that looked like one.
+
+**Permission is asked once, and it tells you what you cannot see.** Before
+helpers touch the web you get this — and read the third paragraph, because most
+software would never admit it:
+
+[![The permission dialog for a research run, explaining that the run will start ten helpers which can each search the web and fetch pages, that approving covers every helper in this run so you are asked once, that the search terms are written by the model as it works and so you are approving an activity rather than a list you can read now, and that denying does not cancel the run but falls back to asking per search](docs/screenshots/gallery/v0133-research-permission-explains-scope.png)](docs/screenshots/gallery/v0133-research-permission-explains-scope.png)
+
+> *"The search terms and page addresses are written by the model as it works,
+> some of them from pages it reads during the run. So this approves the
+> **activity**, not a list you can read now."*
+
+It also says what is **not** covered, that denying does not cancel the run, and
+where the approval ends. A dialog that overstated its own scope would be easier
+to write and worth less.
+
+**A warning screen before every `/osint` run** prices the burn rate in dollars
+per minute for *your* model and settings — computed live, because a generic
+number would be a guess. And dossiers are written to your Documents folder,
+never into the working directory, so a private question cannot end up in a
+git commit.
+
+### Read more
+
+| | |
+|---|---|
+| Plain English, no code | **[docs/OSINT-RESEARCH.md](docs/OSINT-RESEARCH.md)** |
+| The doctrine, and what was deliberately cut | **[docs/OSINT-DOCTRINE.md](docs/OSINT-DOCTRINE.md)** |
+| Every source it can reach | **[docs/OSINT-SOURCE-CATALOG.md](docs/OSINT-SOURCE-CATALOG.md)** |
+
+---
 
 ## Who this is built for
 
