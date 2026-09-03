@@ -163,15 +163,31 @@ var LoadoutComponents = []LoadoutComponent{
 	// authorization, no rationalization, no scanning or stockpiling, quarantine
 	// rather than delete, and match the real user's hardware and budget.
 	//
-	// Default OFF, and honestly so. The behaviour is NOT measured -- no trial has
-	// shown a model scans less with these lines than without them -- and this
-	// project's own precedent for an unmeasured behaviour change is to ship it off
-	// and let the user arm it (tool_search, bio_lookup). The two lines that were
-	// NOT gated went into "# verification" always-on instead, because they are
-	// honesty rules rather than restraint rules and both name a bug this codebase
-	// has actually shipped: a pipeline's exit status read as the real command's,
-	// and a placeholder written so a task could proceed past a missing file.
-	{"prompt.restraint", "Scope restraint (no scanning, no rationalizing, quarantine)", "agent may widen scope by inference -- treating an imported or adjacent file as in-scope, recursively enumerating a tree it was not asked to read, deleting rather than quarantining, and assuming an average machine instead of yours", 212, false, false},
+	// TURNED ON 2026-09-03, deliberately, to find out what it does. It shipped
+	// OFF for one release-cycle's worth of caution: the behaviour is NOT measured,
+	// no trial has shown a model scans less with these lines than without them,
+	// and this project's precedent for an unmeasured behaviour change is to ship
+	// it off (tool_search, bio_lookup).
+	//
+	// The counter-argument won: a rule nobody runs produces no evidence, and this
+	// one costs 212 measured tokens against a ~2,000-token prompt. Leaving it off
+	// guaranteed it stayed unmeasured forever. It is one keypress to switch back
+	// in /context, and the row says exactly what is lost.
+	//
+	// WHAT TO WATCH, so this is falsifiable rather than a hunch: the failure mode
+	// is over-restraint, not under. Suspect these lines first if the agent starts
+	// asking permission for reads it used to just do, stops batching independent
+	// tool calls, or reports a task blocked where it would previously have looked
+	// one directory across. "no scanning or stockpiling" is the line most likely
+	// to overreach, because a legitimate search and an unrequested scan look the
+	// same from inside the rule.
+	//
+	// The two lines that were NOT gated went into "# verification" always-on
+	// instead, because they are honesty rules rather than restraint rules and both
+	// name a bug this codebase has actually shipped: a pipeline's exit status read
+	// as the real command's, and a placeholder written so a task could proceed
+	// past a missing file.
+	{"prompt.restraint", "Scope restraint (no scanning, no rationalizing, quarantine)", "agent may widen scope by inference -- treating an imported or adjacent file as in-scope, recursively enumerating a tree it was not asked to read, deleting rather than quarantining, and assuming an average machine instead of yours", 212, true, false},
 	{"prompt.localtools", "Local tool hints (android, media, forensics)", "agent keeps the wrong first instincts about local tools: it will reach for adb backup (dead since Android 12, fails silently), let yt-dlp pull whole videos to get subtitles, and may imply carving can recover source code", 120, false, false},
 }
 
@@ -411,7 +427,9 @@ var lowBandwidthKeep = map[string]string{
 		"recursively enumerate, do not cache for later, do not chase a second error, do " +
 		"not assume a fast machine. A metered link is exactly where an unrequested tree " +
 		"walk costs the most, so a user who armed this wants it more on a slow link, not " +
-		"less. Ships OFF; the preset does not turn it on, it just does not turn it off.",
+		"less. Now default ON, so the preset genuinely has to leave it alone rather " +
+		"than merely not arm it -- which is why this entry moved from a note about " +
+		"a switched-off row to a real decision.",
 	"prompt.env": "cheap since the shallow project_summary change (~130 measured " +
 		"tokens) and MORE useful on a remote link, not less: knowing the cwd, OS and " +
 		"git state prevents a wasted round trip, which is the expensive thing here.",

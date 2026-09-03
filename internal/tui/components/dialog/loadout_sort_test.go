@@ -39,13 +39,47 @@ func TestLoadoutRowsAreAlphabetical(t *testing.T) {
 	// tool; the alphabet wants them the other way round, so their relative
 	// position on screen distinguishes sorted rendering from registry-order
 	// rendering.
+	// GORILLA FIX (2026-09-03): this asserted at a fixed Height: 50 and had
+	// become FLAKY — measured on unmodified origin/main at v0.1.132, six runs
+	// of this test alone gave three passes and three failures, and it was
+	// already flaky before a 21st component made it fail nearly every time.
+	//
+	// The cause is arithmetic, not chance. The dialog WINDOWS its feature rows
+	// and scrolls. At Height 50 it renders 49 lines of which 31 are chrome —
+	// header, cost lines, dials, two section headings, the +RUN and scroll
+	// notes, the extras block, the help line — leaving 18 rows for 21
+	// components. View and Write are last in the alphabet, so they were below
+	// the fold and the test failed with "rows not rendered", which points at
+	// the renderer rather than at the real cause: the window was too small.
+	//
+	// Two earlier attempts at this are recorded because both were wrong. A
+	// bigger fixed number is the same bug one component later. Deriving the
+	// height as len(rows)+30 was still one line short of the measured chrome
+	// and failed 5 times in 10 — a fix that was never checked against the
+	// thing it was fixing.
+	//
+	// So: size the window from the registry plus the measured chrome plus real
+	// margin, and if windowing STILL happens, say that in the failure instead
+	// of blaming the renderer. A test about SORT ORDER must not also be a test
+	// of whether the terminal is tall enough.
+	const measuredChrome = 31
+	height := len(rows) + measuredChrome + 9
+
 	d := NewLoadoutDialogCmp().(*loadoutDialogCmp)
-	d.Update(tea.WindowSizeMsg{Width: 130, Height: 50})
+	d.Update(tea.WindowSizeMsg{Width: 130, Height: height})
 	view := d.View()
+
+	if strings.Contains(view, "up/down to reach the rest") {
+		t.Fatalf("%d components still do not fit at height %d: the dialog is "+
+			"windowing rows, so this test cannot see the whole list. Raise the "+
+			"margin above %d.\n%s", len(rows), height, measuredChrome+9, view)
+	}
+
 	vi := strings.Index(view, "View tool")
 	wi := strings.Index(view, "Write tool")
 	if vi < 0 || wi < 0 {
-		t.Fatalf("view/write rows not rendered:\n%s", view)
+		t.Fatalf("view/write rows not rendered at height %d with %d components:\n%s",
+			height, len(rows), view)
 	}
 	if vi > wi {
 		t.Errorf("View tool renders after Write tool — the display is not alphabetical (registry order leaked through)")

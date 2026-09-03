@@ -52,12 +52,21 @@ import (
 // and ships OFF, so it is NOT in this figure. It measures 212 tokens against a
 // hand-typed 150 -- out by 41%, caught by this test on the first run.
 //
+// BASE PROMPT 2037 -> 2250 on 2026-09-03, +213 tokens. prompt.restraint was
+// switched from default OFF to default ON, so its five scope-restraint lines
+// now ride every turn. The row records 212 as its measured cost and the base
+// prompt moved by 213; the one-token difference is rounding in two independent
+// len/4 divisions, not a discrepancy worth chasing.
+//
+// This is the number to watch if the change is reverted: it must come back to
+// 2037 exactly, and if it does not, something else moved at the same time.
+//
 // These are here to make a silent drift loud, not because the exact values are
 // sacred: a new tool or a reworded description SHOULD move them, and then this
 // test tells you by how much instead of letting it pass unremarked.
 const (
 	measuredDefaultToolSchemaTokens = 9733
-	measuredBasePromptTokens        = 2037
+	measuredBasePromptTokens        = 2250
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.
 	schemaDriftAllowance = 500

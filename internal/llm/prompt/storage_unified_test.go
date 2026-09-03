@@ -360,8 +360,18 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		//
 		// Behaviour is NOT verified here either. A byte count cannot show a model
 		// checked the artifact instead of the exit code.
+		//
+		// 8148 -> 9003 on 2026-09-03. +855 bytes, and NOT a prompt edit: the file
+		// is unchanged. prompt.restraint went from default OFF to default ON, so
+		// five lines that were being gated out of the assembled prompt are now
+		// assembled into it.
+		//
+		// That is worth noticing about this test: it measures what is SENT, not
+		// what is written. A default flipped in the loadout registry moves this
+		// number without a single character changing in coder-modern.txt, which is
+		// exactly the drift it exists to make loud.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 8148, "simple question gets direct sentence"},
+			BaseCoderPrompt(models.ProviderLocal), 9003, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {
