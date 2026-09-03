@@ -575,13 +575,29 @@ func DeferredCatalogueBlock(all []BaseTool) string {
 		info := t.Info()
 		fmt.Fprintf(&b, "  %-14s %s\n", info.Name, oneLineOf(firstParagraph(info.Description), 100))
 	}
-	b.WriteString("\nTwo rules about this list.\n\n" +
-		"Never tell the user a capability is missing without searching for it first.\n\n" +
-		"And if one of these does the job, LOAD IT rather than doing the work by hand " +
-		"with view and bash. Reading a file tells you what is in it; these tools tell " +
-		"you things reading cannot — whether a patch actually applies, what an analyser " +
-		"finds, what a database holds. An answer assembled by eye from a file looks like " +
-		"the real thing and is not.\n")
+	b.WriteString("\nNever tell the user a capability is missing without searching for it first.\n")
+
+	// REMOVED 2026-09-03, because it was measured and did nothing.
+	//
+	// A second paragraph used to follow, telling the model to load a tool
+	// rather than do the work by hand with view and bash — written after
+	// tracing why patch_port was never discovered: asked whether a patch would
+	// APPLY, the model read what the patch CHANGED and answered from the diff.
+	//
+	// It cost 63 tokens on every turn and bought nothing. Deferred patch_port
+	// went 0/2 before the wording and 0/3 after it, same behaviour every time:
+	// find, view, answer from the file, never search. Three runs is enough to
+	// stop paying for it.
+	//
+	// The line above stays. It addresses a DIFFERENT failure — a model
+	// announcing that a capability is absent — which is real and which the
+	// web_search trials showed happening.
+	//
+	// What the evidence actually says is that a model which never enters the
+	// search path cannot be talked into it by text it has already been given.
+	// The next thing to try is structural, not more prose: patch_port and the
+	// other verbs that read like ordinary file work may simply not be
+	// deferrable on a small model.
 	return b.String()
 }
 
