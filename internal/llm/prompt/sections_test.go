@@ -231,3 +231,72 @@ func TestTheLocalToolHintsAreActuallyPresent(t *testing.T) {
 		}
 	}
 }
+
+// GORILLA (2026-09-03): prompt.restraint is the second line-gated row. Same
+// guard as the one above, for the same reason -- if the sentences are edited
+// away the /context row keeps billing 212 tokens for nothing -- plus the check
+// localtools never got: that the gate actually WORKS in both directions.
+//
+// That second half matters more than it looks. GatedLineTokens reads the raw
+// embedded source, so it returns 212 whether the gate functions or not. A
+// measurement that passes on a broken gate is decoration, which is the failure
+// this project keeps finding in its own guards.
+func TestTheRestraintLinesArePresentAndGated(t *testing.T) {
+	want := []string{
+		"adjacency is not authorization",
+		"no rationalization",
+		"no scanning or stockpiling",
+		"prefer quarantine to deletion",
+		"match the real user",
+	}
+	for _, w := range want {
+		if !strings.Contains(baseModernCoderPrompt, w) {
+			t.Errorf("the prompt no longer contains %q, but prompt.restraint still bills for it", w)
+		}
+	}
+	if got := GatedLineTokens("prompt.restraint"); got <= 0 {
+		t.Fatalf("prompt.restraint measured %d tokens; five lines are not free", got)
+	}
+
+	// OFF (the shipped default): the lines must be absent, and so must the
+	// marker -- a stray "[[needs ...]]" reaching the model is worse than
+	// either state, because it names a capability and then reads as noise.
+	// This row ships OFF, and withLoadout only ever switches things off, so
+	// flip it by hand and restore whatever it was.
+	wasOn := config.LoadoutEnabled("prompt.restraint")
+	t.Cleanup(func() {
+		if config.LoadoutEnabled("prompt.restraint") != wasOn {
+			config.ToggleLoadout("prompt.restraint")
+		}
+	})
+	if config.LoadoutEnabled("prompt.restraint") {
+		config.ToggleLoadout("prompt.restraint")
+	}
+	off := BaseCoderPrompt(models.ProviderLocal)
+	for _, w := range want {
+		if strings.Contains(off, w) {
+			t.Errorf("prompt.restraint is OFF but %q was still sent", w)
+		}
+	}
+
+	// ON: every line present, no marker left behind.
+	config.ToggleLoadout("prompt.restraint")
+	on := BaseCoderPrompt(models.ProviderLocal)
+	for _, w := range want {
+		if !strings.Contains(on, w) {
+			t.Errorf("prompt.restraint is ON but %q was not sent", w)
+		}
+	}
+	if strings.Contains(on, "[[needs") {
+		t.Error("a [[needs ...]] marker survived into the prompt sent to the model")
+	}
+
+	// The always-on verification lines are NOT gated: they must survive the
+	// restraint row being off, because they are honesty rules, not restraint
+	// rules, and both name a bug this codebase has actually shipped.
+	for _, w := range []string{"verify the artifact not the signal", "missing means missing"} {
+		if !strings.Contains(off, w) {
+			t.Errorf("%q must ship unconditionally, but it was absent with prompt.restraint off", w)
+		}
+	}
+}

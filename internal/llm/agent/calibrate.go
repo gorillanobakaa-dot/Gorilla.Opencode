@@ -114,5 +114,6 @@ func CalibrateLoadout(
 	// hand-typed guess on the one screen built not to do that. The sentinel in
 	// calibrate_test.go caught it on the first run.
 	config.SetLoadoutTokens("prompt.localtools", prompt.GatedLineTokens("prompt.localtools"))
+	config.SetLoadoutTokens("prompt.restraint", prompt.GatedLineTokens("prompt.restraint"))
 	config.SetLoadoutTokens("prompt.lsp", len(prompt.LSPInfoBlock())/4)
 }

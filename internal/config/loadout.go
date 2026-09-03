@@ -154,6 +154,24 @@ var LoadoutComponents = []LoadoutComponent{
 	// else, and a prompt line is a RECURRING bill — it rides every turn
 	// forever. Shipping them on by default would tax every user for a
 	// capability most of them will never use.
+	// GORILLA (2026-09-03): five scope-restraint lines, added after checking a set
+	// of hardened Gemini directives against this prompt. Most of that document is
+	// already covered here, or is enforced in CODE rather than by asking the model
+	// nicely -- every mutating tool calls permissions.Request, so "approval is
+	// scoped exactly" is a guarantee the program makes, not a sentence it hopes
+	// the model reads. Five rules had no equivalent anywhere: adjacency is not
+	// authorization, no rationalization, no scanning or stockpiling, quarantine
+	// rather than delete, and match the real user's hardware and budget.
+	//
+	// Default OFF, and honestly so. The behaviour is NOT measured -- no trial has
+	// shown a model scans less with these lines than without them -- and this
+	// project's own precedent for an unmeasured behaviour change is to ship it off
+	// and let the user arm it (tool_search, bio_lookup). The two lines that were
+	// NOT gated went into "# verification" always-on instead, because they are
+	// honesty rules rather than restraint rules and both name a bug this codebase
+	// has actually shipped: a pipeline's exit status read as the real command's,
+	// and a placeholder written so a task could proceed past a missing file.
+	{"prompt.restraint", "Scope restraint (no scanning, no rationalizing, quarantine)", "agent may widen scope by inference -- treating an imported or adjacent file as in-scope, recursively enumerating a tree it was not asked to read, deleting rather than quarantining, and assuming an average machine instead of yours", 212, false, false},
 	{"prompt.localtools", "Local tool hints (android, media, forensics)", "agent keeps the wrong first instincts about local tools: it will reach for adb backup (dead since Android 12, fails silently), let yt-dlp pull whole videos to get subtitles, and may imply carving can recover source code", 120, false, false},
 }
 
@@ -389,6 +407,11 @@ var lowBandwidthKeep = map[string]string{
 		"only ever subtract (TestLowBandwidthOnlyEverSubtracts) and that guarantee " +
 		"is worth more than this exception. Left untouched, and the /context row " +
 		"says what it does for anyone on a slow link who wants it.",
+	"prompt.restraint": "it SUBTRACTS work. Its whole content is refusals -- do not " +
+		"recursively enumerate, do not cache for later, do not chase a second error, do " +
+		"not assume a fast machine. A metered link is exactly where an unrequested tree " +
+		"walk costs the most, so a user who armed this wants it more on a slow link, not " +
+		"less. Ships OFF; the preset does not turn it on, it just does not turn it off.",
 	"prompt.env": "cheap since the shallow project_summary change (~130 measured " +
 		"tokens) and MORE useful on a remote link, not less: knowing the cwd, OS and " +
 		"git state prevents a wasted round trip, which is the expensive thing here.",

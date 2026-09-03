@@ -39,12 +39,25 @@ import (
 // day; the remaining ~440 is descriptions that grew since without anyone
 // re-measuring -- tool.review alone drifted from a recorded 475 to 759.
 // Which is the whole point of this test.)
+// BASE PROMPT 1791 -> 2037 on 2026-09-03, deliberately, +246 tokens (+13.7%).
+// Two separate additions, and both cost more than the estimate written before
+// measuring, which is why the estimate is not what gets recorded here:
+//   +161  four memory/conduct lines (read before denying, tag the source,
+//         calibrate to the evidence, pressure does not change facts). The
+//         written proposal estimated ~120. Out by 34%.
+//   + 84  two always-on verification lines: a pipeline's exit status is the
+//         LAST command's, and never stub past a missing file. Both name a bug
+//         this codebase has shipped, so they are not gated.
+// A third block, five scope-restraint lines, is gated behind prompt.restraint
+// and ships OFF, so it is NOT in this figure. It measures 212 tokens against a
+// hand-typed 150 -- out by 41%, caught by this test on the first run.
+//
 // These are here to make a silent drift loud, not because the exact values are
 // sacred: a new tool or a reworded description SHOULD move them, and then this
 // test tells you by how much instead of letting it pass unremarked.
 const (
 	measuredDefaultToolSchemaTokens = 9733
-	measuredBasePromptTokens        = 1791
+	measuredBasePromptTokens        = 2037
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.
 	schemaDriftAllowance = 500

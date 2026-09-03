@@ -304,8 +304,64 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// declaring "unestablished" on questions they could have answered with
 		// one more tool call, suspect this line first. Not pre-registered as a
 		// probe; see EXPERIMENT-PREREG-2026-08-04.md if it should be.
+		//
+		// 7164 -> 7811 on 2026-09-03, deliberately. +647 bytes, +9.0%, four lines
+		// imported after reading a Claude Fable 5.1 prompt against this one. That
+		// source's authenticity is unverified and nothing here depends on it: each
+		// line was kept because it names a failure this project has actually had,
+		// not because of where it was noticed.
+		//
+		// Three land in "# memory", which said what to record and what to skip but
+		// nothing about WHOSE claim a note is:
+		//   read before denying      - answering "I do not have that" with the file
+		//                              still unread is a confident wrong answer,
+		//                              and the cheapest one to prevent.
+		//   tag the source           - an inference filed as if the user had said
+		//                              it is re-read as fact in every later
+		//                              session. Same failure as an unobserved
+		//                              success claim, with a longer fuse.
+		//   calibrate to the evidence - stops the store drifting into a flattering
+		//                              caricature: one mention is not a preference,
+		//                              a brief yes is not assent to every detail
+		//                              inside the proposal.
+		//
+		// One lands in "# conduct": "pressure does not change facts". Neither
+		// "# conduct" nor "# honesty" covered what happens when the USER is
+		// annoyed, and the failure there is specific and expensive - the user says
+		// "that is wrong", the model folds, and a correct diagnosis is abandoned
+		// for a wrong one that reads as more cooperative. Sharma et al. 2023
+		// (arXiv:2310.13548) measured that pressure directly.
+		//
+		// Behaviour is NOT verified, same caveat as the entry above: a byte count
+		// cannot show a model held a correct answer under pushback. Watch for the
+		// opposite failure - a model that will not concede a real error because it
+		// has been told not to fold. Suspect this line first.
+		//
+		// 7811 -> 8148 on 2026-09-03, deliberately. +337 bytes, two lines added to
+		// "# verification" while checking a hardened set of Gemini scope directives
+		// against this prompt. Most of that document was already covered here or is
+		// enforced in CODE -- every mutating tool calls permissions.Request -- but
+		// these two were covered nowhere and both name a bug this project has had:
+		//   verify the artifact not the signal - "cmd | head" reports head's exit
+		//     status. This has printed BUILD OK over a failed build in this repo
+		//     more than once, and it is in the published project write-up as a
+		//     standing warning to maintainers. A prompt that says "verify" without
+		//     saying WHAT to look at does not prevent it.
+		//   missing means missing - a stub written so the task can proceed turns a
+		//     detectable failure into an undetectable one. This is the mechanism
+		//     behind false-success reporting measured in Advani 2026
+		//     (arXiv:2606.09863) and the corrupt-success rates in Cao et al. 2026
+		//     (arXiv:2603.03116), where 27-78% of scored successes were
+		//     procedurally broken runs.
+		//
+		// The other five candidate lines from that review are gated behind
+		// prompt.restraint and ship OFF, so they are not in this byte count. They
+		// are restraint rules, not honesty rules, and their behaviour is unmeasured.
+		//
+		// Behaviour is NOT verified here either. A byte count cannot show a model
+		// checked the artifact instead of the exit code.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 7164, "simple question gets direct sentence"},
+			BaseCoderPrompt(models.ProviderLocal), 8148, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {
