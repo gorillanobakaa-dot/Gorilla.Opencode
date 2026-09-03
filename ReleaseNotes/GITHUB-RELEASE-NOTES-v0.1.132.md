@@ -146,6 +146,35 @@ They did.
 
 ---
 
+## The command reference uses the window now
+
+`/help` capped itself at 84 columns. On a 200-column terminal that is a narrow
+panel floating in the middle of the display, showing about a dozen of
+thirty-one commands, with nothing to say the list continued. Reported plainly:
+someone who does not already know a reference is scrollable reads the bottom row
+as the end of what the program can do.
+
+The answer is to show the commands rather than announce them. Full width, two
+columns, and on a normal-sized terminal **every command is on screen at once**
+with no scrolling at all.
+
+- **tab**, and the left and right arrows, move between the columns, the way the
+  old Slackware installer moved between panes.
+- Columns are balanced while everything fits, and only fill top-to-bottom once
+  there is more than a screenful. Filling in order first put every row in the
+  left column and left the right half empty, which is the same wasted window
+  moved to the other side of the screen.
+- The header now counts what exists, so the size of the list is a fact on the
+  page rather than something you discover by scrolling.
+- The border is gone. It drew a rounded box around the whole screen, spending
+  two rows and two columns of a fixed budget to put a line just inside an edge
+  the terminal already has. Those are also box-drawing characters, which are
+  East Asian Ambiguous and measure two columns instead of one on a terminal
+  configured for CJK: the one piece of decoration here that could change width
+  on somebody else's machine.
+
+---
+
 ## Screenshots
 
 <!-- SCREENSHOTS PENDING.
@@ -171,6 +200,11 @@ They did.
        v0132-patch-port-permission-prompt.png
          the same tool asked for a forward-port, stopping on the permission
          dialog, with the tree path and the operation named in it.
+
+       v0132-help-two-columns-full-window.png
+         /help on a wide terminal, filling it, both columns populated, the
+         header line showing the command count. The point it proves is that
+         the whole reference is visible without scrolling.
 
      The A/B of the last two is the argument: the gate is not "does it prompt",
      it is "it prompts for exactly the operations that can write".
