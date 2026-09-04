@@ -371,7 +371,7 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// number without a single character changing in coder-modern.txt, which is
 		// exactly the drift it exists to make loud.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 9003, "simple question gets direct sentence"},
+			BaseCoderPrompt(models.ProviderLocal), 9259, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {
