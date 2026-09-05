@@ -22,7 +22,7 @@ pkgname=gorilla-opencode
 # PKGBUILD: makepkg succeeds, the package installs, and only the version string
 # betrays it. BUMP THIS WITH EVERY RELEASE; TestPKGBUILDTracksTheCurrentRelease
 # now fails the build if it drifts.
-pkgver=0.1.133
+pkgver=0.1.134
 pkgrel=1
 pkgdesc="Terminal AI coding agent (revived original OpenCode), bring your own API keys"
 arch=('x86_64')
