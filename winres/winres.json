@@ -4,10 +4,16 @@
       "0000": [
         "icons/icon-256.png",
         "icons/icon-128.png",
+        "icons/icon-96.png",
+        "icons/icon-80.png",
+        "icons/icon-74.png",
+        "icons/icon-72.png",
         "icons/icon-64.png",
         "icons/icon-48.png",
+        "icons/icon-40.png",
         "icons/icon-32.png",
         "icons/icon-24.png",
+        "icons/icon-20.png",
         "icons/icon-16.png"
       ]
     }
