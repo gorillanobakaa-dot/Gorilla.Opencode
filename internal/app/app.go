@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"strings"
 	"sync"
 	"time"
 
@@ -193,12 +194,44 @@ func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat
 			logging.Info("Agent processing cancelled", "session_id", sess.ID)
 			return nil
 		}
+		// GORILLA FIX (2026-10-04): a deliberate stop is not a failure of
+		// "agent processing". Measured with a real model: the loop detector
+		// ended a turn, and the run printed "Error: agent processing failed:"
+		// in front of a sentence written for a person. The sentence stands on
+		// its own; the exit code still says the task was not finished.
+		var stuck *agent.StuckError
+		if errors.As(result.Error, &stuck) {
+			return errors.New(stuck.Reason)
+		}
 		return fmt.Errorf("agent processing failed: %w", result.Error)
 	}
 
 	// Stop spinner before printing output
 	if !quiet && spinner != nil {
 		spinner.Stop()
+	}
+
+	// GORILLA FIX (2026-10-04): a refused action must say so, and must not exit 0.
+	//
+	// Measured with a real model: an unattended `git reset --hard` was refused,
+	// as designed. The assistant message then had no text, so this printed
+	// "No content available" and returned success. A script reads that as "done,
+	// with a strange answer"; a person reads nothing at all. The reason is in
+	// the tool result the permission service wrote, so it is read from there.
+	if result.Message.FinishReason() == message.FinishReasonPermissionDenied {
+		why := "an action needed a person's approval and nobody was here to give it"
+		if msgs, err := a.Messages.List(context.Background(), sess.ID); err == nil {
+			for i := len(msgs) - 1; i >= 0; i-- {
+				for _, tr := range msgs[i].ToolResults() {
+					if tr.IsError && strings.HasPrefix(strings.ToLower(tr.Content), "permission denied") {
+						why = tr.Content
+						i = -1
+						break
+					}
+				}
+			}
+		}
+		return fmt.Errorf("stopped without finishing: %s", why)
 	}
 
 	// Get the text content from the response

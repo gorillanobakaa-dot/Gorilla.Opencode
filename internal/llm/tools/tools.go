@@ -125,11 +125,20 @@ func clampToolContent(content string) string {
 	if len(content) <= MaxToolResponseBytes {
 		return content
 	}
-	return content[:MaxToolResponseBytes] + fmt.Sprintf(
+	// GORILLA FIX (2026-10-04): the notice is paid for out of the cap, not added
+	// on top of it. It grew when it started naming the saved file and the next
+	// call, and the result went 604 bytes over the limit this function exists to
+	// hold — caught by TestNoToolCanExceedTheResponseCap, not by anyone reading.
+	notice := spillNotice(spillOutput("tool", content))
+	keep := MaxToolResponseBytes - len(notice) - 256
+	if keep < 0 {
+		keep = 0
+	}
+	return content[:keep] + fmt.Sprintf(
 		"\n\n[TRUNCATED: this tool returned %d bytes; %d were kept. "+
 			"The result is incomplete — narrow the request rather than "+
 			"drawing conclusions from this fragment.%s]",
-		len(content), MaxToolResponseBytes, spillNotice(spillOutput("tool", content)))
+		len(content), keep, notice)
 }
 
 func NewTextResponse(content string) ToolResponse {

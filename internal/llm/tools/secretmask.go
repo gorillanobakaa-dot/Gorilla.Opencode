@@ -208,9 +208,27 @@ func MaskNotice(n int) string {
 	if n == 0 {
 		return ""
 	}
-	return "\n\nnote: " + pluralSecrets(n) + " in this output was replaced with [REDACTED: ...] " +
-		"by this program before you saw it. The real value is on the machine and was not sent. " +
-		"Do not try to recover it; you do not need it to do the work."
+	// GORILLA FIX (2026-10-04): written to be true WHOEVER reads it.
+	//
+	// Measured with a real model (gemma-4-e2b), three wordings:
+	//
+	//  1. "...before you saw it. Do not try to recover it; you do not need it."
+	//     Copied word for word into the answer, so the PERSON was told they had
+	//     not seen their own key and should not try to recover it.
+	//  2. "[Note to the assistant ... do not repeat it ...]". Obeyed on one run,
+	//     copied out in full on the next. An instruction a small model follows
+	//     half the time is not a control.
+	//  3. This one: no "you", no instruction, nothing that is false or odd if
+	//     the model reads it out. Whether it is repeated stops mattering.
+	//
+	// The same principle as a truncation notice: say what happened, in words
+	// that stay correct when they are passed on.
+	verb := "was"
+	if n > 1 {
+		verb = "were"
+	}
+	return "\n\n[Gorilla OpenCode: " + pluralSecrets(n) + " in this output " + verb +
+		" hidden and shown as [REDACTED: ...]. The real value stays on this computer and was not sent to the AI.]"
 }
 
 func pluralSecrets(n int) string {

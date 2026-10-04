@@ -110,7 +110,26 @@ func TestTheNoticeSaysWhoDidItAndOnlyWhenSomethingWasMasked(t *testing.T) {
 	if MaskNotice(0) != "" {
 		t.Errorf("a notice was produced for output that was not masked")
 	}
-	if got := MaskNotice(2); !strings.Contains(got, "2 credentials") || !strings.Contains(got, "by this program") {
-		t.Errorf("the notice does not say what happened: %q", got)
+	got := MaskNotice(2)
+	if !strings.Contains(got, "2 credentials") || !strings.Contains(got, "Gorilla OpenCode") {
+		t.Errorf("the notice does not say what happened or who did it: %q", got)
+	}
+	// Found with a real model (gemma-4-e2b, 2026-10-04). A note addressed to the
+	// model was copied into the answer, so the PERSON was told "before you saw
+	// it ... do not try to recover it". A second wording that said "do not
+	// repeat it" was obeyed on one run and copied out on the next. So the rule
+	// is on the text, not on the model: nothing in it may address a reader or
+	// give an instruction, because either may be read out to the wrong one.
+	low := strings.ToLower(got)
+	for _, banned := range []string{" you ", " you.", " you,", "your ", "do not", "don't", "assistant", "tell the"} {
+		if strings.Contains(low, banned) {
+			t.Errorf("the notice contains %q; it must stay true and sensible if a model reads it out to the person: %q", banned, got)
+		}
+	}
+	if !strings.Contains(got, "was not sent to the AI") {
+		t.Errorf("the notice does not say the one thing both readers need: %q", got)
+	}
+	if one := MaskNotice(1); !strings.Contains(one, "1 credential in this output was hidden") {
+		t.Errorf("singular wording is wrong: %q", one)
 	}
 }

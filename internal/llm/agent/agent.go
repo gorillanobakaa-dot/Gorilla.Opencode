@@ -757,9 +757,16 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 			if toolErr != nil {
 				if errors.Is(toolErr, permission.ErrorPermissionDenied) {
 					ran[i] = false // the person said no; the model did not loop
+					// The tool may have wrapped the sentinel with its reason
+					// ("permission denied: this command was NOT run, because
+					// ..."). Keep it: the bare two words told nobody anything.
+					denied := "Permission denied"
+					if msg := toolErr.Error(); len(msg) > len("permission denied") {
+						denied = strings.ToUpper(msg[:1]) + msg[1:]
+					}
 					toolResults[i] = message.ToolResult{
 						ToolCallID: toolCall.ID,
-						Content:    "Permission denied",
+						Content:    denied,
 						IsError:    true,
 					}
 					for j := i + 1; j < len(toolCalls); j++ {

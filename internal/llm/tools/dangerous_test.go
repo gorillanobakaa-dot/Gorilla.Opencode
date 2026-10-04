@@ -5,7 +5,14 @@ package tools
 // the one that matters day to day — a warning that fires on `go build` teaches
 // the person to click through it, after which it protects nothing.
 
-import "testing"
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/opencode-ai/opencode/internal/permission"
+)
 
 func TestCommandsThatCannotBeTakenBackAreRecognised(t *testing.T) {
 	for cmd, want := range map[string]string{
@@ -98,6 +105,21 @@ func TestOrdinaryWorkIsNotCalledDangerous(t *testing.T) {
 	} {
 		if got := DangerousPatternIn(cmd); got != nil {
 			t.Errorf("REGRESSION: ordinary command called dangerous (%s): %s", got.Name, cmd)
+		}
+	}
+}
+
+// Found with a real model (gemma-4-e2b, 2026-10-04): a refusal that says only
+// "Permission denied" leaves the model and the person with nothing to act on.
+func TestARefusedDangerousCommandSaysWhyAndWhatToDo(t *testing.T) {
+	err := fmt.Errorf("%w: this command was NOT run, because %s. It needs a person to approve it",
+		permission.ErrorPermissionDenied, DangerousPatternIn("git reset --hard").Why)
+	if !errors.Is(err, permission.ErrorPermissionDenied) {
+		t.Fatal("the explained refusal is no longer recognised as a permission denial, so the turn would not end")
+	}
+	for _, want := range []string{"NOT run", "never committed", "person"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal does not say %q: %v", want, err)
 		}
 	}
 }

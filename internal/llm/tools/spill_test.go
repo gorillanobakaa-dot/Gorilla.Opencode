@@ -111,3 +111,24 @@ func TestOldSpilledOutputIsPruned(t *testing.T) {
 		t.Errorf("%d spilled files kept; the limit is %d", len(entries), spillKeep)
 	}
 }
+
+// Found with a real model (gemma-4-e2b, 2026-10-04). The notice naming the saved
+// file sat in the middle of 30,000 bytes; the model never opened the file and
+// reported that the line it was asked for did not exist. The LAST lines of a
+// result are what a model weighs, so the file and the warning must be there.
+func TestTheTruncationNoticeIsTheLastThingInTheResult(t *testing.T) {
+	useTempSpillDir(t)
+	out := strings.Repeat("record processed ok\n", 3000) + "NEEDLE: the one line that matters\n" +
+		strings.Repeat("record processed ok\n", 3000)
+	got := truncateOutput(out)
+
+	tail := got[len(got)-1100:]
+	for _, want := range []string{"OUTPUT TRUNCATED", "saved at", "Do not conclude that something is absent"} {
+		if !strings.Contains(tail, want) {
+			t.Errorf("the end of a truncated result does not say %q; a model that reads the start and the end never learns the middle exists:\n%s", want, tail)
+		}
+	}
+	if !strings.HasSuffix(strings.TrimSpace(got), "]") {
+		t.Errorf("the notice is not the final thing in the result")
+	}
+}

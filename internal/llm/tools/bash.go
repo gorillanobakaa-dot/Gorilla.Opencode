@@ -276,6 +276,17 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 			},
 		)
 		if !p {
+			// GORILLA FIX (2026-10-04): say WHY. Measured with a real model:
+			// an unattended run asked to `git reset --hard` was correctly
+			// refused, the tool result read "Permission denied", and the run
+			// printed "No content available" and exited 0. The work was saved
+			// and nobody was told what had happened or why.
+			if irreversible != "" {
+				return ToolResponse{}, fmt.Errorf("%w: this command was NOT run, because %s. "+
+					"It needs a person to approve it: run it yourself in a terminal, or start "+
+					"Gorilla OpenCode interactively and approve it when asked",
+					permission.ErrorPermissionDenied, irreversible)
+			}
 			return ToolResponse{}, permission.ErrorPermissionDenied
 		}
 	}
@@ -441,8 +452,23 @@ func truncateOutput(content string) string {
 	truncatedLinesCount := countLines(content[halfLength : len(content)-halfLength])
 	// The middle is where a build's first error usually is. Keep it on disk
 	// rather than make the model run the command again to see it. See spill.go.
-	return fmt.Sprintf("%s\n\n... [%d lines truncated.%s] ...\n\n%s",
-		start, truncatedLinesCount, spillNotice(spillOutput("bash", content)), end)
+	//
+	// GORILLA FIX (2026-10-04): the notice is stated at the END as well, and it
+	// says what must not be concluded. Measured with a real model the same day:
+	// gemma-4-e2b was asked for the one line containing NEEDLE in 6,001 lines of
+	// output. The line was in the cut middle, the complete output was on disk,
+	// and the notice naming the file sat in the middle of 30,000 bytes. The
+	// model never opened the file and answered "the word NEEDLE was not found in
+	// the output" — a false statement drawn from a fragment, which is the exact
+	// failure clampToolContent's own comment warns about. A notice the reader
+	// does not see is not a notice. The last lines of a result are the ones a
+	// model weighs most, so that is where it goes.
+	notice := spillNotice(spillOutput("bash", content))
+	tail := fmt.Sprintf("\n\n[OUTPUT TRUNCATED: %d lines from the MIDDLE are not shown above. "+
+		"Do not conclude that something is absent from this output: it may be in the part not shown.%s]",
+		truncatedLinesCount, notice)
+	return fmt.Sprintf("%s\n\n... [%d lines truncated here; see the note at the end] ...\n\n%s%s",
+		start, truncatedLinesCount, end, tail)
 }
 
 func countLines(s string) int {

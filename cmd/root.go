@@ -551,7 +551,17 @@ func setupSubscriptions(app *app.App, parentCtx context.Context) (chan tea.Msg, 
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
-		if runtime.GOOS == "windows" {
+		// The pause exists for a window opened by double-clicking the icon: it
+		// would otherwise close before the error could be read.
+		//
+		// GORILLA FIX (2026-10-04): not for a run started with -p. That run has
+		// nobody at the keyboard by definition, so waiting for Enter turns every
+		// error into a hang, and the line itself was printed on STDOUT where a
+		// script reads it as the model's answer. Measured: a headless run ended
+		// by the loop detector printed "[Gorilla OpenCode] An error occurred.
+		// Press Enter to exit..." as its result.
+		headless, _ := rootCmd.Flags().GetString("prompt")
+		if runtime.GOOS == "windows" && headless == "" {
 			fmt.Println("\n[Gorilla OpenCode] An error occurred. Press Enter to exit...")
 			var b = make([]byte, 1)
 			os.Stdin.Read(b)

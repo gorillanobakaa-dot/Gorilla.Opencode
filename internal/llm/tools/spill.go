@@ -34,6 +34,7 @@ package tools
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -132,6 +133,20 @@ func spillNotice(path string) string {
 	if path == "" {
 		return ""
 	}
-	return fmt.Sprintf(" The COMPLETE output is saved at %s — read the part you need with view "+
-		"(offset and limit) or search it with find; do not re-run the command to see it.", path)
+	// GORILLA FIX (2026-10-04): hand over the call, do not describe it.
+	//
+	// Measured twice with a real model (gemma-4-e2b). Given "read the part you
+	// need with view or search it with find", it called neither. The first time
+	// it reported the line it was asked for as absent; the second time it
+	// invented one. A small model carries out a call it is given and does not
+	// compose one from a description — the reason every Fieldkit answer ends in
+	// a NEXT: line. The path is JSON-encoded here so the suggested call is valid
+	// as written: a Windows path pasted with single backslashes is the exact
+	// malformed argument toolinput.go exists to repair.
+	call, err := json.Marshal(map[string]string{"query": "the text you are looking for", "path": path})
+	if err != nil {
+		return fmt.Sprintf(" The COMPLETE output is saved at %s .", path)
+	}
+	return fmt.Sprintf(" The COMPLETE output is saved at %s and can be searched. Do not answer from the "+
+		"part shown above and do not re-run the command.\nNEXT: call the find tool with %s", path, call)
 }
