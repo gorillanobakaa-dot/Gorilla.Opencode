@@ -3,9 +3,12 @@ package app
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -199,6 +202,10 @@ func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat
 		// ended a turn, and the run printed "Error: agent processing failed:"
 		// in front of a sentence written for a person. The sentence stands on
 		// its own; the exit code still says the task was not finished.
+		// The receipt goes out on every ending that did work, not only the
+		// successful one: a run that was stopped is the run whose record a
+		// person most needs. On stderr here, beside the error it explains.
+		a.printReceipt(os.Stderr, sess.ID)
 		var stuck *agent.StuckError
 		if errors.As(result.Error, &stuck) {
 			return errors.New(stuck.Reason)
@@ -231,6 +238,7 @@ func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat
 				}
 			}
 		}
+		a.printReceipt(os.Stderr, sess.ID)
 		return fmt.Errorf("stopped without finishing: %s", why)
 	}
 
@@ -240,7 +248,27 @@ func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat
 		content = result.Message.Content().String()
 	}
 
-	fmt.Println(format.FormatOutput(content, outputFormat))
+	// GORILLA OVERRIDE (2026-10-04): the answer, then the receipt. See
+	// receipt.go. Set GORILLA_OPENCODE_NO_RECEIPT=1 for the answer alone, for a
+	// script that parses this output and cannot be changed.
+	receipt, haveReceipt := a.receipt(sess.ID)
+	if !haveReceipt || os.Getenv("GORILLA_OPENCODE_NO_RECEIPT") == "1" {
+		fmt.Println(format.FormatOutput(content, outputFormat))
+	} else if f, _ := format.Parse(outputFormat); f == format.JSON {
+		out, err := json.MarshalIndent(struct {
+			Response string  `json:"response"`
+			Receipt  Receipt `json:"receipt"`
+		}{content, receipt}, "", "  ")
+		if err != nil {
+			fmt.Println(format.FormatOutput(content, outputFormat))
+		} else {
+			fmt.Println(string(out))
+		}
+	} else {
+		fmt.Println(content)
+		fmt.Println()
+		fmt.Print(receipt.Text())
+	}
 
 	logging.Info("Non-interactive run completed", "session_id", sess.ID)
 
@@ -295,4 +323,25 @@ func (app *App) ReloadCoderTools() (deferred bool) {
 	// loadout toggles (the env block can be thousands of tokens) take
 	// effect immediately, not on restart.
 	return app.CoderAgent.RebuildProvider()
+}
+
+// receipt builds the program's own account of one session. The second value is
+// false when the record could not be read; the caller then prints the answer
+// alone rather than a receipt that says nothing ran.
+func (a *App) receipt(sessionID string) (Receipt, bool) {
+	msgs, err := a.Messages.List(context.Background(), sessionID)
+	if err != nil {
+		logging.Warn("could not read the session to build the receipt", "session_id", sessionID, "err", err)
+		return Receipt{}, false
+	}
+	return BuildReceipt(msgs), true
+}
+
+func (a *App) printReceipt(w io.Writer, sessionID string) {
+	if os.Getenv("GORILLA_OPENCODE_NO_RECEIPT") == "1" {
+		return
+	}
+	if r, ok := a.receipt(sessionID); ok {
+		fmt.Fprint(w, r.Text())
+	}
 }
