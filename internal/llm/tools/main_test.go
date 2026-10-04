@@ -34,6 +34,12 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
+	// GORILLA FIX (2026-10-04): same mistake, third time. Oversized results are
+	// now kept on disk (spill.go) under the STATE directory, which IsolateWith
+	// does not redirect — so the first run of the response-cap tests left two
+	// 3 MB files in the developer's real ~/.local/state. Point it at the
+	// throwaway directory for the whole binary.
+	spillDirOverride = dir + "/tool-output"
 	code := configtest.IsolateWith(m, func() {
 		if _, err := config.Load(dir, false); err != nil {
 			os.RemoveAll(dir)

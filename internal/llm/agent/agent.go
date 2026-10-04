@@ -511,6 +511,9 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 	// That is how a control gets switched off in practice while still looking
 	// present in the source. See internal/permission/taint.go.
 	permission.ClearTaint(sessionID)
+	// Same boundary, same reason: the person has seen the last turn. Whatever
+	// the model repeated then is not held against what they ask for now.
+	stuck.Reset(sessionID)
 	// Append the new user message to the conversation history.
 	msgHistory := append(msgs, userMsg)
 
@@ -635,6 +638,10 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 
 	toolResults := make([]message.ToolResult, len(assistantMsg.ToolCalls()))
 	toolCalls := assistantMsg.ToolCalls()
+	// ran[i] is true once call i has been attempted, whatever came of it. A
+	// call that was cancelled or refused stays false. See aftertool.go.
+	ran := make([]bool, len(toolCalls))
+	stuckStop := ""
 	for i, toolCall := range toolCalls {
 		select {
 		case <-ctx.Done():
@@ -650,6 +657,7 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 			goto out
 		default:
 			// Continue processing
+			ran[i] = true
 			// GORILLA OVERRIDE: exact match, then ONE control-token cleaning
 			// pass, then exact match again. Nothing else. The rules and the
 			// reasons live in toolname.go — read them before changing this.
@@ -748,6 +756,7 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 			})
 			if toolErr != nil {
 				if errors.Is(toolErr, permission.ErrorPermissionDenied) {
+					ran[i] = false // the person said no; the model did not loop
 					toolResults[i] = message.ToolResult{
 						ToolCallID: toolCall.ID,
 						Content:    "Permission denied",
@@ -804,6 +813,9 @@ out:
 	if len(toolResults) == 0 {
 		return assistantMsg, nil, nil
 	}
+	// GORILLA OVERRIDE (2026-10-04): mask credentials and watch for loops, for
+	// every tool, before anything is stored or sent. See aftertool.go.
+	stuckStop = finishToolResults(sessionID, toolCalls, toolResults, ran)
 	parts := make([]message.ContentPart, 0)
 	for _, tr := range toolResults {
 		parts = append(parts, tr)
@@ -815,9 +827,22 @@ out:
 	if err != nil {
 		return assistantMsg, nil, fmt.Errorf("failed to create cancelled tool message: %w", err)
 	}
+	if stuckStop != "" {
+		// The results are already stored, so the history is whole and the
+		// person can pick up from here. Only the next round trip is not made.
+		logging.Warn("turn stopped: the model was repeating itself",
+			"session", sessionID, "agent", string(a.agentName), "reason", stuckStop)
+		return assistantMsg, &msg, &StuckError{Reason: stuckStop}
+	}
 
 	return assistantMsg, &msg, err
 }
+
+// StuckError ends a turn in which the model was going round in circles. Its
+// text is written for the person, not for a log.
+type StuckError struct{ Reason string }
+
+func (e *StuckError) Error() string { return e.Reason }
 
 // cancelPendingToolCalls writes a "canceled" result for every tool call the
 // assistant announced but never got to run. Returns nil when there are none.

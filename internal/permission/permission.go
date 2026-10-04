@@ -92,6 +92,15 @@ type CreatePermissionRequest struct {
 	// egress unconditionally, because the sink is where a prompt injection
 	// gets paid. See mustAskAnyway.
 	Egress bool `json:"egress"`
+	// Irreversible, when not empty, is the plain sentence saying why a wrong
+	// yes here cannot be taken back ("it deletes the whole disk ..."). The
+	// caller sets it; this package does not judge commands.
+	//
+	// GORILLA OVERRIDE (2026-10-04): auto-approve does not cover these. The
+	// policy is OpenHands' ConfirmRisky (openhands-sdk security/
+	// confirmation_policy.py, MIT) reduced to the one level that matters here:
+	// everything else may be waved through, this may not. See mustAskAnyway.
+	Irreversible string `json:"irreversible,omitempty"`
 }
 
 type PermissionRequest struct {
@@ -365,6 +374,15 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 		s.mu.RLock()
 		unattended := s.unattended
 		s.mu.RUnlock()
+		if unattended && opts.Irreversible != "" {
+			// The other carve-outs log and proceed when nobody is watching,
+			// because refusing them would make unattended runs useless. This
+			// one refuses: a leak can be rotated, a deleted disk cannot.
+			logging.Warn("refusing an irreversible action because nobody is watching",
+				"tool", opts.ToolName, "action", opts.Action, "reason", override,
+				"grant_key", opts.GrantKey, "session", root)
+			return false
+		}
 		if unattended {
 			logging.Warn("auto-approving under a carve-out because nobody is watching",
 				"tool", opts.ToolName, "action", opts.Action, "reason", override,
@@ -595,6 +613,11 @@ func PermissionWaitForTest(d time.Duration) func() {
 //
 // It does not deny anything. It only declines to skip the question.
 func (s *permissionService) mustAskAnyway(opts CreatePermissionRequest, root string) string {
+	// First, because it is the one carve-out whose cost is not a leak or a
+	// stray file but a loss that nothing restores.
+	if opts.Irreversible != "" {
+		return "this cannot be undone: " + opts.Irreversible
+	}
 	if opts.Egress {
 		if reason, ok := TaintOf(root); ok {
 			return "this leaves the machine, and this turn has already read untrusted content (" + reason.Reason + ")"

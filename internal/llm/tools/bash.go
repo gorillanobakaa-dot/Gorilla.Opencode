@@ -248,6 +248,16 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	if sessionID == "" || messageID == "" {
 		return ToolResponse{}, fmt.Errorf("session ID and message ID are required for creating a new file")
 	}
+	// GORILLA OVERRIDE (2026-10-04): a command that cannot be taken back says so
+	// in the prompt, is never treated as read-only, and is asked about even
+	// when auto-approve is on. See dangerous.go.
+	description := fmt.Sprintf("Execute command: %s", params.Command)
+	irreversible := ""
+	if d := DangerousPatternIn(params.Command); d != nil {
+		irreversible = d.Why
+		isSafeReadOnly = false
+		description = fmt.Sprintf("DANGEROUS — %s.\nExecute command: %s", d.Why, params.Command)
+	}
 	if !isSafeReadOnly {
 		p := b.permissions.Request(
 			permission.CreatePermissionRequest{
@@ -257,8 +267,9 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 				Action:    "execute",
 				// Scope the grant to THIS command. "Allow for session" on
 				// `go build ./...` should not also authorise `rm -rf ~`.
-				GrantKey:    params.Command,
-				Description: fmt.Sprintf("Execute command: %s", params.Command),
+				GrantKey:     params.Command,
+				Description:  description,
+				Irreversible: irreversible,
 				Params: BashPermissionsParams{
 					Command: params.Command,
 				},
@@ -428,7 +439,10 @@ func truncateOutput(content string) string {
 	end := content[len(content)-halfLength:]
 
 	truncatedLinesCount := countLines(content[halfLength : len(content)-halfLength])
-	return fmt.Sprintf("%s\n\n... [%d lines truncated] ...\n\n%s", start, truncatedLinesCount, end)
+	// The middle is where a build's first error usually is. Keep it on disk
+	// rather than make the model run the command again to see it. See spill.go.
+	return fmt.Sprintf("%s\n\n... [%d lines truncated.%s] ...\n\n%s",
+		start, truncatedLinesCount, spillNotice(spillOutput("bash", content)), end)
 }
 
 func countLines(s string) int {

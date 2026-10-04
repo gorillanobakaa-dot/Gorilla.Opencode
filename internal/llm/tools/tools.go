@@ -128,8 +128,8 @@ func clampToolContent(content string) string {
 	return content[:MaxToolResponseBytes] + fmt.Sprintf(
 		"\n\n[TRUNCATED: this tool returned %d bytes; %d were kept. "+
 			"The result is incomplete — narrow the request rather than "+
-			"drawing conclusions from this fragment.]",
-		len(content), MaxToolResponseBytes)
+			"drawing conclusions from this fragment.%s]",
+		len(content), MaxToolResponseBytes, spillNotice(spillOutput("tool", content)))
 }
 
 func NewTextResponse(content string) ToolResponse {
