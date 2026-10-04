@@ -95,7 +95,7 @@ source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gorillanobakaa-dot/Gori
 # archive/refs/tags/v${pkgver}.tar.gz, sha256sum it, paste it here, commit to
 # main, then re-download and verify. Do not guess it and do not carry the
 # previous release's value forward.
-sha256sums=('12a1b58ee13d0ae76582d82a3b0fe5a02d9ce0c7ed58c49053345211fb80b9b9')
+sha256sums=('172285999be4ae6558be4ee3b24ce92124e50320f13bae7e7061ba13497b0e51')
 
 build() {
     cd "Gorilla.Opencode-${pkgver}"
