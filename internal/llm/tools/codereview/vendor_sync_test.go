@@ -9,7 +9,7 @@ package codereview
 // change — that is how the .deb once shipped a launcher with no plain-mode
 // action, and how three copies of the desktop entry got out of step.
 //
-// This is 12 Python modules and 34 rule documents rather than one file, so the
+// This is 12 Python modules and 54 rule documents rather than one file, so the
 // check is per-file and names what moved. It only runs on a machine that HAS
 // the development copy; everywhere else there is nothing to drift against.
 

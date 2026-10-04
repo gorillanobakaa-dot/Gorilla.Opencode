@@ -8,6 +8,8 @@ from the OpenCodeReview project:
 - Copyright: Alibaba Group
 - Licence: Apache License 2.0 — full text in `LICENSE.apache-2.0` in this directory
 - Vendored on: 2026-08-06 (34 files, from `main`)
+- Refreshed on: 2026-10-04 (54 files, from `main` at commit `a758d9c`): 20 new docs,
+  and `python.md` updated upstream
 
 ## Why these are here
 

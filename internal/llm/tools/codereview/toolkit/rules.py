@@ -45,7 +45,7 @@ UPSTREAM_PATH = "internal/config/rules/rule_docs"
 LANGUAGE_TO_DOC = {
     "c": "c",
     "cpp": "cpp",
-    "objc": "c",           # near enough for memory/buffer guidance
+    "objc": "objc",        # upstream has its own doc since the 2026-10-04 refresh
     "objcpp": "cpp",
     "python": "python",
     "javascript": "ts_js_tsx_jsx",
@@ -70,22 +70,163 @@ FILENAME_TO_DOC = {
     "build.gradle.kts": "build_gradle",
 }
 
+# Extensions the analyser registry has NO language for, but a rule doc exists
+# for. Without this table those docs are dead weight: rules_for_languages() only
+# sees languages the registry can classify, so a Swift or Solidity file got no
+# guidance and no sign any was available. Mirrors upstream's system_rules.json.
+EXTENSION_TO_DOC = {
+    ".kt": "kotlin", ".kts": "kotlin",
+    ".php": "php", ".phtml": "php",
+    ".swift": "swift",
+    ".zig": "zig",
+    ".sol": "solidity", ".vy": "vyper",
+    ".rego": "rego",
+    ".proto": "protobuf", ".thrift": "thrift", ".capnp": "capnp",
+    ".graphql": "graphql", ".gql": "graphql",
+    ".prisma": "prisma",
+    ".jl": "julia", ".r": "r",
+    ".tf": "terraform", ".hcl": "terraform", ".tfvars": "terraform",
+    ".bicep": "bicep", ".nix": "nix",
+    ".hs": "haskell", ".lhs": "haskell",
+    ".nim": "nim", ".nims": "nim", ".nimble": "nim",
+    ".elm": "elm",
+    ".jsonnet": "jsonnet", ".libsonnet": "jsonnet",
+    ".ml": "ocaml", ".mli": "ocaml", ".re": "ocaml", ".rei": "ocaml",
+    ".fs": "fsharp", ".fsi": "fsharp", ".fsx": "fsharp",
+    ".v": "verilog", ".sv": "verilog", ".vh": "verilog",
+    ".vhd": "vhdl", ".vhdl": "vhdl",
+    ".ets": "arkts", ".astro": "astro",
+    ".hbs": "handlebars_mustache", ".mustache": "handlebars_mustache",
+    ".jinja2": "jinja", ".j2": "jinja", ".pug": "pug",
+    ".yaml": "yaml", ".yml": "yaml",
+    ".json": "json", ".json5": "json",
+    ".properties": "properties", ".po": "po", ".pot": "pot",
+}
+
+# ".m" is both Objective-C and MATLAB. The registry calls it objc because that
+# is what its analysers can run on; for GUIDANCE the first line decides. These
+# are upstream's signals (internal/config/rules/sniffer.go): a MATLAB file
+# cannot begin with "/" and its comments start with "%", so a C-style comment
+# opener is itself a reliable Objective-C sign.
+OBJC_FIRST_LINE = ("#import", "#include", "#pragma", "#if", "#define",
+                   "@import", "@interface", "@implementation", "@class",
+                   "@protocol", "//", "/*")
+
 DEFAULT_DOC = "default"
 
+# A project may keep its own rule docs in this directory at its root, named
+# exactly like the vendored ones (c.md, python.md, default.md, ...). Layering,
+# highest first -- the idea is upstream's custom > project > global > system:
+#
+#   <project>/.code-review-rules/<doc>.md     the project's own
+#   rule_docs/<doc>.md                        vendored
+#
+# The project's text is ADDED after the vendored text, because the usual need is
+# "also check our house rule", not "forget everything else". A project file
+# whose first line is exactly  <!-- replace -->  replaces the vendored doc.
+PROJECT_RULES_DIRNAME = ".code-review-rules"
+REPLACE_MARKER = "<!-- replace -->"
+
 _cache: Dict[str, str] = {}
+_project_dir: str = ""
+_sources: Dict[str, str] = {}
+
+
+def set_project(target_dir: str) -> None:
+    """Point the resolver at a project so its own rule docs are layered in.
+    Clears the cache: the same doc name now resolves differently."""
+    global _project_dir
+    _project_dir = target_dir or ""
+    _cache.clear()
+    _sources.clear()
+
+
+def _read_file(path: str) -> str:
+    try:
+        # utf-8 stated outright: the platform default on Windows is cp1252, which
+        # turns every non-ASCII character in a rule doc into mojibake.
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
 
 
 def _read(doc: str) -> str:
     if doc in _cache:
         return _cache[doc]
-    path = os.path.join(RULES_DIR, f"{doc}.md")
-    try:
-        with open(path, errors="replace") as f:
-            text = f.read().strip()
-    except OSError:
-        text = ""
+    system = _read_file(os.path.join(RULES_DIR, f"{doc}.md"))
+    project = ""
+    if _project_dir:
+        project = _read_file(os.path.join(_project_dir, PROJECT_RULES_DIRNAME, f"{doc}.md"))
+
+    if project.startswith(REPLACE_MARKER):
+        text, source = project[len(REPLACE_MARKER):].strip(), "project"
+    elif project and system:
+        text = system + "\n\n#### Project rules (from " + PROJECT_RULES_DIRNAME + ")\n" + project
+        source = "system+project"
+    elif project:
+        text, source = project, "project"
+    else:
+        text, source = system, "system"
+
     _cache[doc] = text
+    if text:
+        _sources[doc] = source
     return text
+
+
+def sources() -> Dict[str, str]:
+    """{doc: "system" | "project" | "system+project"} for every doc read so far,
+    so a reader can tell which rules were the project's own."""
+    return dict(_sources)
+
+
+def doc_for_file(path: str) -> str:
+    """The rule doc name for one file, or "" if none applies. Filename first
+    (pom.xml), then the extensions the registry cannot classify, then ".m"."""
+    base = os.path.basename(path).lower()
+    if base in FILENAME_TO_DOC:
+        return FILENAME_TO_DOC[base]
+    ext = os.path.splitext(base)[1]
+    # Three docs upstream keys on a path PATTERN rather than a name: CI
+    # workflows, other .github configuration, and MyBatis mapper/DAO XML.
+    parts = path.replace("\\", "/").lower().split("/")
+    if ext in (".yml", ".yaml") and ".github" in parts:
+        return "github_workflows" if "workflows" in parts else "github_config"
+    if ext == ".xml" and ("mapper" in base or "dao" in base):
+        return "mapper_dao_xml"
+    if ext == ".m":
+        return "objc" if _looks_like_objc(path) else "matlab"
+    return EXTENSION_TO_DOC.get(ext, "")
+
+
+def _looks_like_objc(path: str) -> bool:
+    """First non-blank line decides, as upstream does: an Objective-C signal
+    means Objective-C, anything else means MATLAB. A file that cannot be read
+    is Objective-C, which is what the registry already assumes for ".m"."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    return line.startswith(OBJC_FIRST_LINE)
+    except OSError:
+        return True
+    return False
+
+
+def rules_for_files(files) -> dict:
+    """{doc: guidance} for files matched by NAME or EXTENSION rather than by a
+    registry language: build files, config formats, and every language the
+    registry has no analyser for. Complements rules_for_languages()."""
+    out = {}
+    for f in files or []:
+        doc = doc_for_file(f)
+        if doc and doc not in out:
+            text = _read(doc)
+            if text:
+                out[doc] = text
+    return dict(sorted(out.items()))
 
 
 def available() -> list:
@@ -102,8 +243,10 @@ def for_language(lang: str) -> str:
     callers should treat that as "no guidance", never as "nothing to check"."""
     if not lang:
         return ""
-    doc = LANGUAGE_TO_DOC.get(lang, lang)
-    return _read(doc) if doc else ""
+    # A language mapped to None has no VENDORED doc; a project may still keep
+    # one under the language's own name, so fall back to that rather than "".
+    doc = LANGUAGE_TO_DOC.get(lang, lang) or lang
+    return _read(doc)
 
 
 def for_filename(path: str) -> str:

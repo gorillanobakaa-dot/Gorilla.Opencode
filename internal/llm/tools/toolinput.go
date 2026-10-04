@@ -33,6 +33,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 // UnmarshalToolInput decodes a model's tool arguments into a parameter struct,
@@ -63,13 +64,41 @@ func UnmarshalToolInput(raw string, into any) error {
 	// only doubles a backslash that is not already starting a legal JSON escape
 	// — so "\n" stays a newline and "\\" stays an escaped backslash. A path is
 	// recovered; nothing else is reinterpreted.
-	if repaired, ok := escapeLoneBackslashes([]byte(raw)); ok {
-		if err := json.Unmarshal(repaired, into); err == nil {
+	//
+	// GORILLA OVERRIDE (2026-10-04): bare control characters, and containers that
+	// arrive as strings. Both ideas come from alibaba/open-code-review
+	// (internal/tool/comment_args_repair.go, Apache-2.0); the code is ours.
+	//
+	// A small model asked to write a file puts a REAL newline inside the JSON
+	// string instead of the two characters backslash-n. JSON forbids every byte
+	// below 0x20 inside a string, so the whole call is refused and the content is
+	// lost. Escaping those bytes is lossless: a raw newline inside a string
+	// literal has no other possible meaning.
+	//
+	// The repairs are tried alone and together, and one is used only if the
+	// result then decodes. base keeps the first repaired text that is at least
+	// valid JSON, so the field-level coercions below have something to work on.
+	base := []byte(raw)
+	var candidates [][]byte
+	if slashes, ok := escapeLoneBackslashes([]byte(raw)); ok {
+		candidates = append(candidates, slashes)
+	}
+	if controls, ok := escapeBareControls([]byte(raw)); ok {
+		candidates = append(candidates, controls)
+		if both, ok := escapeLoneBackslashes(controls); ok {
+			candidates = append(candidates, both)
+		}
+	}
+	for _, c := range candidates {
+		if err := json.Unmarshal(c, into); err == nil {
 			return nil
+		}
+		if !json.Valid(base) && json.Valid(c) {
+			base = c
 		}
 	}
 
-	coerced, ok := coerceScalarStrings([]byte(raw), into)
+	coerced, ok := coerceFields(base, into)
 	if !ok {
 		return strictErr
 	}
@@ -81,12 +110,20 @@ func UnmarshalToolInput(raw string, into any) error {
 	return nil
 }
 
-// coerceScalarStrings rewrites quoted scalars to bare ones, but ONLY for keys
-// whose destination field is numeric or boolean. Reports false when there was
-// nothing it could safely change.
-func coerceScalarStrings(raw []byte, into any) ([]byte, bool) {
+// coerceFields rewrites a value whose SHAPE is wrong for the field it is headed
+// to, and nothing else:
+//
+//   - a quoted scalar ("30", "true") headed for a numeric or boolean field;
+//   - a container serialised into a string headed for a slice, map or struct
+//     field;
+//   - one bare string headed for a []string field, which becomes a list of one.
+//
+// A string headed for a string field is never touched. Reports false when there
+// was nothing it could safely change.
+func coerceFields(raw []byte, into any) ([]byte, bool) {
 	kinds := scalarFieldKinds(into)
-	if len(kinds) == 0 {
+	containers := containerFieldTypes(into)
+	if len(kinds) == 0 && len(containers) == 0 {
 		return nil, false
 	}
 
@@ -97,20 +134,23 @@ func coerceScalarStrings(raw []byte, into any) ([]byte, bool) {
 
 	changed := false
 	for key, val := range obj {
-		kind, wanted := kinds[key]
-		if !wanted {
-			continue
-		}
 		var s string
 		if err := json.Unmarshal(val, &s); err != nil {
-			continue // already a number/bool, or something else entirely
+			continue // not a string, so its shape is not this function's business
 		}
-		lit, ok := scalarLiteral(s, kind)
-		if !ok {
+		if kind, wanted := kinds[key]; wanted {
+			if lit, ok := scalarLiteral(s, kind); ok {
+				obj[key] = json.RawMessage(lit)
+				changed = true
+			}
 			continue
 		}
-		obj[key] = json.RawMessage(lit)
-		changed = true
+		if typ, wanted := containers[key]; wanted {
+			if lit, ok := containerLiteral(s, typ); ok {
+				obj[key] = json.RawMessage(lit)
+				changed = true
+			}
+		}
 	}
 	if !changed {
 		return nil, false
@@ -270,4 +310,262 @@ func escapeLoneBackslashes(raw []byte) ([]byte, bool) {
 
 func isHex(b byte) bool {
 	return (b >= '0' && b <= '9') || (b >= 'a' && b <= 'f') || (b >= 'A' && b <= 'F')
+}
+
+// containerFieldTypes maps json keys to the type of the field behind them, for
+// slice, array, map and struct fields only.
+func containerFieldTypes(into any) map[string]reflect.Type {
+	t := reflect.TypeOf(into)
+	for t != nil && t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t == nil || t.Kind() != reflect.Struct {
+		return nil
+	}
+	out := map[string]reflect.Type{}
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		name := jsonKey(f)
+		if name == "" {
+			continue
+		}
+		ft := f.Type
+		for ft.Kind() == reflect.Ptr {
+			ft = ft.Elem()
+		}
+		switch ft.Kind() {
+		case reflect.Slice, reflect.Array, reflect.Map, reflect.Struct:
+			out[name] = ft
+		}
+	}
+	return out
+}
+
+// containerLiteral recovers the container a model serialised into a string.
+//
+// Three cases, in order of how much is assumed:
+//
+//  1. The string is itself valid JSON of the right outer shape. Unwrap it; this
+//     assumes nothing.
+//  2. The string looks like a container but does not parse, because the model
+//     dropped one level of escaping. Repair it, and accept the result only if it
+//     passes repairedContainerAcceptable.
+//  3. The field is a list of strings and the model sent one plain string. That
+//     is a list of one.
+func containerLiteral(s string, typ reflect.Type) (string, bool) {
+	trimmed := strings.TrimSpace(s)
+	if trimmed == "" {
+		return "", false
+	}
+
+	open := byte('{')
+	if typ.Kind() == reflect.Slice || typ.Kind() == reflect.Array {
+		open = '['
+	}
+	if trimmed[0] == open {
+		if json.Valid([]byte(trimmed)) {
+			return trimmed, true
+		}
+		repaired, n := repairSerializedContainer(trimmed)
+		if n > 0 && repairedContainerAcceptable(repaired, typ) {
+			return repaired, true
+		}
+		return "", false
+	}
+
+	if typ.Kind() == reflect.Slice && typ.Elem().Kind() == reflect.String {
+		lit, err := json.Marshal([]string{s})
+		if err != nil {
+			return "", false
+		}
+		return string(lit), true
+	}
+	return "", false
+}
+
+// escapeBareControls escapes every byte below 0x20 that sits inside a JSON
+// string literal. Reports false when there was nothing to change.
+func escapeBareControls(raw []byte) ([]byte, bool) {
+	out := make([]byte, 0, len(raw)+16)
+	inString := false
+	changed := false
+	for i := 0; i < len(raw); i++ {
+		c := raw[i]
+		if !inString {
+			if c == '"' {
+				inString = true
+			}
+			out = append(out, c)
+			continue
+		}
+		switch {
+		case c == '\\' && i+1 < len(raw):
+			// Copy an escape pair whole, so an escaped quote does not end the string.
+			out = append(out, c, raw[i+1])
+			i++
+		case c == '"':
+			inString = false
+			out = append(out, c)
+		case c < 0x20:
+			out = append(out, controlEscape(c)...)
+			changed = true
+		default:
+			out = append(out, c)
+		}
+	}
+	if !changed {
+		return nil, false
+	}
+	return out, true
+}
+
+// controlEscape is the JSON escape for a control character: the short form
+// where JSON has one, the six-character unicode form otherwise.
+func controlEscape(c byte) string {
+	switch c {
+	case '\n':
+		return `\n`
+	case '\r':
+		return `\r`
+	case '\t':
+		return `\t`
+	case '\b':
+		return `\b`
+	case '\f':
+		return `\f`
+	}
+	const hex = "0123456789abcdef"
+	return `\u00` + string([]byte{hex[c>>4], hex[c&0x0f]})
+}
+
+// repairSerializedContainer escapes what makes a model-serialised container
+// invalid: quotes inside prose, bare control characters, backslashes that open
+// no legal escape. It returns the text and how many characters it escaped.
+//
+// A real closing quote is always followed by ',' '}' ']' ':' or the end of the
+// text. A quote followed by anything else is content. So the scan never misses
+// a genuine terminator; its one possible mistake is ending a string EARLY, at a
+// content quote that happens to precede punctuation. repairedContainerAcceptable
+// exists to catch that.
+func repairSerializedContainer(s string) (string, int) {
+	var b strings.Builder
+	b.Grow(len(s) + 16)
+	escaped := 0
+	inString := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !inString {
+			if c == '"' {
+				inString = true
+			}
+			b.WriteByte(c)
+			continue
+		}
+		switch {
+		case c == '\\':
+			if legalEscapeAt(s, i+1) {
+				b.WriteByte(c)
+				i++
+				b.WriteByte(s[i])
+			} else {
+				b.WriteString(`\\`)
+				escaped++
+			}
+		case c == '"':
+			j := i + 1
+			for j < len(s) && (s[j] == ' ' || s[j] == '\t' || s[j] == '\r' || s[j] == '\n') {
+				j++
+			}
+			if j >= len(s) || s[j] == ',' || s[j] == '}' || s[j] == ']' || s[j] == ':' {
+				inString = false
+				b.WriteByte(c)
+			} else {
+				b.WriteString(`\"`)
+				escaped++
+			}
+		case c < 0x20:
+			b.WriteString(controlEscape(c))
+			escaped++
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String(), escaped
+}
+
+func legalEscapeAt(s string, i int) bool {
+	if i >= len(s) {
+		return false
+	}
+	switch s[i] {
+	case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
+		return true
+	case 'u':
+		return i+4 < len(s) && isHex(s[i+1]) && isHex(s[i+2]) && isHex(s[i+3]) && isHex(s[i+4])
+	}
+	return false
+}
+
+// repairedContainerAcceptable decides whether a repaired container may be used.
+// Parsing again is not enough: a misjudged terminator yields JSON that is valid
+// and wrong. Two checks, both from the upstream repair:
+//
+//   - No object may carry a key the destination does not define. Prose re-read
+//     as structure almost never spells a real field name.
+//   - No string may hold an odd number of double quotes. A value cut short at a
+//     misjudged terminator keeps an unpaired quote; prose quotes come in pairs.
+//
+// A refusal costs nothing: the caller reports the original error and the model
+// resends, which is what happened before this repair existed.
+func repairedContainerAcceptable(repaired string, typ reflect.Type) bool {
+	var v any
+	if err := json.Unmarshal([]byte(repaired), &v); err != nil {
+		return false
+	}
+	return valueAcceptable(v, typ)
+}
+
+func valueAcceptable(v any, typ reflect.Type) bool {
+	for typ != nil && typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+	}
+	switch x := v.(type) {
+	case string:
+		return strings.Count(x, `"`)%2 == 0
+	case []any:
+		var elem reflect.Type
+		if typ != nil && (typ.Kind() == reflect.Slice || typ.Kind() == reflect.Array) {
+			elem = typ.Elem()
+		}
+		for _, e := range x {
+			if !valueAcceptable(e, elem) {
+				return false
+			}
+		}
+	case map[string]any:
+		var fields map[string]reflect.Type
+		if typ != nil && typ.Kind() == reflect.Struct {
+			fields = map[string]reflect.Type{}
+			for i := 0; i < typ.NumField(); i++ {
+				if name := jsonKey(typ.Field(i)); name != "" {
+					fields[name] = typ.Field(i).Type
+				}
+			}
+		}
+		for k, e := range x {
+			var ft reflect.Type
+			if fields != nil {
+				known := false
+				if ft, known = fields[k]; !known {
+					return false
+				}
+			} else if typ != nil && typ.Kind() == reflect.Map {
+				ft = typ.Elem()
+			}
+			if !valueAcceptable(e, ft) {
+				return false
+			}
+		}
+	}
+	return true
 }

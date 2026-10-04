@@ -682,6 +682,101 @@ def write_reports(results_dir: str, target: str, profile: str, files: List[str],
 
 
 # ---------------------------------------------------------------------------
+# Coverage: what was supposed to be looked at, and what actually was.
+#
+# The idea is OpenCodeReview's sealed manifest (alibaba/open-code-review,
+# internal/agent, Apache-2.0): freeze the denominator before reporting, and make
+# every item in it end in exactly one state. Only the idea is taken; this is our
+# own code over our own job records.
+#
+# It exists because the trust block used to list a tool under tools_ran merely
+# for having been SCHEDULED. A machine with no analysers installed reported
+# "Analysers that ran: 18" and "NOT INSTALLED, so they never ran: 17" in the same
+# breath, with the same names in both lists, above "All findings: 0".
+# ---------------------------------------------------------------------------
+
+def review_rules_for(ctx: dict, langs, files) -> dict:
+    """Guidance for everything in scope: by registry language, and by file name
+    or extension for the formats and languages the registry cannot classify.
+    The project's own .code-review-rules/ docs are layered in."""
+    rules.set_project((ctx or {}).get("target", ""))
+    out = rules.rules_for_files(files)
+    out.update(rules.rules_for_languages(langs))
+    return out
+
+
+JOB_STATES = ("completed", "missing", "errored", "timed_out")
+
+
+def job_state(r) -> str:
+    """Exactly one terminal state per job. The four states partition the jobs:
+    a job is never counted twice and never left out."""
+    if r.returncode == 127:
+        return "missing"
+    if r.returncode == 124:
+        return "timed_out"
+    if r.issue_count == 0 and r.returncode != 0:
+        return "errored"
+    return "completed"
+
+
+def coverage_of(files, all_results) -> dict:
+    """The sealed account of a run: jobs by terminal state, tools by whether any
+    of their jobs completed, and each language in scope by whether ANY analyser
+    for it completed.
+
+    A language is:
+      reviewed      at least one analyser for it completed
+      unreviewed    analysers were scheduled for it and none completed
+      no-analyser   nothing in the registry was scheduled for it at all
+    """
+    states = {s: 0 for s in JOB_STATES}
+    by_tool: Dict[str, Set[str]] = {}
+    for r in all_results:
+        st = job_state(r)
+        states[st] += 1
+        by_tool.setdefault(r.job.tool_id, set()).add(st)
+
+    completed_tools = sorted(t for t, st in by_tool.items() if "completed" in st)
+    never_completed = sorted(t for t, st in by_tool.items() if "completed" not in st)
+
+    languages = {}
+    for lang in sorted(languages_of(files)):
+        ran, not_run = [], []
+        for tid in sorted(by_tool):
+            tool = TOOLS_BY_ID.get(tid)
+            if tool is None or lang not in tool.languages:
+                continue        # "*" tools (secrets, recon) review no language
+            (ran if tid in completed_tools else not_run).append(tid)
+        if ran:
+            state = "reviewed"
+        elif not_run:
+            state = "unreviewed"
+        else:
+            state = "no-analyser"
+        languages[lang] = {"state": state, "analysers_completed": ran,
+                           "analysers_not_completed": not_run}
+
+    unreviewed = sorted(l for l, v in languages.items() if v["state"] != "reviewed")
+    if not all_results or not completed_tools:
+        terminal = "nothing-ran"
+    elif unreviewed or never_completed:
+        terminal = "partial"
+    else:
+        terminal = "complete"
+
+    return {
+        "terminal_state": terminal,
+        "jobs_planned": len(all_results),
+        "jobs": states,
+        "tools_completed": completed_tools,
+        "tools_never_completed": never_completed,
+        "languages": languages,
+        "languages_unreviewed": unreviewed,
+    }
+
+
+# ---------------------------------------------------------------------------
 # agent-facing output
 #
 # The Markdown report is written for a person: prose, tables, tick-boxes, "run
@@ -704,7 +799,10 @@ def emit_agent_json(results_dir, target, profile, files, all_results,
                       if r.issue_count == 0 and r.returncode not in (0, 124, 127)})
     missing = sorted({r.job.tool_id for r in all_results if r.returncode == 127})
     timed_out = sorted({r.job.tool_id for r in all_results if r.returncode == 124})
-    ran_ids = {r.job.tool_id for r in all_results}
+    # A tool RAN only if at least one of its jobs reached the end. Scheduling a
+    # job for an analyser that is not installed is not running it.
+    coverage = coverage_of(files, all_results)
+    ran_ids = set(coverage["tools_completed"])
 
     langs = sorted(languages_of(files))
 
@@ -741,6 +839,10 @@ def emit_agent_json(results_dir, target, profile, files, all_results,
         "suppressed_by_baseline": suppressed_n,
         "baseline_problems": baseline_problems,
 
+        # The sealed account: every scheduled job in exactly one state, and each
+        # language marked reviewed only if an analyser for it completed.
+        "coverage": coverage,
+
         # Read this before concluding anything from an empty findings list.
         "trust": {
             "tools_ran": sorted(ran_ids),
@@ -770,7 +872,10 @@ def emit_agent_json(results_dir, target, profile, files, all_results,
 
         # Review know-how for the languages present, so the reader knows what to
         # look for in the code that no tool here can check.
-        "review_rules": rules.rules_for_languages(langs),
+        "review_rules": review_rules_for(ctx, langs, files),
+        # Which docs were the project's own (.code-review-rules/) and which were
+        # the vendored ones. Read after review_rules: it reports what that read.
+        "review_rule_sources": rules.sources(),
 
         # Things this toolkit deliberately refuses to auto-run, as literal
         # commands. An agent CAN run these -- it has a shell -- so they are

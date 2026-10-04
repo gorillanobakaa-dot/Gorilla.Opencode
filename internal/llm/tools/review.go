@@ -337,6 +337,19 @@ type agentReport struct {
 		Caveat        string   `json:"caveat"`
 	} `json:"trust"`
 
+	// Coverage is the sealed account of the run: every scheduled job in exactly
+	// one state, and each language reviewed only if an analyser for it finished.
+	// Absent from reports written by a toolkit older than 2026-10-04.
+	Coverage *struct {
+		TerminalState string         `json:"terminal_state"`
+		JobsPlanned   int            `json:"jobs_planned"`
+		Jobs          map[string]int `json:"jobs"`
+		Languages     map[string]struct {
+			State string `json:"state"`
+		} `json:"languages"`
+		Unreviewed []string `json:"languages_unreviewed"`
+	} `json:"coverage"`
+
 	ManualSteps []string `json:"manual_steps"`
 }
 
@@ -359,6 +372,31 @@ func summariseReview(raw []byte, focus string) (string, error) {
 
 	// 1. WHAT DID NOT RUN.
 	b.WriteString("## Trust — read this before the findings\n\n")
+	// GORILLA OVERRIDE (2026-10-04): the verdict comes before the lists.
+	//
+	// A small model was handed "Analysers that ran: 18", "NOT INSTALLED: 17" and
+	// "All findings: 0" and had to work out for itself that nothing had been
+	// reviewed. The sealed coverage block (idea from alibaba/open-code-review's
+	// run manifest) states the conclusion outright, so it is read, not derived.
+	if c := rep.Coverage; c != nil {
+		switch c.TerminalState {
+		case "nothing-ran":
+			b.WriteString("- **NOTHING WAS REVIEWED.** No analyser completed a single job. " +
+				"The empty findings list below means nothing ran, not that the code is clean. " +
+				"Do not report this code as reviewed.\n")
+		case "partial":
+			fmt.Fprintf(&b, "- **PARTIAL REVIEW.** %d of %d scheduled jobs completed.",
+				c.Jobs["completed"], c.JobsPlanned)
+			if len(c.Unreviewed) > 0 {
+				fmt.Fprintf(&b, " **Languages with NO completed analyser: %s** — say so in your answer.",
+					strings.Join(c.Unreviewed, ", "))
+			}
+			b.WriteString("\n")
+		case "complete":
+			fmt.Fprintf(&b, "- Coverage: all %d scheduled jobs completed, every language in scope had an analyser finish.\n",
+				c.JobsPlanned)
+		}
+	}
 	fmt.Fprintf(&b, "- Analysers that ran: %d (%s)\n", len(rep.Trust.ToolsRan), joinCapped(rep.Trust.ToolsRan, 14))
 	if n := len(rep.Trust.ToolsMissing); n > 0 {
 		fmt.Fprintf(&b, "- **NOT INSTALLED, so they never ran: %d (%s)** — the code they cover is UNREVIEWED\n",

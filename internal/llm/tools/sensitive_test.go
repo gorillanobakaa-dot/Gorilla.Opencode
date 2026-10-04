@@ -96,3 +96,50 @@ func TestWorkspaceFixturesAreStillExempt(t *testing.T) {
 		t.Errorf("refused a file inside the workspace: %s\n%s", p, why)
 	}
 }
+
+// GORILLA OVERRIDE (2026-10-04): the names taken from comparing this list with
+// alibaba/open-code-review's secret patterns.
+func TestRegistryTokensAndEnvFilesOutsideTheProjectAreRefused(t *testing.T) {
+	for _, p := range []string{
+		"/home/gorilla/_netrc",
+		"/home/gorilla/.npmrc",
+		"/home/gorilla/.pypirc",
+		"/home/gorilla/.dockercfg",
+		"/home/gorilla/other-project/.env",
+		"/home/gorilla/other-project/.env.production",
+		"/home/gorilla/other-project/.ENV.local",
+	} {
+		if why := RefuseSensitiveRead(p); why == "" {
+			t.Errorf("ALLOWED a credential read: %s", p)
+		}
+	}
+}
+
+// CAPABILITY GUARD. The template spellings hold placeholders and are what a
+// person is told to copy from; a name that merely starts with "env" is not an
+// environment file at all.
+func TestEnvTemplatesAndLookalikesStayReadable(t *testing.T) {
+	for _, p := range []string{
+		"/home/gorilla/other-project/.env.example",
+		"/home/gorilla/other-project/.env.sample",
+		"/home/gorilla/other-project/.env.template",
+		"/home/gorilla/other-project/.envrc.md",
+		"/home/gorilla/other-project/environment.md",
+		"/home/gorilla/other-project/env.go",
+	} {
+		if why := RefuseSensitiveRead(p); why != "" {
+			t.Errorf("REGRESSION: refused a harmless file %q: %s", p, why)
+		}
+	}
+}
+
+// And inside the project the user's own .env is still theirs to open.
+func TestAnEnvFileInsideTheWorkspaceIsStillExempt(t *testing.T) {
+	wd := config.WorkingDirectory()
+	if wd == "" {
+		t.Skip("no workspace")
+	}
+	if why := RefuseSensitiveRead(filepath.Join(wd, ".env")); why != "" {
+		t.Errorf("refused a file inside the workspace: %s", why)
+	}
+}

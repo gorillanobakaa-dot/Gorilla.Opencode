@@ -46,6 +46,23 @@ var sensitiveBasenames = []string{
 	"credentials", "authorized_keys",
 	".netrc", ".pgpass", ".htpasswd",
 	"secring.gpg", "trustdb.gpg",
+	// GORILLA OVERRIDE (2026-10-04): four names this list lacked, found by
+	// comparing it with alibaba/open-code-review's default_secret_patterns.json.
+	// _netrc is what Windows calls .netrc; .npmrc and .pypirc hold registry
+	// upload tokens; .dockercfg is the old location of registry passwords.
+	"_netrc", ".npmrc", ".pypirc", ".dockercfg",
+}
+
+// isDotEnv reports whether a basename is an environment file holding real
+// values. The three template spellings carry placeholders by convention and are
+// what a person is told to copy FROM, so they stay readable. Same rule as
+// upstream's isSecretEnvPath.
+func isDotEnv(lowerBase string) bool {
+	switch lowerBase {
+	case ".env.example", ".env.sample", ".env.template":
+		return false
+	}
+	return lowerBase == ".env" || strings.HasPrefix(lowerBase, ".env.")
 }
 
 // sensitiveDirSegments mark a directory whose contents are credentials. Matched
@@ -80,6 +97,9 @@ func RefuseSensitiveRead(path string) string {
 		if strings.EqualFold(base, n) {
 			return reason(abs, "it is a credential file")
 		}
+	}
+	if isDotEnv(lower) {
+		return reason(abs, "it is an environment file, which is where API keys and passwords are kept")
 	}
 	for _, suf := range sensitiveSuffixes {
 		if strings.HasSuffix(lower, suf) {

@@ -11,6 +11,8 @@ package tools
 
 import (
 	"encoding/json"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -242,5 +244,91 @@ func TestSecurityFilterJudgesTheFindingNotOnlyTheTool(t *testing.T) {
 	// Dedicated security tools count regardless of wording.
 	if !looksSecurity("low", "anything at all", "", "gitleaks-worktree") {
 		t.Error("a dedicated secrets scanner's finding was dropped")
+	}
+}
+
+// GORILLA OVERRIDE (2026-10-04): the verdict is stated, not left to be derived.
+//
+// The report that prompted this said 18 analysers ran, 17 were not installed,
+// and found nothing — with the same names in both lists. A model reading that
+// has to notice the overlap to learn that nothing was reviewed. The coverage
+// block says it in the first line of the trust section.
+func TestNothingRanIsSaidOutrightBeforeTheLists(t *testing.T) {
+	raw := mustJSON(t, map[string]any{
+		"target": "/src/proj", "files_scanned": 40,
+		"findings": []map[string]any{}, "corroborated": []map[string]any{},
+		"trust": map[string]any{"tools_ran": []string{}, "tools_missing": []string{"bandit", "gosec"}},
+		"coverage": map[string]any{
+			"terminal_state": "nothing-ran", "jobs_planned": 17,
+			"jobs":                 map[string]int{"completed": 0, "missing": 17},
+			"languages_unreviewed": []string{"go", "python"},
+		},
+	})
+	out, err := summariseReview(raw, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	iVerdict := strings.Index(out, "NOTHING WAS REVIEWED")
+	iLists := strings.Index(out, "Analysers that ran")
+	if iVerdict < 0 {
+		t.Fatalf("a run in which no analyser completed is not called what it is:\n%s", out)
+	}
+	if iLists < 0 || iVerdict > iLists {
+		t.Errorf("the verdict comes after the lists; it has to be the first thing read")
+	}
+}
+
+func TestAPartialReviewNamesTheLanguagesNothingLookedAt(t *testing.T) {
+	raw := mustJSON(t, map[string]any{
+		"target": "/src/proj", "files_scanned": 9,
+		"findings": []map[string]any{}, "corroborated": []map[string]any{},
+		"trust": map[string]any{"tools_ran": []string{"flake8"}},
+		"coverage": map[string]any{
+			"terminal_state": "partial", "jobs_planned": 5,
+			"jobs":                 map[string]int{"completed": 2, "missing": 3},
+			"languages_unreviewed": []string{"go"},
+		},
+	})
+	out, err := summariseReview(raw, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"PARTIAL REVIEW", "2 of 5", "NO completed analyser: go"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the summary never says %q:\n%s", want, out)
+		}
+	}
+}
+
+// A report from a toolkit that predates the coverage block must still render.
+func TestAReportWithoutCoverageStillRenders(t *testing.T) {
+	raw := mustJSON(t, map[string]any{
+		"target": "/src/proj", "files_scanned": 1,
+		"findings": []map[string]any{}, "corroborated": []map[string]any{},
+		"trust": map[string]any{"tools_ran": []string{"gofmt"}},
+	})
+	out, err := summariseReview(raw, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "NOTHING WAS REVIEWED") || strings.Contains(out, "PARTIAL REVIEW") {
+		t.Errorf("a verdict was invented for a report that carried no coverage block:\n%s", out)
+	}
+}
+
+// The Python side of the same contract: a tool that was only scheduled is never
+// listed as having run. Runs the toolkit's own check; skipped without Python.
+func TestToolkitCoverageAccountingHolds(t *testing.T) {
+	py, err := exec.LookPath("python")
+	if err != nil {
+		if py, err = exec.LookPath("python3"); err != nil {
+			t.Skipf("no python: %v", err)
+		}
+	}
+	for _, script := range []string{"test_coverage.py", "test_rules.py"} {
+		out, err := exec.Command(py, filepath.Join("codereview", "toolkit", "tests", script)).CombinedOutput()
+		if err != nil {
+			t.Errorf("the toolkit's own check %s failed: %v\n%s", script, err, out)
+		}
 	}
 }
