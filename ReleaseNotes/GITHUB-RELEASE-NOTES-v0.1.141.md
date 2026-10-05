@@ -2,11 +2,14 @@
 
 **Every time it started, the program spent ten seconds re-testing a key it had already tested. It now tests a key when it is new and once a day after that. And on Windows you can update without closing it first.**
 
-> **About the Linux files on this page.** The automatic checks that install them
-> on real Linux run on GitHub's computers, and GitHub's build service has been
-> out of order all evening. The checks had not run when this page went up, and
-> there is no Arch package for this version yet for the same reason. They run
-> when the service is back, and this note will be replaced by what they printed.
+> **Linux checks: all passed.** GitHub's build service was out of order when
+> this page went up. When it returned, the checks ran on the files published
+> here. The .deb was installed, started and removed on Ubuntu. The .rpm was
+> installed, started and removed on Fedora. The Arch package was built on Arch
+> Linux, installed, started and removed, and is now attached below. And the
+> program, installed from the .deb, held a conversation with an AI running on
+> the same Linux machine. Sentences further down this page that say these checks
+> had not run were true when it was published.
 
 ## What is this program?
 
