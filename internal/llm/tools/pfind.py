@@ -2939,6 +2939,10 @@ def main():
             print(f)
         if len(all_files) > len(shown):
             print(f"… and {len(all_files) - len(shown)} more file(s) not shown — this list is INCOMPLETE; narrow it with path, glob or type)")
+        elif len(shown) > 1 and (args.globs or getattr(args, "iglobs", None)):
+            # The count is stated so that nobody has to count: a model listed
+            # fifteen paths and reported "14 files", twice (2026-10-05).
+            print(f"[{len(shown)} files found; this list is complete]")
         return 0
 
     # Exploratory Mode (zero query or explicit directory target with tree/long flags)

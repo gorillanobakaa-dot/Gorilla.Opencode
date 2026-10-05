@@ -63,6 +63,9 @@ func TestANamePatternAndATypeMeanBothNotEither(t *testing.T) {
 		assert.NotContains(t, list.Content, "README.md", "%s: the type widened the name pattern", engine)
 		assert.NotContains(t, list.Content, "notes.md", engine)
 
+		all := runFind(t, FindParams{Path: dir, Glob: "*.md"})
+		assert.Contains(t, all.Content, "[3 files found; this list is complete]", "%s: the count must be stated, not left to be counted", engine)
+
 		wide := runFind(t, FindParams{Path: dir, Glob: "gemini*", Type: "md"})
 		assert.Contains(t, wide.Content, "GEMINI.md", engine)
 		assert.NotContains(t, wide.Content, "gemini.txt", "%s: the type did not narrow the name pattern", engine)
