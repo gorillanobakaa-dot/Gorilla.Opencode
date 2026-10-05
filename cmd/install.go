@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/opencode-ai/opencode/internal/assets"
 	"github.com/spf13/cobra"
@@ -86,7 +87,27 @@ func copySelf(dst string) (copied bool, err error) {
 		return false, err
 	}
 	if err := os.WriteFile(dst, data, 0o755); err != nil {
-		return false, fmt.Errorf("writing %s: %w", dst, err)
+		// GORILLA FIX (2026-10-05): updating while the program is open.
+		//
+		// Windows will not let a running program's file be overwritten, so
+		// `install` failed with "being used by another process" whenever any
+		// Gorilla OpenCode window was open, and the only advice available was
+		// "close every window and try again". Windows DOES allow that file to be
+		// RENAMED. So the copy in use is moved aside and the new one written in
+		// its place: the open window carries on with the old version, and the
+		// next one started is the new version. Hit while installing v0.1.140 on
+		// the owner's machine with his own window open.
+		aside := dst + ".replaced-" + time.Now().Format("20060102-150405")
+		if rerr := os.Rename(dst, aside); rerr != nil {
+			return false, fmt.Errorf("writing %s: %w", dst, err)
+		}
+		if werr := os.WriteFile(dst, data, 0o755); werr != nil {
+			_ = os.Rename(aside, dst) // put the working copy back
+			return false, fmt.Errorf("writing %s: %w", dst, werr)
+		}
+		fmt.Printf("note: Gorilla OpenCode is open in another window. That window keeps the old version;\n"+
+			"      the next one you start is the new one. The old file was kept as %s\n"+
+			"      and can be deleted once every window is closed.\n", filepath.Base(aside))
 	}
 	return true, nil
 }
