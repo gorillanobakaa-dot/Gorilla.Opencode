@@ -32,15 +32,8 @@ permissions:
 
 jobs:
   talk:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
-    services:
-      ollama:
-        image: ollama/ollama:latest
-        ports:
-          - 11434:11434
-        env:
-          OLLAMA_CONTEXT_LENGTH: "16384"
     env:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ inputs.tag || github.event.release.tag_name }}
@@ -66,6 +59,12 @@ jobs:
         run: |
           go build -ldflags "-s -w -X github.com/opencode-ai/opencode/internal/version.Version=source" -o gorilla-opencode .
           sudo install -m755 gorilla-opencode /usr/local/bin/gorilla-opencode
+
+      # Started in a step, not as a `services:` container: with the service
+      # block, GitHub twice cancelled this job after fifteen minutes with "The
+      # job was not acquired by Runner of type hosted", before a single step ran.
+      - name: start Ollama on this machine
+        run: docker run -d --name ollama -p 11434:11434 -e OLLAMA_CONTEXT_LENGTH=16384 ollama/ollama:latest
 
       - name: fetch the model into Ollama
         run: |
