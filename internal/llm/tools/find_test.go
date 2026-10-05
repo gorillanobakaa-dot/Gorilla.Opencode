@@ -782,3 +782,38 @@ func setUserCacheDir(t *testing.T, dir string) {
 	}
 	t.Setenv("XDG_CACHE_HOME", dir)
 }
+
+// GORILLA FIX (2026-10-05): the search engine has two ways of listing files,
+// ripgrep when it is installed and plain Python when it is not, and only the
+// first was ever run by these tests, because every development machine has
+// ripgrep. The second was wrong for any pattern with a folder in it. This runs
+// the same questions through BOTH.
+func TestFolderPatternsWorkWithAndWithoutRipgrep(t *testing.T) {
+	dir := t.TempDir()
+	for rel, body := range map[string]string{
+		".github/workflows/ci.yml": "jobs:\n  build:\n",
+		"src/app/main.go":          "package main\n",
+		"src/app/util.go":          "package main\n",
+		"docs/guide.md":            "# guide\n",
+	} {
+		p := filepath.Join(dir, filepath.FromSlash(rel))
+		require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o755))
+		require.NoError(t, os.WriteFile(p, []byte(body), 0o644))
+	}
+	for _, engine := range []string{"ripgrep if installed", "pure Python"} {
+		if engine == "pure Python" {
+			t.Setenv("PFIND_NO_RG", "1")
+		}
+		hidden := runFind(t, FindParams{Path: dir, Glob: ".github/**"})
+		assert.Contains(t, hidden.Content, "ci.yml", "%s: a pattern naming a hidden folder found nothing", engine)
+
+		src := runFind(t, FindParams{Path: dir, Glob: "src/**"})
+		assert.Contains(t, src.Content, "main.go", "%s: src/** found nothing", engine)
+		assert.Contains(t, src.Content, "util.go", "%s", engine)
+		assert.NotContains(t, src.Content, "guide.md", "%s: src/** matched a file outside src", engine)
+
+		byName := runFind(t, FindParams{Path: dir, Glob: "*.md"})
+		assert.Contains(t, byName.Content, "guide.md", "%s: a plain name pattern stopped working", engine)
+		assert.NotContains(t, byName.Content, "main.go", "%s", engine)
+	}
+}

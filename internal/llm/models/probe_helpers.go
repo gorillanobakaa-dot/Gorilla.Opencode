@@ -51,3 +51,14 @@ func EndpointWasProbed(endpoint string) bool {
 	}
 	return false
 }
+
+// EndpointHasModels reports whether any registered model is routed through the
+// named endpoint.
+func EndpointHasModels(endpoint string) bool {
+	for _, r := range localRoute {
+		if r.Endpoint == endpoint {
+			return true
+		}
+	}
+	return false
+}

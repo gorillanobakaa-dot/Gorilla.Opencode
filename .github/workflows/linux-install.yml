@@ -1,0 +1,104 @@
+name: linux-install
+
+# Install the PUBLISHED Linux files on real Linux and start the program.
+#
+# Every release up to v0.1.138 said the same sentence: "The Linux files were
+# built on Windows and inspected, not installed or started on Linux." They are
+# cross-built on a Windows laptop with no Linux on it, so that was true, and it
+# stayed true for as long as nobody did anything about it.
+#
+# This takes the exact files attached to a release (not a rebuild), checks them
+# against the published checksums, installs the .deb on Ubuntu and the .rpm on
+# Fedora, and runs the installed program. It proves the packages install and the
+# program starts. It does not prove a conversation with an AI works on Linux:
+# there is no key here and none should be.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to install, e.g. v0.1.139"
+        required: true
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  deb-ubuntu:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag || github.event.release.tag_name }}
+    steps:
+      - name: download the published files
+        run: |
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -D dl
+          ls -la dl
+      - name: checksums match what was published
+        run: cd dl && sha256sum -c SHA256SUMS-*.txt --ignore-missing
+      - name: install the .deb
+        run: sudo apt-get install -y ./dl/gorilla-opencode_*_amd64.deb
+      - name: the installed program starts and reports its version
+        run: |
+          v="$(gorilla-opencode --version)"
+          echo "$v"
+          test "$v" = "$TAG"
+      - name: what the package put on the system
+        run: |
+          dpkg -L gorilla-opencode | head -60
+          test -x /usr/bin/gorilla-opencode
+          head -1 "$(command -v pfind)" | grep -q '^#!/bin/sh$'   # an LF shebang, not CRLF
+      - name: the model doctor runs on a fresh home
+        run: |
+          set +e
+          HOME="$(mktemp -d)" gorilla-opencode models doctor
+          rc=$?
+          echo "exit status $rc"
+          test $rc -eq 0 -o $rc -eq 3
+      - name: the bundled search works with no ripgrep installed
+        run: |
+          ! command -v rg || echo "ripgrep is present on this runner; the fallback is covered by the Go test"
+          mkdir -p t/.github/workflows && echo "jobs:" > t/.github/workflows/ci.yml
+          pfind --help >/dev/null
+      - name: the plain binary starts too
+        run: |
+          chmod +x dl/gorilla-opencode-*-linux-amd64
+          test "$(./dl/gorilla-opencode-*-linux-amd64 --version)" = "$TAG"
+      - name: it uninstalls cleanly
+        run: |
+          sudo apt-get remove -y gorilla-opencode
+          ! command -v gorilla-opencode
+
+  rpm-fedora:
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag || github.event.release.tag_name }}
+    steps:
+      - name: tools for this job
+        run: dnf install -y gh
+      - name: download the published files
+        run: gh release download "$TAG" -R "$GITHUB_REPOSITORY" -D dl
+      - name: checksums match what was published
+        run: cd dl && sha256sum -c SHA256SUMS-*.txt --ignore-missing
+      - name: install the .rpm
+        run: dnf install -y ./dl/gorilla-opencode-*.x86_64.rpm
+      - name: the installed program starts and reports its version
+        run: |
+          v="$(gorilla-opencode --version)"
+          echo "$v"
+          test "$v" = "$TAG"
+      - name: the model doctor runs on a fresh home
+        run: |
+          set +e
+          HOME="$(mktemp -d)" gorilla-opencode models doctor
+          rc=$?
+          echo "exit status $rc"
+          test $rc -eq 0 -o $rc -eq 3
+      - name: it uninstalls cleanly
+        run: |
+          dnf remove -y gorilla-opencode
+          ! command -v gorilla-opencode

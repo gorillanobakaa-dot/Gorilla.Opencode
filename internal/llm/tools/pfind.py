@@ -194,7 +194,11 @@ RRF_WEIGHTS_DEFAULT = {
     "recency": 0.5,
 }
 
-HAVE_RG = shutil.which("rg") is not None
+# PFIND_NO_RG=1 forces the pure-Python path even where ripgrep is installed, so
+# that path can be TESTED on a machine that has ripgrep. It went untested for
+# exactly that reason: every development machine had rg, the pure-Python glob
+# matcher was wrong, and only a computer without ripgrep ever ran it.
+HAVE_RG = shutil.which("rg") is not None and os.environ.get("PFIND_NO_RG") != "1"
 HAVE_GIT = shutil.which("git") is not None
 
 # ---------------------------------------------------------------------------
@@ -517,7 +521,16 @@ def _apply_user_globs(paths, globs, is_dir=False):
         if "/" not in pattern:
             return (fnmatch.fnmatch(os.path.basename(path), pattern)
                     or fnmatch.fnmatch(path, pattern))
-        return fnmatch.fnmatch(path, pattern)
+        # A glob with a folder in it (".github/**", "src/*.go") is matched by
+        # ripgrep RELATIVE to the search root and at any depth. The paths here
+        # are whatever os.walk joined, usually absolute and, on Windows, with
+        # backslashes, so a plain fnmatch against the whole path matched
+        # nothing: find(glob=".github/**") answered "No matches found" on every
+        # computer without ripgrep, which a model reads as "this project has no
+        # CI". Measured on GitHub's Linux runner, failing since v0.1.135.
+        norm = path.replace(os.sep, "/")
+        pat = pattern.lstrip("/")
+        return (fnmatch.fnmatch(norm, pat) or fnmatch.fnmatch(norm, "*/" + pat))
 
     filtered = []
     for p in paths:
@@ -2805,7 +2818,7 @@ def main():
         roots = resolve_roots(path_list, presets)
         type_globs = resolve_type_globs(args.types, args.types_not)
         all_files = (rg_list_files(roots, args.ext, args.exclude, type_globs, args.hidden, args.no_ignore, args.workers, args.max_depth, globs=args.globs, opts=args)
-                     if HAVE_RG else py_fallback_files(roots, set(args.ext or []), args.exclude, type_globs, args.max_depth, globs=args.globs, opts=args))
+                     if HAVE_RG else py_fallback_files(roots, set(args.ext or []), args.exclude, type_globs, args.max_depth, include_hidden=args.hidden or getattr(args, 'almost_all', False), globs=args.globs, opts=args))
         for r in roots:
             if os.path.isfile(r) and str(r) not in all_files:
                 all_files.append(str(r))
@@ -2824,7 +2837,7 @@ def main():
         roots = resolve_roots(path_list, presets)
         type_globs = resolve_type_globs(args.types, args.types_not)
         all_files = (rg_list_files(roots, args.ext, args.exclude, type_globs, args.hidden, args.no_ignore, args.workers, args.max_depth, globs=args.globs, opts=args)
-                     if HAVE_RG else py_fallback_files(roots, set(args.ext or []), args.exclude, type_globs, args.max_depth, globs=args.globs, opts=args))
+                     if HAVE_RG else py_fallback_files(roots, set(args.ext or []), args.exclude, type_globs, args.max_depth, include_hidden=args.hidden or getattr(args, 'almost_all', False), globs=args.globs, opts=args))
         for r in roots:
             if os.path.isfile(r) and str(r) not in all_files:
                 all_files.append(str(r))
@@ -2982,7 +2995,7 @@ def main():
     name_ranked, name_scores = [], {}
     if do_names:
         files = (rg_list_files(roots, args.ext, args.exclude, type_globs, args.hidden, args.no_ignore, args.workers, args.max_depth, globs=args.globs, opts=args)
-                 if HAVE_RG else py_fallback_files(roots, set(args.ext or []), args.exclude, type_globs, args.max_depth, globs=args.globs, opts=args))
+                 if HAVE_RG else py_fallback_files(roots, set(args.ext or []), args.exclude, type_globs, args.max_depth, include_hidden=args.hidden or getattr(args, 'almost_all', False), globs=args.globs, opts=args))
         for r in roots:
             if os.path.isfile(r) and str(r) not in files:
                 files.append(str(r))
@@ -3008,7 +3021,7 @@ def main():
                 smart_case=args.smart_case
             )
         else:
-            files = py_fallback_files(roots, set(args.ext or []), args.exclude, type_globs, args.max_depth, globs=args.globs, opts=args)
+            files = py_fallback_files(roots, set(args.ext or []), args.exclude, type_globs, args.max_depth, include_hidden=args.hidden or getattr(args, 'almost_all', False), globs=args.globs, opts=args)
             # os.walk yields nothing for a root that is itself a file, so a
             # named file would silently return "no matches" without this.
             for r in roots:

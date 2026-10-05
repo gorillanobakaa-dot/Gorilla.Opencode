@@ -135,7 +135,12 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 		var found config.LocalEndpoint
 		var ok bool
 		for _, e := range cfg.LocalEndpoints {
-			if e.BaseURL != baseURL || e.Disabled {
+			// GORILLA FIX (2026-10-05): compare where the address LEADS.
+			// http://127.0.0.1:1234/v1 and http://localhost:1234/v1 are one
+			// server. Compared as text they were two, so the owner's own
+			// "lmstudio" entry was invisible here and choosing the LM Studio row
+			// wrote a second entry beside it: two connections, one server.
+			if models.CanonicalEndpointURL(e.BaseURL) != models.CanonicalEndpointURL(baseURL) || e.Disabled {
 				continue
 			}
 			if !ok || (found.APIKey == "" && e.APIKey != "") {
@@ -746,10 +751,13 @@ func applyLocalEndpoint(name, baseURL, key string) error {
 	// also carried over when none was typed, so simply pressing Enter on the row
 	// never blanks a working credential.
 	for _, e := range config.Get().LocalEndpoints {
-		if e.BaseURL != baseURL {
+		// The same server under another spelling of its address is the same
+		// connection: adopt it, and keep the address the user wrote.
+		if models.CanonicalEndpointURL(e.BaseURL) != models.CanonicalEndpointURL(baseURL) {
 			continue
 		}
 		name = e.Name
+		baseURL = e.BaseURL
 		if key == "" {
 			key = e.APIKey
 		}

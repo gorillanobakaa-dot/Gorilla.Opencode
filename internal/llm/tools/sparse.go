@@ -134,13 +134,6 @@ func (s *sparseTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 
 	// sparse is a binary the user may not have installed. Say so plainly with
 	// the fix, rather than returning an opaque exec error.
-	binary, err := exec.LookPath("sparse")
-	if err != nil {
-		return NewTextErrorResponse(
-			"sparse is not installed. On Debian/Ubuntu: sudo apt install sparse\n" +
-				"See readme.before.compiling.md in the kernel work directory."), nil
-	}
-
 	filePath := params.FilePath
 	if !filepath.IsAbs(filePath) {
 		filePath = filepath.Join(config.WorkingDirectory(), filePath)
@@ -156,6 +149,20 @@ func (s *sparseTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 	if sessionID == "" {
 		return ToolResponse{}, fmt.Errorf("session ID is required to run sparse")
 	}
+
+	// GORILLA FIX (2026-10-05): "is sparse installed?" is asked AFTER the checks
+	// above, not before them. Asked first, a computer without sparse answered
+	// "not installed" to a file that does not exist and to a call with no
+	// session, so two tests of those checks failed on every machine without
+	// sparse, GitHub's Linux runner among them, and had been failing there
+	// unread since v0.1.135.
+	binary, err := exec.LookPath("sparse")
+	if err != nil {
+		return NewTextErrorResponse(
+			"sparse is not installed. On Debian/Ubuntu: sudo apt install sparse\n" +
+				"See readme.before.compiling.md in the kernel work directory."), nil
+	}
+
 	if s.permissions != nil {
 		granted := s.permissions.Request(permission.CreatePermissionRequest{
 			SessionID:   sessionID,

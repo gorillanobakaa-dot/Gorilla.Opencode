@@ -62,12 +62,16 @@ func TestAShellCommandNamesThePathItReachesOutsideTheProject(t *testing.T) {
 	}
 	wd := config.WorkingDirectory()
 	want := filepath.Join(home, ".ssh", "authorized_keys")
-	for _, cmd := range []string{
-		`Set-Content $env:USERPROFILE\.ssh\authorized_keys "ssh-ed25519 AAAA"`,
+	cmds := []string{
 		`echo x >> ~/.ssh/authorized_keys`,
 		`cp key.pub $HOME/.ssh/authorized_keys`,
 		`cat a.txt | tee "` + want + `"`,
-	} {
+	}
+	if runtime.GOOS == "windows" {
+		// Backslashes are path separators only on Windows.
+		cmds = append(cmds, `Set-Content $env:USERPROFILE\.ssh\authorized_keys "ssh-ed25519 AAAA"`)
+	}
+	for _, cmd := range cmds {
 		got := bashRequestPath(cmd)
 		if !strings.EqualFold(filepath.Clean(got), filepath.Clean(want)) {
 			t.Errorf("%q -> %q, want %q", cmd, got, want)
@@ -75,7 +79,7 @@ func TestAShellCommandNamesThePathItReachesOutsideTheProject(t *testing.T) {
 	}
 	// Ordinary project work stays the working directory, and the program being
 	// RUN is not a place being touched.
-	prog := filepath.Join(home, "go", "bin", "tool.exe")
+	prog := filepath.Join(home, "go", "bin", "tool")
 	for _, cmd := range []string{
 		"go test ./...", "git status", "ls -la src", "cat ./README.md",
 		"curl https://example.org/x", prog + " --version", "echo hi > /dev/null",

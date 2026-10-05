@@ -79,7 +79,7 @@ func RunModelDoctor(cacheDir string, set AgentSetter) []Finding {
 	var out []Finding
 	out = append(out, doctorAgents(set)...)
 	out = append(out, doctorKeys()...)
-	out = append(out, doctorEndpoints()...)
+	out = append(out, doctorEndpoints(set != nil)...)
 	out = append(out, doctorNames()...)
 	out = append(out, doctorRanks()...)
 	out = append(out, doctorStaleness(cacheDir)...)
@@ -211,8 +211,17 @@ func isLoopbackURL(u string) bool {
 
 // 3. Two endpoints that point at the same server show every model twice and
 // take each other's routes.
-func doctorEndpoints() []Finding {
+//
+// With fix, the spare entries are removed and one is kept: the one whose name
+// the registered models are routed through, else the one holding a key, else
+// the first. Nothing is lost by it: both entries named the same server, and the
+// kept one is the one already in use. Without fix it only reports.
+func doctorEndpoints(fix bool) []Finding {
 	var out []Finding
+	keyed := map[string]bool{}
+	for _, e := range cfg.LocalEndpoints {
+		keyed[e.Name] = e.APIKey != ""
+	}
 	byURL := map[string][]string{}
 	var order []string
 	for _, e := range cfg.LocalEndpoints {
@@ -226,8 +235,41 @@ func doctorEndpoints() []Finding {
 		byURL[c] = append(byURL[c], e.Name)
 	}
 	for _, c := range order {
-		if names := byURL[c]; len(names) > 1 {
+		names := byURL[c]
+		if len(names) < 2 {
+			continue
+		}
+		if !fix {
 			out = append(out, Finding{Text: fmt.Sprintf("%d saved connections point at the same server (%s): %s. Keep one and remove the rest in /connect.", len(names), c, strings.Join(names, ", "))})
+			continue
+		}
+		keep := ""
+		for _, n := range names {
+			if models.EndpointHasModels(n) {
+				keep = n
+				break
+			}
+		}
+		if keep == "" {
+			for _, n := range names {
+				if keyed[n] {
+					keep = n
+					break
+				}
+			}
+		}
+		if keep == "" {
+			keep = names[0]
+		}
+		for _, n := range names {
+			if n == keep {
+				continue
+			}
+			if err := RemoveLocalEndpoint(n); err != nil {
+				out = append(out, Finding{Text: fmt.Sprintf("the connection %s is a second entry for the same server as %s and could not be removed: %v", n, keep, err)})
+				continue
+			}
+			out = append(out, Finding{Fixed: true, Text: fmt.Sprintf("removed the connection %s: it was a second entry for the same server as %s (%s), which is kept.", n, keep, c)})
 		}
 	}
 	return out

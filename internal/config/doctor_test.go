@@ -123,9 +123,30 @@ func TestDoctorReportsTwoConnectionsToOneServer(t *testing.T) {
 		{Name: "Ollama", BaseURL: "http://localhost:11434/v1"},
 		{Name: "Off", BaseURL: "http://localhost:11434/v1", Disabled: true},
 	}
-	got := doctorEndpoints()
-	if len(got) != 1 || !strings.Contains(got[0].Text, "lmstudio, LM Studio") {
+	got := doctorEndpoints(false)
+	if len(got) != 1 || got[0].Fixed || !strings.Contains(got[0].Text, "lmstudio, LM Studio") {
 		t.Errorf("findings: %s", texts(got))
+	}
+	if len(c.LocalEndpoints) != 4 {
+		t.Fatal("a report-only run removed a connection")
+	}
+
+	// With repairs allowed: one of the pair goes, the other three entries stay,
+	// and a second run has nothing left to say.
+	c.LocalEndpoints[0].APIKey = "lm-studio" // the keyed one is the one to keep
+	fixed := doctorEndpoints(true)
+	if len(fixed) != 1 || !fixed[0].Fixed || !strings.Contains(fixed[0].Text, "removed the connection LM Studio") {
+		t.Fatalf("fix run: %s", texts(fixed))
+	}
+	var names []string
+	for _, e := range c.LocalEndpoints {
+		names = append(names, e.Name)
+	}
+	if strings.Join(names, ",") != "lmstudio,Ollama,Off" {
+		t.Errorf("connections left: %v", names)
+	}
+	if again := doctorEndpoints(true); len(again) != 0 {
+		t.Errorf("second run: %s", texts(again))
 	}
 }
 
