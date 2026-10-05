@@ -1032,6 +1032,10 @@ func (a *agent) processEvent(ctx context.Context, sessionID string, assistantMsg
 				return a.TrackUsage(ctx, sessionID, a.prov().Model(), event.Response.Usage)
 			}
 		}
+		if len(assistantMsg.ToolCalls()) > 0 {
+			// What a model does in use outranks what one test question found.
+			models.NoteAnsweredInUse(a.prov().Model().ID, config.CacheBase())
+		}
 		assistantMsg.AddFinish(event.Response.FinishReason)
 		if err := a.messages.Update(ctx, *assistantMsg); err != nil {
 			return fmt.Errorf("failed to update message: %w", err)

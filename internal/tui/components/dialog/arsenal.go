@@ -28,6 +28,8 @@ package dialog
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -35,6 +37,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/arsenal"
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 	"github.com/opencode-ai/opencode/internal/tui/util"
@@ -63,8 +66,20 @@ const (
 type ArsenalCmp struct {
 	width, height int
 	view          arsenalView
-	man           arsenal.Manifest
-	pm            arsenal.PackageManager
+	// planFrom is the view the install plan was opened from, so esc goes back
+	// THERE.
+	//
+	// GORILLA FIX (2026-10-05), from the /arsenal audit (A5): leaving the plan
+	// did `m.view--`, which is the detail page whatever came before. Pressing i
+	// on the series list and then esc showed the full detail of an entry the
+	// user had never opened, under a hint that said "esc back".
+	planFrom arsenalView
+	// man is the manifest AS IT APPLIES TO THIS OPERATING SYSTEM — what is
+	// listed and counted. full is everything, kept so a tagfile written on
+	// another system can be read and explained rather than called unknown.
+	man  arsenal.Manifest
+	full arsenal.Manifest
+	pm   arsenal.PackageManager
 
 	// status is detection, done once on open: measured, never claimed.
 	status map[string]arsenal.Status
@@ -76,8 +91,14 @@ type ArsenalCmp struct {
 	// selected is the tagfile in memory — entry ids the user has ticked.
 	selected map[string]bool
 
-	// linkSpeed is KB/s used to turn megabytes into minutes.
-	linkSpeed float64
+	// linkSpeed is KB/s used to turn megabytes into minutes. linkMeasured says
+	// where it came from: true when it is this machine's own observed
+	// throughput, false when it is the assumed figure.
+	linkSpeed    float64
+	linkMeasured bool
+
+	// tagIdx is which selection file L loads next. See loadTagfile.
+	tagIdx int
 
 	// pricing holds measured costs, filled lazily because apt-get takes a
 	// second or two and the screen must open instantly.
@@ -86,8 +107,16 @@ type ArsenalCmp struct {
 	notice string
 }
 
+// assumedLinkKBps is used only when no transfer has been timed on this machine
+// yet. 8 KB/s is the audience this project is built for (§8). It is an
+// ASSUMPTION, and every line that uses it says so in that word.
+const assumedLinkKBps = 8
+
 func NewArsenalCmp() ArsenalCmp {
-	m, _ := arsenal.Load()
+	full, _ := arsenal.Load()
+	// GORILLA FIX (2026-10-05), from the /arsenal audit (A10): list and count
+	// only what can exist on this operating system. See arsenal.ForPlatform.
+	m := arsenal.ForPlatform(full)
 	pm := arsenal.DetectPackageManager()
 	st := map[string]arsenal.Status{}
 	for _, s := range m.Series {
@@ -95,16 +124,34 @@ func NewArsenalCmp() ArsenalCmp {
 			st[e.ID] = arsenal.DetectEntry(e)
 		}
 	}
-	return ArsenalCmp{
-		man:      m,
-		pm:       pm,
-		status:   st,
-		selected: map[string]bool{},
-		pricing:  map[string]arsenal.Cost{},
-		// 8 KB/s is the audience this project is built for (§8). It is a
-		// stated assumption, shown on screen, not a silent one.
-		linkSpeed: 8,
+	c := ArsenalCmp{
+		man:       m,
+		full:      full,
+		pm:        pm,
+		status:    st,
+		selected:  map[string]bool{},
+		pricing:   map[string]arsenal.Cost{},
+		linkSpeed: assumedLinkKBps,
 	}
+	// GORILLA FIX (2026-10-05), from the /arsenal audit (A9): every time figure
+	// used a typed 8 KB/s while the program already keeps a measurement of
+	// this machine's link (config.EstimatedKBps, timed from transfers that
+	// were happening anyway — zero extra bytes). The measurement is used when
+	// there is one. It is in KiB/s; DownloadTime counts in units of 1000.
+	if kibps, ok := config.EstimatedKBps(); ok {
+		c.linkSpeed, c.linkMeasured = kibps*1.024, true
+	}
+	return c
+}
+
+// speedLabel is how a time figure names the speed it was worked out at. The
+// measured figure is a floor (see config/linkspeed.go), so the real wait is at
+// most what is shown; the assumed figure is labelled as assumed.
+func (m ArsenalCmp) speedLabel() string {
+	if m.linkMeasured {
+		return fmt.Sprintf("at %.0f KB/s, measured on this link", m.linkSpeed)
+	}
+	return fmt.Sprintf("at an assumed %.0f KB/s", m.linkSpeed)
 }
 
 func (m *ArsenalCmp) SetSize(w, h int) { m.width, m.height = w, h }
@@ -261,7 +308,37 @@ func (m *ArsenalCmp) toggle(ids []string) {
 	if present > 0 {
 		m.notice += fmt.Sprintf(" (%d already installed, skipped)", present)
 	}
-	m.notice += " — press p to measure the cost."
+	// GORILLA FIX (2026-10-05), audit A3: the next step is only "measure" where
+	// this package manager can measure.
+	switch {
+	case allOn:
+	case arsenal.CanMeasure(m.pm):
+		m.notice += " — press p to measure the cost."
+	default:
+		m.notice += " — press i for the install plan."
+	}
+}
+
+// selectionSummary splits the current selection into what the package manager
+// can fetch and what it cannot.
+func (m ArsenalCmp) selectionSummary() (pkgs []string, fetchable, unfetchable int) {
+	pkgs, chosen, unavailable := m.installable(m.selectedIDs())
+	return pkgs, len(chosen), len(unavailable)
+}
+
+// nothingFetchable is the sentence for a selection that resolves to no packages
+// at all.
+//
+// GORILLA FIX (2026-10-05), from the /arsenal audit (A2): on a Windows machine
+// without Scoop, `a` then `p` answered "measured: nothing to download - all of
+// it is already here" for twenty-four tools, none of which were there. Zero
+// packages meant "cannot fetch any of this", and it was reported as "has all
+// of this". Opposite facts, again.
+func (m ArsenalCmp) nothingFetchable(n int) string {
+	if m.pm == arsenal.Unknown {
+		return fmt.Sprintf("No supported package manager was found, so none of the %d selected can be fetched from here — nothing to measure, nothing to install.", n)
+	}
+	return fmt.Sprintf("None of the %d selected can be fetched by %s — nothing to measure, nothing to install.", n, pmName(m.pm))
 }
 
 func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -278,8 +355,7 @@ func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.view == viewSeries {
 				return m, util.CmdHandler(CloseArsenalMsg{})
 			}
-			m.view--
-			m.scrollTop = 0
+			m.back()
 			return m, nil
 		case "up", "k":
 			m.move(-1)
@@ -297,8 +373,7 @@ func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "left", "h":
 			if m.view > viewSeries {
-				m.view--
-				m.scrollTop = 0
+				m.back()
 			}
 			return m, nil
 		case " ":
@@ -320,7 +395,16 @@ func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toggle(m.everyID())
 			return m, nil
 		case "n":
+			// GORILLA FIX (2026-10-05), from the /arsenal audit (A12): this
+			// cleared the selection and said nothing, against the rule four
+			// lines above it. With nothing selected it looked like a dead key.
+			had := len(m.selectedIDs())
 			m.selected = map[string]bool{}
+			if had == 0 {
+				m.notice = "Nothing was selected."
+			} else {
+				m.notice = fmt.Sprintf("un-selected %d — the selection is now empty.", had)
+			}
 			return m, nil
 		// GORILLA FIX (2026-08-19): these were `return m, m.price()`.
 		//
@@ -345,7 +429,8 @@ func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		case "?":
 			// Costs a model turn, so it is never the default path.
-			return m, m.emitInstall()
+			cmd := m.emitInstall()
+			return m, cmd
 		}
 	case arsenalPricedMsg:
 		m.pricing[msg.key] = msg.cost
@@ -365,13 +450,16 @@ func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case !msg.cost.Measured:
 			m.notice = "could not measure: " + msg.cost.Note
 		case msg.cost.DownloadBytes == 0:
-			m.notice = "measured: nothing to download - all of it is already here."
+			// Only reachable when the package manager's own answer was read
+			// and said zero (audit A2/A4): no packages, or an answer that
+			// could not be parsed, both arrive as !Measured above.
+			m.notice = "measured: " + pmName(m.pm) + " reports nothing left to download for this."
 		default:
 			// Short enough to survive an 80-column terminal, because the
 			// figure is the whole point of the line and a truncated number is
 			// no number at all. The full breakdown is on the install plan.
 			m.notice = "measured: " + arsenal.HumanBytes(msg.cost.DownloadBytes) + " down / " +
-				arsenal.HumanBytes(msg.cost.DiskBytes) + " disk"
+				diskText(msg.cost) + " disk"
 			if t := arsenal.DownloadTime(msg.cost.DownloadBytes, m.linkSpeed); t != "" {
 				m.notice += " / ~" + t
 			}
@@ -382,6 +470,25 @@ func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// diskText is the disk figure, or the plain statement that there is none. A
+// figure the package manager did not report must never be printed as "0 B".
+func diskText(c arsenal.Cost) string {
+	if !c.DiskMeasured {
+		return "unreported"
+	}
+	return arsenal.HumanBytes(c.DiskBytes)
+}
+
+// back leaves the current view for the one it was reached from.
+func (m *ArsenalCmp) back() {
+	if m.view == viewPlan {
+		m.view = m.planFrom
+	} else {
+		m.view--
+	}
+	m.scrollTop = 0
+}
+
 func (m *ArsenalCmp) move(d int) {
 	switch m.view {
 	case viewSeries:
@@ -390,7 +497,11 @@ func (m *ArsenalCmp) move(d int) {
 		if s, ok := m.currentSeries(); ok {
 			m.entryIdx = clampInt(m.entryIdx+d, 0, len(s.Entries)-1)
 		}
-	case viewDetail:
+	case viewDetail, viewPlan:
+		// GORILLA FIX (2026-10-05): the plan was missing here. A plan longer
+		// than the screen showed "... more line(s) — down to continue" and
+		// down did nothing, so the install command at the bottom — the one
+		// thing the page is for — could not be reached on a short terminal.
 		m.scrollTop = maxInt(0, m.scrollTop+d)
 	}
 }
@@ -431,8 +542,19 @@ func (m *ArsenalCmp) price() tea.Cmd {
 		m.notice = "Nothing selected yet — space takes what the cursor is on, a takes everything."
 		return nil
 	}
+	// GORILLA FIX (2026-10-05), audit A3: where the package manager cannot
+	// price anything, say so at once instead of pretending to start.
+	if !arsenal.CanMeasure(m.pm) {
+		m.notice = "Cannot measure here: " + arsenal.CannotMeasureNote(m.pm) + "."
+		return nil
+	}
+	pkgs, _, unfetchable := m.selectionSummary()
+	if len(pkgs) == 0 {
+		// Audit A2. See nothingFetchable.
+		m.notice = m.nothingFetchable(unfetchable)
+		return nil
+	}
 	m.notice = "measuring with " + pmName(m.pm) + "..."
-	pkgs, _, _ := m.installable(ids)
 	key := strings.Join(ids, ",")
 	pm := m.pm
 	return func() tea.Msg {
@@ -456,6 +578,9 @@ func (m *ArsenalCmp) showPlan() tea.Cmd {
 		m.notice = "Nothing selected. Space picks the thing under the cursor; a picks everything."
 		return nil
 	}
+	if m.view != viewPlan {
+		m.planFrom = m.view
+	}
 	m.view, m.scrollTop = viewPlan, 0
 	return nil
 }
@@ -469,7 +594,8 @@ func (m ArsenalCmp) planLines() []arsLine {
 
 	out := []arsLine{
 		{"h1", "Install plan"},
-		{"mute", "esc back | s save this selection as a shareable file"},
+		{"mute", "esc back | up/down scroll | s save this selection as a shareable file"},
+		{"mute", askHint},
 		{"", ""},
 	}
 	if len(chosen) > 0 {
@@ -486,32 +612,58 @@ func (m ArsenalCmp) planLines() []arsLine {
 	}
 
 	if len(pkgs) == 0 {
-		out = append(out, arsLine{"", ""}, arsLine{"have", "Nothing to install."})
+		// Audit A2: "Nothing to install." in green read as "all done". When
+		// the reason is that nothing selected can be fetched, say that.
+		out = append(out, arsLine{"", ""})
+		if len(unavailable) > 0 {
+			for _, l := range wrapPlain(m.nothingFetchable(len(unavailable)), m.wrapWidth(0)) {
+				out = append(out, arsLine{"warn", l})
+			}
+		} else {
+			out = append(out, arsLine{"have", "Nothing to install."})
+		}
 		return out
 	}
 
 	out = append(out, arsLine{"", ""}, arsLine{"h2", fmt.Sprintf("%d package(s)", len(pkgs))})
-	for _, l := range wrapPlain(strings.Join(pkgs, " "), maxInt(30, m.width-12)) {
+	for _, l := range wrapPlain(strings.Join(pkgs, " "), m.wrapWidth(2)) {
 		out = append(out, arsLine{"mute", "  " + l})
 	}
 
-	if c, ok := m.pricing[strings.Join(ids, ",")]; ok && c.Measured {
-		line := fmt.Sprintf("%s to download, %s on disk", arsenal.HumanBytes(c.DownloadBytes), arsenal.HumanBytes(c.DiskBytes))
+	c, priced := m.pricing[strings.Join(ids, ",")]
+	switch {
+	case priced && c.Measured:
+		line := fmt.Sprintf("%s to download, disk %s", arsenal.HumanBytes(c.DownloadBytes), diskText(c))
 		if t := arsenal.DownloadTime(c.DownloadBytes, m.linkSpeed); t != "" {
-			line += fmt.Sprintf(" — about %s at %.0f KB/s", t, m.linkSpeed)
+			line += fmt.Sprintf(" — about %s %s", t, m.speedLabel())
 		}
 		out = append(out, arsLine{"", ""}, arsLine{"sel", line})
 		out = append(out, arsLine{"mute", "measured by your own package manager against what is already here, not a table"})
-	} else {
-		out = append(out, arsLine{"", ""}, arsLine{"mute", "press p on the previous screen to measure what this costs"})
+		if c.Note != "" {
+			out = append(out, arsLine{"mute", c.Note})
+		}
+	case priced:
+		out = append(out, arsLine{"", ""}, arsLine{"warn", "cost not measured: " + c.Note})
+	case arsenal.CanMeasure(m.pm):
+		out = append(out, arsLine{"", ""}, arsLine{"mute", "cost not measured yet — press p to ask " + pmName(m.pm) + " what this costs"})
+	default:
+		// Audit A3: no offer of a measurement that cannot be made.
+		out = append(out, arsLine{"", ""}, arsLine{"mute", "cost not measured: " + arsenal.CannotMeasureNote(m.pm)})
 	}
 
 	out = append(out,
 		arsLine{"", ""},
 		arsLine{"h2", "Run this yourself"},
 		arsLine{"", ""})
-	for _, l := range wrapPlain(arsenal.InstallCommand(pkgs, m.pm), maxInt(30, m.width-12)) {
-		out = append(out, arsLine{"on", "  " + l})
+	// One command per line, in order (audit A11): each is wrapped on its own
+	// so two commands can never be joined into one unrunnable line.
+	for _, command := range arsenal.InstallCommands(pkgs, m.pm) {
+		for i, l := range wrapPlain(command, m.wrapWidth(4)) {
+			if i > 0 {
+				l = "  " + l
+			}
+			out = append(out, arsLine{"on", "  " + l})
+		}
 	}
 	// GORILLA OVERRIDE (2026-09-01): the closing note names the package manager
 	// in play. It said "apt can be interrupted and resumed" unconditionally,
@@ -527,7 +679,7 @@ func (m ArsenalCmp) planLines() []arsLine {
 	out = append(out,
 		arsLine{"", ""},
 		arsLine{"mute", "This program will not run it and will never ask for your password. Copy it,"})
-	for _, l := range wrapPlain(tail, maxInt(30, m.width-12)) {
+	for _, l := range wrapPlain(tail, m.wrapWidth(0)) {
 		out = append(out, arsLine{"mute", l})
 	}
 	return out
@@ -535,16 +687,27 @@ func (m ArsenalCmp) planLines() []arsLine {
 
 // emitInstall asks the MODEL about a selection. Costs a turn, so it is a
 // separate, explicitly-labelled key rather than the default path.
-func (m ArsenalCmp) emitInstall() tea.Cmd {
+//
+// GORILLA FIX (2026-10-05), from the /arsenal audit (A7): the key was printed
+// nowhere on the screen, so "explicitly-labelled" above was false — the one key
+// on this page that spends money was the one key with no label. And with
+// nothing selected, or nothing fetchable, it returned nil and said nothing.
+// It is now in the hints with its cost (askHint), and both empty cases answer.
+func (m *ArsenalCmp) emitInstall() tea.Cmd {
 	ids := m.selectedIDs()
 	if len(ids) == 0 {
+		m.notice = "Nothing selected, so there is nothing to ask the model about. Space picks; a picks everything."
 		return nil
 	}
 	pkgs, chosen, unavailable := m.installable(ids)
 	if len(pkgs) == 0 {
+		m.notice = m.nothingFetchable(len(unavailable)) + " Nothing was sent to the model."
 		return nil
 	}
-	cmd := arsenal.InstallCommand(pkgs, m.pm)
+	// tui.go indents the command by four spaces when it writes the message;
+	// the continuation lines are given the same indent here so a two-command
+	// answer stays one block.
+	cmd := strings.Join(arsenal.InstallCommands(pkgs, m.pm), "\n    ")
 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "%d capabilit%s, %d package(s):\n", len(chosen), plural(len(chosen)), len(pkgs))
@@ -617,16 +780,22 @@ func (m ArsenalCmp) header() []arsLine {
 			case !c.Measured:
 				line += " | could not price: " + c.Note
 			case c.DownloadBytes == 0:
-				line += " | nothing to download — all of it is already here"
+				line += " | " + pmName(m.pm) + " reports nothing left to download"
 			default:
-				line += fmt.Sprintf(" | %s to download, %s on disk",
-					arsenal.HumanBytes(c.DownloadBytes), arsenal.HumanBytes(c.DiskBytes))
+				line += fmt.Sprintf(" | %s to download, disk %s",
+					arsenal.HumanBytes(c.DownloadBytes), diskText(c))
 				if t := arsenal.DownloadTime(c.DownloadBytes, m.linkSpeed); t != "" {
-					line += fmt.Sprintf(" | about %s at %.0f KB/s", t, m.linkSpeed)
+					line += fmt.Sprintf(" | about %s %s", t, m.speedLabel())
 				}
 			}
-		} else {
+		} else if pkgs, _, unfetchable := m.selectionSummary(); len(pkgs) == 0 {
+			// Audit A2: a selection the package manager cannot fetch any of.
+			line += fmt.Sprintf(" | none of it can be fetched by %s (%d)", pmWord(m.pm), unfetchable)
+		} else if arsenal.CanMeasure(m.pm) {
 			line += " | press p to measure what it costs"
+		} else {
+			// Audit A3.
+			line += " | cost not measured: " + arsenal.CannotMeasureNote(m.pm)
 		}
 		head = append(head, arsLine{"sel", line})
 	}
@@ -640,12 +809,35 @@ func pmName(pm arsenal.PackageManager) string {
 	return string(pm)
 }
 
+// pmWord is the package manager inside a sentence, where "none found" would
+// not read.
+func pmWord(pm arsenal.PackageManager) string {
+	if pm == arsenal.Unknown {
+		return "any package manager here"
+	}
+	return string(pm)
+}
+
+// askHint labels the one key on this page that costs money. See emitInstall.
+const askHint = "? send the selection to the model to discuss — costs one model turn"
+
+// actionHint is the second line of keys. The p key is listed only where it can
+// do what it says (audit A3).
+func (m ArsenalCmp) actionHint(last string) string {
+	keys := "i the install plan | s save selection | L load one | " + last
+	if arsenal.CanMeasure(m.pm) {
+		return "p measure the real cost | " + keys
+	}
+	return keys
+}
+
 func (m ArsenalCmp) seriesLines() []arsLine {
 	out := m.header()
 	out = append(out,
 		arsLine{"", ""},
 		arsLine{"mute", "up/down move | enter open | space take this series | a everything | n none"},
-		arsLine{"mute", "p measure the real cost | i the install command | s save selection | L load one | esc close"},
+		arsLine{"mute", m.actionHint("esc close")},
+		arsLine{"mute", askHint},
 		arsLine{"", ""})
 
 	for i, s := range m.man.Series {
@@ -667,18 +859,53 @@ func (m ArsenalCmp) seriesLines() []arsLine {
 		if pick > 0 {
 			tag += fmt.Sprintf(", %d picked", pick)
 		}
-		out = append(out, arsLine{kind, fmt.Sprintf("%s%-46s %s", cursor, s.Title, tag)})
+		// The count is the point of the row, so the TITLE gives way when the
+		// two do not fit: at 80 columns the longest title used to push
+		// "0/4 here" off the right-hand edge, where it was cut.
+		titleW := maxInt(10, m.textWidth()-len(cursor)-1-len(tag))
+		out = append(out, arsLine{kind, fmt.Sprintf("%s%-*s %s", cursor, min(46, titleW),
+			truncateToWidth(s.Title, titleW), tag)})
 		if i == m.seriesIdx {
-			for _, l := range wrapPlain(s.Why, maxInt(30, m.width-14)) {
+			for _, l := range wrapPlain(s.Why, m.wrapWidth(4)) {
 				out = append(out, arsLine{"mute", "    " + l})
 			}
 		}
 	}
 	out = append(out,
 		arsLine{"", ""},
-		arsLine{"mute", "Nothing here is installed by this program. It shows you the exact command; you run it."},
-		arsLine{"mute", "Everything listed is free and needs no account. Times assume " + fmt.Sprintf("%.0f KB/s", m.linkSpeed) + "."})
+		arsLine{"mute", "Nothing here is installed by this program. It shows you the exact command; you run it."})
+	// Counted from the manifest, not asserted: the day an entry needing an
+	// account is added, this line changes by itself.
+	if n := m.needingAccount(); n == 0 {
+		out = append(out, arsLine{"mute", "Everything listed is free and needs no account."})
+	} else {
+		out = append(out, arsLine{"warn", fmt.Sprintf("%d of these need an account or a card — each one says so on its own page.", n)})
+	}
+	// GORILLA FIX (2026-10-05), audit A9: say where the speed came from.
+	if m.linkMeasured {
+		out = append(out, arsLine{"mute", fmt.Sprintf("Times are worked out at %.0f KB/s, the best speed measured on this link so far.", m.linkSpeed)})
+	} else {
+		out = append(out, arsLine{"mute", fmt.Sprintf("Times ASSUME %.0f KB/s: no transfer has been timed on this machine yet, so this is a guess.", m.linkSpeed)})
+	}
+	// GORILLA FIX (2026-10-05), audit A14: "here" means on the PATH of the
+	// shell this program was started from. The same machine gives different
+	// counts from Git Bash and from PowerShell, and the screen did not say
+	// which question it had answered.
+	out = append(out, arsLine{"mute", "\"Here\" means found on the PATH this program was started with; another shell may differ."})
 	return out
+}
+
+// needingAccount counts listed entries that ask for an account or a card.
+func (m ArsenalCmp) needingAccount() int {
+	n := 0
+	for _, s := range m.man.Series {
+		for _, e := range s.Entries {
+			if e.Needs.Account || e.Needs.Card {
+				n++
+			}
+		}
+	}
+	return n
 }
 
 func (m ArsenalCmp) entryLines() []arsLine {
@@ -690,7 +917,8 @@ func (m ArsenalCmp) entryLines() []arsLine {
 	out = append(out,
 		arsLine{"", ""},
 		arsLine{"h2", s.Title},
-		arsLine{"mute", "up/down move | enter full detail | space take this one | p cost | i install command | esc back"},
+		arsLine{"mute", "up/down move | enter full detail | space take this one"},
+		arsLine{"mute", m.actionHint("esc back")},
 		arsLine{"", ""})
 
 	for i, e := range s.Entries {
@@ -706,7 +934,7 @@ func (m ArsenalCmp) entryLines() []arsLine {
 		if i == m.entryIdx {
 			// The one-line description AT THE POINT OF CHOOSING is the part of
 			// the Slackware installer that actually taught people what exists.
-			for _, l := range wrapPlain(e.Teaches, maxInt(30, m.width-17)) {
+			for _, l := range wrapPlain(e.Teaches, m.wrapWidth(7)) {
 				out = append(out, arsLine{"mute", "       " + l})
 			}
 			if n := arsenal.UnavailableNote(e, m.pm); n != "" {
@@ -729,17 +957,35 @@ func (m ArsenalCmp) detailLines() []arsLine {
 		{"", ""},
 	}
 
+	// Wrapped, not left to truncation: these lines can now carry a full path,
+	// and a path cut off with "..." cannot be typed.
+	state := func(kind, text string) {
+		for _, l := range wrapPlain(text, m.wrapWidth(0)) {
+			out = append(out, arsLine{kind, l})
+		}
+	}
 	switch {
+	case st.Present && st.OffPath:
+		// Audit A6: present on the disk, absent from PATH. Both halves are
+		// stated, because "HAVE" alone would promise a command that fails.
+		state("have", "ALREADY ON THIS MACHINE — found: "+strings.Join(st.Found, ", "))
+		state("warn", "It is NOT on PATH, so its short name will not run. Call it by the full path above.")
 	case st.Present:
-		out = append(out, arsLine{"have", "ALREADY ON THIS MACHINE — found: " + strings.Join(st.Found, ", ")})
+		state("have", "ALREADY ON THIS MACHINE — found: "+strings.Join(st.Found, ", "))
 	case st.Partial():
-		out = append(out, arsLine{"warn", "PARTLY HERE — found " + strings.Join(st.Found, ", ") +
-			"; missing " + strings.Join(st.Missing, ", ")})
+		state("warn", "PARTLY HERE — found "+strings.Join(st.Found, ", ")+
+			"; missing "+strings.Join(st.Missing, ", "))
 	default:
-		out = append(out, arsLine{"mute", "not installed — looked for: " + strings.Join(e.Detect.Binaries, ", ")})
+		state("mute", "not found on PATH — looked for: "+strings.Join(e.Detect.Binaries, ", "))
+	}
+	// Audit A1: a file of the right name that is the wrong program. Said out
+	// loud, so nobody who can see convert.exe on their own disk has to wonder
+	// why it was not counted.
+	for _, ig := range st.Ignored {
+		state("mute", fmt.Sprintf("not counted: %s at %s is %s.", ig.Binary, ig.Path, ig.Is))
 	}
 	out = append(out, arsLine{"", ""}, arsLine{"h2", "What it is"})
-	for _, l := range wrapPlain(e.Teaches, maxInt(30, m.width-10)) {
+	for _, l := range wrapPlain(e.Teaches, m.wrapWidth(0)) {
 		out = append(out, arsLine{"", l})
 	}
 
@@ -749,17 +995,29 @@ func (m ArsenalCmp) detailLines() []arsLine {
 	}
 
 	out = append(out, arsLine{"", ""}, arsLine{"h2", "What will disappoint you"})
-	for _, l := range wrapPlain(e.Caveats, maxInt(30, m.width-10)) {
+	for _, l := range wrapPlain(e.Caveats, m.wrapWidth(0)) {
 		out = append(out, arsLine{"warn", l})
 	}
 
 	out = append(out, arsLine{"", ""}, arsLine{"h2", "How to get it"})
 	if pkgs := arsenal.PackagesFor(e, m.pm); len(pkgs) > 0 {
-		out = append(out, arsLine{"", arsenal.InstallCommand(pkgs, m.pm)})
+		// One command per line (audit A11).
+		for _, command := range arsenal.InstallCommands(pkgs, m.pm) {
+			for _, l := range wrapPlain(command, m.wrapWidth(0)) {
+				out = append(out, arsLine{"", l})
+			}
+		}
 	} else {
 		out = append(out, arsLine{"warn", arsenal.UnavailableNote(e, m.pm)})
-		for name, pkgs := range e.Packages {
-			if len(pkgs) > 0 {
+		// Sorted: a Go map has no order, so these lines changed places from
+		// one opening of the page to the next.
+		names := make([]string, 0, len(e.Packages))
+		for name := range e.Packages {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			if pkgs := e.Packages[name]; len(pkgs) > 0 {
 				out = append(out, arsLine{"mute", fmt.Sprintf("on %s: %s", name, strings.Join(pkgs, " "))})
 			}
 		}
@@ -826,16 +1084,111 @@ func wrapPlain(s string, w int) []string {
 	return append(out, cur)
 }
 
+// cursorTop is the first line to draw so that the cursor's row, and the
+// description under it, are on screen.
+//
+// GORILLA FIX (2026-10-05): the two list views never scrolled. On a terminal
+// too short for the list the page printed "... more line(s) — down to
+// continue", and down moved the cursor off the bottom of the window where it
+// could no longer be seen. The marker promised scrolling that did not exist.
+func cursorTop(lines []arsLine, visible int) int {
+	cur := -1
+	for i, l := range lines {
+		if strings.HasPrefix(l.text, "> ") {
+			cur = i
+			break
+		}
+	}
+	if cur < 0 || len(lines) <= visible {
+		return 0
+	}
+	// The description lines are the indented ones directly under the cursor.
+	last := cur
+	for last+1 < len(lines) && strings.HasPrefix(lines[last+1].text, "    ") {
+		last++
+	}
+	// One row is kept back for the overflow marker.
+	room := max(1, visible-1)
+	top := 0
+	if last >= room {
+		top = last - room + 1
+	}
+	if top > cur {
+		top = cur
+	}
+	return top
+}
+
+// boxWidth and textWidth are the frame's styled width and the width of the text
+// inside it. View explains the arithmetic.
+func (m ArsenalCmp) boxWidth() int  { return max(24, dialogWidth(m.width, 120, 6)) }
+func (m ArsenalCmp) textWidth() int { return max(20, m.boxWidth()-4) }
+
+// wrapWidth is how wide wrapped text may be when the caller will put `indent`
+// columns in front of it.
+//
+// GORILLA FIX (2026-10-05): every wrap was sized from the TERMINAL width
+// (m.width minus a constant) while the box is capped at 120 columns. On any
+// terminal wider than about 134 the text was wrapped wider than the box and
+// then truncated to fit it — including the install command, the one line on
+// this page that must be exact. At 200 columns that is a 188-column wrap
+// inside a 116-column box. Wraps are now sized from the box.
+func (m ArsenalCmp) wrapWidth(indent int) int { return maxInt(30, m.textWidth()-indent) }
+
 func (m ArsenalCmp) lines() []arsLine {
 	switch m.view {
 	case viewEntries:
-		return m.entryLines()
+		return m.fit(m.entryLines())
 	case viewDetail:
-		return m.detailLines()
+		return m.fit(m.detailLines())
 	case viewPlan:
-		return m.planLines()
+		return m.fit(m.planLines())
 	}
-	return m.seriesLines()
+	return m.fit(m.seriesLines())
+}
+
+// fit makes every row fit the box by FOLDING it, so that View's truncation is
+// a last resort and not the normal case.
+//
+// GORILLA FIX (2026-10-05): at 80 columns the box holds 70, and the key hints,
+// the footer and the header were each longer than that. They were cut with
+// "..." — which removed "esc close" from the hints and would have removed the
+// new line that labels the ? key. A row of " | " items is re-packed item by
+// item; a sentence is wrapped on words, keeping its indent. The cursor rows of
+// the two lists are left alone: they are one item each and are sized where
+// they are built.
+func (m ArsenalCmp) fit(in []arsLine) []arsLine {
+	w := m.textWidth()
+	out := make([]arsLine, 0, len(in))
+	for _, l := range in {
+		if lipgloss.Width(l.text) <= w ||
+			strings.HasPrefix(l.text, "> ") || strings.HasPrefix(l.text, "  [") {
+			out = append(out, l)
+			continue
+		}
+		if strings.Contains(l.text, " | ") {
+			cur := ""
+			for _, part := range strings.Split(l.text, " | ") {
+				switch {
+				case cur == "":
+					cur = part
+				case lipgloss.Width(cur)+3+lipgloss.Width(part) > w:
+					out = append(out, arsLine{l.kind, cur})
+					cur = part
+				default:
+					cur += " | " + part
+				}
+			}
+			out = append(out, arsLine{l.kind, cur})
+			continue
+		}
+		body := strings.TrimLeft(l.text, " ")
+		indent := l.text[:len(l.text)-len(body)]
+		for _, piece := range wrapPlain(body, maxInt(10, w-len(indent))) {
+			out = append(out, arsLine{l.kind, indent + piece})
+		}
+	}
+	return out
 }
 
 // View renders the page FULL SCREEN.
@@ -880,8 +1233,8 @@ func (m ArsenalCmp) View() string {
 	// 120 rather than 104 because the entries carry long plain-language
 	// descriptions and the whole point of them is being readable — but capped,
 	// so the frame is a window on any screen wider than that.
-	boxW := max(24, dialogWidth(m.width, 120, 6))
-	w := max(20, boxW-4)
+	boxW := m.boxWidth()
+	w := m.textWidth()
 	budget := max(5, m.height-4)
 
 	lines := m.lines()
@@ -892,6 +1245,9 @@ func (m ArsenalCmp) View() string {
 	}
 	visible := max(1, budget-reserve)
 	top := m.scrollTop
+	if m.view == viewSeries || m.view == viewEntries {
+		top = cursorTop(lines, visible)
+	}
 	if top > len(lines)-visible {
 		top = max(0, len(lines)-visible)
 	}
@@ -985,7 +1341,7 @@ func (m *ArsenalCmp) saveTagfile() tea.Cmd {
 		m.notice = "Nothing selected to save."
 		return nil
 	}
-	path, err := arsenal.SaveTagfile(ids, m.man, m.pm)
+	path, err := arsenal.SaveTagfile(ids, m.full, m.pm)
 	if err != nil {
 		m.notice = "Could not save: " + err.Error()
 		return nil
@@ -1003,23 +1359,65 @@ func (m *ArsenalCmp) saveTagfile() tea.Cmd {
 // Ids this build does not know about are REPORTED, never silently dropped — a
 // tagfile from a newer version naming a capability that does not exist here is
 // a fact the user should hear.
+//
+// GORILLA FIX (2026-10-05), from the /arsenal audit (A12), three faults:
+//
+//   - It could read one path only, the one `s` writes, so a file from somebody
+//     else could be loaded only by overwriting your own. L now walks every
+//     *.tagfile in the folder, one per press, and names the file it loaded.
+//   - Every failure was reported as "No selection to load" — including a file
+//     that exists and cannot be read. The real error is now shown.
+//   - An id that exists but not on this operating system was going to be
+//     called "not in this version" once the list became per-platform. It is
+//     reported as what it is.
 func (m *ArsenalCmp) loadTagfile() tea.Cmd {
-	path := arsenal.TagfilePath()
-	ids, unknown, err := arsenal.LoadTagfile(path, m.man)
-	if err != nil {
-		m.notice = "No selection to load at " + path
+	files := arsenal.Tagfiles()
+	if len(files) == 0 {
+		m.notice = "No selection file to load. Put a file ending .tagfile in " + arsenal.TagfileDir()
 		return nil
 	}
+	if m.tagIdx >= len(files) {
+		m.tagIdx = 0
+	}
+	at := m.tagIdx
+	path := files[at]
+	m.tagIdx++
+
+	ids, unknown, err := arsenal.LoadTagfile(path, m.full)
+	if err != nil {
+		if os.IsNotExist(err) {
+			m.notice = "No selection to load at " + path
+		} else {
+			m.notice = "Could not read " + path + ": " + err.Error()
+		}
+		return nil
+	}
+	listed := map[string]bool{}
+	for _, id := range m.everyID() {
+		listed[id] = true
+	}
 	m.selected = map[string]bool{}
-	added := 0
+	added, elsewhere := 0, 0
 	for _, id := range ids {
+		if !listed[id] {
+			elsewhere++ // real, but cannot exist on this operating system
+			continue
+		}
 		if m.status[id].Present {
 			continue // already here; selecting it would inflate the cost
 		}
 		m.selected[id] = true
 		added++
 	}
-	m.notice = fmt.Sprintf("Loaded %d of %d from %s", added, len(ids), path)
+	// The file NAME leads and the folder is left out: the notice is one row,
+	// and the part that tells two files apart must survive truncation.
+	m.notice = fmt.Sprintf("Loaded %d of %d from %s", added, len(ids), filepath.Base(path))
+	if len(files) > 1 {
+		m.notice += fmt.Sprintf(" (file %d of %d, L for the next)", at+1, len(files))
+	}
+	if elsewhere > 0 {
+		m.notice += fmt.Sprintf(" — %d cannot exist on this system", elsewhere)
+	}
 	if len(unknown) > 0 {
 		m.notice += fmt.Sprintf(" — %d not in this version: %s", len(unknown), strings.Join(unknown, ", "))
 	}

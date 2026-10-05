@@ -83,12 +83,15 @@ func (v ProbeVerdict) Label() string {
 		return "your key was refused for this model on " + day
 	case ProbeNeedsPay:
 		return "needs paid credit (checked " + day + ")"
+	// The next three say nothing lasting about the model. One of them sat on
+	// a row as "provider error 500" while that model carried a whole
+	// conversation the same evening, so each now says it may have passed.
 	case ProbeBusy:
-		return "rate-limited when checked on " + day
+		return "rate-limited when tested on " + day + "; may work now"
 	case ProbeError:
-		return fmt.Sprintf("provider error %d on %s", v.Status, day)
+		return fmt.Sprintf("provider error %d when tested on %s; may work now", v.Status, day)
 	case ProbeTimeout:
-		return "did not answer within 45 seconds on " + day
+		return "did not answer within 45 seconds when tested on " + day + "; may work now"
 	}
 	return ""
 }
@@ -109,8 +112,22 @@ func isLoopback(baseURL string) bool {
 	return h == "localhost" || h == "::1" || strings.HasPrefix(h, "127.") || h == "0.0.0.0"
 }
 
-// ProbeChat sends one small tool-call request to an OpenAI-compatible endpoint.
+// probeRetryPause is how long ProbeChat waits before asking a second time
+// after a 5xx. A variable so the tests do not sleep.
+var probeRetryPause = 2 * time.Second
+
+// ProbeChat asks a model one small tool-call question. A 5xx is the server
+// failing, not the model: it is asked once more before that goes on record.
 func ProbeChat(baseURL, apiKey, apiModel string) ProbeVerdict {
+	v := probeChatOnce(baseURL, apiKey, apiModel)
+	if v.Outcome == ProbeError && v.Status >= 500 {
+		time.Sleep(probeRetryPause)
+		v = probeChatOnce(baseURL, apiKey, apiModel)
+	}
+	return v
+}
+
+func probeChatOnce(baseURL, apiKey, apiModel string) ProbeVerdict {
 	v := ProbeVerdict{At: time.Now().UTC()}
 	if isLoopback(baseURL) && !probeAllowLoopback {
 		v.Outcome, v.Detail = ProbeUnreached, "local runtimes are never probed: asking loads the model"

@@ -186,7 +186,7 @@ func (f *findTool) Info() ToolInfo {
 			},
 			"glob": map[string]any{
 				"type":        "string",
-				"description": "Only consider files matching this glob, e.g. '*.go' or 'src/**/*.ts'. Prefix with ! to exclude.",
+				"description": "Only consider files matching this glob, e.g. '*.go' or 'src/**/*.ts'. Capitals do not matter: 'readme.md' finds README.md. Prefix with ! to exclude. With type as well, a file must match BOTH.",
 			},
 			"type": map[string]any{
 				"type":        "string",
@@ -551,7 +551,12 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		"--max-columns-preview",
 	)
 	if params.Glob != "" {
-		args = append(args, "--glob", normaliseGlob(params.Glob))
+		// Names are matched WITHOUT regard to case. Asked on Windows for
+		// "**/gemini.md", the tool answered "No matches found" while fifteen
+		// files named GEMINI.md existed; the model found them on its fifth call
+		// by guessing the capitals (2026-10-05). Nobody looking for a file by
+		// name means "and only if I guessed its capitals".
+		args = append(args, "--iglob", normaliseGlob(params.Glob))
 	}
 	if params.Type != "" {
 		args = append(args, "--type", params.Type)

@@ -18,9 +18,12 @@
 package tui
 
 import (
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
 )
@@ -56,11 +59,17 @@ func parseReviewArgs(raw string) reviewRequest {
 	var req reviewRequest
 	var positional []string
 
-	fields := strings.Fields(raw)
+	tokens := reviewFields(raw)
+	fields := make([]string, len(tokens))
+	for i, tk := range tokens {
+		fields[i] = tk.text
+	}
 	for i := 0; i < len(fields); i++ {
 		f := fields[i]
 
-		if !strings.HasPrefix(f, "-") {
+		// A quoted word is content, whatever it starts with: quoting is how a
+		// person says "this is the path, do not read it as anything else".
+		if tokens[i].quoted || !strings.HasPrefix(f, "-") {
 			positional = append(positional, f)
 			continue
 		}
@@ -77,7 +86,7 @@ func parseReviewArgs(raw string) reviewRequest {
 			if value != "" {
 				return value
 			}
-			if i+1 < len(fields) && !strings.HasPrefix(fields[i+1], "-") {
+			if i+1 < len(fields) && !tokens[i+1].quoted && !strings.HasPrefix(fields[i+1], "-") {
 				i++
 				return fields[i]
 			}
@@ -86,12 +95,32 @@ func parseReviewArgs(raw string) reviewRequest {
 
 		switch name {
 		case "focus", "level", "depth":
-			if v, ok := focusAliases[strings.ToLower(takesNext())]; ok {
+			// GORILLA FIX (2026-10-05): `--focus banana` consumed "banana" and
+			// then reported "Don't know the option --focus". The option is
+			// known; the value is not. The value now travels with the flag so
+			// the message can say which half was wrong.
+			got := takesNext()
+			if v, ok := focusAliases[strings.ToLower(got)]; ok {
 				req.Focus = v
 			} else {
-				req.Unknown = append(req.Unknown, f)
+				req.Unknown = append(req.Unknown, "--"+name+"="+got)
 			}
 		case "diff", "changes", "since":
+			// GORILLA FIX (2026-10-05): the next word was taken as the ref
+			// unconditionally, so `/review --diff internal/auth` became "the
+			// whole folder, against a ref called internal/auth" and failed in
+			// git. A bare --diff is documented as meaning HEAD, so a word that
+			// is a path on disk and NOT something git can resolve is the path,
+			// and the ref stays HEAD. A word that is both (a folder called
+			// main, a branch called main) is the ref: that is what was typed
+			// after --diff. Git is only asked when the path exists, so the
+			// ordinary `--diff HEAD` never starts a process.
+			if value == "" && i+1 < len(fields) && !tokens[i+1].quoted &&
+				!strings.HasPrefix(fields[i+1], "-") &&
+				reviewPathExists(fields[i+1]) && !reviewRefExists(fields[i+1]) {
+				req.Diff = "HEAD"
+				continue
+			}
 			if v := takesNext(); v != "" {
 				req.Diff = v
 			} else {
@@ -119,7 +148,7 @@ func parseReviewArgs(raw string) reviewRequest {
 	// plausible directory names. A folder that is really there always wins: the
 	// depth reading only applies when the alternative is reviewing something
 	// that does not exist.
-	if len(positional) == 1 && req.Focus == "" {
+	if len(positional) == 1 && req.Focus == "" && !soleTokenQuoted(tokens, positional[0]) {
 		word := strings.ToLower(positional[0])
 		if depth, ok := focusAliases[word]; ok && !reviewPathExists(positional[0]) {
 			req.Focus = depth
@@ -129,6 +158,86 @@ func parseReviewArgs(raw string) reviewRequest {
 
 	req.Path = strings.Join(positional, " ")
 	return req
+}
+
+// reviewToken is one word of the argument string.
+type reviewToken struct {
+	text   string
+	quoted bool
+}
+
+// reviewFields splits the arguments on spaces, keeping a quoted run together
+// and dropping the quotes.
+//
+// GORILLA FIX (2026-10-05): this was strings.Fields. `/review "my project"`
+// became the two words `"my` and `project"`, rejoined with the quote characters
+// still in them, and the model was told to review a path that began with a
+// double quote. No backslash escapes are interpreted: a Windows path is full of
+// backslashes that mean nothing of the kind.
+func reviewFields(raw string) []reviewToken {
+	var out []reviewToken
+	var cur strings.Builder
+	var quote rune
+	inWord, wasQuoted := false, false
+	flush := func() {
+		if inWord {
+			out = append(out, reviewToken{text: cur.String(), quoted: wasQuoted})
+		}
+		cur.Reset()
+		inWord, wasQuoted = false, false
+	}
+	for _, r := range raw {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				cur.WriteRune(r)
+			}
+		case r == '"' || r == '\'':
+			// Only at the start of a word. An apostrophe in the middle of one
+			// (O'Brien, don't) is a character, not a delimiter.
+			if !inWord {
+				quote, inWord, wasQuoted = r, true, true
+			} else {
+				cur.WriteRune(r)
+			}
+		case r == ' ' || r == '\t' || r == '\n' || r == '\r':
+			flush()
+		default:
+			inWord = true
+			cur.WriteRune(r)
+		}
+	}
+	flush()
+	return out
+}
+
+// soleTokenQuoted reports whether the one positional word was typed in quotes,
+// in which case it is a path even if it spells a depth.
+func soleTokenQuoted(tokens []reviewToken, word string) bool {
+	for _, tk := range tokens {
+		if tk.quoted && tk.text == word {
+			return true
+		}
+	}
+	return false
+}
+
+// reviewRefExists reports whether git, in the working directory, can resolve
+// the word to a commit. A variable for the same reason as reviewPathExists.
+// Anything that stops git answering — not installed, not a repository, slow —
+// is "no": the caller only asks about a word that IS a path on disk, so "no"
+// means it is treated as the path it is.
+var reviewRefExists = func(ref string) bool {
+	wd := workingDirOrEmpty()
+	if wd == "" {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "-C", wd, "rev-parse", "--verify", "--quiet", ref+"^{commit}")
+	return cmd.Run() == nil
 }
 
 // reviewPathExists is a variable so tests can decide what is on disk instead of
@@ -166,6 +275,24 @@ func workingDirOrEmpty() (dir string) {
 // Guessing at what was meant would be worse: a review is expensive enough that
 // running the wrong one wastes real time.
 func unknownReviewOptionMessage(unknown []string) string {
+	// A depth flag with a value that is not a depth is a different mistake from
+	// a flag that does not exist, and "don't know the option --focus" sends the
+	// user looking for the wrong one.
+	var notOptions []string
+	for _, u := range unknown {
+		name, value, hasValue := strings.Cut(strings.TrimLeft(u, "-"), "=")
+		switch strings.ToLower(name) {
+		case "focus", "level", "depth":
+			if !hasValue || value == "" {
+				return "--" + name + " needs a depth after it: quick, security or full." +
+					"  Full explanation: /review help"
+			}
+			return "--" + name + " takes quick, security or full; \"" + value + "\" is none of them." +
+				"  Full explanation: /review help"
+		}
+		notOptions = append(notOptions, u)
+	}
+	unknown = notOptions
 	return "Don't know the option " + strings.Join(unknown, " ") +
 		". Try: /review --quick, --security, --full, --diff HEAD, or a path." +
 		"  Full explanation: /review help"
@@ -192,7 +319,8 @@ func reviewPrompt(req reviewRequest) string {
 	switch req.Focus {
 	case "quick":
 		b.WriteString("The user asked for a QUICK pass: pass focus=\"quick\". Tell them plainly " +
-			"that this skips the security stages entirely.\n")
+			"that this runs linters and formatters only — no static analysis, no security " +
+			"tools, no secret scan — and name the analysers the result says were left out.\n")
 	case "security":
 		b.WriteString("The user asked for a SECURITY review: pass focus=\"security\".\n")
 	case "full":
@@ -205,7 +333,8 @@ func reviewPrompt(req reviewRequest) string {
 	case req.Path == "":
 		b.WriteString("If this is a git repository with uncommitted or recent changes, pass " +
 			"diff=\"HEAD\" so the review is scoped to what changed rather than every tracked " +
-			"file.\n")
+			"file. If the tool answers that nothing was in scope, nothing has changed against " +
+			"that ref: say so and run it once more without diff.\n")
 	}
 
 	b.WriteString("\nWhen it returns: read the trust block FIRST and tell the user plainly which " +

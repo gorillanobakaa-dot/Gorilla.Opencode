@@ -42,7 +42,7 @@ cost before they start. Everything else is local.
 | `/reset` · `/defaults` | Put things back the way they shipped. |
 | `/research <question>` | Send helper agents to investigate, each on one angle. |
 | `/osint <question>` · `/dossier` | The serious one. Professional dossier. Burns real money. |
-| `/review [--quick|--security|--full] [--diff REF] [folder]` · `/audit` `/codereview` | Run 30 real analysers over your code and report honestly. |
+| `/review [--quick|--security|--full] [--diff REF] [folder]` · `/audit` `/codereview` | Run real analysers over your code and report honestly. |
 | `/port [operation] [--onto REF] [--series DIR] [--build CMD]` · `/patch` `/backport` `/forwardport` | Move patches to another version of the code. |
 | `/yolo` · `/auto` `/autopilot` `/goal` | Approve everything for this conversation. No more prompts. |
 | `/tasks` · `/task` `/agents` `/kill` | See and stop background helpers. |
@@ -226,13 +226,13 @@ Shows what you have left to spend, in plain words. If you signed in with the Ant
 
 **What this agent can do here, what it could do, and the cost.**
 
-A map of capabilities, not a chat answer. It checks THIS machine for about thirty tools — reading PDFs and scanned pages, transcribing audio, taking apart firmware and disk images, inspecting Android apps and Windows files, looking up who owns a domain — and shows what is already here, what is not, and the exact command to get the rest.
+A map of capabilities, not a chat answer. It checks THIS machine for the tools behind each one — reading PDFs and scanned pages, taking audio and video apart, opening firmware and disk images, inspecting Android apps, looking up who owns a domain — and shows what is already here, what is not, and the exact command to get the rest. The screen counts them itself. Tools that cannot exist on your operating system are left off the list rather than shown as missing.
 
 It exists because a capability was found sitting unused: a model reported that it could not read a screenshot while the tool that reads screenshots was already installed on the same machine. Nobody stumbles onto binwalk or sleuthkit or ssdeep unaided, and you cannot ask for a thing you do not know exists. The barrier was never bandwidth — it was the map.
 
-Slackware style: take a whole group, walk it item by item, or pick single tools. Every entry says in plain words what it is FOR, what the agent gains, and — the part most documentation leaves out — what will disappoint you about it. Costs are measured against your own machine by your own package manager, including everything already installed, and are shown in minutes as well as megabytes.
+Slackware style: take a whole group, walk it item by item, or pick single tools. Every entry says in plain words what it is FOR, what the agent gains, and — the part most documentation leaves out — what will disappoint you about it. On Linux (apt or pacman) the cost is measured against your own machine by your own package manager, allowing for everything already installed, and is shown in minutes as well as megabytes. On Windows (Scoop) the size cannot be known before installing, and the screen says so instead of showing a figure.
 
-It NEVER installs anything and never asks for your password. It prints the exact command into the conversation and you decide. Everything listed is free and needs no account.
+It NEVER installs anything and never asks for your password. It shows the exact command on its own install plan and you decide whether to run it. Nothing is sent to the model unless you press ? there, which hands your selection to the model to talk over, costs one model turn, and tells it not to run anything. Everything listed is free and needs no account.
 
 ### `/context`
 
@@ -272,7 +272,11 @@ Undoes your changes, in whichever area you pick — settings, instructions, or f
 
 **Send helper agents to investigate, each on one angle.**
 
-The everyday investigation tool: four to ten helpers, each given ONE angle, collecting with the same intelligence-cycle discipline as /osint but in a single pass. A verifier attacks their conclusions. Each helper is a full model session, so the dialog shows the cost before anything starts. Worth it when being wrong is expensive; waste when a single search would answer. For the full professional dossier — rounds, graded sources, the works — see /osint.
+The everyday investigation tool, for questions about code and this machine: 4 to 10 helpers, each working ONE fixed lane (what already exists here, prior art, the primary sources, what the target actually demands; from 5 helpers up a verifier attacks the others' conclusions). Each helper is a full model session, so the dialog shows the cost before anything starts. Worth it when being wrong is expensive; waste when a single search would answer.
+
+Every run saves each helper's report to a file in your Gorilla-OSINT-Dossiers folder (in Documents, or in your home folder if there is no Documents), outside the working folder and readable by your account only, before the answer is written. If the answer never gets written, /osint --recover writes it up from that file.
+
+/research help shows this page and starts nothing. If the research helpers are switched off in /context the command says so instead of opening the cost dialog. For questions about the world rather than this machine — graded sources, the official record against the reporting — see /osint.
 
 ### `/osint <question>`
 
@@ -280,7 +284,7 @@ The everyday investigation tool: four to ten helpers, each given ONE angle, coll
 
 **The serious one. Professional dossier. Burns real money.**
 
-A professional intelligence assessment, not a chat answer: plans your question into sub-questions, collects from hundreds of free primary sources (scholarly APIs, SEC filings, World Bank, humanitarian data, global news), grades every claim on two axes like a real intelligence shop, hunts its own gaps, and tells you plainly what it could NOT establish. OFF by default — arm it in /context. Every run starts with a warning showing the burn rate in money, because 4-10 helpers is 4-10 full model sessions. Type /osint alone for the full explanation page.
+A professional intelligence assessment, not a chat answer. It works your question in fixed lanes, one helper per lane: the official record, the scholarly literature and data, the reporting, and the strongest case against, with more lanes as you add helpers. No lane searches your own machine. Helpers start from a built-in atlas of free sources (scholarly indexes, official statistics, filings, humanitarian data, news) and the open web, are told to grade every claim on two axes like a real intelligence shop, and the dossier states plainly what could NOT be established. The model may ask for ONE follow-up to close a gap; the program refuses a second. OFF by default — arm it in /context; it also needs the research helpers switched on there. Every run starts with a warning showing the burn rate in money, because 4-10 helpers is 4-10 full model sessions. Your question and the search terms go to your model provider and to the search services; the dossier file stays on this machine. Type /osint alone, or /osint help, for the full explanation page.
 
 /osint --recover writes up a run that collected its findings but never produced the dossier — the usual outcome when a connection drops or the model runs out of room at the very last step. It costs nothing to look: the findings are already on disk and in the local store, and it lists every past run so you can pick one. The write-up happens in a fresh conversation carrying only those findings, which is exactly why it succeeds where the original run ran out of room. Nothing is collected again and no helpers are sent out.
 
@@ -288,22 +292,28 @@ A professional intelligence assessment, not a chat answer: plans your question i
 
 *Also: `/audit`, `/codereview`*
 
-**Run 30 real analysers over your code and report honestly.**
+**Run real analysers over your code and report honestly.**
 
-A professional static-analysis and security review, built in. Point it at a folder, a file, or your changes and it runs around thirty real analysers — the ones that find memory errors, injection, leaked secrets, unchecked errors — picking whichever suit the languages actually present. C, C++, Go, Python, JavaScript, TypeScript, Rust, shell and more.
+A professional static-analysis and security review, built in. Point it at a folder, a file, or your changes and it runs the real analysers installed on your machine — the ones that find memory errors, injection, leaked secrets, unchecked errors — picking whichever suit the languages actually present. C, C++, Go, Python, JavaScript, TypeScript, Rust, shell and more.
 
-With no arguments it reviews your current folder. Add a path for somewhere else. The tools live inside the program; nothing is downloaded when you run it.
+With no arguments it reviews your current folder. Add a path for somewhere else; put it in quotes if it has spaces.
+
+**What it needs.** Python 3, and the analysers themselves. The part that drives them and reads their output lives inside this program; the analysers do not, and it tells you which are missing and how to get them.
+
+**What leaves your machine.** Most analysers read your files and nothing else. A few fetch something when they run: semgrep downloads its rule packs (its usage reporting is switched off), cargo audit downloads a list of known vulnerabilities, and the Go and Rust tools download any dependency of your project that is not already on disk. Before anything runs you are shown exactly which of these are installed and apply to your code, and asked.
+
+**Where the results go.** Every tool's full output is kept in this program's own cache folder, and the answer gives you the path. Nothing is written into the folder being reviewed.
 
 **How deep:**
   /review                    the normal pass — fast checks and static analysis, and it escalates to the deep security tools ON ITS OWN for any file that looks security-shaped. This is usually the one you want.
-  /review --quick            linters and formatters only, seconds. Skips the security stages entirely, and says so.
+  /review --quick            linters and formatters only. No static analysis, no security tools, no search for leaked secrets — and the answer names every analyser it left out.
   /review --security         forces the deep security pass over everything and reports only security findings.
   /review --full             every stage over every file.
-  /review --diff HEAD        only what you changed. Add a ref for something else: --diff origin/main.
+  /review --diff HEAD        only what you changed. Add a ref for something else: --diff origin/main. If nothing has changed it says so; that is not a clean report.
 
 These combine, and the order does not matter: /review --security --diff HEAD internal/auth
 
-**It tells you what did NOT run.** That is the part that matters. Those thirty analysers have to be installed on your machine, and if they are missing they simply find nothing — which looks exactly like a clean report. So the answer always starts with which tools ran, which are missing, and which failed; and if none of them are installed it refuses to run at all rather than hand you a reassuring blank.
+**It tells you what did NOT run.** That is the part that matters. The analysers have to be installed on your machine, and if they are missing they simply find nothing — which looks exactly like a clean report. So the answer always starts with which tools ran, which are missing, and which failed; and if none of them are installed it refuses to run at all rather than hand you a reassuring blank.
 
 It also flags every line that two or more DIFFERENT tools complained about independently. Those are the ones worth reading first.
 

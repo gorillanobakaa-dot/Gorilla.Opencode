@@ -50,6 +50,15 @@ HEADROOM_MB = 500
 
 def _run_check(cmd, timeout=15):
     import subprocess
+    # Resolve the program through PATH and PATHEXT first. Without this a bare
+    # name that is a .cmd shim on Windows (everything npm installs) raises
+    # FileNotFoundError and is reported missing while installed. Same fix, same
+    # date (2026-10-05) and same reason as resolve_argv() in code_review.py;
+    # repeated here because this module must not import that one.
+    exe = shutil.which(cmd[0]) if cmd else None
+    if exe is None:
+        return 127
+    cmd = [exe] + list(cmd[1:])
     try:
         # check=False: we are asking "does this binary exist", and the answer
         # is the return code (127 = no). An exception would hide it.

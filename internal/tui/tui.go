@@ -1260,14 +1260,8 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Instruct rather than call directly: the tool belongs to the agent, and
 		// routing through it keeps the findings in the conversation where the
 		// model can act on them.
-		prompt := fmt.Sprintf(
-			"Use the research tool to investigate the following. "+
-				"Set mode=%q and agents=%d exactly as given — the user chose these and they decide what this costs. "+
-				"Pass everything already established in this conversation as `context` so no helper pays to re-derive it. "+
-				"When the helpers report, check at least one load-bearing claim yourself, carry the evidence tiers through, "+
-				"and say plainly what nobody established.\n\nQUESTION: %s",
-			msg.Mode, msg.Agents, msg.Question)
-		return a, util.CmdHandler(chat.SendMsg{Text: prompt})
+		// The wording lives in researchroute.go, with its tests.
+		return a, util.CmdHandler(chat.SendMsg{Text: researchPrompt(msg.Mode, msg.Agents, msg.Question)})
 
 	case dialog.CloseOsintDialogMsg:
 		a.showOsintDialog = false
@@ -1277,20 +1271,9 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// GORILLA OVERRIDE: the dossier product is WRITTEN OUTSIDE the working
 		// folder, always. A working folder is often a git repo; a personal
 		// question swept into a commit and pushed is the worst failure this
-		// feature could have. ~/Documents/gorilla-dossiers is nobody's repo.
-		prompt := fmt.Sprintf(
-			"Use the research tool with doctrine=%q, mode=%q and agents=%d exactly as given — "+
-				"the user chose these on the warning screen and they decide what this costs. "+
-				"Pass everything already established in this conversation as `context` so no helper pays to re-derive it. "+
-				"When the helpers report: run the gap check the tool's report demands, verify at least one load-bearing claim "+
-				"yourself, carry every two-axis grade through unchanged, and assemble the dossier product "+
-				"(BLUF first, graded claims, SOURCES TRIED, NOT ESTABLISHED, recommended action). "+
-				"Then write the complete dossier as markdown to a NEW timestamped file under %q using the write tool "+
-				"(create the folder if it is missing), tell the user the exact path, and give them the BLUF and key "+
-				"findings in the conversation. Never write the dossier into the working folder: it may be a git "+
-				"repository, and a private question must never end up in a commit.\n\nQUESTION: %s",
-			"dossier", msg.Mode, msg.Agents, config.DossierDir(), msg.Question)
-		return a, util.CmdHandler(chat.SendMsg{Text: prompt})
+		// feature could have. The dossier folder is nobody's repo. The wording
+		// lives in researchroute.go (osintPrompt), with its tests.
+		return a, util.CmdHandler(chat.SendMsg{Text: osintPrompt(msg.Mode, msg.Agents, msg.Question)})
 
 	case dialog.SessionsCloseMsg:
 		a.showSessionsMgr = false
@@ -1421,10 +1404,23 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The mode multiplies the bill (supervised is double), and the model
 		// picking it from a schema the user never sees is the wrong place for
 		// that decision.
+		//
+		// GORILLA FIX (2026-10-05): audit findings S1 and S2. `/research help` was
+		// investigated as a question, and with the research tool switched off the
+		// user still got the cost dialog and the model was then told to use a
+		// tool it had not been given. Both are decided by routeResearch before
+		// the dialog opens; see researchroute.go.
 		case "research":
 			q := strings.TrimSpace(msg.Args)
-			if q == "" {
+			route := routeResearch(msg.Args, config.LoadoutEnabled(researchToolID))
+			if route == routeHelp {
+				return a, a.explainCommand("research")
+			}
+			if route == routeEmpty {
 				return a, util.ReportWarn("Give it something to investigate: /research does X actually work on this machine?")
+			}
+			if route == routeToolOff {
+				return a, a.requireTool(researchToolID, "/research")
 			}
 			a.researchDialog = dialog.NewResearchDialogCmp(q)
 			a.researchDialog.SetSize(a.width, a.height)
@@ -1457,21 +1453,32 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// The model refused to fabricate a dossier about a flag, which was the
 			// right call and cost the user a run's worth of setup to discover.
 			// Recognised here, before anything can be spent.
-			if isRecoverFlag(q) {
+			//
+			// GORILLA FIX (2026-10-05): audit findings S1 and S2, the same two
+			// holes as /research above. `/osint help` and `/osint -h` went to the
+			// red gate as the question, one keypress from a dossier on the word
+			// "help"; they now open the capability page, which is this command's
+			// help. And the gate checked the dossier row only, never the research
+			// tool the dossier runs on. routeOsint decides, in researchroute.go.
+			route := routeOsint(msg.Args, config.LoadoutEnabled(researchToolID), config.LoadoutEnabled(config.DossierComponentID))
+			if route == routeRecover {
 				runs := agent.ListRecoverableRuns(context.Background(), a.app.Sessions, a.app.Messages)
 				a.osintRecover = dialog.NewOsintRecoverCmp(runs)
 				a.osintRecover.SetSize(a.width, a.height)
 				a.showOsintRecover = true
 				return a, nil
 			}
-			if q == "" {
+			if route == routeHelp || route == routeEmpty {
 				a.osintPage = dialog.NewOsintPageCmp()
 				a.osintPage.SetSize(a.width, a.height)
 				a.showOsintPage = true
 				return a, nil
 			}
-			if !config.LoadoutEnabled(config.DossierComponentID) {
+			if route == routeDossierOff {
 				return a, util.ReportWarn("The serious OSINT dossier is switched OFF (it burns real money, so it ships that way). Arm it: /context -> \"" + config.DossierRowName + "\" -> space. Or type /osint alone to read what it does first.")
+			}
+			if route == routeToolOff {
+				return a, a.requireTool(researchToolID, "/osint")
 			}
 			a.osintDialog = dialog.NewOsintDialogCmp(q)
 			a.osintDialog.SetSize(a.width, a.height)

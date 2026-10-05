@@ -919,7 +919,17 @@ func (m *modelDialogCmp) connectionLine() string {
 	case ProviderBookmarks:
 		return "each row is tagged [connection] — the same model can arrive via two keys, on two quotas"
 	case models.ProviderLocal:
-		return "served by your configured endpoints — each row names the one that owns it"
+		line := "served by your configured endpoints, working ones first — each row names the one that owns it"
+		var ids []models.ModelID
+		for id, mod := range models.SupportedModels {
+			if mod.Provider == models.ProviderLocal && !config.IsModelHidden(string(id)) {
+				ids = append(ids, id)
+			}
+		}
+		if _, retired, notChat := models.PickerOrder(ids); retired+notChat > 0 {
+			line += fmt.Sprintf(" | not shown: %d retired by their provider, %d that are not chat models", retired, notChat)
+		}
+		return line
 	case models.ProviderGeminiCA:
 		return "served through your Google login (Code Assist quota)"
 	case models.ProviderAntigravity:
@@ -1426,6 +1436,27 @@ func getModelsForProvider(provider models.ModelProvider) []models.Model {
 			continue
 		}
 		providerModels = append(providerModels, model)
+	}
+
+	// GORILLA OVERRIDE (2026-10-05): endpoint-served models are shown by what
+	// was FOUND when they were asked, and the unusable ones are left out and
+	// counted (models.PickerOrder). The note further down about never hiding a
+	// model is about taste: a small or old model is someone's legitimate
+	// choice. A model the provider has retired is nobody's choice, and an
+	// embedder cannot hold a conversation.
+	if provider == models.ProviderLocal {
+		byID := make(map[models.ModelID]models.Model, len(providerModels))
+		ids := make([]models.ModelID, 0, len(providerModels))
+		for _, m := range providerModels {
+			byID[m.ID] = m
+			ids = append(ids, m.ID)
+		}
+		shown, _, _ := models.PickerOrder(ids)
+		out := make([]models.Model, 0, len(shown))
+		for _, id := range shown {
+			out = append(out, byID[id])
+		}
+		return out
 	}
 
 	// Coding-usefulness heuristic order — used for unranked models and for

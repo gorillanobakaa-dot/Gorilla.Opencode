@@ -621,7 +621,17 @@ func convertLocalModel(model localModel) Model {
 		if meta.Name != "" {
 			name = meta.Name
 		}
-		description = meta.Description
+		// GORILLA OVERRIDE (2026-10-05, second pass): the typed description and
+		// the typed price went the way of the typed rank.
+		//
+		// The picker was still printing nim.json's sentences beside models the
+		// provider had retired, and beside a model the same row said had failed
+		// its test: "best speed/quality NVIDIA tier", "shit tier". And the
+		// status bar charged "$0.11" for a conversation on an endpoint that
+		// bills nothing, from a market price typed for a different seller. An
+		// endpoint that reports no price has no price here. The one description
+		// kept is a verdict EARNED in this project, which cites its evidence.
+		_ = meta.Description
 		metaCtx = meta.ContextWindow
 		// GORILLA OVERRIDE (2026-10-05): the typed rank is NOT used.
 		//
@@ -633,10 +643,10 @@ func convertLocalModel(model localModel) Model {
 		// lists today and what answered when asked (probe.go); the bundle still
 		// supplies names, descriptions, context sizes and prices.
 		_ = meta.Rank
-		costIn = meta.CostIn
-		costInCached = meta.CostInCached
-		costOut = meta.CostOut
-		costOutCached = meta.CostOutCached
+		_, _, _, _ = meta.CostIn, meta.CostInCached, meta.CostOut, meta.CostOutCached
+	}
+	if v, ok := EarnedVerdict(model.ID); ok {
+		description = "tested here: " + v.Verdict
 	}
 	// GORILLA OVERRIDE (2026-09-01): the ADVERTISED ceiling is deliberately
 	// NOT used as the operating window.

@@ -19,7 +19,12 @@ func TestReviewScriptOutputDecodesWithTheRealStruct(t *testing.T) {
 	if err != nil {
 		t.Skipf("no python: %v", err)
 	}
-	args := append(append([]string{}, pre...), script, "../../config", "--audience", "agent", "--max-files", "12")
+	// --results-dir (2026-10-05): without it this test wrote a fresh
+	// internal/config/.code_review/<timestamp>/ into the repository on every
+	// run — the test reproducing, in the project's own tree, the defect the
+	// tool had in everyone else's.
+	args := append(append([]string{}, pre...), script, "../../config", "--audience", "agent",
+		"--max-files", "12", "--results-dir", t.TempDir())
 	out, err := exec.Command(py, args...).Output()
 	if err != nil {
 		t.Fatalf("script failed: %v", err)

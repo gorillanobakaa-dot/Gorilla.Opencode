@@ -131,21 +131,17 @@ func (m OsintDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // sessions is the honest total for the chosen shape, from the same role table
 // the run reads (see the research dialog's sessionCount for why).
 func (m OsintDialogCmp) sessions() int {
-	if osintModes[m.selected].mode == "supervised" {
-		n, _ := agent.SupervisedSessions(m.agents)
-		return n
-	}
-	return m.agents
+	n, _, _, _ := agent.RunShapeFor(agent.DoctrineDossier, osintModes[m.selected].mode, m.agents)
+	return n
 }
 
 // inFlight is how many helpers genuinely run at once for the chosen mode —
 // sequential is one at a time, so quoting it parallel's peak rate would be a
 // lie in the expensive direction, which is still a lie.
 func (m OsintDialogCmp) inFlight() int {
-	if osintModes[m.selected].mode == "sequential" {
-		return 1
-	}
-	return min(m.sessions(), agent.ResearchMaxInFlight)
+	// The same function the /research screen asks (audit finding O7): the two
+	// gates price one engine and must not hold two opinions of its concurrency.
+	return agent.PeakInFlight(agent.DoctrineDossier, osintModes[m.selected].mode, m.agents)
 }
 
 // moneyLines states the burn in the only unit that means anything, computed
@@ -187,12 +183,29 @@ func assumptionsLine() string {
 	// this line must stop calling it an assumption when it is not one.
 	if secs, n, ok := config.MeasuredSecondsPerHelper(); ok {
 		return fmt.Sprintf("Assumptions on screen, arguable: %d steps/helper, ~%d tokens out/step. "+
-			"Timing is MEASURED: ~%.0fs/helper, median of your last %d. Dossiers add a gap round on top.",
+			"Timing is MEASURED: ~%.0fs/helper, median of your last %d.",
 			config.ResearchStepsPerHelper, config.ResearchOutputPerStep, secs, n)
 	}
 	return fmt.Sprintf("Assumptions on screen, arguable: %d steps/helper, ~%d tokens out/step, ~%.0fs/step "+
-		"(not yet timed on this machine). Dossiers add a gap round on top.",
+		"(not yet timed on this machine).",
 		config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep)
+}
+
+// followUpLine states the one cost the figures above do not contain.
+//
+// GORILLA FIX (2026-10-05): audit finding O2. This screen said "then a gap
+// round hunts what they missed" and "Dossiers add a gap round on top", as
+// though a second round always ran and as though it were priced. Neither was
+// so: the round is a follow-up call the MODEL may choose to make, nothing in
+// Go bounded it, and its sessions were in no figure on this screen. The bound
+// is now enforced in the research tool, so this line states it as a ceiling,
+// computed from the same clamp, for the mode currently selected.
+func (m OsintDialogCmp) followUpLine() string {
+	mode := osintModes[m.selected].mode
+	return fmt.Sprintf("NOT IN THE FIGURES ABOVE: one OPTIONAL follow-up. If the first pass leaves a gap the answer "+
+		"depends on, the model may ask ONCE more: at most %d more sessions (%d helpers, %s). The program refuses "+
+		"a third call. The model may equally skip it.",
+		agent.DossierFollowUpSessions(mode), agent.ResearchMinAgents, mode)
 }
 
 // scaleLines states the size of the run in TOKENS, which is the only unit that
@@ -204,16 +217,47 @@ func assumptionsLine() string {
 // was working — 21,596 tokens a minute. Scaling is linear in the number of
 // sessions, which is the same assumption the per-minute figure already makes
 // and is printed on screen so it can be argued with.
+//
+// GORILLA FIX (2026-10-05): audit finding O3. The paragraph above describes
+// where the number CAME from; what the code did with it was type it in. The
+// rate was the constant 21596/8, from that one run on that one model, shown to
+// every user on every model as "measured from a real run, not modelled". The
+// fixed sentence under it ("a quarter of a million tokens in the first ten
+// minutes is normal") did not survive its own arithmetic at the default four
+// helpers: 4 x 2,699 x 10 is about 108,000.
+//
+// The size is now this machine's own: the median tokens per session over its
+// finished runs (agent.MeasuredRunSize), times the sessions selected. Until a
+// run has finished here there is no measurement, and the line says exactly
+// that rather than borrowing someone else's.
 func (m OsintDialogCmp) scaleLines() []string {
-	measuredPerMinutePerSession := 21596.0 / 8.0
-	sessions := m.sessions()
-	perHour := measuredPerMinutePerSession * float64(sessions) * 60.0
-	return []string{
-		fmt.Sprintf("SIZE OF THIS RUN: about %s TOKENS PER HOUR while it works (%d sessions x ~%s tokens/min each,",
-			commaInt(int(perHour)), sessions, commaInt(int(measuredPerMinutePerSession))),
-		"measured from a real run, not modelled). A quarter of a million tokens in the first ten minutes is normal.",
-		"If a per-minute figure above looks small to you, this is the number to look at instead.",
+	var out []string
+	for i, l := range measuredRunLines(m.sessions()) {
+		text := strings.TrimSpace(l.text)
+		if i == 0 {
+			text = "SIZE OF THIS RUN IN TOKENS — " + text
+		}
+		out = append(out, text)
 	}
+	return out
+}
+
+// followUpShort is followUpLine for the leanest form of the gate: the ceiling
+// and nothing else, in the longest wording that fits one row of width w.
+func (m OsintDialogCmp) followUpShort(w int) string {
+	n := agent.DossierFollowUpSessions(osintModes[m.selected].mode)
+	long := fmt.Sprintf("+ optional follow-up: max %d more sessions", n)
+	if len(long) <= w {
+		return long
+	}
+	return fmt.Sprintf("+ optional follow-up: max %d more", n)
+}
+
+// atlasTotal is how many sources every helper is handed, counted from the
+// embedded atlas itself.
+func atlasTotal() int {
+	n, _ := agent.SourceAtlasCount()
+	return n
 }
 
 func helperModel() models.Model {
@@ -270,15 +314,31 @@ func (m OsintDialogCmp) renderAt(lean int) string {
 	if lean < 2 {
 		b = append(b,
 			body.Render(""),
-			body.Render(fmt.Sprintf("It will spin up %d helper agents. Every one is a FULL model session working a lane of your", m.agents)),
-			body.Render("question against hundreds of real sources, then a gap round hunts what they missed. This is"),
-			body.Render("the most expensive thing this program can do, and it does it on purpose."),
+			body.Render(fmt.Sprintf("It will spin up %d helper agents. Every one is a FULL model session working your", m.agents)),
+			// GORILLA FIX (2026-10-05): audit findings O2 and O4. This line read
+			// "against hundreds of real sources, then a gap round hunts what they
+			// missed". A helper is given the source atlas, which is tens of
+			// entries, and no gap round runs unless the model asks for one. The
+			// count is the atlas's own; the follow-up is stated with the money.
+			body.Render(fmt.Sprintf("question in its own fixed lane, starting from a built-in atlas of %d sources and the open web.", atlasTotal())),
+			body.Render("This is the most expensive thing this program can do, and it does it on purpose."),
 		)
 	}
 	b = append(b, body.Render(""))
 	// The money NEVER goes. It is the entire reason this screen exists.
 	for _, line := range m.moneyLines() {
 		b = append(b, red.Render(line))
+	}
+	// Money too, so it never goes either: the only cost not in the lines above.
+	// In the leanest form it takes the place of the blank row that used to
+	// follow, in a wording short enough for the narrowest terminal this dialog
+	// is measured at, so stating it costs the decision no rows.
+	followUpShown := false
+	if lean < 3 {
+		b = append(b, red.Render(m.followUpLine()))
+	} else {
+		b = append(b, red.Render(m.followUpShort(w)))
+		followUpShown = true
 	}
 	// GORILLA (2026-08-17): the SCALE, in tokens, measured from a real run.
 	//
@@ -302,7 +362,7 @@ func (m OsintDialogCmp) renderAt(lean int) string {
 	if lean < 1 {
 		b = append(b,
 			body.Render(""),
-			body.Render("It is your wallet and it is your funeral. If you are in a crunch and need ten agents in full"),
+			body.Render(fmt.Sprintf("It is your wallet and it is your funeral. If you are in a crunch and need %d agents in full", agent.ResearchMaxAgents)),
 			body.Render("parallel to get an answer you can stand behind — that is exactly what this exists for. Your call."),
 		)
 	}
@@ -313,8 +373,10 @@ func (m OsintDialogCmp) renderAt(lean int) string {
 			mute.Render("so a private question can never end up in a git repository."),
 		)
 	}
+	if !followUpShown {
+		b = append(b, body.Render(""))
+	}
 	b = append(b,
-		body.Render(""),
 		head.Render(fmt.Sprintf("Helpers: ‹ %d ›  (<-/->, %d–%d)", m.agents, agent.ResearchMinAgents, agent.ResearchMaxAgents)),
 	)
 	for i, o := range osintModes {

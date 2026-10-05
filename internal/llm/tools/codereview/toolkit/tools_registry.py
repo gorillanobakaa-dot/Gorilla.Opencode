@@ -76,6 +76,25 @@ DEFAULT_IGNORE_DIRS = {
     ".tox", "third_party", "objdir", ".ccache",
 }
 
+# What a QUICK pass runs: these categories and nothing else.
+#
+# Added 2026-10-05. "quick" used to be `--no-stage3`, which only stops the deep
+# stage from escalating. Stages 1 and 2 still ran in full -- bandit, gosec,
+# cargo audit, clang-tidy, semgrep, gitleaks -- while the caller was told "only
+# the fast linters and formatters ran; the security stages were skipped
+# entirely". The statement was false in the one block a reader is told to trust
+# first. A quick pass is now defined by CATEGORY, here, so "linters and
+# formatters only" is a property of the run and not a description of it.
+QUICK_CATEGORIES = ("recon", "lint", "format")
+
+# Shared wording for tools that go through the Go toolchain, which resolves a
+# missing dependency by downloading it.
+_GO_MODULES_NETWORK = ("the Go toolchain downloads any module the project "
+                       "depends on that is not already in its local cache, "
+                       "from proxy.golang.org.")
+_SEMGREP_NETWORK = ("downloads its rule packs from semgrep.dev on every run. "
+                    "Usage metrics are switched off (--metrics=off).")
+
 # Keywords that, if seen in a stage 1/2 log, escalate that file to stage 3.
 ESCALATION_KEYWORDS = [
     "CWE-", "CVE-", "overflow", "use-after-free", "double-free", "uaf",
@@ -179,6 +198,17 @@ class Tool:
     # anything that does not build on Windows.
     platforms: List[str] = field(default_factory=list)
     notes: str = ""
+    # What this tool fetches from, or sends to, another machine WHEN IT RUNS.
+    # Empty means it works on what is on disk and nothing else.
+    #
+    # Added 2026-10-05. The /review help said "nothing is downloaded when you
+    # run it" while semgrep fetched its rule packs from semgrep.dev, cargo audit
+    # cloned the RustSec database and the Go tools could download modules. The
+    # sentence was typed once and nothing connected it to the commands below.
+    # Now the fact lives beside the command it describes, and `--network-report`
+    # reads it back, so the permission prompt is built from this field rather
+    # than from somebody's memory of it.
+    network: str = ""
 
     def runs_on(self, plat_os_name: str) -> bool:
         """Whether this tool could exist on this platform at all."""
@@ -277,22 +307,34 @@ def _semgrep_fast_cmd(path, ctx):
     # --json: semgrep's pretty output is a colour-aligned tree whose shape moves
     # between releases, so it's the one tool we ask for machine output. The log
     # still holds semgrep's complete, unedited response. See findings.py notes.
-    return ["semgrep", "scan", "--quiet", "--json", "--config", "p/ci", path]
+    #
+    # --metrics=off (2026-10-05): with a registry ruleset semgrep reports usage
+    # metrics to semgrep.dev unless told not to. The /review help said nothing
+    # left the machine. The rule packs still have to be FETCHED, which is why
+    # this tool carries a `network` note; what is switched off here is the part
+    # that sends something about the user's project the other way.
+    return ["semgrep", "scan", "--quiet", "--json", "--metrics=off", "--config", "p/ci", path]
 
 def _semgrep_deep_cmd(path, ctx):
     packs = ["p/security-audit", "p/owasp-top-ten"]
     extra = ctx.get("semgrep_language_packs") or []
-    cmd = ["semgrep", "scan", "--quiet", "--json"]
+    cmd = ["semgrep", "scan", "--quiet", "--json", "--metrics=off"]
     for p in packs + extra:
         cmd += ["--config", p]
     cmd.append(path)
     return cmd
 
+# --redact (2026-10-05): -v prints every secret it finds, in full, and the raw
+# log is kept on disk beside the report. parse_gitleaks() already withholds the
+# value from the finding record, so the only copy that ever carried it was a
+# plain-text log file -- a second place for a credential to be found. The
+# parser needs the -v layout (File:, Line:, RuleID:) and does not need the
+# value, so the value is redacted at the source.
 def _gitleaks_cmd(path, ctx):
-    return ["gitleaks", "detect", "--source", path, "--no-git", "-v"]
+    return ["gitleaks", "detect", "--source", path, "--no-git", "-v", "--redact"]
 
 def _gitleaks_git_history_cmd(path, ctx):
-    return ["gitleaks", "detect", "--source", path, "-v", "--log-opts=--all"]
+    return ["gitleaks", "detect", "--source", path, "-v", "--redact", "--log-opts=--all"]
 
 def _cloc_cmd(path, ctx):
     return ["cloc", "--quiet", path]
@@ -583,6 +625,8 @@ TOOLS: List[Tool] = [
                              manual_notes="rustup component add clippy"),
         build_cmd=_cargo_clippy_cmd,
         severity_markers=["warning:", "error:"],
+        network="cargo downloads any crate the project depends on that is not "
+                "already in its local cache, from crates.io.",
     ),
     Tool(
         id="cargo-fmt-check", label="cargo fmt --check", languages=["rust"],
@@ -601,6 +645,7 @@ TOOLS: List[Tool] = [
         build_cmd=_cargo_audit_cmd,
         severity_markers=["Vulnerability", "ID:"],
         notes="Needs network access to fetch the RustSec advisory database.",
+        network="downloads the RustSec advisory database from github.com.",
     ),
 
     # ---- Go ------------------------------------------------------------------------
@@ -612,6 +657,7 @@ TOOLS: List[Tool] = [
         build_cmd=_golangci_lint_cmd,
         severity_markers=["warning", "error"],
         notes="Bundles govet, staticcheck, errcheck, gosec, revive, gofmt, goimports and more.",
+        network=_GO_MODULES_NETWORK,
     ),
     Tool(
         id="go-vet", label="go vet", languages=["go"],
@@ -623,6 +669,7 @@ TOOLS: List[Tool] = [
         build_cmd=_go_vet_cmd,
         severity_markers=["vet:"],
         included_in="golangci-lint",
+        network=_GO_MODULES_NETWORK,
     ),
     Tool(
         id="staticcheck", label="staticcheck (standalone)", languages=["go"],
@@ -632,6 +679,7 @@ TOOLS: List[Tool] = [
         build_cmd=_staticcheck_cmd,
         severity_markers=["SA", "ST", "error"],
         included_in="golangci-lint",
+        network=_GO_MODULES_NETWORK,
     ),
     Tool(
         id="gosec", label="gosec (Go security)", languages=["go"],
@@ -641,6 +689,7 @@ TOOLS: List[Tool] = [
         build_cmd=_gosec_cmd,
         severity_markers=["Severity:", "CWE"],
         included_in="golangci-lint",
+        network=_GO_MODULES_NETWORK,
     ),
 
     # ---- Multi-language ---------------------------------------------------------------
@@ -654,6 +703,7 @@ TOOLS: List[Tool] = [
         notes="No login/API key needed -- pulls the public 'p/ci' ruleset from the registry. "
               "Runs once across the whole target (semgrep understands multiple languages in "
               "a single pass, so per-file invocations would just be slower and redundant).",
+        network=_SEMGREP_NETWORK,
     ),
     Tool(
         id="semgrep-deep", label="semgrep (security-audit + owasp-top-ten)", languages=["python", "javascript", "typescript", "go", "c", "cpp"],
@@ -663,6 +713,7 @@ TOOLS: List[Tool] = [
         build_cmd=_semgrep_deep_cmd,
         severity_markers=["ERROR", "WARNING"],
         included_in="semgrep-fast",
+        network=_SEMGREP_NETWORK,
     ),
     Tool(
         id="shellcheck", label="shellcheck", languages=["shell"],

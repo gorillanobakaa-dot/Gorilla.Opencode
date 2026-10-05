@@ -116,7 +116,7 @@ var researchOptions = []researchOption{
 	{
 		mode:  "supervised",
 		name:  "Supervised",
-		short: "parallel + an auditor on each blind lane, ~DOUBLE price",
+		short: "parallel + an auditor on each blind lane, up to DOUBLE price",
 		// GORILLA FIX: was "audits every lane" / "Every helper gets a checker" /
 		// "every lane checked twice". Supervision covers the BLIND lanes only —
 		// the verifier and completeness lanes are never audited. Above 4 helpers
@@ -140,8 +140,8 @@ type ResearchDialogCmp struct {
 
 func NewResearchDialogCmp(question string) ResearchDialogCmp {
 	return ResearchDialogCmp{
-		selected: 1, // parallel: same price as sequential, less waiting
-		agents:   4, // the mandatory four lanes; the cheapest real investigation
+		selected: 1,                       // parallel: same price as sequential, less waiting
+		agents:   agent.ResearchMinAgents, // the mandatory lanes; the cheapest real investigation
 		question: question,
 	}
 }
@@ -173,11 +173,11 @@ func (m ResearchDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, key.NewBinding(key.WithKeys("down", "j", "tab"))):
 			m.selected = (m.selected + 1) % len(researchOptions)
 		case key.Matches(msg, key.NewBinding(key.WithKeys("left", "h"))):
-			if m.agents > 4 {
+			if m.agents > agent.ResearchMinAgents {
 				m.agents--
 			}
 		case key.Matches(msg, key.NewBinding(key.WithKeys("right", "l"))):
-			if m.agents < 10 {
+			if m.agents < agent.ResearchMaxAgents {
 				m.agents++
 			}
 		case key.Matches(msg, key.NewBinding(key.WithKeys("m"))):
@@ -420,10 +420,12 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	n, audited, _, seconds := agent.RunShape(mode, m.agents)
 	minutes := seconds / 60
 
-	inFlight := 4
-	if mode == "sequential" {
-		inFlight = 1
-	}
+	// GORILLA FIX (2026-10-05): audit findings S6 and O7. This was the literal 4,
+	// the in-flight cap the engine dropped on 2026-08-14, and the helper bounds
+	// on this screen were the literals 4 and 10. The /osint gate asked the agent
+	// package and got a different answer for the same engine. Both ask
+	// agent.PeakInFlight now, and the bounds are the agent package's constants.
+	inFlight := agent.PeakInFlight("", mode, m.agents)
 	perHelper, _, per1MIn, modelName, priced := config.ResearchCost(inFlight)
 
 	var lines []costLine
@@ -551,11 +553,20 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	}
 	add(kindQuota, "Run out and «NOTHING WORKS» until it resets. Paid or free.")
 
-	if helper, chat, otherProvider := config.ResearchHelperModel(); otherProvider {
-		add(kindMuted, "")
-		add(kindDanger, "WARNING: HELPERS RUN ON A DIFFERENT PROVIDER.")
-		add(kindMuted, "   %s, not %s that you are chatting with.", helper, chat)
-		add(kindMuted, "   Different account, different bill. Set a \"research\" agent to change it.")
+	// GORILLA FIX (2026-10-05): audit finding S5. This block closed with `Set a
+	// "research" agent to change it`: the instruction the «m» key was added to
+	// replace, because the only way to follow it was to hand-edit config.json.
+	// It also repeated the provider warning the block at the top of this screen
+	// had already given, with the working instruction beside it. It is now shown
+	// only when that top block could not be (no model choice resolved), and it
+	// names the key.
+	if _, _, shownAbove := config.ResearchModelChoice(); !shownAbove {
+		if helper, chat, otherProvider := config.ResearchHelperModel(); otherProvider {
+			add(kindMuted, "")
+			add(kindDanger, "WARNING: HELPERS RUN ON A DIFFERENT PROVIDER.")
+			add(kindMuted, "   %s, not %s that you are chatting with.", helper, chat)
+			add(kindMuted, "   Different account, different bill. Press «m» to run helpers on your chat model.")
+		}
 	}
 
 	add(kindMuted, "")
@@ -581,6 +592,103 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	} else {
 		add(kindAssumed, "ASSUMED («not measured»): %d steps | %d out | %.0fs per step. The per-minute figure rests on that %.0fs until a run has been timed.",
 			config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep, config.ResearchSecondsPerStep)
+	}
+	// One row, never more: this screen is already as tall as its smallest
+	// supported terminal, and the row it takes was given back in View. On a
+	// short screen only the line that changes the decision is kept: the
+	// forecast being low.
+	if l := measuredRunLine(m.compact); !m.compact || l.kind == kindDanger {
+		add(l.kind, "%s", l.text)
+	}
+	return lines
+}
+
+// measuredRunLine is measuredRunLines in one row, for this screen: what a
+// session really used on this machine, against what the money above assumes.
+// short drops the sample count so the row still fits a narrow dialog unwrapped.
+func measuredRunLine(short bool) costLine {
+	assumed := config.ResearchStepsPerHelper * (config.ResearchHelperBasisTokens() + config.ResearchOutputPerStep)
+	tokens, _, runs, ok := agent.MeasuredRunSize()
+	if !ok || assumed <= 0 {
+		return measuredRunLines(0)[0]
+	}
+	head := fmt.Sprintf("MEASURED (your last %d run(s)): %s tokens/session vs %s assumed",
+		runs, humanCount(int(tokens)), humanCount(assumed))
+	if short {
+		head = fmt.Sprintf("MEASURED: %s tokens/session vs %s assumed", humanCount(int(tokens)), humanCount(assumed))
+	}
+	switch ratio := float64(tokens) / float64(assumed); {
+	case ratio >= 1.25:
+		return costLine{fmt.Sprintf("%s: expect about %.1fx the money shown.", head, ratio), kindDanger}
+	case ratio <= 0.8:
+		return costLine{fmt.Sprintf("%s: the money shown is high, by about %.1fx.", head, 1/ratio), kindMuted}
+	}
+	return costLine{head + ": the forecast is about right.", kindMeasured}
+}
+
+// researchFooterHint is the key line at the foot of the chooser.
+//
+// GORILLA FIX (2026-10-05): audit finding S5. It listed every key except «m»,
+// the one the cost block tells the user to press to move helpers onto their
+// chat model. A key named in a warning and missing from the key line reads as
+// a key that does not exist.
+const researchFooterHint = "enter: go   up/down: mode   left/right: helpers   m: helper model   esc: cancel"
+
+// measuredRunLines states the size of a run from this machine's own finished
+// runs, beside what the money forecast assumes, so the two can be compared.
+//
+// GORILLA FIX (2026-10-05): audit findings S15 and O3. The forecast prices
+// ResearchStepsPerHelper steps of (helper context + ResearchOutputPerStep)
+// tokens per session. Both are assumptions and are labelled as such, but
+// nothing on screen said how far from reality they are, and the one real run
+// this project quotes (2026-08-17: 280,744 tokens across eight helpers) is
+// several times that size. The /osint gate, meanwhile, printed that single
+// run's rate as a constant and called it measured.
+//
+// Now every finished run is remembered (agent.MeasuredRunSize). The /osint
+// gate prints these lines: the median per session, the size of THIS run at
+// that rate, and — when the forecast's assumption is out by a quarter or more
+// — by how much. This screen prints the same comparison in one row
+// (measuredRunLine). Before any run has finished there is nothing to print,
+// and both say so.
+func measuredRunLines(sessions int) []costLine {
+	assumed := config.ResearchStepsPerHelper * (config.ResearchHelperBasisTokens() + config.ResearchOutputPerStep)
+	tokens, calls, runs, ok := agent.MeasuredRunSize()
+	if !ok {
+		return []costLine{{
+			text: fmt.Sprintf("NO MEASUREMENT YET of a run's real size (no run finished here). Assumed: %s tokens/session.",
+				humanCount(assumed)),
+			kind: kindAssumed,
+		}}
+	}
+	lines := []costLine{
+		{
+			text: fmt.Sprintf("MEASURED: %s tokens, %.1f tool calls per session (median, your last %d run(s)).",
+				humanCount(int(tokens)), calls, runs),
+			kind: kindMeasured,
+		},
+		{
+			text: fmt.Sprintf("   At that size THIS RUN is about %s tokens (%d sessions).",
+				humanCount(int(tokens)*sessions), sessions),
+			kind: kindMeasured,
+		},
+	}
+	if assumed > 0 {
+		ratio := float64(tokens) / float64(assumed)
+		switch {
+		case ratio >= 1.25:
+			lines = append(lines, costLine{
+				text: fmt.Sprintf("   The money above ASSUMES %s/session: expect about %.1fx the figure shown.",
+					humanCount(assumed), ratio),
+				kind: kindDanger,
+			})
+		case ratio <= 0.8:
+			lines = append(lines, costLine{
+				text: fmt.Sprintf("   The money above ASSUMES %s/session: the figure shown is high, by about %.1fx.",
+					humanCount(assumed), 1/ratio),
+				kind: kindMuted,
+			})
+		}
 	}
 	return lines
 }
@@ -668,7 +776,15 @@ func humanCount(n int) string {
 func (m ResearchDialogCmp) theWarning() string {
 	switch researchOptions[m.selected].mode {
 	case "supervised":
-		return "Feeling lucky, punk? Double price, every lane checked twice. Well — do ya?"
+		// GORILLA FIX (2026-10-05): audit finding S4. This read "Double price,
+		// every lane checked twice", on the same screen whose QUOTA block says
+		// "Only 8 of 10 lanes are audited". The comments on the supervised option
+		// above and on agent.SupervisedSessions both record the claim as false
+		// above four helpers; the one line the user reads last still made it.
+		// The voice stays. The numbers are the scheduler's.
+		sessions, audited := agent.SupervisedSessions(m.agents)
+		return fmt.Sprintf("Feeling lucky, punk? %d sessions, not %d: up to double, %d lanes checked twice. Do ya?",
+			sessions, m.agents, audited)
 	case "sequential":
 		return "The slow way. Same money, more waiting. Your funeral."
 	default:
@@ -735,13 +851,15 @@ func (m ResearchDialogCmp) View() string {
 
 	rows = append(rows,
 		base.Foreground(t.Text()).Width(maxWidth).Padding(0, 1).
-			Render(fmt.Sprintf("Helpers: <- %d ->   (4 minimum, 10 maximum)", m.agents)),
+			Render(fmt.Sprintf("Helpers: <- %d ->   (%d minimum, %d maximum)", m.agents, agent.ResearchMinAgents, agent.ResearchMaxAgents)),
 		m.renderCost(maxWidth),
 		base.Foreground(t.Primary()).Bold(true).Width(maxWidth).Padding(1, 1).
 			Render(m.theWarning()),
-		base.Width(maxWidth).Render(""),
+		// The warning's own padding already leaves a blank row above the key
+		// line. A second one stood here; it was given to the measured-size row
+		// in the cost block (2026-10-05) so the dialog is no taller than it was.
 		base.Foreground(t.TextMuted()).Width(maxWidth).Padding(0, 1).
-			Render("enter: go   up/down: mode   left/right: helpers   esc: cancel"),
+			Render(researchFooterHint),
 	)
 
 	content := lipgloss.JoinVertical(lipgloss.Left, rows...)

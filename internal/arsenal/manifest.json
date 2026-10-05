@@ -189,7 +189,15 @@
               "magick",
               "identify"
             ],
-            "mode": "any"
+            "mode": "any",
+            "impostors": [
+              {
+                "binary": "convert",
+                "os": "windows",
+                "under": "SystemRoot",
+                "is": "Windows' own disk converter (FAT to NTFS), not ImageMagick"
+              }
+            ]
           },
           "packages": {
             "apt": [
@@ -257,6 +265,9 @@
               "bwrap"
             ]
           },
+          "platforms": [
+            "linux"
+          ],
           "packages": {
             "apt": [
               "bubblewrap"
@@ -271,7 +282,7 @@
             "network_at_runtime": false
           },
           "tier": "MINIMUM",
-          "caveats": "Needs unprivileged user namespaces enabled, which most distributions do by default. Landlock is NOT available on this machine's kernel; bwrap is the path here."
+          "caveats": "Needs unprivileged user namespaces enabled, which most distributions do by default. Landlock, the other unprivileged boundary, is not present in every kernel; where it is missing, bwrap is the path."
         }
       ]
     },
@@ -424,7 +435,13 @@
               "libreoffice",
               "soffice"
             ],
-            "mode": "any"
+            "mode": "any",
+            "paths": {
+              "windows": [
+                "${SCOOP}/apps/libreoffice/current/LibreOffice/program/soffice.exe",
+                "${ProgramFiles}/LibreOffice/program/soffice.exe"
+              ]
+            }
           },
           "packages": {
             "apt": [
@@ -445,7 +462,7 @@
             "network_at_runtime": false
           },
           "tier": "NICE",
-          "caveats": "Roughly 400 MB. Only worth it if pandoc has already failed on files you actually have. On a slow link this is hours."
+          "caveats": "Roughly 400 MB. Only worth it if pandoc has already failed on files you actually have. On a slow link this is hours. On Windows neither Scoop nor the official installer puts soffice on PATH, so it has to be called by the full path this screen shows once it is found."
         }
       ]
     },
@@ -574,7 +591,15 @@
               "ast-grep",
               "sg"
             ],
-            "mode": "any"
+            "mode": "any",
+            "impostors": [
+              {
+                "binary": "sg",
+                "os": "linux",
+                "target": "newgrp",
+                "is": "the system's own sg, a link to newgrp (run a command as another group), not ast-grep"
+              }
+            ]
           },
           "packages": {
             "apt": [],
@@ -638,6 +663,9 @@
               "valgrind"
             ]
           },
+          "platforms": [
+            "linux"
+          ],
           "packages": {
             "apt": [
               "valgrind"
@@ -795,7 +823,7 @@
     {
       "id": "mobile",
       "title": "Mobile — Android and iOS",
-      "why": "Understanding an app or a phone from a laptop. About 1.5 MB for the whole set, and the two most useful pieces are already here.",
+      "why": "Understanding an app or a phone from a laptop. About 1.5 MB for the whole set on Debian.",
       "entries": [
         {
           "id": "adb",
@@ -920,6 +948,9 @@
               "ifuse"
             ]
           },
+          "platforms": [
+            "linux"
+          ],
           "packages": {
             "apt": [
               "libimobiledevice-utils",
@@ -959,6 +990,9 @@
               "cabextract"
             ]
           },
+          "platforms": [
+            "linux"
+          ],
           "packages": {
             "apt": [
               "msitools",
@@ -993,6 +1027,9 @@
               "pestr"
             ]
           },
+          "platforms": [
+            "linux"
+          ],
           "packages": {
             "apt": [
               "pev"
@@ -1025,6 +1062,9 @@
               "esedbexport"
             ]
           },
+          "platforms": [
+            "linux"
+          ],
           "packages": {
             "apt": [
               "libevtx-utils",

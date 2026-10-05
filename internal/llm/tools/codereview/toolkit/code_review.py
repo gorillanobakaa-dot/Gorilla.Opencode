@@ -38,6 +38,7 @@ import concurrent.futures
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -48,7 +49,8 @@ from typing import Dict, List, Optional, Set
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tools_registry import (  # noqa: E402
     TOOLS, TOOLS_BY_ID, EXTENSION_LANGUAGE, MAKEFILE_NAMES,
-    DEFAULT_IGNORE_DIRS, ESCALATION_KEYWORDS, Tool, unparsed_tool_ids,
+    DEFAULT_IGNORE_DIRS, ESCALATION_KEYWORDS, QUICK_CATEGORIES, Tool,
+    unparsed_tool_ids,
 )
 import llm_client  # noqa: E402
 import findings as fnd  # noqa: E402
@@ -118,7 +120,33 @@ JOB_TIMEOUT_DEFAULT = 600
 # so this file has no import-time dependency on install_tools.py)
 # ---------------------------------------------------------------------------
 
+def resolve_argv(argv):
+    """argv with its program resolved to a full path, or None if it is not on PATH.
+
+    2026-10-05, measured on Windows: subprocess.run(["npm", "--version"]) raised
+    FileNotFoundError with npm installed and on PATH. Without a shell, Windows
+    only finds a bare name that is an .exe; npm, eslint, prettier and stylelint
+    are .cmd shims. Every analyser installed through npm was therefore reported
+    NOT INSTALLED when it was installed, and JavaScript, TypeScript and CSS were
+    listed as unreviewable on a machine that could review them.
+
+    shutil.which applies PATHEXT, so it finds what the user's own terminal
+    finds, and a full path to a .cmd is something Windows will start. On POSIX
+    this changes nothing: which() and exec agree there.
+    """
+    if not argv:
+        return None
+    exe = shutil.which(argv[0])
+    if exe is None:
+        return None
+    return [exe] + list(argv[1:])
+
+
 def run(cmd, timeout=30, cwd=None):
+    resolved = resolve_argv(cmd)
+    if resolved is None:
+        return 127, "", "not found"
+    cmd = resolved
     try:
         # check=False is deliberate and explicit: every caller inspects the
         # return code itself (127 = not installed, 124 = timed out, non-zero
@@ -274,7 +302,10 @@ def make_job(tool: Tool, path: str, argv: List[str], results_dir: str, cwd: str)
 
 
 def build_jobs(files: List[str], target_dir: str, profile: str, results_dir: str,
-               ctx: dict, stages) -> List[Job]:
+               ctx: dict, stages, categories=None) -> List[Job]:
+    """Jobs for the given stages. `categories`, when given, restricts the run to
+    tools of those categories -- that is what makes a quick pass quick. See
+    QUICK_CATEGORIES in tools_registry.py."""
     jobs = []
     langs_present: Set[str] = languages_of(files)
     skip_ids = SKIP_FOR_PROFILE.get(profile, set())
@@ -283,6 +314,8 @@ def build_jobs(files: List[str], target_dir: str, profile: str, results_dir: str
         if tool.scope not in ("auto-file", "auto-project") or tool.stage not in stages:
             continue
         if tool.id in skip_ids:
+            continue
+        if categories is not None and tool.category not in categories:
             continue
 
         if "*" in tool.languages:
@@ -348,10 +381,15 @@ def run_job(job: Job, timeout: int) -> JobResult:
         with open(job.log_path, "w") as f:
             f.write(header)
             f.flush()
+            # Resolved here, not when the job was built, so the log header still
+            # shows the command as the registry wrote it. See resolve_argv().
+            argv = resolve_argv(job.argv)
+            if argv is None:
+                raise FileNotFoundError(job.argv[0] if job.argv else "")
             # check=False: an analyser exiting non-zero usually means it FOUND
             # something, which is success from our side. execute_jobs()
             # interprets the code.
-            proc = subprocess.run(job.argv, cwd=job.cwd, stdout=subprocess.PIPE,
+            proc = subprocess.run(argv, cwd=job.cwd, stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT, text=True,
                                    timeout=timeout, check=False)
             f.write(proc.stdout or "")
@@ -789,7 +827,7 @@ def coverage_of(files, all_results) -> dict:
 def emit_agent_json(results_dir, target, profile, files, all_results,
                     manual_tools, checklist_tools, ctx, pos_report,
                     diff_summary=None, suppressed_n=0,
-                    baseline_problems=None) -> None:
+                    baseline_problems=None, depth=None) -> None:
     baseline_problems = baseline_problems or []
     all_findings = fnd.finalize([f for r in all_results for f in r.findings])
     groups = fnd.corroborated(all_findings)
@@ -842,6 +880,12 @@ def emit_agent_json(results_dir, target, profile, files, all_results,
         # The sealed account: every scheduled job in exactly one state, and each
         # language marked reviewed only if an analyser for it completed.
         "coverage": coverage,
+
+        # How deep this run went, as reported by the run itself. For a quick
+        # pass, tools_skipped_by_depth names every analyser that applied to
+        # this code and did not run BECAUSE of the depth -- which is a different
+        # fact from tools_missing, and the caller must not confuse the two.
+        "depth": depth,
 
         # Read this before concluding anything from an empty findings list.
         "trust": {
@@ -922,6 +966,15 @@ def parse_args():
     ap.add_argument("--timeout", type=int, default=JOB_TIMEOUT_DEFAULT, help="per-job timeout in seconds")
     ap.add_argument("--deep", action="store_true", help="force stage 3 deep-dive tools on everything")
     ap.add_argument("--no-stage3", action="store_true", help="never auto-escalate to stage 3")
+    ap.add_argument("--quick", action="store_true",
+                     help="linters and formatters ONLY (categories: "
+                          + ", ".join(QUICK_CATEGORIES) + "). No static analysis, no "
+                          "security tools, no secret scan, no deep stage. The report's "
+                          "`depth` block names every analyser this left out.")
+    ap.add_argument("--network-report", action="store_true",
+                     help="print, as JSON, which analysers that apply to the target contact "
+                          "another machine when they run and whether each is installed. "
+                          "Reviews nothing.")
     ap.add_argument("--skip-preflight", action="store_true",
                     help="run even if the preflight finds NO analysis tools installed (not recommended)")
     ap.add_argument("--compile-commands-dir", default=None,
@@ -966,7 +1019,8 @@ def tool_available(tool) -> bool:
     return rc != 127
 
 
-def relevant_tools(profile: str, files: List[str], stages=(0, 1, 2)) -> List[Tool]:
+def relevant_tools(profile: str, files: List[str], stages=(0, 1, 2),
+                   categories=None) -> List[Tool]:
     """The auto-run tools that WOULD fire for this profile + the languages
     actually present in scope -- i.e. exactly what build_jobs would select."""
     langs = languages_of(files)
@@ -977,16 +1031,74 @@ def relevant_tools(profile: str, files: List[str], stages=(0, 1, 2)) -> List[Too
             continue
         if t.id in skip:
             continue
+        if categories is not None and t.category not in categories:
+            continue
         if "*" in t.languages or (set(t.languages) & langs):
             out.append(t)
     return out
 
 
-def preflight(profile: str, files: List[str], skip_gate: bool, target_dir: str = "") -> None:
+def depth_of(args, profile: str, files: List[str]) -> dict:
+    """What depth this run is, stated as what it does NOT run.
+
+    Added 2026-10-05 with --quick. The caller used to describe a quick pass from
+    its own idea of what the flag did, and that idea was wrong: it said the
+    security stages were skipped while they ran. The run now reports its own
+    depth, and names every analyser that applied to this code and was left out
+    because of it, so the sentence a reader is shown is read off the run.
+    """
+    if args.quick:
+        ran = relevant_tools(profile, files, stages=(0, 1, 2), categories=QUICK_CATEGORIES)
+        everything = relevant_tools(profile, files, stages=(0, 1, 2, 3))
+        ran_ids = {t.id for t in ran}
+        skipped = [t for t in everything if t.id not in ran_ids]
+        return {
+            "mode": "quick",
+            "categories_run": list(QUICK_CATEGORIES),
+            # "Skipped entirely" is only true of a category none of whose tools
+            # ran. A deep-stage linter (vulture) is left out too, and is named
+            # in tools_skipped_by_depth, but linting as a category did run.
+            "categories_skipped": sorted({t.category for t in skipped}
+                                         - set(QUICK_CATEGORIES)),
+            "tools_skipped_by_depth": sorted(t.id for t in skipped),
+        }
+    mode = "deep" if args.deep else "standard"
+    return {"mode": mode, "categories_run": [], "categories_skipped": [],
+            "tools_skipped_by_depth": []}
+
+
+def network_report(target: str, quick: bool = False) -> dict:
+    """Which analysers that apply to this target contact another machine when
+    they run, whether each is installed, and whether it runs at this depth.
+    Runs nothing but version checks.
+
+    This is what the permission prompt is built from. See Tool.network.
+
+    `runs` is decided HERE, by the same rule build_jobs applies, so the caller
+    never has to carry its own copy of what a quick pass includes. On a
+    standard pass a stage-3 tool counts as running: escalation can reach it.
+    """
+    langs = doctor.languages_in(target)
+    out = []
+    for t in TOOLS:
+        if not t.network or t.scope not in ("auto-file", "auto-project"):
+            continue
+        if not ("*" in t.languages or (set(t.languages) & set(langs))):
+            continue
+        runs = (not quick) or (t.category in QUICK_CATEGORIES and t.stage < 3)
+        out.append({"id": t.id, "label": t.label, "category": t.category,
+                    "stage": t.stage, "network": t.network,
+                    "installed": tool_available(t), "runs": runs})
+    return {"schema": "code-review/network/1", "target": target,
+            "languages": sorted(langs), "tools": out}
+
+
+def preflight(profile: str, files: List[str], skip_gate: bool, target_dir: str = "",
+              categories=None) -> None:
     """Report which relevant tools are installed. If NONE of the actual
     analysis tools (everything except pure recon) are present, refuse to run
     unless the caller explicitly passed --skip-preflight."""
-    rel = relevant_tools(profile, files)
+    rel = relevant_tools(profile, files, categories=categories)
     present = [t for t in rel if tool_available(t)]
     missing = [t for t in rel if t not in present]
     # Only EXTERNAL analysers count towards "this machine can review something".
@@ -1006,11 +1118,25 @@ def preflight(profile: str, files: List[str], skip_gate: bool, target_dir: str =
         # of what it says: it knows the per-language breakdown, the download
         # size and whether there's even disk space for the fix.
         print("\n" + "!" * 70)
-        print("PREFLIGHT FAILED: no analyser for this project is installed.")
+        if categories is not None:
+            # A quick pass can fail this gate on a machine that could do a
+            # standard review: bandit installed, no linter. Say which it is,
+            # or the advice that follows ("install an analyser") reads as wrong.
+            print("PREFLIGHT FAILED: a quick pass runs only "
+                  + ", ".join(c for c in categories if c != "recon")
+                  + " tools, and none for this project is installed.")
+            print("A standard review may still be possible -- run without --quick.")
+        else:
+            print("PREFLIGHT FAILED: no analyser for this project is installed.")
         print("Running now would inspect NOTHING, and an empty result must NOT be")
         print("read as 'no problems found'. Full breakdown follows.")
         print("!" * 70)
-        doctor.report(target_dir, langs_for_doctor)
+        # stream= is passed explicitly (2026-10-05). doctor.report's default is
+        # bound to the ORIGINAL stdout when that module is imported, so in agent
+        # mode -- where main() has pointed sys.stdout at stderr to keep stdout
+        # for the JSON alone -- this report went to the real stdout anyway. A
+        # caller reading JSON got a page of prose first and could not parse it.
+        doctor.report(target_dir, langs_for_doctor, stream=sys.stdout)
         print("  Override (NOT recommended): pass --skip-preflight.\n")
         if not skip_gate:
             sys.exit(3)
@@ -1040,6 +1166,17 @@ def main():
         langs = doctor.languages_in(target)
         summary = doctor.report(target, langs)
         sys.exit(0 if summary["ready"] else 3)
+
+    # --network-report answers "what will this send or fetch" before anybody is
+    # asked to approve the run. JSON on the real stdout whatever the audience.
+    if args.network_report:
+        real_stdout.write(json.dumps(network_report(target, args.quick), indent=2) + "\n")
+        sys.exit(0)
+
+    if args.quick and args.deep:
+        print("ERROR: --quick and --deep contradict each other. Pick one.")
+        sys.exit(2)
+    quick_categories = QUICK_CATEGORIES if args.quick else None
     target_is_file = os.path.isfile(target)
     target_dir = os.path.dirname(target) if target_is_file else target
 
@@ -1066,7 +1203,7 @@ def main():
 
     # Gate: make sure the tools we're about to rely on actually exist, so an
     # empty run can never be mistaken for a clean one.
-    preflight(profile, files, args.skip_preflight, target_dir)
+    preflight(profile, files, args.skip_preflight, target_dir, quick_categories)
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_dir = args.results_dir or os.path.join(target_dir, ".code_review", ts)
@@ -1076,19 +1213,27 @@ def main():
     ctx = build_ctx(target_dir, results_dir, args, profile=profile)
 
     print("-- Stage 0: recon --")
-    jobs0 = build_jobs(files, target_dir, profile, results_dir, ctx, stages=(0,))
+    jobs0 = build_jobs(files, target_dir, profile, results_dir, ctx, stages=(0,),
+                       categories=quick_categories)
     results0 = execute_jobs(jobs0, args.jobs, args.timeout)
 
-    print("\n-- Stage 1-2: fast lint + standard static analysis / security --")
-    jobs12 = build_jobs(files, target_dir, profile, results_dir, ctx, stages=(1, 2))
+    if args.quick:
+        print("\n-- Stage 1-2, QUICK: linters and formatters only --")
+    else:
+        print("\n-- Stage 1-2: fast lint + standard static analysis / security --")
+    jobs12 = build_jobs(files, target_dir, profile, results_dir, ctx, stages=(1, 2),
+                        categories=quick_categories)
     print(f"Launching {len(jobs12)} job(s) across {args.jobs} worker(s)...")
     results12 = execute_jobs(jobs12, args.jobs, args.timeout)
 
     all_results = results0 + results12
 
-    hit_files = find_escalation_hits(results12) if not args.no_stage3 else set()
+    # A quick pass never reaches stage 3, by escalation or otherwise: the deep
+    # stage is security tooling, which is exactly what quick leaves out.
+    no_stage3 = args.no_stage3 or args.quick
+    hit_files = find_escalation_hits(results12) if not no_stage3 else set()
     results3 = []
-    if not args.no_stage3 and (args.deep or hit_files):
+    if not no_stage3 and (args.deep or hit_files):
         print(f"\n-- Stage 3: deep-dive ({'forced by --deep' if args.deep else f'{len(hit_files)} file(s) flagged security-shaped hints'}) --")
         jobs3 = build_stage3_jobs(files, target_dir, results_dir, ctx, hit_files, args.deep)
         print(f"Launching {len(jobs3)} job(s)...")
@@ -1199,7 +1344,8 @@ def main():
         sys.stdout = real_stdout
         emit_agent_json(results_dir, target, profile, files, all_results,
                         manual_tools, checklist_tools, ctx, pos_report,
-                        diff_summary, suppressed_n, baseline_problems)
+                        diff_summary, suppressed_n, baseline_problems,
+                        depth=depth_of(args, profile, files))
         return
 
     total_issues = sum(r.issue_count for r in all_results)

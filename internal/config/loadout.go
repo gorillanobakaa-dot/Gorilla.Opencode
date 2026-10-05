@@ -87,7 +87,7 @@ var LoadoutComponents = []LoadoutComponent{
 	// left BOTH research rows saying OSINT and no way to tell the everyday tool
 	// from the expensive one — "i don't know which is the old one". The command
 	// name is now in the row, because that is the thing a user can act on.
-	{"tool.research", "Research helpers — /research", "agent can't send helpers to investigate a question — it works alone, which is how two days went into the wrong fix. A RUN is 4-10 full model sessions", 450, true, false},
+	{"tool.research", "Research helpers — /research", "agent can't send helpers to investigate a question — it works alone, which is how two days went into the wrong fix. A RUN is several full model sessions; the screen states how many before it starts", 450, true, false},
 	// GORILLA OVERRIDE: the serious dossier ships OFF and is armed here by hand.
 	// That is the whole design: a run is 4-10 full model sessions plus a gap
 	// round, so nobody meets it by accident — /osint refuses until this row is
@@ -105,10 +105,14 @@ var LoadoutComponents = []LoadoutComponent{
 	// other coding agent ships. Its description is deliberately long because it
 	// has to say what static analysis CANNOT find; a short description here
 	// would produce reviews that claim to be complete and are half a review.
-	// 759 is MEASURED (toolTokens), not estimated -- re-measured 2026-09-02,
-	// having drifted up from 475 as the description grew — the first hand-written
-	// guess here was 320, out by 48%, and calibrate_test.go caught it.
-	{"tool.review", "Code review — /review", "agent loses the 30 static-analysis and security tools; it can still read your code, but nothing mechanically checks for memory errors, injection, leaked secrets or unchecked errors", 759, true, false},
+	// 839 is MEASURED (toolTokens), not estimated -- re-measured 2026-10-05
+	// after the description gained its Python, network and results-location
+	// sentences; it was 759 on 2026-09-02, having drifted up from 475 as the
+	// description grew — the first hand-written guess here was 320, out by 48%,
+	// and calibrate_test.go caught it. Calibration overwrites it at startup.
+	// The row no longer states how many analysers there are: "the 30 tools" was
+	// typed, and the registry has never held 30.
+	{"tool.review", "Code review — /review", "agent loses the static-analysis and security tools; it can still read your code, but nothing mechanically checks for memory errors, injection, leaked secrets or unchecked errors", 839, true, false},
 	// GORILLA (2026-09-02): the porting half of the same embedded toolkit.
 	// 734 is MEASURED with toolTokens, like the line above, and calibrate
 	// overwrites it at startup. Default ON: it was shipped inside the binary

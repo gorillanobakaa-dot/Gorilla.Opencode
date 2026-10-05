@@ -1,9 +1,27 @@
 package tools
 
 // GORILLA OVERRIDE (2026-08-18): the `review` tool — point it at a folder, a
-// file or a diff and it drives ~30 real static analysers, then hands back
-// normalised, position-verified findings and an honest account of what did NOT
-// run.
+// file or a diff and it drives the real static analysers installed on this
+// machine, then hands back normalised, position-verified findings and an honest
+// account of what did NOT run.
+//
+// GORILLA FIX (2026-10-05): seven statements this tool made about itself were
+// not true, found by reading what the embedded toolkit actually does:
+//
+//   - "quick" claimed the security stages were skipped. They ran. It mapped to
+//     --no-stage3, which only stops the deep stage. It is now --quick, a real
+//     linters-and-formatters-only run, and the sentence is read off the report.
+//   - Results were written into <target>/.code_review/, inside the folder under
+//     review, on every run. They now go under the program's cache directory.
+//   - "Nothing is downloaded." semgrep fetched rule packs and sent metrics;
+//     cargo audit and the Go tools fetch too. Metrics are off, and the
+//     permission prompt names every network-using analyser that is installed.
+//   - stderr was discarded, so "no files changed", "no such path" and "not a
+//     git repository" all reached the model as "exit status 1" or as a failure.
+//   - A doctor that crashed with partial output counted as "ready".
+//   - The analyser count was typed (30) and wrong (the registry holds more, a
+//     given language gets a handful). No count is stated any more.
+//   - A timeout killed Python and orphaned the analysers it had started.
 //
 // WHY THIS IS NOT "ASK THE MODEL TO READ THE CODE". Those are different jobs
 // and both are needed. An analyser finds the buffer overrun, the shell
@@ -28,11 +46,16 @@ package tools
 // says what it left out, with the path to the complete report on disk.
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -116,7 +139,7 @@ func (r *reviewTool) Info() ToolInfo {
 		Name: ReviewToolName,
 		Description: `Run a professional static-analysis and security review over a folder, a file, or a set of changes.
 
-Drives around thirty real analysers appropriate to the languages actually present (C/C++, Go, Python, JavaScript/TypeScript, Rust, shell, CSS and more), normalises every tool's output into one shape, verifies that each reported line really says what the tool claims, and reports what did NOT run.
+Drives the real analysers installed on this machine that suit the languages actually present (C/C++, Go, Python, JavaScript/TypeScript, Rust, shell, CSS and more), normalises every tool's output into one shape, verifies that each reported line really says what the tool claims, and reports what did NOT run. Needs Python 3. Logs and the full report are written under the program's cache directory, never into the folder being reviewed. Some analysers fetch rule packs or dependencies over the network; the permission prompt names the ones that apply before anything runs.
 
 WHEN TO USE IT
   - Before committing, to check your own changes: pass diff="HEAD" or diff="origin/main".
@@ -141,7 +164,8 @@ START FROM corroborated. Those are lines flagged independently by two or more di
 			"focus": map[string]any{
 				"type": "string",
 				"enum": []string{"quick", "security", "full"},
-				"description": "How much to run. 'quick' = linters and formatters only, seconds, for a fast sanity check. " +
+				"description": "How much to run. 'quick' = linters and formatters only, for a fast sanity check: " +
+					"no static analysis, no security tools, no secret scan. " +
 					"'security' = force the deep security pass over everything and report only security, secrets and " +
 					"static-analysis findings. 'full' = every stage over every file. " +
 					"OMIT THIS for the normal review: by default the fast and standard stages run, and the deep security " +
@@ -190,14 +214,39 @@ func (r *reviewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 	// The doctor runs first, always. It is fast, it needs no permission because
 	// it only inspects, and it is the difference between "clean" and "nothing
 	// ran". Refusing here is the whole point of the feature.
-	doctor, ready := runDoctor(ctx, script, target)
-	if !ready {
+	python, preArgs, err := getPythonBinary()
+	if err != nil {
+		return NewTextErrorResponse(fmt.Sprintf("The review did NOT run - Python 3 not found: %s"+
+			"\n\nDo not describe the code as reviewed.", err.Error())), nil
+	}
+	tk := toolkitRunner{python: python, preArgs: preArgs, script: script}
+
+	doctor, state := runDoctor(ctx, tk, target)
+	switch state {
+	case doctorNoAnalysers:
 		return NewTextResponse("The review did NOT run, because no analyser for this " +
 			"code is installed on this machine. An empty result would have looked exactly " +
 			"like a clean report, so nothing was run at all.\n\n" + doctor +
 			"\n\nTell the user which analysers are missing and the command that installs " +
 			"them. Do not describe the code as reviewed."), nil
+	case doctorFailed:
+		// Not "no analyser installed": the check itself did not finish, so
+		// nothing is known about the analysers either way. Saying which of the
+		// two happened is the whole point of having a doctor.
+		return NewTextErrorResponse("The review did NOT run, because the readiness check " +
+			"could not complete. This is not a statement about which analysers are " +
+			"installed.\n\n" + doctor + "\n\nDo not describe the code as reviewed."), nil
 	}
+
+	focus := strings.ToLower(strings.TrimSpace(params.Focus))
+	if focus == "" && params.Deep {
+		focus = "full" // the old boolean, still honoured
+	}
+
+	// What will touch the network, asked of the toolkit BEFORE the user is
+	// asked to approve anything. A failure here is reported in the prompt
+	// rather than hidden: "could not find out" is not "nothing will".
+	network := networkNote(ctx, tk, target, focus)
 
 	sid, mid := GetContextValues(ctx)
 	if sid == "" || mid == "" {
@@ -212,15 +261,29 @@ func (r *reviewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 		Path:        target,
 		ToolName:    ReviewToolName,
 		Action:      "run",
-		Description: "Run static analysis and security tools over " + shown,
+		Description: "Run static analysis and security tools over " + shown + "\n\n" + network.text,
 		// Grant covers THIS target, not every path in the session.
 		GrantKey: target,
 		Params:   params,
+		// Only when an installed analyser really will reach another machine,
+		// or when that could not be established.
+		Egress: network.egress,
 	}) {
 		return ToolResponse{}, permission.ErrorPermissionDenied
 	}
 
-	args := []string{script, target, "--audience", "agent"}
+	// GORILLA FIX (2026-10-05): results go under the program's own cache
+	// directory. The toolkit's default is <target>/.code_review/<timestamp>,
+	// which put a new untracked folder of logs inside the user's repository on
+	// every review — the thing /osint goes out of its way never to do, and one
+	// `git add -A` away from being committed.
+	resultsDir, err := newReviewResultsDir(target)
+	if err != nil {
+		return NewTextErrorResponse(fmt.Sprintf("The review did NOT run: it has nowhere to write "+
+			"its report (%s). Do not describe the code as reviewed.", err)), nil
+	}
+
+	args := []string{target, "--audience", "agent", "--results-dir", resultsDir}
 	if params.Diff != "" {
 		args = append(args, "--diff", params.Diff)
 	}
@@ -235,70 +298,330 @@ func (r *reviewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 	// stage 0 recon, 1 fast linters, 2 static analysis and security, 3 deep —
 	// where stage 3 normally escalates by itself on files whose earlier output
 	// looked security-shaped.
-	focus := strings.ToLower(strings.TrimSpace(params.Focus))
-	if focus == "" && params.Deep {
-		focus = "full" // the old boolean, still honoured
-	}
-	switch focus {
-	case "quick":
-		// Stages 0-1 only, and never escalate. For "did I break anything
-		// obvious", where waiting minutes for a security sweep is the wrong
-		// trade.
-		args = append(args, "--no-stage3")
-	case "security", "full":
-		args = append(args, "--deep")
-	}
+	args = append(args, focusArgs(focus)...)
 
 	runCtx, cancel := context.WithTimeout(ctx, reviewTimeout)
 	defer cancel()
 
-	python, preArgs, err := getPythonBinary()
-	if err != nil {
-		return NewTextErrorResponse(fmt.Sprintf("Review failed - Python 3 not found: %s", err.Error())), nil
+	stdout, stderr, runErr := tk.run(runCtx, args...)
+	if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+		return NewTextErrorResponse(fmt.Sprintf("The review was stopped after %s without finishing, "+
+			"and the analysers it had started were stopped with it. Nothing below that point was "+
+			"checked. Narrow it — pass diff, a smaller path, or focus=\"quick\" — and run it again."+
+			"\n\nDo not describe the code as reviewed.%s", reviewTimeout, stderrTail(stderr))), nil
 	}
-
-	cmd := exec.CommandContext(runCtx, python, append(append([]string{}, preArgs...), args...)...)
-	cmd.Dir = filepath.Dir(script)
-	out, runErr := cmd.Output()
-	if len(out) == 0 {
-		msg := "the review produced no output"
-		if runErr != nil {
-			msg = runErr.Error()
-		}
-		return NewTextErrorResponse("The review failed to run: " + msg +
-			"\n\nDo not describe the code as reviewed."), nil
+	text, isErr := interpretReviewRun(stdout, stderr, runErr, focus)
+	if isErr {
+		return NewTextErrorResponse(text), nil
 	}
-
-	summary, err := summariseReview(out, focus)
-	if err != nil {
-		return NewTextErrorResponse(fmt.Sprintf("the review ran but its output could not be read: %s", err)), nil
-	}
-	return NewTextResponse(summary), nil
+	return NewTextResponse(text), nil
 }
 
+// focusArgs maps a depth onto the toolkit's own flags.
+//
+// GORILLA FIX (2026-10-05): "quick" was --no-stage3, with a comment here saying
+// "Stages 0-1 only". It was neither. --no-stage3 only stops the deep stage, so
+// stages 1 AND 2 ran: bandit, gosec, cargo audit, clang-tidy, semgrep, gitleaks.
+// The summary then told the model the security stages had been "SKIPPED
+// ENTIRELY" and that the pass "cannot have found" an injection or a leaked
+// credential, in the trust block, which is the part it is told to believe.
+//
+// --quick is a real mode in the toolkit: linters and formatters by CATEGORY,
+// nothing else, never escalating. The claim was kept and made true.
+func focusArgs(focus string) []string {
+	switch focus {
+	case "quick":
+		return []string{"--quick"}
+	case "security", "full":
+		return []string{"--deep"}
+	}
+	return nil
+}
+
+// toolkitRunner starts the embedded toolkit. One place, so the doctor, the
+// network report and the review itself cannot each grow their own idea of how
+// to find Python, where to run, or what to do with stderr.
+type toolkitRunner struct {
+	python  string
+	preArgs []string
+	script  string
+}
+
+// run executes the toolkit and returns stdout and stderr SEPARATELY.
+//
+// GORILLA FIX (2026-10-05): this used cmd.Output(), which drops stderr. In
+// agent mode the toolkit sends every word that is not the final JSON to
+// stderr — including the only explanation it ever gives for stopping. So
+// "No files found in scope", "<path> does not exist" and "--diff was given but
+// this is not a git repository" all arrived here as empty output plus "exit
+// status 1", and the model was told the review had failed with no reason.
+func (t toolkitRunner) run(ctx context.Context, args ...string) (stdout, stderr []byte, err error) {
+	full := append(append(append([]string{}, t.preArgs...), t.script), args...)
+	cmd := exec.CommandContext(ctx, t.python, full...)
+	cmd.Dir = filepath.Dir(t.script)
+	var so, se bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &so, &se
+
+	// GORILLA FIX (2026-10-05): stop the whole tree, not just Python.
+	//
+	// CommandContext kills the process it started. On Windows that leaves every
+	// analyser Python launched still running — a cancelled or timed-out review
+	// went on consuming the machine with nothing left to read its output.
+	// `taskkill /T` walks the tree; the same approach as the shell tool.
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return nil
+		}
+		if runtime.GOOS == "windows" {
+			if exec.Command("taskkill", "/T", "/F", "/PID", fmt.Sprint(cmd.Process.Pid)).Run() == nil {
+				return nil
+			}
+		}
+		return cmd.Process.Kill()
+	}
+	// A child that inherited the pipes can hold them open after Python is
+	// gone; without a bound, Wait would block on them indefinitely.
+	cmd.WaitDelay = 5 * time.Second
+
+	err = cmd.Run()
+	return so.Bytes(), se.Bytes(), err
+}
+
+// stderrTail is the last few lines of what the toolkit said on stderr, for
+// showing to the model. Bounded: a tool result is re-sent on every later turn.
+func stderrTail(stderr []byte) string {
+	var lines []string
+	for _, l := range strings.Split(strings.ReplaceAll(string(stderr), "\r\n", "\n"), "\n") {
+		if strings.TrimSpace(l) != "" {
+			lines = append(lines, strings.TrimRight(l, " \t"))
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	const keep = 12
+	if len(lines) > keep {
+		lines = lines[len(lines)-keep:]
+	}
+	return "\n\nWhat the toolkit said:\n" + oneBlockOf(strings.Join(lines, "\n"), 1500)
+}
+
+func oneBlockOf(s string, max int) string {
+	if r := []rune(s); len(r) > max {
+		return "..." + string(r[len(r)-max:])
+	}
+	return s
+}
+
+// interpretReviewRun turns what the toolkit produced into what the model is
+// told. It is separate from Run so each outcome can be tested without Python.
+//
+// Three outcomes used to be one ("The review failed to run"):
+//
+//   - exit 0, nothing on stdout: the run had NOTHING IN SCOPE. The usual cause
+//     is diff="HEAD" on a tree with no changes — a result, not a failure, and
+//     /review's own prompt steers the model into it.
+//   - non-zero exit, nothing on stdout: it stopped, and stderr says why.
+//   - JSON on stdout: a report, whatever the exit code.
+func interpretReviewRun(stdout, stderr []byte, runErr error, focus string) (text string, isError bool) {
+	if len(bytes.TrimSpace(stdout)) == 0 {
+		if runErr == nil {
+			return "NOTHING WAS IN SCOPE, so nothing was reviewed. This is not a failure and " +
+				"it is not a clean result: no file was looked at. If you passed diff, there " +
+				"are no changed files against that ref — say so, and offer a review of the " +
+				"folder without diff if the user wants one." + stderrTail(stderr) +
+				"\n\nDo not describe the code as reviewed.", false
+		}
+		// Exit 3 is the toolkit's preflight: nothing that this depth runs is
+		// installed. The readiness check before the permission prompt asks
+		// about a standard review, so this is reached by a quick pass on a
+		// machine with security tools and no linter. Its explanation is at the
+		// TOP of a long stderr, which the tail would cut, so it is said here.
+		var ee *exec.ExitError
+		if errors.As(runErr, &ee) && ee.ExitCode() == 3 {
+			msg := "The review did NOT run: none of the analysers this depth uses is installed " +
+				"for this code, so it would have inspected nothing."
+			if focus == "quick" {
+				msg += " A quick pass runs linters and formatters only. A standard review may " +
+					"still be possible: run it again without focus=\"quick\"."
+			}
+			return msg + "\n\nDo not describe the code as reviewed.", true
+		}
+		return "The review did NOT run: " + runErr.Error() + "." + stderrTail(stderr) +
+			"\n\nDo not describe the code as reviewed.", true
+	}
+	summary, err := summariseReview(stdout, focus)
+	if err != nil {
+		return fmt.Sprintf("The review ran but its output could not be read: %s.%s"+
+			"\n\nDo not describe the code as reviewed.", err, stderrTail(stderr)), true
+	}
+	return summary, false
+}
+
+// reviewKeepResults is how many past result folders are kept. Each holds every
+// analyser's raw log for one run; they are for reading after a review, not an
+// archive, and nothing else ever removes them.
+const reviewKeepResults = 20
+
+var reviewSlugUnsafe = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+
+// reviewResultsRoot is where every review's logs and reports live.
+func reviewResultsRoot() string {
+	return filepath.Join(config.CacheBase(), "code-review", "results")
+}
+
+// newReviewResultsDir creates a fresh, private folder for one run and prunes
+// the oldest beyond reviewKeepResults.
+//
+// 0700 because the raw logs quote the code under review, and a review of a
+// private repository should not be readable by other accounts on the machine.
+func newReviewResultsDir(target string) (string, error) {
+	root := reviewResultsRoot()
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		return "", err
+	}
+	slug := strings.Trim(reviewSlugUnsafe.ReplaceAllString(filepath.Base(target), "-"), "-.")
+	if slug == "" {
+		slug = "review"
+	}
+	if len(slug) > 40 {
+		slug = slug[:40]
+	}
+	// The timestamp sorts; MkdirTemp's suffix keeps two runs in one second apart.
+	dir, err := os.MkdirTemp(root, time.Now().Format("20060102_150405")+"-"+slug+"-")
+	if err != nil {
+		return "", err
+	}
+	pruneReviewResults(root, dir)
+	return dir, nil
+}
+
+func pruneReviewResults(root, keep string) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return
+	}
+	var dirs []string
+	for _, e := range entries {
+		if e.IsDir() {
+			dirs = append(dirs, e.Name())
+		}
+	}
+	sort.Strings(dirs) // names start with the timestamp, so this is oldest first
+	for len(dirs) > reviewKeepResults {
+		victim := filepath.Join(root, dirs[0])
+		dirs = dirs[1:]
+		if victim == keep {
+			continue
+		}
+		_ = os.RemoveAll(victim)
+	}
+}
+
+// networkTool is one entry of the toolkit's --network-report.
+type networkTool struct {
+	ID        string `json:"id"`
+	Label     string `json:"label"`
+	Category  string `json:"category"`
+	Stage     int    `json:"stage"`
+	Network   string `json:"network"`
+	Installed bool   `json:"installed"`
+	// Runs is the toolkit's own answer to "does this tool run at the depth
+	// asked for". Decided there, by the rule that schedules the jobs, so this
+	// file holds no second copy of what a quick pass includes.
+	Runs bool `json:"runs"`
+}
+
+type networkInfo struct {
+	text   string
+	egress bool
+}
+
+// networkNote asks the toolkit which analysers will contact another machine
+// during this run, and turns the answer into the paragraph the user approves.
+//
+// GORILLA FIX (2026-10-05): the prompt said "Run static analysis and security
+// tools over <path>" and the help said "nothing is downloaded when you run it",
+// while semgrep fetched rule packs from semgrep.dev and reported usage metrics,
+// cargo audit cloned an advisory database, and the Go tools could download
+// modules. The list is not typed here. It is read from the registry entry of
+// each tool (Tool.network), filtered to the languages in THIS target, to the
+// tools actually installed, and to the depth asked for.
+func networkNote(ctx context.Context, tk toolkitRunner, target, focus string) networkInfo {
+	nctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	args := append([]string{target, "--network-report"}, focusArgs(focus)...)
+	stdout, stderr, err := tk.run(nctx, args...)
+	if err != nil {
+		return networkInfo{egress: true, text: "NETWORK: could not establish which analysers " +
+			"contact the network (" + err.Error() + "). Assume some will." + stderrTail(stderr)}
+	}
+	return describeNetwork(stdout)
+}
+
+// describeNetwork renders a --network-report. Separate so it is testable.
+func describeNetwork(report []byte) networkInfo {
+	var rep struct {
+		Tools []networkTool `json:"tools"`
+	}
+	if err := json.Unmarshal(report, &rep); err != nil {
+		return networkInfo{egress: true, text: "NETWORK: could not read the toolkit's account " +
+			"of which analysers contact the network (" + err.Error() + "). Assume some will."}
+	}
+	var lines []string
+	for _, t := range rep.Tools {
+		if !t.Installed || !t.Runs {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("- %s: %s", t.Label, t.Network))
+	}
+	if len(lines) == 0 {
+		return networkInfo{text: "NETWORK: none of the analysers that will run here contact " +
+			"another machine. Everything is read from disk."}
+	}
+	return networkInfo{egress: true, text: "NETWORK: these installed analysers contact other " +
+		"machines when they run. What each one requests is visible to the service it asks:\n" +
+		strings.Join(lines, "\n")}
+}
+
+type doctorState int
+
+const (
+	doctorReady doctorState = iota
+	doctorNoAnalysers
+	doctorFailed
+)
+
 // runDoctor asks whether this machine can review that target at all.
-func runDoctor(ctx context.Context, script, target string) (string, bool) {
+//
+// GORILLA FIX (2026-10-05): this returned ready=true for ANY exit code other
+// than 3 as long as something had been printed. A doctor that crashed halfway,
+// or was pointed at a path that does not exist, therefore passed the gate; the
+// user was asked to approve a review that then failed. Ready is exit 0 and
+// nothing else. Exit 3 is the toolkit's documented "no analyser installed";
+// every other outcome is a failed check, reported as one.
+func runDoctor(ctx context.Context, tk toolkitRunner, target string) (string, doctorState) {
 	dctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	python, preArgs, err := getPythonBinary()
-	if err != nil {
-		return "Doctor cannot run: Python 3 not found - " + err.Error(), false
-	}
+	stdout, stderr, err := tk.run(dctx, target, "--doctor")
+	return classifyDoctor(stdout, stderr, err)
+}
 
-	cmd := exec.CommandContext(dctx, python, append(append([]string{}, preArgs...), script, target, "--doctor")...)
-	cmd.Dir = filepath.Dir(script)
-	out, err := cmd.Output()
-	text := strings.TrimSpace(string(out))
-
-	// Exit code 3 is the toolkit's documented "no analyser installed" signal.
-	if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 3 {
-		return text, false
+func classifyDoctor(stdout, stderr []byte, err error) (string, doctorState) {
+	text := strings.TrimSpace(string(stdout))
+	if err == nil {
+		return text, doctorReady
 	}
-	if err != nil && text == "" {
-		return "the doctor could not run: " + err.Error(), false
+	var ee *exec.ExitError
+	if errors.As(err, &ee) && ee.ExitCode() == 3 {
+		return text, doctorNoAnalysers
 	}
-	return text, true
+	msg := "The readiness check stopped: " + err.Error() + "."
+	if text != "" {
+		msg += "\n\n" + oneBlockOf(text, 1500)
+	}
+	return msg + stderrTail(stderr), doctorFailed
 }
 
 // agentReport is the subset of schema code-review/agent/1 this tool reads.
@@ -307,7 +630,11 @@ type agentReport struct {
 	Profile      string   `json:"profile"`
 	FilesScanned int      `json:"files_scanned"`
 	Languages    []string `json:"languages"`
-	ResultsDir   string   `json:"results_dir"`
+	// GORILLA FIX (2026-10-05): the key is logs_dir. This read "results_dir",
+	// which the toolkit has never written, so the line that tells the reader
+	// where the full report is was never printed — while the truncation notice
+	// went on saying the missing findings "are all in the full report".
+	ResultsDir string `json:"logs_dir"`
 
 	Findings []struct {
 		Tool     string `json:"tool"`
@@ -337,6 +664,16 @@ type agentReport struct {
 		Caveat        string   `json:"caveat"`
 	} `json:"trust"`
 
+	// Depth is the run's OWN statement of how deep it went and which analysers
+	// it left out because of that. Absent from a toolkit older than 2026-10-05,
+	// in which case nothing is claimed about what a quick pass skipped.
+	Depth *struct {
+		Mode              string   `json:"mode"`
+		CategoriesRun     []string `json:"categories_run"`
+		CategoriesSkipped []string `json:"categories_skipped"`
+		ToolsSkipped      []string `json:"tools_skipped_by_depth"`
+	} `json:"depth"`
+
 	// Coverage is the sealed account of the run: every scheduled job in exactly
 	// one state, and each language reviewed only if an analyser for it finished.
 	// Absent from reports written by a toolkit older than 2026-10-04.
@@ -350,7 +687,18 @@ type agentReport struct {
 		Unreviewed []string `json:"languages_unreviewed"`
 	} `json:"coverage"`
 
-	ManualSteps []string `json:"manual_steps"`
+	// GORILLA FIX (2026-10-05): manual_steps is a list of OBJECTS. This was
+	// []string, so json.Unmarshal failed on the whole report whenever the
+	// toolkit offered a manual step — which it does for every C or C++ tree
+	// (valgrind, scan-build) and every kernel or Firefox profile. Those reviews
+	// ran to completion and then reported "its output could not be read". The
+	// contract test never saw it because it decodes a Go-only directory.
+	ManualSteps []struct {
+		ID      string `json:"id"`
+		Label   string `json:"label"`
+		Why     string `json:"why"`
+		Command string `json:"command"`
+	} `json:"manual_steps"`
 }
 
 // summariseReview turns the report into something a model can act on, bounded.
@@ -420,10 +768,30 @@ func summariseReview(raw []byte, focus string) (string, error) {
 	// security stage is the same lie as an uninstalled analyser.
 	switch focus {
 	case "quick":
-		b.WriteString("- **DEPTH: quick.** Only the fast linters and formatters ran. The " +
-			"security and deep stages were SKIPPED ENTIRELY — this pass cannot have found a " +
-			"buffer overrun, an injection, or a leaked credential, and says nothing about " +
-			"whether one is there.\n")
+		// GORILLA FIX (2026-10-05): this sentence is now read off the report.
+		//
+		// It used to be printed whenever "quick" had been ASKED for, whatever
+		// the toolkit then did — and what it did was run the security stages.
+		// The claim is only made when the run itself says it was a quick one,
+		// and it names the analysers that were left out, so a reader can check
+		// it against the list of what ran two lines above.
+		if d := rep.Depth; d != nil && d.Mode == "quick" {
+			b.WriteString("- **DEPTH: quick.** Only linters and formatters ran. Static analysis, " +
+				"security tools and the secret scan were SKIPPED ENTIRELY — this pass cannot " +
+				"have found a buffer overrun, an injection, or a leaked credential, and says " +
+				"nothing about whether one is there.\n")
+			if len(d.CategoriesSkipped) > 0 {
+				fmt.Fprintf(&b, "  - Kinds of check not run at all: %s\n", strings.Join(d.CategoriesSkipped, ", "))
+			}
+			if len(d.ToolsSkipped) > 0 {
+				fmt.Fprintf(&b, "  - Analysers that apply to this code and were left out by the depth: %s\n",
+					joinCapped(d.ToolsSkipped, 20))
+			}
+		} else {
+			b.WriteString("- **DEPTH: quick was asked for, but the run did not confirm it.** " +
+				"Treat the lists above as the only account of what ran; do not tell the user " +
+				"which stages were skipped.\n")
+		}
 	case "security":
 		b.WriteString("- **DEPTH: security.** The deep pass was forced over every file, and " +
 			"only security, secrets and static-analysis findings are listed below. Style and " +
@@ -511,7 +879,11 @@ func summariseReview(raw []byte, focus string) (string, error) {
 	if len(rep.ManualSteps) > 0 {
 		b.WriteString("\n## Cannot be automated safely — run these by hand if it matters\n\n")
 		for _, m := range capped(rep.ManualSteps, 8) {
-			fmt.Fprintf(&b, "- %s\n", oneLineOf(m, 200))
+			fmt.Fprintf(&b, "- %s", oneLineOf(m.Label, 120))
+			if m.Command != "" {
+				fmt.Fprintf(&b, ": `%s`", oneLineOf(m.Command, 200))
+			}
+			b.WriteString("\n")
 		}
 	}
 	if rep.ResultsDir != "" {
@@ -560,10 +932,21 @@ func oneLineOf(s string, max int) string {
 // vocabulary is the toolkit's own escalation keyword set, which is what decides
 // the deep stage in the first place — one definition of "security-shaped",
 // used in both places.
+//
+// securityToolIDs are the analysers whose every finding is a security finding:
+// the registry's auto-run tools of category "security" or "secrets".
+//
+// GORILLA FIX (2026-10-05): the list named "npm-audit" and "semgrep", neither
+// of which is an id the toolkit has ever emitted, so two of its nine entries
+// could never match. TestSecurityToolIDsAreTheRegistrysOwn now compares it with
+// the registry, in both directions.
+var securityToolIDs = map[string]bool{
+	"gosec": true, "bandit": true, "bandit-deep": true, "semgrep-deep": true,
+	"gitleaks-worktree": true, "gitleaks-history": true, "cargo-audit": true,
+}
+
 func looksSecurity(severity, message, rule, tool string) bool {
-	switch strings.ToLower(tool) {
-	case "gosec", "bandit", "bandit-deep", "semgrep", "semgrep-deep",
-		"gitleaks-worktree", "gitleaks-history", "cargo-audit", "npm-audit":
+	if securityToolIDs[strings.ToLower(tool)] {
 		return true
 	}
 	hay := strings.ToLower(message + " " + rule)

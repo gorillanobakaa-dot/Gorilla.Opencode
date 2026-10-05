@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -78,55 +79,6 @@ const (
 	// try this without editing a file.
 	searxngEnvVar = "SEARXNG_URL"
 
-	// searxngSetup is what the model is told when web search is switched off. It
-	// is the highest-leverage string in this file: it is read at exactly the
-	// moment the model has been asked for something it cannot get, which is the
-	// moment that produced the 2026-08-07 fabrication. It must close the door
-	// firmly and point at the human, not leave a gap that invites improvisation.
-	searxngSetup = `General web search is NOT configured, so nothing was searched.
-
-Do not answer from memory as though a search had happened, and do not guess URLs.
-
-OFFER TO FIX IT. The user is not expected to know any of this - say plainly that
-web search is off, that you can turn it on for them, and that it needs no
-account, no API key and no card. Offer the QUICK option first:
-
-QUICK (about five seconds, 641 KB) - install the lynx text browser, which this
-tool drives directly:
-
-  sudo -n apt-get install -y lynx
-
-Use -n so it fails immediately instead of hanging on a password prompt you
-cannot answer. If it fails for that reason, do NOT retry it and do NOT try to
-type a password. Show the user this exact line and ask them to run it in their
-own terminal, then tell them to ask you again:
-
-  sudo apt install lynx
-
-BETTER (a couple of minutes) - their own private SearXNG, which gives better
-results and reports which search engines failed. If they want it, run EXACTLY:
-
-  /usr/share/gorilla-opencode/setup-searxng.sh
-
-DO NOT improvise either installation, and do not retype the script's steps from
-memory. It encodes two failures that are easy to reproduce and hard to spot:
-SearXNG's build needs msgspec and pyyaml present before "pip install -e ." will
-work, and its JSON API is disabled by default so this tool gets 403 without one
-line in settings.yml. It verifies itself with a live query and exits non-zero if
-anything is wrong. Retyping the steps is how a half-built install gets reported
-as a success.
-
-If the script is not on disk (running from source rather than the .deb), it is at
-packaging/setup-searxng.sh in the repository.
-
-If the user declines both, that is the end of it: ask them for a URL and read it
-with web_fetch. Do not go looking for another way to search - do not fetch a
-search engine's results page, and do not substitute remembered facts for a search
-you did not perform.
-
-Scholarly sources (scholar, medical, crossref, openaccess, books, reference) need
-none of this and still work.`
-
 	webSearchDescriptionBase = `Search the web and scholarly sources by keyword.
 
 Search here before guessing a URL — and before guessing a FACT. Do not
@@ -173,6 +125,133 @@ out to be a different paper is worse than an empty result.
 
 To read a page you already have the address of, use web_fetch.`
 )
+
+// webSearchSources is every value the `source` parameter accepts, in the order
+// the description lists them. The schema enum and the refusal for an unknown
+// source are both built from it.
+var webSearchSources = []string{
+	"web", "scholar", "medical", "preprints", "crossref", "openaccess", "books",
+	"reference", "news", "worldbank", "humanitarian", "sec", "all",
+}
+
+// KeylessSearchSources is the sources that work with no key, no account and no
+// configuration: everything except "web" (which needs SearXNG or lynx) and
+// "all" (which is a combination of three of the others, not a source).
+//
+// GORILLA FIX (2026-10-05): audit finding S13. Three texts each typed this list
+// or its length and all three disagreed with the dispatch below: the research
+// tool said "seven keyless scholarly sources", the helper method and the
+// refusal text named six. Whoever needs the list or the count asks here.
+func KeylessSearchSources() []string {
+	var out []string
+	for _, s := range webSearchSources {
+		if s != "web" && s != "all" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// searxngSetup is what the model is told when web search is switched off. It
+// is the highest-leverage string in this file: it is read at exactly the
+// moment the model has been asked for something it cannot get, which is the
+// moment that produced the 2026-08-07 fabrication. It must close the door
+// firmly and point at the human, not leave a gap that invites improvisation.
+func searxngSetup() string { return searxngSetupFor(runtime.GOOS) }
+
+// searxngSetupFor builds that text for one operating system.
+//
+// GORILLA FIX (2026-10-05): audit finding S7. This was one constant, written
+// on Debian. On Windows the model was told to run `sudo -n apt-get install -y
+// lynx` and `/usr/share/gorilla-opencode/setup-searxng.sh`: a command that does
+// not exist there and a path that cannot. Every research helper depends on this
+// tool, so on Windows the moment a helper needed the open web it was handed
+// instructions none of which could work, at the one point where the text exists
+// to stop it improvising.
+//
+// The Windows branch uses scoop because that is this project's package manager
+// convention there (internal/arsenal lists lynx under scoop). It offers no
+// SearXNG installer because there is none for Windows: setup-searxng.sh is a
+// Linux script, and saying "run it" would be inventing a route.
+//
+// The typed "about five seconds, 641 KB" and "a couple of minutes" are gone
+// from both branches. Nobody measured them on the reader's machine or link.
+func searxngSetupFor(goos string) string {
+	const head = `General web search is NOT configured, so nothing was searched.
+
+Do not answer from memory as though a search had happened, and do not guess URLs.
+
+OFFER TO FIX IT. The user is not expected to know any of this - say plainly that
+web search is off, that you can turn it on for them, and that it needs no
+account, no API key and no card. Offer the QUICK option first:
+`
+	quick := `
+QUICK - install the lynx text browser, which this tool drives directly:
+
+  sudo -n apt-get install -y lynx
+
+Use -n so it fails immediately instead of hanging on a password prompt you
+cannot answer. If it fails for that reason, do NOT retry it and do NOT try to
+type a password. Show the user this exact line and ask them to run it in their
+own terminal, then tell them to ask you again:
+
+  sudo apt install lynx
+
+On a system without apt, use that system's own package manager for the package
+named lynx, the same way: one attempt, and hand the line to the user if it
+needs a password.
+`
+	better := `
+BETTER - their own private SearXNG, which gives better results and reports
+which search engines failed. If they want it, run EXACTLY:
+
+  /usr/share/gorilla-opencode/setup-searxng.sh
+
+DO NOT improvise either installation, and do not retype the script's steps from
+memory. It encodes two failures that are easy to reproduce and hard to spot:
+SearXNG's build needs msgspec and pyyaml present before "pip install -e ." will
+work, and its JSON API is disabled by default so this tool gets 403 without one
+line in settings.yml. It verifies itself with a live query and exits non-zero if
+anything is wrong. Retyping the steps is how a half-built install gets reported
+as a success.
+
+If the script is not on disk (running from source rather than the .deb), it is at
+packaging/setup-searxng.sh in the repository.
+`
+	if goos == "windows" {
+		quick = `
+QUICK - install the lynx text browser, which this tool drives directly. On
+Windows this is done with scoop:
+
+  scoop install lynx
+
+Run it once. If scoop itself is not installed ("scoop" is not recognised), do
+NOT install scoop yourself and do NOT download lynx from anywhere else: tell
+the user that scoop is missing, that it is the package manager this program
+uses on Windows, and that https://scoop.sh shows the one command that installs
+it. When lynx is installed, tell them to ask you again. If the tool still says
+web search is not configured, this program was started before lynx was on the
+PATH: ask the user to close and reopen it.
+`
+		better = `
+BETTER - their own private SearXNG, which gives better results and reports
+which search engines failed. This program has NO SearXNG installer for Windows,
+so do not try to install one and do not improvise the steps. If the user
+ALREADY runs a SearXNG instance (on another machine, in WSL or in a container),
+it can be used: its JSON output must be enabled (settings.yml, search.formats
+must include json), and its address goes in the ` + searxngEnvVar + ` environment
+variable or in "searxngURL" in this program's config.json. Ask the user for the
+address; never guess one and never point this at a public instance.
+`
+	}
+	return head + quick + better + `
+If the user declines both, that is the end of it: ask them for a URL and read it
+with web_fetch. Do not go looking for another way to search - do not fetch a
+search engine's results page, and do not substitute remembered facts for a search
+you did not perform.
+
+These sources need none of this and still work: ` + strings.Join(KeylessSearchSources(), ", ") + `.`
+}
 
 type WebSearchParams struct {
 	Query      string `json:"query"`
@@ -280,7 +359,7 @@ func (t *webSearchTool) Info() ToolInfo {
 			"source": map[string]any{
 				"type":        "string",
 				"description": "Which index to search. Defaults to scholar. 'web' needs a self-hosted SearXNG.",
-				"enum":        []string{"web", "scholar", "medical", "preprints", "crossref", "openaccess", "books", "reference", "news", "worldbank", "humanitarian", "sec", "all"},
+				"enum":        webSearchSources,
 			},
 			"max_results": map[string]any{
 				"type":        "number",
@@ -964,7 +1043,7 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 	// PATH. lynx is a Recommends of the package, so in practice this fires only
 	// for someone who removed it.
 	if source == "web" && searxngEndpoint() == "" && lynxPath() == "" {
-		return NewTextErrorResponse(searxngSetup), nil
+		return NewTextErrorResponse(searxngSetup()), nil
 	}
 
 	sessionID, messageID := GetContextValues(ctx)
@@ -1052,7 +1131,7 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		chosen = []backend{{"OpenAlex", t.searchOpenAlex}, {"Europe PMC", t.searchEuropePMC}, {"Crossref", t.searchCrossref}}
 	default:
 		return NewTextErrorResponse(
-			"source must be one of: web, scholar, medical, preprints, crossref, openaccess, books, reference, news, worldbank, humanitarian, sec, all"), nil
+			"source must be one of: " + strings.Join(webSearchSources, ", ")), nil
 	}
 
 	// Degradation short of failure is collected here and surfaced as PARTIAL

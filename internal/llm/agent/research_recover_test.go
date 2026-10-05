@@ -148,16 +148,16 @@ func TestHelperIDPatternSeparatesSupervisorsFromTheirLanes(t *testing.T) {
 		{"call_2d3bca9114a643ff9b2edd4d-supervisor:prior_art", "call_2d3bca9114a643ff9b2edd4d", "supervisor:prior_art"},
 		{"call_462c68845e6a49eebb7722f8-primary_source", "call_462c68845e6a49eebb7722f8", "primary_source"},
 	} {
-		m := helperIDPattern.FindStringSubmatch(c.id)
-		if m == nil {
+		call, role, ok := splitHelperID(c.id, "")
+		if !ok {
 			t.Fatalf("%s did not parse as a helper session id", c.id)
 		}
-		if m[1] != c.call || m[2] != c.role {
-			t.Errorf("%s parsed as (%q, %q), want (%q, %q)", c.id, m[1], m[2], c.call, c.role)
+		if call != c.call || role != c.role {
+			t.Errorf("%s parsed as (%q, %q), want (%q, %q)", c.id, call, role, c.call, c.role)
 		}
 	}
 	// An ordinary conversation must never be mistaken for a research lane.
-	if helperIDPattern.MatchString("56d29c8d-9109-4284-a21b-68fb008f36a1") {
+	if _, _, ok := splitHelperID("56d29c8d-9109-4284-a21b-68fb008f36a1", "New Session"); ok {
 		t.Errorf("a normal session id parsed as a research helper")
 	}
 }

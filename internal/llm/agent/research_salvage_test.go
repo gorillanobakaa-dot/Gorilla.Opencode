@@ -81,7 +81,7 @@ func TestFindingsAreSavedBeforeAnyModelTouchesThem(t *testing.T) {
 		t.Errorf("the coverage count is missing or wrong")
 	}
 	// It must not masquerade as the finished product.
-	if !strings.Contains(s, "not the finished assessment") {
+	if !strings.Contains(s, "not the finished write-up") {
 		t.Errorf("raw findings do not say what they are; someone could mistake them for the dossier")
 	}
 	if !strings.Contains(s, "/osint --recover") {

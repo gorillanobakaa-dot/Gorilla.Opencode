@@ -37,6 +37,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -79,6 +80,17 @@ type Entry struct {
 	// Unlocks is what the AGENT gains, concretely.
 	Unlocks []string `json:"unlocks"`
 	Detect  Detect   `json:"detect"`
+	// Platforms lists the operating systems (runtime.GOOS values) this entry
+	// can exist on. Empty means everywhere this program runs.
+	//
+	// GORILLA FIX (2026-10-05), from the /arsenal audit (A10): on Windows the
+	// "minimum" series could never read 8/8, because bubblewrap is built on
+	// Linux kernel namespaces and has no Windows form at all — and the series
+	// "understanding Windows files on Linux" was listed ON Windows with every
+	// entry N/A. An entry that cannot exist here is not a missing capability,
+	// and counting it as one makes the score unreachable. See Applicable and
+	// ForPlatform.
+	Platforms []string `json:"platforms,omitempty"`
 	// Packages is per package manager, because "how do I get it" has a
 	// different answer on every distribution and a wrong one is useless.
 	Packages map[string][]string `json:"packages"`
@@ -109,6 +121,115 @@ type Detect struct {
 	// poppler-utils genuinely gives you pdftotext AND pdfimages AND pdfinfo,
 	// and having one of the three is worth reporting as partial.
 	Mode string `json:"mode,omitempty"`
+	// Impostors names the cases where a detect name resolves to something that
+	// is NOT this tool.
+	//
+	// GORILLA FIX (2026-10-05), from the /arsenal audit (A1): `convert` is
+	// ImageMagick on Linux and the FAT-to-NTFS disk converter on Windows
+	// (C:\Windows\System32\convert.exe), so every Windows machine reported
+	// ImageMagick as HAVE whether or not it was installed. A false HAVE is the
+	// fault this feature exists to prevent, pointing the other way. The same
+	// trap sits on Linux: /usr/bin/sg is a link to newgrp, not ast-grep, which
+	// the astgrep caveat already said in words while detection ignored it.
+	Impostors []Impostor `json:"impostors,omitempty"`
+	// Paths lists, per operating system (runtime.GOOS), well-known install
+	// locations to check when nothing was found on PATH. ${NAME} is an
+	// environment variable; ${SCOOP} is the Scoop root. Only meaningful with
+	// Mode "any": one existing file is the whole capability.
+	//
+	// GORILLA FIX (2026-10-05), from the /arsenal audit (A6): Scoop's
+	// libreoffice package creates Start-menu shortcuts only — no shim, nothing
+	// on PATH. Measured on a Windows machine with it installed: soffice.exe was
+	// on the disk and /arsenal reported it missing, and would have gone on
+	// offering the install command for ever.
+	Paths map[string][]string `json:"paths,omitempty"`
+}
+
+// Impostor is one known name collision: on OS, a file called Binary that
+// matches Under or Target is a different program.
+type Impostor struct {
+	Binary string `json:"binary"`
+	// OS is a runtime.GOOS value.
+	OS string `json:"os"`
+	// Under is the name of an environment variable holding a directory. A hit
+	// anywhere inside that directory is the operating system's own program.
+	Under string `json:"under,omitempty"`
+	// Target is the file name (without extension) the hit resolves to once
+	// symbolic links are followed.
+	Target string `json:"target,omitempty"`
+	// Is says, in plain words, what the impostor really is. Shown to the user.
+	Is string `json:"is"`
+}
+
+// Seams for tests. Production code never reassigns them.
+var (
+	lookPath = exec.LookPath
+	goos     = runtime.GOOS
+)
+
+func (i Impostor) matches(binary, path string) bool {
+	if i.Binary != binary || i.OS != goos {
+		return false
+	}
+	if i.Under != "" {
+		if root := os.Getenv(i.Under); root != "" && pathWithin(path, root) {
+			return true
+		}
+	}
+	if i.Target != "" {
+		real, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			real = path
+		}
+		base := filepath.Base(real)
+		base = strings.TrimSuffix(base, filepath.Ext(base))
+		if real != path && strings.EqualFold(base, i.Target) {
+			return true
+		}
+	}
+	return false
+}
+
+// pathWithin reports whether path lies inside dir. Case-insensitive on Windows,
+// where C:\WINDOWS and C:\Windows are the same directory.
+func pathWithin(path, dir string) bool {
+	p, d := filepath.Clean(path), filepath.Clean(dir)
+	if goos == "windows" {
+		p, d = strings.ToLower(p), strings.ToLower(d)
+	}
+	return strings.HasPrefix(p, d+string(filepath.Separator))
+}
+
+// Applicable reports whether an entry can exist on this operating system.
+func Applicable(e Entry) bool {
+	if len(e.Platforms) == 0 {
+		return true
+	}
+	for _, p := range e.Platforms {
+		if p == goos {
+			return true
+		}
+	}
+	return false
+}
+
+// ForPlatform returns the manifest as it applies to this operating system:
+// entries that cannot exist here are removed, and a series left with nothing in
+// it is not listed at all.
+func ForPlatform(m Manifest) Manifest {
+	out := Manifest{Version: m.Version, Generated: m.Generated}
+	for _, s := range m.Series {
+		kept := Series{ID: s.ID, Title: s.Title, Why: s.Why}
+		for _, e := range s.Entries {
+			if Applicable(e) {
+				kept.Entries = append(kept.Entries, e)
+			}
+		}
+		if len(kept.Entries) > 0 {
+			out.Series = append(out.Series, kept)
+		}
+	}
+	return out
 }
 
 // Needs answers the question that decides everything for this audience: will
@@ -141,6 +262,21 @@ type Status struct {
 	Found []string
 	// Missing lists the ones that were not.
 	Missing []string
+	// Ignored lists names that DID resolve, to a different program. They are
+	// also in Missing; this is the explanation, so the screen can say why a
+	// file the user can see on their own disk was not counted.
+	Ignored []IgnoredHit
+	// OffPath is true when the entry was found only at a well-known install
+	// location, not on PATH. Found then holds the full path, because that is
+	// the only way to call it.
+	OffPath bool
+}
+
+// IgnoredHit is one detect name that resolved to an impostor.
+type IgnoredHit struct {
+	Binary string
+	Path   string
+	Is     string
 }
 
 // Partial reports an entry that is half-installed — some binaries present,
@@ -152,17 +288,35 @@ func (s Status) Partial() bool { return len(s.Found) > 0 && len(s.Missing) > 0 }
 func DetectEntry(e Entry) Status {
 	st := Status{Entry: e}
 	for _, b := range e.Detect.Binaries {
-		if _, err := exec.LookPath(b); err == nil {
-			st.Found = append(st.Found, b)
-		} else {
+		path, err := lookPath(b)
+		if err != nil {
 			st.Missing = append(st.Missing, b)
+			continue
 		}
+		impostor := false
+		for _, imp := range e.Detect.Impostors {
+			if imp.matches(b, path) {
+				st.Ignored = append(st.Ignored, IgnoredHit{Binary: b, Path: path, Is: imp.Is})
+				impostor = true
+				break
+			}
+		}
+		if impostor {
+			st.Missing = append(st.Missing, b)
+			continue
+		}
+		st.Found = append(st.Found, b)
 	}
 	if e.Detect.Mode == "any" {
 		// Any one name is the whole capability, so nothing is "missing" once
 		// one is found — reporting the other spellings as missing would read
 		// as a half-install that does not exist.
 		st.Present = len(st.Found) > 0
+		if !st.Present {
+			if p := firstExistingPath(e.Detect.Paths[goos]); p != "" {
+				st.Found, st.Present, st.OffPath = []string{p}, true, true
+			}
+		}
 		if st.Present {
 			st.Missing = nil
 		}
@@ -170,6 +324,45 @@ func DetectEntry(e Entry) Status {
 	}
 	st.Present = len(st.Found) > 0 && len(st.Missing) == 0
 	return st
+}
+
+// scoopRoot is where Scoop keeps itself: $SCOOP when the user moved it,
+// otherwise the scoop folder in the home directory. "" when neither is known.
+func scoopRoot() string {
+	if r := os.Getenv("SCOOP"); r != "" {
+		return r
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, "scoop")
+	}
+	return ""
+}
+
+// firstExistingPath expands each candidate and returns the first that is a
+// file on this disk. A candidate naming a variable that is not set is skipped
+// rather than expanded to a path that was never meant.
+func firstExistingPath(candidates []string) string {
+	for _, raw := range candidates {
+		unset := false
+		p := os.Expand(raw, func(name string) string {
+			v := os.Getenv(name)
+			if name == "SCOOP" {
+				v = scoopRoot()
+			}
+			if v == "" {
+				unset = true
+			}
+			return v
+		})
+		if unset {
+			continue
+		}
+		p = filepath.FromSlash(p)
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			return p
+		}
+	}
+	return ""
 }
 
 // PackageManager is what this machine actually uses to install things.
@@ -200,28 +393,50 @@ const (
 // DetectPackageManager looks for the tool rather than reading /etc/os-release,
 // because what matters is what can actually be run here.
 func DetectPackageManager() PackageManager {
-	if runtime.GOOS == "windows" {
+	if goos == "windows" {
 		// scoop is a PowerShell function on a shim, so LookPath finds
 		// scoop.cmd / scoop.ps1 rather than an .exe. Checking the shim
 		// directory as well means a working Scoop is not missed just because
 		// PATH has not been refreshed in this shell yet.
-		if _, err := exec.LookPath("scoop"); err == nil {
+		if _, err := lookPath("scoop"); err == nil {
 			return Scoop
 		}
-		if home, err := os.UserHomeDir(); err == nil {
-			if _, err := os.Stat(filepath.Join(home, "scoop", "shims", "scoop.cmd")); err == nil {
+		if root := scoopRoot(); root != "" {
+			if _, err := os.Stat(filepath.Join(root, "shims", "scoop.cmd")); err == nil {
 				return Scoop
 			}
 		}
 		return Unknown
 	}
-	if _, err := exec.LookPath("apt-get"); err == nil {
+	if _, err := lookPath("apt-get"); err == nil {
 		return APT
 	}
-	if _, err := exec.LookPath("pacman"); err == nil {
+	if _, err := lookPath("pacman"); err == nil {
 		return Pacman
 	}
 	return Unknown
+}
+
+// CanMeasure reports whether this package manager can price a selection
+// before installing it.
+//
+// GORILLA FIX (2026-10-05), from the /arsenal audit (A3): on Scoop the screen
+// said "p measure the real cost" in three places and p could only ever answer
+// that Scoop does not report sizes. An offer the program knows it cannot keep
+// is not made; the screen asks this function before printing the key.
+func CanMeasure(pm PackageManager) bool { return pm == APT || pm == Pacman }
+
+// CannotMeasureNote says why not, in the words shown on screen.
+func CannotMeasureNote(pm PackageManager) string {
+	switch {
+	case CanMeasure(pm):
+		return ""
+	case pm == Scoop:
+		// Scoop has no equivalent of `apt-get --print-uris`: sizes live inside
+		// each manifest's architecture block and are often absent entirely.
+		return "scoop does not report download size before installing"
+	}
+	return "no supported package manager found on this machine"
 }
 
 // PackagesFor returns the package names for this machine's package manager,
@@ -269,34 +484,61 @@ func UnavailableNote(e Entry, pm PackageManager) string {
 // is worse than no prompt at all. So the command is DISPLAYED, and running it
 // is a separate, explicit act.
 func InstallCommand(pkgs []string, pm PackageManager) string {
+	return strings.Join(InstallCommands(pkgs, pm), "\n")
+}
+
+// scoopHasBucket reports whether a Scoop bucket is already added on this
+// machine. A variable so a test can answer for a machine it is not running on.
+var scoopHasBucket = func(name string) bool {
+	root := scoopRoot()
+	if root == "" {
+		return false
+	}
+	fi, err := os.Stat(filepath.Join(root, "buckets", name))
+	return err == nil && fi.IsDir()
+}
+
+// InstallCommands is the same thing as separate lines, one command each, in
+// the order they must be run.
+//
+// GORILLA FIX (2026-10-05), from the /arsenal audit (A11): the Scoop form was
+// one line, "scoop bucket add extras; scoop install ...". The semicolon is
+// PowerShell. Pasted into cmd.exe it is handed to scoop as part of the bucket
+// name and the whole line fails. Two lines work in both shells. The bucket
+// line is also left out when the bucket is already there, which is checked on
+// the disk rather than assumed either way.
+func InstallCommands(pkgs []string, pm PackageManager) []string {
 	if len(pkgs) == 0 {
-		return ""
+		return nil
 	}
 	switch pm {
 	case APT:
-		return "sudo apt-get install -y " + strings.Join(pkgs, " ")
+		return []string{"sudo apt-get install -y " + strings.Join(pkgs, " ")}
 	case Pacman:
-		return "sudo pacman -S --needed " + strings.Join(pkgs, " ")
+		return []string{"sudo pacman -S --needed " + strings.Join(pkgs, " ")}
 	case Scoop:
 		// No sudo: Scoop installs into the user's own profile, which is the
 		// reason it was chosen over winget and choco. A package written
-		// "extras/name" lives outside the default bucket, so the command that
-		// adds it comes first - otherwise the install fails with a bucket error
-		// that says nothing about buckets.
-		needsExtras := false
+		// "bucket/name" lives outside the default bucket, so the command that
+		// adds the bucket comes first - otherwise the install fails with a
+		// bucket error that says nothing about buckets.
+		var out []string
+		seen := map[string]bool{}
 		for _, p := range pkgs {
-			if strings.HasPrefix(p, "extras/") {
-				needsExtras = true
-				break
+			i := strings.Index(p, "/")
+			if i <= 0 {
+				continue
 			}
+			bucket := p[:i]
+			if seen[bucket] || scoopHasBucket(bucket) {
+				continue
+			}
+			seen[bucket] = true
+			out = append(out, "scoop bucket add "+bucket)
 		}
-		cmd := "scoop install " + strings.Join(pkgs, " ")
-		if needsExtras {
-			return "scoop bucket add extras; " + cmd
-		}
-		return cmd
+		return append(out, "scoop install "+strings.Join(pkgs, " "))
 	}
-	return ""
+	return nil
 }
 
 // Cost is what a selection will really take, on THIS machine.
@@ -307,6 +549,10 @@ type Cost struct {
 	// could not measure must say so rather than show a zero, because a zero
 	// reads as "free".
 	Measured bool
+	// DiskMeasured is the same distinction for DiskBytes alone. pacman -Sp
+	// reports download size only, and until 2026-10-05 the screen printed that
+	// as "0 B on disk" — a zero standing in for "not reported".
+	DiskMeasured bool
 	// Note carries why, when Measured is false.
 	Note string
 }
@@ -315,8 +561,9 @@ type Cost struct {
 // decimal point, both locale-dependent, which is why the command is run under
 // LC_ALL=C below.
 var (
-	aptNeedRe = regexp.MustCompile(`Need to get ([0-9.,]+) ?([kMG]?)B`)
-	aptDiskRe = regexp.MustCompile(`After this operation, ([0-9.,]+) ?([kMG]?)B of additional disk space`)
+	aptNeedRe  = regexp.MustCompile(`Need to get ([0-9.,]+) ?([kMG]?)B`)
+	aptDiskRe  = regexp.MustCompile(`After this operation, ([0-9.,]+) ?([kMG]?)B of additional disk space`)
+	aptFreedRe = regexp.MustCompile(`After this operation, ([0-9.,]+) ?([kMG]?)B disk space will be freed`)
 )
 
 // MeasureCost asks the package manager what a selection would really cost,
@@ -332,23 +579,25 @@ var (
 // on a fully-loaded desktop and 29.5 MB on a fresh netinst. Quoting either
 // number as universal would be misleading by omission.
 func MeasureCost(pkgs []string, pm PackageManager) Cost {
-	if len(pkgs) == 0 {
-		return Cost{Measured: true}
-	}
-	switch pm {
-	case APT:
-		return measureAPT(pkgs)
-	case Pacman:
-		return measurePacman(pkgs)
-	case Scoop:
-		// Scoop has no equivalent of `apt-get --print-uris`: sizes live inside
-		// each manifest's architecture block and are often absent entirely.
+	if !CanMeasure(pm) {
 		// Reporting an unmeasured 0 here would read as FREE next to "not
 		// installed", which is the trap the rest of this file is written
 		// against - so it says plainly that it does not know.
-		return Cost{Note: "scoop does not report download size before installing"}
+		return Cost{Note: CannotMeasureNote(pm)}
 	}
-	return Cost{Note: "no supported package manager found on this machine"}
+	if len(pkgs) == 0 {
+		// GORILLA FIX (2026-10-05), from the /arsenal audit (A2): this returned
+		// Measured with zero bytes, and the screen turned that into "nothing to
+		// download - all of it is already here". The usual way to arrive here
+		// is the opposite: every selected entry is one this package manager
+		// CANNOT fetch, so there were no packages to ask about. Nothing was
+		// asked, so nothing was measured.
+		return Cost{Note: "no packages in this selection, so there was nothing to ask the package manager"}
+	}
+	if pm == APT {
+		return measureAPT(pkgs)
+	}
+	return measurePacman(pkgs)
 }
 
 func measureAPT(pkgs []string) Cost {
@@ -363,12 +612,33 @@ func measureAPT(pkgs []string) Cost {
 		// rather than a zero, which would read as "free".
 		return Cost{Note: firstUsefulLine(string(out), "could not price this — "+err.Error())}
 	}
-	c := Cost{Measured: true}
-	if m := aptNeedRe.FindStringSubmatch(string(out)); m != nil {
-		c.DownloadBytes = parseSize(m[1], m[2])
+	return parseAPTCost(string(out))
+}
+
+// parseAPTCost reads apt-get's summary lines.
+//
+// GORILLA FIX (2026-10-05), from the /arsenal audit (A4): the cost was marked
+// Measured BEFORE the output was read, so an answer matching neither pattern —
+// a changed format, a translated line that slipped past LC_ALL=C — stayed
+// "measured" at 0 B and reached the screen as "nothing to download". An
+// answer this program cannot read is not a measurement of zero. Each figure
+// now counts only if its own line was found.
+func parseAPTCost(out string) Cost {
+	need := aptNeedRe.FindStringSubmatch(out)
+	if need == nil {
+		return Cost{Note: "apt answered, but not in a form this program can read — not measured"}
 	}
-	if m := aptDiskRe.FindStringSubmatch(string(out)); m != nil {
-		c.DiskBytes = parseSize(m[1], m[2])
+	c := Cost{Measured: true, DownloadBytes: parseSize(need[1], need[2])}
+	switch {
+	case aptDiskRe.MatchString(out):
+		m := aptDiskRe.FindStringSubmatch(out)
+		c.DiskBytes, c.DiskMeasured = parseSize(m[1], m[2]), true
+	case aptFreedRe.MatchString(out):
+		// Installing frees space only when it replaces something larger. No
+		// ADDITIONAL space is a true zero, not a missing figure.
+		c.DiskMeasured = true
+	default:
+		c.Note = "download only — apt's disk figure could not be read"
 	}
 	return c
 }
@@ -381,12 +651,25 @@ func measurePacman(pkgs []string) Cost {
 	if err != nil {
 		return Cost{Note: firstUsefulLine(string(out), "could not price this — "+err.Error())}
 	}
-	c := Cost{Measured: true}
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if n, err := strconv.ParseInt(strings.TrimSpace(line), 10, 64); err == nil {
+	return parsePacmanCost(string(out))
+}
+
+// parsePacmanCost sums the per-package sizes `pacman -Sp --print-format %s`
+// prints, one number per line. Same rule as parseAPTCost: with no line it can
+// read as a size, nothing was measured.
+func parsePacmanCost(out string) Cost {
+	var c Cost
+	sizes := 0
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if n, err := strconv.ParseInt(strings.TrimSpace(line), 10, 64); err == nil && n >= 0 {
 			c.DownloadBytes += n
+			sizes++
 		}
 	}
+	if sizes == 0 {
+		return Cost{Note: "pacman answered, but not in a form this program can read — not measured"}
+	}
+	c.Measured = true
 	// pacman -Sp reports download size only. Saying so beats reporting 0 for
 	// disk, which would read as "takes no space".
 	c.Note = "download only — pacman does not report installed size here"
@@ -465,6 +748,29 @@ func TagfileDir() string {
 
 // TagfilePath is the default selection file.
 func TagfilePath() string { return filepath.Join(TagfileDir(), "selection.tagfile") }
+
+// Tagfiles lists every selection file in TagfileDir: the user's own first,
+// then the rest by name.
+//
+// GORILLA FIX (2026-10-05), from the /arsenal audit (A12): loading could read
+// exactly one path, the same one saving writes. The stated point of a tagfile
+// is that somebody else can send you theirs — and the only way to load theirs
+// was to overwrite your own with it. Any file ending .tagfile that is dropped
+// into this folder can now be loaded, and nothing is overwritten.
+func Tagfiles() []string {
+	matches, _ := filepath.Glob(filepath.Join(TagfileDir(), "*.tagfile"))
+	sort.Strings(matches)
+	own := TagfilePath()
+	out := make([]string, 0, len(matches))
+	for _, p := range matches {
+		if p == own {
+			out = append([]string{p}, out...)
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
 
 // SaveTagfile writes a selection as plain text and returns the path.
 //

@@ -99,7 +99,7 @@ import sys
 import tarfile
 import time
 import zipfile
-from collections import defaultdict
+from collections import Counter, defaultdict
 from difflib import SequenceMatcher
 from pathlib import Path
 
@@ -499,6 +499,90 @@ def rg_common_globs(ext_filter, extra_excludes, type_globs, globs=()):
     for g in globs:
         out += ["-g", g]
     return out
+
+
+def _split_type_filter(ext_filter, type_globs, globs, opts):
+    """Make a type filter and a name glob mean BOTH, not EITHER.
+
+    ripgrep treats every -g/--iglob include as an alternative: a file matching
+    any one of them is listed. pfind turned -t md into the glob *.md and handed
+    it over beside the caller's own glob, so glob=**/gemini.md with type=md
+    asked for "gemini.md OR any Markdown file". Measured on a home folder,
+    2026-10-05: 120,765 files returned for a name that matches 15.
+
+    When both kinds are present, only the caller's globs go to ripgrep and the
+    type is applied here, to the names that come back. Returns the ext filter
+    and type globs to pass on, and a predicate (or None when nothing changes).
+    """
+    iglobs = (getattr(opts, "iglobs", None) or []) if opts is not None else []
+    user_inc = [x for x in list(globs or ()) + list(iglobs) if not x.startswith("!")]
+    type_inc = [x for x in (type_globs or ()) if not x.startswith("!")]
+    exts = [e if e.startswith(".") else "." + e for e in (ext_filter or ())]
+    if not user_inc or not (type_inc or exts):
+        return ext_filter, type_globs, None
+    pats = [x.lower() for x in type_inc] + ["*" + e.lower() for e in exts]
+
+    def keep(path):
+        base = path.replace("\\", "/").rpartition("/")[2].lower()
+        return any(fnmatch.fnmatchcase(base, x) for x in pats)
+
+    return (), [x for x in (type_globs or ()) if x.startswith("!")], keep
+
+
+def render_folder_overview(all_files, roots, limit):
+    """A tree of a folder too large to draw: folders only, with file counts.
+
+    The tree view used to draw the first `limit` files in the order the walk
+    produced them and stop without a word. Asked for the folders of a home
+    directory holding 3.9 million files, it drew 40 files, showed Documents as
+    containing one, and a model reported that as the structure (2026-10-05).
+    A cut-off tree is not a smaller tree, it is a wrong one. This answers the
+    question that can be answered at this size: which folders, how big.
+    """
+    sep = os.sep
+    direct = Counter(f.replace("/", sep).rpartition(sep)[0] for f in all_files)
+    cap = max(limit or 0, 200)
+    for root in roots:
+        rootstr = os.path.normpath(str(root)).rstrip(sep)
+        prefix = rootstr + sep
+        total = Counter()
+        here = n = 0
+        for d, k in direct.items():
+            if d == rootstr:
+                here += k
+                n += k
+                continue
+            if not d.startswith(prefix):
+                continue
+            n += k
+            parts = d[len(prefix):].split(sep)
+            for i in range(1, len(parts) + 1):
+                total[sep.join(parts[:i])] += k
+        by_depth = Counter(rel.count(sep) + 1 for rel in total)
+        depth, running = 1, by_depth.get(1, 0)
+        deepest = max(by_depth) if by_depth else 1
+        while depth < deepest and running + by_depth.get(depth + 1, 0) <= max(limit or 0, 150):
+            depth += 1
+            running += by_depth[depth]
+        shown = [rel for rel in total if rel.count(sep) + 1 <= depth]
+        left_out = 0
+        if len(shown) > cap:
+            shown.sort(key=lambda rel: -total[rel])
+            left_out = len(shown) - cap
+            shown = shown[:cap]
+        shown.sort(key=lambda rel: [x.lower() for x in rel.split(sep)])
+        print(f"{rootstr}: {n:,} files in {len(total):,} folders. That is too many to list one by one, "
+              f"so this shows FOLDERS ONLY, {depth} level(s) deep, each with the number of files inside it "
+              f"(sub-folders included). Hidden and git-ignored files are not counted. This is NOT the whole tree.")
+        for rel in shown:
+            parts = rel.split(sep)
+            print(f"{'    ' * (len(parts) - 1)}{parts[-1]}{sep}  ({total[rel]:,} files)")
+        if left_out:
+            print(f"… and {left_out:,} smaller folder(s) at this depth not shown.")
+        if here:
+            print(f"({here:,} file(s) sit directly in {rootstr}, not listed here.)")
+        print("To see inside one folder, call find again with path set to that folder.")
+
 
 
 def _apply_user_globs(paths, globs, is_dir=False):
@@ -1027,6 +1111,7 @@ def rg_match_flags(opts):
     return out
 
 def rg_list_files(roots, ext_filter, extra_excludes, type_globs, include_hidden, no_ignore, workers, max_depth=None, globs=(), opts=None):
+    ext_filter, type_globs, keep_type = _split_type_filter(ext_filter, type_globs, globs, opts)
     cmd = ["rg", "--files", "--threads", str(workers)]
     if include_hidden:
         cmd.append("--hidden")
@@ -1046,7 +1131,8 @@ def rg_list_files(roots, ext_filter, extra_excludes, type_globs, include_hidden,
         msg = (out.stderr or "").strip().splitlines()
         if msg:
             print(f"pfind: rg --files: {msg[0]}", file=sys.stderr)
-    return [line for line in out.stdout.splitlines() if line]
+    return [line for line in out.stdout.splitlines()
+            if line and (keep_type is None or keep_type(line))]
 
 def rg_content(pattern, roots, regex, ignore_case, case_sensitive, word_regexp,
                ext_filter, extra_excludes, type_globs, include_hidden, no_ignore,
@@ -1057,6 +1143,7 @@ def rg_content(pattern, roots, regex, ignore_case, case_sensitive, word_regexp,
                smart_case=False):
     if fixed is None:
         fixed = not regex
+    ext_filter, type_globs, keep_type = _split_type_filter(ext_filter, type_globs, globs, opts)
     cmd = ["rg", "--json", "--threads", str(workers)]
     # -s wins over -i wins over -S, matching ripgrep's own precedence.
     if case_sensitive:
@@ -1126,6 +1213,8 @@ def rg_content(pattern, roots, regex, ignore_case, case_sensitive, word_regexp,
         d = obj.get("data", {})
         path = d.get("path", {}).get("text")
         if not path:
+            continue
+        if keep_type is not None and not keep_type(path):
             continue
         rec = hits[path]
         text = (d.get("lines", {}).get("text") or "").rstrip("\n")
@@ -2849,7 +2938,7 @@ def main():
         for f in shown:
             print(f)
         if len(all_files) > len(shown):
-            print(f"… and {len(all_files) - len(shown)} more file(s) not shown (raise --limit)")
+            print(f"… and {len(all_files) - len(shown)} more file(s) not shown — this list is INCOMPLETE; narrow it with path, glob or type)")
         return 0
 
     # Exploratory Mode (zero query or explicit directory target with tree/long flags)
@@ -2915,6 +3004,14 @@ def main():
         if args.git_dirty and git_cache:
             all_files = [f for f in all_files if git_cache.get_status(f)]
         
+        # A tree too large to draw is answered with its folders and their sizes,
+        # never with the first few files of the walk. See render_folder_overview.
+        tree_limit = args.limit if args.limit else 200
+        if (args.tree and len(all_files) > tree_limit and args.level is None
+                and not args.only_dirs and not args.only_files):
+            render_folder_overview(all_files, roots, tree_limit)
+            return 0
+
         # Apply sorting
         sort_field = args.sortr if args.sortr else args.sort
         reverse = bool(args.sortr) or args.reverse

@@ -63,6 +63,10 @@ type RecoverableRun struct {
 	Path string
 
 	Question string
+	// Doctrine is DoctrineDossier or DoctrineStandard: which discipline the
+	// helpers worked under, and so whether the findings carry two-axis grades or
+	// evidence tiers. Empty when it could not be established.
+	Doctrine string
 	When     time.Time
 	Lanes    int // helper sessions belonging to the run
 	Covered  int // of those, how many actually reported
@@ -79,8 +83,12 @@ func (r RecoverableRun) Label() string {
 	if q == "" {
 		q = "(question not recorded)"
 	}
-	if len(q) > 60 {
-		q = strings.TrimSpace(q[:57]) + "..."
+	// GORILLA FIX (2026-10-05): audit finding S14. This sliced BYTES (q[:57]), so
+	// a question in French, Swahili, Portuguese or Dari was cut through the
+	// middle of a character and the picker showed a broken glyph. Those are the
+	// languages this program is written for. Counted and cut in runes.
+	if r := []rune(q); len(r) > 60 {
+		q = strings.TrimSpace(string(r[:57])) + "..."
 	}
 	return fmt.Sprintf("%s  %s", r.When.Format("Jan 02 15:04"), q)
 }
@@ -122,9 +130,53 @@ func humanTokens(n int64) string {
 	return fmt.Sprintf("%.0fK tokens", float64(n)/1000)
 }
 
-// helperIDPattern matches the session ids research helpers are given:
-// call_<toolCallID>-<roleID>, where a supervisor's role id is "supervisor:x".
-var helperIDPattern = regexp.MustCompile(`^(call_[A-Za-z0-9]+)-(.+)$`)
+// helperTitlePrefix opens the title runHelper gives every helper session; the
+// rest of the title is the role id.
+const helperTitlePrefix = "Research: "
+
+const supervisorRolePrefix = "supervisor:"
+
+// splitHelperID takes a helper session id apart into the tool call it belongs
+// to and the role it ran. Helper ids are "<call id>-<role id>" (helperSessionID),
+// where a supervisor's role id is "supervisor:<role id>".
+//
+// GORILLA FIX (2026-10-05): audit finding S10. This was the pattern
+// ^(call_[A-Za-z0-9]+)-(.+)$, which guessed the alphabet of the CALL id, and
+// the guess only fitted one provider. Run against the ids the providers really
+// produce:
+//
+//   - Gemini direct, "call_" + a UUID with hyphens: cut at the FIRST hyphen, so
+//     the call id was eight characters and the role "9a4d-...-local". Every lane
+//     of a run landed in the wrong group, supervisor audits were listed as
+//     lanes, and the headings were garbage.
+//   - Anthropic and Antigravity-Claude, "toolu_...": no match at all. Those
+//     runs did not exist as far as store recovery was concerned.
+//   - any local server not using "call_" + alphanumerics: no match.
+//
+// The call id is whatever the provider says it is. The ROLE id is ours: a fixed
+// list, with no hyphen in any of them. So the id is split from the right, on a
+// role this program defines. A role that has since been retired is not in the
+// list, and for those the session title still carries the role id ("Research:
+// <role id>"), which is the last candidate tried. Neither route cares what the
+// call id looks like.
+func splitHelperID(id, title string) (callID, roleID string, ok bool) {
+	candidates := knownRoleIDs()
+	if t, found := strings.CutPrefix(title, helperTitlePrefix); found && strings.TrimSpace(t) != "" {
+		t = strings.TrimSpace(t)
+		candidates = append(candidates, strings.TrimPrefix(t, supervisorRolePrefix))
+	}
+	for _, role := range candidates {
+		// The supervisor form first: "-supervisor:local" also ends in ":local",
+		// never in "-local", so the two cannot be confused, but trying the longer
+		// suffix first keeps that true by construction rather than by luck.
+		for _, suffix := range []string{supervisorRolePrefix + role, role} {
+			if call, found := strings.CutSuffix(id, "-"+suffix); found && call != "" {
+				return call, suffix, true
+			}
+		}
+	}
+	return "", "", false
+}
 
 // ListRecoverableRuns finds every run that can still be written up: the saved
 // findings files first, then the runs that live only in the session store.
@@ -196,6 +248,7 @@ func recoverableFiles() []RecoverableRun {
 			// "## ANSWER" and "## FINDINGS" headings, so counting them read a
 			// six-lane run as thirty — measured on a recovered file.
 			run.Covered, run.Lanes = parseCoverage(s)
+			run.Doctrine = FindingsDoctrine(s)
 		}
 		out = append(out, run)
 	}
@@ -222,14 +275,13 @@ func recoverableSessions(ctx context.Context, sessions session.Service, messages
 	groups := map[string]*group{}
 
 	for _, s := range all {
-		if !strings.HasPrefix(s.Title, "Research: ") {
+		if !strings.HasPrefix(s.Title, helperTitlePrefix) {
 			continue
 		}
-		m := helperIDPattern.FindStringSubmatch(s.ID)
-		if m == nil {
+		callID, _, ok := splitHelperID(s.ID, s.Title)
+		if !ok {
 			continue
 		}
-		callID := m[1]
 		g := groups[callID]
 		if g == nil {
 			g = &group{}
@@ -254,9 +306,18 @@ func recoverableSessions(ctx context.Context, sessions session.Service, messages
 		// prompt carries it verbatim under a fixed heading, so nothing had to
 		// have been stored separately. Coverage is NOT counted here — see
 		// Detail() for why an honest "8 lanes" beats a cheap "8 of 8 reported".
+		// The doctrine is read the same way, and only a lane's own prompt states
+		// it, so the loop goes on past a supervisor until it has both.
 		for _, s := range g.lanes {
+			if run.Question != "" && run.Doctrine != "" {
+				break
+			}
+			q, d := questionFromLane(ctx, messages, s.ID)
 			if run.Question == "" {
-				run.Question = questionFromLane(ctx, messages, s.ID)
+				run.Question = q
+			}
+			if run.Doctrine == "" {
+				run.Doctrine = d
 			}
 		}
 		out = append(out, run)
@@ -267,10 +328,16 @@ func recoverableSessions(ctx context.Context, sessions session.Service, messages
 // questionFromLane pulls the investigated question back out of a helper's
 // opening instructions. Every research prompt carries it verbatim under a fixed
 // heading, so nothing has to have been stored separately for this to work.
-func questionFromLane(ctx context.Context, messages message.Service, sessionID string) string {
+//
+// The doctrine comes out of the same instructions, for the same reason: a
+// dossier helper's prompt carries the DOSSIER DISCIPLINE block and a standard
+// helper's does not. A supervisor's prompt carries the question but not that
+// block, so the doctrine is only reported from a lane's own prompt (one that
+// opens "You are helper"); from a supervisor it is "", meaning not known.
+func questionFromLane(ctx context.Context, messages message.Service, sessionID string) (question, doctrine string) {
 	msgs, err := messages.List(ctx, sessionID)
 	if err != nil {
-		return ""
+		return "", ""
 	}
 	for _, m := range msgs {
 		if m.Role != message.User {
@@ -282,10 +349,20 @@ func questionFromLane(ctx context.Context, messages message.Service, sessionID s
 			continue
 		}
 		q, _, _ := strings.Cut(after, "\n\n")
-		return strings.TrimSpace(q)
+		if strings.HasPrefix(strings.TrimSpace(text), "You are helper") {
+			doctrine = DoctrineStandard
+			if strings.Contains(text, dossierDisciplineMarker) {
+				doctrine = DoctrineDossier
+			}
+		}
+		return strings.TrimSpace(q), doctrine
 	}
-	return ""
+	return "", ""
 }
+
+// dossierDisciplineMarker is the heading dossierMethodAddendum opens with. A
+// test holds the two together.
+const dossierDisciplineMarker = "DOSSIER DISCIPLINE"
 
 // laneReport returns a helper's final written report — the last assistant
 // message that carried prose.
@@ -343,16 +420,19 @@ func RecoverFindings(ctx context.Context, run RecoverableRun, sessions session.S
 	var lanes []lane
 	audits := map[string]string{}
 
+	doctrine := run.Doctrine
 	for _, s := range all {
-		m := helperIDPattern.FindStringSubmatch(s.ID)
-		if m == nil || m[1] != run.CallID {
+		callID, roleID, ok := splitHelperID(s.ID, s.Title)
+		if !ok || callID != run.CallID {
 			continue
 		}
-		roleID := m[2]
 		report := laneReport(ctx, messages, s.ID)
-		if strings.HasPrefix(roleID, "supervisor:") {
-			audits[strings.TrimPrefix(roleID, "supervisor:")] = report
+		if strings.HasPrefix(roleID, supervisorRolePrefix) {
+			audits[strings.TrimPrefix(roleID, supervisorRolePrefix)] = report
 			continue
+		}
+		if doctrine == "" {
+			_, doctrine = questionFromLane(ctx, messages, s.ID)
 		}
 		lanes = append(lanes, lane{roleID: roleID, report: report})
 	}
@@ -363,7 +443,7 @@ func RecoverFindings(ctx context.Context, run RecoverableRun, sessions session.S
 	// Present them in the order the roles are defined, so a recovered document
 	// reads like a fresh one rather than in whatever order SQLite returned.
 	order := map[string]int{}
-	for i, r := range researchRoles {
+	for i, r := range roleLibrary(doctrine) {
 		order[r.ID] = i
 	}
 	sort.SliceStable(lanes, func(i, j int) bool {
@@ -379,7 +459,7 @@ func RecoverFindings(ctx context.Context, run RecoverableRun, sessions session.S
 	replies := make([]string, len(lanes))
 	auditList := make([]string, len(lanes))
 	for i, l := range lanes {
-		roles[i] = researchRole{ID: l.roleID, Title: roleTitle(l.roleID)}
+		roles[i] = researchRole{ID: l.roleID, Title: roleTitleIn(doctrine, l.roleID)}
 		replies[i] = l.report
 		auditList[i] = audits[l.roleID]
 	}
@@ -388,7 +468,13 @@ func RecoverFindings(ctx context.Context, run RecoverableRun, sessions session.S
 	if question == "" {
 		question = "(question not recorded)"
 	}
-	path := writeRawFindings(question, roles, replies, auditList, "dossier")
+	// GORILLA FIX (2026-10-05): audit finding S9. This passed "dossier" for every
+	// run in the store, so a recovered /research run was saved under a note
+	// saying its claims carry two-axis grades. They carry tiers. The doctrine is
+	// read from the lanes' own instructions; a run whose instructions cannot be
+	// read is saved as standard, because claiming grades that may not be there is
+	// the worse of the two mistakes.
+	path := writeRawFindings(question, roles, replies, auditList, doctrine)
 	if path == "" {
 		return "", "", fmt.Errorf("recovered the findings but could not write them to %s", config.DossierDir())
 	}
@@ -402,10 +488,20 @@ func RecoverFindings(ctx context.Context, run RecoverableRun, sessions session.S
 // roleTitle maps a stored role id back to its heading. An id that is no longer
 // a defined role still gets a usable heading rather than being dropped — the
 // roles may change, and a recovered run predates whatever they are now.
-func roleTitle(id string) string {
-	for _, r := range researchRoles {
-		if r.ID == id {
-			return r.Title
+func roleTitle(id string) string { return roleTitleIn("", id) }
+
+// roleTitleIn looks in the run's own role table first: "completeness" is a lane
+// of both, with a different heading in each.
+func roleTitleIn(doctrine, id string) string {
+	other := dossierRoles
+	if doctrine == DoctrineDossier {
+		other = researchRoles
+	}
+	for _, lib := range [][]researchRole{roleLibrary(doctrine), other} {
+		for _, r := range lib {
+			if r.ID == id {
+				return r.Title
+			}
 		}
 	}
 	return strings.ToUpper(strings.ReplaceAll(id, "_", " "))
@@ -418,7 +514,18 @@ func roleTitle(id string) string {
 // it to read the file would work, but it would also put the file through the
 // tool-result path — and a tool result is exactly the kind of bulk that put the
 // original run at 145% of its window. Inline, once, is the smaller thing.
+//
+// GORILLA FIX (2026-10-05): audit finding S9. There was one prompt, and it was
+// the dossier's: "carry every two-axis grade through UNCHANGED ... use the PHIA
+// probability yardstick ... as the findings themselves do". Every /research
+// run is told to use /osint --recover too, and its findings carry evidence
+// TIERS and no grades at all. A model handed tier-labelled findings and ordered
+// to carry their grades through has one way to comply, which is to make the
+// grades up. The prompt now follows the doctrine recorded in the findings.
 func AssemblyPrompt(question, findings, path string) string {
+	if FindingsDoctrine(findings) != DoctrineDossier {
+		return standardAssemblyPrompt(question, findings, path)
+	}
 	var b strings.Builder
 
 	b.WriteString("Assemble the finished OSINT dossier from findings that have ALREADY been collected. ")
@@ -447,6 +554,49 @@ func AssemblyPrompt(question, findings, path string) string {
 
 	fmt.Fprintf(&b, "Write the finished dossier to a NEW timestamped file under %s using the write tool, "+
 		"then tell the user the exact path and give them the BLUF in the conversation. "+
+		"Never write it into the working folder: it may be a git repository, and a private question "+
+		"must not end up in a commit.\n\n", config.DossierDir())
+
+	b.WriteString("--- FINDINGS BEGIN ---\n\n")
+	b.WriteString(findings)
+	b.WriteString("\n\n--- FINDINGS END ---\n")
+
+	return b.String()
+}
+
+// standardAssemblyPrompt is the write-up instruction for a standard research
+// run: evidence tiers, no grades, no yardstick, and an answer rather than a
+// dossier. It asks for the file in the same folder for the same reason.
+func standardAssemblyPrompt(question, findings, path string) string {
+	var b strings.Builder
+
+	b.WriteString("Write up a research run from findings that have ALREADY been collected. ")
+	b.WriteString("Do NOT research anything. Do not call the research tool. Do not search the web. ")
+	b.WriteString("The collection phase is over and was paid for; your entire job is the write-up.\n\n")
+
+	fmt.Fprintf(&b, "THE QUESTION: %s\n\n", question)
+	fmt.Fprintf(&b, "The lane reports are below, exactly as the helpers returned them. "+
+		"They were saved to %s.\n\n", path)
+
+	b.WriteString("RULES FOR THE WRITE-UP:\n")
+	b.WriteString("1. Carry every evidence TIER through UNCHANGED. A claim that arrived as single_claim " +
+		"leaves as single_claim. You did not do this research and you are not entitled to upgrade it.\n")
+	b.WriteString("2. These findings carry tiers, NOT two-axis grades and NOT probability terms. Do not add " +
+		"a letter-and-digit grade, a likelihood word or a confidence rating to any claim: none was " +
+		"assigned, and one you add now would be invented.\n")
+	b.WriteString("3. Where a lane is marked LANE UNCOVERED, say so under NOT ESTABLISHED. " +
+		"A gap reported is cheaper than a gap discovered later.\n")
+	b.WriteString("4. Where the lanes disagree, say they disagree and give both. " +
+		"Do not average two accounts into one that nobody reported.\n")
+	b.WriteString("5. Add nothing from your own knowledge. If it is not in the findings, it is not in the answer.\n\n")
+
+	b.WriteString("THE PRODUCT — write it as markdown in this order: the ANSWER (three sentences or fewer, " +
+		"each naming the evidence and tier it rests on), the FINDINGS organised by theme rather than by " +
+		"lane (each with its evidence and tier), SOURCES TRIED, and NOT ESTABLISHED (what nobody " +
+		"covered, and what it would take).\n\n")
+
+	fmt.Fprintf(&b, "Write the finished answer to a NEW timestamped file under %s using the write tool, "+
+		"then tell the user the exact path and give them the answer in the conversation. "+
 		"Never write it into the working folder: it may be a git repository, and a private question "+
 		"must not end up in a commit.\n\n", config.DossierDir())
 

@@ -123,9 +123,9 @@ func TestOsintPageRendersAndScrolls(t *testing.T) {
 	}
 	for _, want := range []string{
 		"GORILLA OSINT",
-		"STATUS:",              // armed/off state is live, not prose
-		"never cites a source", // the iron rule
-		"git repositor",        // the privacy reason, stated
+		"STATUS:",                      // armed/off state is live, not prose
+		"instructions, not guarantees", // the rules, worded as what they are (O5)
+		"git repositor",                // the privacy reason, stated
 	} {
 		if !strings.Contains(all.String(), want) {
 			t.Errorf("page content missing %q", want)
@@ -164,25 +164,47 @@ func TestOsintPageRendersAndScrolls(t *testing.T) {
 // totalling the database by hand and was within 7% — nobody else will do that.
 // His verdict on the old screen: the numbers "look deceivingly small and
 // reassuring". The token-per-hour line is the correction, so it is asserted.
+//
+// GORILLA FIX (2026-10-05): audit finding O3. This test used to assert the
+// words "measured from a real run", and they were on screen, and the number
+// beside them was the constant 21596/8 typed in from that one August run. The
+// test passed on every machine and model because it checked the label and not
+// where the figure came from. It now seeds this machine's own record and
+// checks the arithmetic, and checks that with no record the screen says so.
 func TestGateStatesTheRunSizeInTokens(t *testing.T) {
 	if _, err := config.Load(t.TempDir(), false); err != nil {
 		t.Fatalf("config.Load: %v", err)
 	}
-	d := NewOsintDialogCmp("q")
-	d.SetSize(150, 45)
-	d.agents = agent.ResearchMaxAgents
-	view := d.View()
+	seedRunHistory(t, "")
 
-	for _, want := range []string{"TOKENS PER HOUR", "measured from a real run", "tokens/min each"} {
-		if !strings.Contains(view, want) {
-			t.Errorf("gate does not state the run's size in tokens: missing %q", want)
+	d := NewOsintDialogCmp("q")
+	d.SetSize(150, 60)
+	d.agents = agent.ResearchMaxAgents
+	view := flatText(d.View())
+	if !strings.Contains(view, "NO MEASUREMENT YET") {
+		t.Errorf("with no finished run on this machine the gate must say there is no measurement:\n%s", view)
+	}
+	for _, gone := range []string{"measured from a real run", "TOKENS PER HOUR", "quarter of a million", "2,699"} {
+		if strings.Contains(view, gone) {
+			t.Errorf("the gate still shows the typed August figure (%q)", gone)
 		}
 	}
-	// The figure must scale with the run: more sessions, bigger number.
+
+	// One finished run on record: 8 sessions, 280,744 tokens, 35,093 a session.
+	seedRunHistory(t, `[{"sessions":8,"tokens_in":248122,"tokens_out":32622,"tool_calls":96,"seconds":780}]`)
+	view = flatText(d.View())
+	if !strings.Contains(view, "MEASURED: 35.1K tokens") {
+		t.Errorf("the gate does not show this machine's measured tokens per session:\n%s", view)
+	}
+	// The run's size is that figure times the sessions selected — and scales.
+	sizeOf := func(m OsintDialogCmp) string { return strings.Join(m.scaleLines(), "\n") }
+	if want := humanCount(35093 * d.sessions()); !strings.Contains(sizeOf(d), want+" tokens ("+itoaDialog(d.sessions())+" sessions)") {
+		t.Errorf("run size is not measured tokens x sessions (want %s for %d sessions):\n%s", want, d.sessions(), sizeOf(d))
+	}
 	small := NewOsintDialogCmp("q")
-	small.SetSize(150, 45)
+	small.SetSize(150, 60)
 	small.agents = agent.ResearchMinAgents
-	if small.scaleLines()[0] == d.scaleLines()[0] {
+	if sizeOf(small) == sizeOf(d) {
 		t.Errorf("the token figure does not change between %d and %d helpers — it is decoration, not a measurement",
 			agent.ResearchMinAgents, agent.ResearchMaxAgents)
 	}

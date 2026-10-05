@@ -168,11 +168,23 @@ func TestEachDepthDeclaresWhatItSkipped(t *testing.T) {
 		"trust": map[string]any{"tools_ran": []string{"gofmt"}},
 	})
 
-	quick, err := summariseReview(raw, "quick")
+	// The quick report carries the run's own depth block. Since 2026-10-05 the
+	// "skipped entirely" sentence is only printed when the run confirms it —
+	// see TestQuickClaimIsOnlyMadeWhenTheRunConfirmsIt for the other half.
+	rawQuick := mustJSON(t, map[string]any{
+		"target": "/src", "findings": []map[string]any{}, "corroborated": []map[string]any{},
+		"trust": map[string]any{"tools_ran": []string{"gofmt"}},
+		"depth": map[string]any{
+			"mode": "quick", "categories_run": []string{"recon", "lint", "format"},
+			"categories_skipped":     []string{"secrets", "security", "static-analysis"},
+			"tools_skipped_by_depth": []string{"gosec", "staticcheck"},
+		},
+	})
+	quick, err := summariseReview(rawQuick, "quick")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"DEPTH: quick", "SKIPPED ENTIRELY", "cannot have found"} {
+	for _, want := range []string{"DEPTH: quick", "SKIPPED ENTIRELY", "cannot have found", "gosec", "staticcheck"} {
 		if !strings.Contains(quick, want) {
 			t.Errorf("a quick pass does not admit what it skipped — missing %q", want)
 		}

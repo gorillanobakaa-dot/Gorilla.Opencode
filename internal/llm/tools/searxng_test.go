@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -295,12 +297,115 @@ func TestWebSearchRefusesUnconfiguredWebBeforeAskingPermission(t *testing.T) {
 	// It must offer the CHEAP route (lynx) as well as the good one, use a
 	// non-blocking sudo, and give a paste-able fallback: a sudo password prompt
 	// inside the agent's shell has no way to be answered and would hang.
-	for _, want := range []string{
-		"not configured", "sudo -n apt-get install -y lynx", "sudo apt install lynx",
-		"setup-searxng.sh", "do not improvise", "web_fetch",
-	} {
+	//
+	// GORILLA FIX (2026-10-05): the commands are the ones for THIS operating
+	// system. The list used to be the Debian one on every platform, and it passed
+	// on Windows, which is how a Windows model came to be told to run apt-get.
+	// Both branches are asserted in full by the test below; this one proves the
+	// branch that reaches the model is the one for the machine it is on.
+	want := []string{"not configured", "do not improvise", "web_fetch"}
+	if runtime.GOOS == "windows" {
+		want = append(want, "scoop install lynx")
+	} else {
+		want = append(want, "sudo -n apt-get install -y lynx", "sudo apt install lynx", "setup-searxng.sh")
+	}
+	for _, want := range want {
 		if !strings.Contains(strings.ToLower(resp.Content), want) {
 			t.Errorf("refusal text must mention %q so the user can fix it; got:\n%s", want, resp.Content)
+		}
+	}
+}
+
+// Audit finding S7. The refusal text was one constant written on Debian. On
+// Windows every instruction in it was inapplicable: `sudo -n apt-get install -y
+// lynx` and `/usr/share/gorilla-opencode/setup-searxng.sh`. It also carried a
+// typed "about five seconds, 641 KB" that nobody measured on the reader's link.
+func TestWebSearchSetupInstructionsFitTheOperatingSystem(t *testing.T) {
+	win := searxngSetupFor("windows")
+	for _, gone := range []string{"sudo", "apt-get", "apt install", "/usr/share", "setup-searxng.sh", ".deb"} {
+		if strings.Contains(win, gone) {
+			t.Errorf("the Windows instructions still contain %q, which cannot work on Windows", gone)
+		}
+	}
+	for _, want := range []string{"scoop install lynx", "NO SearXNG installer for Windows", searxngEnvVar, "searxngURL", "NOT install scoop yourself"} {
+		if !strings.Contains(win, want) {
+			t.Errorf("the Windows instructions are missing %q", want)
+		}
+	}
+
+	linux := searxngSetupFor("linux")
+	for _, want := range []string{"sudo -n apt-get install -y lynx", "sudo apt install lynx", "/usr/share/gorilla-opencode/setup-searxng.sh", "pyyaml"} {
+		if !strings.Contains(linux, want) {
+			t.Errorf("the Linux instructions lost %q", want)
+		}
+	}
+	if strings.Contains(linux, "scoop") {
+		t.Error("the Linux instructions mention scoop")
+	}
+
+	typed := regexp.MustCompile(`(?i)\b\d+(\.\d+)?\s*(KB|MB|GB|seconds?|minutes?)\b|five seconds|couple of minutes`)
+	for goos, text := range map[string]string{"windows": win, "linux": linux, "darwin": searxngSetupFor("darwin")} {
+		if m := typed.FindString(text); m != "" {
+			t.Errorf("%s: the instructions state a size or duration nobody measured: %q", goos, m)
+		}
+		// What every branch must still do, whatever the platform.
+		for _, want := range []string{"NOT configured", "Do not answer from memory", "no card", "web_fetch", "lynx"} {
+			if !strings.Contains(text, want) {
+				t.Errorf("%s: the instructions are missing %q", goos, want)
+			}
+		}
+		// The closing list of sources that still work is the real one.
+		for _, s := range KeylessSearchSources() {
+			if !strings.Contains(text, s) {
+				t.Errorf("%s: does not say that source %q still works", goos, s)
+			}
+		}
+	}
+	if searxngSetup() != searxngSetupFor(runtime.GOOS) {
+		t.Error("the text the tool returns is not the one for this operating system")
+	}
+}
+
+// Audit finding S13. Three texts each typed the list of keyless sources, or its
+// length, and none matched the dispatch: "seven", and two lists of six. The
+// list is now one variable; this holds it to the code that serves the sources
+// and to the description the model reads.
+func TestWebSearchSourceListMatchesTheDispatch(t *testing.T) {
+	src, err := os.ReadFile("websearch.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := string(src)
+	for _, s := range webSearchSources {
+		if !strings.Contains(code, `case "`+s+`":`) {
+			t.Errorf("source %q is offered to the model but no case serves it", s)
+		}
+		if !regexp.MustCompile(`(?m)^  ` + s + `\b`).MatchString(webSearchDescriptionBase) {
+			t.Errorf("source %q is offered but the description does not explain it", s)
+		}
+	}
+	// And nothing is served that is not offered.
+	for _, m := range regexp.MustCompile(`(?m)^\tcase "([a-z]+)":$`).FindAllStringSubmatch(code, -1) {
+		found := false
+		for _, s := range webSearchSources {
+			found = found || s == m[1]
+		}
+		if !found {
+			t.Errorf("the dispatch serves %q, which is not in webSearchSources", m[1])
+		}
+	}
+
+	enum, _ := (&webSearchTool{}).Info().Parameters["source"].(map[string]any)["enum"].([]string)
+	if len(enum) != len(webSearchSources) {
+		t.Errorf("the schema offers %d sources, the list has %d", len(enum), len(webSearchSources))
+	}
+	keyless := KeylessSearchSources()
+	if len(keyless) != len(webSearchSources)-2 {
+		t.Errorf("keyless sources = %d, want every source except web and all (%d)", len(keyless), len(webSearchSources)-2)
+	}
+	for _, s := range keyless {
+		if s == "web" || s == "all" {
+			t.Errorf("%q is listed as a keyless source", s)
 		}
 	}
 }

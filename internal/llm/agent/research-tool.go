@@ -51,8 +51,10 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
@@ -229,8 +231,180 @@ var researchRoles = []researchRole{
 	},
 }
 
+// dossierRoles is the role library a DOSSIER run uses instead of researchRoles.
+// Same structure and the same rule: the first four are mandatory and always
+// run, in this order; the rest are added as the agent budget allows.
+//
+// GORILLA FIX (2026-10-05): audit finding O1. /osint promised a professional
+// assessment of ANY question and ran the software-engineering lanes above for
+// every one of them, because selectRoles read one table whatever the doctrine.
+// A dossier on a health or money question therefore paid a full model session
+// for LOCAL ("search THIS machine and THIS project, installed packages"),
+// another for PRIOR ART (repositories and issue trackers) and another for
+// REQUIREMENT ("its feature detection, its API contract"). At four helpers
+// every lane was the wrong shape and one of them was reading the user's disk
+// on behalf of a question about the world.
+//
+// These lanes are cut by KIND OF SOURCE, which is what "all-source" means: the
+// record, the literature, the reporting, and the case against. No lane here
+// may search the user's own machine, and dossier helpers are not handed the
+// tools to do it (see dossierHelperTools) — an instruction alone would be one
+// more unverified promise.
+//
+// The peeking lanes sit at positions 5 and 10, the same positions the
+// standard table has them, so a supervised dossier audits the same number of
+// lanes as a supervised research run of the same size. That is a convenience,
+// not an invariant: every forecast asks RunShapeFor with the doctrine.
+//
+// Role ids contain no hyphen, here or above. Helper session ids are
+// "<call id>-<role id>" and recovery splits on that; see splitHelperID.
+var dossierRoles = []researchRole{
+	{
+		ID:    "official",
+		Title: "OFFICIAL RECORD — what the primary and official sources say",
+		Lane: "Go to the bodies that hold the record itself: legislation and regulations, court and " +
+			"regulator filings, government and intergovernmental statistics, standards, registries, and " +
+			"the named organisation's own published documents. Quote them with URL and date. Where a " +
+			"summary and the record disagree, the record wins and you say so. State the jurisdiction and " +
+			"the date each document applies to.",
+		Prevents: "A dossier built on what people say a document says, when the document was one fetch away.",
+	},
+	{
+		ID:    "scholarly",
+		Title: "SCHOLARLY AND DATA — what the research literature and the datasets show",
+		Lane: "Search the peer-reviewed literature and the open datasets: systematic reviews before single " +
+			"studies, the dataset before the article quoting it. For each result state the study type, " +
+			"the sample or coverage, the year, and whether it is peer reviewed or a preprint. Report " +
+			"figures and ranges as the source gives them; do not round a hedge into a certainty.",
+		Prevents: "One striking study standing in for a literature that does not agree with it.",
+	},
+	{
+		ID:    "reporting",
+		Title: "REPORTING — news and contemporaneous accounts",
+		Lane: "Find what was reported at the time and since: news coverage, press statements, situation " +
+			"reports, dated first-hand accounts. Build the dated sequence of who reported what, and when. " +
+			"For each item name the outlet, the date, and whether it did its own reporting or is " +
+			"repeating a wire, a press release or another outlet.",
+		Prevents: "Treating the most recent or most repeated account as the best one.",
+	},
+	{
+		ID:    "dissent",
+		Title: "COUNTER-EVIDENCE — the strongest case against the obvious answer",
+		Lane: "Assume the answer the other lanes are likely to reach is wrong. Search for the evidence, " +
+			"the credible critics and the data that contradict it: retractions, corrections, failed " +
+			"replications, minority reports, official denials, and the affected party's own account. " +
+			"Report the strongest opposing case at full strength, graded on its own evidence, and say " +
+			"plainly if an honest search found none.",
+		Prevents: "A confident assessment that never met the evidence against it.",
+	},
+	{
+		ID:    "provenance",
+		Title: "PROVENANCE — where each claim originally came from",
+		Lane: "You are given the other helpers' findings. For every load-bearing claim, trace it to its " +
+			"ULTIMATE ORIGIN: the first observer, document or dataset. Say which claims that look " +
+			"independently confirmed in fact descend from one origin (circular reporting), which sources " +
+			"have an interest in the answer, and which claims you could not trace at all. Lower the " +
+			"credibility digit of any claim whose confirmations are not independent, and say that you did.",
+		Prevents: "Ten outlets repeating one press release being counted as ten confirmations.",
+	},
+	{
+		ID:    "chronology",
+		Title: "CHRONOLOGY — what changed, and when",
+		Lane: "Establish the dated sequence that bears on the question: when each rule, figure, policy or " +
+			"state of affairs began, changed or ended, and which version is in force now. Report every " +
+			"fact with the date it was true. Where two sources disagree, check first whether they simply " +
+			"describe different dates.",
+		Prevents: "An answer that was correct for a situation that no longer exists.",
+	},
+	{
+		ID:    "interests",
+		Title: "INTERESTS — who is speaking, and what they gain",
+		Lane: "Identify the parties with a stake in the answer: who funds, owns, regulates, sells or " +
+			"campaigns. For each, find what they have said on the record and what they gain or lose by " +
+			"it, from sources other than themselves where possible. A source with an interest is not " +
+			"thereby wrong; it is graded with the interest stated.",
+		Prevents: "An advocate's account being read as a neutral one because nobody asked who was paying.",
+	},
+	{
+		ID:    "baseline",
+		Title: "BASELINE — how often, how much, compared with what",
+		Lane: "Find the base rates and comparators that give the question its scale: how common, how " +
+			"large, how this case compares with the same measure elsewhere or at another time. Take the " +
+			"figures from statistical offices and datasets, with the year and the definition used. A " +
+			"number with no denominator is reported as such.",
+		Prevents: "A figure that sounds alarming or reassuring only because nothing was put beside it.",
+	},
+	{
+		ID:    "practical",
+		Title: "PRACTICAL — what a person acting on this would run into",
+		Lane: "Find what the sources say about acting on each candidate answer: cost, eligibility, " +
+			"waiting times, legal limits, known risks, and how these differ by country or jurisdiction. " +
+			"Take it from the bodies that administer the thing and from documented experience, not from " +
+			"your own judgement of what is sensible.",
+		Prevents: "An assessment that is correct and of no use to the person who asked.",
+	},
+	{
+		ID:    "completeness",
+		Title: "COMPLETENESS CRITIC — what did nobody look at",
+		Lane: "You are given the other helpers' findings. Do not summarise them. Name what was NOT covered: " +
+			"a kind of source unread, a claim untested, an obvious explanation nobody considered, a " +
+			"party nobody heard from. Then name the single cheapest search that would most reduce the " +
+			"remaining uncertainty.",
+		Prevents: "A thorough-looking investigation with a hole in the middle.",
+	},
+}
+
+// DoctrineDossier is the doctrine string of a dossier run. The empty string is
+// the everyday run.
+const DoctrineDossier = "dossier"
+
+// roleLibrary returns the role table a run of this doctrine draws from.
+func roleLibrary(doctrine string) []researchRole {
+	if doctrine == DoctrineDossier {
+		return dossierRoles
+	}
+	return researchRoles
+}
+
+// knownRoleIDs is every role id either table defines, without duplicates.
+func knownRoleIDs() []string {
+	seen := map[string]bool{}
+	var ids []string
+	for _, lib := range [][]researchRole{researchRoles, dossierRoles} {
+		for _, r := range lib {
+			if !seen[r.ID] {
+				seen[r.ID] = true
+				ids = append(ids, r.ID)
+			}
+		}
+	}
+	return ids
+}
+
+func roleIDs(lib []researchRole) []string {
+	ids := make([]string, len(lib))
+	for i, r := range lib {
+		ids[i] = r.ID
+	}
+	return ids
+}
+
+// DossierLaneTitles is the lane headings of a dossier run of n helpers, in the
+// order they run. The /osint page prints these rather than typing a list that
+// would describe some other program by the next release.
+func DossierLaneTitles(n int) []string {
+	roles, _ := selectRolesFor(DoctrineDossier, "", n)
+	titles := make([]string, len(roles))
+	for i, r := range roles {
+		titles[i] = r.Title
+	}
+	return titles
+}
+
 // Roles that must be given the other helpers' findings to do their job.
-func rolePeeksAtOthers(id string) bool { return id == "verifier" || id == "completeness" }
+func rolePeeksAtOthers(id string) bool {
+	return id == "verifier" || id == "completeness" || id == "provenance"
+}
 
 // SupervisedSessions reports what a supervised run of n helpers ACTUALLY costs,
 // in sessions, and how many lanes really get audited.
@@ -251,7 +425,13 @@ func rolePeeksAtOthers(id string) bool { return id == "verifier" || id == "compl
 // how "DOUBLE / every lane checked twice" got printed over a run that does
 // neither.
 func SupervisedSessions(n int) (sessions, audited int) {
-	roles, _ := selectRoles("", n)
+	return SupervisedSessionsFor("", n)
+}
+
+// SupervisedSessionsFor is SupervisedSessions for a named doctrine, so the
+// /osint gate counts the dossier's lanes rather than the standard ones.
+func SupervisedSessionsFor(doctrine string, n int) (sessions, audited int) {
+	roles, _ := selectRolesFor(doctrine, "", n)
 	audited = auditableLanes(roles)
 	return len(roles) + audited, audited
 }
@@ -287,10 +467,33 @@ func auditableLanes(roles []researchRole) int {
 // first, and under supervision the auditors are a whole extra pass over the
 // blind lanes.
 //
-// The seconds are only as good as ResearchSecondsPerStep, which is an
-// ASSUMPTION and is labelled as one on screen. The batch COUNT is exact.
+// The batch COUNT is exact. The seconds come from secondsPerBatch: measured on
+// this machine once enough helpers have been timed, assumed until then, and the
+// screen says which.
 func RunShape(mode string, n int) (sessions, audited, batches int, seconds float64) {
-	roles, _ := selectRoles("", n)
+	return RunShapeFor("", mode, n)
+}
+
+// secondsPerBatch is how long one batch of helpers takes: about as long as one
+// helper, because a batch runs concurrently.
+//
+// GORILLA FIX (2026-10-05): audit finding S3. RunShape multiplied batches by
+// ResearchStepsPerHelper x ResearchSecondsPerStep, the invented 15 seconds,
+// and never looked at config.MeasuredSecondsPerHelper. So the /research screen
+// printed "THIS RUN ... 45s of running" and a per-minute rate derived from it,
+// and a few lines lower "MEASURED: Ns per helper" from this machine's own runs,
+// and the two did not agree. The measured median is the duration of a helper,
+// which is the duration of a batch, so it is used directly when it exists.
+func secondsPerBatch() (seconds float64, measured bool) {
+	if secs, _, ok := config.MeasuredSecondsPerHelper(); ok && secs > 0 {
+		return secs, true
+	}
+	return float64(config.ResearchStepsPerHelper) * config.ResearchSecondsPerStep, false
+}
+
+// RunShapeFor is RunShape for a named doctrine.
+func RunShapeFor(doctrine, mode string, n int) (sessions, audited, batches int, seconds float64) {
+	roles, _ := selectRolesFor(doctrine, "", n)
 	audited = auditableLanes(roles)
 	peeking := len(roles) - audited
 
@@ -313,8 +516,27 @@ func RunShape(mode string, n int) (sessions, audited, batches int, seconds float
 	}
 	batches += ceilDiv(peeking, width)
 
-	seconds = float64(batches) * float64(config.ResearchStepsPerHelper) * config.ResearchSecondsPerStep
+	perBatch, _ := secondsPerBatch()
+	seconds = float64(batches) * perBatch
 	return sessions, audited, batches, seconds
+}
+
+// PeakInFlight is how many helpers can be running at one moment for a run of
+// this many sessions in this mode. Both cost gates ask here.
+//
+// GORILLA FIX (2026-10-05): audit findings S6 and O7. The /research screen typed
+// `inFlight := 4`, the cap this file abandoned on 2026-08-14, while the /osint
+// gate used min(sessions, ResearchMaxInFlight). Two screens priced one engine
+// two ways. Neither was the scheduler's figure: the widest wave is the blind
+// lanes, since the auditors and the peeking lanes only start after them.
+func PeakInFlight(doctrine, mode string, helpers int) int {
+	if mode == ModeSequential {
+		return 1
+	}
+	roles, _ := selectRolesFor(doctrine, "", helpers)
+	blind := auditableLanes(roles)
+	widest := max(blind, len(roles)-blind)
+	return max(1, min(widest, ResearchMaxInFlight))
 }
 
 // Execution modes. Sequential is concurrency of 1, so all three share one
@@ -383,8 +605,34 @@ verdict is REJECTED, write "nothing from this lane".`,
 // minimalism for research runs, which are manually triggered and budgeted.
 // Regenerate from the registry when it changes; TestSourceAtlas guards shape.
 //
+// GORILLA FIX (2026-10-05): audit findings S11 and O4. The atlas told every
+// helper "the full 985-source registry ships in docs/". It does not ship: only
+// this file is embedded, and an installed copy is one executable with no docs
+// folder beside it. A helper was being pointed at a file that is not there.
+// The user-facing texts made the matching claim from the other side ("hundreds
+// of real sources", "a 985-source registry"). What a helper is actually given
+// is the entries below, and SourceAtlasCount is how anything that wants to
+// state a number gets it.
+//
 //go:embed source-atlas.txt
 var sourceAtlas string
+
+// atlasEntry matches one source line of the atlas: two spaces of indent, a
+// name, then its "[grade reach]" tag. Continuation lines are indented further
+// and section headings are not indented at all.
+var atlasEntry = regexp.MustCompile(`(?m)^  \S.*?\[[A-F] ([^\]]+)\]`)
+
+// SourceAtlasCount reports how many sources ride in every helper prompt, and
+// how many of those need a free registration key before they answer.
+func SourceAtlasCount() (total, needKey int) {
+	for _, m := range atlasEntry.FindAllStringSubmatch(sourceAtlas, -1) {
+		total++
+		if strings.Contains(m[1], "API-key") {
+			needKey++
+		}
+	}
+	return total, needKey
+}
 
 // researchMethod is the collection cycle every helper works, injected into
 // every helper prompt.
@@ -400,16 +648,29 @@ var sourceAtlas string
 // imposed here. The audit of Anthropic's own prompts (2026-08-17) found the
 // same hole from the other side: vet: 0, credib: 0 occurrences — their
 // collector carries no vetting instructions at all.
-func researchMethod(steps int) string {
+//
+// GORILLA FIX (2026-10-05): two typed facts removed. The keyless source list
+// was six names here and "seven" in the tool description (audit finding S13);
+// web_search actually serves more than either, so the list is now read from
+// tools.KeylessSearchSources. And a dossier helper was told to "check this
+// machine before the web" (audit finding O1), on a question about the world.
+func researchMethod(steps int, doctrine string) string {
+	local := `   - find: THIS machine — code, docs, configs, installed tools. Check here
+     before the web; the answer already being on disk is common.`
+	if doctrine == DoctrineDossier {
+		local = `   - THIS MACHINE IS OUT OF BOUNDS. The question is about the world, not
+     about this computer. You have no tool that reads or searches local
+     files, and you must not ask for one.`
+	}
 	return fmt.Sprintf(`METHOD — work this cycle, in order:
 
 1. DIRECTION. From your lane, write down the two to four specific questions you
    must answer. Every tool call serves one of them.
 2. COLLECTION. Your tools and what each is for:
-   - find: THIS machine — code, docs, configs, installed tools. Check here
-     before the web; the answer already being on disk is common.
-   - web_search: sources scholar / medical / crossref / openaccess / books /
-     reference work with no key. source web is the user's private search
+%s
+   - web_search: these sources work with no key:
+     %s.
+     source web is the user's private search
      engine; the tool says if it is missing. Start with one or two BROAD
      queries to map the ground, then narrow. Short queries beat long ones.
    - web_fetch: read a page you already have the address of.
@@ -423,7 +684,7 @@ func researchMethod(steps int) string {
    about %d tool calls from you. When two consecutive calls add nothing new,
    stop and write up — searching past that point is spend, not diligence.
    Absence after an honest search is a reportable finding.
-`, steps)
+`, local, strings.Join(tools.KeylessSearchSources(), " / "), steps)
 }
 
 const researchOutputContract = `
@@ -495,7 +756,18 @@ func (r *researchTool) Info() tools.ToolInfo {
 // tool.dossier row — inflating the /context header total by ~163. Same
 // double-count class as the research basis figure fixed on 2026-08-14: two
 // rows must measure disjoint things or the total is fiction.
+//
+// GORILLA FIX (2026-10-05): audit findings S4 and S13. The text told the model
+// that supervised "audits each lane" and "roughly doubles" the cost, which the
+// comment on SupervisedSessions had already recorded as false above four
+// helpers, and that web_search has "seven keyless scholarly sources" where the
+// method text listed six. The session counts and the source count below are
+// now computed from the scheduler and from web_search's own list.
 func (r *researchTool) infoBase() tools.ToolInfo {
+	minSup, _ := SupervisedSessions(ResearchMinAgents)
+	maxSup, maxAudited := SupervisedSessions(ResearchMaxAgents)
+	supervisedCost := fmt.Sprintf("%d helpers become %d sessions, %d become %d (%d of the %d lanes audited)",
+		ResearchMinAgents, minSup, ResearchMaxAgents, maxSup, maxAudited, ResearchMaxAgents)
 	info := tools.ToolInfo{
 		Name: ResearchToolName,
 		Description: "Investigate a question with several helper agents in fixed, non-overlapping roles, " +
@@ -510,17 +782,19 @@ func (r *researchTool) infoBase() tools.ToolInfo {
 			"pages, and read the filesystem; they cannot modify anything.\n\n" +
 			"MODES. 'parallel' (default) runs helpers concurrently — 6 helpers take about as long as the " +
 			"slowest one. 'sequential' runs them one at a time. 'supervised' adds a second agent that audits " +
-			"each lane before you see it and returns APPROVED/WEAK/REJECTED.\n\n" +
+			"each BLIND lane before you see it and returns APPROVED/WEAK/REJECTED. The lanes that read the " +
+			"others' work (VERIFIER, COMPLETENESS CRITIC) are not audited.\n\n" +
 			"SCALE THE RUN TO THE QUESTION before choosing agents: a single factual question with one likely " +
 			"answer = 4 (the mandatory lanes); a comparison or 'which approach' question = 5-6, adding verifier " +
 			"and cost; an open-ended investigation or one where being wrong is expensive = 7+ and consider " +
 			"mode=supervised. Over-spawning is the main way this tool wastes the user's money.\n\n" +
 			"Helpers carry the find tool (local search: ranked, with context lines) and web_search " +
-			"(seven keyless scholarly sources, plus the user's private SearXNG when configured), and follow a " +
+			fmt.Sprintf("(%d sources that need no key, plus the user's private SearXNG when configured), and follow a ",
+				len(tools.KeylessSearchSources())) +
 			"collection method: direction, broad-then-narrow collection, source vetting, an explicit stop " +
 			"condition, and a SOURCES TRIED log including queries that returned nothing.\n\n" +
 			"COST. Parallel is faster, NOT cheaper: 6 helpers is still 6 LLM sessions and 6x the tokens, and " +
-			"'supervised' roughly doubles that again. Ask for 4 unless the question genuinely spans more " +
+			"'supervised' adds one more session per audited lane: " + supervisedCost + ". Ask for 4 unless the question genuinely spans more " +
 			"ground. Helpers use the 'research' agent model from config, which you can point at a cheaper " +
 			"model than the coder.\n\n" +
 			"YOU are the orchestrator. This tool returns each helper's findings with their evidence tiers; " +
@@ -551,15 +825,15 @@ func (r *researchTool) infoBase() tools.ToolInfo {
 				"description": "How helpers run. 'parallel' (default) runs them concurrently, so the wall-clock " +
 					"is the slowest helper rather than the sum — same token cost, much less waiting. " +
 					"'sequential' runs one at a time: slower, but easier to follow and gentler on a " +
-					"rate-limited key. 'supervised' is parallel PLUS a second agent auditing each lane's " +
+					"rate-limited key. 'supervised' is parallel PLUS a second agent auditing each blind lane's " +
 					"report before you see it, returning APPROVED / WEAK / REJECTED with the problems named — " +
-					"roughly DOUBLE the sessions and the tokens, for when being wrong is expensive.",
+					"up to DOUBLE the sessions and the tokens (" + supervisedCost + "), for when being wrong is expensive.",
 			},
 			"roles": map[string]any{
 				"type": "string",
 				"description": "Optional comma-separated role IDs to run instead of the default set: " +
-					"local, prior_art, primary_source, requirement, verifier, cost, history, sidestep, " +
-					"adversary, completeness. The count still clamps to the 4..10 bounds.",
+					strings.Join(roleIDs(researchRoles), ", ") +
+					fmt.Sprintf(". The count still clamps to the %d..%d bounds.", ResearchMinAgents, ResearchMaxAgents),
 			},
 		},
 		Required: []string{"question"},
@@ -579,16 +853,29 @@ func (r *researchTool) infoWithDoctrine(base tools.ToolInfo) tools.ToolInfo {
 // addDoctrine applies the marginal schema unconditionally. Split out so the
 // cost can be measured without consulting — or disturbing — the loadout.
 func addDoctrine(base tools.ToolInfo) tools.ToolInfo {
-	base.Description += dossierSchemaBlurb
+	base.Description += dossierSchemaBlurb()
 	base.Parameters["doctrine"] = dossierParamSchema()
 	return base
 }
 
-// selectRoles picks the roles to run. Explicit IDs win; otherwise the library
-// order is taken, which puts the four mandatory lanes first by construction.
+// selectRoles picks the roles of a standard run. Explicit IDs win; otherwise
+// the library order is taken, which puts the four mandatory lanes first by
+// construction.
 func selectRoles(spec string, want int) ([]researchRole, string) {
-	byID := make(map[string]researchRole, len(researchRoles))
-	for _, role := range researchRoles {
+	return selectRolesFor("", spec, want)
+}
+
+// selectRolesFor picks the roles to run from the doctrine's own library.
+//
+// GORILLA FIX (2026-10-05): audit finding O1. There was one library, so a
+// dossier ran the software-engineering lanes. An id from the OTHER library is
+// refused by name rather than honoured: honouring "local" on a dossier run is
+// the exact fault being fixed, and it must not come back through the `roles`
+// parameter.
+func selectRolesFor(doctrine, spec string, want int) ([]researchRole, string) {
+	library := roleLibrary(doctrine)
+	byID := make(map[string]researchRole, len(library))
+	for _, role := range library {
 		byID[role.ID] = role
 	}
 
@@ -604,14 +891,15 @@ func selectRoles(spec string, want int) ([]researchRole, string) {
 			}
 			role, ok := byID[id]
 			if !ok {
-				notes = append(notes, fmt.Sprintf("unknown role %q ignored", id))
+				notes = append(notes, fmt.Sprintf("unknown role %q ignored (this run's roles are: %s)",
+					id, strings.Join(roleIDs(library), ", ")))
 				continue
 			}
 			seen[id] = true
 			chosen = append(chosen, role)
 		}
 		// Top up from the library so the mandatory lanes are never silently lost.
-		for _, role := range researchRoles {
+		for _, role := range library {
 			if len(chosen) >= want {
 				break
 			}
@@ -622,7 +910,7 @@ func selectRoles(spec string, want int) ([]researchRole, string) {
 			}
 		}
 	} else {
-		chosen = append(chosen, researchRoles...)
+		chosen = append(chosen, library...)
 	}
 
 	if len(chosen) > want {
@@ -649,7 +937,7 @@ func buildPrompt(role researchRole, question, sharedContext, peerFindings string
 		fmt.Fprintf(&b, "THE OTHER HELPERS REPORTED THE FOLLOWING. Your job is to test it, not to agree with it:\n%s\n\n", peerFindings)
 	}
 
-	b.WriteString(researchMethod(config.ResearchStepsPerHelper))
+	b.WriteString(researchMethod(config.ResearchStepsPerHelper, doctrine))
 	if doctrine == "dossier" {
 		b.WriteString(dossierMethodAddendum)
 	}
@@ -666,11 +954,24 @@ func buildPrompt(role researchRole, question, sharedContext, peerFindings string
 // dossierSchemaBlurb and dossierParamSchema are the marginal schema the model
 // sees ONLY while the /context dossier row is armed — the everyday loadout
 // does not pay for a feature that is switched off.
-const dossierSchemaBlurb = "\n\nDOSSIER DOCTRINE (armed on this install). Pass doctrine=\"dossier\" ONLY when the user " +
-	"chose it through /osint — never volunteer it, the run costs several times an ordinary question. " +
-	"It switches helpers to two-axis intelligence grading (source reliability A-F x information " +
-	"credibility 1-6), adds a bounded gap round, and your synthesis must follow the dossier product " +
-	"format the tool's report will spell out."
+//
+// GORILLA FIX (2026-10-05): audit findings O1 and O2. This said the doctrine
+// "adds a bounded gap round". Nothing added one: the round is a follow-up call
+// the model may make, and nothing bounded it either. The bound now exists
+// (reserveDossierCall) and the text says what the code does. The dossier lanes
+// are named from their own table, because the `roles` parameter above lists
+// the standard ids and those are refused on a dossier run.
+func dossierSchemaBlurb() string {
+	return "\n\nDOSSIER DOCTRINE (armed on this install). Pass doctrine=\"dossier\" ONLY when the user " +
+		"chose it through /osint — never volunteer it, the run costs several times an ordinary question. " +
+		"It replaces the lanes above with open-source lanes that never touch this machine (role ids: " +
+		strings.Join(roleIDs(dossierRoles), ", ") + "), switches helpers to two-axis intelligence " +
+		"grading (source reliability A-F x information credibility 1-6), and your synthesis must follow " +
+		"the dossier product format the tool's report will spell out. " +
+		fmt.Sprintf("You MAY make ONE follow-up dossier call per question to close a load-bearing gap; "+
+			"the tool holds it to %d helpers in the first call's mode and refuses any call after it.",
+			ResearchMinAgents)
+}
 
 func dossierParamSchema() map[string]any {
 	return map[string]any{
@@ -802,16 +1103,12 @@ two are separate claims; do not average them into one word.`,
 
 // dossierDutiesFooter is appended to the tool's report on dossier runs: the
 // gap round (bounded, so the loop cannot run away with the user's money) and
-// the product format the synthesis must follow. %s is the dossier directory.
+// the product format the synthesis must follow. The first %s is the gap-round
+// duty for this call (see gapRoundDuty), the second the dossier directory.
 const dossierDutiesFooter = `
 ## DOSSIER DUTIES — this was a dossier run, three more obligations
 
-1. GAP ROUND (bounded). Collect every NOT ESTABLISHED entry above. If any of
-   them is LOAD-BEARING for the answer, you may call the research tool ONCE
-   more: doctrine="dossier", agents=4 or fewer, roles chosen to target the
-   named gaps, and the gaps pasted into context. ONE follow-up call is the
-   ceiling — the user priced this run at the warning screen, not an open loop.
-   If the gaps are not load-bearing, say so and skip the round.
+%s
 
 2. THE PRODUCT. Assemble the assessment in exactly this shape:
    # All-Source Assessment: <the question>
@@ -842,6 +1139,126 @@ const dossierDutiesFooter = `
    repositories, and a private question must never end up in a public commit.
    In the conversation, give the bottom line and key findings only.
 `
+
+// DossierCallsPerQuestion is how many dossier calls one question may make: the
+// run the user priced on the warning screen, and one follow-up.
+const DossierCallsPerQuestion = 2
+
+// DossierFollowUpSessions is the most a follow-up call can add to a dossier
+// run in this mode, in sessions. The cost gate prints it, so it is computed
+// from the same clamp reserveDossierCall applies.
+func DossierFollowUpSessions(mode string) int {
+	sessions, _, _, _ := RunShapeFor(DoctrineDossier, mode, ResearchMinAgents)
+	return sessions
+}
+
+// dossierTurn is what one conversation has spent of its dossier allowance on
+// the question currently being answered.
+type dossierTurn struct {
+	turn  string // id of the user message the calls belong to
+	calls int
+	mode  string // the first call's mode; the follow-up is held to it
+}
+
+var (
+	dossierMu    sync.Mutex
+	dossierTurns = map[string]*dossierTurn{}
+)
+
+// reserveDossierCall counts a dossier call against its question and reports
+// which call this is. ok is false when the allowance is spent.
+//
+// GORILLA FIX (2026-10-05): audit finding O2. The report told the model "ONE
+// follow-up call is the ceiling — the user priced this run at the warning
+// screen, not an open loop", and nothing in Go counted anything: a second, a
+// third and a tenth dossier call passed exactly the checks the first did. The
+// ceiling was a sentence. The warning screen priced one run and the loop was
+// open.
+//
+// A "question" is one user message: the allowance resets when the user speaks
+// again, because that is the user deciding to spend more, which is theirs to
+// decide. It does not reset on the model's own steps.
+//
+// firstMode is returned so the caller can hold the follow-up to the mode the
+// user chose. Without that a parallel run could be followed by a supervised
+// one, and the figure printed on the gate would be short by the auditors.
+func reserveDossierCall(sessionID, turn, mode string) (ordinal int, firstMode string, ok bool) {
+	dossierMu.Lock()
+	defer dossierMu.Unlock()
+	t := dossierTurns[sessionID]
+	if t == nil || t.turn != turn {
+		t = &dossierTurn{turn: turn, mode: mode}
+		dossierTurns[sessionID] = t
+	}
+	if t.calls >= DossierCallsPerQuestion {
+		return t.calls, t.mode, false
+	}
+	t.calls++
+	return t.calls, t.mode, true
+}
+
+// dossierTurnKey identifies the question a tool call belongs to: the id of the
+// most recent user message in the conversation. An unreadable store yields "",
+// which still counts — per conversation instead of per question, the stricter
+// of the two, since the failure must not be the thing that reopens the loop.
+func (r *researchTool) dossierTurnKey(ctx context.Context, sessionID string) string {
+	if r.messages == nil {
+		return ""
+	}
+	msgs, err := r.messages.List(ctx, sessionID)
+	if err != nil {
+		return ""
+	}
+	key := ""
+	for _, m := range msgs {
+		if m.Role == message.User {
+			key = m.ID
+		}
+	}
+	return key
+}
+
+// gapRoundDuty is item 1 of the dossier duties, worded for the call it is
+// attached to. The first call is told the follow-up is optional and what the
+// tool will do to it; the follow-up is told there is no third.
+func gapRoundDuty(ordinal int, mode string) string {
+	if ordinal >= DossierCallsPerQuestion {
+		return `1. GAP ROUND — DONE. This call WAS the follow-up. The research tool will
+   refuse another dossier call for this question, so do not make one. Whatever
+   is still open goes under "Not established", stated plainly.`
+	}
+	return fmt.Sprintf(`1. GAP ROUND — OPTIONAL, ONCE. Collect every NOT ESTABLISHED entry above. If
+   any of them is LOAD-BEARING for the answer, you may call the research tool
+   ONCE more: doctrine="dossier", roles chosen from the dossier role ids to
+   target the named gaps, and the gaps pasted into context. The tool enforces
+   the bound: the follow-up runs %d helpers in %s mode (at most %d more
+   sessions) whatever you pass, and a call after it is refused. The user was
+   shown that ceiling on the warning screen. If the gaps are not load-bearing,
+   say so and skip the round — skipping costs nothing and is often right.`,
+		ResearchMinAgents, mode, DossierFollowUpSessions(mode))
+}
+
+// dossierHelperTools is the toolset of a dossier helper: the web tools and
+// nothing that reads this machine.
+//
+// GORILLA FIX (2026-10-05): audit finding O1, the enforced half. Removing the
+// LOCAL lane and telling helpers the machine is out of bounds would still have
+// left every dossier helper holding find and view. The same list that defines
+// the egress grant defines what a dossier helper may hold, so a tool added to
+// research helpers later does not reach dossier runs by accident.
+func dossierHelperTools(all []tools.BaseTool) []tools.BaseTool {
+	allowed := map[string]bool{}
+	for _, name := range researchEgressTools() {
+		allowed[name] = true
+	}
+	var kept []tools.BaseTool
+	for _, t := range all {
+		if allowed[t.Info().Name] {
+			kept = append(kept, t)
+		}
+	}
+	return kept
+}
 
 // checkContract reports which required headings a reply is missing. A helper
 // that ignored the contract is reported as such rather than quietly folded into
@@ -931,11 +1348,6 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 		}
 	}
 
-	roles, roleNote := selectRoles(params.Roles, want)
-	if len(roles) == 0 {
-		return tools.NewTextErrorResponse("no usable roles selected"), nil
-	}
-
 	mode := strings.ToLower(strings.TrimSpace(params.Mode))
 	switch mode {
 	case "", ModeParallel, "concurrent":
@@ -943,8 +1355,42 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	case ModeSequential, ModeSupervised:
 	default:
 		return tools.NewTextErrorResponse(fmt.Sprintf(
-			"unknown mode %q. Use %q (one at a time, slowest, easiest to follow), %q (default) or %q (every lane audited by a second agent before you see it).",
+			"unknown mode %q. Use %q (one at a time, slowest, easiest to follow), %q (default) or %q (each blind lane audited by a second agent before you see it).",
 			params.Mode, ModeSequential, ModeParallel, ModeSupervised)), nil
+	}
+
+	// GORILLA FIX (2026-10-05): audit finding O2. The dossier ceiling, enforced.
+	// Counted AFTER every other refusal so a call that was never going to run
+	// does not spend the allowance, and BEFORE the roles are chosen because a
+	// follow-up is held to the minimum helper count and to the first call's
+	// mode. See reserveDossierCall.
+	dossierCall := 0
+	if params.Doctrine == DoctrineDossier {
+		ordinal, firstMode, ok := reserveDossierCall(sessionID, r.dossierTurnKey(ctx, sessionID), mode)
+		if !ok {
+			return tools.NewTextErrorResponse(fmt.Sprintf(
+				"The dossier ceiling for this question is reached: it has had its run and its one follow-up "+
+					"(%d dossier calls). Nothing was started and nothing was spent by this call. Assemble the "+
+					"dossier from the findings you already have and list what is still open under "+
+					"\"Not established\". If the user wants more collected, that is their decision: they can "+
+					"ask again.", DossierCallsPerQuestion)), nil
+		}
+		dossierCall = ordinal
+		if ordinal > 1 {
+			if want > ResearchMinAgents {
+				clampNote = strings.TrimSpace(clampNote + fmt.Sprintf(" (follow-up call: held to %d helpers, lowered from %d)", ResearchMinAgents, want))
+				want = ResearchMinAgents
+			}
+			if mode != firstMode {
+				clampNote = strings.TrimSpace(clampNote + fmt.Sprintf(" (follow-up call: run in %s mode like the first call, not %s)", firstMode, mode))
+				mode = firstMode
+			}
+		}
+	}
+
+	roles, roleNote := selectRolesFor(params.Doctrine, params.Roles, want)
+	if len(roles) == 0 {
+		return tools.NewTextErrorResponse("no usable roles selected"), nil
 	}
 	// Sequential is simply concurrency of 1 — same scheduler, so the modes
 	// cannot drift apart as the code changes.
@@ -953,6 +1399,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 		inFlight = 1
 	}
 
+	started := time.Now()
 	var out strings.Builder
 	fmt.Fprintf(&out, "# Research: %s\n\n", strings.TrimSpace(params.Question))
 	switch mode {
@@ -996,55 +1443,50 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	// helpers released their slots, which let the queued ones start. Now every
 	// helper owns a cancellable context from the moment it exists, so killing a
 	// QUEUED helper stops it before it ever spends a token.
+	//
+	// GORILLA FIX (2026-10-05): audit finding S16. On a cancelled context the
+	// launch loop did `return`, which skipped wg.Wait(). Helpers already started
+	// were still running and still writing results[i] while Run went on to read
+	// results for the receipt: a data race, and a helper's spend that could be
+	// missed on exactly the path (the user pressed X) where the accounting has
+	// already been lost twice. launchWave stops launching and still waits.
 	runWave := func(idxs []int, peers string) {
-		var wg sync.WaitGroup
 		sem := make(chan struct{}, inFlight)
-		for _, i := range idxs {
+		launchWave(ctx, idxs, func(i int) {
+			hctx, hcancel := context.WithCancel(ctx)
+			defer hcancel()
+			entry := RegisterSubAgentState(
+				helperSessionID(call.ID, roles[i]), sessionID, call.ID,
+				helperLabel(roles[i]), SubAgentQueued, hcancel)
+			// NO per-helper unregister. It used to fire the instant this
+			// goroutine returned, microseconds after the state was set to
+			// DONE, so a finished lane vanished instead of being shown as
+			// finished. Rows for the whole call are purged together when
+			// Run returns; see UnregisterSubAgentsForCall.
+
+			// Wait for a slot, but stay killable while waiting.
 			select {
-			case <-ctx.Done():
+			case sem <- struct{}{}:
+			case <-hctx.Done():
+				SetSubAgentState(entry.ID, SubAgentKilled)
+				results[i] = outcome{err: hctx.Err()}
 				return
-			default:
 			}
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
+			defer func() { <-sem }()
 
-				hctx, hcancel := context.WithCancel(ctx)
-				defer hcancel()
-				entry := RegisterSubAgentState(
-					helperSessionID(call.ID, roles[i]), sessionID, call.ID,
-					helperLabel(roles[i]), SubAgentQueued, hcancel)
-				// NO per-helper unregister. It used to fire the instant this
-				// goroutine returned, microseconds after the state was set to
-				// DONE, so a finished lane vanished instead of being shown as
-				// finished. Rows for the whole call are purged together when
-				// Run returns; see UnregisterSubAgentsForCall.
-
-				// Wait for a slot, but stay killable while waiting.
-				select {
-				case sem <- struct{}{}:
-				case <-hctx.Done():
-					SetSubAgentState(entry.ID, SubAgentKilled)
-					results[i] = outcome{err: hctx.Err()}
-					return
-				}
-				defer func() { <-sem }()
-
-				SetSubAgentState(entry.ID, SubAgentRunning)
-				prompt := buildPrompt(roles[i], params.Question, params.Context, peers, i, len(roles), params.Doctrine)
-				reply, spend, err := r.runHelper(hctx, sessionID, call.ID, roles[i], prompt, entry.ID)
-				switch {
-				case err != nil && hctx.Err() != nil:
-					SetSubAgentState(entry.ID, SubAgentKilled)
-				case err != nil:
-					SetSubAgentState(entry.ID, SubAgentFailed)
-				default:
-					SetSubAgentState(entry.ID, SubAgentDone)
-				}
-				results[i] = outcome{reply: reply, err: err, spend: spend}
-			}(i)
-		}
-		wg.Wait()
+			SetSubAgentState(entry.ID, SubAgentRunning)
+			prompt := buildPrompt(roles[i], params.Question, params.Context, peers, i, len(roles), params.Doctrine)
+			reply, spend, err := r.runHelper(hctx, sessionID, call.ID, roles[i], prompt, entry.ID, params.Doctrine)
+			switch {
+			case err != nil && hctx.Err() != nil:
+				SetSubAgentState(entry.ID, SubAgentKilled)
+			case err != nil:
+				SetSubAgentState(entry.ID, SubAgentFailed)
+			default:
+				SetSubAgentState(entry.ID, SubAgentDone)
+			}
+			results[i] = outcome{reply: reply, err: err, spend: spend}
+		})
 	}
 
 	var firstWave, secondWave []int
@@ -1126,7 +1568,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 
 				SetSubAgentState(entry.ID, SubAgentRunning)
 				reply, spend, err := r.runHelper(hctx, sessionID, call.ID, sup,
-					supervisorPrompt(roles[i], params.Question, results[i].reply), entry.ID)
+					supervisorPrompt(roles[i], params.Question, results[i].reply), entry.ID, params.Doctrine)
 				// GORILLA FIX (2026-08-23): bill the spend BEFORE the early
 				// return. A supervisor that failed still burned tokens getting
 				// there, and returning here skipped the add entirely, so its
@@ -1329,18 +1771,24 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	}
 	if saved := writeRawFindings(params.Question, roles, replies, audits, params.Doctrine); saved != "" {
 		fmt.Fprintf(&out, "\n## Findings already saved\n\n"+
-			"Every lane's graded report is on disk at:\n\n    %s\n\n"+
+			"Every lane's report is on disk at:\n\n    %s\n\n"+
 			"That happened automatically, before you were asked to do anything, so this run "+
 			"cannot be lost by a failure further down. If you run out of context while "+
-			"assembling the assessment, say so plainly and tell the user to run "+
-			"`/osint --recover` — the findings are safe and the write-up can be redone on a "+
-			"model with a larger window. Do NOT silently produce a shortened dossier instead.\n",
+			"writing the answer, say so plainly and tell the user to run "+
+			"`/osint --recover` — it writes up any saved run, a standard one included, from "+
+			"these findings on a model with a larger window. Do NOT silently produce a "+
+			"shortened answer instead.\n",
 			saved)
 	}
 
-	if params.Doctrine == "dossier" {
-		fmt.Fprintf(&out, dossierDutiesFooter, config.DossierDir())
+	if params.Doctrine == DoctrineDossier {
+		fmt.Fprintf(&out, dossierDutiesFooter, gapRoundDuty(dossierCall, mode), config.DossierDir())
 	}
+
+	// GORILLA FIX (2026-10-05): audit findings O3 and S15. What this run really
+	// used is remembered, so the next cost screen can show a measured size
+	// beside its forecast instead of a figure typed from one run in August.
+	recordResearchRun(ranSessions, completed, len(roles), total, time.Since(started))
 
 	// The receipt travels as metadata too, so the UI can put the total in red
 	// without parsing prose back out of the report.
@@ -1357,8 +1805,14 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 
 // runHelper spawns one helper in its own session, registered so the user can
 // see it in /tasks and kill it.
-func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID string, role researchRole, prompt string, registryID string) (string, helperSpend, error) {
-	helper, err := NewAgent(researchAgentName(), r.sessions, r.messages, ResearchAgentTools(r.lspClients, r.permissions))
+func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID string, role researchRole, prompt string, registryID string, doctrine string) (string, helperSpend, error) {
+	// A dossier helper (and its supervisor) holds the web tools only. See
+	// dossierHelperTools.
+	helperTools := ResearchAgentTools(r.lspClients, r.permissions)
+	if doctrine == DoctrineDossier {
+		helperTools = dossierHelperTools(helperTools)
+	}
+	helper, err := NewAgent(researchAgentName(), r.sessions, r.messages, helperTools)
 	if err != nil {
 		return "", helperSpend{}, fmt.Errorf("could not create helper: %w", err)
 	}
@@ -1428,6 +1882,25 @@ func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID st
 		return "", spent, fmt.Errorf("helper returned an empty reply")
 	}
 	return reply, spent, nil
+}
+
+// launchWave runs work(i) for every index, each in its own goroutine, and
+// returns only when every goroutine it started has returned. A cancelled
+// context stops further launches; it never stops the waiting. See the S16 note
+// at runWave for what returning early cost.
+func launchWave(ctx context.Context, idxs []int, work func(i int)) {
+	var wg sync.WaitGroup
+	for _, i := range idxs {
+		if ctx.Err() != nil {
+			break
+		}
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			work(i)
+		}(i)
+	}
+	wg.Wait()
 }
 
 // helperSpend is what one helper consumed. Cost alone is not enough: on a free
@@ -1520,7 +1993,14 @@ func researchEgressTools() []string {
 func researchFleetPrompt(helpers int, toolNames []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "This research run will start **%d helpers**, and each one can search the web and fetch pages.\n\n", helpers)
-	fmt.Fprintf(&b, "Approving here covers **%s** for every helper in this run, so you are asked once instead of once per search.\n\n", strings.Join(toolNames, "` and `"))
+	// GORILLA FIX (2026-10-05): audit finding S12. The names were joined with
+	// "` and `" inside a bare **%s**, so the first and last backtick were never
+	// written and the dialog rendered "**web_search` and `web_fetch**".
+	quoted := make([]string, len(toolNames))
+	for i, name := range toolNames {
+		quoted[i] = "`" + name + "`"
+	}
+	fmt.Fprintf(&b, "Approving here covers %s for every helper in this run, so you are asked once instead of once per search.\n\n", strings.Join(quoted, " and "))
 	b.WriteString("**What you are approving.** The search terms and page addresses are written by the model as it works, some of them from pages it reads during the run. So this approves the *activity*, not a list you can read now.\n\n")
 	b.WriteString("Nothing else is covered: files, commands and every other tool still ask as normal, and this ends when the run ends.\n\n")
 	b.WriteString("**Allow for session** stops the question for later research runs too.\n\n")
