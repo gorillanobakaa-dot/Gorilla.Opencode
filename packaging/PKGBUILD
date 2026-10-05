@@ -62,6 +62,11 @@ license=('MIT')
 #              single dependency cannot express.
 depends=('lynx' 'python' 'ripgrep' 'xclip')
 makedepends=('go>=1.21')
+# GORILLA OVERRIDE (2026-10-05): no separate -debug package, and no second strip.
+# makepkg's default is to split debug symbols into gorilla-opencode-debug. The
+# binary is built with -s -w, so there are none: the first real build produced a
+# 3.8 KB debug package with nothing in it, beside the real one.
+options=('!debug' '!strip')
 # GORILLA: source is the tagged tarball from GitHub. The sha256sum covers the
 # archive as downloaded; regenerate with `makepkg -g` after a version bump.
 #

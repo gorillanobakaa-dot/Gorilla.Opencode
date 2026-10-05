@@ -55,13 +55,13 @@ jobs:
 
       - name: what is in the package
         run: |
-          pkg=$(ls /build/*.pkg.tar.zst)
+          pkg="/build/gorilla-opencode-${TAG#v}-1-x86_64.pkg.tar.zst"
           pacman -Qip "$pkg"
           pacman -Qlp "$pkg" | head -40
           echo "files: $(pacman -Qlp "$pkg" | wc -l)"
 
       - name: install it
-        run: pacman -U --noconfirm /build/*.pkg.tar.zst
+        run: pacman -U --noconfirm "/build/gorilla-opencode-${TAG#v}-1-x86_64.pkg.tar.zst"
 
       - name: the installed program starts and reports its version
         run: |
@@ -88,7 +88,7 @@ jobs:
       - name: attach it to the release, with its checksum
         run: |
           cd /build
-          pkg=$(ls *.pkg.tar.zst)
+          pkg="gorilla-opencode-${TAG#v}-1-x86_64.pkg.tar.zst"
           gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p "SHA256SUMS-${TAG}.txt"
           grep -v " ${pkg}$" "SHA256SUMS-${TAG}.txt" > sums.new || true
           sha256sum "$pkg" >> sums.new
