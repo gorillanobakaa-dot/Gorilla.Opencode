@@ -619,7 +619,10 @@ func convertLocalModel(model localModel) Model {
 	var costIn, costInCached, costOut, costOutCached float64
 	if meta, ok := lookupModelMeta(model.ID); ok {
 		if meta.Name != "" {
-			name = meta.Name
+			// A typed name is kept for its spelling only. One of them read
+			// "Nemotron Nano 3 30B-A3B (unverified listing)": a claim about
+			// the provider's list, typed once, shown for ever.
+			name, _, _ = strings.Cut(meta.Name, " (")
 		}
 		// GORILLA OVERRIDE (2026-10-05, second pass): the typed description and
 		// the typed price went the way of the typed rank.

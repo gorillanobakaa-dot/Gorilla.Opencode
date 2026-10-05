@@ -919,7 +919,7 @@ func (m *modelDialogCmp) connectionLine() string {
 	case ProviderBookmarks:
 		return "each row is tagged [connection] — the same model can arrive via two keys, on two quotas"
 	case models.ProviderLocal:
-		line := "served by your configured endpoints, working ones first — each row names the one that owns it"
+		line := "your endpoints, working models first"
 		var ids []models.ModelID
 		for id, mod := range models.SupportedModels {
 			if mod.Provider == models.ProviderLocal && !config.IsModelHidden(string(id)) {
@@ -927,7 +927,9 @@ func (m *modelDialogCmp) connectionLine() string {
 			}
 		}
 		if _, retired, notChat := models.PickerOrder(ids); retired+notChat > 0 {
-			line += fmt.Sprintf(" | not shown: %d retired by their provider, %d that are not chat models", retired, notChat)
+			// Short on purpose: at 120 columns the first wording was cut off
+			// at "not shown: 13..." and the reason never reached the screen.
+			line += fmt.Sprintf(" | left out: %d retired, %d not chat models", retired, notChat)
 		}
 		return line
 	case models.ProviderGeminiCA:

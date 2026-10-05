@@ -142,6 +142,9 @@ func TestAnEndpointModelCarriesNoTypedOpinionOrPrice(t *testing.T) {
 		if m.CostPer1MIn != 0 || m.CostPer1MOut != 0 {
 			t.Fatalf("%s: typed price %.2f/%.2f reached the model", id, m.CostPer1MIn, m.CostPer1MOut)
 		}
+		if strings.Contains(m.Name, "(") {
+			t.Fatalf("%s: a typed remark reached the model's name: %q", id, m.Name)
+		}
 		if m.Description != "" && !strings.HasPrefix(m.Description, "tested here: ") {
 			t.Fatalf("%s: typed description reached the model: %q", id, m.Description)
 		}
