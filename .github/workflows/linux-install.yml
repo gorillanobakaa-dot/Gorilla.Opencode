@@ -19,6 +19,9 @@ on:
       tag:
         description: "Release tag to install, e.g. v0.1.139"
         required: true
+      expect:
+        description: "Version the program must report, when it differs from the tag (a release candidate)"
+        required: false
   release:
     types: [published]
 
@@ -31,6 +34,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      EXPECT: ${{ inputs.expect || inputs.tag || github.event.release.tag_name }}
     steps:
       - name: download the published files
         run: |
@@ -44,7 +48,7 @@ jobs:
         run: |
           v="$(gorilla-opencode --version)"
           echo "$v"
-          test "$v" = "$TAG"
+          test "$v" = "$EXPECT"
       - name: what the package put on the system
         run: |
           dpkg -L gorilla-opencode | head -60
@@ -65,7 +69,7 @@ jobs:
       - name: the plain binary starts too
         run: |
           chmod +x dl/gorilla-opencode-*-linux-amd64
-          test "$(./dl/gorilla-opencode-*-linux-amd64 --version)" = "$TAG"
+          test "$(./dl/gorilla-opencode-*-linux-amd64 --version)" = "$EXPECT"
       - name: it uninstalls cleanly
         run: |
           sudo apt-get remove -y gorilla-opencode
@@ -77,6 +81,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      EXPECT: ${{ inputs.expect || inputs.tag || github.event.release.tag_name }}
     steps:
       - name: tools for this job
         run: dnf install -y gh
@@ -90,7 +95,7 @@ jobs:
         run: |
           v="$(gorilla-opencode --version)"
           echo "$v"
-          test "$v" = "$TAG"
+          test "$v" = "$EXPECT"
       - name: the model doctor runs on a fresh home
         run: |
           set +e
