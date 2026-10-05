@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 // PreferredOnSameEndpoint names the model to fall back on when id, served by a
 // configured endpoint, has been found dead: the endpoint's own best candidate
 // (see candidateOrder). "" when id is not an endpoint model or nothing else is
@@ -61,4 +63,41 @@ func EndpointHasModels(endpoint string) bool {
 		}
 	}
 	return false
+}
+
+// EndpointProvenWithin reports whether a model of the named endpoint was seen
+// to answer with a tool call less than maxAge ago, and how long ago the most
+// recent such answer was.
+func EndpointProvenWithin(endpoint string, maxAge time.Duration) (time.Duration, bool) {
+	best, found := time.Duration(0), false
+	for id, r := range localRoute {
+		if r.Endpoint != endpoint {
+			continue
+		}
+		v, ok := ProbeVerdictFor(id)
+		if !ok || !v.Usable() {
+			continue
+		}
+		age := time.Since(v.At)
+		if age < 0 || age >= maxAge {
+			continue
+		}
+		if !found || age < best {
+			best, found = age, true
+		}
+	}
+	return best, found
+}
+
+// SetProbeVerdictForTest records a verdict as if a check had found it. For
+// tests in other packages; nothing in the program calls it.
+func SetProbeVerdictForTest(id ModelID, outcome string, at time.Time) {
+	setProbeVerdict(id, ProbeVerdict{Outcome: outcome, At: at})
+}
+
+// ClearProbeVerdictForTest forgets one verdict.
+func ClearProbeVerdictForTest(id ModelID) {
+	probeMu.Lock()
+	delete(probeVerdicts, id)
+	probeMu.Unlock()
 }

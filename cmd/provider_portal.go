@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/opencode-ai/opencode/internal/auth"
 	"github.com/opencode-ai/opencode/internal/config"
@@ -738,6 +739,8 @@ func localRuntimeRow(s localRuntimeSpec) startup.ProviderRow {
 
 func applyLocalEndpoint(name, baseURL, key string) error {
 	key = strings.TrimSpace(key)
+	// A key typed just now has never been tried. A stored one may have been.
+	newKey := key != ""
 
 	// GORILLA FIX: adopt whatever the user already calls this endpoint.
 	//
@@ -782,6 +785,26 @@ func applyLocalEndpoint(name, baseURL, key string) error {
 	// first id in the list. A few small requests settle both: is the key
 	// accepted, and which model answers with a tool call. A model server on
 	// this machine is never asked (the probe refuses loopback itself).
+	// GORILLA FIX (2026-10-05): ... but not AGAIN on every launch.
+	//
+	// The provider menu is shown at every start, and Enter on the row already
+	// in use came through here: three test questions to NVIDIA, about ten
+	// seconds, each time, to learn what was learned an hour ago. Measured on
+	// v0.1.140 in the owner's home folder: ready 1.3 s after Esc, 11.0 s after
+	// Enter on the NVIDIA row.
+	//
+	// A check is reused when it is less than a day old and no new key was
+	// typed. A new key is always tried at once, and /update repeats the checks
+	// whenever asked.
+	if !newKey {
+		if age, ok := models.EndpointProvenWithin(name, probeReuse); ok {
+			fmt.Printf("\n%s: checked %s ago, a model answered; not asked again (type /update to re-check).\n", name, humanAge(age))
+			if id := models.PreferredOnEndpoint(name); id != "" {
+				first = id
+			}
+			return finishLocalEndpoint(name, first)
+		}
+	}
 	rep := probeEndpoint(name, config.CacheBase())
 	if rep.Skipped == "" {
 		fmt.Println("\n" + rep.Note())
@@ -808,6 +831,27 @@ func applyLocalEndpoint(name, baseURL, key string) error {
 	// If the coder is already on a model served by THIS endpoint, and that model
 	// is still registered, the choice stands. Same principle as adopting the
 	// user's endpoint name above: confirm what is there rather than replace it.
+	return finishLocalEndpoint(name, first)
+}
+
+// probeReuse is how long a successful check of a connection stands before the
+// provider menu asks its models again.
+const probeReuse = 24 * time.Hour
+
+// humanAge says a duration the way a person would.
+func humanAge(d time.Duration) string {
+	switch {
+	case d < 2*time.Minute:
+		return "a moment"
+	case d < 2*time.Hour:
+		return fmt.Sprintf("%d minutes", int(d.Minutes()))
+	}
+	return fmt.Sprintf("%d hours", int(d.Hours()))
+}
+
+// finishLocalEndpoint points the agents at a connection's default model,
+// unless the coder is already on a model of that connection that still works.
+func finishLocalEndpoint(name string, first models.ModelID) error {
 	if cur := config.Get().Agents[config.AgentCoder].Model; cur != "" {
 		if _, known := models.SupportedModels[cur]; known && models.LocalEndpointFor(cur) == name {
 			// ... unless that model has since been found retired: keeping it
