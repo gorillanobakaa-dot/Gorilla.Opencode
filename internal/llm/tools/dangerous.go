@@ -125,5 +125,10 @@ func DangerousPatternIn(cmd string) *DangerousCommand {
 			return &dangerousCommands[i]
 		}
 	}
+	// Recursive deletes are also PARSED, because a pattern only knows the
+	// spellings somebody thought of. See dangerous_delete.go.
+	if deletesSomethingHuge(cmd) {
+		return &bigDeleteWhy
+	}
 	return nil
 }

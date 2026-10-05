@@ -31,6 +31,7 @@ var knownHTTPClients = map[string]string{
 	"internal/llm/models/refresh.go":         "the model catalogue, a fixed URL",
 	"internal/llm/models/catalogue_fetch.go": "provider /v1/models listings; the URLs are constants in LiveCatalogues, the model cannot choose one",
 	"internal/llm/models/verify.go":          "verifies a configured provider's endpoint answers",
+	"internal/llm/models/probe.go":          "asks a model on an endpoint the USER saved whether it answers (/update, models probe); the address comes from config.json, never from the model, and loopback is refused",
 	"internal/llm/tools/fetch.go":            "MODEL-CHOSEN: guarded by blockedFetchTarget + dialer Control + CheckRedirect",
 	"internal/llm/tools/websearch.go":        "the SearxNG instance from config; the model supplies the query, not the host",
 	"internal/llm/models/local.go":           "OpenAI-compatible /v1/models listings for endpoints the USER configured (or the two default local ports); the model never supplies the address",

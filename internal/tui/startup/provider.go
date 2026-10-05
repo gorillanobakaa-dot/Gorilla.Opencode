@@ -18,6 +18,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -47,6 +48,11 @@ type ProviderRow struct {
 	// Secret2 masks the second field independently: an account id is not a
 	// secret and hiding it only makes it harder to check for a typo.
 	Secret2 bool
+	// Check, when set, judges the first value before it is accepted. It returns
+	// "" for a usable value, otherwise the sentence to show under the field.
+	// Nothing is saved while it objects. It lives on the row because this
+	// package cannot know what an NVIDIA key looks like and cmd can.
+	Check func(value string) string
 	// Free marks a provider that costs nothing to use. Rendered as a distinct
 	// tag because a row that costs money and a row that does not otherwise look
 	// identical, and the people this is built for cannot afford to find out by
@@ -165,8 +171,17 @@ func (m *providerModel) updateEntering(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		row := m.rows[m.sel]
 		if m.stage == 0 {
 			if len(m.input) == 0 {
-				m.hint = "Nothing entered yet — paste the value, or Esc to go back."
+				m.hint = "Nothing entered yet — press Ctrl+V to paste the value, or Esc to go back."
 				return m, nil
+			}
+			if row.Check != nil {
+				if problem := row.Check(strings.TrimSpace(string(m.input))); problem != "" {
+					// Refused, and the field is emptied: the next Ctrl+V must
+					// replace the bad value, not be glued onto the end of it.
+					m.hint = problem
+					m.input = nil
+					return m, nil
+				}
 			}
 			if row.InputPrompt2 != "" {
 				m.stage = 1
@@ -193,18 +208,78 @@ func (m *providerModel) updateEntering(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.input = m.input[:len(m.input)-1]
 		}
 		return m, nil
-	}
-	// Runes cover typing and paste alike; bubbletea delivers a paste as one
-	// KeyRunes message with every rune in it.
-	if msg.Type == tea.KeyRunes {
-		if m.stage == 1 {
-			m.input2 = append(m.input2, msg.Runes...)
-		} else {
-			m.input = append(m.input, msg.Runes...)
+	case "ctrl+v":
+		// GORILLA OVERRIDE (2026-10-05): Ctrl+V did NOTHING in this field.
+		//
+		// The comment that stood here said "runes cover typing and paste alike".
+		// That holds only when the terminal performs the paste itself and sends
+		// the text as keystrokes. When it does not, the program receives the
+		// Ctrl+V keypress (bubbletea: KeyCtrlV) and is expected to fetch the
+		// clipboard. This handler had no case for it, so the press was dropped.
+		//
+		// Every other text field in this program is a bubbles textinput, which
+		// does fetch the clipboard on Ctrl+V. So paste worked in the chat box
+		// and in /connect and failed HERE, on the one screen that exists for
+		// pasting keys.
+		//
+		// MEASURED: the owner's config.json and both of its backups (1 and 30
+		// September) hold no NVIDIA entry at all, and his screenshot shows this
+		// field at "(1 chars)" after a paste. INFERRED, not measured: that his
+		// console window is one that hands the keypress over. Whichever it is,
+		// both routes are now handled, and a value that is not a key is refused
+		// (ProviderRow.Check) instead of being saved.
+		text, err := readClipboard()
+		if err != nil || strings.TrimSpace(text) == "" {
+			m.hint = "The clipboard is empty or could not be read. Copy the key again, then press Ctrl+V."
+			return m, nil
 		}
-		m.hint = ""
+		m.insert(cleanPasted(text))
+		return m, nil
+	}
+	// Typing, and a paste performed by the terminal (right-click, or Ctrl+V in
+	// Windows Terminal): the text arrives as runes.
+	if msg.Type == tea.KeyRunes {
+		m.insert(cleanPasted(string(msg.Runes)))
 	}
 	return m, nil
+}
+
+// readClipboard is a seam: tests must not touch the real clipboard, and the
+// real one may hold something private.
+var readClipboard = clipboard.ReadAll
+
+// insert appends to whichever field is active.
+func (m *providerModel) insert(r []rune) {
+	if len(r) == 0 {
+		return
+	}
+	if m.stage == 1 {
+		m.input2 = append(m.input2, r...)
+	} else {
+		m.input = append(m.input, r...)
+	}
+	m.hint = ""
+}
+
+// cleanPasted keeps what can be part of a key or an id and drops the rest:
+// line breaks and tabs that ride along with a copied line, and the invisible
+// control characters a terminal wraps round a paste. A credential never
+// contains any of them, and one stray newline stored inside a key makes every
+// request fail with an error that points nowhere near the cause.
+func cleanPasted(s string) []rune {
+	// The markers a terminal puts round a pasted block, when they arrive as
+	// text instead of being consumed.
+	for _, marker := range []string{"\x1b[200~", "\x1b[201~", "[200~", "[201~"} {
+		s = strings.ReplaceAll(s, marker, "")
+	}
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		if r < 0x20 || r == 0x7f || r == 0xfeff {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
 }
 
 // contentWidth mirrors the extras screen: never assume a width before the
@@ -289,7 +364,7 @@ func (m *providerModel) View() string {
 			b.WriteString(dim.Render(m.echo(m.input, cur.Secret, w)) + "\n\n")
 			writeWrapped(lipgloss.NewStyle(), "2. "+cur.InputPrompt2)
 			b.WriteString(m.echo(m.input2, cur.Secret2, w) + "\n")
-			writeWrapped(dim, "Enter to save | Esc to go back to the first value")
+			writeWrapped(dim, "Ctrl+V to paste | Enter to save | Esc to go back to the first value")
 		} else {
 			prompt := cur.InputPrompt
 			if cur.InputPrompt2 != "" {
@@ -297,9 +372,9 @@ func (m *providerModel) View() string {
 			}
 			writeWrapped(lipgloss.NewStyle(), prompt)
 			b.WriteString(m.echo(m.input, cur.Secret, w) + "\n")
-			next := "Enter to save | Esc to go back"
+			next := "Ctrl+V to paste | Enter to save | Esc to go back"
 			if cur.InputPrompt2 != "" {
-				next = "Enter for the next value | Esc to go back"
+				next = "Ctrl+V to paste | Enter for the next value | Esc to go back"
 			}
 			writeWrapped(dim, next)
 		}

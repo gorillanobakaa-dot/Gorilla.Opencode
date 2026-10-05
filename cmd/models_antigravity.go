@@ -105,7 +105,7 @@ the ids it actually honours.`,
 		// "No longer offered" is reported but NOT removed from the catalogue —
 		// a model someone has configured must not vanish because one refresh
 		// did not mention it.
-		report("Not offered to this account (kept, in case you configured one)", res.Removed, 10)
+		report("No longer offered to this account, removed from the picker", res.Removed, 10)
 
 		fmt.Println("  Saved. Pick one with /models.")
 		fmt.Println()
@@ -114,5 +114,86 @@ the ids it actually honours.`,
 }
 
 func init() {
-	modelsCmd.AddCommand(modelsRefreshAntigravityCmd)
+	modelsCmd.AddCommand(modelsRefreshAntigravityCmd, modelsDoctorCmd, modelsProbeCmd)
+}
+
+// modelsDoctorCmd prints what the model doctor finds, changing nothing unless
+// --fix is given. The same checks /update, /model and /provider run.
+var modelsDoctorCmd = &cobra.Command{
+	Use:   "doctor",
+	Short: "Check the model lists, saved keys and agent settings for known faults",
+	Long: `Runs every check in the model doctor and prints what it finds.
+
+No network, no AI: the same rules over the same files give the same answer
+every time. It looks for an agent set to a model that no longer exists or that
+was found retired, saved keys that are a failed paste, two connections to the
+same server, rows in the model list that read the same, a ranking that is
+upside down, and lists that have not been fetched for a week.
+
+Without --fix nothing is changed. Exit status 3 when a problem is left.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fix, _ := cmd.Flags().GetBool("fix")
+		wd, _ := os.Getwd()
+		if _, err := config.Load(wd, false); err != nil {
+			return err
+		}
+		var set config.AgentSetter
+		if fix {
+			set = config.UpdateAgentModel
+		}
+		findings := config.RunModelDoctor(config.CacheBase(), set)
+		if len(findings) == 0 {
+			fmt.Println("Nothing wrong found.")
+			return nil
+		}
+		left := 0
+		for _, line := range config.DoctorSummary(findings) {
+			fmt.Println(line)
+		}
+		for _, f := range findings {
+			if !f.Fixed {
+				left++
+			}
+		}
+		if left > 0 {
+			os.Exit(3)
+		}
+		return nil
+	},
+}
+
+// modelsProbeCmd asks the likeliest models on each remote connection whether
+// they answer, the way /update does.
+var modelsProbeCmd = &cobra.Command{
+	Use:   "probe",
+	Short: "Ask your remote connections' models whether they actually answer",
+	Long: `Sends one small request, carrying one ordinary tool, to the likeliest models
+on each remote connection you have saved (NVIDIA NIM, Cloudflare, ...) and
+records what came back: answered with a tool call, retired, key refused,
+provider error. At most ten requests per connection.
+
+A model list is not evidence that a model works. This is.
+It is never sent to a model server on this machine.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		wd, _ := os.Getwd()
+		if _, err := config.Load(wd, false); err != nil {
+			return err
+		}
+		eps := models.ProbedEndpoints()
+		if len(eps) == 0 {
+			fmt.Println("No remote connection is saved, so there is nothing to ask.")
+			return nil
+		}
+		for _, ep := range eps {
+			fmt.Println(models.ProbeEndpoint(ep, config.CacheBase()).Note())
+			if id := models.PreferredOnEndpoint(ep); id != "" {
+				fmt.Printf("  default for %s: %s\n", ep, models.SupportedModels[id].APIModel)
+			}
+		}
+		return nil
+	},
+}
+
+func init() {
+	modelsDoctorCmd.Flags().Bool("fix", false, "repair what has exactly one right repair")
 }

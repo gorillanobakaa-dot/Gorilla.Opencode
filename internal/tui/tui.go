@@ -1547,8 +1547,15 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.sessionsMgr.SetNotice("ctrl+r hands the highlighted work to this model in a fresh conversation.")
 			return a, nil
 		case "model", "models":
+			// The doctor first (offline, instant): the list about to be shown
+			// must not offer the agent's own model as retired, or rows that read
+			// the same, without saying so.
+			notes := config.DoctorSummary(config.RunModelDoctor(config.CacheBase(), a.doctorSetAgent))
 			a.modelDialog.Init()
 			a.showModelDialog = true
+			if len(notes) > 0 {
+				return a, util.ReportWarn(strings.Join(notes, " | "))
+			}
 			return a, nil
 		// GORILLA OVERRIDE: /provider and /switch are natural aliases —
 		// UPDATED 2026-08-05: /providers, /provider and /switch now open the
@@ -3345,7 +3352,14 @@ func (a *appModel) refreshModelCatalogues() tea.Cmd {
 			if res, rerr := models.RefreshAntigravity(dir, rows); rerr != nil {
 				notes = append(notes, fmt.Sprintf("Antigravity failed: %v", rerr))
 			} else {
-				notes = append(notes, fmt.Sprintf("Antigravity %d usable", res.Usable))
+				note := fmt.Sprintf("Antigravity %d usable", res.Usable)
+				if len(res.Added) > 0 || len(res.Removed) > 0 {
+					note += fmt.Sprintf(" (+%d, -%d)", len(res.Added), len(res.Removed))
+				}
+				if len(res.Removed) > 0 {
+					note += ", no longer offered: " + strings.Join(res.Removed, ", ")
+				}
+				notes = append(notes, note)
 			}
 		}
 
@@ -3407,13 +3421,60 @@ func (a *appModel) refreshModelCatalogues() tea.Cmd {
 		// everything else fetches its own list. Azure, Copilot, Bedrock and
 		// VertexAI are not here at all: they were removed, since none of them is
 		// reachable without an enterprise account or a card.
-		notes = append(notes, "Gemini ships with the app and updates with it")
+		// GORILLA OVERRIDE (2026-10-05): Gemini is fetched like everything else.
+		// This step used to be one line, "Gemini ships with the app and updates
+		// with it" — on a day Google listed 44 models and this program 14.
+		if key := config.ProviderAPIKey(models.ProviderGemini); key == "" {
+			notes = append(notes, "Gemini skipped (no API key saved)")
+		} else if raw, ferr := models.FetchGeminiList(key); ferr != nil {
+			notes = append(notes, fmt.Sprintf("Gemini failed: %v", ferr))
+		} else if res, rerr := models.RefreshGemini(dir, raw); rerr != nil {
+			notes = append(notes, fmt.Sprintf("Gemini failed: %v", rerr))
+		} else {
+			note := fmt.Sprintf("Gemini %d usable", res.Usable)
+			if len(res.Added) > 0 || len(res.Removed) > 0 {
+				note += fmt.Sprintf(" (+%d, -%d)", len(res.Added), len(res.Removed))
+			}
+			notes = append(notes, note)
+		}
+
+		// 6. ASK the remote endpoints' likeliest models whether they answer.
+		// A list is not evidence: on 2026-10-05 NVIDIA still listed a model that
+		// returned HTTP 500, and this program ranked 26 that returned 410. Bounded
+		// to a handful of small requests per endpoint; never sent to a model
+		// server on this machine. See models/probe.go.
+		for _, ep := range models.ProbedEndpoints() {
+			notes = append(notes, models.ProbeEndpoint(ep, dir).Note())
+		}
+
+		// 7. The doctor: every agent on a model that exists and answers, no two
+		// rows alike, ranks the right way up, no broken keys, no stale lists.
+		// Fixes what has one right repair and says what it did. See
+		// config/doctor.go.
+		notes = append(notes, config.DoctorSummary(config.RunModelDoctor(dir, a.doctorSetAgent))...)
 
 		if n := config.HiddenCount(); n > 0 {
 			notes = append(notes, fmt.Sprintf("%d hidden stayed hidden (H to review)", n))
 		}
 		return refreshSummaryMsg(notes)
 	}
+}
+
+// doctorSetAgent is how the model doctor moves an agent off a model that is
+// gone (config/doctor.go).
+//
+// GORILLA OVERRIDE (2026-10-05): a refresh now REMOVES what a provider stopped
+// listing. Without a move, the session would go on naming a model the registry
+// no longer has and the first message would fail with an error about a model
+// the user never chose to leave. The coder goes through the live agent, which
+// must rebuild its provider; the background agents are read from the config
+// each time they run.
+func (a *appModel) doctorSetAgent(name config.AgentName, to models.ModelID) error {
+	if name == config.AgentCoder && a.app != nil && a.app.CoderAgent != nil {
+		_, err := a.app.CoderAgent.Update(name, to)
+		return err
+	}
+	return config.UpdateAgentModel(name, to)
 }
 
 // catalogueNote is one provider's line in the /update report.

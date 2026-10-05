@@ -74,7 +74,47 @@ var shellChainOperators = []string{"&&", "||", ";", "|", "&", "\n", "\r"}
 //	${ ... }         parameter expansion, can carry substitution
 //	>  >>          redirection: writes, so not read-only by definition
 //	<( ... ) >( ... )  process substitution
-var opaqueConstructs = []string{"$(", "`", "${", ">", "<("}
+//
+// GORILLA FIX (2026-10-05): ( and { are opaque too. The list above is bash's.
+// On Windows the shell is PowerShell, where a bare parenthesis in argument
+// position is EVALUATED and a brace is a script block:
+//
+//	echo (Remove-Item -Recurse -Force C:\Users\me\Documents)
+//
+// has no chain operator, starts with "echo", and so counted as a safe
+// read-only command and ran with no prompt at all. In bash ( ) is a subshell,
+// so the rule costs nothing there either: a real read-only command does not
+// need a parenthesis.
+var opaqueConstructs = []string{"$(", "`", "${", ">", "<(", "(", "{"}
+
+// unsafeFlags turn a command on the read-only list into one that runs a
+// program, writes a file, deletes something or reaches the network. The list
+// matches by PREFIX, so without this every flag rode along:
+//
+//	go test -exec <program>      go vet -vettool=<exe>     go build -toolexec <cmd>
+//	go build -o <any path>       git diff --output=<file>  git diff --no-index <any file>
+//	git branch -D <name>         git tag -d <name>
+//
+// A segment carrying any of these is not refused. It is asked about.
+var unsafeFlags = []string{
+	"-exec", "-toolexec", "-vettool", "-o", "-w", "--output", "--no-index", "--ext-diff",
+	"-d", "-D", "--delete", "-m", "-M", "--move", "-f", "--force", "-c", "-C",
+	"--upload-pack", "--exec", "add", "remove", "rename", "set-url", "prune",
+}
+
+// hasUnsafeFlag reports whether any word of a segment is, or starts with, one
+// of unsafeFlags followed by end, '=' or nothing. Case-SENSITIVE on purpose:
+// -d and -D, -m and -M are different flags and both are listed.
+func hasUnsafeFlag(segment string) bool {
+	for _, w := range strings.Fields(segment)[1:] {
+		for _, f := range unsafeFlags {
+			if w == f || strings.HasPrefix(w, f+"=") {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 // splitShellCommands breaks a command line into the individual commands a shell
 // would execute. Deliberately crude: it over-splits rather than under-splits,
@@ -188,7 +228,7 @@ func IsSafeReadOnly(cmd string, safe []string) bool {
 		return false
 	}
 	for _, seg := range segments {
-		if !segmentIsReadOnly(seg, safe) {
+		if !segmentIsReadOnly(seg, safe) || hasUnsafeFlag(seg) {
 			return false
 		}
 	}

@@ -450,6 +450,20 @@ func (c *codeAssistClient) stream(ctx context.Context, messages []message.Messag
 				continue
 			}
 			if len(chunk.Response.Candidates) == 0 {
+				// GORILLA FIX (2026-10-05): an error sent MID-STREAM has no
+				// candidates either, and was skipped here as an empty chunk; the
+				// reply then ended "normally" with whatever had arrived.
+				var fault struct {
+					Error struct {
+						Code    int    `json:"code"`
+						Message string `json:"message"`
+					} `json:"error"`
+				}
+				if json.Unmarshal([]byte(payload), &fault) == nil && fault.Error.Message != "" {
+					eventChan <- ProviderEvent{Type: EventError,
+						Error: fmt.Errorf("Google ended the reply with an error (%d): %s", fault.Error.Code, fault.Error.Message)}
+					return
+				}
 				continue
 			}
 			cand := chunk.Response.Candidates[0]
@@ -472,6 +486,16 @@ func (c *codeAssistClient) stream(ctx context.Context, messages []message.Messag
 			}
 		}
 		if err := scanner.Err(); err != nil && ctx.Err() == nil {
+			eventChan <- ProviderEvent{Type: EventError, Error: err}
+			return
+		}
+		// No finish reason and no tool call: the stream stopped, it did not end.
+		// mapFinish("") used to turn that into "end of turn".
+		if finish == "" && len(allCalls) == 0 {
+			err := ctx.Err()
+			if err == nil {
+				err = fmt.Errorf("Google ended the connection before the reply was complete")
+			}
 			eventChan <- ProviderEvent{Type: EventError, Error: err}
 			return
 		}

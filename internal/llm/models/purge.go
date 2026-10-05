@@ -111,6 +111,8 @@ func PurgeFetchedCatalogues(configDir string, keep ...ModelID) PurgeResult {
 		ProviderOpenRouter:  true,
 		ProviderAntigravity: true,
 	}
+	// Its own edit, closed before the two purges below open theirs.
+	SupportedModels, _, commit := beginRegistryEdit()
 	for id, m := range SupportedModels {
 		if !fetched[m.Provider] || inUse[id] {
 			continue
@@ -127,6 +129,7 @@ func PurgeFetchedCatalogues(configDir string, keep ...ModelID) PurgeResult {
 			res.RemovedCompiled++
 		}
 	}
+	commit()
 	// GORILLA FIX (2026-08-21): local endpoint models were being left behind.
 	// They are fetched too, just over the wire at startup instead of from a
 	// cache file, and that distinction means nothing to whoever typed /purge.
@@ -142,7 +145,7 @@ func PurgeFetchedCatalogues(configDir string, keep ...ModelID) PurgeResult {
 		res.RemovedModels += PurgeCatalogue(configDir, p, inUse)
 	}
 
-	res.Kept = len(SupportedModels)
+	res.Kept = len(registryNow())
 
 	for _, name := range []string{cacheFileName, "antigravity-models.json"} {
 		p := filepath.Join(configDir, name)

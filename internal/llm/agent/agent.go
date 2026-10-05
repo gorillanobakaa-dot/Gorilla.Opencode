@@ -102,6 +102,9 @@ type agent struct {
 	lastUsage   provider.TokenUsage
 	lastUsageMu sync.RWMutex
 	toolsMu     sync.RWMutex
+	// Read with a.prov() and written with a.setProv(): /model swaps it from
+	// the UI goroutine while a turn is reading it on another.
+	providerMu  sync.RWMutex
 	provider    provider.Provider
 
 	titleProvider     provider.Provider
@@ -156,7 +159,7 @@ func NewAgent(
 }
 
 func (a *agent) Model() models.Model {
-	return a.provider.Model()
+	return a.prov().Model()
 }
 
 // GORILLA OVERRIDE: getTools/ReloadTools let the context loadout swap the
@@ -264,7 +267,7 @@ func (a *agent) RebuildProvider() (deferred bool) {
 
 func (a *agent) rebuildProviderNow() {
 	if p, err := createAgentProvider(a.agentName); err == nil {
-		a.provider = p
+		a.setProv(p)
 	} else {
 		logging.Error("failed to rebuild agent provider", "agent", a.agentName, "error", err)
 	}
@@ -285,14 +288,31 @@ func (a *agent) drainPendingRebuild() {
 	}
 }
 
+// activeRun is one Run's entry in activeRequests. A pointer, so the run that
+// stored it can remove exactly its own entry and nobody else's.
+type activeRun struct {
+	cancel context.CancelFunc
+}
+
 func (a *agent) Cancel(sessionID string) {
-	// Cancel regular requests
-	if cancelFunc, exists := a.activeRequests.LoadAndDelete(sessionID); exists {
-		if cancel, ok := cancelFunc.(context.CancelFunc); ok {
+	// GORILLA FIX (2026-10-05): cancelling ASKS the run to stop; it does not
+	// declare the session free.
+	//
+	// This used LoadAndDelete, so the session read as idle the instant Esc was
+	// pressed, while the old goroutine was still inside a tool. A new message
+	// started a second run beside it; when the old one finally ended it deleted
+	// the NEW run's entry, so the new run could no longer be cancelled and a
+	// third could start. The entry is now removed by the run that owns it, when
+	// it has really finished (see Run).
+	if v, exists := a.activeRequests.Load(sessionID); exists {
+		if run, ok := v.(*activeRun); ok && run.cancel != nil {
 			logging.InfoPersist(fmt.Sprintf("Request cancellation initiated for session: %s", sessionID))
-			cancel()
+			run.cancel()
 		}
 	}
+	// A tool parked on a permission prompt does not watch the context; without
+	// this it stayed parked for up to ten minutes after the cancel.
+	permission.CancelForSession(sessionID)
 
 	// Also check for summarize requests
 	if cancelFunc, exists := a.activeRequests.LoadAndDelete(sessionID + "-summarize"); exists {
@@ -306,13 +326,9 @@ func (a *agent) Cancel(sessionID string) {
 func (a *agent) IsBusy() bool {
 	busy := false
 	a.activeRequests.Range(func(key, value interface{}) bool {
-		if cancelFunc, ok := value.(context.CancelFunc); ok {
-			if cancelFunc != nil {
-				busy = true
-				return false // Stop iterating
-			}
-		}
-		return true // Continue iterating
+		// Any entry is a run in progress, whichever kind stored it.
+		busy = true
+		return false
 	})
 	return busy
 }
@@ -370,11 +386,14 @@ func (a *agent) err(err error) AgentEvent {
 }
 
 func (a *agent) Run(ctx context.Context, sessionID string, content string, attachments ...message.Attachment) (<-chan AgentEvent, error) {
-	if !a.provider.Model().SupportsAttachments && attachments != nil {
+	if !a.prov().Model().SupportsAttachments && attachments != nil {
 		attachments = nil
 	}
 	events := make(chan AgentEvent)
-	if a.IsSessionBusy(sessionID) {
+	// Claim the session in ONE step. "Is it busy? no; then store" let two
+	// messages sent together both pass the check.
+	run := &activeRun{}
+	if _, taken := a.activeRequests.LoadOrStore(sessionID, run); taken {
 		return nil, ErrSessionBusy
 	}
 
@@ -385,8 +404,7 @@ func (a *agent) Run(ctx context.Context, sessionID string, content string, attac
 	}
 
 	genCtx, cancel := context.WithCancel(ctx)
-
-	a.activeRequests.Store(sessionID, cancel)
+	run.cancel = cancel
 	go func() {
 		logging.Debug("Request started", "sessionID", sessionID)
 		defer logging.RecoverPanic("agent.Run", func() {
@@ -401,8 +419,15 @@ func (a *agent) Run(ctx context.Context, sessionID string, content string, attac
 			logging.ErrorPersist(result.Error.Error())
 		}
 		logging.Debug("Request completed", "sessionID", sessionID)
-		a.activeRequests.Delete(sessionID)
+		// Only this run's own entry. See Cancel.
+		a.activeRequests.CompareAndDelete(sessionID, run)
 		cancel()
+		// A helper's loop history is finished with its run; the coder's is
+		// cleared at the next turn. Without this every helper session ever
+		// started stayed in the detector's map for the life of the program.
+		if a.agentName != config.AgentCoder {
+			stuck.Reset(sessionID)
+		}
 		// Delete first, so IsBusy inside the drain sees this session as finished.
 		// This is the single point a request completes on both the success and
 		// the error path, which is why the drain belongs here.
@@ -432,6 +457,7 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 	ctx = provider.WithUploadBudget(ctx, provider.NewUploadBudget(config.TurnUploadBudgetBytes()))
 	// List existing messages; if none, start title generation asynchronously.
 	msgs, err := a.messages.List(ctx, sessionID)
+	msgs = answerOrphanedToolCalls(msgs)
 	if err != nil {
 		return a.err(fmt.Errorf("failed to list messages: %w", err))
 	}
@@ -510,7 +536,16 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 	// prompt forever, and a prompt that always fires is a prompt nobody reads.
 	// That is how a control gets switched off in practice while still looking
 	// present in the source. See internal/permission/taint.go.
-	permission.ClearTaint(sessionID)
+	//
+	// GORILLA FIX (2026-10-05): ... and ONLY the user typing. This line ran for
+	// every agent, and ClearTaint resolves a helper's session to its root. So a
+	// page that had tainted the turn only had to get the model to start a helper
+	// (the agent tool, or research) and the root's taint was wiped: the next
+	// action was auto-approved without the "this turn has read untrusted
+	// content" prompt. A helper starting is the model acting, not the person.
+	if a.agentName == config.AgentCoder {
+		permission.ClearTaint(sessionID)
+	}
 	// Same boundary, same reason: the person has seen the last turn. Whatever
 	// the model repeated then is not held against what they ask for now.
 	stuck.Reset(sessionID)
@@ -567,8 +602,8 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 			// everything up to this point is already recorded, so /compact
 			// carries it forward.
 			if over := ContextOverflowMessage(
-				EstimateRequestTokens(a.provider.SystemPrompt(), msgHistory, a.getTools()),
-				a.provider.Model(),
+				EstimateRequestTokens(a.prov().SystemPrompt(), a.wireView(msgHistory), a.visibleTools(sessionID)),
+				a.prov().Model(),
 			); over != "" {
 				agentMessage.AddFinish(message.FinishReasonError)
 				a.messages.Update(context.Background(), agentMessage)
@@ -595,12 +630,12 @@ func (a *agent) createUserMessage(ctx context.Context, sessionID, content string
 
 func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msgHistory []message.Message) (message.Message, *message.Message, error) {
 	ctx = context.WithValue(ctx, tools.SessionIDContextKey, sessionID)
-	eventChan := a.provider.StreamResponse(ctx, msgHistory, a.visibleTools(sessionID))
+	eventChan := a.prov().StreamResponse(ctx, msgHistory, a.visibleTools(sessionID))
 
 	assistantMsg, err := a.messages.Create(ctx, sessionID, message.CreateMessageParams{
 		Role:  message.Assistant,
 		Parts: []message.ContentPart{},
-		Model: a.provider.Model().ID,
+		Model: a.prov().Model().ID,
 	})
 	if err != nil {
 		return assistantMsg, nil, fmt.Errorf("failed to create assistant message: %w", err)
@@ -634,6 +669,21 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 			a.finishMessage(context.Background(), &assistantMsg, message.FinishReasonCanceled)
 			return assistantMsg, a.cancelPendingToolCalls(&assistantMsg), ctx.Err()
 		}
+	}
+	// GORILLA FIX (2026-10-05): a stream that closed WITHOUT saying it was
+	// finished is a failure, not an answer. A provider goroutine that returned
+	// early (a dropped connection, a cancelled retry wait) closed the channel
+	// with neither a completion nor an error; this loop simply ended, and half
+	// a reply, or an empty one, was stored and shown as the model's answer.
+	if assistantMsg.FinishPart() == nil {
+		if ctx.Err() != nil {
+			a.finishMessage(context.Background(), &assistantMsg, message.FinishReasonCanceled)
+			return assistantMsg, a.cancelPendingToolCalls(&assistantMsg), ctx.Err()
+		}
+		incomplete := errors.New("the connection to the model ended before the reply was complete; nothing after this point was received. Send the message again")
+		assistantMsg.AddFinish(message.FinishReasonError, incomplete.Error())
+		_ = a.messages.Update(ctx, assistantMsg)
+		return assistantMsg, a.cancelPendingToolCalls(&assistantMsg), incomplete
 	}
 
 	toolResults := make([]message.ToolResult, len(assistantMsg.ToolCalls()))
@@ -716,10 +766,8 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 				toolResults[i] = message.ToolResult{
 					ToolCallID: toolCall.ID,
 					Content: fmt.Sprintf(
-						"The arguments for %s arrived damaged in transport and were not run: %s. "+
-							"This is NOT a mistake in what you sent — the text was corrupted between "+
-							"the model and this program. Send the same call again unchanged.",
-						toolCall.Name, reason),
+						"The arguments for %s could not be used: %s. %s",
+						toolCall.Name, reason, corruptedToolAdvice(reason)),
 					IsError: true,
 				}
 				continue
@@ -777,7 +825,14 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 						}
 					}
 					a.finishMessage(ctx, &assistantMsg, message.FinishReasonPermissionDenied)
-					break
+					// GORILLA FIX (2026-10-05): this was a bare `break`. It sits
+					// inside `select { default: }`, so it left the SELECT and the
+					// loop went on: the calls just marked "canceled by user" were
+					// then RUN, and their real results replaced the cancellation.
+					// The person said no to the first of three commands and the
+					// other two executed. Found by audit; no test drove a denial
+					// with a call after it.
+					goto out
 				}
 
 				// GORILLA FIX (2026-08-18): report the failure instead of
@@ -912,7 +967,18 @@ func (a *agent) processEvent(ctx context.Context, sessionID string, assistantMsg
 
 	switch event.Type {
 	case provider.EventThinkingDelta:
-		assistantMsg.AppendReasoningContent(event.Content)
+		// GORILLA FIX (2026-10-05): Anthropic and the ChatGPT sign-in put the
+		// reasoning text in Thinking, not Content. Reading only Content stored
+		// an empty string per delta: the reasoning was thrown away and each
+		// nothing still cost a database write.
+		text := event.Content
+		if text == "" {
+			text = event.Thinking
+		}
+		if text == "" {
+			return nil
+		}
+		assistantMsg.AppendReasoningContent(text)
 		return a.messages.Update(ctx, *assistantMsg)
 	case provider.EventContentDelta:
 		assistantMsg.AppendContent(event.Content)
@@ -963,14 +1029,14 @@ func (a *agent) processEvent(ctx context.Context, sessionID string, assistantMsg
 				if err := a.messages.Update(ctx, *assistantMsg); err != nil {
 					return fmt.Errorf("failed to update message: %w", err)
 				}
-				return a.TrackUsage(ctx, sessionID, a.provider.Model(), event.Response.Usage)
+				return a.TrackUsage(ctx, sessionID, a.prov().Model(), event.Response.Usage)
 			}
 		}
 		assistantMsg.AddFinish(event.Response.FinishReason)
 		if err := a.messages.Update(ctx, *assistantMsg); err != nil {
 			return fmt.Errorf("failed to update message: %w", err)
 		}
-		return a.TrackUsage(ctx, sessionID, a.provider.Model(), event.Response.Usage)
+		return a.TrackUsage(ctx, sessionID, a.prov().Model(), event.Response.Usage)
 	}
 
 	return nil
@@ -1086,9 +1152,9 @@ func (a *agent) Update(agentName config.AgentName, modelID models.ModelID) (mode
 		return models.Model{}, fmt.Errorf("failed to update config: %w", err)
 	}
 
-	a.provider = provider
+	a.setProv(provider)
 
-	return a.provider.Model(), nil
+	return a.prov().Model(), nil
 }
 
 func (a *agent) Summarize(ctx context.Context, sessionID string) error {
@@ -1118,6 +1184,7 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 		a.Publish(pubsub.CreatedEvent, event)
 		// Get all messages from the session
 		msgs, err := a.messages.List(summarizeCtx, sessionID)
+		msgs = answerOrphanedToolCalls(msgs)
 		if err != nil {
 			event = AgentEvent{
 				Type:  AgentEventTypeError,
@@ -1384,7 +1451,115 @@ func corruptedToolInput(input string) string {
 	}
 	var probe any
 	if err := json.Unmarshal([]byte(input), &probe); err != nil {
-		return "the arguments are not valid JSON (" + err.Error() + ")"
+		// GORILLA FIX (2026-10-05): try the repair BEFORE refusing.
+		//
+		// tools.UnmarshalToolInput mends the things a model really sends: an
+		// unescaped Windows path, a real newline inside a string, a list that
+		// arrived as text. But this check ran first and refused anything a
+		// strict decode rejected, so the call never reached the tool and the
+		// repair never ran in the loop at all. Its tests called the function
+		// directly and passed. Found by audit.
+		var mended map[string]any
+		if tools.UnmarshalToolInput(input, &mended) == nil {
+			return ""
+		}
+		return notValidJSON + " (" + err.Error() + ")"
 	}
 	return ""
+}
+
+// notValidJSON marks the one reason that is NOT a transport fault. Arguments
+// that stop being JSON part-way through were almost always cut off by the
+// model's output limit, and telling the model "send the same call again
+// unchanged" sends it round the same loop until the stuck detector ends the
+// turn. See corruptedToolAdvice.
+const notValidJSON = "the arguments are not complete, valid JSON"
+
+// corruptedToolAdvice is what the model is told to do about a refused call.
+func corruptedToolAdvice(reason string) string {
+	if strings.HasPrefix(reason, notValidJSON) {
+		return "The call was NOT run. The usual cause is that the call was cut off by the " +
+			"output limit before it was finished, so sending it again unchanged will fail " +
+			"the same way. Send a SMALLER call: write a long file in several parts (create " +
+			"it with the first part, then add the rest with edit), or shorten the text."
+	}
+	return "This is NOT a mistake in what you sent — the text was corrupted between " +
+		"the model and this program. Send the same call again unchanged."
+}
+
+// prov returns the provider this agent is using right now.
+func (a *agent) prov() provider.Provider {
+	a.providerMu.RLock()
+	defer a.providerMu.RUnlock()
+	return a.provider
+}
+
+func (a *agent) setProv(p provider.Provider) {
+	a.providerMu.Lock()
+	a.provider = p
+	a.providerMu.Unlock()
+}
+
+// answerOrphanedToolCalls gives every tool call in a loaded history a result.
+//
+// GORILLA FIX (2026-10-05): if the program was killed, or crashed, while a tool
+// was running, the session is left holding a tool call that was never answered.
+// OpenAI and Anthropic refuse any history shaped like that, on EVERY later
+// turn, and /compact sends the same history, so the conversation could never be
+// used again. Nothing repaired it.
+//
+// The repair is made on the copy being sent, not in the database: what is
+// stored stays the record of what happened. The model is told the truth, that
+// the call never came back.
+func answerOrphanedToolCalls(msgs []message.Message) []message.Message {
+	out := make([]message.Message, 0, len(msgs))
+	for i := 0; i < len(msgs); i++ {
+		m := msgs[i]
+		out = append(out, m)
+		calls := m.ToolCalls()
+		if m.Role != message.Assistant || len(calls) == 0 {
+			continue
+		}
+		answered := map[string]bool{}
+		j := i + 1
+		for ; j < len(msgs) && msgs[j].Role == message.Tool; j++ {
+			for _, r := range msgs[j].ToolResults() {
+				answered[r.ToolCallID] = true
+			}
+			out = append(out, msgs[j])
+		}
+		i = j - 1
+		var missing []message.ContentPart
+		for _, c := range calls {
+			if !answered[c.ID] {
+				missing = append(missing, message.ToolResult{
+					ToolCallID: c.ID,
+					Content: "This call never returned a result: the program stopped while it was running. " +
+						"It may or may not have taken effect. Check the current state before relying on it.",
+					IsError: true,
+				})
+			}
+		}
+		if len(missing) > 0 {
+			out = append(out, message.Message{Role: message.Tool, SessionID: m.SessionID, Parts: missing})
+		}
+	}
+	return out
+}
+
+// wireView returns the history as the provider will actually SEND it.
+//
+// GORILLA FIX (2026-10-05): the "will this fit?" check measured the raw history
+// and every tool. The request that goes out has had stale and aged file reads
+// replaced by one-line stubs and carries only the tools in view, so it is much
+// smaller. A long session was therefore refused with "the request was not
+// sent" although it fitted, and each "continue" did one round and was refused
+// again.
+func (a *agent) wireView(msgs []message.Message) []message.Message {
+	if w, ok := a.prov().(interface {
+		WireMessages([]message.Message) []message.Message
+	}); ok {
+		return w.WireMessages(msgs)
+	}
+	return msgs
 }

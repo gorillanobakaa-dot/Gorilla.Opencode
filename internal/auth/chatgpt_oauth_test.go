@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -142,5 +143,29 @@ func TestAuthHeadersCarryEverythingTheBackendNeeds(t *testing.T) {
 	// empty header value is not the same request as no header.
 	if _, present := (&ChatGPTCreds{}).AuthHeaders("t")["ChatGPT-Account-ID"]; present {
 		t.Error("empty account id produced a ChatGPT-Account-ID header")
+	}
+}
+
+// The client_version sent to the backend decides which models it LISTS. Pinned
+// to a real Codex release ("0.147.0") it hid gpt-6-luna, whose minimum is
+// 0.155.0, and /update truthfully reported "3 usable" from a filtered answer.
+// Measured 2026-10-05 on a free account: 0.147.0 lists 3 chat models, anything
+// from 0.155.0 up lists 4.
+//
+// So the value must stay above any release number a model could require. This
+// fails if someone "corrects" it back to the current Codex version, which is the
+// natural thing to do and the thing that broke.
+func TestClientVersionDoesNotHideNewModels(t *testing.T) {
+	major, _, ok := strings.Cut(chatgptClientVersion, ".")
+	n, err := strconv.Atoi(major)
+	if !ok || err != nil {
+		t.Fatalf("client version %q is not MAJOR.MINOR.PATCH", chatgptClientVersion)
+	}
+	if n < 99 {
+		t.Errorf("client version is %s. A real release number hides every model whose "+
+			"minimal_client_version is newer; see the note on chatgptClientVersion", chatgptClientVersion)
+	}
+	if ChatGPTClientVersion != chatgptClientVersion {
+		t.Error("the listing and the generation path announce different client versions")
 	}
 }

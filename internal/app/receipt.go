@@ -83,7 +83,7 @@ func BuildReceipt(msgs []message.Message) Receipt {
 
 			outcome := "no result recorded"
 			if tr, ok := results[tc.ID]; ok {
-				outcome = outcomeOf(tr)
+				outcome = outcomeFor(tc.Name, tr)
 			}
 			if outcome != "ok" {
 				r.Problems++
@@ -101,15 +101,30 @@ func BuildReceipt(msgs []message.Message) Receipt {
 	return r
 }
 
-// outcomeOf says how a call ended, in a few words, from its result alone.
-func outcomeOf(tr message.ToolResult) string {
+// outcomeOf is outcomeFor for a shell command, kept for callers that have only
+// the result.
+func outcomeOf(tr message.ToolResult) string { return outcomeFor("bash", tr) }
+
+// outcomeFor says how a call ended, in a few words, from its result.
+//
+// GORILLA FIX (2026-10-05): the tool's NAME now matters. The shell's own
+// phrases ("Exit code 1", "Command was aborted") were searched for in every
+// tool's result, so viewing a file that contained the words "Exit code 1" was
+// listed as a failed call. And a command that was stopped by a timeout or a
+// cancel returns an ordinary result, so it was listed as "ok".
+func outcomeFor(tool string, tr message.ToolResult) string {
 	c := tr.Content
 	low := strings.ToLower(c)
+	shell := tool == "bash"
 	switch {
 	case strings.HasPrefix(low, "permission denied"):
 		return "refused, not run"
-	case strings.Contains(c, "Tool execution canceled"):
+	case strings.HasPrefix(c, "Tool execution canceled"):
 		return "cancelled, not run"
+	case shell && strings.Contains(c, "Command was aborted before completion"):
+		return "STOPPED before it finished (timeout or cancel)"
+	case strings.HasPrefix(c, "This call never returned a result"):
+		return "never returned: the program stopped while it ran"
 	case strings.HasPrefix(c, "Tool not found"):
 		return "no such tool"
 	}
@@ -133,7 +148,7 @@ func outcomeOf(tr message.ToolResult) string {
 	// A command that ran and failed is not an "error result" as far as the
 	// shell tool is concerned: it reports the exit code in the text. Read it,
 	// or every failing build would be listed here as ok.
-	if m := exitCodeRe.FindAllStringSubmatch(c, -1); len(m) > 0 {
+	if m := exitCodeRe.FindAllStringSubmatch(c, -1); shell && len(m) > 0 {
 		if code := m[len(m)-1][1]; code != "0" {
 			return "exit code " + code
 		}

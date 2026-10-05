@@ -184,10 +184,15 @@ func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat
 	//
 	// So the deadline is checked FIRST and separately, and it fails loudly.
 	if ctx.Err() == context.DeadlineExceeded || errors.Is(result.Error, context.DeadlineExceeded) {
+		// GORILLA FIX (2026-10-05): this said "Nothing was written", whatever
+		// had been edited before the deadline, and printed no receipt. The
+		// receipt is the program's own record; on the one path where the model
+		// gives no account at all it is the only account there is.
+		a.printReceipt(os.Stderr, sess.ID)
 		return fmt.Errorf(
 			"gave up after %s: no answer arrived. The connection may have gone silent — "+
 				"on a satellite or mobile link that is common, and there is nobody here to "+
-				"cancel by hand. Nothing was written. Raise or remove the limit with "+
+				"cancel by hand. Anything done before the limit is listed above. Raise or remove the limit with "+
 				"GORILLA_OPENCODE_HEADLESS_TIMEOUT (a duration such as 45m, or 0 to wait "+
 				"indefinitely)", config.NonInteractiveDeadline())
 	}

@@ -379,3 +379,10 @@ func WithGeminiOptions(geminiOptions ...GeminiOption) ProviderClientOption {
 		options.geminiOptions = geminiOptions
 	}
 }
+
+// WireMessages returns the history as it will be sent: after the same cleaning
+// every request goes through. For callers that must measure a request before
+// sending it (the agent's context check).
+func (p *baseProvider[C]) WireMessages(messages []message.Message) []message.Message {
+	return p.cleanMessages(messages)
+}

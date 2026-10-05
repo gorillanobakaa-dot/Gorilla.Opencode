@@ -43,12 +43,15 @@ package tools
 // and the file-read exemption are ours.
 
 import (
+	"encoding/json"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
 )
@@ -84,10 +87,16 @@ var (
 func knownSecrets() []knownSecret {
 	knownSecretsMu.Lock()
 	defer knownSecretsMu.Unlock()
-	if knownSecretsDone {
+	// GORILLA FIX (2026-10-05): the list was built once per process, so a key
+	// entered with /connect or /provider afterwards was never masked. It is
+	// rebuilt when it is more than a few seconds old; building it reads the
+	// configuration in memory and three small files.
+	if knownSecretsDone && time.Since(knownSecretsAt) < 10*time.Second {
 		return knownSecretsList
 	}
 	knownSecretsDone = true
+	knownSecretsAt = time.Now()
+	knownSecretsList = nil
 
 	seen := map[string]bool{}
 	add := func(value, label string) {
@@ -109,6 +118,30 @@ func knownSecrets() []knownSecret {
 	if cfg := safeConfig(); cfg != nil {
 		for name, p := range cfg.Providers {
 			add(p.APIKey, "provider key for "+string(name))
+		}
+		// GORILLA FIX (2026-10-05): the keys of saved connections (NVIDIA NIM,
+		// Cloudflare ...) were not on the list at all, though they are the
+		// keys most people here actually hold.
+		for _, e := range cfg.LocalEndpoints {
+			add(e.APIKey, "key for the connection "+e.Name)
+		}
+	}
+	// ... nor were the sign-in tokens, which are as good as a password until
+	// they expire. Read from the files the sign-ins write; no parsing of who
+	// wrote them, just the token fields.
+	for _, f := range []string{"chatgpt-oauth.json", "antigravity-oauth.json", "gemini-oauth.json", "oauth_creds.json"} {
+		blob, err := os.ReadFile(filepath.Join(config.ConfigBase(), f))
+		if err != nil {
+			continue
+		}
+		var fields map[string]any
+		if json.Unmarshal(blob, &fields) != nil {
+			continue
+		}
+		for _, k := range []string{"access_token", "refresh_token", "id_token"} {
+			if v, ok := fields[k].(string); ok {
+				add(v, "sign-in token ("+strings.TrimSuffix(f, ".json")+")")
+			}
 		}
 	}
 	for _, kv := range os.Environ() {
@@ -245,3 +278,6 @@ func looksLikePath(v string) bool {
 	}
 	return len(v) >= 3 && v[1] == ':' && (v[2] == '\\' || v[2] == '/')
 }
+
+// knownSecretsAt is when knownSecretsList was last built.
+var knownSecretsAt time.Time

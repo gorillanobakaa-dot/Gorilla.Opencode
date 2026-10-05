@@ -101,7 +101,7 @@ const evictAfterAssistantTurns = 8
 const evictAgeMinContent = 400
 
 const agedStubFmt = "[dropped to save context: this %s result is %d turns old and " +
-	"has not been needed since. The content is NOT lost, it is in the session store " +
+	"was set aside for its age alone. The content is NOT lost, it is in the session store " +
 	"on disk. If you still need it, run %s again rather than recalling it from " +
 	"memory: the file may have changed since.]"
 

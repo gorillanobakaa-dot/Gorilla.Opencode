@@ -130,6 +130,8 @@ func LoadRefreshedCatalogue(configDir string) (int, error) {
 			c.Schema, catalogueSchema)
 	}
 	n := 0
+	SupportedModels, _, commit := beginRegistryEdit()
+	defer commit()
 	for id, m := range c.Models {
 		if m.Provider != ProviderOpenRouter || m.APIModel == "" {
 			continue // refuse entries that could not work
@@ -320,6 +322,8 @@ func RefreshOpenRouter(configDir string) (*RefreshResult, error) {
 		return nil, err
 	}
 
+	SupportedModels, _, commit := beginRegistryEdit()
+	defer commit()
 	for id, m := range fresh {
 		SupportedModels[id] = m
 	}

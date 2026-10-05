@@ -562,6 +562,10 @@ func validateAgent(cfg *Config, name AgentName, agent Agent) error {
 	if current, isLegacy := models.LegacyModelIDs[agent.Model]; isLegacy {
 		logging.Info("migrating legacy model id",
 			"agent", name, "from", agent.Model, "to", current)
+		// Remembered for the model doctor, which says it on screen and writes
+		// it to config.json. A move known only to a log file was repeated on
+		// every launch and never seen.
+		legacyMoves[name] = [2]models.ModelID{agent.Model, current}
 		agent.Model = current
 		updated := cfg.Agents[name]
 		updated.Model = current
@@ -827,14 +831,26 @@ func sanitiseProviderKeys() {
 		}
 		if clean == "" && p.APIKey != "" {
 			logging.Warn("ignoring unusable API key (contains control characters)", "provider", name)
+			discardedKeys[string(name)] = len([]rune(p.APIKey))
 		}
 		p.APIKey = clean
 		cfg.Providers[name] = p
 	}
 	for i, e := range cfg.LocalEndpoints {
-		cfg.LocalEndpoints[i].APIKey = SanitiseAPIKey(e.APIKey)
+		clean := SanitiseAPIKey(e.APIKey)
+		if clean == "" && e.APIKey != "" {
+			discardedKeys["the connection "+e.Name] = len([]rune(e.APIKey))
+		}
+		cfg.LocalEndpoints[i].APIKey = clean
 	}
 }
+
+// discardedKeys records every saved key that was thrown away at load because it
+// was not a key, with its length. A log line nobody reads is not a report: the
+// owner's gemini key sat in config.json as nine NUL bytes for five weeks,
+// warned about on every launch into a log, while the provider simply showed as
+// not set up. The model doctor reads this and says it on screen.
+var discardedKeys = map[string]int{}
 
 // SanitiseAPIKey strips whitespace and refuses a key containing control
 // characters.
@@ -1331,6 +1347,13 @@ func registerLocalEndpoints() {
 	} else if n > 0 {
 		logging.Debug("Applied refreshed ChatGPT model list", "models", n)
 	}
+
+	// The Gemini API-key list, as last fetched. Disk only.
+	models.LoadRefreshedGemini(CacheBase())
+	// What the last /update found when it ASKED models whether they answer
+	// (models/probe.go). Disk only. Loaded before any endpoint is registered so
+	// the default model for an endpoint is chosen with that evidence in hand.
+	models.LoadProbeVerdicts(CacheBase())
 
 	var first models.ModelID
 	for _, url := range order {
@@ -1849,3 +1872,7 @@ func ReregisterLocalEndpoints() int {
 	registerLocalEndpoints()
 	return n
 }
+
+// legacyMoves records each agent that validateAgent moved off a retired model
+// id in memory: from, to. See doctorAgents.
+var legacyMoves = map[AgentName][2]models.ModelID{}

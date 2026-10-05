@@ -92,7 +92,27 @@ const (
 	// the backend uses it to decide whether the client is new enough (it returns
 	// a "minimal_client_version" in its own payload, see
 	// codex-api/src/endpoint/models.rs:207).
-	chatgptClientVersion = "0.147.0"
+	//
+	// GORILLA OVERRIDE (2026-10-05): this was "0.147.0", the Codex release the
+	// wire was read from, and that number silently HID models. The backend only
+	// lists a model to a client at or above that model's minimal_client_version.
+	// Measured on the owner's free account, same token, same minute:
+	//
+	//	client_version=0.147.0  ->  gpt-5.6-terra, gpt-5.6-luna, gpt-5.5
+	//	client_version=0.160.0  ->  the same three PLUS gpt-6-luna (minimum 0.155.0)
+	//
+	// and the three it did list had been relabelled by OpenAI "Older ..." and
+	// "Legacy ...", which is the backend saying a newer one exists. /update ran,
+	// reported "3 usable" and was telling the truth about a filtered answer.
+	//
+	// A pinned release number is a hand-typed fact with an expiry date, the same
+	// rot as a hand-typed model list. So the value is now deliberately higher
+	// than any real Codex release: "show me everything this account may use".
+	// It is not a claim to be that release. What it must not break is the wire,
+	// and that was measured, not assumed: gpt-6-luna and gpt-5.6-terra both
+	// answered an ordinary function-call request on /responses with this value
+	// (HTTP 200, get_weather({"city":"Bucharest"})) on 2026-10-05.
+	chatgptClientVersion = "99.0.0"
 
 	// ChatGPTClientVersion is the same value, exported for the provider
 	// transport, which must append it to /responses as well. One constant so the

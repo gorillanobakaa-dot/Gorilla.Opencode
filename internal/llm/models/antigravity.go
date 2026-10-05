@@ -21,7 +21,13 @@ const (
 	AGGemini31Pro    ModelID = "antigravity.gemini-3.1-pro-high"
 )
 
-// AntigravityModels is the curated catalogue exposed in the model picker.
+// AntigravityModels is the built-in, offline first-run list. It is REPLACED by
+// the fetched list as soon as one exists (antigravity_refresh.go), because a
+// typed list goes stale: by 2026-10-05 Google no longer listed the two Claude
+// 4.6 entries below, and they were still at the top of the picker.
+//
+// Rank is 1 = best, the convention the picker prints and sorts by. These used
+// to count the other way (10 = best) and were shown numbered "9." and "10.".
 var AntigravityModels = map[ModelID]Model{
 	AGClaudeSonnet46: {
 		ID:                  AGClaudeSonnet46,
@@ -33,7 +39,7 @@ var AntigravityModels = map[ModelID]Model{
 		DefaultMaxTokens:    16_384,
 		CanReason:           false,
 		SupportsAttachments: true,
-		Rank:                9,
+		Rank:                2,
 	},
 	AGClaudeOpus46: {
 		ID:                  AGClaudeOpus46,
@@ -45,7 +51,7 @@ var AntigravityModels = map[ModelID]Model{
 		DefaultMaxTokens:    32_000,
 		CanReason:           true,
 		SupportsAttachments: true,
-		Rank:                10,
+		Rank:                1,
 	},
 	AGGPTOSS120B: {
 		ID:                  AGGPTOSS120B,
@@ -57,7 +63,7 @@ var AntigravityModels = map[ModelID]Model{
 		DefaultMaxTokens:    16_384,
 		CanReason:           true,
 		SupportsAttachments: false,
-		Rank:                6,
+		Rank:                5,
 	},
 	AGGemini36Flash: {
 		ID:                  AGGemini36Flash,
@@ -69,7 +75,7 @@ var AntigravityModels = map[ModelID]Model{
 		DefaultMaxTokens:    16_384,
 		CanReason:           true,
 		SupportsAttachments: true,
-		Rank:                7,
+		Rank:                4,
 	},
 	AGGemini31Pro: {
 		ID:                  AGGemini31Pro,
@@ -81,7 +87,7 @@ var AntigravityModels = map[ModelID]Model{
 		DefaultMaxTokens:    16_384,
 		CanReason:           true,
 		SupportsAttachments: true,
-		Rank:                8,
+		Rank:                3,
 	},
 }
 

@@ -400,6 +400,9 @@ func (c *chatgptClient) stream(ctx context.Context, messages []message.Message, 
 		var usage TokenUsage
 		finish := message.FinishReasonEndTurn
 		var streamErr error
+		// completed is set only by the backend's own closing event. A stream
+		// that stops without one was cut off, whatever text had arrived.
+		completed := false
 
 		scanner := bufio.NewScanner(resp.Body)
 		// Tool arguments arrive whole on output_item.done, and a large file edit
@@ -460,6 +463,7 @@ func (c *chatgptClient) stream(ctx context.Context, messages []message.Message, 
 				eventChan <- ProviderEvent{Type: EventToolUseStop, ToolCall: &tc}
 
 			case "response.completed":
+				completed = true
 				usage = TokenUsage{
 					InputTokens:     ev.Response.Usage.InputTokens,
 					OutputTokens:    ev.Response.Usage.OutputTokens,
@@ -467,6 +471,7 @@ func (c *chatgptClient) stream(ctx context.Context, messages []message.Message, 
 				}
 
 			case "response.incomplete":
+				completed = true
 				finish = message.FinishReasonMaxTokens
 
 			case "response.failed", "error":
@@ -486,6 +491,17 @@ func (c *chatgptClient) stream(ctx context.Context, messages []message.Message, 
 			return
 		}
 		if err := scanner.Err(); err != nil && ctx.Err() == nil {
+			eventChan <- ProviderEvent{Type: EventError, Error: err}
+			return
+		}
+		// GORILLA FIX (2026-10-05): no closing event, no answer. `finish` starts
+		// as "end of turn", so a connection dropped mid-reply was reported as a
+		// complete reply with partial text and zero usage.
+		if !completed {
+			err := ctx.Err()
+			if err == nil {
+				err = fmt.Errorf("ChatGPT: the connection ended before the reply was complete")
+			}
 			eventChan <- ProviderEvent{Type: EventError, Error: err}
 			return
 		}

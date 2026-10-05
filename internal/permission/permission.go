@@ -35,7 +35,7 @@ var ErrorPermissionDenied = errors.New("permission denied")
 // back. What must not happen is waiting forever. When it expires the request is
 // DENIED, which the tool reports as a failure — a lane that failed loudly is
 // recoverable; a lane that hangs silently poisons the whole run.
-var permissionWait = 10 * time.Minute
+var permissionWait = PermissionWait
 
 // PermissionWait is the shipped value, for documentation and display.
 const PermissionWait = 10 * time.Minute

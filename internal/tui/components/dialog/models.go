@@ -795,6 +795,15 @@ func (m *modelDialogCmp) View() string {
 		// ASCII only, and appended rather than prefixed: prefixes are already
 		// carrying rank, bookmarks and the multi-select mark, and box-drawing
 		// glyphs are ambiguous-width and wrap the frame (styles/ascii.go).
+		// GORILLA OVERRIDE (2026-10-05): say what was FOUND when this model was
+		// last asked a question (models/probe.go). A listed model that returns
+		// "retired" or an error looks exactly like one that works until it is
+		// picked; the row is where that has to be said.
+		if v, ok := models.ProbeVerdictFor(m.models[i].ID); ok {
+			if l := v.Label(); l != "" {
+				label += "  (" + l + ")"
+			}
+		}
 		switch m.models[i].LocalState {
 		case "loaded":
 			label += "  (loaded)"

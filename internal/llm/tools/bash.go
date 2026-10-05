@@ -101,13 +101,21 @@ var bannedCommands = []string{
 // generators, the tests themselves). They are safe only to the degree the tree
 // is. Writing that code requires the write tool, which does prompt.
 var safeReadOnlyCommands = []string{
-	"ls", "echo", "pwd", "date", "cal", "uptime", "whoami", "id", "groups", "which", "type", "whereis",
+	// GORILLA FIX (2026-10-05): "type" is gone. In PowerShell it is Get-Content:
+	// `type $env:USERPROFILE\.aws\credentials` read a credentials file with no
+	// prompt and past the sensitive-read guard, which only the view tool calls.
+	"ls", "echo", "pwd", "date", "cal", "uptime", "whoami", "id", "groups", "which", "whereis",
 	"whatis", "uname", "hostname", "df", "du", "free",
 
-	"git status", "git log", "git diff", "git show", "git branch", "git tag", "git remote", "git ls-files", "git ls-remote",
+	// "git ls-remote" is gone: it contacts whatever host it is given, so it is
+	// egress, not a read. Flags that write, delete or run a program are caught
+	// by unsafeFlags in commandgate.go.
+	"git status", "git log", "git diff", "git show", "git branch", "git tag", "git remote", "git ls-files",
 	"git rev-parse", "git config --get", "git config --list", "git describe", "git blame", "git grep", "git shortlog",
 
-	"go version", "go help", "go list", "go env", "go doc", "go vet", "go fmt", "go mod", "go test", "go build",
+	// "go fmt" (rewrites files), "go mod" (downloads) and "go env" (-w writes
+	// the user's Go configuration) are gone: none of them is a read.
+	"go version", "go help", "go list", "go doc", "go vet", "go test", "go build",
 }
 
 // powerShellGuidance is appended to the bash tool description when the session
@@ -176,7 +184,7 @@ Before executing the command, please follow these steps:
 
 Usage notes:
 - The command argument is required.
-- You can specify an optional timeout in milliseconds (up to 600000ms / 10 minutes). If not specified, commands will timeout after 30 minutes.
+- You can specify an optional timeout in milliseconds (up to 600000ms / 10 minutes). If not specified, a command is stopped after 60 seconds, so pass a larger timeout for a build or a test run.
 - VERY IMPORTANT: You MUST avoid running shell search/read commands ('grep', 'rg', 'cat', 'head', 'tail', 'ls', and the shell command 'find'). Use the find TOOL to search and list, and the view tool to read files — they are bounded and ranked; raw shell output is not.
 - When issuing multiple commands, use the ';' or '&&' operator to separate them. DO NOT use newlines (newlines are ok in quoted strings).
 - IMPORTANT: All commands share the same shell session. Shell state (environment variables, virtual environments, current directory, etc.) persist between commands. For example, if you set an environment variable as part of a command, the environment variable will persist for subsequent commands.
@@ -262,8 +270,14 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		p := b.permissions.Request(
 			permission.CreatePermissionRequest{
 				SessionID: sessionID,
-				Path:      config.WorkingDirectory(),
-				ToolName:  BashToolName,
+				// GORILLA FIX (2026-10-05): the path is the one the command
+				// reaches OUTSIDE the project, when it names one. It was
+				// always the working directory, so auto-approve's rule "not
+				// outside every workspace root" could never apply to a shell
+				// command: `Set-Content $env:USERPROFILE\.ssh\authorized_keys`
+				// was approved as if it were project work.
+				Path:     bashRequestPath(params.Command),
+				ToolName: BashToolName,
 				Action:    "execute",
 				// Scope the grant to THIS command. "Allow for session" on
 				// `go build ./...` should not also authorise `rm -rf ~`.
@@ -463,7 +477,12 @@ func truncateOutput(content string) string {
 	// failure clampToolContent's own comment warns about. A notice the reader
 	// does not see is not a notice. The last lines of a result are the ones a
 	// model weighs most, so that is where it goes.
-	notice := spillNotice(spillOutput("bash", content))
+	// GORILLA FIX (2026-10-05): mask BEFORE the copy is saved. The full output
+	// was written to disk raw and the model was then told to search that file
+	// with find, whose output is not shape-masked: a secret in the cut middle
+	// could be fetched back out by the very notice meant to help.
+	spillCopy, _ := MaskSecrets(BashToolName, content)
+	notice := spillNotice(spillOutput("bash", spillCopy))
 	tail := fmt.Sprintf("\n\n[OUTPUT TRUNCATED: %d lines from the MIDDLE are not shown above. "+
 		"Do not conclude that something is absent from this output: it may be in the part not shown.%s]",
 		truncatedLinesCount, notice)

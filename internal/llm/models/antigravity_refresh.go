@@ -125,6 +125,8 @@ func BuildAntigravityModels(rows []AntigravityRow) map[ModelID]Model {
 			CostPer1MOut: 0,
 		}
 	}
+	// Order and unique names: see antigravity_order.go.
+	finishAntigravity(out)
 	return out
 }
 
@@ -148,12 +150,18 @@ func RefreshAntigravity(configDir string, rows []AntigravityRow) (*AntigravityRe
 	res := &AntigravityRefreshResult{Fetched: len(rows), Usable: len(built)}
 	res.Skipped = res.Fetched - res.Usable
 
+	// Compared with what is REGISTERED now, not with the built-in map: the
+	// built-in map never changes, so measuring against it reported the same
+	// "added" models on every refresh for ever.
 	for id := range built {
-		if _, existed := AntigravityModels[id]; !existed {
+		if m, existed := SupportedModels[id]; !existed || m.Provider != ProviderAntigravity {
 			res.Added = append(res.Added, strings.TrimPrefix(string(id), "antigravity."))
 		}
 	}
-	for id := range AntigravityModels {
+	for id, m := range SupportedModels {
+		if m.Provider != ProviderAntigravity {
+			continue
+		}
 		if _, still := built[id]; !still {
 			res.Removed = append(res.Removed, strings.TrimPrefix(string(id), "antigravity."))
 		}
@@ -201,17 +209,57 @@ func LoadRefreshedAntigravity(configDir string) (int, error) {
 	if cached.Schema != antigravityCacheSchema || len(cached.Models) == 0 {
 		return 0, nil
 	}
+	// A cache written before 2026-10-05 has no ranks and repeats names. Repair
+	// it here so the picker is right at once, not after the next refresh.
+	finishAntigravity(cached.Models)
 	applyAntigravity(cached.Models)
 	return len(cached.Models), nil
 }
 
-// applyAntigravity registers the refreshed models. Entries are ADDED and
-// UPDATED, never removed: a model the user has configured must not vanish from
-// under them because one refresh did not list it.
+// applyAntigravity REPLACES this provider's registered models with the fetched
+// set.
+//
+// GORILLA OVERRIDE (2026-10-05): this used to add and update and never remove,
+// on the argument that "a model the user has configured must not vanish from
+// under them because one refresh did not list it". Measured outcome of that
+// rule: Google stopped listing claude-sonnet-4-6 and claude-opus-4-6-thinking,
+// the picker went on showing both at the top of the list, and the portal went
+// on selecting the first of them as the coder at every sign-in. A model that is
+// offered and does not answer is worse than one that is gone. RefreshChatGPT
+// already replaces, for the same reason.
+//
+// The concern in the old rule is real and is met another way: every id that
+// disappears is mapped in LegacyModelIDs to the best current model of the same
+// family, so a config or a running session that names a retired model is moved
+// to its successor (validateAgent, and the /update handler) instead of being
+// dropped onto an unrelated default.
+//
+// AntigravityModels, the built-in map, is deliberately left alone: it is the
+// offline first-run list and nothing else.
 func applyAntigravity(built map[ModelID]Model) {
-	for id, m := range built {
-		AntigravityModels[id] = m
-		SupportedModels[id] = m
+	retired := map[ModelID]string{}
+	func() {
+		SupportedModels, _, commit := beginRegistryEdit()
+		defer commit()
+		for id, m := range SupportedModels {
+			if m.Provider != ProviderAntigravity {
+				continue
+			}
+			if _, still := built[id]; !still {
+				retired[id] = agBaseLabel(m)
+			}
+			delete(SupportedModels, id)
+		}
+		for id, m := range built {
+			SupportedModels[id] = m
+			delete(LegacyModelIDs, id) // listed again: it is not retired
+		}
+	}()
+	// The successors are looked up AFTER the new list is published.
+	for id, label := range retired {
+		if to := AntigravityReplacementFor(id, label); to != "" {
+			LegacyModelIDs[id] = to
+		}
 	}
 }
 

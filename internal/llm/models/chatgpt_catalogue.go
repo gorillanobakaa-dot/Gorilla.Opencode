@@ -31,7 +31,10 @@ import (
 	"time"
 )
 
-const chatgptCacheSchema = 1
+// Schema 2 (2026-10-05): Rank is 1 = best. Schema 1 files hold the old
+// count-down-from-9 ranks and are converted when read, not thrown away: the
+// list in them is still the last thing the backend said.
+const chatgptCacheSchema = 2
 
 // ChatGPTCatalogueEntry is one model as the backend publishes it. The live
 // payload carries about forty fields per model (including the full Codex system
@@ -126,24 +129,23 @@ func (e ChatGPTCatalogueEntry) usable() bool {
 // So the flag is recorded and shown to the user, and does not exclude anything.
 const toolModeCodeOnly = "code_mode_only"
 
-// chatgptRankFor turns the backend's priority order into this program's Rank,
-// where HIGHER is better. Ranks are assigned by position rather than by
-// arithmetic on the priority number, because the numbers are sparse (2, 3, 7,
-// 23) and any formula over them would produce ties or negatives the moment
-// OpenAI renumbers.
+// chatgptRankFor turns the backend's priority order into this program's Rank.
+// Ranks are assigned by position rather than by arithmetic on the priority
+// number, because the numbers are sparse (4, 8, 9, 13) and any formula over
+// them would produce ties or negatives the moment OpenAI renumbers.
+//
+// GORILLA OVERRIDE (2026-10-05): 1 IS BEST, like everywhere else.
+//
+// This used to count DOWN from 9 ("higher is better"), which is the opposite of
+// what Model.Rank means in the rest of the program (metadata.go: "1 = best") and
+// of what the picker prints above the list: "ranked best-first (1=best)". The
+// picker sorts ascending, so this provider's list came out worst-first and
+// numbered "7. GPT-5.5, 8. Luna, 9. Terra" under a heading promising the
+// reverse. Seen by the owner in a screenshot; no test compared the two
+// conventions because each side was tested against itself.
 func chatgptRankFor(position int) int {
-	rank := chatgptTopRank - position
-	if rank < 1 {
-		return 1
-	}
-	return rank
+	return position + 1
 }
-
-// chatgptTopRank keeps this provider's best model level with the other free
-// sign-ins rather than sorting it to the bottom of the picker as "unranked".
-// The previous hand-written list gave GPT-5.5 rank 9; the top of the fetched
-// list inherits that so the picker does not reshuffle for existing users.
-const chatgptTopRank = 9
 
 // BuildChatGPTModels converts the fetched entries into registry models, best
 // first. Exported for the tests, which build from a recorded payload rather than
@@ -330,6 +332,8 @@ func writeChatGPTCache(configDir string, built map[ModelID]Model) error {
 
 // applyChatGPT replaces every registered entry for this provider.
 func applyChatGPT(built []Model) {
+	SupportedModels, _, commit := beginRegistryEdit()
+	defer commit()
 	for id, m := range SupportedModels {
 		if m.Provider == ProviderChatGPT {
 			delete(SupportedModels, id)
@@ -353,12 +357,24 @@ func LoadRefreshedChatGPT(configDir string) (int, error) {
 	if err := json.Unmarshal(blob, &cached); err != nil {
 		return 0, fmt.Errorf("ChatGPT model cache unreadable, using built-in list: %w", err)
 	}
-	if cached.Schema != chatgptCacheSchema || len(cached.Models) == 0 {
+	if (cached.Schema != chatgptCacheSchema && cached.Schema != 1) || len(cached.Models) == 0 {
 		return 0, nil
 	}
 	built := make([]Model, 0, len(cached.Models))
 	for _, m := range cached.Models {
 		built = append(built, m)
+	}
+	if cached.Schema == 1 {
+		// Old convention: higher was better. Re-number 1..N best-first.
+		sort.SliceStable(built, func(i, j int) bool {
+			if built[i].Rank != built[j].Rank {
+				return built[i].Rank > built[j].Rank
+			}
+			return built[i].ID < built[j].ID
+		})
+		for i := range built {
+			built[i].Rank = chatgptRankFor(i)
+		}
 	}
 	applyChatGPT(built)
 	return len(built), nil
@@ -389,8 +405,8 @@ func ChatGPTCatalogueAge(configDir string) (age time.Duration, ok bool) {
 // session. It also pinned the background agents to a model OpenAI retires on
 // 31 Aug 2026.
 //
-// best is the highest-ranked model, which is the backend's own first choice
-// (see chatgptRankFor). cheap is the lowest-ranked, deliberately: on a free plan
+// best is rank 1, which is the backend's own first choice (see chatgptRankFor).
+// cheap is the last-ranked, deliberately: on a free plan
 // the COOLDOWN is the scarce resource, not money, so the strong model should not
 // be spent generating conversation titles.
 //
@@ -402,10 +418,12 @@ func PreferredChatGPTModels() (best, cheap ModelID) {
 		if m.Provider != ProviderChatGPT {
 			continue
 		}
-		if bestRank < 0 || m.Rank > bestRank {
+		// 1 = best. The id tiebreak keeps the answer stable when two models
+		// share a rank; map order must never decide what the user is put on.
+		if bestRank < 0 || m.Rank < bestRank || (m.Rank == bestRank && id < best) {
 			best, bestRank = id, m.Rank
 		}
-		if cheapRank < 0 || m.Rank < cheapRank {
+		if cheapRank < 0 || m.Rank > cheapRank || (m.Rank == cheapRank && id < cheap) {
 			cheap, cheapRank = id, m.Rank
 		}
 	}

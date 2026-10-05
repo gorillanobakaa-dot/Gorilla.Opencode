@@ -280,6 +280,7 @@ func (e *editTool) deleteContent(ctx context.Context, filePath, oldString string
 	}
 
 	oldContent := string(content)
+	oldString = matchLineEndings(oldContent, oldString)
 
 	index := strings.Index(oldContent, oldString)
 	if index == -1 {
@@ -397,6 +398,8 @@ func (e *editTool) replaceContent(ctx context.Context, filePath, oldString, newS
 	}
 
 	oldContent := string(content)
+	oldString = matchLineEndings(oldContent, oldString)
+	newString = matchLineEndings(oldContent, newString)
 
 	index := strings.Index(oldContent, oldString)
 	if index == -1 {
@@ -480,4 +483,20 @@ func (e *editTool) replaceContent(ctx context.Context, filePath, oldString, newS
 			Additions: additions,
 			Removals:  removals,
 		}), nil
+}
+
+// matchLineEndings rewrites text to use the line endings of the file it is
+// about to be matched against or written into.
+//
+// GORILLA FIX (2026-10-05): view shows a file with its carriage returns
+// removed, so what a model copies out of a Windows file has plain \n line
+// breaks, while the file on disk has \r\n. An exact match of anything longer
+// than one line therefore failed with "old_string not found", on every CRLF
+// file, and a one-line edit wrote \n into a \r\n file and left it mixed.
+func matchLineEndings(file, text string) string {
+	bare := strings.ReplaceAll(text, "\r\n", "\n")
+	if strings.Contains(file, "\r\n") {
+		return strings.ReplaceAll(bare, "\n", "\r\n")
+	}
+	return bare
 }

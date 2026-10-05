@@ -25,6 +25,9 @@ type PersistentShell struct {
 	mu           sync.Mutex
 	commandQueue chan *commandExecution
 	isPowerShell bool
+	// closeQueue closes commandQueue exactly once. Two goroutines closed it
+	// (the panic handler and the process waiter); the second close panics.
+	closeQueue sync.Once
 }
 
 type commandExecution struct {
@@ -162,7 +165,7 @@ func newPersistentShell(cwd string) *PersistentShell {
 			if r := recover(); r != nil {
 				fmt.Fprintf(os.Stderr, "Panic in shell command processor: %v\n", r)
 				shell.isAlive = false
-				close(shell.commandQueue)
+				shell.closeQueue.Do(func() { close(shell.commandQueue) })
 			}
 		}()
 		shell.processCommands()
@@ -174,7 +177,7 @@ func newPersistentShell(cwd string) *PersistentShell {
 			// Log the error if needed
 		}
 		shell.isAlive = false
-		close(shell.commandQueue)
+		shell.closeQueue.Do(func() { close(shell.commandQueue) })
 	}()
 
 	return shell
@@ -314,6 +317,12 @@ echo $EXEC_EXIT_CODE > %s
 		)
 	}
 
+	// GORILLA FIX (2026-10-05): a command that was cancelled while it waited in
+	// the queue must not be run. The context was only looked at AFTER the
+	// command had been written to the shell.
+	if ctx.Err() != nil {
+		return commandResult{stderr: "The command was cancelled before it started.", exitCode: 1, interrupted: true}
+	}
 	_, err := s.stdin.Write([]byte(fullCommand + "\n"))
 	if err != nil {
 		return commandResult{
@@ -351,7 +360,7 @@ echo $EXEC_EXIT_CODE > %s
 		for {
 			select {
 			case <-ctx.Done():
-				s.killChildren()
+				s.stopRunning(statusFile)
 				interrupted = true
 				done <- true
 				return
@@ -372,7 +381,7 @@ echo $EXEC_EXIT_CODE > %s
 				if timeout > 0 {
 					elapsed := time.Since(startTime)
 					if elapsed > timeout {
-						s.killChildren()
+						s.stopRunning(statusFile)
 						interrupted = true
 						done <- true
 						return
@@ -426,6 +435,35 @@ echo $EXEC_EXIT_CODE > %s
 		stderr:      stderr,
 		exitCode:    exitCode,
 		interrupted: interrupted,
+	}
+}
+
+// stopRunning ends whatever the shell is doing, for a cancel or a timeout.
+//
+// GORILLA FIX (2026-10-05): killing the shell's CHILD processes stops a program
+// the shell started. It does nothing to work the shell is doing ITSELF: a
+// PowerShell cmdlet (Remove-Item -Recurse, Get-ChildItem -Recurse, Start-Sleep)
+// or a bash builtin loop has no child to kill. The person pressed Esc, was told
+// "interrupted", and the delete carried on; the next command then queued behind
+// it and burned its own timeout waiting.
+//
+// So: kill the children, give the shell a moment to write its status, and if it
+// has not, the shell itself is what is busy. It is killed and marked dead, and
+// the next command gets a fresh one (GetPersistentShell). The working directory
+// is carried over; shell variables set earlier are lost, which is the price of
+// the stop actually stopping.
+func (s *PersistentShell) stopRunning(statusFile string) {
+	s.killChildren()
+	deadline := time.Now().Add(750 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if (fileExists(statusFile) && fileSize(statusFile) > 0) || !s.isAlive {
+			return
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	s.isAlive = false
+	if s.cmd != nil && s.cmd.Process != nil {
+		_ = s.cmd.Process.Kill()
 	}
 }
 
@@ -488,11 +526,15 @@ func (s *PersistentShell) Exec(ctx context.Context, command string, timeoutMs in
 	timeout := time.Duration(timeoutMs) * time.Millisecond
 
 	resultChan := make(chan commandResult)
-	s.commandQueue <- &commandExecution{
+	// The shell can die between the check above and this send (a command that
+	// ran `exit`); sending on the closed queue would panic the whole program.
+	if !s.enqueue(&commandExecution{
 		command:    command,
 		timeout:    timeout,
 		resultChan: resultChan,
 		ctx:        ctx,
+	}) {
+		return "", "Shell is not alive", 1, false, errors.New("shell is not alive")
 	}
 
 	result := <-resultChan

@@ -181,3 +181,27 @@ func TestTheReceiptStillRecognisesTheReviewToolsOwnWords(t *testing.T) {
 		}
 	}
 }
+
+// GORILLA FIX (2026-10-05): the shell's phrases are only the shell's. Viewing a
+// file that CONTAINS "Exit code 1" is not a failed call, and a command stopped
+// by a timeout is not "ok".
+func TestOutcomesDependOnWhichToolProducedThem(t *testing.T) {
+	text := "some log\nExit code 1\n"
+	if got := outcomeFor("view", message.ToolResult{Content: text}); got != "ok" {
+		t.Errorf("a view of a file containing the words was listed as %q", got)
+	}
+	if got := outcomeFor("bash", message.ToolResult{Content: text}); got != "exit code 1" {
+		t.Errorf("a failing command was listed as %q", got)
+	}
+	stopped := message.ToolResult{Content: "partial output\nCommand was aborted before completion"}
+	if got := outcomeFor("bash", stopped); got == "ok" || !strings.Contains(got, "STOPPED") {
+		t.Errorf("a command killed by a timeout was listed as %q", got)
+	}
+	if got := outcomeFor("view", stopped); got != "ok" {
+		t.Errorf("a file that quotes the phrase was listed as %q", got)
+	}
+	orphan := message.ToolResult{Content: "This call never returned a result: the program stopped while it was running.", IsError: true}
+	if got := outcomeFor("write", orphan); !strings.Contains(got, "never returned") {
+		t.Errorf("an unanswered call was listed as %q", got)
+	}
+}

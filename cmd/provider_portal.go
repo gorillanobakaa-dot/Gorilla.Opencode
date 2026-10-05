@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/auth"
@@ -85,6 +86,18 @@ var fetchProviderCatalogue = models.FetchProviderCatalogue
 // registerLocalEndpoint is a seam: RegisterLocalEndpoint fetches /v1/models
 // over the network, and tests must not.
 var registerLocalEndpoint = models.RegisterLocalEndpoint
+
+// probeEndpoint is a seam for the same reason.
+var probeEndpoint = models.ProbeEndpoint
+
+// portalDoctor runs the model doctor after a provider has been set up and
+// prints what it fixed or found. /provider and the launch portal both end here,
+// so a switch can never leave an agent on a model that is gone.
+func portalDoctor() {
+	for _, line := range config.DoctorSummary(config.RunModelDoctor(config.CacheBase(), config.UpdateAgentModel)) {
+		fmt.Println(line)
+	}
+}
 
 // providerPortalRows builds the menu from the loaded config. Returns the rows
 // and whether anything currently works (canKeep — what Esc means).
@@ -212,9 +225,13 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			ID:   "antigravity",
 			Free: true,
 			Name: "Google Antigravity - Claude + GPT-OSS + Gemini (Gmail sign-in)",
+			// GORILLA OVERRIDE (2026-10-05): the model names are READ from the
+			// registry. This sentence used to say "Claude Sonnet/Opus 4.6" long
+			// after Google had stopped listing either.
 			What: "Signs in with your Google account and uses your free Google " +
-				"Antigravity tier: Claude Sonnet/Opus 4.6, GPT-OSS 120B, and Gemini. " +
-				"No API key, no cost - it is your account's own entitlement.",
+				"Antigravity tier: Claude, GPT-OSS and Gemini models. " +
+				portalModelSummary(models.ProviderAntigravity) +
+				" No API key, no cost - it is your account's own entitlement.",
 			Warning: "Weekly quotas apply per model group (Gemini separate from " +
 				"Claude/GPT). Unofficial: it speaks the Antigravity CLI's protocol, so " +
 				"a Google-side change could break it without notice.",
@@ -251,7 +268,7 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 				"that is the limit, not a broken key. Wait, or switch to a Google " +
 				"sign-in row above, which spends a different allowance.",
 			NeedsInput: true,
-			InputPrompt: "Paste your Gemini API key (AIzaSy...). Free from " +
+			InputPrompt: "Paste your Gemini API key (it starts AIza... or AQ....). Free from " +
 				"aistudio.google.com/apikey - no card needed.",
 			Secret:     true,
 			Configured: keyed(models.ProviderGemini),
@@ -261,14 +278,18 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 		{
 			ID:   "chatgpt",
 			Free: true,
-			Name: "ChatGPT sign-in - GPT-5.5 (works on the FREE plan, no API key)",
+			// GORILLA OVERRIDE (2026-10-05): no model is named in the label, and
+			// the ones in the description are READ from the registry. The label
+			// said "GPT-5.5", the description "GPT-5.5 and GPT-5.4 Mini", and the
+			// warning that GPT-5.6 "is not offered here" - on the day the session
+			// behind this very menu was running GPT-5.6-Terra, and OpenAI had
+			// retired 5.4 Mini five weeks earlier. Three typed facts, three wrong.
+			Name: "ChatGPT sign-in - OpenAI models (works on the FREE plan, no API key)",
 			What: "Signs in with your ChatGPT account and uses OpenAI models through " +
 				"the Codex backend. No API key and no credit card: a free ChatGPT " +
-				"account is enough. GPT-5.5 and GPT-5.4 Mini.",
+				"account is enough. " + portalModelSummary(models.ProviderChatGPT),
 			Warning: "Usage counts against your ChatGPT plan's limits, so a free plan " +
-				"will hit a cooldown rather than a bill. GPT-5.6 is not offered here: " +
-				"it needs a tool format this program does not speak yet. GPT-5.4 Mini " +
-				"is retired by OpenAI on 31 Aug 2026.",
+				"will hit a cooldown rather than a bill.",
 			Configured: cgReady,
 			Active:     curProv == models.ProviderChatGPT,
 		},
@@ -277,12 +298,20 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			ID:   "nvidia-nim",
 			Free: true,
 			Name: "NVIDIA NIM (free API key)",
-			What: "NVIDIA's hosted models via an nvapi-... key. Note: the key is only " +
-				"proven at the first generation - NVIDIA lists models without " +
-				"authentication, so setup succeeding is not the key working.",
+			// GORILLA OVERRIDE (2026-10-05): this used to warn that "the key is
+			// only proven at the first generation ... setup succeeding is not the
+			// key working". True, and the wrong answer to it: the program now
+			// asks a model one small question during setup (models/probe.go), so
+			// the key IS proven before the menu closes.
+			What: "NVIDIA's hosted models via a free nvapi-... key from build.nvidia.com. " +
+				"When you save the key, the program asks a few models one small question " +
+				"to prove the key works and to start you on a model that actually answers.",
 			NeedsInput:  true,
 			InputPrompt: "Paste your NVIDIA NIM key (nvapi-...). It is stored in config.json (mode 0600).",
 			Secret:      true,
+			// Refuse a value that cannot be an NVIDIA key BEFORE it is saved.
+			// See checkNIMKey.
+			Check: checkNIMKey,
 			Configured:  nimReady,
 			Active:      curEndpoint == nimName,
 		},
@@ -439,6 +468,7 @@ func runProviderPortal(ctx context.Context) (quit bool, err error) {
 			fmt.Fprintf(os.Stderr, "\nCould not set up %s: %v\n\n", choice.ID, err)
 			continue // back to the menu so another provider can be picked
 		}
+		portalDoctor()
 		return false, nil
 	}
 }
@@ -469,6 +499,7 @@ func reopenProviderPortal() error {
 	if err := applyPortalChoice(context.Background(), choice); err != nil {
 		return fmt.Errorf("could not set up %s: %w", choice.ID, err)
 	}
+	portalDoctor()
 	return nil
 }
 
@@ -489,17 +520,42 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 		if err := config.UpsertProviderKey(models.ProviderAntigravity, oauthLoginPlaceholder); err != nil {
 			return err
 		}
-		// Coder on Claude Sonnet; the background agents (summarizer/task/title)
-		// on Gemini Flash, which draws the SEPARATE Gemini weekly pool and so
-		// leaves the Claude/GPT quota for the work the user actually watches.
-		if err := config.UpdateAgentModel(config.AgentCoder, models.AGClaudeSonnet46); err != nil {
+		// GORILLA OVERRIDE (2026-10-05): ask the backend what it serves, THEN
+		// choose. This used to name two constants, AGClaudeSonnet46 and
+		// AGGemini36Flash. Google stopped listing claude-sonnet-4-6 and every
+		// sign-in went on putting the coder on it. Same fault, same fix as the
+		// ChatGPT branch below (2026-08-23), which should have been applied to
+		// both at the time.
+		//
+		// A failed listing is not a failed sign-in: whatever is registered (the
+		// last cached list, or the built-in one) is used.
+		refreshAntigravityCatalogue(ctx)
+		// Coder on the best Claude Sonnet; the background agents
+		// (summarizer/task/title) on a Gemini Flash, which draws the SEPARATE
+		// Gemini weekly pool and so leaves the Claude/GPT quota for the work the
+		// user actually watches.
+		coder, background := models.PreferredAntigravityModels()
+		if coder == "" {
+			return fmt.Errorf("signed in, but no Antigravity models are registered")
+		}
+		// GORILLA FIX: re-selecting the row must not undo a /model choice. The
+		// portal runs on every launch; if the coder is already on a model this
+		// provider still offers, it stands (same rule as applyLocalEndpoint).
+		if cur := config.Get().Agents[config.AgentCoder].Model; cur != "" {
+			if m, known := models.SupportedModels[cur]; known && m.Provider == models.ProviderAntigravity {
+				fmt.Printf("\nKeeping your model: %s. /model to switch.\n", m.Name)
+				return nil
+			}
+		}
+		if err := config.UpdateAgentModel(config.AgentCoder, coder); err != nil {
 			return err
 		}
 		for _, a := range []config.AgentName{config.AgentSummarizer, config.AgentTask, config.AgentTitle} {
-			if err := config.UpdateAgentModel(a, models.AGGemini36Flash); err != nil {
+			if err := config.UpdateAgentModel(a, background); err != nil {
 				return err
 			}
 		}
+		fmt.Printf("\nStart chatting - %s is selected; /model to switch.\n", models.SupportedModels[coder].Name)
 		return nil
 
 	case "chatgpt":
@@ -533,7 +589,13 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 		// The strong model codes; the cheapest one does titles and summaries.
 		// On a free plan the COOLDOWN is the scarce resource rather than money,
 		// so the good model must not be spent generating conversation titles.
-		return applyAgentModels(best, cheap)
+		if err := applyAgentModels(best, cheap); err != nil {
+			return err
+		}
+		// Printed AFTER the choice, from the choice. It used to be printed before
+		// the list was fetched and said "GPT-5.5 is selected" whatever was.
+		fmt.Printf("\nStart chatting - %s is selected; /model to switch.\n", models.SupportedModels[best].Name)
+		return nil
 
 	case "google-oauth":
 		if err := runGoogleLogin(ctx, ""); err != nil {
@@ -588,6 +650,15 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 				return fmt.Errorf("%s listed %d models, none usable for chat", res.Label, res.Usable)
 			}
 			return applyAgentModels(model, model)
+		}
+		// Gemini's list is fetched the moment a key exists, like the others.
+		// Best-effort: the built-in rolling aliases keep working without it.
+		if prov == models.ProviderGemini {
+			if raw, err := models.FetchGeminiList(config.ProviderAPIKey(prov)); err == nil {
+				if res, err := models.RefreshGemini(config.CacheBase(), raw); err == nil {
+					fmt.Printf("Model list refreshed from Google: %d available.\n", res.Usable)
+				}
+			}
 		}
 		d := portalDefaults[c.ID]
 		return applyAgentModels(d.coder, d.title)
@@ -696,6 +767,26 @@ func applyLocalEndpoint(name, baseURL, key string) error {
 		return fmt.Errorf("no models found at %s - is it running, and is the key valid?", baseURL)
 	}
 
+	// GORILLA OVERRIDE (2026-10-05): ASK before trusting the list.
+	//
+	// NVIDIA lists its models to anyone, key or no key, and lists models that
+	// answer 500. So "n > 0" proved nothing about the key, and "first" was the
+	// first id in the list. A few small requests settle both: is the key
+	// accepted, and which model answers with a tool call. A model server on
+	// this machine is never asked (the probe refuses loopback itself).
+	rep := probeEndpoint(name, config.CacheBase())
+	if rep.Skipped == "" {
+		fmt.Println("\n" + rep.Note())
+		for _, v := range rep.Failed {
+			if v.Outcome == models.ProbeRefused {
+				return fmt.Errorf("the key was saved, but %s refused it (HTTP %d). Check that the whole key was copied, then press r on the row to enter it again", name, v.Status)
+			}
+		}
+		if id := models.PreferredOnEndpoint(name); id != "" {
+			first = id
+		}
+	}
+
 	// GORILLA FIX: re-selecting an endpoint must not overwrite a model the user
 	// already chose on it.
 	//
@@ -711,10 +802,18 @@ func applyLocalEndpoint(name, baseURL, key string) error {
 	// user's endpoint name above: confirm what is there rather than replace it.
 	if cur := config.Get().Agents[config.AgentCoder].Model; cur != "" {
 		if _, known := models.SupportedModels[cur]; known && models.LocalEndpointFor(cur) == name {
-			return nil
+			// ... unless that model has since been found retired: keeping it
+			// would be keeping an error.
+			if v, seen := models.ProbeVerdictFor(cur); !seen || !v.Dead() {
+				return nil
+			}
 		}
 	}
-	return applyAgentModels(first, first)
+	if err := applyAgentModels(first, first); err != nil {
+		return err
+	}
+	fmt.Printf("Start chatting - %s is selected; /model to switch.\n", models.SupportedModels[first].Name)
+	return nil
 }
 
 // cfAccountRe matches a Cloudflare account id: 32 lowercase hex characters.
@@ -825,7 +924,6 @@ func runAntigravityLogin(ctx context.Context) error {
 		return nil
 	}
 	fmt.Printf("Ready. Project: %s\n", creds.ProjectID)
-	fmt.Println("\nStart chatting — pick a Claude / GPT-OSS / Gemini model from /model.")
 	return nil
 }
 
@@ -855,7 +953,6 @@ func runChatGPTPortalLogin(ctx context.Context) error {
 		plan = "unknown"
 	}
 	fmt.Printf("\nSigned in as %s (plan: %s).\n", who, plan)
-	fmt.Println("\nStart chatting — GPT-5.5 is selected; /model to switch.")
 	return nil
 }
 
@@ -895,4 +992,104 @@ func refreshChatGPTCatalogue(ctx context.Context) {
 		return
 	}
 	fmt.Printf("Model list refreshed from OpenAI: %d available.\n", res.Usable)
+}
+
+// refreshAntigravityCatalogue asks the Antigravity backend what it currently
+// serves and registers it, best-effort. The pair to refreshChatGPTCatalogue, and
+// best-effort for the same reason: it runs straight after a sign-in, and a
+// listing that fails must not turn a working sign-in into an error.
+func refreshAntigravityCatalogue(ctx context.Context) {
+	creds, err := auth.LoadAntigravityCreds()
+	if err != nil || creds == nil {
+		return
+	}
+	fetched, err := creds.FetchAvailableModels(ctx)
+	if err != nil {
+		return
+	}
+	rows := make([]models.AntigravityRow, 0, len(fetched))
+	for id, m := range fetched {
+		rows = append(rows, models.AntigravityRow{
+			ID: id, DisplayName: m.DisplayName, APIProvider: m.APIProvider,
+			MaxTokens: m.MaxTokens, MaxOutputTokens: m.MaxOutputTokens,
+			SupportsImages: m.SupportsImages, SupportsThinking: m.SupportsThinking,
+			IsInternal: m.IsInternal,
+		})
+	}
+	res, err := models.RefreshAntigravity(config.CacheBase(), rows)
+	if err != nil || res == nil {
+		return
+	}
+	fmt.Printf("Model list refreshed from Google: %d available.\n", res.Usable)
+}
+
+// portalModelSummary says what a sign-in provider offers RIGHT NOW, from the
+// registry: how many models, and the first few by rank. It exists so no portal
+// row has a model name typed into it; every one that did went stale.
+func portalModelSummary(p models.ModelProvider) string {
+	type row struct {
+		name string
+		rank int
+	}
+	var rows []row
+	for _, m := range models.SupportedModels {
+		if m.Provider != p {
+			continue
+		}
+		name := m.Name
+		for _, suffix := range []string{" (Antigravity free)", " (ChatGPT sign-in)"} {
+			name = strings.TrimSuffix(name, suffix)
+		}
+		rank := m.Rank
+		if rank <= 0 {
+			rank = 1 << 20
+		}
+		rows = append(rows, row{name, rank})
+	}
+	if len(rows) == 0 {
+		return "The model list is fetched when you sign in."
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].rank != rows[j].rank {
+			return rows[i].rank < rows[j].rank
+		}
+		return rows[i].name < rows[j].name
+	})
+	const show = 3
+	names := make([]string, 0, show)
+	for _, r := range rows {
+		if len(names) == show {
+			break
+		}
+		names = append(names, r.name)
+	}
+	if len(rows) > show {
+		return fmt.Sprintf("%d models at the last check, among them %s.", len(rows), strings.Join(names, ", "))
+	}
+	return fmt.Sprintf("At the last check: %s.", strings.Join(names, ", "))
+}
+
+// checkNIMKey refuses a value that cannot be an NVIDIA key, before it is saved.
+//
+// GORILLA OVERRIDE (2026-10-05): the field accepted anything, one character
+// included, and NVIDIA lists its models WITHOUT authentication - so a wrong
+// value was saved, the model list came back, setup reported success, and the
+// first message failed with an error that reads like a broken service. The
+// owner's screenshot shows the field holding "(1 chars)" after a paste. A
+// check that costs nothing and says exactly what is wrong belongs here, at
+// the one moment the user is looking at the field.
+//
+// Returns "" when the value is acceptable, otherwise the sentence to show.
+func checkNIMKey(v string) string {
+	v = strings.TrimSpace(v)
+	switch {
+	case !strings.HasPrefix(v, "nvapi-"):
+		return fmt.Sprintf("That is %d character(s) and does not start with nvapi- so it is not an "+
+			"NVIDIA key, and it was NOT saved. Copy the whole key from build.nvidia.com, then press "+
+			"Ctrl+V here.", len([]rune(v)))
+	case len(v) < 40:
+		return fmt.Sprintf("That starts with nvapi- but is only %d characters. A real key is about 70, "+
+			"so part of it is missing, and it was NOT saved. Copy the whole key and press Ctrl+V again.", len(v))
+	}
+	return ""
 }

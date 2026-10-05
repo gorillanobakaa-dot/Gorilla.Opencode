@@ -77,8 +77,8 @@ const (
 // field because nothing here is billed per token. The ChatGPT plan is, and a
 // free plan is not billed at all. Do not populate the cost fields with API
 // prices; they would be shown to the user as money this path never charges.
-// Ranks match the order the backend itself publishes (its "priority" field,
-// lower being more prominent: terra 2, luna 3, gpt-5.5 7, gpt-5.4-mini 23), so
+// Ranks are 1 = best, in the order the backend itself publishes (its "priority"
+// field, lower being more prominent: terra 2, luna 3, gpt-5.5 7, gpt-5.4-mini 23), so
 // the picker does not reshuffle when the fallback is replaced by the fetched
 // list. chatgpt_catalogue.go derives the same numbers from the wire.
 var ChatGPTModels = map[ModelID]Model{
@@ -97,7 +97,7 @@ var ChatGPTModels = map[ModelID]Model{
 		DefaultMaxTokens:    32_000,
 		CanReason:           true,
 		SupportsAttachments: true,
-		Rank:                9,
+		Rank:                1,
 	},
 	ChatGPT56Luna: {
 		ID:          ChatGPT56Luna,
@@ -114,7 +114,7 @@ var ChatGPTModels = map[ModelID]Model{
 		DefaultMaxTokens:    32_000,
 		CanReason:           true,
 		SupportsAttachments: true,
-		Rank:                8,
+		Rank:                2,
 	},
 	ChatGPT55: {
 		ID:          ChatGPT55,
@@ -130,7 +130,7 @@ var ChatGPTModels = map[ModelID]Model{
 		DefaultMaxTokens:    32_000,
 		CanReason:           true,
 		SupportsAttachments: true,
-		Rank:                7,
+		Rank:                3,
 	},
 	ChatGPT54Mini: {
 		ID:          ChatGPT54Mini,
@@ -146,7 +146,7 @@ var ChatGPTModels = map[ModelID]Model{
 		DefaultMaxTokens:    32_000,
 		CanReason:           true,
 		SupportsAttachments: true,
-		Rank:                6,
+		Rank:                4,
 	},
 }
 

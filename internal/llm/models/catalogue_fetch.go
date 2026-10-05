@@ -319,6 +319,8 @@ func catalogueModel(p ModelProvider, cat LiveCatalogue, e listEntry) Model {
 
 // registerCatalogue replaces every entry for one provider.
 func registerCatalogue(p ModelProvider, built []Model) {
+	SupportedModels, _, commit := beginRegistryEdit()
+	defer commit()
 	for id, m := range SupportedModels {
 		if m.Provider == p {
 			delete(SupportedModels, id)
@@ -440,6 +442,8 @@ func PreferredCatalogueModel(p ModelProvider) ModelID {
 // /purge treats these exactly like the other downloaded lists. keep protects the
 // models an agent is currently pointed at.
 func PurgeCatalogue(dir string, p ModelProvider, keep map[ModelID]bool) int {
+	SupportedModels, _, commit := beginRegistryEdit()
+	defer commit()
 	n := 0
 	for id, m := range SupportedModels {
 		if m.Provider == p && !keep[id] {

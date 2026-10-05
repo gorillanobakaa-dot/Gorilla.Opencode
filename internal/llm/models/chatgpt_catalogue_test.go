@@ -94,8 +94,13 @@ func TestCodeModeOnlyModelsAreStillOffered(t *testing.T) {
 }
 
 // Order comes from the backend's priority field, not from a hand-written list.
-// terra(2) < luna(3) < 5.5(7) < 5.4-mini(23), and this program's Rank is
-// higher-is-better, so the ranks must descend in that same order.
+// terra(2) < luna(3) < 5.5(7) < 5.4-mini(23). Rank is 1 = best, the convention
+// the picker prints above the list and sorts by, so the ranks must be 1, 2, 3, 4
+// in that same order.
+//
+// Until 2026-10-05 this test asserted the OPPOSITE (ranks descending from 9) and
+// passed, while the picker showed the list worst-first numbered 7, 8, 9 under
+// "ranked best-first (1=best)". It tested the builder against itself.
 func TestOrderFollowsTheBackendsOwnPriority(t *testing.T) {
 	built := BuildChatGPTModels(parseFixture(t))
 	wantOrder := []string{"gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4-mini"}
@@ -103,16 +108,10 @@ func TestOrderFollowsTheBackendsOwnPriority(t *testing.T) {
 		if built[i].APIModel != slug {
 			t.Fatalf("position %d is %s, want %s (backend priority order)", i, built[i].APIModel, slug)
 		}
-	}
-	for i := 1; i < len(built); i++ {
-		if built[i].Rank >= built[i-1].Rank {
-			t.Errorf("rank did not descend: %s=%d then %s=%d",
-				built[i-1].APIModel, built[i-1].Rank, built[i].APIModel, built[i].Rank)
+		if built[i].Rank != i+1 {
+			t.Errorf("%s has rank %d, want %d: rank 1 is the best model, as the picker says",
+				slug, built[i].Rank, i+1)
 		}
-	}
-	if built[0].Rank != chatgptTopRank {
-		t.Errorf("best model ranked %d, want %d so the picker does not reshuffle "+
-			"for users who were on the hand-written list", built[0].Rank, chatgptTopRank)
 	}
 }
 

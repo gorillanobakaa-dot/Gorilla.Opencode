@@ -55,12 +55,14 @@ func TestChatGPTRowIsOffered(t *testing.T) {
 	if !strings.Contains(strings.ToLower(r.Warning), "cooldown") {
 		t.Errorf("the row does not explain that a free plan hits a cooldown rather than a charge: %q", r.Warning)
 	}
-	// The two 5.6 models are deliberately withheld (code_mode_only). If someone
-	// later registers them without implementing that tool shape, this row's
-	// promise becomes false — so the omission is stated on screen, not only in
-	// a source comment.
-	if !strings.Contains(r.Warning, "5.6") {
-		t.Errorf("the row does not say GPT-5.6 is unavailable, so its absence looks like a bug: %q", r.Warning)
+	// GORILLA OVERRIDE (2026-10-05): this test used to REQUIRE the warning to say
+	// GPT-5.6 is unavailable. That stopped being true on 2026-08-23, when the 5.6
+	// pair was measured working and registered, and the test went on holding the
+	// false sentence in place for six weeks. The row must not assert anything
+	// about a model by name; what it offers is read from the registry
+	// (TestSignInRowsNameTheModelsThatAreRegisteredAndNoOthers).
+	if strings.Contains(r.Warning, "not offered") {
+		t.Errorf("the row claims a model is not offered; that is a typed fact and it goes stale: %q", r.Warning)
 	}
 }
 
@@ -68,13 +70,23 @@ func TestChatGPTRowIsOffered(t *testing.T) {
 // guard: signing in is worthless if the models it advertises are not in the
 // catalogue or do not route to a provider that can serve them.
 func TestChatGPTModelsAreRegisteredAndRoutable(t *testing.T) {
-	for _, id := range []models.ModelID{models.ChatGPT55, models.ChatGPT54Mini} {
-		m, ok := models.SupportedModels[id]
-		if !ok {
-			t.Fatalf("%s is not in SupportedModels, so the model picker cannot offer it", id)
+	// GORILLA OVERRIDE (2026-10-05): checks whatever IS registered, not two ids
+	// by name. It named GPT-5.4 Mini, which OpenAI retired; it then passed alone
+	// and failed in a full run, whenever an earlier test had applied a fetched
+	// list that (correctly) no longer held that model.
+	var ids []models.ModelID
+	for id, m := range models.SupportedModels {
+		if m.Provider == models.ProviderChatGPT {
+			ids = append(ids, id)
 		}
-		if m.Provider != models.ProviderChatGPT {
-			t.Errorf("%s routes to provider %q, not %q", id, m.Provider, models.ProviderChatGPT)
+	}
+	if len(ids) == 0 {
+		t.Fatal("no ChatGPT model is registered, so the sign-in row offers nothing")
+	}
+	for _, id := range ids {
+		m := models.SupportedModels[id]
+		if !strings.HasPrefix(string(id), string(models.ProviderChatGPT)+".") {
+			t.Errorf("%s is registered under the ChatGPT provider with a foreign id", id)
 		}
 		if m.APIModel == "" {
 			t.Errorf("%s has no APIModel, so the backend would be sent an empty model name", id)

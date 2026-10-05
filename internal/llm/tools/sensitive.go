@@ -83,11 +83,21 @@ var sensitiveSuffixes = []string{".pem", ".key", ".p12", ".pfx", ".jks", ".keyst
 // a test fixture named key.pem, and the user chose to work there. The risk being
 // addressed is reaching OUT of the workspace for credentials.
 func RefuseSensitiveRead(path string) string {
-	abs := resolveForGuard(path)
+	lexical := resolveForGuard(path)
+	// GORILLA FIX (2026-10-05): judge where the path really LEADS. The guard
+	// compared text, and on Windows three different texts open the same file:
+	// a short 8.3 name (AWS~1\CREDEN~1), a name with trailing dots or spaces
+	// (.ssh.\id_rsa.), and a junction inside the project that points at
+	// ~\.ssh, which also counted as "inside the workspace" and was exempt.
+	abs := realForGuard(lexical)
 
-	// Inside the workspace the user has already chosen this ground.
-	if _, ok := config.RootFor(abs); ok {
-		return ""
+	// Inside the workspace the user has already chosen this ground. Both the
+	// path as written AND where it leads must be inside: a link in the project
+	// that leads out of it is not the project.
+	if _, ok := config.RootFor(lexical); ok {
+		if _, okReal := config.RootFor(abs); okReal || strings.EqualFold(abs, lexical) {
+			return ""
+		}
 	}
 
 	base := filepath.Base(abs)
@@ -108,8 +118,15 @@ func RefuseSensitiveRead(path string) string {
 	}
 
 	// The application's own configuration holds provider API keys.
-	if strings.Contains(abs, filepath.Join(".config", "gorilla-opencode")) ||
-		strings.Contains(abs, filepath.Join(".config", "opencode")) {
+	// Case-insensitively (Windows opens .CONFIG as .config), and wherever the
+	// configuration really is: with XDG_CONFIG_HOME set it is not under .config.
+	lowAbs := strings.ToLower(abs)
+	if strings.Contains(lowAbs, strings.ToLower(filepath.Join(".config", "gorilla-opencode"))) ||
+		strings.Contains(lowAbs, strings.ToLower(filepath.Join(".config", "opencode"))) {
+		return reason(abs, "it holds this program's own provider API keys")
+	}
+	if base := strings.ToLower(filepath.Clean(config.ConfigBase())); len(base) > 3 &&
+		(lowAbs == base || strings.HasPrefix(lowAbs, base+string(filepath.Separator))) {
 		return reason(abs, "it holds this program's own provider API keys")
 	}
 
@@ -162,4 +179,63 @@ func reason(path, why string) string {
 			"and into the session database. If you genuinely need it, copy the part you "+
 			"need into the project first.",
 		path, why)
+}
+
+// realForGuard resolves a path to the file it actually names: links and
+// junctions followed, short names expanded, and (on Windows) the trailing dots
+// and spaces that Win32 ignores removed. A path that does not exist yet is
+// resolved as far as its parent.
+func realForGuard(abs string) string {
+	if runtime.GOOS == "windows" {
+		parts := strings.Split(abs, `\`)
+		for i := 1; i < len(parts); i++ {
+			if t := strings.TrimRight(parts[i], ". "); t != "" {
+				parts[i] = t
+			}
+		}
+		abs = strings.Join(parts, `\`)
+	}
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		return real
+	}
+	if dir, err := filepath.EvalSymlinks(filepath.Dir(abs)); err == nil {
+		return filepath.Join(dir, filepath.Base(abs))
+	}
+	return abs
+}
+
+// refuseSensitiveGlob refuses a search whose PATTERN reaches into a credential
+// folder from outside the workspace.
+//
+// GORILLA FIX (2026-10-05): find checked only the folder it was pointed at.
+// find(path="C:\\Users", glob=".aws/**", query="secret") passed, because
+// C:\Users is not sensitive, and printed lines out of .aws\credentials.
+func refuseSensitiveGlob(glob, searchRoot string) string {
+	if strings.TrimSpace(glob) == "" {
+		return ""
+	}
+	if _, inside := config.RootFor(realForGuard(resolveForGuard(searchRoot))); inside {
+		return ""
+	}
+	for _, seg := range strings.FieldsFunc(strings.TrimPrefix(glob, "!"), func(r rune) bool { return r == '/' || r == '\\' }) {
+		name := strings.ToLower(strings.Trim(seg, "*?"))
+		if name == "" {
+			continue
+		}
+		hit := isDotEnv(name)
+		for _, d := range sensitiveDirSegments {
+			hit = hit || name == d
+		}
+		for _, b := range sensitiveBasenames {
+			hit = hit || name == strings.ToLower(b)
+		}
+		for _, suf := range sensitiveSuffixes {
+			hit = hit || strings.HasSuffix(name, suf)
+		}
+		if hit {
+			return fmt.Sprintf("Refusing this search: the pattern %q reaches for %s, which is where credentials are kept, "+
+				"and the search starts outside the project. Search inside the project, or name a different pattern.", glob, seg)
+		}
+	}
+	return ""
 }

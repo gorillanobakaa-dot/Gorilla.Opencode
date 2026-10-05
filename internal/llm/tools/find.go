@@ -457,6 +457,9 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	if why := RefuseSensitiveRead(searchPath); why != "" {
 		return NewTextErrorResponse(why), nil
 	}
+	if why := refuseSensitiveGlob(params.Glob, searchPath); why != "" {
+		return NewTextErrorResponse(why), nil
+	}
 
 	// GORILLA FIX (2026-08-19): refuse a doomed search UP FRONT rather than
 	// spending thirty seconds discovering it is doomed.
@@ -753,8 +756,12 @@ func doomedContentSearch(params FindParams, searchPath string) string {
 		return ""
 	}
 	clean := filepath.Clean(searchPath)
+	// GORILLA FIX (2026-10-05): the list knew only Unix. On Windows a whole
+	// drive (C:\) and the folder holding every user (C:\Users) were searched.
 	tooBig := clean == filepath.Clean(home) || clean == "/" ||
-		clean == "/home" || clean == "/usr" || clean == "/var"
+		clean == "/home" || clean == "/usr" || clean == "/var" ||
+		clean == filepath.Dir(filepath.Clean(home)) ||
+		(filepath.VolumeName(clean) != "" && strings.TrimRight(clean, `\/`) == filepath.VolumeName(clean))
 	if !tooBig {
 		return ""
 	}

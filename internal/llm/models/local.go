@@ -224,6 +224,9 @@ func RegisterLocalEndpoint(name, baseURL, apiKey string) (int, ModelID) {
 	// every provider the user has never touched. An endpoint someone added by
 	// hand is the one they are looking for.
 	ProviderPopularity[ProviderLocal] = 1
+	// After the listing, never across it: see registry_edit.go.
+	SupportedModels, localRoute, commit := beginRegistryEdit()
+	defer commit()
 	registered := make([]ModelID, 0, len(raw))
 	n := 0
 	for _, m := range raw {
@@ -248,6 +251,28 @@ func RegisterLocalEndpoint(name, baseURL, apiKey string) (int, ModelID) {
 		localRoute[model.ID] = localRouteInfo{BaseURL: baseURL, APIKey: apiKey, Endpoint: name}
 		registered = append(registered, model.ID)
 		n++
+	}
+	// GORILLA OVERRIDE (2026-10-05): no two rows of one endpoint may read the
+	// same. The bundled metadata names nvidia/nemotron-parse and
+	// nvidia/nemotron-parse-2.0 both "Nemotron Parse"; found by the model
+	// doctor on its first run. A name shared inside this endpoint gets the
+	// provider's own id appended. Idempotent: an id already there is not added
+	// twice.
+	byName := map[string][]ModelID{}
+	for _, id := range registered {
+		byName[SupportedModels[id].Name] = append(byName[SupportedModels[id].Name], id)
+	}
+	for name, same := range byName {
+		if len(same) < 2 {
+			continue
+		}
+		for _, id := range same {
+			m := SupportedModels[id]
+			if tag := " [" + m.APIModel + "]"; !strings.HasSuffix(name, tag) {
+				m.Name = name + tag
+				SupportedModels[id] = m
+			}
+		}
 	}
 	return n, preferredChatModel(registered)
 }
@@ -279,32 +304,20 @@ func preferredChatModel(ids []ModelID) ModelID {
 	if len(ids) == 0 {
 		return ""
 	}
-	have := make(map[ModelID]bool, len(ids))
-	for _, id := range ids {
-		have[id] = true
-	}
-	for _, want := range []string{
-		"local.meta/llama-3.3-70b-instruct",
-		"local.meta/llama-3.1-70b-instruct",
-		"local.qwen/qwen2.5-coder-32b-instruct",
-		"local.meta/llama-3.1-8b-instruct",
-	} {
-		if have[ModelID(want)] {
-			return ModelID(want)
-		}
-	}
-	for _, id := range ids {
-		low := strings.ToLower(string(id))
-		bad := false
-		for _, pat := range cannotChat {
-			if strings.Contains(low, pat) {
-				bad = true
-				break
-			}
-		}
-		if !bad {
-			return id
-		}
+	// GORILLA OVERRIDE (2026-10-05): no model is named here any more.
+	//
+	// The fix described above was a list of four ids to prefer, led by
+	// "meta/llama-3.3-70b-instruct". NVIDIA retired that model on 2026-08-26
+	// and the other three before it, so the list matched nothing, the code
+	// fell through to "first id that is not obviously an embedder" and the
+	// default was 01-ai/yi-large again: the exact bug the list was written to
+	// remove, back within weeks, with the comment still claiming it was fixed.
+	//
+	// The order now comes from rules and from evidence (probe.go): a model that
+	// was SEEN to answer with a tool call first, then unchecked models by family
+	// and size, and a model seen to be retired last. Nothing to retype.
+	if order := candidateOrder(ids); len(order) > 0 {
+		return order[0]
 	}
 	return ids[0]
 }
@@ -312,6 +325,8 @@ func preferredChatModel(ids []ModelID) ModelID {
 // UnregisterLocalEndpoint drops every model routed to baseURL (used when a
 // connection is disabled/removed so its models vanish from the picker).
 func UnregisterLocalEndpoint(baseURL string) {
+	SupportedModels, localRoute, commit := beginRegistryEdit()
+	defer commit()
 	for id, r := range localRoute {
 		if r.BaseURL == baseURL {
 			delete(localRoute, id)
@@ -329,6 +344,8 @@ func UnregisterLocalEndpoint(baseURL string) {
 // redundant entry being removed. The route records which endpoint registered it,
 // so match on that.
 func UnregisterLocalEndpointByName(name string) int {
+	SupportedModels, localRoute, commit := beginRegistryEdit()
+	defer commit()
 	n := 0
 	for id, r := range localRoute {
 		if r.Endpoint == name {
@@ -359,6 +376,8 @@ func UnregisterLocalEndpointByName(name string) int {
 // keep names the models an agent is currently pointed at; those survive, so a
 // purge cannot blank out the model you are talking to right now.
 func PurgeLocalModels(keep map[ModelID]bool) int {
+	SupportedModels, localRoute, commit := beginRegistryEdit()
+	defer commit()
 	n := 0
 	for id, m := range SupportedModels {
 		if m.Provider != ProviderLocal || keep[id] {
@@ -604,7 +623,16 @@ func convertLocalModel(model localModel) Model {
 		}
 		description = meta.Description
 		metaCtx = meta.ContextWindow
-		rank = meta.Rank
+		// GORILLA OVERRIDE (2026-10-05): the typed rank is NOT used.
+		//
+		// metadata/nim.json ranks 31 models "probe-verified, 1 = best". On this
+		// date 26 of them answered HTTP 410 (retired), its rank 1, 2 and 3 among
+		// them, and the five survivors sat at the top of the picker numbered 5,
+		// 6, 10, 18 and 31 above every current model. A ranking typed once is a
+		// claim with no expiry date. The order now comes from what the provider
+		// lists today and what answered when asked (probe.go); the bundle still
+		// supplies names, descriptions, context sizes and prices.
+		_ = meta.Rank
 		costIn = meta.CostIn
 		costInCached = meta.CostInCached
 		costOut = meta.CostOut
@@ -806,25 +834,17 @@ func RefreshLocalEndpoints() int {
 // machine picks the same model every launch. An agent that silently changed
 // model between runs would be worse than one that failed.
 func PreferredLocalModel() ModelID {
-	best := ModelID("")
-	bestRank := 0
+	// GORILLA OVERRIDE (2026-10-05): "lowest rank, then lowest id" picked
+	// local.01-ai/yi-large whenever nothing was ranked, because "01" sorts
+	// first. The same rule as an endpoint's default is used instead: a model
+	// seen to answer, then by family and size. Still deterministic.
+	var ids []ModelID
 	for id, m := range SupportedModels {
-		if m.Provider != ProviderLocal {
-			continue
-		}
-		if best == "" {
-			best, bestRank = id, m.Rank
-			continue
-		}
-		// Rank 0 means "not ranked", which must lose to any real rank.
-		switch {
-		case m.Rank > 0 && (bestRank == 0 || m.Rank < bestRank):
-			best, bestRank = id, m.Rank
-		case m.Rank == bestRank && id < best:
-			best = id
+		if m.Provider == ProviderLocal {
+			ids = append(ids, id)
 		}
 	}
-	return best
+	return preferredChatModel(sortedIDs(ids))
 }
 
 // CanonicalEndpointURL reduces a local endpoint URL to a form that compares

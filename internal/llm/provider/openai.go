@@ -563,10 +563,11 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 				logging.WarnPersist(o.busyNotice(attempts, after), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
-					// context cancelled
-					if ctx.Err() == nil {
-						eventChan <- ProviderEvent{Type: EventError, Error: ctx.Err()}
-					}
+					// GORILLA FIX (2026-10-05): this sent the error only
+					// `if ctx.Err() == nil`, which is never true once Done has
+					// fired, so the channel closed with no event at all and the
+					// agent took the silence for a finished reply.
+					eventChan <- ProviderEvent{Type: EventError, Error: ctx.Err()}
 					close(eventChan)
 					return
 				case <-time.After(time.Duration(after) * time.Millisecond):
