@@ -1,10 +1,15 @@
 name: release
 
+# GORILLA OVERRIDE (2026-10-05): started by hand only.
+#
+# This is the upstream project's goreleaser job. It ran on every tag and failed
+# on every tag ("missing GITHUB_TOKEN, GITLAB_TOKEN and GITEA_TOKEN"), because
+# Gorilla OpenCode is not released by goreleaser: the files are built, tested
+# against a real model and published by hand, and then installed on real Linux
+# by linux-install.yml. A check that is red on every release teaches everyone to
+# ignore red, which is how the Linux test run went unread for four releases.
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "*"
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 

@@ -91,10 +91,21 @@ rpm-fedora | v0.1.138
 rpm-fedora | Nothing wrong found.
 ```
 
-Those lines are from the previous version's files, which are built the same
-way. The same check runs by itself on this version's files the moment they are
-published, and anyone can read the result: on the project's GitHub page, open
-the tab called **Actions** and look for **linux-install**.
+Those lines are from the previous version's files, checked before this version
+went out. The same check then ran by itself on **this** version's files, minutes
+after they were published:
+
+```
+deb-ubuntu | Setting up gorilla-opencode (0.1.139) ...
+deb-ubuntu | v0.1.139
+deb-ubuntu | Nothing wrong found.
+rpm-fedora | Complete!
+rpm-fedora | v0.1.139
+rpm-fedora | Nothing wrong found.
+```
+
+Anyone can read the full result: on the project's GitHub page, open the tab
+called **Actions** and look for **linux-install**.
 
 **What it means for you, in one line:** on Linux, you are no longer the first
 person to install this.
