@@ -1,0 +1,97 @@
+name: arch-package
+
+# Build the Arch Linux package on real Arch, install it there, and attach it to
+# the release.
+#
+# packaging/PKGBUILD tells Arch users to download a .pkg.tar.zst from the
+# release page. From v0.1.133 to v0.1.139 there was none: the recipe could not
+# build (it installed a file that was no longer in the source), and it could not
+# be built on the Windows laptop the releases are made on. This runs it where it
+# belongs: an Arch container, makepkg as an ordinary user, checksums verified.
+#
+# Started by hand, AFTER the commit that records the release tarball's checksum
+# in the recipe: the checksum of a tag's tarball cannot be known before the tag
+# exists, so the recipe that can build a release is always one commit after it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build, e.g. v0.1.140. Must match pkgver in packaging/PKGBUILD on this branch."
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: tools
+        run: pacman -Syu --noconfirm --needed base-devel git go github-cli sudo
+
+      - uses: actions/checkout@v4
+
+      - name: the recipe is for this release
+        run: |
+          ver="${TAG#v}"
+          grep -q "^pkgver=${ver}$" packaging/PKGBUILD || {
+            echo "::error::packaging/PKGBUILD has $(grep '^pkgver=' packaging/PKGBUILD), not pkgver=${ver}"; exit 1; }
+
+      - name: build as an ordinary user (makepkg refuses to run as root)
+        run: |
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          mkdir /build
+          cp packaging/PKGBUILD packaging/setup-searxng.sh /build/
+          chown -R builder /build
+          cd /build
+          sudo -u builder makepkg --syncdeps --noconfirm
+          ls -la /build/*.pkg.tar.zst
+
+      - name: what is in the package
+        run: |
+          pkg=$(ls /build/*.pkg.tar.zst)
+          pacman -Qip "$pkg"
+          pacman -Qlp "$pkg" | head -40
+          echo "files: $(pacman -Qlp "$pkg" | wc -l)"
+
+      - name: install it
+        run: pacman -U --noconfirm /build/*.pkg.tar.zst
+
+      - name: the installed program starts and reports its version
+        run: |
+          v="$(gorilla-opencode --version)"
+          echo "$v"
+          test "$v" = "$TAG"
+
+      - name: the model doctor and the search tool run
+        run: |
+          set +e
+          HOME="$(mktemp -d)" gorilla-opencode models doctor
+          rc=$?
+          set -e
+          echo "exit status $rc"
+          test $rc -eq 0 -o $rc -eq 3
+          pfind --help >/dev/null
+          test -x /usr/share/gorilla-opencode/setup-searxng.sh
+
+      - name: it uninstalls cleanly
+        run: |
+          pacman -R --noconfirm gorilla-opencode
+          ! command -v gorilla-opencode
+
+      - name: attach it to the release, with its checksum
+        run: |
+          cd /build
+          pkg=$(ls *.pkg.tar.zst)
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p "SHA256SUMS-${TAG}.txt"
+          grep -v " ${pkg}$" "SHA256SUMS-${TAG}.txt" > sums.new || true
+          sha256sum "$pkg" >> sums.new
+          mv sums.new "SHA256SUMS-${TAG}.txt"
+          cat "SHA256SUMS-${TAG}.txt"
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" "$pkg" "SHA256SUMS-${TAG}.txt" --clobber

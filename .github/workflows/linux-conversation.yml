@@ -1,0 +1,122 @@
+name: linux-conversation
+
+# Hold a real conversation with a real AI, on Linux, and check what happened.
+#
+# linux-install.yml proves the packages install and the program starts. It
+# cannot prove the program can TALK to an AI on Linux, because that needs an AI
+# and a key, and no key belongs on a public build machine.
+#
+# So this uses an AI that needs no key: a small open model run by Ollama on the
+# build machine itself. The program is pointed at it exactly as a user would
+# point it at Ollama on their own computer, is asked to run a command, and its
+# own receipt is read to see whether the AI really called the tool.
+#
+# What this proves: on Linux the program starts a turn, sends the request, reads
+# the streamed reply, runs the tool the AI asked for, sends the result back and
+# prints the answer and the receipt. What it does not prove: that any particular
+# hosted provider works on Linux. The model here is small; if it answers without
+# calling the tool, the run is retried, and the job fails only if the PROGRAM
+# fails or no attempt produced a tool call.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Install this release's .deb instead of building from source (e.g. v0.1.140). Empty = build from source."
+        required: false
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  talk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      ollama:
+        image: ollama/ollama:latest
+        ports:
+          - 11434:11434
+        env:
+          OLLAMA_CONTEXT_LENGTH: "16384"
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      MODEL: "qwen2.5:3b"
+      GORILLA_OPENCODE_HEADLESS_TIMEOUT: "20m"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install the published .deb
+        if: env.TAG != ''
+        run: |
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p 'gorilla-opencode_*_amd64.deb' -D dl
+          sudo apt-get install -y ./dl/gorilla-opencode_*_amd64.deb
+
+      - uses: actions/setup-go@v5
+        if: env.TAG == ''
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: or build from this source
+        if: env.TAG == ''
+        run: |
+          go build -ldflags "-s -w -X github.com/opencode-ai/opencode/internal/version.Version=source" -o gorilla-opencode .
+          sudo install -m755 gorilla-opencode /usr/local/bin/gorilla-opencode
+
+      - name: fetch the model into Ollama
+        run: |
+          for i in $(seq 1 30); do curl -sf http://localhost:11434/api/tags >/dev/null && break; sleep 2; done
+          curl -sf http://localhost:11434/api/pull -d "{\"name\":\"$MODEL\",\"stream\":false}"
+          echo
+          curl -sf http://localhost:11434/v1/models
+
+      - name: point the program at it, as a user would
+        run: |
+          mkdir -p "$HOME/.config/gorilla-opencode" ws
+          cat > "$HOME/.config/gorilla-opencode/config.json" <<EOF
+          {
+            "localEndpoints": [{"name": "Ollama", "baseURL": "http://localhost:11434/v1"}],
+            "agents": {
+              "coder":      {"model": "local.$MODEL"},
+              "summarizer": {"model": "local.$MODEL"},
+              "task":       {"model": "local.$MODEL"},
+              "title":      {"model": "local.$MODEL"}
+            }
+          }
+          EOF
+          gorilla-opencode --version
+          gorilla-opencode models doctor || test $? -eq 3
+
+      - name: have the conversation
+        run: |
+          ok=0
+          for attempt in 1 2 3; do
+            echo "::group::attempt $attempt"
+            set +e
+            gorilla-opencode -p 'Run this exact shell command using the bash tool: echo linux-conversation-check . Then tell me what it printed.' -q -c "$PWD/ws" > out.txt 2> err.txt
+            rc=$?
+            set -e
+            echo "exit status $rc"
+            echo "----- what the program printed -----"
+            cat out.txt
+            echo "----- its error stream -----"
+            cat err.txt
+            echo "::endgroup::"
+            # The program itself must have worked: a reply and its own receipt.
+            if ! grep -q 'what actually ran' out.txt err.txt; then
+              echo "::error::attempt $attempt: the program printed no receipt"
+              exit 1
+            fi
+            # The AI must have called the tool, and the tool must have run.
+            if grep -Eq 'bash +echo linux-conversation-check.*-> ok' out.txt && grep -q 'linux-conversation-check' out.txt; then
+              ok=1
+              break
+            fi
+            echo "attempt $attempt: the model answered without a successful tool call; trying again"
+          done
+          test "$ok" = 1 || { echo "::error::no attempt produced a tool call that ran"; exit 1; }
+          echo "A real AI was asked on Linux, called the tool, and the program ran it and recorded it."

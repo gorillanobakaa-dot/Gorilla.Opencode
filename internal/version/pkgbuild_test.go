@@ -16,6 +16,8 @@ package version
 // the repository alone.
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -97,17 +99,53 @@ func TestPKGBUILDTracksTheCurrentRelease(t *testing.T) {
 // telling the reader to regenerate it.
 func TestPKGBUILDChecksumIsNotSKIP(t *testing.T) {
 	src := readPKGBUILD(t)
-	m := regexp.MustCompile(`(?m)^sha256sums=\((.*)\)$`).FindStringSubmatch(src)
+	// GORILLA OVERRIDE (2026-10-05): one checksum PER SOURCE, possibly over
+	// several lines. The recipe gained a second source (setup-searxng.sh) and
+	// this test read a single-line array holding a single sum.
+	m := regexp.MustCompile(`(?s)\nsha256sums=\((.*?)\)`).FindStringSubmatch(src)
 	if m == nil {
-		t.Fatal("PKGBUILD has no sha256sums= line")
+		t.Fatal("PKGBUILD has no sha256sums= array")
 	}
-	sum := strings.Trim(strings.TrimSpace(m[1]), "'\"")
-	if sum == "SKIP" {
-		t.Error("sha256sums is SKIP - makepkg will accept whatever arrives from the network.\n" +
-			"  Regenerate with `makepkg -g`, or sha256sum the tagged tarball directly.")
+	sums := strings.Fields(m[1])
+	srcs := regexp.MustCompile(`(?s)\nsource=\((.*?)\)\n`).FindStringSubmatch(src)
+	if srcs == nil {
+		t.Fatal("PKGBUILD has no source= array")
 	}
-	if len(sum) != 64 {
-		t.Errorf("sha256sums=%q is %d chars; a sha256 is 64 hex characters", sum, len(sum))
+	if want := len(strings.Fields(srcs[1])); len(sums) != want {
+		t.Errorf("%d checksum(s) for %d source(s); makepkg needs exactly one each", len(sums), want)
+	}
+	hex64 := regexp.MustCompile(`^[0-9a-f]{64}$`)
+	for _, raw := range sums {
+		sum := strings.Trim(raw, "'\"")
+		if sum == "SKIP" {
+			t.Error("a sha256sums entry is SKIP - makepkg will accept whatever arrives from the network.\n" +
+				"  Regenerate with `makepkg -g`, or sha256sum the file directly.")
+			continue
+		}
+		if !hex64.MatchString(sum) {
+			t.Errorf("sha256sums entry %q is not 64 hex characters", sum)
+		}
+	}
+}
+
+// The second source is a file in this repository, so its checksum can be
+// checked here and now. A recipe whose checksum does not match the file beside
+// it fails for every user, at the first step.
+func TestPKGBUILDLocalSourceMatchesItsChecksum(t *testing.T) {
+	src := readPKGBUILD(t)
+	raw, err := os.ReadFile("../../packaging/setup-searxng.sh")
+	if err != nil {
+		t.Fatalf("the recipe lists setup-searxng.sh as a source and it is not beside it: %v", err)
+	}
+	// The repository stores LF; a Windows checkout may hold CRLF. The checksum
+	// is of what git stores and what an Arch user gets.
+	sum := sha256.Sum256([]byte(strings.ReplaceAll(string(raw), "\r\n", "\n")))
+	if want := hex.EncodeToString(sum[:]); !strings.Contains(src, "'"+want+"'") {
+		t.Errorf("packaging/setup-searxng.sh has sha256 %s, which is not in the recipe's sha256sums.\n"+
+			"  The file changed without the recipe; makepkg would refuse it.", want)
+	}
+	if strings.Contains(src, `"packaging/setup-searxng.sh"`) {
+		t.Error("package() still installs setup-searxng.sh from inside the tarball, where it is not")
 	}
 }
 

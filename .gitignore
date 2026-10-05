@@ -211,3 +211,9 @@ TODO.readme.md
 
 # built toolkit bundles (now outside the embedded tree)
 internal/llm/tools/codereview/dist/
+
+# GORILLA OVERRIDE (2026-10-05): one .sh IS published. setup-searxng.sh is not an
+# internal script: it is a file the packages install on users' computers (it is
+# inside every published .deb and .rpm), and the Arch recipe lists it as a source.
+# Ignored, it was absent from the repository and the recipe could not build.
+!packaging/setup-searxng.sh

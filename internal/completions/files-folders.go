@@ -1,10 +1,11 @@
 package completions
 
 import (
-	"bytes"
-	"fmt"
-	"os/exec"
+	"bufio"
+	"io/fs"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/opencode-ai/opencode/internal/fileutil"
@@ -27,143 +28,121 @@ func (cg *filesAndFoldersContextGroup) GetEntry() dialog.CompletionItemI {
 	})
 }
 
-func processNullTerminatedOutput(outputBytes []byte) []string {
-	if len(outputBytes) > 0 && outputBytes[len(outputBytes)-1] == 0 {
-		outputBytes = outputBytes[:len(outputBytes)-1]
-	}
+// Limits on one listing. See getFiles.
+const (
+	// completionShown is how many suggestions a list can usefully hold. Nobody
+	// reads past the first screenful; they type another letter instead.
+	completionShown = 200
+	// completionScan is how many file names are looked at for one query before
+	// the search stops. A project of any ordinary size is far below it.
+	completionScan = 60000
+)
 
-	if len(outputBytes) == 0 {
-		return []string{}
-	}
+// completionBudget is how long one listing may take. A variable so tests can
+// shorten it.
+var completionBudget = 1500 * time.Millisecond
 
-	split := bytes.Split(outputBytes, []byte{0})
-	matches := make([]string, 0, len(split))
-
-	for _, p := range split {
-		if len(p) == 0 {
-			continue
+// getFiles lists files for the @-mention suggestions.
+//
+// GORILLA FIX (2026-10-05): BOUNDED. This used to list every file under the
+// working folder, however many there were, before returning anything, and it is
+// called once while the window is being built. So the program could not start
+// until the whole tree had been walked.
+//
+// Measured on the owner's machine with the released v0.1.139:
+//
+//	opened in an empty folder   ready in 8.5 s,  79 MB
+//	opened in C:\Users\gorilla1  NOT ready after 150 s, 3,157 MB, 125 s of CPU
+//
+// with `rg --files -L --null C:\Users\gorilla1` feeding `fzf --filter ""`: an
+// empty filter passes everything, so every path in the home folder was read into
+// memory twice over. The owner saw a window frozen on its first three lines.
+// Every test had started the program in a small folder, where this costs
+// nothing, which is why it was never seen.
+//
+// A suggestion list needs a screenful, not the tree. So the listing stops at
+// whichever comes first: enough matches to show, completionScan names looked
+// at, or completionBudget elapsed. The lister is then stopped, not left running.
+// fzf is no longer used here: it cannot be told to stop early, and the fuzzy
+// match it did is done in Go on the names already read.
+func (cg *filesAndFoldersContextGroup) getFiles(query string) ([]string, error) {
+	deadline := time.Now().Add(completionBudget)
+	names := scanFileNames(deadline, func(seen int, kept []string) bool {
+		if query == "" {
+			return len(kept) >= completionShown
 		}
-
-		path := string(p)
-		path = filepath.Join(".", path)
-
-		if !fileutil.SkipHidden(path) {
-			matches = append(matches, path)
-		}
+		return seen >= completionScan
+	})
+	if query == "" {
+		return names, nil
 	}
-
-	return matches
+	matches := fuzzy.Find(query, names)
+	if len(matches) > completionShown {
+		matches = matches[:completionShown]
+	}
+	return matches, nil
 }
 
-func (cg *filesAndFoldersContextGroup) getFiles(query string) ([]string, error) {
-	cmdRg := fileutil.GetRgCmd("") // No glob pattern for this use case
-	cmdFzf := fileutil.GetFzfCmd(query)
-
-	var matches []string
-	// Case 1: Both rg and fzf available
-	if cmdRg != nil && cmdFzf != nil {
-		rgPipe, err := cmdRg.StdoutPipe()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get rg stdout pipe: %w", err)
+// scanFileNames yields visible file names under the workspace until enough()
+// says stop or the deadline passes. It uses ripgrep when it is installed, which
+// honours .gitignore, and a plain walk when it is not. In both cases the lister
+// is stopped as soon as the answer is in hand.
+func scanFileNames(deadline time.Time, enough func(seen int, kept []string) bool) []string {
+	kept := make([]string, 0, completionShown)
+	seen := 0
+	take := func(path string) (stop bool) {
+		seen++
+		path = filepath.Join(".", path)
+		if !fileutil.SkipHidden(path) {
+			kept = append(kept, path)
 		}
-		defer rgPipe.Close()
-
-		cmdFzf.Stdin = rgPipe
-		var fzfOut bytes.Buffer
-		var fzfErr bytes.Buffer
-		cmdFzf.Stdout = &fzfOut
-		cmdFzf.Stderr = &fzfErr
-
-		if err := cmdFzf.Start(); err != nil {
-			return nil, fmt.Errorf("failed to start fzf: %w", err)
-		}
-
-		errRg := cmdRg.Run()
-		errFzf := cmdFzf.Wait()
-
-		if errRg != nil {
-			logging.Warn(fmt.Sprintf("rg command failed during pipe: %v", errRg))
-		}
-
-		if errFzf != nil {
-			if exitErr, ok := errFzf.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
-				return []string{}, nil // No matches from fzf
-			}
-			return nil, fmt.Errorf("fzf command failed: %w\nStderr: %s", errFzf, fzfErr.String())
-		}
-
-		matches = processNullTerminatedOutput(fzfOut.Bytes())
-
-		// Case 2: Only rg available
-	} else if cmdRg != nil {
-		logging.Debug("Using Ripgrep with fuzzy match fallback for file completions")
-		var rgOut bytes.Buffer
-		var rgErr bytes.Buffer
-		cmdRg.Stdout = &rgOut
-		cmdRg.Stderr = &rgErr
-
-		if err := cmdRg.Run(); err != nil {
-			return nil, fmt.Errorf("rg command failed: %w\nStderr: %s", err, rgErr.String())
-		}
-
-		allFiles := processNullTerminatedOutput(rgOut.Bytes())
-		matches = fuzzy.Find(query, allFiles)
-
-		// Case 3: Only fzf available
-	} else if cmdFzf != nil {
-		logging.Debug("Using FZF with doublestar fallback for file completions")
-		files, _, err := fileutil.GlobWithDoublestar("**/*", ".", 0)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list files for fzf: %w", err)
-		}
-
-		allFiles := make([]string, 0, len(files))
-		for _, file := range files {
-			if !fileutil.SkipHidden(file) {
-				allFiles = append(allFiles, file)
-			}
-		}
-
-		var fzfIn bytes.Buffer
-		for _, file := range allFiles {
-			fzfIn.WriteString(file)
-			fzfIn.WriteByte(0)
-		}
-
-		cmdFzf.Stdin = &fzfIn
-		var fzfOut bytes.Buffer
-		var fzfErr bytes.Buffer
-		cmdFzf.Stdout = &fzfOut
-		cmdFzf.Stderr = &fzfErr
-
-		if err := cmdFzf.Run(); err != nil {
-			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
-				return []string{}, nil
-			}
-			return nil, fmt.Errorf("fzf command failed: %w\nStderr: %s", err, fzfErr.String())
-		}
-
-		matches = processNullTerminatedOutput(fzfOut.Bytes())
-
-		// Case 4: Fallback to doublestar with fuzzy match
-	} else {
-		logging.Debug("Using doublestar with fuzzy match for file completions")
-		allFiles, _, err := fileutil.GlobWithDoublestar("**/*", ".", 0)
-		if err != nil {
-			return nil, fmt.Errorf("failed to glob files: %w", err)
-		}
-
-		filteredFiles := make([]string, 0, len(allFiles))
-		for _, file := range allFiles {
-			if !fileutil.SkipHidden(file) {
-				filteredFiles = append(filteredFiles, file)
-			}
-		}
-
-		matches = fuzzy.Find(query, filteredFiles)
+		return enough(seen, kept) || time.Now().After(deadline)
 	}
 
-	return matches, nil
+	if cmd := fileutil.GetRgCmd(""); cmd != nil {
+		out, err := cmd.StdoutPipe()
+		if err == nil && cmd.Start() == nil {
+			// Whatever happens below, the lister does not outlive this call.
+			stopped := make(chan struct{})
+			timer := time.AfterFunc(time.Until(deadline), func() { _ = cmd.Process.Kill() })
+			go func() { _ = cmd.Wait(); close(stopped) }()
+
+			r := bufio.NewReaderSize(out, 64<<10)
+			for {
+				name, err := r.ReadString(0)
+				if n := strings.TrimSuffix(name, "\x00"); n != "" {
+					if take(n) {
+						break
+					}
+				}
+				if err != nil {
+					break
+				}
+			}
+			timer.Stop()
+			_ = cmd.Process.Kill()
+			<-stopped
+			return kept
+		}
+		logging.Debug("ripgrep could not be started for file completions; walking instead")
+	}
+
+	_ = filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // an unreadable folder is skipped, not fatal
+		}
+		if d.IsDir() {
+			if path != "." && fileutil.SkipHidden(path) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if take(path) {
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	return kept
 }
 
 func (cg *filesAndFoldersContextGroup) GetChildEntries(query string) ([]dialog.CompletionItemI, error) {

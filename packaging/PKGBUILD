@@ -64,7 +64,16 @@ depends=('lynx' 'python' 'ripgrep' 'xclip')
 makedepends=('go>=1.21')
 # GORILLA: source is the tagged tarball from GitHub. The sha256sum covers the
 # archive as downloaded; regenerate with `makepkg -g` after a version bump.
-source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gorillanobakaa-dot/Gorilla.Opencode/archive/refs/tags/v${pkgver}.tar.gz")
+#
+# GORILLA OVERRIDE (2026-10-05): setup-searxng.sh is a SECOND source, a file that
+# sits beside this one. package() used to install it from inside the release
+# tarball, where it has not been since the packaging scripts were moved out of
+# the repository. So this recipe could not build any release after that: the
+# install line failed on a file that was not there. Nobody found out, because
+# nobody ran makepkg; no Arch package was published after v0.1.132. It is now
+# built and installed on real Arch by .github/workflows/arch-package.yml.
+source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gorillanobakaa-dot/Gorilla.Opencode/archive/refs/tags/v${pkgver}.tar.gz"
+        "setup-searxng.sh")
 # GORILLA OVERRIDE (2026-08-20): a real checksum, not SKIP.
 #
 # SKIP disables integrity checking entirely - makepkg accepts whatever arrives
@@ -95,7 +104,8 @@ source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gorillanobakaa-dot/Gori
 # archive/refs/tags/v${pkgver}.tar.gz, sha256sum it, paste it here, commit to
 # main, then re-download and verify. Do not guess it and do not carry the
 # previous release's value forward.
-sha256sums=('34b7eb4981e133fd14556bfb0187f3ca96f5bb2c50bfe5fb49e59709c2ebab3b')
+sha256sums=('34b7eb4981e133fd14556bfb0187f3ca96f5bb2c50bfe5fb49e59709c2ebab3b'
+            '6aa609225bc1ebfdfaea046da530e43fbeded4daa83d75580230f9bd39448429')
 
 build() {
     cd "Gorilla.Opencode-${pkgver}"
@@ -132,7 +142,7 @@ package() {
 
     # SearXNG setup helper (makes web search work out of the box)
     install -Dm755 \
-        "packaging/setup-searxng.sh" \
+        "${srcdir}/setup-searxng.sh" \
         "${pkgdir}/usr/share/${pkgname}/setup-searxng.sh"
 
     # GORILLA OVERRIDE (2026-08-20): pfind. Absent from this file entirely until
