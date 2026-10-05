@@ -477,6 +477,8 @@ On version 0.1.141 the first of those rows read `provider error 500 on 2026-10-0
 
 **The real screens.** `/update`, `/model` and `/provider` were typed into the real program by a script, and the list of AIs was read off its screen.
 
+**On real Linux, after publication.** Automatic checks on GitHub took the files from this page. The .deb was installed, started and removed on Ubuntu. The .rpm was installed, started and removed on Fedora. The Arch package was built on Arch Linux, installed, started and removed, and is attached below. The program, installed from the .deb, held a conversation with an AI running on the same Linux machine. All passed.
+
 **Starting up.** Timed twice in the home folder, pressing Enter on the NVIDIA row: ready to type after 1.56 and 1.93 seconds.
 
 **What was not tested, and why.**
@@ -484,7 +486,6 @@ On version 0.1.141 the first of those rows read `provider error 500 on 2026-10-0
 - `/review`, `/research` and `/osint` were not run from start to finish with an AI. A research run costs money and many minutes, and none of the checking tools `/review` drives is installed on the test computer. Their repairs rest on the program's own tests.
 - Pasting a key with Ctrl+V could not be proven again on this file. The check needs the Windows clipboard, and Windows answered `Requested Clipboard operation did not succeed` because the screen was locked. The same check failed in the same way on version 0.1.141, which had passed it before. That part of the program has not changed since.
 - The reading of package-manager answers on Linux was tested with typed samples, not with answers captured from a real Linux computer.
-- The Linux files are installed on real Linux by automatic checks that run on GitHub after this page is published. Their result is not known at the time of writing.
 
 **What is still wrong.**
 
