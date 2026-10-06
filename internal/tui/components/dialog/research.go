@@ -615,6 +615,12 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	case tokensMeasured:
 		add(kindAssumed, "ASSUMED («not measured»): %d steps x %.0fs = %.0fs per helper. The per-minute figure rests on that until a run has been timed.",
 			config.ResearchStepsPerHelper, config.ResearchSecondsPerStep, config.ResearchStepsPerHelper*config.ResearchSecondsPerStep)
+	case m.compact:
+		// The long form wraps to two rows at 90 columns, and on a 30-row
+		// terminal that second row pushed the key line off the screen
+		// (GitHub's Linux runner, 2026-10-06, where no run had been timed).
+		add(kindAssumed, "ASSUMED («not measured»): %d steps | %d out | %.0fs per step.",
+			config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep)
 	default:
 		add(kindAssumed, "ASSUMED («not measured»): %d steps | %d out | %.0fs per step. The per-minute figure rests on that %.0fs until a run has been timed.",
 			config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep, config.ResearchSecondsPerStep)
@@ -805,6 +811,13 @@ func (m ResearchDialogCmp) theWarning() string {
 		// above four helpers; the one line the user reads last still made it.
 		// The voice stays. The numbers are the scheduler's.
 		sessions, audited := agent.SupervisedSessions(m.agents)
+		if m.compact {
+			// At 90 columns the full line wraps and takes the row the key
+			// line needs on a 30-row terminal (2026-10-06). Same facts,
+			// fewer flourishes.
+			return fmt.Sprintf("Feeling lucky? %d sessions, not %d: up to double, %d lanes checked twice.",
+				sessions, m.agents, audited)
+		}
 		return fmt.Sprintf("Feeling lucky, punk? %d sessions, not %d: up to double, %d lanes checked twice. Do ya?",
 			sessions, m.agents, audited)
 	case "sequential":
