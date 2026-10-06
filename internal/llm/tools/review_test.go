@@ -195,12 +195,26 @@ func TestEachDepthDeclaresWhatItSkipped(t *testing.T) {
 		t.Errorf("the depth note is below the findings; it belongs with the other 'what was not checked' facts")
 	}
 
-	sec, err := summariseReview(raw, "security")
+	// GORILLA FIX (2026-10-06): the security sentence is read off the depth
+	// block too. See TestSecurityAndFullClaimsAreOnlyMadeWhenTheRunConfirmsThem
+	// for the unconfirmed half.
+	rawSec := mustJSON(t, map[string]any{
+		"target": "/src", "findings": []map[string]any{}, "corroborated": []map[string]any{},
+		"trust": map[string]any{"tools_ran": []string{"gosec"}},
+		"depth": map[string]any{
+			"mode": "security", "categories_run": []string{"recon", "secrets", "security", "static-analysis"},
+			"categories_skipped":     []string{"format", "lint"},
+			"tools_skipped_by_depth": []string{"golangci-lint", "vulture"},
+		},
+	})
+	sec, err := summariseReview(rawSec, "security")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(sec, "deliberately left out") {
-		t.Errorf("focus=security narrows the report without saying what it dropped")
+	for _, want := range []string{"DEPTH: security", "SKIPPED ENTIRELY", "golangci-lint", "narrowed"} {
+		if !strings.Contains(sec, want) {
+			t.Errorf("focus=security does not say what the depth skipped and that the list is narrowed — missing %q", want)
+		}
 	}
 
 	std, err := summariseReview(raw, "")

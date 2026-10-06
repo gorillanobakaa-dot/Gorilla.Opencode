@@ -63,7 +63,7 @@ type Receipt struct {
 var exitCodeRe = regexp.MustCompile(`(?m)^Exit code (\d+)\s*$`)
 
 // partialReviewRe matches the review tool's own verdict line (tools/review.go).
-var partialReviewRe = regexp.MustCompile(`\*\*PARTIAL REVIEW\.\*\* (\d+) of (\d+) scheduled jobs completed`)
+var partialReviewRe = regexp.MustCompile(`\*\*PARTIAL REVIEW\.\*\* (\d+) of (\d+) scheduled jobs completed(?: \((\d+) not installed, (\d+) failed, (\d+) timed out\))?`)
 
 // BuildReceipt reads the stored messages of one session. It uses only tool
 // calls and tool results, which the program writes; assistant text is ignored.
@@ -85,7 +85,7 @@ func BuildReceipt(msgs []message.Message) Receipt {
 			if tr, ok := results[tc.ID]; ok {
 				outcome = outcomeFor(tc.Name, tr)
 			}
-			if outcome != "ok" {
+			if outcome != "ok" && !strings.HasPrefix(outcome, "ok, ") {
 				r.Problems++
 			}
 
@@ -143,6 +143,15 @@ func outcomeFor(tool string, tr message.ToolResult) string {
 		return "ran, but reviewed nothing"
 	}
 	if m := partialReviewRe.FindStringSubmatch(c); m != nil {
+		// GORILLA FIX (2026-10-06): a review short of analysers is not a
+		// review that failed. On the first run against a real model, every
+		// installed analyser ran and found the planted faults, and this line
+		// still said "did not succeed". Missing tools are stated as missing;
+		// the call counts as a problem only when something broke or a
+		// language was left with no analyser at all.
+		if m[3] != "" && m[4] == "0" && m[5] == "0" && !strings.Contains(c, "Languages with NO completed analyser") {
+			return "ok, partial: " + m[1] + " analysers ran, " + m[3] + " not installed"
+		}
 		return "partial: " + m[1] + " of " + m[2] + " jobs completed"
 	}
 	// A command that ran and failed is not an "error result" as far as the

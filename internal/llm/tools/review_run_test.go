@@ -44,13 +44,92 @@ func TestQuickAsksTheToolkitForARealQuickPass(t *testing.T) {
 	if strings.Contains(got, "no-stage3") {
 		t.Error("focus=quick sends --no-stage3, which still runs bandit, gosec, semgrep and gitleaks")
 	}
-	for _, f := range []string{"security", "full"} {
-		if strings.Join(focusArgs(f), " ") != "--deep" {
-			t.Errorf("focus=%s no longer forces the deep stage", f)
-		}
+	if strings.Join(focusArgs("full"), " ") != "--deep" {
+		t.Errorf("focus=full no longer forces the deep stage: %v", focusArgs("full"))
+	}
+	// GORILLA FIX (2026-10-06): security is its own mode, not full under
+	// another name. It sent --deep, so every linter and formatter ran on a
+	// security review and the two focuses differed only in the summary.
+	if strings.Join(focusArgs("security"), " ") != "--security" {
+		t.Errorf("focus=security sends %q; it must send --security", focusArgs("security"))
+	}
+	if strings.Join(focusArgs("security"), " ") == strings.Join(focusArgs("full"), " ") {
+		t.Error("focus=security and focus=full send the same flags; they are the same run")
 	}
 	if len(focusArgs("")) != 0 {
 		t.Errorf("the standard pass sends depth flags: %v", focusArgs(""))
+	}
+}
+
+// GORILLA FIX (2026-10-06): the security and full sentences are claims about
+// the run, read off its depth block like the quick one. A report that does not
+// carry the mode asked for is said to be unconfirmed, not described anyway.
+func TestSecurityAndFullClaimsAreOnlyMadeWhenTheRunConfirmsThem(t *testing.T) {
+	base := map[string]any{
+		"target": "/src", "findings": []map[string]any{}, "corroborated": []map[string]any{},
+		"trust": map[string]any{"tools_ran": []string{"gosec", "black-check"}},
+	}
+	withDepth := func(mode string, skippedCats, skippedTools []string) []byte {
+		m := map[string]any{}
+		for k, v := range base {
+			m[k] = v
+		}
+		if mode != "" {
+			m["depth"] = map[string]any{"mode": mode, "categories_skipped": skippedCats,
+				"tools_skipped_by_depth": skippedTools}
+		}
+		return mustJSON(t, m)
+	}
+
+	// Confirmed security run: says what it skipped, by category and by name.
+	out, err := summariseReview(withDepth("security", []string{"format", "lint"}, []string{"black-check", "pylint", "vulture"}), "security")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"DEPTH: security", "SKIPPED ENTIRELY", "format, lint", "vulture", "Linters and formatters"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("a confirmed security run does not say what it skipped — missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "deliberately left out") || strings.Contains(out, "did not confirm") {
+		t.Errorf("a confirmed security run carries the old or the unconfirmed wording:\n%s", out)
+	}
+	if strings.Index(out, "DEPTH: security") > strings.Index(out, "## Corroborated") {
+		t.Error("the depth note is below the findings; it belongs in the trust block")
+	}
+
+	// Security asked for, run reports itself as deep (an older toolkit that
+	// did not know --security, or one that ignored it): no skip claim.
+	out, err = summariseReview(withDepth("deep", nil, nil), "security")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "SKIPPED ENTIRELY") || !strings.Contains(out, "did not confirm") {
+		t.Errorf("claimed linters were skipped on a run that reports itself as deep:\n%s", out)
+	}
+	// And with no depth block at all.
+	out, err = summariseReview(withDepth("", nil, nil), "security")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "SKIPPED ENTIRELY") || !strings.Contains(out, "did not confirm") {
+		t.Errorf("claimed linters were skipped on a report with no depth block:\n%s", out)
+	}
+
+	// Full: confirmed by mode "deep", unconfirmed by anything else.
+	out, err = summariseReview(withDepth("deep", nil, nil), "full")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "DEPTH: full.") || strings.Contains(out, "did not confirm") {
+		t.Errorf("a confirmed full run is not described as full:\n%s", out)
+	}
+	out, err = summariseReview(withDepth("standard", nil, nil), "full")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "DEPTH: full.") || !strings.Contains(out, "did not confirm") {
+		t.Errorf("a standard run was described as full:\n%s", out)
 	}
 }
 
@@ -382,6 +461,119 @@ func TestARealQuickRunSchedulesNoSecurityToolAndLeavesTheTargetAlone(t *testing.
 	}
 	if !strings.Contains(summary, "SKIPPED ENTIRELY") || !strings.Contains(summary, rep.Depth.ToolsSkipped[0]) {
 		t.Errorf("the summary of a confirmed quick run does not say what was left out:\n%s", summary)
+	}
+}
+
+// GORILLA FIX (2026-10-06), for real: a security run reports itself as
+// security, schedules no linter or formatter in ANY state, reaches the deep
+// security stage, and differs from a full run of the same tree.
+func TestARealSecurityRunSchedulesNoLinterAndReachesTheDeepStage(t *testing.T) {
+	tk := toolkitForTest(t)
+	target := t.TempDir()
+	writeReviewFixture(t, filepath.Join(target, "a.py"), "import os\nx = 1\n")
+	writeReviewFixture(t, filepath.Join(target, "a.go"), "package main\n\nfunc main() {}\n")
+	writeReviewFixture(t, filepath.Join(target, "go.mod"), "module example.test/x\n\ngo 1.21\n")
+
+	// The registry's own answer to "which ids are linters or formatters", so
+	// this test holds no typed copy of it.
+	code := "import json, tools_registry as r; print(json.dumps(sorted(t.id for t in r.TOOLS " +
+		"if t.category in ('lint', 'format') and t.scope in ('auto-file', 'auto-project'))))"
+	cmd := exec.Command(tk.python, append(append([]string{}, tk.preArgs...), "-c", code)...)
+	cmd.Dir = filepath.Dir(tk.script)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("could not read the registry: %v", err)
+	}
+	var styleIDs []string
+	if err := json.Unmarshal(out, &styleIDs); err != nil {
+		t.Fatalf("registry ids did not decode: %v\n%s", err, out)
+	}
+	isStyle := map[string]bool{}
+	for _, id := range styleIDs {
+		isStyle[id] = true
+	}
+
+	run := func(focus string) agentReport {
+		args := append([]string{target, "--audience", "agent", "--results-dir", t.TempDir(), "--skip-preflight"},
+			focusArgs(focus)...)
+		stdout, stderr, err := tk.run(context.Background(), args...)
+		if err != nil {
+			t.Fatalf("%s run failed: %v\n%s", focus, err, stderr)
+		}
+		var rep agentReport
+		if err := json.Unmarshal(stdout, &rep); err != nil {
+			t.Fatalf("%s report did not decode: %v\n%s", focus, err, stdout)
+		}
+		return rep
+	}
+	touchedBy := func(rep agentReport) map[string]bool {
+		touched := map[string]bool{}
+		for _, list := range [][]string{rep.Trust.ToolsRan, rep.Trust.ToolsMissing, rep.Trust.ToolsErrored, rep.Trust.ToolsTimedOut} {
+			for _, id := range list {
+				touched[id] = true
+			}
+		}
+		return touched
+	}
+
+	sec := run("security")
+	if sec.Depth == nil || sec.Depth.Mode != "security" {
+		t.Fatalf("the run does not report itself as security: %+v", sec.Depth)
+	}
+	secTouched := touchedBy(sec)
+	for id := range secTouched {
+		if isStyle[id] {
+			t.Errorf("a SECURITY pass scheduled the linter/formatter %s", id)
+		}
+	}
+	// Python and Go are present, so the deep security tools apply: semgrep-deep
+	// and bandit-deep must have been scheduled (ran, or missing because not
+	// installed — either proves the stage was reached).
+	for _, id := range []string{"semgrep-deep", "bandit-deep", "gosec", "bandit", "gitleaks-worktree"} {
+		if !secTouched[id] {
+			t.Errorf("a security pass over Python and Go did not schedule %s", id)
+		}
+	}
+	skippedByDepth := map[string]bool{}
+	for _, id := range sec.Depth.ToolsSkipped {
+		skippedByDepth[id] = true
+		if secTouched[id] {
+			t.Errorf("%s is reported both as left out by the depth and as scheduled", id)
+		}
+		if !isStyle[id] {
+			t.Errorf("a security pass says it skipped %s, which is not a linter or formatter", id)
+		}
+	}
+	for _, id := range []string{"pylint", "golangci-lint", "black-check", "vulture"} {
+		if !skippedByDepth[id] {
+			t.Errorf("a security pass over Python and Go did not name %s among what it left out", id)
+		}
+	}
+
+	// A full run of the same tree is a DIFFERENT run: it schedules the linters
+	// the security pass left out, and reports itself as deep.
+	full := run("full")
+	if full.Depth == nil || full.Depth.Mode != "deep" {
+		t.Fatalf("the full run does not report itself as deep: %+v", full.Depth)
+	}
+	fullTouched := touchedBy(full)
+	if !fullTouched["pylint"] || !fullTouched["vulture"] || !fullTouched["semgrep-deep"] {
+		t.Errorf("a full run did not schedule the linters and the deep stage together: %v", fullTouched)
+	}
+	if len(full.Depth.ToolsSkipped) != 0 {
+		t.Errorf("a full run says the depth left something out: %v", full.Depth.ToolsSkipped)
+	}
+
+	// And the summary built from the real security report makes the claim.
+	stdout, _, _ := tk.run(context.Background(), append([]string{target, "--audience", "agent",
+		"--results-dir", t.TempDir(), "--skip-preflight"}, focusArgs("security")...)...)
+	summary, err := summariseReview(stdout, "security")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(summary, "DEPTH: security") || !strings.Contains(summary, "SKIPPED ENTIRELY") ||
+		!strings.Contains(summary, "pylint") {
+		t.Errorf("the summary of a confirmed security run does not say what was left out:\n%s", summary)
 	}
 }
 

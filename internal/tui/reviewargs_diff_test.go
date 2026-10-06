@@ -169,3 +169,24 @@ func TestTheQuickPromptDescribesWhatQuickReallyRuns(t *testing.T) {
 		t.Errorf("the default prompt steers to diff=HEAD without covering an unchanged tree:\n%s", d)
 	}
 }
+
+// GORILLA FIX (2026-10-06): security and full are different runs, and the
+// prompt for each says what it runs. Until today both said only "pass
+// focus=...", because both were the same --deep run underneath.
+func TestTheSecurityAndFullPromptsSayWhatEachReallyRuns(t *testing.T) {
+	sec := reviewPrompt(reviewRequest{Focus: "security"})
+	for _, want := range []string{`focus="security"`, "secret scanners", "static", "deep pass", "no linters, no formatters", "left out"} {
+		if !strings.Contains(sec, want) {
+			t.Errorf("the security prompt does not say %q:\n%s", want, sec)
+		}
+	}
+	full := reviewPrompt(reviewRequest{Focus: "full"})
+	for _, want := range []string{`focus="full"`, "every analyser of every kind", "linters", "secret scan", "deep pass"} {
+		if !strings.Contains(full, want) {
+			t.Errorf("the full prompt does not say %q:\n%s", want, full)
+		}
+	}
+	if strings.Contains(full, "no linters") {
+		t.Errorf("the full prompt says linters are skipped:\n%s", full)
+	}
+}

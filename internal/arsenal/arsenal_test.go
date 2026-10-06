@@ -1,6 +1,7 @@
 package arsenal
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -938,4 +939,129 @@ func TestNothingInTheManifestNeedsAnAccountOrACard(t *testing.T) {
 			}
 		}
 	}
+}
+
+// GORILLA FIX (2026-10-06): the old `whoisdns` entry detected whois + dig + host
+// in all-mode and named no scoop package, so on Windows it read "not packaged
+// for scoop" although Scoop's main bucket has `bind`, which ships dig.exe and
+// host.exe (read from scoop/buckets/main/bucket/bind.json on the audited
+// machine). A Windows user with bind installed was told the capability was
+// unavailable, and a Linux user with dig but no whois was told it was partial.
+// It is two capabilities, from two packages, and is now two entries.
+func TestDnsAndWhoisAreSeparateEntries(t *testing.T) {
+	m, _ := Load()
+	for _, s := range m.Series {
+		for _, e := range s.Entries {
+			if e.ID == "whoisdns" {
+				t.Fatal("the merged whoisdns entry is still in the manifest")
+			}
+		}
+	}
+	dns := entryByID(t, "dns")
+	whois := entryByID(t, "whois")
+
+	// Same series, same tier: the split must not move either out of the OSINT
+	// set or change how much of "the minimum" each counts for.
+	seriesOf := func(id string) string {
+		for _, s := range m.Series {
+			for _, e := range s.Entries {
+				if e.ID == id {
+					return s.ID
+				}
+			}
+		}
+		return ""
+	}
+	if seriesOf("dns") != "osint" || seriesOf("whois") != "osint" {
+		t.Errorf("dns is in %q and whois in %q; both belong in osint", seriesOf("dns"), seriesOf("whois"))
+	}
+	if dns.Tier != whois.Tier || dns.Tier != "MINIMUM" {
+		t.Errorf("tiers drifted in the split: dns=%s whois=%s", dns.Tier, whois.Tier)
+	}
+
+	// The DNS entry is dig + host, from bind on scoop and pacman and dnsutils
+	// on apt; whois is whois alone, with no scoop package because there is none.
+	if got := strings.Join(dns.Detect.Binaries, ","); got != "dig,host" || dns.Detect.Mode == "any" {
+		t.Errorf("dns detects %q (mode %q); it must be dig and host, both required", got, dns.Detect.Mode)
+	}
+	if got := strings.Join(whois.Detect.Binaries, ","); got != "whois" {
+		t.Errorf("whois detects %q; it must be whois alone", got)
+	}
+	for _, binary := range dns.Detect.Binaries {
+		if !scoopBindShips(binary) {
+			t.Errorf("dns detects %q, which scoop's bind package does not ship", binary)
+		}
+	}
+	for pm, want := range map[PackageManager]string{APT: "dnsutils", Pacman: "bind", Scoop: "bind"} {
+		if got := strings.Join(PackagesFor(dns, pm), ","); got != want {
+			t.Errorf("dns on %s installs %q, want %q", pm, got, want)
+		}
+	}
+	for pm, want := range map[PackageManager]string{APT: "whois", Pacman: "whois"} {
+		if got := strings.Join(PackagesFor(whois, pm), ","); got != want {
+			t.Errorf("whois on %s installs %q, want %q", pm, got, want)
+		}
+	}
+	if Available(whois, Scoop) {
+		t.Errorf("whois claims a scoop package: %v", PackagesFor(whois, Scoop))
+	}
+	if !strings.Contains(strings.ToLower(whois.Caveats), "scoop") {
+		t.Error("whois has no scoop package and its caveat does not say so")
+	}
+
+	// On a Windows machine with scoop's bind installed, DNS is HAVE and whois is
+	// honestly MISSING — not one merged entry that is half of each.
+	useMachine(t, "windows", map[string]string{
+		"dig":  `C:\Users\u\scoop\shims\dig.exe`,
+		"host": `C:\Users\u\scoop\shims\host.exe`,
+	})
+	if st := DetectEntry(dns); !st.Present || len(st.Missing) != 0 {
+		t.Errorf("dns with dig and host on PATH is not reported as present: %+v", st)
+	}
+	if st := DetectEntry(whois); st.Present || st.Partial() {
+		t.Errorf("whois with nothing on PATH is reported as present or partial: %+v", st)
+	}
+	if !Available(dns, Scoop) || InstallCommand(PackagesFor(dns, Scoop), Scoop) != "scoop install bind" {
+		t.Errorf("dns on Windows does not offer `scoop install bind`: %q", InstallCommand(PackagesFor(dns, Scoop), Scoop))
+	}
+	if UnavailableNote(whois, Scoop) == "" {
+		t.Error("whois on Windows offers no explanation for having no package")
+	}
+}
+
+// scoopBindShips reads the real bucket manifest when this machine has one, so
+// the binary names the dns entry detects are checked against what `scoop
+// install bind` puts on PATH rather than against memory. Without a bucket on
+// disk the names are taken as read; the test above still checks everything else.
+func scoopBindShips(binary string) bool {
+	root := scoopRoot()
+	if root == "" {
+		return true
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "buckets", "main", "bucket", "bind.json"))
+	if err != nil {
+		return true
+	}
+	var man struct {
+		Bin []json.RawMessage `json:"bin"`
+	}
+	if err := json.Unmarshal(raw, &man); err != nil {
+		return true
+	}
+	for _, b := range man.Bin {
+		var name string
+		var pair []string
+		switch {
+		case json.Unmarshal(b, &name) == nil:
+		case json.Unmarshal(b, &pair) == nil && len(pair) == 2:
+			name = pair[1] // ["bin\\nslookup.exe", "nslookup-bind"]: the alias is the shim
+		default:
+			continue
+		}
+		name = strings.TrimSuffix(name[strings.LastIndexAny(name, `\/`)+1:], ".exe")
+		if name == binary {
+			return true
+		}
+	}
+	return false
 }

@@ -533,8 +533,13 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	// so they are not one-for-one. See ResearchQuotaMultiple.
 	add(kindQuota, "WORTH ABOUT %d ORDINARY QUESTIONS in tokens.", config.ResearchQuotaMultiple(n))
 	if !m.compact {
-		add(kindMuted, "   %s per helper step vs %s on one of your own turns.",
-			humanCount(config.ResearchHelperBasisTokens()), humanCount(config.LoadoutActiveTokens()))
+		// GORILLA (2026-10-06): the two quantities ResearchQuotaMultiple divides,
+		// per SESSION, since the session is now what is measured and priced.
+		// It read "per helper step vs ... on one of your own turns" and compared
+		// two contexts, neither of which was the numerator or the denominator.
+		in, out, _, _ := config.ResearchHelperSessionTokens()
+		add(kindMuted, "   %s tokens per helper session vs %s for one of your own turns.",
+			humanCount(in+out), humanCount(config.ResearchOrdinaryQuestionTokens()))
 	}
 	if mode == "supervised" {
 		add(kindMuted, "   %d helpers + %d auditors = %d sessions, %d steps each.",
@@ -576,54 +581,83 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	// The HELPER's context, which is not the coder's: helpers carry four tools,
 	// the coder carries thirteen. Using the coder's figure here priced every
 	// helper step at nearly double. See ResearchHelperBasisTokens.
-	add(kindMeasured, "MEASURED: %s tokens of context per helper step (this machine).",
-		humanCount(config.ResearchHelperBasisTokens()))
-	add(kindPublished, "PUBLISHED: the model's own per-1M price.")
+	// GORILLA FIX (2026-10-06): with a priced helper model, supervised, at the
+	// helper maximum, this screen was 33 rows on a 32-row terminal and the key
+	// line fell off. On a short screen, once the money is priced from a
+	// measured session, the per-step context row is superseded by the BASIS
+	// row below, and the PUBLISHED row restates what the money lines show.
+	_, _, _, tokensMeasured := config.ResearchHelperSessionTokens()
+	if !(m.compact && tokensMeasured) {
+		add(kindMeasured, "MEASURED: %s tokens of context per helper step (this machine).",
+			humanCount(config.ResearchHelperBasisTokens()))
+	}
+	if !m.compact {
+		add(kindPublished, "PUBLISHED: the model's own per-1M price.")
+	}
 	// GORILLA OVERRIDE (2026-08-23): ROADMAP item 5. The timing half of this line
 	// used to be an assumption on every machine forever. It is now measured from
 	// this machine's own finished helpers once there are enough of them, and the
 	// wording changes so a reader can tell which of the two they are looking at.
 	// "Not measured yet" and "measured, and it agrees with the guess" must never
 	// read the same.
-	if secs, n, ok := config.MeasuredSecondsPerHelper(); ok {
+	// GORILLA (2026-10-06): once a run has finished here the money is priced
+	// from its measured size, and the step and output assumptions are out of
+	// the arithmetic; listing them as what the money rests on would be false.
+	// Only the timing assumption, if still unmeasured, remains to declare.
+	secs, n, timed := config.MeasuredSecondsPerHelper()
+	switch {
+	case timed && tokensMeasured:
+		add(kindMeasured, "MEASURED: %.0fs per helper, median of your last %d (this machine).", secs, n)
+	case timed:
 		add(kindMeasured, "MEASURED: %.0fs per helper, median of your last %d (this machine).", secs, n)
 		add(kindAssumed, "ASSUMED («not measured»): %d steps | %d out per step.",
 			config.ResearchStepsPerHelper, config.ResearchOutputPerStep)
-	} else {
+	case tokensMeasured:
+		add(kindAssumed, "ASSUMED («not measured»): %d steps x %.0fs = %.0fs per helper. The per-minute figure rests on that until a run has been timed.",
+			config.ResearchStepsPerHelper, config.ResearchSecondsPerStep, config.ResearchStepsPerHelper*config.ResearchSecondsPerStep)
+	default:
 		add(kindAssumed, "ASSUMED («not measured»): %d steps | %d out | %.0fs per step. The per-minute figure rests on that %.0fs until a run has been timed.",
 			config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep, config.ResearchSecondsPerStep)
 	}
 	// One row, never more: this screen is already as tall as its smallest
 	// supported terminal, and the row it takes was given back in View. On a
-	// short screen only the line that changes the decision is kept: the
-	// forecast being low.
-	if l := measuredRunLine(m.compact); !m.compact || l.kind == kindDanger {
+	// short screen the ASSUMED row above already says the basis is assumed, so
+	// only a measured basis is worth the row.
+	if l := forecastBasisLine(); !m.compact || l.kind == kindMeasured {
 		add(l.kind, "%s", l.text)
 	}
 	return lines
 }
 
-// measuredRunLine is measuredRunLines in one row, for this screen: what a
-// session really used on this machine, against what the money above assumes.
-// short drops the sample count so the row still fits a narrow dialog unwrapped.
-func measuredRunLine(short bool) costLine {
-	assumed := config.ResearchStepsPerHelper * (config.ResearchHelperBasisTokens() + config.ResearchOutputPerStep)
-	tokens, _, runs, ok := agent.MeasuredRunSize()
-	if !ok || assumed <= 0 {
-		return measuredRunLines(0)[0]
+// forecastBasisPhrase says, in the words both cost screens use, where the
+// per-helper token basis under the money comes from. One function, so the
+// /research screen and the /osint gate cannot disagree about it.
+func forecastBasisPhrase() (phrase string, measured bool) {
+	_, _, runs, measured := config.ResearchHelperSessionTokens()
+	if !measured {
+		return "assumed; no run measured yet", false
 	}
-	head := fmt.Sprintf("MEASURED (your last %d run(s)): %s tokens/session vs %s assumed",
-		runs, humanCount(int(tokens)), humanCount(assumed))
-	if short {
-		head = fmt.Sprintf("MEASURED: %s tokens/session vs %s assumed", humanCount(int(tokens)), humanCount(assumed))
+	if runs == 1 {
+		return "measured from 1 run on this computer", true
 	}
-	switch ratio := float64(tokens) / float64(assumed); {
-	case ratio >= 1.25:
-		return costLine{fmt.Sprintf("%s: expect about %.1fx the money shown.", head, ratio), kindDanger}
-	case ratio <= 0.8:
-		return costLine{fmt.Sprintf("%s: the money shown is high, by about %.1fx.", head, 1/ratio), kindMuted}
+	return fmt.Sprintf("measured from %d runs on this computer", runs), true
+}
+
+// forecastBasisLine is the one row on this screen that states the token basis
+// the money above is priced from, and whether it is this machine's own.
+//
+// GORILLA (2026-10-06): this row used to compare the measured size of a run
+// with what the money ASSUMED and print the multiplier between them ("expect
+// about 1.6x the money shown"). The money is priced from the measurement now,
+// so the row states the basis instead of apologising for it.
+func forecastBasisLine() costLine {
+	in, out, _, _ := config.ResearchHelperSessionTokens()
+	phrase, measured := forecastBasisPhrase()
+	kind := kindAssumed
+	if measured {
+		kind = kindMeasured
 	}
-	return costLine{head + ": the forecast is about right.", kindMeasured}
+	return costLine{fmt.Sprintf("BASIS: %s tokens per helper session, %s.", humanCount(in+out), phrase), kind}
 }
 
 // researchFooterHint is the key line at the foot of the chooser.
@@ -645,52 +679,40 @@ const researchFooterHint = "enter: go   up/down: mode   left/right: helpers   m:
 // several times that size. The /osint gate, meanwhile, printed that single
 // run's rate as a constant and called it measured.
 //
-// Now every finished run is remembered (agent.MeasuredRunSize). The /osint
-// gate prints these lines: the median per session, the size of THIS run at
-// that rate, and — when the forecast's assumption is out by a quarter or more
-// — by how much. This screen prints the same comparison in one row
-// (measuredRunLine). Before any run has finished there is nothing to print,
-// and both say so.
+// Now every finished run is remembered (config.MeasuredRunSize). The /osint
+// gate prints these lines: the size of THIS run at the basis the money is
+// priced from, and where that basis comes from, in the same words the
+// /research screen uses (forecastBasisPhrase).
+//
+// GORILLA (2026-10-06): the money is priced from the measured basis now
+// (config.ResearchHelperSessionTokens), so the rows that said by what
+// multiple the money was wrong are gone; there is nothing left to confess.
+// Before any run has finished the size is stated at the assumed basis and
+// the row says so.
 func measuredRunLines(sessions int) []costLine {
-	assumed := config.ResearchStepsPerHelper * (config.ResearchHelperBasisTokens() + config.ResearchOutputPerStep)
-	tokens, calls, runs, ok := agent.MeasuredRunSize()
-	if !ok {
+	in, out, _, _ := config.ResearchHelperSessionTokens()
+	perSession := in + out
+	phrase, measured := forecastBasisPhrase()
+	if !measured {
 		return []costLine{{
-			text: fmt.Sprintf("NO MEASUREMENT YET of a run's real size (no run finished here). Assumed: %s tokens/session.",
-				humanCount(assumed)),
+			text: fmt.Sprintf("about %s tokens (%d sessions x %s per session, %s).",
+				humanCount(perSession*sessions), sessions, humanCount(perSession), phrase),
 			kind: kindAssumed,
 		}}
 	}
-	lines := []costLine{
+	_, calls, _, _ := agent.MeasuredRunSize()
+	return []costLine{
 		{
-			text: fmt.Sprintf("MEASURED: %s tokens, %.1f tool calls per session (median, your last %d run(s)).",
-				humanCount(int(tokens)), calls, runs),
+			text: fmt.Sprintf("MEASURED: %s tokens, %.1f tool calls per session (%s).",
+				humanCount(perSession), calls, phrase),
 			kind: kindMeasured,
 		},
 		{
 			text: fmt.Sprintf("   At that size THIS RUN is about %s tokens (%d sessions).",
-				humanCount(int(tokens)*sessions), sessions),
+				humanCount(perSession*sessions), sessions),
 			kind: kindMeasured,
 		},
 	}
-	if assumed > 0 {
-		ratio := float64(tokens) / float64(assumed)
-		switch {
-		case ratio >= 1.25:
-			lines = append(lines, costLine{
-				text: fmt.Sprintf("   The money above ASSUMES %s/session: expect about %.1fx the figure shown.",
-					humanCount(assumed), ratio),
-				kind: kindDanger,
-			})
-		case ratio <= 0.8:
-			lines = append(lines, costLine{
-				text: fmt.Sprintf("   The money above ASSUMES %s/session: the figure shown is high, by about %.1fx.",
-					humanCount(assumed), 1/ratio),
-				kind: kindMuted,
-			})
-		}
-	}
-	return lines
 }
 
 // renderCost paints each line by meaning.
@@ -853,7 +875,9 @@ func (m ResearchDialogCmp) View() string {
 		base.Foreground(t.Text()).Width(maxWidth).Padding(0, 1).
 			Render(fmt.Sprintf("Helpers: <- %d ->   (%d minimum, %d maximum)", m.agents, agent.ResearchMinAgents, agent.ResearchMaxAgents)),
 		m.renderCost(maxWidth),
-		base.Foreground(t.Primary()).Bold(true).Width(maxWidth).Padding(1, 1).
+		// On a short screen the warning loses its blank row above and below;
+		// the words stay.
+		base.Foreground(t.Primary()).Bold(true).Width(maxWidth).Padding(map[bool]int{true: 0, false: 1}[m.compact], 1).
 			Render(m.theWarning()),
 		// The warning's own padding already leaves a blank row above the key
 		// line. A second one stood here; it was given to the measured-size row

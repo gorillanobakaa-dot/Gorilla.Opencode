@@ -65,7 +65,9 @@ import (
 // sacred: a new tool or a reworded description SHOULD move them, and then this
 // test tells you by how much instead of letting it pass unremarked.
 const (
-	measuredDefaultToolSchemaTokens = 9733
+	// Re-measured 2026-10-06 (v0.1.143): the find, research, review, bash and
+	// web_search descriptions all grew with the audit fixes.
+	measuredDefaultToolSchemaTokens = 9947
 	measuredBasePromptTokens        = 2250
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.

@@ -181,14 +181,21 @@ func assumptionsLine() string {
 	// GORILLA OVERRIDE (2026-08-23): ROADMAP item 5. The timing figure is measured
 	// from this machine's own finished helpers once enough have been timed, so
 	// this line must stop calling it an assumption when it is not one.
-	if secs, n, ok := config.MeasuredSecondsPerHelper(); ok {
-		return fmt.Sprintf("Assumptions on screen, arguable: %d steps/helper, ~%d tokens out/step. "+
-			"Timing is MEASURED: ~%.0fs/helper, median of your last %d.",
-			config.ResearchStepsPerHelper, config.ResearchOutputPerStep, secs, n)
+	//
+	// GORILLA (2026-10-06): the same for the token figures. Once a run has
+	// finished here the money is priced from its measured size (the SIZE line
+	// above says so, in the words the /research screen uses) and the steps and
+	// output per step are no longer in the arithmetic, so they are no longer
+	// listed as assumptions the money rests on.
+	tokens := fmt.Sprintf("Assumptions on screen, arguable: %d steps/helper, ~%d tokens out/step",
+		config.ResearchStepsPerHelper, config.ResearchOutputPerStep)
+	if _, _, _, measured := config.ResearchHelperSessionTokens(); measured {
+		tokens = "Tokens per helper are MEASURED (the SIZE line above), not assumed"
 	}
-	return fmt.Sprintf("Assumptions on screen, arguable: %d steps/helper, ~%d tokens out/step, ~%.0fs/step "+
-		"(not yet timed on this machine).",
-		config.ResearchStepsPerHelper, config.ResearchOutputPerStep, config.ResearchSecondsPerStep)
+	if secs, n, ok := config.MeasuredSecondsPerHelper(); ok {
+		return fmt.Sprintf("%s. Timing is MEASURED: ~%.0fs/helper, median of your last %d.", tokens, secs, n)
+	}
+	return fmt.Sprintf("%s; ~%.0fs/step (not yet timed on this machine).", tokens, config.ResearchSecondsPerStep)
 }
 
 // followUpLine states the one cost the figures above do not contain.
@@ -227,9 +234,13 @@ func (m OsintDialogCmp) followUpLine() string {
 // helpers: 4 x 2,699 x 10 is about 108,000.
 //
 // The size is now this machine's own: the median tokens per session over its
-// finished runs (agent.MeasuredRunSize), times the sessions selected. Until a
+// finished runs (config.MeasuredRunSize), times the sessions selected. Until a
 // run has finished here there is no measurement, and the line says exactly
 // that rather than borrowing someone else's.
+//
+// GORILLA (2026-10-06): the per-session figure here is the one the money
+// above is priced from (config.ResearchHelperSessionTokens), measured or
+// assumed, and the line names which in the /research screen's own words.
 func (m OsintDialogCmp) scaleLines() []string {
 	var out []string
 	for i, l := range measuredRunLines(m.sessions()) {

@@ -103,6 +103,67 @@ def main() -> int:
         good &= check("depth: standard skips nothing by depth",
                       s["mode"] == "standard" and not s["tools_skipped_by_depth"])
 
+        # 2b. A security pass (2026-10-06) schedules the security categories at
+        # full depth and NOTHING else. Before this, --security did not exist:
+        # "security" and "full" were both --deep, and black, prettier and
+        # clang-format ran on every security review.
+        sec12 = cr.build_jobs(files, root, "generic", results, ctx, stages=(0, 1, 2),
+                              categories=reg.SECURITY_CATEGORIES)
+        sec3 = cr.build_stage3_jobs(files, root, results, ctx, set(), True,
+                                    categories=reg.SECURITY_CATEGORIES)
+        sec = sec12 + sec3
+        sec_cats = {reg.TOOLS_BY_ID[j.tool_id].category for j in sec}
+        good &= check("security: only security categories are scheduled",
+                      sec_cats <= set(reg.SECURITY_CATEGORIES), f"got {sorted(sec_cats)}")
+        for wanted in ("security", "secrets", "static-analysis"):
+            good &= check(f"security: a {wanted} tool IS scheduled", wanted in sec_cats)
+        for banned in ("lint", "format"):
+            ids = sorted({j.tool_id for j in sec
+                          if reg.TOOLS_BY_ID[j.tool_id].category == banned})
+            good &= check(f"security: no {banned} tool is scheduled", not ids, f"scheduled {ids}")
+        sec_ids = {j.tool_id for j in sec}
+        good &= check("security: the deep stage is reached (semgrep-deep scheduled)",
+                      "semgrep-deep" in sec_ids, f"{sorted(sec_ids)}")
+        good &= check("security: the deep-stage LINTER is not picked up by the forced deep stage",
+                      "vulture" not in sec_ids)
+        # The unrestricted deep stage, by contrast, does pick vulture up --
+        # otherwise the case above would pass on a registry that had lost it.
+        full3 = {j.tool_id for j in cr.build_stage3_jobs(files, root, results, ctx, set(), True)}
+        good &= check("full: the deep stage runs vulture too", "vulture" in full3)
+
+        d2 = cr.depth_of(argparse.Namespace(quick=False, security=True, deep=False),
+                         "generic", files)
+        good &= check("depth: security is reported as security", d2["mode"] == "security")
+        good &= check("depth: security lists lint and format as skipped entirely",
+                      {"lint", "format"} <= set(d2["categories_skipped"]),
+                      f"{d2['categories_skipped']}")
+        good &= check("depth: security never lists a security category as skipped",
+                      not (set(d2["categories_skipped"]) & set(reg.SECURITY_CATEGORIES)),
+                      f"{d2['categories_skipped']}")
+        good &= check("depth: security names vulture among the tools it left out",
+                      "vulture" in d2["tools_skipped_by_depth"])
+        good &= check("depth: security skipped and scheduled are disjoint",
+                      not (set(d2["tools_skipped_by_depth"]) & sec_ids),
+                      f"both: {sorted(set(d2['tools_skipped_by_depth']) & sec_ids)}")
+        d3 = cr.depth_of(argparse.Namespace(quick=False, security=False, deep=True),
+                         "generic", files)
+        good &= check("depth: --deep alone is reported as deep and skips nothing",
+                      d3["mode"] == "deep" and not d3["tools_skipped_by_depth"])
+        good &= check("depth: quick and security are different runs",
+                      set(d["categories_run"]) != set(d2["categories_run"]))
+
+        # 2c. The network report agrees with the scheduler about each mode.
+        nq = {t["id"]: t["runs"] for t in cr.network_report(root, quick=True)["tools"]}
+        ns = {t["id"]: t["runs"] for t in cr.network_report(root, security=True)["tools"]}
+        nd = {t["id"]: t["runs"] for t in cr.network_report(root)["tools"]}
+        good &= check("network: semgrep-deep runs on a security pass", ns.get("semgrep-deep") is True)
+        good &= check("network: semgrep-deep does not run on a quick pass", nq.get("semgrep-deep") is False)
+        good &= check("network: everything runs on a standard/deep pass", all(nd.values()))
+        for tid, runs in ns.items():
+            cat = reg.TOOLS_BY_ID[tid].category
+            good &= check(f"network: {tid} runs on security iff its category qualifies",
+                          runs == (cat in reg.SECURITY_CATEGORIES))
+
         # 3. Network notes: the report carries every relevant tool that has one.
         rep = cr.network_report(root)
         got = {t["id"] for t in rep["tools"]}

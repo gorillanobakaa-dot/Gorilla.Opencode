@@ -49,8 +49,8 @@ from typing import Dict, List, Optional, Set
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tools_registry import (  # noqa: E402
     TOOLS, TOOLS_BY_ID, EXTENSION_LANGUAGE, MAKEFILE_NAMES,
-    DEFAULT_IGNORE_DIRS, ESCALATION_KEYWORDS, QUICK_CATEGORIES, Tool,
-    unparsed_tool_ids,
+    DEFAULT_IGNORE_DIRS, ESCALATION_KEYWORDS, QUICK_CATEGORIES, SECURITY_CATEGORIES,
+    Tool, unparsed_tool_ids,
 )
 import llm_client  # noqa: E402
 import findings as fnd  # noqa: E402
@@ -346,12 +346,17 @@ def build_jobs(files: List[str], target_dir: str, profile: str, results_dir: str
 
 
 def build_stage3_jobs(files: List[str], target_dir: str, results_dir: str, ctx: dict,
-                       hit_files: Set[str], deep: bool) -> List[Job]:
+                       hit_files: Set[str], deep: bool, categories=None) -> List[Job]:
+    """Deep-stage jobs. `categories`, when given, restricts them the same way
+    build_jobs is restricted (2026-10-06): a security pass forces the deep
+    stage but must not pick up vulture, the deep-stage linter."""
     jobs = []
     langs_present: Set[str] = languages_of(files)
 
     for tool in TOOLS:
         if tool.stage != 3 or tool.scope not in ("auto-file", "auto-project"):
+            continue
+        if categories is not None and tool.category not in categories:
             continue
         if tool.scope == "auto-project":
             if tool.build_cmd is None:
@@ -881,8 +886,8 @@ def emit_agent_json(results_dir, target, profile, files, all_results,
         # language marked reviewed only if an analyser for it completed.
         "coverage": coverage,
 
-        # How deep this run went, as reported by the run itself. For a quick
-        # pass, tools_skipped_by_depth names every analyser that applied to
+        # How deep this run went, as reported by the run itself. For a quick or
+        # a security pass, tools_skipped_by_depth names every analyser that applied to
         # this code and did not run BECAUSE of the depth -- which is a different
         # fact from tools_missing, and the caller must not confuse the two.
         "depth": depth,
@@ -971,6 +976,12 @@ def parse_args():
                           + ", ".join(QUICK_CATEGORIES) + "). No static analysis, no "
                           "security tools, no secret scan, no deep stage. The report's "
                           "`depth` block names every analyser this left out.")
+    ap.add_argument("--security", action="store_true",
+                     help="security analysers ONLY, at full depth (categories: "
+                          + ", ".join(SECURITY_CATEGORIES) + "): secret scanners, security "
+                          "tools and static analysis, with the deep stage forced on every "
+                          "file. No linters, no formatters. The report's `depth` block "
+                          "names every analyser this left out.")
     ap.add_argument("--network-report", action="store_true",
                      help="print, as JSON, which analysers that apply to the target contact "
                           "another machine when they run and whether each is installed. "
@@ -1046,28 +1057,52 @@ def depth_of(args, profile: str, files: List[str]) -> dict:
     security stages were skipped while they ran. The run now reports its own
     depth, and names every analyser that applied to this code and was left out
     because of it, so the sentence a reader is shown is read off the run.
+
+    Extended 2026-10-06 with --security, which is the same shape: a category
+    list and the stages it reaches. The modes are therefore:
+
+      quick     categories QUICK_CATEGORIES,    stages 0-2
+      security  categories SECURITY_CATEGORIES, stages 0-3 (deep forced)
+      deep      everything,                     stages 0-3 (deep forced)
+      standard  everything,                     stages 0-2, 3 by escalation
     """
-    if args.quick:
-        ran = relevant_tools(profile, files, stages=(0, 1, 2), categories=QUICK_CATEGORIES)
-        everything = relevant_tools(profile, files, stages=(0, 1, 2, 3))
-        ran_ids = {t.id for t in ran}
-        skipped = [t for t in everything if t.id not in ran_ids]
-        return {
-            "mode": "quick",
-            "categories_run": list(QUICK_CATEGORIES),
-            # "Skipped entirely" is only true of a category none of whose tools
-            # ran. A deep-stage linter (vulture) is left out too, and is named
-            # in tools_skipped_by_depth, but linting as a category did run.
-            "categories_skipped": sorted({t.category for t in skipped}
-                                         - set(QUICK_CATEGORIES)),
-            "tools_skipped_by_depth": sorted(t.id for t in skipped),
-        }
-    mode = "deep" if args.deep else "standard"
-    return {"mode": mode, "categories_run": [], "categories_skipped": [],
-            "tools_skipped_by_depth": []}
+    mode, categories, stages = depth_mode(args)
+    if categories is None:
+        return {"mode": mode, "categories_run": [], "categories_skipped": [],
+                "tools_skipped_by_depth": []}
+    ran = relevant_tools(profile, files, stages=stages, categories=categories)
+    everything = relevant_tools(profile, files, stages=(0, 1, 2, 3))
+    ran_ids = {t.id for t in ran}
+    skipped = [t for t in everything if t.id not in ran_ids]
+    return {
+        "mode": mode,
+        "categories_run": list(categories),
+        # "Skipped entirely" is only true of a category none of whose tools
+        # ran. A deep-stage linter (vulture) is left out of a quick pass too,
+        # and is named in tools_skipped_by_depth, but linting as a category
+        # did run.
+        "categories_skipped": sorted({t.category for t in skipped} - set(categories)),
+        "tools_skipped_by_depth": sorted(t.id for t in skipped),
+    }
 
 
-def network_report(target: str, quick: bool = False) -> dict:
+def depth_mode(args) -> tuple:
+    """(mode name, category allow-list or None, stages the pass reaches).
+
+    One definition, read by the scheduler, the depth block, the network report
+    and the preflight, so none of them can hold its own idea of what a mode
+    runs -- which is how "quick" came to run the security stages in 2026-10.
+    """
+    if getattr(args, "quick", False):
+        return "quick", QUICK_CATEGORIES, (0, 1, 2)
+    if getattr(args, "security", False):
+        return "security", SECURITY_CATEGORIES, (0, 1, 2, 3)
+    if getattr(args, "deep", False):
+        return "deep", None, (0, 1, 2, 3)
+    return "standard", None, (0, 1, 2, 3)
+
+
+def network_report(target: str, quick: bool = False, security: bool = False) -> dict:
     """Which analysers that apply to this target contact another machine when
     they run, whether each is installed, and whether it runs at this depth.
     Runs nothing but version checks.
@@ -1075,17 +1110,19 @@ def network_report(target: str, quick: bool = False) -> dict:
     This is what the permission prompt is built from. See Tool.network.
 
     `runs` is decided HERE, by the same rule build_jobs applies, so the caller
-    never has to carry its own copy of what a quick pass includes. On a
-    standard pass a stage-3 tool counts as running: escalation can reach it.
+    never has to carry its own copy of what a quick or a security pass
+    includes. On a standard pass a stage-3 tool counts as running: escalation
+    can reach it.
     """
     langs = doctor.languages_in(target)
+    _, categories, stages = depth_mode(argparse.Namespace(quick=quick, security=security))
     out = []
     for t in TOOLS:
         if not t.network or t.scope not in ("auto-file", "auto-project"):
             continue
         if not ("*" in t.languages or (set(t.languages) & set(langs))):
             continue
-        runs = (not quick) or (t.category in QUICK_CATEGORIES and t.stage < 3)
+        runs = (categories is None or t.category in categories) and t.stage in stages
         out.append({"id": t.id, "label": t.label, "category": t.category,
                     "stage": t.stage, "network": t.network,
                     "installed": tool_available(t), "runs": runs})
@@ -1094,11 +1131,11 @@ def network_report(target: str, quick: bool = False) -> dict:
 
 
 def preflight(profile: str, files: List[str], skip_gate: bool, target_dir: str = "",
-              categories=None) -> None:
+              categories=None, mode: str = "standard", stages=(0, 1, 2)) -> None:
     """Report which relevant tools are installed. If NONE of the actual
     analysis tools (everything except pure recon) are present, refuse to run
     unless the caller explicitly passed --skip-preflight."""
-    rel = relevant_tools(profile, files, categories=categories)
+    rel = relevant_tools(profile, files, stages=stages, categories=categories)
     present = [t for t in rel if tool_available(t)]
     missing = [t for t in rel if t not in present]
     # Only EXTERNAL analysers count towards "this machine can review something".
@@ -1120,12 +1157,13 @@ def preflight(profile: str, files: List[str], skip_gate: bool, target_dir: str =
         print("\n" + "!" * 70)
         if categories is not None:
             # A quick pass can fail this gate on a machine that could do a
-            # standard review: bandit installed, no linter. Say which it is,
-            # or the advice that follows ("install an analyser") reads as wrong.
-            print("PREFLIGHT FAILED: a quick pass runs only "
+            # standard review: bandit installed, no linter. A security pass
+            # can fail it the other way round. Say which it is, or the advice
+            # that follows ("install an analyser") reads as wrong.
+            print(f"PREFLIGHT FAILED: a {mode} pass runs only "
                   + ", ".join(c for c in categories if c != "recon")
                   + " tools, and none for this project is installed.")
-            print("A standard review may still be possible -- run without --quick.")
+            print(f"A standard review may still be possible -- run without --{mode}.")
         else:
             print("PREFLIGHT FAILED: no analyser for this project is installed.")
         print("Running now would inspect NOTHING, and an empty result must NOT be")
@@ -1170,13 +1208,18 @@ def main():
     # --network-report answers "what will this send or fetch" before anybody is
     # asked to approve the run. JSON on the real stdout whatever the audience.
     if args.network_report:
-        real_stdout.write(json.dumps(network_report(target, args.quick), indent=2) + "\n")
+        real_stdout.write(json.dumps(network_report(target, args.quick, args.security),
+                                     indent=2) + "\n")
         sys.exit(0)
 
-    if args.quick and args.deep:
-        print("ERROR: --quick and --deep contradict each other. Pick one.")
+    if args.quick and (args.deep or args.security):
+        print("ERROR: --quick contradicts --deep and --security. Pick one.")
         sys.exit(2)
-    quick_categories = QUICK_CATEGORIES if args.quick else None
+    # One allow-list for every stage of this run (2026-10-06). --security adds
+    # a second restricted mode beside --quick: the security categories only,
+    # with the deep stage forced. --deep alone keeps running everything.
+    mode, categories, stages = depth_mode(args)
+    force_deep = args.deep or args.security
     target_is_file = os.path.isfile(target)
     target_dir = os.path.dirname(target) if target_is_file else target
 
@@ -1203,7 +1246,7 @@ def main():
 
     # Gate: make sure the tools we're about to rely on actually exist, so an
     # empty run can never be mistaken for a clean one.
-    preflight(profile, files, args.skip_preflight, target_dir, quick_categories)
+    preflight(profile, files, args.skip_preflight, target_dir, categories, mode, stages)
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_dir = args.results_dir or os.path.join(target_dir, ".code_review", ts)
@@ -1214,15 +1257,17 @@ def main():
 
     print("-- Stage 0: recon --")
     jobs0 = build_jobs(files, target_dir, profile, results_dir, ctx, stages=(0,),
-                       categories=quick_categories)
+                       categories=categories)
     results0 = execute_jobs(jobs0, args.jobs, args.timeout)
 
     if args.quick:
         print("\n-- Stage 1-2, QUICK: linters and formatters only --")
+    elif args.security:
+        print("\n-- Stage 1-2, SECURITY: secret scan, security tools and static analysis only --")
     else:
         print("\n-- Stage 1-2: fast lint + standard static analysis / security --")
     jobs12 = build_jobs(files, target_dir, profile, results_dir, ctx, stages=(1, 2),
-                        categories=quick_categories)
+                        categories=categories)
     print(f"Launching {len(jobs12)} job(s) across {args.jobs} worker(s)...")
     results12 = execute_jobs(jobs12, args.jobs, args.timeout)
 
@@ -1233,9 +1278,12 @@ def main():
     no_stage3 = args.no_stage3 or args.quick
     hit_files = find_escalation_hits(results12) if not no_stage3 else set()
     results3 = []
-    if not no_stage3 and (args.deep or hit_files):
-        print(f"\n-- Stage 3: deep-dive ({'forced by --deep' if args.deep else f'{len(hit_files)} file(s) flagged security-shaped hints'}) --")
-        jobs3 = build_stage3_jobs(files, target_dir, results_dir, ctx, hit_files, args.deep)
+    if not no_stage3 and (force_deep or hit_files):
+        why = (f"forced by --{mode if args.security else 'deep'}" if force_deep
+               else f"{len(hit_files)} file(s) flagged security-shaped hints")
+        print(f"\n-- Stage 3: deep-dive ({why}) --")
+        jobs3 = build_stage3_jobs(files, target_dir, results_dir, ctx, hit_files, force_deep,
+                                  categories=categories)
         print(f"Launching {len(jobs3)} job(s)...")
         results3 = execute_jobs(jobs3, args.jobs, args.timeout)
     all_results += results3

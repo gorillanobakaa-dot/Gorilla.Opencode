@@ -126,6 +126,13 @@ python3 code_review.py ~/src/proj --diff origin/main
 # force the deep/security-focused stage on everything, not just auto-flagged files
 python3 code_review.py ~/src/proj --deep
 
+# security analysers only (secret scan, security tools, static analysis), deep
+# stage forced on every file, no linters or formatters (2026-10-06)
+python3 code_review.py ~/src/proj --security
+
+# linters and formatters only; no static analysis, no security tools
+python3 code_review.py ~/src/proj --quick
+
 # a single file you just patched
 python3 code_review.py ~/src/firefox/dom/canvas/WebGLContext.cpp
 

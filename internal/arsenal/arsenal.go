@@ -383,9 +383,11 @@ const (
 	// Scoop rather than winget or choco because it needs no administrator
 	// rights, which matches this program's decision not to require elevation
 	// (see winres.json). Package names were verified against the real main and
-	// extras buckets on a Windows machine, not recalled - 24 of the 33 entries
-	// have one, and the nine that do not are left absent so UnavailableNote can
-	// say so honestly rather than offering a name that does not resolve.
+	// extras buckets on a Windows machine, not recalled. GORILLA FIX
+	// (2026-10-06): counted again after `whoisdns` was split into `dns` (scoop
+	// has it, as bind) and `whois` (scoop does not) - 24 of the 34 entries have
+	// one, and the ten that do not are left absent so UnavailableNote can say
+	// so honestly rather than offering a name that does not resolve.
 	Scoop   PackageManager = "scoop"
 	Unknown PackageManager = ""
 )

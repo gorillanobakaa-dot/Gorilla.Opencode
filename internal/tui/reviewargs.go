@@ -321,10 +321,22 @@ func reviewPrompt(req reviewRequest) string {
 		b.WriteString("The user asked for a QUICK pass: pass focus=\"quick\". Tell them plainly " +
 			"that this runs linters and formatters only — no static analysis, no security " +
 			"tools, no secret scan — and name the analysers the result says were left out.\n")
+	// GORILLA FIX (2026-10-06): security and full used to be the same run under
+	// two names, so the prompt had nothing to say about either. Each now says
+	// what its pass runs, in the same terms as the quick one, so the model can
+	// tell the user — and can see that security is NOT the full review plus a
+	// filter.
 	case "security":
-		b.WriteString("The user asked for a SECURITY review: pass focus=\"security\".\n")
+		b.WriteString("The user asked for a SECURITY review: pass focus=\"security\". Tell them plainly " +
+			"that this runs only the secret scanners, the security analysers and the static " +
+			"analysers, with the deep pass forced over every file — no linters, no formatters, " +
+			"so it says nothing about style or dead code — and name the analysers the result " +
+			"says were left out.\n")
 	case "full":
-		b.WriteString("The user asked for a FULL review: pass focus=\"full\".\n")
+		b.WriteString("The user asked for a FULL review: pass focus=\"full\". Tell them plainly that " +
+			"this runs every analyser of every kind — linters, formatters, static analysis, " +
+			"security tools and the secret scan — with the deep pass forced over every file. " +
+			"It is the slowest pass and the only one that leaves nothing out by depth.\n")
 	}
 
 	switch {

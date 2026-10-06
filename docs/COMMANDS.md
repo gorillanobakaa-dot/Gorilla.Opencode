@@ -307,8 +307,8 @@ With no arguments it reviews your current folder. Add a path for somewhere else;
 **How deep:**
   /review                    the normal pass — fast checks and static analysis, and it escalates to the deep security tools ON ITS OWN for any file that looks security-shaped. This is usually the one you want.
   /review --quick            linters and formatters only. No static analysis, no security tools, no search for leaked secrets — and the answer names every analyser it left out.
-  /review --security         forces the deep security pass over everything and reports only security findings.
-  /review --full             every stage over every file.
+  /review --security         only the security analysers — the search for leaked secrets, the security tools and the static analysers — with the deep pass forced over every file. No linters, no formatters; the answer names the ones it left out, and lists only security findings.
+  /review --full             every analyser of every kind, with the deep pass forced over every file. The slowest, and the only one that leaves nothing out.
   /review --diff HEAD        only what you changed. Add a ref for something else: --diff origin/main. If nothing has changed it says so; that is not a clean report.
 
 These combine, and the order does not matter: /review --security --diff HEAD internal/auth

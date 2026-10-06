@@ -241,20 +241,22 @@ exists.
 TestDefaultToolSchemaCost -v`:
 
 ```
-tool schemas, default ON                             ~9,733 tokens   84%
-base system prompt (coder-modern)                    ~1,791 tokens   16%
-prompt blocks, default ON                               ~94 tokens    1%
+tool schemas, default ON                             ~9,947 tokens   79%
+base system prompt (coder-modern)                    ~2,314 tokens   18%
+prompt blocks, default ON                              ~369 tokens    3%
                                                      ------------
-per-turn total, before any CLAUDE.md                ~11,618 tokens
+per-turn total, before any CLAUDE.md                ~12,630 tokens
+
+(re-measured 2026-10-06, v0.1.143; the 2026-09 figures were 9,733 / 1,791 / 94 = 11,618)
 
 largest single rows:
-  tool.find        1,322    replaced glob + grep + ls (~1,485 together)
-  tool.research    1,007    spawns helpers; off under the Nuclear Option
-  tool.bash          962
+  tool.bash        1,415
+  tool.find        1,346    replaced glob + grep + ls (~1,485 together)
+  tool.research    1,069    spawns helpers; off under the Nuclear Option
+  tool.review        874
+  tool.websearch     846
   tool.fetch         789
   tool.edit          759
-  tool.review        759
-  tool.websearch     749
 ```
 
 The subtraction was not careless, and the direction of the error is instructive.

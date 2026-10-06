@@ -192,6 +192,12 @@ var All = []Command{
 		// Python 3 is needed, and never said where the logs go — which was
 		// inside the folder being reviewed. Each is now either true or gone;
 		// see internal/llm/tools/review.go and its tests.
+		//
+		// GORILLA FIX (2026-10-06): --security and --full were the same run.
+		// Both sent the toolkit's --deep flag; "reports only security findings"
+		// was a filter on the summary, not a different review. --security is
+		// now its own mode (security categories only, deep forced), and the
+		// two lines below say exactly what each one runs.
 		Summary: "Run real analysers over your code and report honestly.",
 		Detail: "A professional static-analysis and security review, built in. Point " +
 			"it at a folder, a file, or your changes and it runs the real " +
@@ -222,9 +228,12 @@ var All = []Command{
 			"  /review --quick            linters and formatters only. No static analysis, " +
 			"no security tools, no search for leaked secrets — and the answer names every " +
 			"analyser it left out.\n" +
-			"  /review --security         forces the deep security pass over everything and " +
-			"reports only security findings.\n" +
-			"  /review --full             every stage over every file.\n" +
+			"  /review --security         only the security analysers — the search for leaked " +
+			"secrets, the security tools and the static analysers — with the deep pass forced " +
+			"over every file. No linters, no formatters; the answer names the ones it left out, " +
+			"and lists only security findings.\n" +
+			"  /review --full             every analyser of every kind, with the deep pass forced " +
+			"over every file. The slowest, and the only one that leaves nothing out.\n" +
 			"  /review --diff HEAD        only what you changed. Add a ref for something " +
 			"else: --diff origin/main. If nothing has changed it says so; that is not a " +
 			"clean report.\n\n" +

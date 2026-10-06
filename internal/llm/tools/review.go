@@ -166,8 +166,10 @@ START FROM corroborated. Those are lines flagged independently by two or more di
 				"enum": []string{"quick", "security", "full"},
 				"description": "How much to run. 'quick' = linters and formatters only, for a fast sanity check: " +
 					"no static analysis, no security tools, no secret scan. " +
-					"'security' = force the deep security pass over everything and report only security, secrets and " +
-					"static-analysis findings. 'full' = every stage over every file. " +
+					"'security' = ONLY the secret scanners, security analysers and static analysers, with the deep " +
+					"pass forced over every file; no linters or formatters run at all, and only security, secrets and " +
+					"static-analysis findings are listed. 'full' = every analyser of every kind, deep pass forced over " +
+					"every file. " +
 					"OMIT THIS for the normal review: by default the fast and standard stages run, and the deep security " +
 					"pass escalates ON ITS OWN for any file whose output mentions CWE, CVE, overflow, use-after-free, " +
 					"injection, a hardcoded secret, a race, a path traversal or a format string. That is usually what you want.",
@@ -328,11 +330,20 @@ func (r *reviewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 //
 // --quick is a real mode in the toolkit: linters and formatters by CATEGORY,
 // nothing else, never escalating. The claim was kept and made true.
+//
+// GORILLA FIX (2026-10-06): "security" and "full" both sent --deep. The same
+// analysers ran, for the same time; the only difference was that the summary
+// of a "security" run dropped the style findings afterwards. --security is now
+// a real mode in the toolkit too, the mirror of --quick: the secrets, security
+// and static-analysis categories with the deep stage forced on every file, and
+// no linter or formatter. --deep is left to "full", which runs everything.
 func focusArgs(focus string) []string {
 	switch focus {
 	case "quick":
 		return []string{"--quick"}
-	case "security", "full":
+	case "security":
+		return []string{"--security"}
+	case "full":
 		return []string{"--deep"}
 	}
 	return nil
@@ -441,9 +452,14 @@ func interpretReviewRun(stdout, stderr []byte, runErr error, focus string) (text
 		if errors.As(runErr, &ee) && ee.ExitCode() == 3 {
 			msg := "The review did NOT run: none of the analysers this depth uses is installed " +
 				"for this code, so it would have inspected nothing."
-			if focus == "quick" {
+			switch focus {
+			case "quick":
 				msg += " A quick pass runs linters and formatters only. A standard review may " +
 					"still be possible: run it again without focus=\"quick\"."
+			case "security":
+				msg += " A security pass runs secret scanners, security analysers and static " +
+					"analysers only. A standard review may still be possible: run it again " +
+					"without focus=\"security\"."
 			}
 			return msg + "\n\nDo not describe the code as reviewed.", true
 		}
@@ -733,8 +749,13 @@ func summariseReview(raw []byte, focus string) (string, error) {
 				"The empty findings list below means nothing ran, not that the code is clean. " +
 				"Do not report this code as reviewed.\n")
 		case "partial":
-			fmt.Fprintf(&b, "- **PARTIAL REVIEW.** %d of %d scheduled jobs completed.",
-				c.Jobs["completed"], c.JobsPlanned)
+			// GORILLA FIX (2026-10-06), first end-to-end run on a real model:
+			// "6 of 17 scheduled jobs completed" read as eleven failures, and
+			// the receipt listed the call as "did not succeed". The eleven were
+			// analysers that are not installed. The breakdown is stated so a
+			// gap in installed tools is never mistaken for a tool that broke.
+			fmt.Fprintf(&b, "- **PARTIAL REVIEW.** %d of %d scheduled jobs completed (%d not installed, %d failed, %d timed out).",
+				c.Jobs["completed"], c.JobsPlanned, c.Jobs["missing"], c.Jobs["errored"], c.Jobs["timed_out"])
 			if len(c.Unreviewed) > 0 {
 				fmt.Fprintf(&b, " **Languages with NO completed analyser: %s** — say so in your answer.",
 					strings.Join(c.Unreviewed, ", "))
@@ -793,11 +814,39 @@ func summariseReview(raw []byte, focus string) (string, error) {
 				"which stages were skipped.\n")
 		}
 	case "security":
-		b.WriteString("- **DEPTH: security.** The deep pass was forced over every file, and " +
-			"only security, secrets and static-analysis findings are listed below. Style and " +
-			"formatting findings exist and were deliberately left out.\n")
+		// GORILLA FIX (2026-10-06): read off the report, like quick. Until
+		// today this said "the deep pass was forced over every file" and that
+		// style findings "exist and were deliberately left out" — true, because
+		// the run was identical to a full one and every linter had run. Now the
+		// linters do not run, so the sentence that was true of the old run
+		// would be a lie about the new one; the run says what it did.
+		if d := rep.Depth; d != nil && d.Mode == "security" {
+			b.WriteString("- **DEPTH: security.** Only the secret scanners, security analysers and " +
+				"static analysers ran, with the deep pass forced over every file. Linters and " +
+				"formatters were SKIPPED ENTIRELY — this pass says nothing about style, " +
+				"formatting or dead code, and the list below is narrowed to security-shaped " +
+				"findings.\n")
+			if len(d.CategoriesSkipped) > 0 {
+				fmt.Fprintf(&b, "  - Kinds of check not run at all: %s\n", strings.Join(d.CategoriesSkipped, ", "))
+			}
+			if len(d.ToolsSkipped) > 0 {
+				fmt.Fprintf(&b, "  - Analysers that apply to this code and were left out by the depth: %s\n",
+					joinCapped(d.ToolsSkipped, 20))
+			}
+		} else {
+			b.WriteString("- **DEPTH: security was asked for, but the run did not confirm it.** " +
+				"Treat the lists above as the only account of what ran; do not tell the user " +
+				"which kinds of check were skipped. The list below is still narrowed to " +
+				"security-shaped findings.\n")
+		}
 	case "full":
-		b.WriteString("- **DEPTH: full.** Every stage ran over every file.\n")
+		if d := rep.Depth; d != nil && d.Mode == "deep" {
+			b.WriteString("- **DEPTH: full.** Every analyser of every kind ran, with the deep pass " +
+				"forced over every file. Nothing was left out by the depth.\n")
+		} else {
+			b.WriteString("- **DEPTH: full was asked for, but the run did not confirm it.** " +
+				"Treat the lists above as the only account of what ran.\n")
+		}
 	default:
 		b.WriteString("- Depth: standard — fast and static-analysis stages, with the deep " +
 			"security pass escalating automatically on any file whose output looked " +
@@ -853,7 +902,11 @@ func summariseReview(raw []byte, focus string) (string, error) {
 				kept = append(kept, f)
 			}
 		}
-		fmt.Fprintf(&b, "## Security findings: %d (of %d total; style and formatting omitted by focus=security)\n\n",
+		// GORILLA FIX (2026-10-06): the omitted findings are no longer "style
+		// and formatting" — no linter ran. What is dropped now is a static
+		// analyser's non-security output (a type error from mypy, an unused
+		// variable from cppcheck), and the heading says so.
+		fmt.Fprintf(&b, "## Security findings: %d (of %d total; the rest are non-security findings from the static analysers, omitted by focus=security)\n\n",
 			len(kept), total)
 		findings = kept
 	} else {

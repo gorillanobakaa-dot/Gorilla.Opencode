@@ -87,6 +87,20 @@ DEFAULT_IGNORE_DIRS = {
 # formatters only" is a property of the run and not a description of it.
 QUICK_CATEGORIES = ("recon", "lint", "format")
 
+# What a SECURITY pass runs: these categories, at full depth, and nothing else.
+#
+# Added 2026-10-06. Until then "security" and "full" were the same run (`--deep`
+# for both); they differed only in which findings the caller chose to list
+# afterwards, so a security review spent its time on black, prettier and
+# clang-format as well. A security pass is now defined by CATEGORY, like the
+# quick pass: the secret scanners, the security analysers and the static
+# analysers (SAST and dependency audits), with the deep stage forced on every
+# file; linters and formatters are left out and the report's `depth` block
+# names them. "static-analysis" belongs here because that is where cppcheck,
+# clang-tidy, staticcheck and semgrep's fast ruleset live -- the tools that
+# find the overrun before the deep stage confirms it.
+SECURITY_CATEGORIES = ("recon", "secrets", "security", "static-analysis")
+
 # Shared wording for tools that go through the Go toolchain, which resolves a
 # missing dependency by downloading it.
 _GO_MODULES_NETWORK = ("the Go toolchain downloads any module the project "

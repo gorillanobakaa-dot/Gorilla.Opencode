@@ -181,7 +181,9 @@ func TestGateStatesTheRunSizeInTokens(t *testing.T) {
 	d.SetSize(150, 60)
 	d.agents = agent.ResearchMaxAgents
 	view := flatText(d.View())
-	if !strings.Contains(view, "NO MEASUREMENT YET") {
+	// GORILLA (2026-10-06): the wording is forecastBasisPhrase's, shared with
+	// the /research screen, now that the money is priced from the same basis.
+	if !strings.Contains(view, "assumed; no run measured yet") {
 		t.Errorf("with no finished run on this machine the gate must say there is no measurement:\n%s", view)
 	}
 	for _, gone := range []string{"measured from a real run", "TOKENS PER HOUR", "quarter of a million", "2,699"} {

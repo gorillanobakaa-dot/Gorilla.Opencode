@@ -914,6 +914,12 @@ func LoadoutCost() (dollars, per1MIn float64, modelName string, priced bool) {
 // per-helper token accounting that does not exist yet. Measuring the duration
 // and then dividing by an invented step count would produce a guess wearing a
 // measurement's clothes, which is worse than the honest guess it replaced.
+//
+// THE TOKEN BASIS IS NOW MEASURED WHERE POSSIBLE (2026-10-06). Finished runs
+// are remembered (research_runs.go) and ResearchHelperSessionTokens prices a
+// helper at this machine's median tokens per session once one complete run is
+// on record. Steps x OutputPerStep survives only as the first-run basis, and
+// the screens say which of the two the money rests on.
 const (
 	ResearchStepsPerHelper = 3
 	ResearchOutputPerStep  = 700
@@ -973,26 +979,37 @@ func ResearchCost(inFlight int) (perHelper, perMinute, per1MIn float64, modelNam
 	if label == "" {
 		label = string(m.ID)
 	}
+	perHelper, perMinute = helperSessionForecast(m, inFlight)
+	return perHelper, perMinute, m.CostPer1MIn, label, true
+}
 
-	// Per-STEP shape. The input floor is measured for this install
-	// (LoadoutActiveTokens + base prompt); the rest is the estimate, and the UI
-	// prints the assumptions next to the number.
-	// One source of truth for the basis, and NOT LoadoutActiveTokens() +
-	// LoadoutBaseTokens() — that double-counted the base prompt. See the note on
-	// ResearchBasisTokens.
-	// The HELPER's basis, not the coder's. See ResearchHelperBasisTokens.
-	base := ResearchHelperBasisTokens()
-	costPerStep := float64(base)/1e6*m.CostPer1MIn + float64(ResearchOutputPerStep)/1e6*m.CostPer1MOut
-	perHelper = costPerStep * ResearchStepsPerHelper
-
-	// Peak burn: every in-flight helper completing a step every secondsPerStep.
+// helperSessionForecast prices one helper session on model m, and the peak burn
+// with inFlight of them running, from the one token basis.
+//
+// GORILLA OVERRIDE (2026-10-06): ResearchCost and ResearchPaidEquivalent each
+// did this arithmetic per STEP (helper context + ResearchOutputPerStep, times
+// ResearchStepsPerHelper), so the measured size of a run could not reach the
+// money. Both now price the SESSION basis ResearchHelperSessionTokens returns,
+// measured when a run has finished here and assumed until then. The input
+// floor in the assumed basis is measured for this install (the helper's base
+// prompt and tools — NOT LoadoutActiveTokens() + LoadoutBaseTokens(), which
+// double-counted the base prompt; see ResearchHelperBasisTokens).
+//
+// Peak burn: every in-flight helper finishing a session every
+// ResearchStepsPerHelper steps at helperStepsPerMinute, which is the measured
+// helper duration once one exists. With the assumed basis this is the old
+// per-step arithmetic to the cent; with the measured basis the invented step
+// count cancels out of the money entirely.
+func helperSessionForecast(m models.Model, inFlight int) (perHelper, perMinute float64) {
+	in, out, _, _ := ResearchHelperSessionTokens()
+	perHelper = float64(in)/1e6*m.CostPer1MIn + float64(out)/1e6*m.CostPer1MOut
 	if inFlight < 1 {
 		inFlight = 1
 	}
 	stepsPerMin, _ := helperStepsPerMinute()
-	perMinute = costPerStep * float64(inFlight) * stepsPerMin
-
-	return perHelper, perMinute, m.CostPer1MIn, label, true
+	helpersPerMin := stepsPerMin / ResearchStepsPerHelper
+	perMinute = perHelper * float64(inFlight) * helpersPerMin
+	return perHelper, perMinute
 }
 
 // ResearchHelperModel reports which model helpers run on, and whether that is
@@ -1136,15 +1153,12 @@ func ResearchHelperModelInfo() (models.Model, bool) {
 // volume against it. If no sibling exists, say so. Never substitute an
 // unrelated model.
 func ResearchPaidEquivalent(helperModel models.Model, inFlight int) (perMin, perHelper float64, viaName string, ok bool) {
-	if inFlight < 1 {
-		inFlight = 1
-	}
-	base := ResearchHelperBasisTokens()
-
+	// The same session basis and the same arithmetic as ResearchCost, so the
+	// free-tier "if you were paying" figure and the metered figure cannot
+	// disagree about the size of a helper.
 	price := func(m models.Model) (float64, float64) {
-		perStep := float64(base)/1e6*m.CostPer1MIn + float64(ResearchOutputPerStep)/1e6*m.CostPer1MOut
-		spm, _ := helperStepsPerMinute()
-		return perStep * float64(inFlight) * spm, perStep * ResearchStepsPerHelper
+		ph, pm := helperSessionForecast(m, inFlight)
+		return pm, ph
 	}
 
 	// Already metered: the real rate IS the answer, no equivalent needed.
@@ -1346,17 +1360,22 @@ func ResearchBasisTokens() int {
 // on screen. It appears in both numerator and denominator, so an error in it
 // largely cancels rather than compounding, which is why it is tolerable here
 // while it would not be in a raw total.
+//
+// GORILLA OVERRIDE (2026-10-06): the numerator is the session basis the money
+// is priced from (ResearchHelperSessionTokens), measured once a run has
+// finished here. The QUOTA line and the money line now describe the same run.
 func ResearchQuotaMultiple(helpers int) int {
 	if helpers < 1 {
 		return 0
 	}
-	ordinary := LoadoutActiveTokens() + ResearchOutputPerStep
+	ordinary := ResearchOrdinaryQuestionTokens()
 	if ordinary <= 0 {
 		// Nothing to divide by. Fall back to the old step count rather than
 		// returning 0, which would read as "this run is free".
 		return helpers * ResearchStepsPerHelper
 	}
-	runTokens := helpers * ResearchStepsPerHelper * (ResearchHelperBasisTokens() + ResearchOutputPerStep)
+	in, out, _, _ := ResearchHelperSessionTokens()
+	runTokens := helpers * (in + out)
 	multiple := int(math.Round(float64(runTokens) / float64(ordinary)))
 	if multiple < 1 {
 		// A real run is never worth less than one question, and rounding a small
@@ -1570,8 +1589,12 @@ func ResearchOrchestratorTokens(sessions int) (launchIn, synthesisIn int) {
 	launchIn = coder
 	// The synthesis turn is that PLUS everything the helpers wrote back. That
 	// second term is the one that grows with the size of the run, and it is why
-	// a bigger fleet does not only cost more in helpers.
-	synthesisIn = coder + sessions*ResearchStepsPerHelper*ResearchOutputPerStep
+	// a bigger fleet does not only cost more in helpers. What a helper writes
+	// back is the output side of the session basis: measured once a run has
+	// finished here (2026-10-06), ResearchStepsPerHelper x ResearchOutputPerStep
+	// until then.
+	_, outPerSession, _, _ := ResearchHelperSessionTokens()
+	synthesisIn = coder + sessions*outPerSession
 	return launchIn, synthesisIn
 }
 

@@ -1121,28 +1121,28 @@
           "caveats": "It runs no JavaScript, so a page that builds itself in the browser comes back nearly empty. That is a limit of the approach, not a bug."
         },
         {
-          "id": "whoisdns",
-          "title": "Find out who owns a domain or an address",
-          "teaches": "whois and dig answer the basic questions of any internet investigation: who registered this domain, when, where does it point, what mail servers does it use. All free, all public record.",
+          "id": "dns",
+          "title": "Read DNS records directly: where a domain points",
+          "teaches": "dig and host ask the name servers themselves, bypassing whatever your machine has cached: where does this domain point, what mail servers does it use, who serves its records, has it changed. Both come from BIND, the reference DNS software, and both are free and public record.",
           "unlocks": [
-            "look up domain ownership and age",
             "resolve and trace addresses",
-            "read DNS records directly"
+            "read DNS records directly",
+            "find a domain's mail and name servers"
           ],
           "detect": {
             "binaries": [
-              "whois",
               "dig",
               "host"
             ]
           },
           "packages": {
             "apt": [
-              "whois",
               "dnsutils"
             ],
             "pacman": [
-              "whois",
+              "bind"
+            ],
+            "scoop": [
               "bind"
             ]
           },
@@ -1152,7 +1152,36 @@
             "network_at_runtime": true
           },
           "tier": "MINIMUM",
-          "caveats": "Most registrations are behind a privacy service now, so whois usually names the privacy service rather than a person. RDAP is the modern, structured replacement and needs no account either."
+          "caveats": "On Windows, Scoop's bind package is the last BIND release built for Windows (the 9.16 branch, no longer maintained upstream). dig and host still work; do not run its name server."
+        },
+        {
+          "id": "whois",
+          "title": "Find out who registered a domain or holds an address",
+          "teaches": "whois answers the first question of any internet investigation: who registered this domain, when, through which registrar, and which organisation holds this address block. It is a plain text lookup against the registries, free and public record.",
+          "unlocks": [
+            "look up domain ownership and age",
+            "find who holds an address block"
+          ],
+          "detect": {
+            "binaries": [
+              "whois"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "whois"
+            ],
+            "pacman": [
+              "whois"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": true
+          },
+          "tier": "MINIMUM",
+          "caveats": "Most registrations are behind a privacy service now, so whois usually names the privacy service rather than a person. RDAP is the modern, structured replacement and needs no account either. Not packaged for Scoop; Sysinternals publishes a whois.exe for Windows if you need one."
         },
         {
           "id": "gpg",
