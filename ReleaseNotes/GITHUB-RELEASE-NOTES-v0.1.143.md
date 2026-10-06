@@ -382,7 +382,9 @@ BASIS: 21.8K tokens per helper session, assumed; no run measured yet.
 
 **Starting up.** Timed twice in the home folder, pressing Enter on the NVIDIA row: ready to type after 1.6 and 1.3 seconds.
 
-**On real Linux, after publication.** Automatic checks on GitHub take the files from this page and install them on Ubuntu, Fedora and Arch Linux, and hold a conversation with an AI on Linux. This paragraph is replaced with their result when they have run.
+**On real Linux, after publication.** Automatic checks on GitHub took the files from this page. The .deb was installed, started and removed on Ubuntu. The .rpm was installed, started and removed on Fedora. The Arch package was built on Arch Linux, installed, started and removed, and is attached below. The program, installed from the .deb, held a conversation with an AI running on the same Linux machine. All passed.
+
+**One thing the Linux test run caught after publication.** The program's own tests, run on Linux, found the `/research` cost screen one row too tall on a 90-column, 30-row terminal in one shape: a priced helper AI, supervised, ten helpers, and no run yet measured on that computer. On Windows the test had read the maintainer's own run record and passed. The published file has that one-row overflow in that shape; the fix is in the source and ships with the next version.
 
 **What is still true.** A search by name over a folder holding millions of files takes as long as the search engine takes to walk it: 12 to 20 seconds on this day with a cold disk.
 
