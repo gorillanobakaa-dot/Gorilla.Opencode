@@ -51,14 +51,19 @@ type ReceiptLine struct {
 	Detail  string `json:"detail"`
 	Outcome string `json:"outcome"`
 	Times   int    `json:"times"`
+	// Helper marks a call made by a sub-agent the line above it started.
+	Helper bool `json:"helper,omitempty"`
 }
 
 // Receipt is the program's own account of a run.
 type Receipt struct {
-	Calls    int            `json:"tool_calls"`
-	ByTool   map[string]int `json:"by_tool"`
-	Problems int            `json:"calls_that_did_not_succeed"`
-	Lines    []ReceiptLine  `json:"calls"`
+	Calls int `json:"tool_calls"`
+	// HelperCalls are calls made inside sub-agents started with the agent
+	// tool, counted apart from Calls so the first figure stays the model's own.
+	HelperCalls int            `json:"helper_tool_calls,omitempty"`
+	ByTool      map[string]int `json:"by_tool"`
+	Problems    int            `json:"calls_that_did_not_succeed"`
+	Lines       []ReceiptLine  `json:"calls"`
 }
 
 var exitCodeRe = regexp.MustCompile(`(?m)^Exit code (\d+)\s*$`)
@@ -69,6 +74,24 @@ var partialReviewRe = regexp.MustCompile(`\*\*PARTIAL REVIEW\.\*\* (\d+) of (\d+
 // BuildReceipt reads the stored messages of one session. It uses only tool
 // calls and tool results, which the program writes; assistant text is ignored.
 func BuildReceipt(msgs []message.Message) Receipt {
+	return BuildReceiptWithHelpers(msgs, nil)
+}
+
+// BuildReceiptWithHelpers is BuildReceipt that also lists, under each agent
+// call, the calls its sub-agent made. helperMsgs returns the stored messages of
+// the sub-agent session an agent call started (its id is the call id), or nil.
+//
+// GORILLA FIX (2026-10-09): with role=coder a sub-agent edits files and runs
+// commands. Run on Gemini Flash, the receipt said only "agent ... -> ok" while
+// the helper had rewritten app.py and run python. A receipt that hides the
+// writes is the comfort the receipt exists to remove.
+func BuildReceiptWithHelpers(msgs []message.Message, helperMsgs func(toolCallID string) []message.Message) Receipt {
+	r := Receipt{ByTool: map[string]int{}}
+	r.add(msgs, helperMsgs, false)
+	return r
+}
+
+func (r *Receipt) add(msgs []message.Message, helperMsgs func(string) []message.Message, helper bool) {
 	results := map[string]message.ToolResult{}
 	for i := range msgs {
 		for _, tr := range msgs[i].ToolResults() {
@@ -76,11 +99,14 @@ func BuildReceipt(msgs []message.Message) Receipt {
 		}
 	}
 
-	r := Receipt{ByTool: map[string]int{}}
 	for i := range msgs {
 		for _, tc := range msgs[i].ToolCalls() {
-			r.Calls++
-			r.ByTool[tc.Name]++
+			if helper {
+				r.HelperCalls++
+			} else {
+				r.Calls++
+				r.ByTool[tc.Name]++
+			}
 
 			outcome := "no result recorded"
 			if tr, ok := results[tc.ID]; ok {
@@ -90,16 +116,21 @@ func BuildReceipt(msgs []message.Message) Receipt {
 				r.Problems++
 			}
 
-			line := ReceiptLine{Tool: tc.Name, Detail: detailOf(tc), Outcome: outcome, Times: 1}
-			if n := len(r.Lines); n > 0 && r.Lines[n-1].Tool == line.Tool &&
-				r.Lines[n-1].Detail == line.Detail && r.Lines[n-1].Outcome == line.Outcome {
+			line := ReceiptLine{Tool: tc.Name, Detail: detailOf(tc), Outcome: outcome, Times: 1, Helper: helper}
+			if n := len(r.Lines); n > 0 && r.Lines[n-1].Tool == line.Tool && r.Lines[n-1].Helper == line.Helper &&
+				r.Lines[n-1].Detail == line.Detail && r.Lines[n-1].Outcome == line.Outcome && tc.Name != "agent" {
 				r.Lines[n-1].Times++
 				continue
 			}
 			r.Lines = append(r.Lines, line)
+			// One level only: a sub-agent cannot start another.
+			if tc.Name == "agent" && !helper && helperMsgs != nil {
+				if sub := helperMsgs(tc.ID); len(sub) > 0 {
+					r.add(sub, nil, true)
+				}
+			}
 		}
 	}
-	return r
 }
 
 // outcomeOf is outcomeFor for a shell command, kept for callers that have only
@@ -217,6 +248,9 @@ func (r Receipt) Text() string {
 	default:
 		fmt.Fprintf(&b, "%d tool calls", r.Calls)
 	}
+	if r.HelperCalls > 0 {
+		fmt.Fprintf(&b, " plus %d by helpers", r.HelperCalls)
+	}
 	if r.Problems > 0 {
 		fmt.Fprintf(&b, ", %d did not succeed", r.Problems)
 	}
@@ -229,6 +263,10 @@ func (r Receipt) Text() string {
 		times := ""
 		if l.Times > 1 {
 			times = fmt.Sprintf("  x%d", l.Times)
+		}
+		if l.Helper {
+			fmt.Fprintf(&b, "    | %-6s %s  -> %s%s\n", l.Tool, l.Detail, l.Outcome, times)
+			continue
 		}
 		fmt.Fprintf(&b, "  %-6s %s  -> %s%s\n", l.Tool, l.Detail, l.Outcome, times)
 	}

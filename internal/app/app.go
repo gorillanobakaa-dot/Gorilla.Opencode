@@ -339,7 +339,14 @@ func (a *App) receipt(sessionID string) (Receipt, bool) {
 		logging.Warn("could not read the session to build the receipt", "session_id", sessionID, "err", err)
 		return Receipt{}, false
 	}
-	return BuildReceipt(msgs), true
+	helper := func(toolCallID string) []message.Message {
+		sub, err := a.Messages.List(context.Background(), toolCallID)
+		if err != nil {
+			return nil
+		}
+		return sub
+	}
+	return BuildReceiptWithHelpers(msgs, helper), true
 }
 
 func (a *App) printReceipt(w io.Writer, sessionID string) {
