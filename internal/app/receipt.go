@@ -229,3 +229,13 @@ func (r Receipt) Text() string {
 	}
 	return b.String()
 }
+
+// ReceiptText is the receipt for a session as text, for front ends outside
+// this package (the ACP server sends it to the editor at the end of a turn).
+func (a *App) ReceiptText(sessionID string) (string, bool) {
+	r, ok := a.receipt(sessionID)
+	if !ok {
+		return "", false
+	}
+	return r.Text(), true
+}
