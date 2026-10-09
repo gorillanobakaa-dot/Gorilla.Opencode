@@ -52,6 +52,14 @@ const (
 	// and paying coder-model rates for six of them at once is how a research run
 	// stops being affordable on this audience's budget.
 	AgentResearch AgentName = "research"
+	// GORILLA OVERRIDE (2026-10-09): role-based helpers for the agent tool.
+	// AgentSubCoder is a helper that may EDIT, so it runs on the coder's model
+	// and provider, never on the cheap helper model; AgentPlan is read-only and
+	// runs where the task helper runs. Neither needs an entry in config.json:
+	// an absent entry is derived from its parent at spawn time (see
+	// subagent_roles.go), so every existing install works unchanged.
+	AgentSubCoder AgentName = "subcoder"
+	AgentPlan     AgentName = "plan"
 )
 
 // Agent defines configuration for different LLM models and their token limits.
@@ -175,6 +183,11 @@ type Config struct {
 	TUI              TUIConfig                         `json:"tui"`
 	Shell            ShellConfig                       `json:"shell,omitempty"`
 	AutoCompact      bool                              `json:"autoCompact,omitempty"`
+	// GORILLA OVERRIDE (2026-10-09): user-configured lifecycle hooks — local
+	// commands run before/after a tool call and at the end of a turn. None ship
+	// configured. Declared here also so updateCfgFile, which round-trips
+	// config.json through this struct, does not delete them. See hooks.go.
+	Hooks []Hook `json:"hooks,omitempty" mapstructure:"hooks"`
 }
 
 // Application constants
@@ -795,6 +808,14 @@ func Validate() error {
 		}
 	}
 
+	// GORILLA OVERRIDE (2026-10-09): a malformed lifecycle hook stops the load
+	// (fail closed: a gate that silently did not load is believed to be there),
+	// and every valid one is logged. See hooks.go.
+	if err := validateHooks(cfg.Hooks); err != nil {
+		return err
+	}
+	logHooks(cfg.Hooks)
+
 	return nil
 }
 
@@ -1046,7 +1067,11 @@ func setDefaultModelForAgent(agent AgentName) bool {
 	if agent == AgentTitle {
 		maxTokens = 80
 	}
-	helper := agent == AgentTitle || agent == AgentTask || agent == AgentResearch
+	// GORILLA OVERRIDE (2026-10-09): AgentSubCoder is deliberately NOT a light
+	// helper. It edits files and runs commands on the user's behalf, so it gets
+	// the main model, the same as the coder it stands in for. AgentPlan is
+	// read-only and goes with the other helpers.
+	helper := agent == AgentTitle || agent == AgentTask || agent == AgentResearch || agent == AgentPlan
 
 	// pick returns the model for this agent from a (main, helper) pair.
 	pick := func(main, light models.ModelID) models.ModelID {
@@ -1406,6 +1431,12 @@ func registerLocalEndpoints() {
 		// researchAgentName() falls back to AgentTask, so helpers run on the
 		// same provider as everything else. Someone who wants them elsewhere
 		// adds a "research" entry deliberately.
+		//
+		// AgentSubCoder and AgentPlan are left out for the same reason
+		// (2026-10-09): with no entry they are derived from the coder and the
+		// task agent at spawn time (DeriveRoleAgent), so they already land on
+		// `first` through those two. An entry written here would pin them to the
+		// local model and stop them following when the coder is moved.
 		for _, name := range []AgentName{AgentCoder, AgentSummarizer, AgentTask, AgentTitle} {
 			if cfg.Agents[name].Model == "" {
 				a := cfg.Agents[name]
@@ -1602,6 +1633,8 @@ func UpdateAgentModel(agentName AgentName, modelID models.ModelID) error {
 		cfg.Agents[agentName] = existingAgentCfg
 		return fmt.Errorf("failed to update agent model: %w", err)
 	}
+	// Written to config.json below, so it is a choice now, not a derivation.
+	forgetDerivedRoleAgent(agentName)
 
 	return updateCfgFile(func(config *Config) {
 		if config.Agents == nil {
@@ -1719,10 +1752,17 @@ func FollowCoderModel(prevCoder, newModel models.ModelID) ([]AgentModelMove, err
 		return nil, nil
 	}
 	var moves []AgentModelMove
-	for _, name := range []AgentName{AgentSummarizer, AgentTask, AgentTitle, AgentResearch} {
+	// GORILLA OVERRIDE (2026-10-09): AgentSubCoder and AgentPlan follow too,
+	// when the user has configured them — the rule above is that background
+	// agents follow the coder, and a configured sub-coder left behind would be
+	// a helper that EDITS on a model the user moved away from. A derived entry
+	// (no config.json entry; copied from its parent at spawn) is skipped: it
+	// re-derives on the next spawn anyway, and moving it here would write it to
+	// config.json and turn a default into a pinned choice nobody made.
+	for _, name := range []AgentName{AgentSummarizer, AgentTask, AgentTitle, AgentResearch, AgentSubCoder, AgentPlan} {
 		agentCfg, ok := cfg.Agents[name]
-		if !ok || agentCfg.Model == newModel {
-			continue // absent, or already where it needs to be
+		if !ok || agentCfg.Model == newModel || isDerivedRoleAgent(name) {
+			continue // absent, derived, or already where it needs to be
 		}
 		from := agentCfg.Model
 		if err := UpdateAgentModel(name, newModel); err != nil {

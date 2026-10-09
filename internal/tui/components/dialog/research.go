@@ -451,7 +451,14 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	// hard, and research is the hard part.
 	if helper, chat, ok := config.ResearchModelChoice(); ok {
 		hName, cName := config.ModelLabel(helper), config.ModelLabel(chat)
-		if helper.ID != chat.ID {
+		if helper.ID != chat.ID && m.compact {
+			// Short screens: the same three facts in two rows.
+			add(kindDanger, "HELPERS RUN ON: %s — NOT %s, your chat model.", hName, cName)
+			if helper.Provider != chat.Provider {
+				add(kindQuota, "   It is also a DIFFERENT PROVIDER: separate account, separate quota.")
+			}
+			add(kindQuota, "   Every figure below is %s's. Press «m» to use %s.", hName, cName)
+		} else if helper.ID != chat.ID {
 			add(kindDanger, "HELPERS RUN ON: %s", hName)
 			add(kindMuted, "   NOT %s, which you are chatting with.", cName)
 			add(kindMuted, "   Every figure below is %s's. Your research will be as", hName)
@@ -476,7 +483,9 @@ func (m ResearchDialogCmp) costLines() []costLine {
 		total, pmStr, phStr := runMoney(perHelper, n, minutes)
 		add(kindMoney, "%s PER MINUTE.    PER HOUR: %s", pmStr, phStr)
 		add(kindMoney, "THIS RUN: about %s  —  %s of running.", total, humanDuration(seconds))
-		add(kindMuted, "   %s x %s per minute = %s", humanDuration(seconds), pmStr, total)
+		if !m.compact { // restates the two lines above; dropped on short screens
+			add(kindMuted, "   %s x %s per minute = %s", humanDuration(seconds), pmStr, total)
+		}
 		add(kindMuted, "   %d sessions, %s each, on %s.", n, amount(parseBack(total)/float64(n)), modelName)
 		// GORILLA OVERRIDE (2026-08-23): ROADMAP item 6. The figure above is
 		// HELPERS ONLY. The turn that launches the run and the turn that reads
@@ -827,7 +836,23 @@ func (m ResearchDialogCmp) theWarning() string {
 	}
 }
 
+// View renders the dialog, falling back to its compact form when the full
+// form does not fit the terminal.
+//
+// GORILLA FIX (2026-10-09): compact was chosen from the height alone (under
+// 40 rows). With a priced helper model that differs from the chat model the
+// full form is 48 rows, so on a 120x40 terminal the key line fell off the
+// bottom. The deciding fact is whether it fits, so that is what is measured.
 func (m ResearchDialogCmp) View() string {
+	out := m.render()
+	if !m.compact && m.height > 0 && lipgloss.Height(out) > m.height {
+		m.compact = true
+		out = m.render()
+	}
+	return out
+}
+
+func (m ResearchDialogCmp) render() string {
 	t := theme.CurrentTheme()
 	base := styles.BaseStyle()
 
@@ -882,7 +907,9 @@ func (m ResearchDialogCmp) View() string {
 		rows = append(rows, base.Foreground(t.TextMuted()).Width(maxWidth).Padding(0, 1).
 			Render("   "+opt.name+" — "+opt.short))
 	}
-	rows = append(rows, base.Width(maxWidth).Render(""))
+	if !m.compact {
+		rows = append(rows, base.Width(maxWidth).Render(""))
+	}
 
 	rows = append(rows,
 		base.Foreground(t.Text()).Width(maxWidth).Padding(0, 1).

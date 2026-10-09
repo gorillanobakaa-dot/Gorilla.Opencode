@@ -20,6 +20,8 @@ import (
 // record and passed on Windows while failing on a clean Linux runner.
 func TestAPricedSupervisedDialogFitsTheScreenToo(t *testing.T) {
 	pricedConfig(t)
+	// The chat model differs from the helper model here, which adds the
+	// HELPERS RUN ON block: the tallest shape (48 rows before 2026-10-09).
 	for _, measured := range []bool{false, true} {
 		t.Setenv("XDG_CACHE_HOME", t.TempDir())
 		if measured {

@@ -26,69 +26,7 @@ func CoderAgentTools(
 	history history.Service,
 	lspClients map[string]*lsp.Client,
 ) []tools.BaseTool {
-	ctx := context.Background()
-	otherTools := GetMcpTools(ctx, permissions)
-	// GORILLA FIX (2026-08-19): MCP tools were never registered in the
-	// loadout, so /context, the per-turn cost line and the burn-rate warning
-	// were all computed over a tool list that excluded them. Someone with
-	// three MCP servers was shown a number that was simply wrong — on the one
-	// screen built to tell them what their setup costs. Registered here
-	// because this is the first point at which the servers have been contacted
-	// and their real schemas measured; the registry is idempotent by ID.
-	config.RegisterLoadoutComponents(McpLoadoutComponents())
-	if len(lspClients) > 0 && loadoutOn("tool.diagnostics") {
-		otherTools = append(otherTools, tools.NewDiagnosticsTool(lspClients))
-	}
-	var coderTools []tools.BaseTool
-	add := func(id string, t tools.BaseTool) {
-		if loadoutOn(id) {
-			coderTools = append(coderTools, t)
-		}
-	}
-	add("tool.bash", tools.NewBashTool(permissions))
-	add("tool.edit", tools.NewEditTool(lspClients, permissions, history))
-	add("tool.fetch", tools.NewFetchTool(permissions))
-	// GORILLA OVERRIDE: without a search tool the agent hand-builds query
-	// URLs for publisher sites, gets 403s, and has been observed fabricating
-	// citations rather than reporting the failure.
-	add("tool.websearch", tools.NewWebSearchTool(permissions))
-	// GORILLA OVERRIDE: one find tool replaces glob + grep + ls. Those three
-	// carried ~1,485 tokens of description on EVERY turn, and grep could only
-	// return PATHS — so answering any question cost a second turn and a
-	// whole-file view (measured on this repo: a 16-token grep answer with an
-	// 1,829-token view behind it). find returns matching lines with context,
-	// so that second turn usually does not happen, and one tool instead of
-	// three removes the tool-choice mistake that smaller models kept making on
-	// large trees. The three tools still exist and still compile; restoring
-	// them is three lines here. See internal/llm/tools/find.go.
-	add("tool.find", tools.NewFindTool())
-	add("tool.view", tools.NewViewTool(lspClients))
-	add("tool.patch", tools.NewPatchTool(lspClients, permissions, history))
-	add("tool.write", tools.NewWriteTool(lspClients, permissions, history))
-	// GORILLA OVERRIDE: on the Nuclear Option (helper-leash = 0) omit the
-	// agent tool entirely, so its schema tokens vanish too — not just its
-	// spawns (which subagent_guard.go would refuse anyway).
-	if config.MaxSubAgents() != config.SubAgentsNuclear {
-		add("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions))
-		// GORILLA OVERRIDE: multi-role research. Gated on the same Nuclear
-		// Option as the agent tool — it spawns helpers, so with helpers off its
-		// schema tokens should go too.
-		add("tool.research", NewResearchTool(sessions, messages, lspClients, permissions))
-	}
-	// GORILLA OVERRIDE: kernel semantic checker, default off in the loadout.
-	add("tool.sparse", tools.NewSparseTool(permissions))
-	// GORILLA OVERRIDE (2026-08-18): the code-review toolkit, ~30 analysers
-	// embedded in the binary. Loadout-gated because its description is not
-	// free and most turns are not reviews — but ON by default, because a
-	// review capability nobody knows about is not a capability.
-	add("tool.review", tools.NewReviewTool(permissions))
-	// Ported patches are the other half of the embedded toolkit. Same
-	// loadout gating and the same reason: most turns are not ports, but a
-	// capability nobody can reach is not a capability.
-	add("tool.patch_port", tools.NewPatchPortTool(permissions))
-	add("tool.bio_lookup", tools.NewBioDataTool(permissions))
-
-	full := append(coderTools, otherTools...)
+	full := coderToolSet(permissions, sessions, messages, history, lspClients, true)
 
 	// tool_search is appended LAST and is never itself deferred: it is the only
 	// way back to everything that is. It closes over `full`, so its catalogue is
@@ -131,6 +69,111 @@ func CoderAgentTools(
 		config.SetDeferredComponents(nil, 0)
 	}
 	return full
+}
+
+// SubCoderAgentTools is what a role=coder helper of the agent tool gets: the
+// coder's own tool set, under the same loadout, WITHOUT the two tools that
+// spawn helpers (agent, research). A helper that can spawn helpers turns the
+// helper-leash, which is counted per parent turn, into a per-level count with
+// no ceiling; depth stays at one.
+//
+// GORILLA OVERRIDE (2026-10-09). Built by the same coderToolSet as the coder,
+// so a tool added there reaches the sub-coder without a second list to keep in
+// step. Unlike CoderAgentTools it has NO side effects on the prompt catalogue
+// or the /context figures: those describe the main conversation, and a helper
+// starting must not rewrite them. Its tool_search, when deferral is on, closes
+// over its own snapshot, so it can only find what this helper actually has.
+func SubCoderAgentTools(
+	permissions permission.Service,
+	sessions session.Service,
+	messages message.Service,
+	history history.Service,
+	lspClients map[string]*lsp.Client,
+) []tools.BaseTool {
+	full := coderToolSet(permissions, sessions, messages, history, lspClients, false)
+	if config.LoadoutEnabled(config.ToolSearchComponentID) {
+		snapshot := full
+		full = append(full, tools.NewToolSearchTool(func() []tools.BaseTool { return snapshot }))
+	}
+	return full
+}
+
+// coderToolSet builds the coder's tools before tool_search is added. spawners
+// says whether the helper-spawning tools (agent, research) are included.
+func coderToolSet(
+	permissions permission.Service,
+	sessions session.Service,
+	messages message.Service,
+	history history.Service,
+	lspClients map[string]*lsp.Client,
+	spawners bool,
+) []tools.BaseTool {
+	ctx := context.Background()
+	// Copied, not aliased: GetMcpTools returns its cache, and the append of
+	// the diagnostics tool below must never write into that cache's spare
+	// capacity now that two tool sets (coder and sub-coder) are built from it.
+	otherTools := append([]tools.BaseTool(nil), GetMcpTools(ctx, permissions)...)
+	// GORILLA FIX (2026-08-19): MCP tools were never registered in the
+	// loadout, so /context, the per-turn cost line and the burn-rate warning
+	// were all computed over a tool list that excluded them. Someone with
+	// three MCP servers was shown a number that was simply wrong — on the one
+	// screen built to tell them what their setup costs. Registered here
+	// because this is the first point at which the servers have been contacted
+	// and their real schemas measured; the registry is idempotent by ID.
+	config.RegisterLoadoutComponents(McpLoadoutComponents())
+	if len(lspClients) > 0 && loadoutOn("tool.diagnostics") {
+		otherTools = append(otherTools, tools.NewDiagnosticsTool(lspClients))
+	}
+	var coderTools []tools.BaseTool
+	add := func(id string, t tools.BaseTool) {
+		if loadoutOn(id) {
+			coderTools = append(coderTools, t)
+		}
+	}
+	add("tool.bash", tools.NewBashTool(permissions))
+	add("tool.edit", tools.NewEditTool(lspClients, permissions, history))
+	add("tool.fetch", tools.NewFetchTool(permissions))
+	// GORILLA OVERRIDE: without a search tool the agent hand-builds query
+	// URLs for publisher sites, gets 403s, and has been observed fabricating
+	// citations rather than reporting the failure.
+	add("tool.websearch", tools.NewWebSearchTool(permissions))
+	// GORILLA OVERRIDE: one find tool replaces glob + grep + ls. Those three
+	// carried ~1,485 tokens of description on EVERY turn, and grep could only
+	// return PATHS — so answering any question cost a second turn and a
+	// whole-file view (measured on this repo: a 16-token grep answer with an
+	// 1,829-token view behind it). find returns matching lines with context,
+	// so that second turn usually does not happen, and one tool instead of
+	// three removes the tool-choice mistake that smaller models kept making on
+	// large trees. The three tools still exist and still compile; restoring
+	// them is three lines here. See internal/llm/tools/find.go.
+	add("tool.find", tools.NewFindTool())
+	add("tool.view", tools.NewViewTool(lspClients))
+	add("tool.patch", tools.NewPatchTool(lspClients, permissions, history))
+	add("tool.write", tools.NewWriteTool(lspClients, permissions, history))
+	// GORILLA OVERRIDE: on the Nuclear Option (helper-leash = 0) omit the
+	// agent tool entirely, so its schema tokens vanish too — not just its
+	// spawns (which subagent_guard.go would refuse anyway).
+	if spawners && config.MaxSubAgents() != config.SubAgentsNuclear {
+		add("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions, history))
+		// GORILLA OVERRIDE: multi-role research. Gated on the same Nuclear
+		// Option as the agent tool — it spawns helpers, so with helpers off its
+		// schema tokens should go too.
+		add("tool.research", NewResearchTool(sessions, messages, lspClients, permissions))
+	}
+	// GORILLA OVERRIDE: kernel semantic checker, default off in the loadout.
+	add("tool.sparse", tools.NewSparseTool(permissions))
+	// GORILLA OVERRIDE (2026-08-18): the code-review toolkit, ~30 analysers
+	// embedded in the binary. Loadout-gated because its description is not
+	// free and most turns are not reviews — but ON by default, because a
+	// review capability nobody knows about is not a capability.
+	add("tool.review", tools.NewReviewTool(permissions))
+	// Ported patches are the other half of the embedded toolkit. Same
+	// loadout gating and the same reason: most turns are not ports, but a
+	// capability nobody can reach is not a capability.
+	add("tool.patch_port", tools.NewPatchPortTool(permissions))
+	add("tool.bio_lookup", tools.NewBioDataTool(permissions))
+
+	return append(coderTools, otherTools...)
 }
 
 // loadoutIDForTool maps a tool's wire name to its /context row.
@@ -192,6 +235,22 @@ func TaskAgentTools(lspClients map[string]*lsp.Client, permissions permission.Se
 	add("tool.find", tools.NewFindTool())
 	add("tool.view", tools.NewViewTool(lspClients))
 	return taskTools
+}
+
+// PlanAgentTools is what a role=plan helper gets: the explore helper's
+// read-only tools plus diagnostics when a language server is running, because
+// a plan that names a line the compiler already rejects is a plan built on
+// sand. Still strictly read-only — no bash, edit, write or patch.
+//
+// GORILLA OVERRIDE (2026-10-09). Diagnostics is not loadout-gated here, for
+// the reason given on ResearchAgentTools: its description rides only the
+// helper's own turns, never the main conversation.
+func PlanAgentTools(lspClients map[string]*lsp.Client, permissions permission.Service) []tools.BaseTool {
+	planTools := TaskAgentTools(lspClients, permissions)
+	if len(lspClients) > 0 {
+		planTools = append(planTools, tools.NewDiagnosticsTool(lspClients))
+	}
+	return planTools
 }
 
 // registerDeferredComponents tells config which loadout rows are enabled but

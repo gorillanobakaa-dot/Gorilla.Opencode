@@ -461,6 +461,26 @@ project in `.opencode.json`:
 All original providers (Anthropic, OpenAI, Groq, OpenRouter, Azure,
 Bedrock, Vertex, Copilot) remain wired as upstream left them.
 
+### Inside your editor (Zed, JetBrains and other ACP editors)
+
+`gorilla-opencode acp` speaks the [Agent Client Protocol](https://agentclientprotocol.com)
+on stdin and stdout, so an editor can drive the program in place of the
+terminal. The editor shows every tool call as it happens, asks you every
+permission question the program would ask, and each answer ends with the
+program's own record of what ran.
+
+Zed, in `settings.json`:
+
+```json
+"agent_servers": {
+  "Gorilla OpenCode": { "type": "custom", "command": "gorilla-opencode", "args": ["acp"] }
+}
+```
+
+Same providers, same keys, same permission rules as the terminal. No account,
+and nothing is sent anywhere the terminal program would not send it. Choose a
+provider once in the terminal first; the editor uses that choice.
+
 ## See it in action
 
 New to this kind of tool? The plain-English **[GUIDE](docs/GUIDE.md)**

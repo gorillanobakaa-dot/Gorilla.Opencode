@@ -23,11 +23,19 @@ func GetAgentPrompt(agentName config.AgentName, provider models.ModelProvider) s
 		basePrompt = TaskPrompt(provider)
 	case config.AgentSummarizer:
 		basePrompt = SummarizerPrompt(provider)
+	// GORILLA OVERRIDE (2026-10-09): the agent tool's plan and coder roles.
+	case config.AgentPlan:
+		basePrompt = PlanPrompt(provider)
+	case config.AgentSubCoder:
+		basePrompt = SubCoderPrompt(provider)
 	default:
 		basePrompt = "You are a helpful assistant"
 	}
 
-	if agentName == config.AgentCoder || agentName == config.AgentTask {
+	// Every agent that reads or changes the project gets the project's own
+	// instructions; a plan or an edit made without them is made blind.
+	if agentName == config.AgentCoder || agentName == config.AgentTask ||
+		agentName == config.AgentPlan || agentName == config.AgentSubCoder {
 		// Add context from project-specific instruction files if they exist
 		contextContent := getContextFromPaths()
 		logging.Debug("Context content", "Context", contextContent)

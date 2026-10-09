@@ -104,8 +104,8 @@ type agent struct {
 	toolsMu     sync.RWMutex
 	// Read with a.prov() and written with a.setProv(): /model swaps it from
 	// the UI goroutine while a turn is reading it on another.
-	providerMu  sync.RWMutex
-	provider    provider.Provider
+	providerMu sync.RWMutex
+	provider   provider.Provider
 
 	titleProvider     provider.Provider
 	summarizeProvider provider.Provider
@@ -428,6 +428,11 @@ func (a *agent) Run(ctx context.Context, sessionID string, content string, attac
 		if a.agentName != config.AgentCoder {
 			stuck.Reset(sessionID)
 		}
+		// GORILLA OVERRIDE (2026-10-09): the user's turn_end hooks, once per
+		// turn, on success and failure alike. Run before the result is handed
+		// on, so a hook has finished (or been stopped at its timeout) by the
+		// time anyone is told the turn is over. See hooks.go.
+		a.runTurnEndHooks(sessionID, turnFinishReason(result))
 		// Delete first, so IsBusy inside the drain sees this session as finished.
 		// This is the single point a request completes on both the success and
 		// the error path, which is why the drain belongs here.
@@ -797,6 +802,20 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 				logging.Warn("tool call carried parameters the tool does not declare",
 					"tool", toolCall.Name, "unknown", unknown, "agent", string(a.agentName))
 			}
+			// GORILLA OVERRIDE (2026-10-09): the user's before_tool hooks may
+			// refuse this call; a refused call is not run. Keyed on the
+			// RESOLVED name, so a repaired name cannot slip past a filter. A
+			// refusal does not end the turn: the model is told and may adapt,
+			// and each later call is gated on its own. See hooks.go.
+			if refusal := a.runBeforeToolHooks(ctx, sessionID, tool.Info().Name, toolCall.Input); refusal != "" {
+				ran[i] = false // the user's gate said no; the model did not loop
+				toolResults[i] = message.ToolResult{
+					ToolCallID: toolCall.ID,
+					Content:    refusal,
+					IsError:    true,
+				}
+				continue
+			}
 			toolResult, toolErr := tool.Run(ctx, tools.ToolCall{
 				ID:    toolCall.ID,
 				Name:  toolCall.Name,
@@ -852,6 +871,7 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 					Content:    fmt.Sprintf("The %s tool failed and produced no result: %v", toolCall.Name, toolErr),
 					IsError:    true,
 				}
+				a.runAfterToolHooks(ctx, sessionID, tool.Info().Name, toolCall.Input, toolResults[i].Content, true)
 				continue
 			}
 			toolResults[i] = message.ToolResult{
@@ -869,6 +889,7 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 						"understand.",
 					toolCall.Name, unknown, tools.DeclaredParams(tool.Info()))
 			}
+			a.runAfterToolHooks(ctx, sessionID, tool.Info().Name, toolCall.Input, toolResults[i].Content, toolResults[i].IsError)
 		}
 	}
 out:

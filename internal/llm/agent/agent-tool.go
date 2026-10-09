@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/history"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 	"github.com/opencode-ai/opencode/internal/lsp"
 	"github.com/opencode-ai/opencode/internal/message"
@@ -16,6 +18,7 @@ import (
 type agentTool struct {
 	sessions    session.Service
 	messages    message.Service
+	history     history.Service
 	lspClients  map[string]*lsp.Client
 	permissions permission.Service
 }
@@ -24,18 +27,84 @@ const (
 	AgentToolName = "agent"
 )
 
+// GORILLA OVERRIDE (2026-10-09): role-based helpers, after Kimi Code's
+// built-in coder / explore / plan sub-agents. Every role runs in its own
+// session with its own context, so a helper's reading never lands in the
+// parent's window — only its one final report does.
+//
+//	explore  read-only (find, view); returns findings. The default, and
+//	         exactly what this tool did before roles existed.
+//	plan     read-only plus diagnostics; returns a numbered, file-by-file plan.
+//	coder    the coder's own tools minus the helper spawners, on the coder's
+//	         model; it changes files, and every permission question it raises
+//	         still goes to the user through the parent conversation.
+const (
+	AgentRoleExplore = "explore"
+	AgentRolePlan    = "plan"
+	AgentRoleCoder   = "coder"
+)
+
+// AgentRoles is the valid list, in the order it is shown to the model.
+var AgentRoles = []string{AgentRoleExplore, AgentRolePlan, AgentRoleCoder}
+
 type AgentParams struct {
 	Prompt string `json:"prompt"`
+	Role   string `json:"role,omitempty"`
+}
+
+// newHelperAgent builds a helper. A variable only so a test can run the whole
+// tool — leash, session, registry, cost — with a stand-in model; production
+// never reassigns it.
+var newHelperAgent = NewAgent
+
+// roleAgent maps a role to the configured agent it runs as (model, provider
+// and system prompt). False for an unknown role.
+func roleAgent(role string) (config.AgentName, bool) {
+	switch role {
+	case AgentRoleExplore:
+		return config.AgentTask, true
+	case AgentRolePlan:
+		return config.AgentPlan, true
+	case AgentRoleCoder:
+		return config.AgentSubCoder, true
+	}
+	return "", false
+}
+
+// roleTools is the tool set a role's helper gets. Built only after the role is
+// known to be valid and the leash has allowed the spawn: the coder set reads
+// the MCP tool list, which is not free on first use.
+func (b *agentTool) roleTools(role string) []tools.BaseTool {
+	switch role {
+	case AgentRolePlan:
+		return PlanAgentTools(b.lspClients, b.permissions)
+	case AgentRoleCoder:
+		return SubCoderAgentTools(b.permissions, b.sessions, b.messages, b.history, b.lspClients)
+	}
+	return TaskAgentTools(b.lspClients, b.permissions)
 }
 
 func (b *agentTool) Info() tools.ToolInfo {
 	return tools.ToolInfo{
-		Name:        AgentToolName,
-		Description: "Launch a new agent that has access to the following tools: find (search + file finding + directory listing), view. When you are searching for a keyword or file and are not confident that you will find the right match on the first try, use the Agent tool to perform the search for you. For example:\n\n- If you are searching for a keyword like \"config\" or \"logger\", or for questions like \"which file does X?\", the Agent tool is strongly recommended\n- If you want to read a specific file path, use the view tool (or find with a glob) instead of the Agent tool, to get the answer more quickly\n- If you are searching for a specific class definition like \"class Foo\", call find directly instead, to get the match more quickly\n\nUsage notes:\n1. Agents run ONE AT A TIME, in the order you request them. This program has no concurrent tool execution, so launching several agents does not make them finish any sooner — each one blocks until the previous has returned. Batching several calls into a single message is still worth doing, because it costs one model round-trip instead of several, and on a slow connection that round-trip is the expensive part. Just do not expect concurrency from it.\n2. When the agent is done, it will return a single message back to you. The result returned by the agent is not visible to the user. To show the user the result, you should send a text message back to the user with a concise summary of the result.\n3. Each agent invocation is stateless. You will not be able to send additional messages to the agent, nor will the agent be able to communicate with you outside of its final report. Therefore, your prompt should contain a highly detailed task description for the agent to perform autonomously and you should specify exactly what information the agent should return back to you in its final and only message to you.\n4. The agent's outputs should generally be trusted\n5. IMPORTANT: The agent can not use Bash, Replace, Edit, so can not modify files. If you want to use these tools, use them directly instead of going through the agent.",
+		Name: AgentToolName,
+		Description: "Launch a helper agent in its own session. `role` sets what it can do:\n" +
+			"- explore (default): read-only search (find, view). Use it for open-ended searches where the first match may be wrong; for a known path or symbol call view or find directly.\n" +
+			"- plan: read-only plus diagnostics. Returns a numbered, file-by-file plan with the exact places to change and what to verify. It never writes.\n" +
+			"- coder: your coding tools (edit, write, patch, bash and the rest, but not agent or research) on your model. It CAN modify files; every permission question it raises still goes to the user. It reports what it changed and what it ran.\n\n" +
+			"Usage notes:\n" +
+			"1. Helpers run ONE AT A TIME, in the order requested. Batching calls saves model round-trips, not time.\n" +
+			"2. A helper returns one final message, visible only to you. To show the user, summarise it.\n" +
+			"3. Each helper is stateless and cannot be asked follow-ups: give a complete task and say exactly what to report back.\n" +
+			"4. Explore and plan findings can generally be trusted. Check a coder helper's report before telling the user the work is done.",
 		Parameters: map[string]any{
 			"prompt": map[string]any{
 				"type":        "string",
 				"description": "The task for the agent to perform",
+			},
+			"role": map[string]any{
+				"type":        "string",
+				"enum":        AgentRoles,
+				"description": "explore (default), plan or coder",
 			},
 		},
 		Required: []string{"prompt"},
@@ -50,6 +119,16 @@ func (b *agentTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolRes
 	if params.Prompt == "" {
 		return tools.NewTextErrorResponse("prompt is required"), nil
 	}
+	role := strings.ToLower(strings.TrimSpace(params.Role))
+	if role == "" {
+		role = AgentRoleExplore
+	}
+	// Refused BEFORE the leash is charged: a mistyped role must not spend one
+	// of the user's helper slots for this turn.
+	agentName, ok := roleAgent(role)
+	if !ok {
+		return tools.NewTextErrorResponse(fmt.Sprintf("unknown role %q. Valid roles: %s.", params.Role, strings.Join(AgentRoles, ", "))), nil
+	}
 
 	sessionID, messageID := tools.GetContextValues(ctx)
 	if sessionID == "" || messageID == "" {
@@ -59,6 +138,7 @@ func (b *agentTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolRes
 	// GORILLA OVERRIDE: enforce the user's helper-leash (config.MaxSubAgents,
 	// "Dial 2" in /context). A refusal is returned as a normal tool result so
 	// the model adapts (does the work inline) rather than erroring the turn.
+	// Every role counts against the same leash.
 	switch limit := config.MaxSubAgents(); {
 	case limit == config.SubAgentsNuclear:
 		return tools.NewTextErrorResponse("Sub-agents are DISABLED (Gorilla Nuclear Option). Do this task yourself with the direct tools, or the user can re-enable helpers in /context."), nil
@@ -68,7 +148,13 @@ func (b *agentTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolRes
 		}
 	}
 
-	agent, err := NewAgent(config.AgentTask, b.sessions, b.messages, TaskAgentTools(b.lspClients, b.permissions))
+	// plan and coder have no entry in a config.json written before roles
+	// existed; derive it from the parent agent now (no-op for explore).
+	if err := config.DeriveRoleAgent(agentName); err != nil {
+		return tools.NewTextErrorResponse(fmt.Sprintf("cannot start a %s helper: %s", role, err)), nil
+	}
+
+	agent, err := newHelperAgent(agentName, b.sessions, b.messages, b.roleTools(role))
 	if err != nil {
 		return tools.ToolResponse{}, fmt.Errorf("error creating agent: %s", err)
 	}
@@ -76,6 +162,8 @@ func (b *agentTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolRes
 	session, err := b.sessions.CreateTaskSession(ctx, call.ID, sessionID, "New Agent Session")
 	// Same reason as the research helpers: a sub-agent's approvals belong to
 	// the conversation that spawned it, not to a session the user cannot see.
+	// For role=coder this is what keeps every edit and command in front of the
+	// user.
 	if err == nil {
 		b.permissions.RegisterChildSession(session.ID, sessionID)
 	}
@@ -87,9 +175,11 @@ func (b *agentTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolRes
 	// status bar) and KILL it — one by one or via the Nuclear Option. The
 	// helper runs under its own cancelable context; killing it cancels that
 	// context, which unblocks the <-done wait below with a cancellation error.
+	// The role leads the registered prompt, so /tasks says which kind of
+	// helper is running: one that edits must not look like a search.
 	taskCtx, taskCancel := context.WithCancel(ctx)
 	defer taskCancel()
-	entry := RegisterSubAgent(session.ID, sessionID, call.ID, params.Prompt, taskCancel)
+	entry := RegisterSubAgent(session.ID, sessionID, call.ID, "["+role+"] "+params.Prompt, taskCancel)
 	defer UnregisterSubAgent(entry.ID)
 
 	done, err := agent.Run(taskCtx, session.ID, params.Prompt)
@@ -129,10 +219,12 @@ func NewAgentTool(
 	Messages message.Service,
 	LspClients map[string]*lsp.Client,
 	Permissions permission.Service,
+	History history.Service,
 ) tools.BaseTool {
 	return &agentTool{
 		sessions:    Sessions,
 		messages:    Messages,
+		history:     History,
 		lspClients:  LspClients,
 		permissions: Permissions,
 	}

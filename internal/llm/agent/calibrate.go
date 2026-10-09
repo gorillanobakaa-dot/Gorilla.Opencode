@@ -61,7 +61,7 @@ func CalibrateLoadout(
 	set("tool.view", tools.NewViewTool(lspClients))
 	set("tool.patch", tools.NewPatchTool(lspClients, permissions, history))
 	set("tool.write", tools.NewWriteTool(lspClients, permissions, history))
-	set("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions))
+	set("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions, history))
 	// GORILLA FIX (2026-08-17): measure the research tool WITHOUT the dossier
 	// addition, and the dossier row as that addition alone. Measuring Info()
 	// here counted the dossier's tokens in BOTH rows whenever it was armed.

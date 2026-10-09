@@ -89,7 +89,14 @@ func RunModelDoctor(cacheDir string, set AgentSetter) []Finding {
 // 1. Every agent must be on a model that is registered and not known dead.
 func doctorAgents(set AgentSetter) []Finding {
 	var out []Finding
-	for _, name := range []AgentName{AgentCoder, AgentSummarizer, AgentTask, AgentTitle} {
+	// GORILLA OVERRIDE (2026-10-09): a CONFIGURED sub-coder or planner on a
+	// dead model fails every spawn of that role, so it is checked like the
+	// others. A derived one is only a copy of its parent, which is checked
+	// already; moving it through the setter would write a default to config.json.
+	for _, name := range []AgentName{AgentCoder, AgentSummarizer, AgentTask, AgentTitle, AgentSubCoder, AgentPlan} {
+		if isDerivedRoleAgent(name) {
+			continue
+		}
 		cur := cfg.Agents[name].Model
 		// Moved at load, in memory only (validateAgent). Say it, and with a
 		// setter write it down so it is not silently redone at every launch.

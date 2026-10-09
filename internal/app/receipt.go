@@ -35,6 +35,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 	"github.com/opencode-ai/opencode/internal/message"
 )
@@ -119,6 +120,10 @@ func outcomeFor(tool string, tr message.ToolResult) string {
 	switch {
 	case strings.HasPrefix(low, "permission denied"):
 		return "refused, not run"
+	// GORILLA OVERRIDE (2026-10-09): the user's own before_tool hook said no.
+	// Not a tool failure: the tool never ran. See internal/llm/agent/hooks.go.
+	case strings.HasPrefix(c, agent.HookRefusedPrefix):
+		return "refused by hook, not run"
 	case strings.HasPrefix(c, "Tool execution canceled"):
 		return "cancelled, not run"
 	case shell && strings.Contains(c, "Command was aborted before completion"):

@@ -70,7 +70,9 @@ var LoadoutComponents = []LoadoutComponent{
 	{"tool.fetch", "Fetch a web page", "agent can't open a link you give it", 789, true, false},
 	{"tool.websearch", "Find sources + web search", "agent can't look anything up — only what you paste in", 846, true, false},
 	{"tool.diagnostics", "Diagnostics tool", "agent can't read LSP errors/warnings", 400, true, false},
-	{"tool.agent", "Sub-agent tool", "agent can't spawn read-only search sub-agents", 200, true, false},
+	// Trade-off reworded 2026-10-09: the tool now has explore, plan and coder
+	// roles, and "read-only" stopped being true for the third.
+	{"tool.agent", "Sub-agent tool", "agent can't hand work to helper sub-agents (search, plan, or a coder that edits)", 200, true, false},
 	// GORILLA OVERRIDE: multi-role research (4-10 helpers in fixed lanes).
 	// Default ON but it is the first thing to drop on a metered link: helpers
 	// run sequentially, so a run is several LLM sessions and real money. Its
