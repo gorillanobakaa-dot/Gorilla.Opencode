@@ -335,13 +335,16 @@ The refused push has no `after_tool` line because it never ran. There are two `t
 
 **On the published file with Gemini 3.6 Flash:** editor mode creating a file with the permission answered; a `coder` helper editing a file; a check refusing a push; the two notifying checks. Pasting a key with Ctrl+V was proven again.
 
+**On real Linux, after publication.** Automatic checks on GitHub took the files from this page. The .deb was installed, started and removed on Ubuntu. The .rpm was installed, started and removed on Fedora. The Arch package was built on Arch Linux, installed, started and removed, and is attached below. The program, installed from the .deb, held a conversation with an AI running on the same Linux machine. All passed.
+
+**Two things the Linux test run caught after publication.** The program's own tests, run on Linux, failed twice. One was a fault in a test, not in the program: it used a Windows path. The other is real but narrow: on a computer with no AI provider chosen yet, the program reports the missing provider at start and does not reach a broken hook in your settings, so the hook is not named until a provider is chosen. With a provider chosen, a broken hook stops the start and is named, as described above. Both are fixed in the source and ship with the next version.
+
 **Starting up.** Timed in the home folder, pressing Enter on the NVIDIA row: 1.29, 1.29 and 1.25 seconds. One reading of 3.72 seconds was taken while the seven scenarios were running on the same machine.
 
 **What was not tested.**
 
 - Editor mode from Zed or a JetBrains editor. The protocol was exercised by a script, not by an editor.
 - Your own checks on Linux. That part is built and checked by the compiler for Linux but has not run on a Linux computer.
-- The Linux files are installed on real Linux by automatic checks that run on GitHub after this page is published. This paragraph is replaced with their result when they have run.
 
 ## No new pictures, and why
 
