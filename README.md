@@ -481,6 +481,11 @@ Same providers, same keys, same permission rules as the terminal. No account,
 and nothing is sent anywhere the terminal program would not send it. Choose a
 provider once in the terminal first; the editor uses that choice.
 
+Helpers with roles (`explore`, `plan`, `coder`) and your own checks around the
+assistant's tools (`hooks` in `config.json`) are explained, in plain language
+and for developers, in
+[docs/EDITOR-ROLES-HOOKS.dual-track.md](docs/EDITOR-ROLES-HOOKS.dual-track.md).
+
 ## See it in action
 
 New to this kind of tool? The plain-English **[GUIDE](docs/GUIDE.md)**
