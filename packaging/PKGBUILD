@@ -109,7 +109,7 @@ source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gorillanobakaa-dot/Gori
 # archive/refs/tags/v${pkgver}.tar.gz, sha256sum it, paste it here, commit to
 # main, then re-download and verify. Do not guess it and do not carry the
 # previous release's value forward.
-sha256sums=('76d53fb50ab86a6845a3d2fb0d03839751bccac3a0fbac9062d5860c8e7b74f5'
+sha256sums=('2a6a487f137b5b60d39a22eb28d54f6b548f6995d638f831450a2d25c45adff8'
             '6aa609225bc1ebfdfaea046da530e43fbeded4daa83d75580230f9bd39448429')
 
 build() {
