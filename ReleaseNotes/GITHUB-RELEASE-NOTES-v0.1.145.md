@@ -364,12 +364,15 @@ Nothing else started. On version 0.1.144 the same folder made the program start 
 
 **Also on the published file:** editor mode creating a file after the client allowed it, on Gemini 3.6 Flash; pasting a key with Ctrl+V.
 
+**On real Linux, after publication.** Automatic checks on GitHub took the files from this page. The .deb was installed, started and removed on Ubuntu. The .rpm was installed, started and removed on Fedora. The Arch package was built on Arch Linux, installed, started and removed, and is attached below. The program, installed from the .deb, held a conversation with an AI running on the same Linux machine. All passed.
+
+**What the Linux test run caught after publication.** The program's own tests, run on Linux, failed in the new test for project folders, twice, and both times the fault was in the test, not in the program. The test needed an AI provider to be set up and the Linux machine had none; and it treated Linux's normal default shell as if it had come from the folder. Both are corrected in the source and the tests pass on Linux. The program itself is unchanged.
+
 **Starting up.** Timed in the home folder, pressing Enter on the NVIDIA row: 3.74 seconds the first time this new file started, then 1.24 and 1.29 seconds. Version 0.1.144 showed the same pattern, 3.72 seconds on its first start; the later starts are the figure to compare.
 
 **What was not tested.**
 
 - Messaging and your own checks on Linux and macOS. That part is built for both and has not run on either.
-- The Linux files are installed on real Linux by automatic checks that run on GitHub after this page is published. This paragraph is replaced with their result when they have run.
 
 ## No new pictures, and why
 
