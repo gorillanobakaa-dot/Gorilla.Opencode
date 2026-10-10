@@ -515,6 +515,9 @@ never the conversation. One-shot `-p` runs do not take part. Switch it off in
 nowhere and opens nothing. Claude Code sessions cannot join: their format is
 internal and undocumented, so this does not try.
 
+The whole design, the threat analysis and the tests, in plain language and for
+developers: [docs/SESSION-MESSAGES.dual-track.md](docs/SESSION-MESSAGES.dual-track.md).
+
 ## See it in action
 
 New to this kind of tool? The plain-English **[GUIDE](docs/GUIDE.md)**
