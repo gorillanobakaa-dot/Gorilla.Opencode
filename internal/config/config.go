@@ -523,8 +523,9 @@ func mergeLocalConfig(workingDir string) {
 			msg := fmt.Sprintf("note: %s sets %s; a project folder may only choose models (agents) "+
 				"and the theme, so these were IGNORED. Put them in %s if you mean them.",
 				localConfigPath, strings.Join(ignored, ", "), GorillaConfigFile())
+			// Said once, on stderr: the log file is not open yet at this point,
+			// so a logging call here printed the same warning a second time.
 			fmt.Fprintln(os.Stderr, msg)
-			logging.Warn("ignored settings from a project folder file", "file", localConfigPath, "keys", ignored)
 		}
 		viper.MergeConfigMap(kept)
 	}

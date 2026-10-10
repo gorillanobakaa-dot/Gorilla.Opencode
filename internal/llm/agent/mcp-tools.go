@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
@@ -194,9 +196,18 @@ func getTools(ctx context.Context, name string, m config.MCPServer, permissions 
 	// capability the server does not have — and the mcp-go dependency is
 	// pinned, so the version this client asks for is a decision, not a
 	// default. See the GORILLA OVERRIDE on the pin in go.mod.
-	initResult, err := c.Initialize(ctx, initRequest)
+	// GORILLA FIX (2026-10-10): a time limit on the handshake. A configured
+	// server that never answers (measured: a program that is not an MCP server
+	// at all) left Initialize waiting on a context with no deadline, and the
+	// Go runtime ended the whole program with "all goroutines are asleep -
+	// deadlock!" before the first question. The server is dropped and said so.
+	hctx, hcancel := context.WithTimeout(ctx, mcpHandshakeTimeout)
+	defer hcancel()
+	initResult, err := c.Initialize(hctx, initRequest)
 	if err != nil {
-		logging.Error("error initializing mcp client", "error", err)
+		logging.Error("error initializing mcp client", "server", name, "error", err)
+		fmt.Fprintf(os.Stderr, "note: MCP server %q did not answer the handshake (%v); it is not used this session\n", name, err)
+		_ = c.Close()
 		return stdioTools
 	}
 	if initResult != nil {
@@ -220,9 +231,10 @@ func getTools(ctx context.Context, name string, m config.MCPServer, permissions 
 		})
 	}
 	toolsRequest := mcp.ListToolsRequest{}
-	tools, err := c.ListTools(ctx, toolsRequest)
+	tools, err := c.ListTools(hctx, toolsRequest)
 	if err != nil {
-		logging.Error("error listing tools", "error", err)
+		logging.Error("error listing tools", "server", name, "error", err)
+		_ = c.Close()
 		return stdioTools
 	}
 	for _, t := range tools.Tools {
@@ -231,6 +243,10 @@ func getTools(ctx context.Context, name string, m config.MCPServer, permissions 
 	defer c.Close()
 	return stdioTools
 }
+
+// mcpHandshakeTimeout bounds Initialize plus ListTools for one server. A
+// variable so the tests do not wait for it.
+var mcpHandshakeTimeout = 20 * time.Second
 
 // mcpDescriptor is what a server said about itself at Initialize.
 type mcpDescriptor struct {
