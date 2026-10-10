@@ -21,6 +21,8 @@ cost before they start. Everything else is local.
 | `/resume` · `/continue` `/handoff` | Pick up work that stopped, or work another model started. |
 | `/sessions` · `/history` | Every past conversation: search, reopen, save, erase. |
 | `/copy` · `/clip` `/selectall` | Copy the whole conversation to the clipboard. |
+| `/peers [name NEWNAME]` | See the other sessions on this computer; name this one. |
+| `/message NAME text` | Send a short message to another session. |
 | `/export` | Save this conversation to a file. |
 | `/compact` · `/summarize` `/summarise` | Squeeze the conversation down so it keeps working. |
 | `/cd [folder]` | Switch to working in one folder. |
@@ -112,6 +114,22 @@ It also copies MORE than selecting would: the stored conversation, not the glyph
 To copy only PART of it, drag over that part with the mouse and press Enter.
 
 Use /export to write the same text to a file instead. On Linux the clipboard needs xclip or xsel installed; if it is missing, /export still works.
+
+### `/peers [name NEWNAME]`
+
+**See the other sessions on this computer; name this one.**
+
+When Gorilla OpenCode runs in more than one window, each window is a session. This page lists the other sessions you started on this computer, with their folder and whether their AI is busy, and shows this session's own name. /peers name NEWNAME renames this one. A session is named after its folder until you rename it.
+
+Nothing goes over the internet: only your own account on this computer can reach a session. Other sessions learn this one's name, folder, busy or idle, and version, never the conversation. Switch it off in /context (the Session messaging row); from the next start this session is then listed nowhere and cannot be reached.
+
+### `/message NAME text`
+
+**Send a short message to another session.**
+
+Sends your text to the session called NAME (see /peers for the names) and says whether it arrived. It appears in that window at once, and its AI reads it at the start of its next answer, marked as text from another program rather than its own person's instruction.
+
+A message cannot answer a permission question, switch on /yolo, change a setting or make the other AI start working; only the person at that window can. At most 16 KB, and at most 20 a minute from one session. The AI can send messages too, with your permission.
 
 ### `/export`
 

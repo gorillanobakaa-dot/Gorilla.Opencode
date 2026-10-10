@@ -10,6 +10,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/db"
 	"github.com/opencode-ai/opencode/internal/logging"
+	"github.com/opencode-ai/opencode/internal/peers"
 	"github.com/opencode-ai/opencode/internal/version"
 	"github.com/spf13/cobra"
 )
@@ -68,6 +69,13 @@ Nothing is printed to stdout but the protocol. Logs go to the usual log file.`,
 		}
 		defer a.Shutdown()
 		initMCPTools(ctx, a)
+		// GORILLA (2026-10-10): editor sessions take part in session messaging
+		// too. The editor has no notice line of ours to print to, so an arrival
+		// is logged; the AI still receives it, fenced, at its next turn.
+		stopPeers := a.StartPeers(func(m peers.Message) {
+			logging.Info("acp: message from another session", "from", m.From.Name, "kind", m.Kind)
+		})
+		defer stopPeers()
 
 		eng := acp.Engine{
 			Sessions:    a.Sessions,

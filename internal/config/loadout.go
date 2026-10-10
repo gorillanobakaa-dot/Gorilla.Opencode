@@ -142,6 +142,16 @@ var LoadoutComponents = []LoadoutComponent{
 	{ToolSearchComponentID, "Deferred tool loading (tool_search)", "every tool schema is sent on every turn again -- simpler and more reliable for small models, but several thousand tokens more per turn, and adding tools keeps making it worse", 287, false, false},
 	{"tool.bio_lookup", "Biology & chemistry databases", "agent loses direct lookup of proteins, genes, structures, compounds, drug labels and pathways; it can still search papers ABOUT them with /research, but it cannot fetch the record itself and will be guessing at accessions and formulas", 506, false, false},
 	{"tool.patch_port", "Patch porting -- forward-port, backport, rebase", "agent loses forward-porting, backporting, rebasing, patch refresh and series porting; it can still run git by hand, but nothing tells it whether a patch applied cleanly, was merged three-way, or was RELOCATED by fuzz -- and those are not the same thing", 734, true, false},
+	// GORILLA (2026-10-10): session-to-session messaging (internal/peers). This
+	// row gates more than two schemas: when it is OFF the session opens no
+	// local endpoint and writes no register entry, so it is invisible to other
+	// sessions and unreachable by them. Read once at start (app.StartPeers), so
+	// switching it takes effect next launch; the /peers page says so.
+	//
+	// ON by default: the owner asked for it, it never touches the network, and
+	// the endpoint admits only this user account. 230 is a guess; calibration
+	// measures the two tools at startup.
+	{PeersComponentID, "Session messaging — /peers", "this session cannot see or message the other Gorilla OpenCode sessions on this computer, and they cannot see or message it: no local endpoint is opened and nothing is registered", 230, true, false},
 	// GORILLA OVERRIDE: env estimate was 150 when the block was a recursive
 	// 1000-file tree dump (real cost often 10k–30k). After the shallow
 	// project_summary refactor it really is ~100–200 tokens; calibrate
@@ -236,6 +246,10 @@ const (
 	// before and tool_search is not present at all -- a search tool with nothing
 	// to find is pure cost.
 	ToolSearchComponentID = "tool.tool_search"
+
+	// PeersComponentID gates session-to-session messaging: the peers and
+	// send_message tools, the local endpoint and the register entry.
+	PeersComponentID = "tool.peers"
 	// GORILLA FIX (2026-08-17): "EXPENSIVE" left the NAME. It sat beside the
 	// per-turn token column and read as a claim about that number — which is
 	// the smallest on the screen, because arming this only adds a paragraph to
@@ -402,6 +416,11 @@ var lowBandwidthOff = map[string]bool{
 	"tool.review":      true,
 	"tool.patch_port":  true,
 	"prompt.lsp":       true,
+	// GORILLA (2026-10-10): session messaging is local and spends no bandwidth
+	// of its own, but its two schemas ride every turn and it is not part of an
+	// edit/build loop. Dropping it also closes the local endpoint at the next
+	// start, which on this preset's terms is a door closed, not a loss.
+	PeersComponentID: true,
 
 	// Components that ship OFF still belong here. The coverage test used to
 	// skip them, reasoning that something off by default costs nothing -- true

@@ -128,7 +128,10 @@ require (
 	golang.org/x/image v0.26.0 // indirect
 	golang.org/x/net v0.39.0
 	golang.org/x/sync v0.13.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
+	// GORILLA (2026-10-10): direct, not indirect, since internal/peers imports
+	// golang.org/x/sys/windows for the session-messaging named pipe and its
+	// access list. Same version already in the build; go.sum already holds it.
+	golang.org/x/sys v0.32.0
 	golang.org/x/term v0.31.0
 	golang.org/x/text v0.24.0 // indirect
 	google.golang.org/genai v1.64.0

@@ -75,6 +75,9 @@ func CalibrateLoadout(
 	set("tool.review", tools.NewReviewTool(permissions))
 	set("tool.patch_port", tools.NewPatchPortTool(permissions))
 	set("tool.bio_lookup", tools.NewBioDataTool(permissions))
+	// GORILLA (2026-10-10): one row, two tools; the row costs both schemas.
+	config.SetLoadoutTokens(config.PeersComponentID,
+		toolTokens(tools.NewPeersTool())+toolTokens(tools.NewSendMessageTool(permissions)))
 	// The search tool's own schema is fixed, so an empty catalogue measures it
 	// correctly -- the catalogue affects what it FINDS, never what it costs to
 	// declare.

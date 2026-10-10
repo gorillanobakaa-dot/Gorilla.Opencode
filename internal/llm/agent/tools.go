@@ -172,6 +172,13 @@ func coderToolSet(
 	// capability nobody can reach is not a capability.
 	add("tool.patch_port", tools.NewPatchPortTool(permissions))
 	add("tool.bio_lookup", tools.NewBioDataTool(permissions))
+	// GORILLA (2026-10-10): session messaging, main conversation only. A helper
+	// speaks to its parent, not to other programs; the person sees one sender
+	// per session, which is what the receiving side names.
+	if spawners {
+		add(config.PeersComponentID, tools.NewPeersTool())
+		add(config.PeersComponentID, tools.NewSendMessageTool(permissions))
+	}
 
 	return append(coderTools, otherTools...)
 }

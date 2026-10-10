@@ -93,6 +93,7 @@ func (s *Session) Run(ctx context.Context) error {
 	s.sess = sess
 
 	s.banner()
+	s.attachPeers()
 
 	for {
 		fmt.Fprint(s.out, "\n> ")
@@ -455,6 +456,16 @@ func (s *Session) command(ctx context.Context, line string) (stop bool, err erro
 		}
 		return false, nil
 
+	// GORILLA (2026-10-10): session-to-session messaging, the same three
+	// commands as the full interface. See internal/peers.
+	case "peers":
+		s.peersCommand(strings.TrimSpace(strings.TrimPrefix(line, fields[0])))
+		return false, nil
+
+	case "message":
+		s.messageCommand(strings.TrimSpace(strings.TrimPrefix(line, fields[0])))
+		return false, nil
+
 	case "model":
 		if m := config.Get().Agents[config.AgentCoder].Model; m != "" {
 			fmt.Fprintf(s.out, "model: %s\n", m)
@@ -491,6 +502,9 @@ copy the whole session. It carries fewer commands than the full interface.
   /editor               how to use this program inside Zed or a JetBrains editor
   /helpers              the three kinds of helper, and how to ask for each
   /hooks                your own checks around the AI's actions
+  /peers                the other sessions on this computer, and this one's name
+  /peers name NEWNAME   rename this session
+  /message NAME text    send a short message to another session
 
 Type anything else to send it to the model. Ctrl-C interrupts a reply.
 Anything not listed here needs the full interface — run without --plain.`)

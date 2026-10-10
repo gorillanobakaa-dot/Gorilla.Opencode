@@ -1,5 +1,5 @@
-// Package helppages holds the long explanation pages behind /editor, /helpers
-// and /hooks.
+// Package helppages holds the long explanation pages behind /editor, /helpers,
+// /hooks and /peers (the last added 2026-10-10, see peers.go).
 //
 // GORILLA (2026-10-10): v0.1.144 added three capabilities that a user could not
 // discover from inside the program: editor mode (`gorilla-opencode acp`), helper
@@ -66,6 +66,8 @@ func ByName(name string) (Page, bool) {
 		return Helpers(), true
 	case "hooks":
 		return Hooks(), true
+	case "peers":
+		return Peers(), true
 	}
 	return Page{}, false
 }

@@ -31,4 +31,5 @@ var Names = []string{
 	"show", "hide",
 	"model",
 	"editor", "acp", "helpers", "roles", "hooks",
+	"peers", "message", // GORILLA (2026-10-10): session messaging
 }

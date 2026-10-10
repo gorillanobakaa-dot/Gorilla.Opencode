@@ -1453,6 +1453,13 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// now. See infopage_route.go.
 		case "editor", "acp", "helpers", "roles", "hooks":
 			return a, a.openInfoPage(msg.Name)
+		// GORILLA (2026-10-10): session-to-session messaging. /peers opens a
+		// live page of the other sessions; /peers name NEW renames this one;
+		// /message NAME TEXT sends from the person. See peers.go.
+		case "peers":
+			return a, a.peersCommand(msg.Args)
+		case "message":
+			return a, a.messageCommand(msg.Args)
 		case "arsenal", "tools":
 			a.arsenalPage = dialog.NewArsenalCmp()
 			a.arsenalPage.SetSize(a.width, a.height)

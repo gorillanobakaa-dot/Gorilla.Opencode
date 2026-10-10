@@ -358,6 +358,34 @@ var All = []Command{
 			"clipboard needs xclip or xsel installed; if it is missing, /export " +
 			"still works.",
 	},
+	// GORILLA (2026-10-10): session-to-session messaging (internal/peers).
+	{
+		Name:    "peers",
+		Group:   GroupSession,
+		Args:    "[name NEWNAME]",
+		Summary: "See the other sessions on this computer; name this one.",
+		Detail: "When Gorilla OpenCode runs in more than one window, each window is a session. " +
+			"This page lists the other sessions you started on this computer, with their folder and " +
+			"whether their AI is busy, and shows this session's own name. /peers name NEWNAME renames " +
+			"this one. A session is named after its folder until you rename it.\n\n" +
+			"Nothing goes over the internet: only your own account on this computer can reach a " +
+			"session. Other sessions learn this one's name, folder, busy or idle, and version, never " +
+			"the conversation. Switch it off in /context (the Session messaging row); from the next " +
+			"start this session is then listed nowhere and cannot be reached.",
+	},
+	{
+		Name:    "message",
+		Group:   GroupSession,
+		Args:    "NAME text",
+		Summary: "Send a short message to another session.",
+		Detail: "Sends your text to the session called NAME (see /peers for the names) and says " +
+			"whether it arrived. It appears in that window at once, and its AI reads it at the start " +
+			"of its next answer, marked as text from another program rather than its own person's " +
+			"instruction.\n\n" +
+			"A message cannot answer a permission question, switch on /yolo, change a setting or make " +
+			"the other AI start working; only the person at that window can. At most 16 KB, and at most " +
+			"20 a minute from one session. The AI can send messages too, with your permission.",
+	},
 	{
 		Name:    "export",
 		Group:   GroupSession,

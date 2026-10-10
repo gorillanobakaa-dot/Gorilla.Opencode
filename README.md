@@ -488,6 +488,33 @@ assistant's tools (`hooks` in `config.json`) are explained, in plain language
 and for developers, in
 [docs/EDITOR-ROLES-HOOKS.dual-track.md](docs/EDITOR-ROLES-HOOKS.dual-track.md).
 
+### Sessions talking to each other
+
+Run the program in two windows (two projects, or the terminal and your
+editor) and the two sessions can find each other and pass short notes:
+"I am about to start a process", "tell me when you are done".
+
+- `/peers` lists the other sessions on this computer (name, folder, busy or
+  idle) and shows this one's name. `/peers name NEWNAME` renames it; by
+  default a session is named after its folder.
+- `/message NAME your text` sends a note from you. The AI can send one too,
+  with the `send_message` tool, after asking your permission, and can ask the
+  other session to tell it once when its current answer is finished.
+- A note appears in the other window at once. Its AI reads it at the start of
+  its next answer, inside a marked block that says it came from another
+  program and is not its person's instruction. A note cannot answer a
+  permission question, switch on `/yolo`, change a setting or start the other
+  AI working. At most 16 KB, and at most 20 a minute from one session.
+
+Local only: nothing goes over the network. On Windows the connection is a
+named pipe that only your own account may open (remote connections refused);
+on Linux and macOS it is a socket in a folder only your account can enter.
+Other sessions learn a session's name, folder, busy or idle, and version,
+never the conversation. One-shot `-p` runs do not take part. Switch it off in
+`/context` ("Session messaging"); from the next start the session is listed
+nowhere and opens nothing. Claude Code sessions cannot join: their format is
+internal and undocumented, so this does not try.
+
 ## See it in action
 
 New to this kind of tool? The plain-English **[GUIDE](docs/GUIDE.md)**

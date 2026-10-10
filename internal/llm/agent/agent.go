@@ -17,6 +17,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/message"
+	"github.com/opencode-ai/opencode/internal/peers"
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/session"
@@ -401,6 +402,9 @@ func (a *agent) Run(ctx context.Context, sessionID string, content string, attac
 	// top-level (coder) request. Sub-agent (task) runs must NOT reset it.
 	if a.agentName == config.AgentCoder {
 		resetSubAgentSpawns(sessionID)
+		// GORILLA (2026-10-10): other sessions see this one as busy while the
+		// main conversation is in a turn. See peers.go.
+		peerSetBusy(true)
 	}
 
 	genCtx, cancel := context.WithCancel(ctx)
@@ -437,6 +441,12 @@ func (a *agent) Run(ctx context.Context, sessionID string, content string, attac
 		// This is the single point a request completes on both the success and
 		// the error path, which is why the drain belongs here.
 		a.drainPendingRebuild()
+		// GORILLA (2026-10-10): the turn is over; if nothing else is running,
+		// peers now see this session as idle and any waiting idle notice is
+		// sent, once. IsBusy, not false: another session may still be in a turn.
+		if a.agentName == config.AgentCoder {
+			peerSetBusy(a.IsBusy())
+		}
 		a.Publish(pubsub.CreatedEvent, result)
 		events <- result
 		close(events)
@@ -529,8 +539,17 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 		}
 	}
 
-	userMsg, err := a.createUserMessage(ctx, sessionID, content, attachmentParts)
+	// GORILLA (2026-10-10): messages from other sessions open the user's turn,
+	// fenced as text from another program that grants nothing. A new variable,
+	// not a reassignment of content: the title goroutine above reads content.
+	var peerBlock, peerTaint string
+	var peerMsgs []peers.Message
+	if a.agentName == config.AgentCoder {
+		peerBlock, peerTaint, peerMsgs = takePeerMessages()
+	}
+	userMsg, err := a.createUserMessage(ctx, sessionID, withPeerBlock(peerBlock, content), attachmentParts)
 	if err != nil {
+		requeuePeerMessages(peerMsgs)
 		return a.err(fmt.Errorf("failed to create user message: %w", err))
 	}
 	// GORILLA FIX (2026-08-19): a new user turn clears the taint bit.
@@ -550,6 +569,11 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 	// content" prompt. A helper starting is the model acting, not the person.
 	if a.agentName == config.AgentCoder {
 		permission.ClearTaint(sessionID)
+		// GORILLA (2026-10-10): ... unless this turn opens with a message from
+		// another session. The person typed, but the fenced text above their
+		// words was written by another program, so the turn starts tainted and
+		// auto-approve still asks before anything leaves the machine.
+		markPeerTaint(sessionID, peerTaint)
 	}
 	// Same boundary, same reason: the person has seen the last turn. Whatever
 	// the model repeated then is not held against what they ask for now.

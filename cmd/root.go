@@ -326,6 +326,13 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 			return app.RunNonInteractive(ctx, prompt, outputFormat, quiet)
 		}
 
+		// GORILLA (2026-10-10): session-to-session messaging, for the two
+		// interactive front ends only. Deliberately AFTER the -p branch above:
+		// a one-shot run registers nothing and opens no endpoint. Each front end
+		// attaches its own way of showing an arrival (plain.Run, tui.AttachPeers).
+		stopPeers := app.StartPeers(nil)
+		defer stopPeers()
+
 		// GORILLA OVERRIDE: plain interactive mode. Deliberately before the TUI
 		// setup so none of the screen handling runs at all.
 		//
@@ -369,6 +376,8 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 		// browser callback, and printing it instead paints over a screen Bubble
 		// Tea owns, where it can never be cleared.
 		tui.SetProgram(program)
+		// A message from another session appears as a notice in this window.
+		tui.AttachPeers(program)
 
 		// GORILLA OVERRIDE (2026-09-02): watch for a resize ourselves on Windows.
 		//
