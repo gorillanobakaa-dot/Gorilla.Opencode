@@ -770,6 +770,16 @@ func Validate() error {
 		return fmt.Errorf("config not loaded")
 	}
 
+	// GORILLA OVERRIDE (2026-10-09): a malformed lifecycle hook stops the load
+	// (fail closed: a gate that silently did not load is believed to be there),
+	// and every valid one is logged. See hooks.go. Checked FIRST: on GitHub's
+	// Linux runner, with no provider configured, the agent check returned
+	// "no valid provider" and the broken hook was never named.
+	if err := validateHooks(cfg.Hooks); err != nil {
+		return err
+	}
+	logHooks(cfg.Hooks)
+
 	// Validate agent models
 	for name, agent := range cfg.Agents {
 		if err := validateAgent(cfg, name, agent); err != nil {
@@ -807,14 +817,6 @@ func Validate() error {
 			cfg.LSP[language] = lspConfig
 		}
 	}
-
-	// GORILLA OVERRIDE (2026-10-09): a malformed lifecycle hook stops the load
-	// (fail closed: a gate that silently did not load is believed to be there),
-	// and every valid one is logged. See hooks.go.
-	if err := validateHooks(cfg.Hooks); err != nil {
-		return err
-	}
-	logHooks(cfg.Hooks)
 
 	return nil
 }

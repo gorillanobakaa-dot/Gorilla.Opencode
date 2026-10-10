@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -325,8 +326,15 @@ func TestToolKindsAndTitles(t *testing.T) {
 	if got := toolTitle(tc); got != "find needle in C:\\p" {
 		t.Errorf("title %q", got)
 	}
-	if loc := toolLocations(message.ToolCall{Name: "view", Input: `{"file_path":"C:\\p\\a.go"}`}); len(loc) != 1 || loc[0]["path"] != "C:\\p\\a.go" {
+	// An absolute path on THIS system: a C:\ path is not absolute on Linux,
+	// which is how this failed on GitHub's runner after v0.1.144.
+	abs := filepath.Join(t.TempDir(), "a.go")
+	in, _ := json.Marshal(map[string]string{"file_path": abs})
+	if loc := toolLocations(message.ToolCall{Name: "view", Input: string(in)}); len(loc) != 1 || loc[0]["path"] != abs {
 		t.Errorf("locations %v", loc)
+	}
+	if loc := toolLocations(message.ToolCall{Name: "view", Input: `{"file_path":"relative/a.go"}`}); len(loc) != 0 {
+		t.Errorf("a relative path must not become a location: %v", loc)
 	}
 }
 
