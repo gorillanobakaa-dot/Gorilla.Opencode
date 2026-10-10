@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
@@ -207,7 +210,7 @@ func getTools(ctx context.Context, name string, m config.MCPServer, permissions 
 	if err != nil {
 		logging.Error("error initializing mcp client", "server", name, "error", err)
 		fmt.Fprintf(os.Stderr, "note: MCP server %q did not answer the handshake (%v); it is not used this session\n", name, err)
-		_ = c.Close()
+		abandonMCPClient(c)
 		return stdioTools
 	}
 	if initResult != nil {
@@ -234,7 +237,7 @@ func getTools(ctx context.Context, name string, m config.MCPServer, permissions 
 	tools, err := c.ListTools(hctx, toolsRequest)
 	if err != nil {
 		logging.Error("error listing tools", "server", name, "error", err)
-		_ = c.Close()
+		abandonMCPClient(c)
 		return stdioTools
 	}
 	for _, t := range tools.Tools {
@@ -242,6 +245,37 @@ func getTools(ctx context.Context, name string, m config.MCPServer, permissions 
 	}
 	defer c.Close()
 	return stdioTools
+}
+
+var (
+	mcpLoadMu sync.Mutex
+	mcpLoaded bool
+)
+
+// abandonMCPClient ends a server that failed its handshake. Close only shuts
+// the server's stdin and then waits for it to exit, so a program that ignores
+// stdin (measured: a ping configured as a server) went on running after this
+// program had exited. For a stdio server the process is killed first; the
+// wait then returns at once and runs off the start-up path.
+func abandonMCPClient(c MCPClient) {
+	if sc, ok := c.(*client.StdioMCPClient); ok {
+		if cmd := stdioCmd(sc); cmd != nil && cmd.Process != nil {
+			_ = cmd.Process.Kill()
+		}
+	}
+	go func() { _ = c.Close() }()
+}
+
+// stdioCmd reads the unexported process handle of a mcp-go stdio client.
+// mcp-go v0.17.0 (pinned in go.mod) keeps it in the field "cmd" and offers no
+// way to stop the process other than closing stdin. Returns nil if the field
+// is not there, which a dependency update would show in TestAnMCPServerThat...
+func stdioCmd(sc *client.StdioMCPClient) *exec.Cmd {
+	f := reflect.ValueOf(sc).Elem().FieldByName("cmd")
+	if !f.IsValid() || f.Type() != reflect.TypeOf((*exec.Cmd)(nil)) {
+		return nil
+	}
+	return *(**exec.Cmd)(unsafe.Pointer(f.UnsafeAddr()))
 }
 
 // mcpHandshakeTimeout bounds Initialize plus ListTools for one server. A
@@ -352,9 +386,16 @@ func McpLoadoutComponents() []config.LoadoutComponent {
 }
 
 func GetMcpTools(ctx context.Context, permissions permission.Service) []tools.BaseTool {
-	if len(mcpTools) > 0 {
+	// GORILLA FIX (2026-10-10): once per run, success or not. The cache was
+	// "len(mcpTools) > 0", so a server that failed was contacted again by
+	// every caller (calibration, the coder's tools, each tool-set build):
+	// measured, one silent server made start-up take 75 seconds.
+	mcpLoadMu.Lock()
+	defer mcpLoadMu.Unlock()
+	if mcpLoaded {
 		return mcpTools
 	}
+	mcpLoaded = true
 	for name, m := range config.Get().MCPServers {
 		switch m.Type {
 		case config.MCPStdio:
