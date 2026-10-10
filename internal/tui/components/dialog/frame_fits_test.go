@@ -25,6 +25,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/helppages"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/session"
 )
@@ -91,6 +92,18 @@ func TestDialogFramesNeverExceedTheTerminal(t *testing.T) {
 		confirm.SetSize(w, h)
 		confirm.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
 		views["/sessions (confirming)"] = confirm.View()
+
+		// GORILLA (2026-10-10): the /editor, /helpers and /hooks pages, at the
+		// top and scrolled to the bottom, where the longest code lines are.
+		for name, p := range map[string]helppages.Page{
+			"/editor": helppages.Editor(), "/helpers": helppages.Helpers(), "/hooks": infoPageHooksFixture(),
+		} {
+			pg := NewInfoPageCmp(p)
+			pg.SetSize(w, h)
+			views[name] = pg.View()
+			d, _ := pg.Update(tea.KeyMsg{Type: tea.KeyEnd})
+			views[name+" (end)"] = d.View()
+		}
 
 		for name, v := range views {
 			if got := lipgloss.Width(v); got > w {

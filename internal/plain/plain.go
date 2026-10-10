@@ -36,6 +36,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/app"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/export"
+	"github.com/opencode-ai/opencode/internal/helppages"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/permission"
@@ -444,6 +445,16 @@ func (s *Session) command(ctx context.Context, line string) (stop bool, err erro
 	case "show", "hide":
 		return false, s.setExtra(name == "show", fields[1:])
 
+	// GORILLA (2026-10-10): the same three pages as the full interface, from the
+	// same source (internal/helppages), printed as ordinary text so they can be
+	// selected and copied. /hooks lists the hooks loaded now.
+	case "editor", "acp", "helpers", "roles", "hooks":
+		if p, ok := helppages.ByName(name); ok {
+			fmt.Fprintln(s.out)
+			fmt.Fprintln(s.out, p.PlainText(plainPageWidth))
+		}
+		return false, nil
+
 	case "model":
 		if m := config.Get().Agents[config.AgentCoder].Model; m != "" {
 			fmt.Fprintf(s.out, "model: %s\n", m)
@@ -457,6 +468,11 @@ func (s *Session) command(ctx context.Context, line string) (stop bool, err erro
 		return false, nil
 	}
 }
+
+// plainPageWidth is the column the /editor, /helpers and /hooks paragraphs wrap
+// at. Plain mode does not know the terminal's width, and 80 is the default of
+// every terminal this runs in; code lines are printed as written either way.
+const plainPageWidth = 80
 
 func (s *Session) help() {
 	fmt.Fprintln(s.out, `
@@ -472,6 +488,9 @@ copy the whole session. It carries fewer commands than the full interface.
   /show <name>          turn one on   (thinking | reasoning | tools | times)
   /hide <name>          turn one off
   /model                which model is in use
+  /editor               how to use this program inside Zed or a JetBrains editor
+  /helpers              the three kinds of helper, and how to ask for each
+  /hooks                your own checks around the AI's actions
 
 Type anything else to send it to the model. Ctrl-C interrupts a reply.
 Anything not listed here needs the full interface — run without --plain.`)

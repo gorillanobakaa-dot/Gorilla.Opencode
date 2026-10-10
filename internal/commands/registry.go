@@ -526,6 +526,19 @@ var All = []Command{
 			"instructions, or feature switches. Use this when something is " +
 			"behaving oddly and you no longer remember what you changed.",
 	},
+	// GORILLA (2026-10-10): lifecycle hooks (v0.1.144) were documented only in
+	// the README. This page is live: it lists the hooks actually loaded.
+	{
+		Name:    "hooks",
+		Group:   GroupTuning,
+		Summary: "Your own checks before and after the AI's actions.",
+		Detail: "A hook is a command you write in your settings file. It runs before " +
+			"the AI uses a tool (and can stop it), after a tool has run, or when an " +
+			"answer is finished. The page lists the hooks loaded now, or says there " +
+			"are none; shows where the settings file is on this computer; gives an " +
+			"example ready to copy for your system; and states the rules. None ships " +
+			"with the program. Opening the page changes nothing.",
+	},
 
 	// ─── Background helpers ──────────────────────────────────────────
 	{
@@ -581,6 +594,21 @@ var All = []Command{
 			"quota of its own, so this is where you check what is running and " +
 			"stop anything you do not want.",
 	},
+	// GORILLA (2026-10-10): helper roles (v0.1.144) were reachable only by
+	// knowing to ask for them. This page says how.
+	{
+		Name:    "helpers",
+		Aliases: []string{"roles"},
+		Group:   GroupHelpers,
+		Summary: "The three kinds of helper and how to ask for each.",
+		Detail: "The AI can send out helpers: short side conversations that each do " +
+			"one job. There are three kinds. explore only looks; plan writes a " +
+			"step-by-step plan; coder changes files and runs commands, and still " +
+			"asks you before every change. You ask in ordinary words, such as " +
+			"\"use a plan helper to work out how to ...\". The page explains each " +
+			"kind, where to watch them (/tasks) and how many are allowed (/context). " +
+			"Opening it changes nothing.",
+	},
 
 	// ─── Help ────────────────────────────────────────────────────────
 	{
@@ -589,6 +617,21 @@ var All = []Command{
 		Group:   GroupReference,
 		Summary: "This list.",
 		Detail:  "Every command, what it does, and what it costs or changes.",
+	},
+	// GORILLA (2026-10-10): editor mode (`gorilla-opencode acp`, v0.1.144) was
+	// listed only in --help, which nobody inside the program sees.
+	{
+		Name:    "editor",
+		Aliases: []string{"acp"},
+		Group:   GroupReference,
+		Summary: "Use this program inside Zed or a JetBrains editor.",
+		Detail: "Explains editor mode: Gorilla OpenCode working inside a code editor " +
+			"that speaks the Agent Client Protocol, such as Zed or a JetBrains " +
+			"editor, instead of in this window. The page has the exact lines to put " +
+			"in Zed's settings, says what the editor shows (each action, each " +
+			"permission question, the record of what ran) and what does not work " +
+			"there yet. Choose a provider here first; the editor uses it. Opening " +
+			"the page changes nothing.",
 	},
 }
 

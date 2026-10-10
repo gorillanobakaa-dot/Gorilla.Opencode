@@ -514,12 +514,107 @@ func mergeLocalConfig(workingDir string) {
 	local.SetConfigName(fmt.Sprintf(".%s", appName))
 	local.SetConfigType("json")
 	local.AddConfigPath(workingDir)
+	localConfigPath = filepath.Join(workingDir, "."+appName+".json")
 
 	// Merge local config if it exists
 	if err := local.ReadInConfig(); err == nil {
-		viper.MergeConfigMap(local.AllSettings())
+		kept, ignored := filterFolderSettings(local.AllSettings())
+		if len(ignored) > 0 {
+			msg := fmt.Sprintf("note: %s sets %s; a project folder may only choose models (agents) "+
+				"and the theme, so these were IGNORED. Put them in %s if you mean them.",
+				localConfigPath, strings.Join(ignored, ", "), GorillaConfigFile())
+			fmt.Fprintln(os.Stderr, msg)
+			logging.Warn("ignored settings from a project folder file", "file", localConfigPath, "keys", ignored)
+		}
+		viper.MergeConfigMap(kept)
 	}
 }
+
+// filterFolderSettings keeps only what a project folder may decide.
+//
+// GORILLA FIX (2026-10-10), security. The folder file .gorilla-opencode.json
+// was merged WHOLE into the settings. A repository you clone carries that file,
+// so a stranger could set: hooks (a command run as you before every action, and
+// a list that REPLACED your own gate), mcpServers and lsp (programs started as
+// you), shell (the program that runs every command), localEndpoints, providers
+// and searxngURL (where your prompts, code and searches are sent), wd,
+// additionalDirs and contextPaths (which files the AI can read and what is sent
+// to the model), and data (where the conversation database is written). Found
+// while writing /hooks, which had to say where hooks come from.
+//
+// A project may legitimately pin its models (the README's only documented use)
+// and pick a theme. Agent entries keep model, maxTokens and reasoningEffort; a
+// model must already be known, since no endpoint can be added from here.
+// Everything else is dropped, and named on stderr at start.
+func filterFolderSettings(in map[string]any) (map[string]any, []string) {
+	kept := map[string]any{}
+	var ignored []string
+	for key, val := range in {
+		switch key {
+		case "agents":
+			agents, ok := val.(map[string]any)
+			if !ok {
+				ignored = append(ignored, key)
+				continue
+			}
+			clean := map[string]any{}
+			for name, raw := range agents {
+				fields, ok := raw.(map[string]any)
+				if !ok {
+					ignored = append(ignored, "agents."+name)
+					continue
+				}
+				entry := map[string]any{}
+				for f, v := range fields {
+					switch f {
+					case "model", "maxtokens", "reasoningeffort":
+						entry[f] = v
+					default:
+						ignored = append(ignored, "agents."+name+"."+f)
+					}
+				}
+				if len(entry) > 0 {
+					clean[name] = entry
+				}
+			}
+			if len(clean) > 0 {
+				kept["agents"] = clean
+			}
+		case "tui":
+			fields, ok := val.(map[string]any)
+			if !ok {
+				ignored = append(ignored, key)
+				continue
+			}
+			if theme, ok := fields["theme"]; ok {
+				kept["tui"] = map[string]any{"theme": theme}
+			}
+			for f := range fields {
+				if f != "theme" {
+					ignored = append(ignored, "tui."+f)
+				}
+			}
+		default:
+			ignored = append(ignored, key)
+		}
+	}
+	sort.Strings(ignored)
+	return kept, ignored
+}
+
+// localConfigPath is the per-folder file mergeLocalConfig looked for at load.
+var localConfigPath string
+
+// LocalConfigFile is the per-folder settings file mergeLocalConfig read at
+// start-up: .gorilla-opencode.json in the folder the program started in. It is
+// recorded at load rather than derived from the working folder, because /cd
+// moves the working folder without loading that folder's file. "" before Load.
+//
+// GORILLA (2026-10-10): exported for /hooks, which must say where hooks can come
+// from. Hooks written there are loaded like any other setting, and a "hooks"
+// list there replaces the one in config.json (viper merges lists by replacing
+// them). TestHooksInTheFolderFileReplaceTheSettingsFile holds both facts.
+func LocalConfigFile() string { return localConfigPath }
 
 // applyDefaultValues sets default values for configuration fields that need processing.
 func applyDefaultValues() {

@@ -452,7 +452,9 @@ LOCAL_ENDPOINT=http://localhost:11434/v1 gorilla-opencode
 ```
 
 Non-interactive: `gorilla-opencode -p "your task" -q`. Pin models per
-project in `.opencode.json`:
+project in `.gorilla-opencode.json` in that folder (a project folder may
+choose models and the theme, nothing else; anything more is ignored and named
+at start):
 
 ```json
 { "agents": { "coder": { "model": "local.deepseek-ai/deepseek-v4-flash" } } }

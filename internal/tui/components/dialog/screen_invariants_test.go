@@ -16,6 +16,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/helppages"
 	"github.com/opencode-ai/opencode/internal/tui/screentest"
 )
 
@@ -299,6 +300,22 @@ func sizedDialogs(t *testing.T) map[string]func() sizedDialog {
 		},
 		"/osint-page": func() sizedDialog {
 			m := NewOsintPageCmp()
+			return &m
+		},
+		// GORILLA (2026-10-10): the three explanation pages join the harness on
+		// the day they are added, and fit every size here without a ratchet
+		// entry. /hooks is measured with hooks loaded and a long path, the
+		// tallest and widest form it takes.
+		"/editor": func() sizedDialog {
+			m := NewInfoPageCmp(helppages.Editor())
+			return &m
+		},
+		"/helpers": func() sizedDialog {
+			m := NewInfoPageCmp(helppages.Helpers())
+			return &m
+		},
+		"/hooks": func() sizedDialog {
+			m := NewInfoPageCmp(infoPageHooksFixture())
 			return &m
 		},
 	}

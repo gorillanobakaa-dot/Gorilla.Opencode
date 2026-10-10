@@ -318,6 +318,11 @@ type appModel struct {
 	showOsintDialog bool
 	osintPage       dialog.OsintPageCmp
 	showOsintPage   bool
+	// GORILLA (2026-10-10): /editor, /helpers and /hooks — the explanation
+	// pages for editor mode, helper roles and lifecycle hooks. See
+	// internal/helppages and infopage_route.go.
+	infoPage     dialog.InfoPageCmp
+	showInfoPage bool
 	// GORILLA OVERRIDE (2026-08-19): /arsenal — the capability map. See
 	// internal/arsenal.
 	arsenalPage dialog.ArsenalCmp
@@ -1360,6 +1365,10 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.showOsintPage = false
 		return a, nil
 
+	case dialog.CloseInfoPageMsg:
+		a.showInfoPage = false
+		return a, nil
+
 	case dialog.CloseArsenalMsg:
 		a.showArsenal = false
 		return a, nil
@@ -1438,6 +1447,12 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// would cost. It exists because a model reported it could not read a
 		// screenshot while tesseract sat installed three inches away: the
 		// barrier was never bandwidth, it was knowing the thing exists.
+		// GORILLA (2026-10-10): v0.1.144's editor mode, helper roles and hooks
+		// could not be found from inside the program. Each now opens its own
+		// page; /hooks is built at the moment it opens, from the hooks loaded
+		// now. See infopage_route.go.
+		case "editor", "acp", "helpers", "roles", "hooks":
+			return a, a.openInfoPage(msg.Name)
 		case "arsenal", "tools":
 			a.arsenalPage = dialog.NewArsenalCmp()
 			a.arsenalPage.SetSize(a.width, a.height)
@@ -2178,6 +2193,10 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					a.showOsintPage = false
 					return a, nil
 				}
+				if a.showInfoPage {
+					a.showInfoPage = false
+					return a, nil
+				}
 				if a.showArsenal {
 					a.showArsenal = false
 					return a, nil
@@ -2405,6 +2424,15 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d, pCmd := a.osintPage.Update(msg)
 		a.osintPage = d.(dialog.OsintPageCmp)
 		cmds = append(cmds, pCmd)
+		if _, ok := msg.(tea.KeyMsg); ok {
+			return a, tea.Batch(cmds...)
+		}
+	}
+
+	if a.showInfoPage {
+		d, iCmd := a.infoPage.Update(msg)
+		a.infoPage = d.(dialog.InfoPageCmp)
+		cmds = append(cmds, iCmd)
 		if _, ok := msg.(tea.KeyMsg); ok {
 			return a, tea.Batch(cmds...)
 		}
@@ -2825,6 +2853,11 @@ func (a appModel) View() string {
 
 	if a.showOsintPage {
 		overlay := a.osintPage.View()
+		appView = a.placeOverlay(overlay, appView)
+	}
+
+	if a.showInfoPage {
+		overlay := a.infoPage.View()
 		appView = a.placeOverlay(overlay, appView)
 	}
 

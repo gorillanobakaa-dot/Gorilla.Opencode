@@ -40,13 +40,16 @@ cost before they start. Everything else is local.
 | `/settings` · `/config` `/prefs` | Every option, what it accepts, and its default. |
 | `/prompts` · `/prompt` | Read or change the AI's standing instructions. |
 | `/reset` · `/defaults` | Put things back the way they shipped. |
+| `/hooks` | Your own checks before and after the AI's actions. |
 | `/research <question>` | Send helper agents to investigate, each on one angle. |
 | `/osint <question>` · `/dossier` | The serious one. Professional dossier. Burns real money. |
 | `/review [--quick|--security|--full] [--diff REF] [folder]` · `/audit` `/codereview` | Run real analysers over your code and report honestly. |
 | `/port [operation] [--onto REF] [--series DIR] [--build CMD]` · `/patch` `/backport` `/forwardport` | Move patches to another version of the code. |
 | `/yolo` · `/auto` `/autopilot` `/goal` | Approve everything for this conversation. No more prompts. |
 | `/tasks` · `/task` `/agents` `/kill` | See and stop background helpers. |
+| `/helpers` · `/roles` | The three kinds of helper and how to ask for each. |
 | `/help` · `/commands` `/?` | This list. |
+| `/editor` · `/acp` | Use this program inside Zed or a JetBrains editor. |
 
 ## Your conversation
 
@@ -266,6 +269,12 @@ The instructions the AI is given before it sees your message — how careful to 
 
 Undoes your changes, in whichever area you pick — settings, instructions, or feature switches. Use this when something is behaving oddly and you no longer remember what you changed.
 
+### `/hooks`
+
+**Your own checks before and after the AI's actions.**
+
+A hook is a command you write in your settings file. It runs before the AI uses a tool (and can stop it), after a tool has run, or when an answer is finished. The page lists the hooks loaded now, or says there are none; shows where the settings file is on this computer; gives an example ready to copy for your system; and states the rules. None ships with the program. Opening the page changes nothing.
+
 ## Background helpers
 
 ### `/research <question>`
@@ -366,6 +375,14 @@ It lasts only as long as this conversation and is never written to disk, so it c
 
 The AI can start helpers to work on parts of a job. Each one costs quota of its own, so this is where you check what is running and stop anything you do not want.
 
+### `/helpers`
+
+*Also: `/roles`*
+
+**The three kinds of helper and how to ask for each.**
+
+The AI can send out helpers: short side conversations that each do one job. There are three kinds. explore only looks; plan writes a step-by-step plan; coder changes files and runs commands, and still asks you before every change. You ask in ordinary words, such as "use a plan helper to work out how to ...". The page explains each kind, where to watch them (/tasks) and how many are allowed (/context). Opening it changes nothing.
+
 ## Help
 
 ### `/help`
@@ -375,6 +392,14 @@ The AI can start helpers to work on parts of a job. Each one costs quota of its 
 **This list.**
 
 Every command, what it does, and what it costs or changes.
+
+### `/editor`
+
+*Also: `/acp`*
+
+**Use this program inside Zed or a JetBrains editor.**
+
+Explains editor mode: Gorilla OpenCode working inside a code editor that speaks the Agent Client Protocol, such as Zed or a JetBrains editor, instead of in this window. The page has the exact lines to put in Zed's settings, says what the editor shows (each action, each permission question, the record of what ran) and what does not work there yet. Choose a provider here first; the editor uses it. Opening the page changes nothing.
 
 ---
 

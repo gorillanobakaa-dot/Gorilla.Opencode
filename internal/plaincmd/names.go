@@ -30,4 +30,5 @@ var Names = []string{
 	"extras", "context",
 	"show", "hide",
 	"model",
+	"editor", "acp", "helpers", "roles", "hooks",
 }
