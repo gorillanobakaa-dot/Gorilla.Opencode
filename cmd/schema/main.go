@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
@@ -251,6 +252,13 @@ func generateSchema() map[string]any {
 	for modelID := range models.SupportedModels {
 		modelEnum = append(modelEnum, string(modelID))
 	}
+	// GORILLA FIX (2026-10-10): SupportedModels is a map, so the enum came out
+	// in a different order on every run. The committed opencode-schema.json
+	// could therefore never match its generator, a one-line schema change
+	// regenerated as a reshuffle of every model, and the file fell 77 entries
+	// behind without anyone noticing (found by `fieldkit drift`).
+	// TestTheCommittedSchemaMatchesItsGenerator holds both facts.
+	sort.Strings(modelEnum)
 	agentSchema["additionalProperties"].(map[string]any)["properties"].(map[string]any)["model"].(map[string]any)["enum"] = modelEnum
 
 	// Add specific agent properties
