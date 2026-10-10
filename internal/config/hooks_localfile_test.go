@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -63,7 +64,9 @@ func TestAProjectFolderCannotSetHooksOrAnythingThatRunsOrSends(t *testing.T) {
 	if _, ok := c.MCPServers["x"]; ok {
 		t.Error("an MCP server from the folder file was loaded")
 	}
-	if c.Shell.Path != "" {
+	// The shell has a default of its own (on Linux $SHELL, /bin/bash on the
+	// runner); what matters is that the folder's value did not arrive.
+	if strings.Contains(c.Shell.Path, "evil") {
 		t.Errorf("the shell came from the folder file: %q", c.Shell.Path)
 	}
 	if c.SearxNGURL != "" {
