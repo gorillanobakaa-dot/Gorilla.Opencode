@@ -337,6 +337,13 @@
             "description": "HTTP headers for SSE type MCP servers",
             "type": "object"
           },
+          "trust": {
+            "description": "\"local\": a stdio server you installed and trust on this machine labels each answer (_meta.untrusted, _meta.egress) and goes online only for calls that say \"network\": true, so read-only calls need no extra question. Leave unset for any server you did not write or check.",
+            "enum": [
+              "local"
+            ],
+            "type": "string"
+          },
           "type": {
             "default": "stdio",
             "description": "Type of MCP server",

@@ -29,6 +29,10 @@ const (
 	MCPSse   MCPType = "sse"
 )
 
+// MCPTrustLocal marks a stdio server as one the owner runs and trusts on this
+// machine. See MCPServer.Trust.
+const MCPTrustLocal = "local"
+
 // MCPServer defines the configuration for a Model Control Protocol server.
 type MCPServer struct {
 	Command string            `json:"command"`
@@ -37,6 +41,28 @@ type MCPServer struct {
 	Type    MCPType           `json:"type"`
 	URL     string            `json:"url"`
 	Headers map[string]string `json:"headers"`
+	// GORILLA OVERRIDE (2026-10-10): "local" lets a stdio server the owner
+	// installed say, per call, whether it went online and whether its answer
+	// carries text someone else wrote, instead of every call being treated as
+	// both. Without it, each call to a local tool server asked even under
+	// auto-approve ("this sends a request off the machine") and tainted the
+	// conversation, so every later action asked too: a harness of read-only
+	// checks became a click per step. What "local" changes, and nothing else:
+	//   - egress is assumed only when the call's arguments say "network": true
+	//     (the server must refuse to go online without it);
+	//   - the session is tainted only when the answer's _meta.untrusted is not
+	//     exactly false (missing = untrusted, so a server that says nothing is
+	//     treated as today);
+	//   - an answer whose _meta.egress is true for a call that did not declare
+	//     the network taints and says so: a server that lies loses the benefit.
+	// Ignored for sse servers (remote by definition) and for any other value.
+	// Only config.json can set it: folder settings drop mcpServers entirely.
+	Trust string `json:"trust,omitempty"`
+}
+
+// LocalTrust reports whether this server is a stdio server marked "local".
+func (m MCPServer) LocalTrust() bool {
+	return m.Type == MCPStdio && m.Trust == MCPTrustLocal
 }
 
 type AgentName string

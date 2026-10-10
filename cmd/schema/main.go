@@ -164,6 +164,15 @@ func generateSchema() map[string]any {
 						"type": "string",
 					},
 				},
+				// GORILLA OVERRIDE (2026-10-10): see config.MCPServer.Trust.
+				"trust": map[string]any{
+					"type": "string",
+					"description": "\"local\": a stdio server you installed and trust on this machine labels each " +
+						"answer (_meta.untrusted, _meta.egress) and goes online only for calls that say " +
+						"\"network\": true, so read-only calls need no extra question. Leave unset for any server " +
+						"you did not write or check.",
+					"enum": []string{"local"},
+				},
 			},
 			"required": []string{"command"},
 		},
