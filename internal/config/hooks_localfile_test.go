@@ -16,6 +16,10 @@ import (
 )
 
 func TestAProjectFolderCannotSetHooksOrAnythingThatRunsOrSends(t *testing.T) {
+	// A provider must exist or Load stops at "no valid provider" before the
+	// point of the test. Passed here only because LM Studio was running; GitHub's
+	// runner has none (v0.1.145 CI).
+	t.Setenv("GEMINI_API_KEY", "test-key-for-a-reachable-default")
 	prevCfg, prevLocal := cfg, localConfigPath
 	cfg = nil
 	t.Cleanup(func() {
