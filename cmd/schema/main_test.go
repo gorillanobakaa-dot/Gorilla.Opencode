@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"testing"
 )
 
@@ -27,5 +28,15 @@ func TestTheSchemaIsTheSameOnEveryRun(t *testing.T) {
 		if !bytes.Equal(render(t), first) {
 			t.Fatal("two runs of the schema generator gave different output")
 		}
+	}
+}
+
+func TestTheCommittedSchemaMatchesItsGenerator(t *testing.T) {
+	committed, err := os.ReadFile("../../opencode-schema.json")
+	if err != nil {
+		t.Skipf("no committed schema: %v", err)
+	}
+	if !bytes.Equal(bytes.ReplaceAll(committed, []byte("\r\n"), []byte("\n")), render(t)) {
+		t.Fatal("opencode-schema.json is not what cmd/schema generates: run `go run ./cmd/schema > opencode-schema.json` and commit it")
 	}
 }
