@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 )
 
@@ -17,9 +18,14 @@ var basePlanPrompt string
 // BasePlanPrompt is the shipped planning instruction fragment (no env block).
 func BasePlanPrompt() string { return normaliseNewlines(basePlanPrompt) }
 
-// PlanPrompt is the system prompt of a role=plan helper.
+// PlanPrompt is the system prompt of a role=plan helper, for its configured model.
 func PlanPrompt(_ models.ModelProvider) string {
-	return fmt.Sprintf("%s\n%s\n", BasePlanPrompt(), getEnvironmentInfo())
+	return PlanPromptFor(configuredModel(config.AgentPlan))
+}
+
+// PlanPromptFor is the same prompt for an explicit model.
+func PlanPromptFor(model models.Model) string {
+	return fmt.Sprintf("%s\n%s\n", BasePlanPrompt(), getEnvironmentInfo(model))
 }
 
 // SubCoderNote is appended to the coder prompt for a role=coder helper. The
@@ -34,7 +40,17 @@ you are a helper started by a parent agent, not talking to the user. you report 
 - your final message must say: every file you changed (absolute paths) and what changed in each; every command you ran and its result; anything you could not do or verify
 - permission questions still go to the user; a refusal is final: report it, do not work around it`
 
-// SubCoderPrompt is the system prompt of a role=coder helper.
+// SubCoderPrompt is the system prompt of a role=coder helper, for the
+// configured sub-coder model.
 func SubCoderPrompt(provider models.ModelProvider) string {
-	return CoderPrompt(provider) + "\n\n" + SubCoderNote
+	m := configuredModel(config.AgentSubCoder)
+	if m.Provider == "" {
+		m.Provider = provider
+	}
+	return SubCoderPromptFor(m)
+}
+
+// SubCoderPromptFor is the same prompt for an explicit model.
+func SubCoderPromptFor(model models.Model) string {
+	return CoderPromptFor(model) + "\n\n" + SubCoderNote
 }

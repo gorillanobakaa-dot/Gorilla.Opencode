@@ -25,6 +25,7 @@ cost before they start. Everything else is local.
 | `/message NAME text` | Send a short message to another session. |
 | `/export` | Save this conversation to a file. |
 | `/compact` · `/summarize` `/summarise` | Squeeze the conversation down so it keeps working. |
+| `/mode` · `/permissions` | How much the AI may do before asking. Shift+Tab cycles. |
 | `/cd [folder]` | Switch to working in one folder. |
 | `/add-dir` · `/adddir` `/dirs` `/roots` | Work in more than one folder at once. |
 | `/init` | Write the project notes file the AI reads first. |
@@ -148,6 +149,21 @@ This one saves the conversation you are in, and lets you name the file. To save 
 Every message you send carries the whole conversation with it, and each model has a limit on how much it can hold. Approach that limit and answers get worse, then stop. This writes a summary of everything so far and continues from that instead, so the thread survives while the bulk goes.
 
 Use it when a long session starts to drift, or before starting a big job in an old conversation. It costs one model call to write the summary. Models with small windows need this often — the status bar shows how full you are. It also runs by itself at 95% full if you leave that setting on in /settings.
+
+### `/mode`
+
+*Also: `/permissions`*
+
+**How much the AI may do before asking. Shift+Tab cycles.**
+
+Four modes, saved so every conversation starts in the one you chose:
+
+ask — every change asks once; "allow for session" and "allow family" stop the repeats.
+accept-edits — file edits inside your project are approved; shell commands, the web and MCP servers still ask.
+plan — read-only: nothing is changed or run, the AI describes what it would do and you decide.
+auto — approved without asking, for every conversation, except an irreversible command, a request that leaves the machine after untrusted content was read, or a path outside your workspace. Those three still ask, in every mode, because they are the difference between an agent a web page can steer and one it cannot.
+
+/mode shows the current one; /mode <name> sets it; Shift+Tab cycles. The status bar shows the mode whenever it is not "ask".
 
 ## Which files the AI can see
 

@@ -180,6 +180,9 @@ type Config struct {
 	// typing --plain is a capability most users do not have. Same lesson as the
 	// working directory defaulting to $HOME on an icon launch.
 	Interface string `json:"interface,omitempty"`
+	// GORILLA OVERRIDE (2026-10-11): the standing permission mode. See
+	// permissionmode.go.
+	Permissions PermissionsConfig `json:"permissions,omitempty"`
 	// GORILLA OVERRIDE: base URL of a self-hosted SearXNG, e.g.
 	// "http://localhost:8888". Empty means general web search is OFF and
 	// web_search says so rather than guessing — see internal/llm/tools/websearch.go.

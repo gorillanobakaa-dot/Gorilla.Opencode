@@ -12,11 +12,24 @@ import (
 	"github.com/opencode-ai/opencode/internal/logging"
 )
 
+// GetAgentPrompt renders an agent's system prompt for its CONFIGURED model.
+// The agent itself calls GetAgentPromptFor with the model it was built with,
+// which is the same model except during a /model switch, when the config has
+// not yet moved and this would name the previous one.
 func GetAgentPrompt(agentName config.AgentName, provider models.ModelProvider) string {
+	m := configuredModel(agentName)
+	if m.Provider == "" {
+		m.Provider = provider
+	}
+	return GetAgentPromptFor(agentName, m)
+}
+
+func GetAgentPromptFor(agentName config.AgentName, model models.Model) string {
+	provider := model.Provider
 	basePrompt := ""
 	switch agentName {
 	case config.AgentCoder:
-		basePrompt = CoderPrompt(provider)
+		basePrompt = CoderPromptFor(model)
 	case config.AgentTitle:
 		basePrompt = TitlePrompt(provider)
 	case config.AgentTask:
@@ -25,9 +38,9 @@ func GetAgentPrompt(agentName config.AgentName, provider models.ModelProvider) s
 		basePrompt = SummarizerPrompt(provider)
 	// GORILLA OVERRIDE (2026-10-09): the agent tool's plan and coder roles.
 	case config.AgentPlan:
-		basePrompt = PlanPrompt(provider)
+		basePrompt = PlanPromptFor(model)
 	case config.AgentSubCoder:
-		basePrompt = SubCoderPrompt(provider)
+		basePrompt = SubCoderPromptFor(model)
 	default:
 		basePrompt = "You are a helpful assistant"
 	}

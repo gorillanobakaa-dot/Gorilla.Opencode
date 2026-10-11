@@ -46,6 +46,7 @@ type keyMap struct {
 	Filepicker      key.Binding
 	Models          key.Binding
 	SwitchTheme     key.Binding
+	CycleMode       key.Binding
 	ToggleSelection key.Binding
 	CopyTranscript  key.Binding
 }
@@ -186,6 +187,12 @@ var keys = keyMap{
 	SwitchTheme: key.NewBinding(
 		key.WithKeys("ctrl+t"),
 		key.WithHelp("ctrl+t", "switch theme"),
+	),
+	// GORILLA OVERRIDE (2026-10-11): Shift+Tab cycles the permission mode,
+	// the key other coding agents use for the same thing. See /mode.
+	CycleMode: key.NewBinding(
+		key.WithKeys("shift+tab"),
+		key.WithHelp("shift+tab", "permission mode"),
 	),
 	ToggleSelection: key.NewBinding(
 		key.WithKeys("ctrl+y"),
@@ -962,6 +969,8 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.app.Permissions.Grant(msg.Permission)
 		case dialog.PermissionAllowForSession:
 			a.app.Permissions.GrantPersistant(msg.Permission)
+		case dialog.PermissionAllowFamily:
+			a.app.Permissions.GrantFamily(msg.Permission, msg.Family)
 		case dialog.PermissionDeny:
 			a.app.Permissions.Deny(msg.Permission)
 		}
@@ -1708,9 +1717,26 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// question ten times.
 		// /goal is the same switch with a job attached: arm it and go, which is
 		// the shape people know from other agents. Bare /yolo stays a toggle.
+		// GORILLA OVERRIDE (2026-10-11): /mode — the standing permission mode,
+		// persisted, for every conversation. /yolo stays as the one-conversation
+		// switch it always was. See config/permissionmode.go.
+		case "mode", "permissions":
+			want := strings.TrimSpace(msg.Args)
+			if want == "" {
+				cur := config.PermissionMode()
+				return a, util.ReportInfo(fmt.Sprintf("Permission mode: %s — %s. Options: %s. Shift+Tab cycles; /mode <name> sets one.",
+					cur, config.PermissionModeLayman(cur), strings.Join(config.PermissionModes, ", ")))
+			}
+			if config.NormalisePermissionMode(want) == "" {
+				return a, util.ReportError(fmt.Errorf("unknown permission mode %q — use one of %s", want, strings.Join(config.PermissionModes, ", ")))
+			}
+			return a, a.setPermissionMode(config.NormalisePermissionMode(want))
 		case "yolo", "auto", "autopilot", "goal":
 			if a.selectedSession.ID == "" && strings.TrimSpace(msg.Args) == "" {
 				return a, util.ReportWarn("Start a conversation first — YOLO applies to the session you are in.")
+			}
+			if config.PermissionMode() == config.PermissionAuto && strings.TrimSpace(msg.Args) == "" {
+				return a, util.ReportInfo("The standing mode is already auto, for every conversation. /mode ask turns it off; Shift+Tab cycles.")
 			}
 			task := strings.TrimSpace(msg.Args)
 			// With no task, this toggles. Toggling OFF must never be mistaken
@@ -2151,6 +2177,11 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, a.themeDialog.Init()
 			}
 			return a, nil
+		case key.Matches(msg, keys.CycleMode):
+			if !a.showQuit && !a.showPermissions && !a.showSessionDialog && !a.showCommandDialog && !a.showThemeDialog {
+				return a, a.setPermissionMode(config.NextPermissionMode(config.PermissionMode()))
+			}
+			return a, nil
 		case key.Matches(msg, keys.CopyTranscript):
 			return a, a.copyTranscript()
 		// GORILLA FIX (2026-09-01): Ctrl+Y must not turn mouse tracking ON.
@@ -2518,6 +2549,19 @@ func truncatePrompt(s string, max int) string {
 }
 
 // RegisterCommand adds a command to the command dialog
+// setPermissionMode persists the standing mode and says, every time, what
+// has just been handed over — the one message that must never be skipped.
+func (a appModel) setPermissionMode(mode string) tea.Cmd {
+	if err := config.SetPermissionMode(mode); err != nil {
+		return util.ReportError(err)
+	}
+	text := fmt.Sprintf("Permission mode: %s — %s", mode, config.PermissionModeLayman(mode))
+	if mode == config.PermissionAuto {
+		return util.ReportWarn("☢ " + text + ". This is persisted: every conversation runs this way until you change it.")
+	}
+	return util.ReportInfo(text)
+}
+
 func (a *appModel) RegisterCommand(cmd dialog.Command) {
 	a.commands = append(a.commands, cmd)
 }

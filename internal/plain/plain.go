@@ -265,7 +265,15 @@ func (s *Session) askPermission(req permission.PermissionRequest) {
 	if body := describePermissionParams(req.Params); body != "" {
 		fmt.Fprintf(s.out, "  details:\n%s\n", body)
 	}
-	fmt.Fprint(s.out, "allow? [y]es / [n]o / [a]lways for this session: ")
+	// GORILLA FIX (2026-10-11): the family answer, as in the TUI. Plain mode
+	// cannot walk the prefix with keys, so it offers exactly the suggestion
+	// and prints it in full before asking.
+	if req.FamilySuggestion != "" {
+		fmt.Fprintf(s.out, "  family: every command this session that begins with:\n    %s\n", req.FamilySuggestion)
+		fmt.Fprint(s.out, "allow? [y]es / [n]o / [a]lways for this session / [f]amily: ")
+	} else {
+		fmt.Fprint(s.out, "allow? [y]es / [n]o / [a]lways for this session: ")
+	}
 
 	if !s.in.Scan() {
 		// stdin closed mid-turn: refuse rather than assume consent.
@@ -280,6 +288,14 @@ func (s *Session) askPermission(req permission.PermissionRequest) {
 	case "a", "always":
 		s.app.Permissions.GrantPersistant(req)
 		fmt.Fprintln(s.out, "allowed for this session")
+	case "f", "family":
+		if req.FamilySuggestion == "" {
+			s.app.Permissions.Grant(req)
+			fmt.Fprintln(s.out, "no family was offered — allowed once")
+			break
+		}
+		s.app.Permissions.GrantFamily(req, req.FamilySuggestion)
+		fmt.Fprintln(s.out, "allowed for this session, with its family")
 	default:
 		s.app.Permissions.Deny(req)
 		fmt.Fprintln(s.out, "denied")

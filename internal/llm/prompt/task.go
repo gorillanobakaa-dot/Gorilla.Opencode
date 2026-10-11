@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 )
 
@@ -20,5 +21,10 @@ var baseTaskPrompt string
 func BaseTaskPrompt() string { return normaliseNewlines(baseTaskPrompt) }
 
 func TaskPrompt(_ models.ModelProvider) string {
-	return fmt.Sprintf("%s\n%s\n", BaseTaskPrompt(), getEnvironmentInfo())
+	return TaskPromptFor(configuredModel(config.AgentTask))
+}
+
+// TaskPromptFor is the same prompt for an explicit model.
+func TaskPromptFor(model models.Model) string {
+	return fmt.Sprintf("%s\n%s\n", BaseTaskPrompt(), getEnvironmentInfo(model))
 }

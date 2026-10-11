@@ -114,13 +114,35 @@ func TestTaintMakesTheNextActionAsk(t *testing.T) {
 	MarkTainted("conversation", "web page fetched from https://evil.example")
 	t.Cleanup(func() { ClearTaint("conversation") })
 
+	// GORILLA OVERRIDE (2026-10-11, owner decision "B"): a shell command asks;
+	// an edit inside the roots no longer does (it is reviewed in the diff).
 	if s.Request(CreatePermissionRequest{
+		SessionID: "conversation",
+		ToolName:  "bash",
+		Action:    "execute",
+		Path:      config.WorkingDirectory(),
+		GrantKey:  "go build ./...",
+	}) {
+		t.Fatal("a shell command went ahead unasked in a turn that had already read untrusted content")
+	}
+	if !s.Request(CreatePermissionRequest{
 		SessionID: "conversation",
 		ToolName:  "edit",
 		Action:    "write",
 		Path:      config.WorkingDirectory(),
+		GrantKey:  config.WorkingDirectory() + "/main.go",
 	}) {
-		t.Fatal("an edit went ahead unasked in a turn that had already read untrusted content")
+		t.Fatal("an in-project edit asked after untrusted content; decision B lets it through")
+	}
+	outside := t.TempDir()
+	if s.Request(CreatePermissionRequest{
+		SessionID: "conversation",
+		ToolName:  "edit",
+		Action:    "write",
+		Path:      outside,
+		GrantKey:  outside + "/x",
+	}) {
+		t.Fatal("an edit OUTSIDE the roots went ahead unasked in a tainted turn")
 	}
 }
 

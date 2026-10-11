@@ -1455,7 +1455,10 @@ func createAgentProviderFor(agentName config.AgentName, modelID models.ModelID) 
 	opts := []provider.ProviderClientOption{
 		provider.WithAPIKey(apiKey),
 		provider.WithModel(model),
-		provider.WithSystemMessage(prompt.GetAgentPrompt(agentName, model.Provider)),
+		// The model it is about to be, not the configured one: during a /model
+		// switch the config has not moved yet (see Update), and the prompt
+		// names the model it is sent to.
+		provider.WithSystemMessage(prompt.GetAgentPromptFor(agentName, model)),
 		provider.WithMaxTokens(maxTokens),
 	}
 	if model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal && model.CanReason {

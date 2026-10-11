@@ -56,10 +56,30 @@ func BaseCoderPrompt(provider models.ModelProvider) string {
 
 // EnvironmentInfoBlock / LSPInfoBlock expose the switchable prompt blocks
 // so the loadout can price them. GORILLA OVERRIDE.
-func EnvironmentInfoBlock() string { return getEnvironmentInfo() }
+func EnvironmentInfoBlock() string { return getEnvironmentInfo(configuredModel(config.AgentCoder)) }
 func LSPInfoBlock() string         { return lspInformation() }
 
+// CoderPrompt renders the coder prompt for the CONFIGURED coder model. Kept
+// for callers that only hold a provider; the agent itself uses CoderPromptFor
+// with the model it is about to talk to.
 func CoderPrompt(provider models.ModelProvider) string {
+	m := configuredModel(config.AgentCoder)
+	if m.Provider == "" {
+		m.Provider = provider
+	}
+	return CoderPromptFor(m)
+}
+
+// CoderPromptFor renders the coder prompt for one explicit model.
+//
+// GORILLA FIX (2026-10-11): the model is told what it is. Measured on a
+// Nemotron 3 Ultra session: asked, the model answered "I'm not Nemotron. I'm a
+// different model entirely", because nothing in its context said otherwise.
+// Taken from the model the provider is built with, not from the config, so a
+// /model switch (which builds the provider BEFORE it commits the config) names
+// the new model, not the old one. One line; nothing else about honesty is
+// attempted in code.
+func CoderPromptFor(model models.Model) string {
 	// GORILLA OVERRIDE: env and LSP context blocks are switchable via the
 	// context loadout (/context menu). Off = fewer tokens per turn, at the
 	// cost of the agent knowing your cwd/OS/git and active LSPs. Because
@@ -67,7 +87,7 @@ func CoderPrompt(provider models.ModelProvider) string {
 	// toggle takes effect on the next rebuild (see ReloadCoderTools).
 	envInfo := ""
 	if config.LoadoutEnabled("prompt.env") {
-		envInfo = getEnvironmentInfo()
+		envInfo = getEnvironmentInfo(model)
 	}
 	lspInfo := ""
 	if config.LoadoutEnabled("prompt.lsp") {
@@ -86,7 +106,7 @@ func CoderPrompt(provider models.ModelProvider) string {
 		deferred = DeferredCatalogue()
 	}
 
-	return fmt.Sprintf("%s\n\n%s\n%s\n%s", BaseCoderPrompt(provider), envInfo, lspInfo, deferred)
+	return fmt.Sprintf("%s\n\n%s\n%s\n%s", BaseCoderPrompt(model.Provider), envInfo, lspInfo, deferred)
 }
 
 // GORILLA OVERRIDE: two 2023-era prompt constants (baseOpenAICoderPrompt at
@@ -114,12 +134,13 @@ const (
 	maxExtraRootEntries = 12
 )
 
-func getEnvironmentInfo() string {
+func getEnvironmentInfo(model models.Model) string {
 	roots := config.Roots()
 	cwd := roots[0]
 	isGit := isGitRepo(cwd)
 	platform := runtime.GOOS
 	summary := projectSummary(cwd, isGit)
+	modelLine := modelEnvLine(model)
 
 	// GORILLA OVERRIDE: additional roots from /add-dir are advertised here, or
 	// the model has no idea they are in play and will not look in them. Kept
@@ -146,11 +167,43 @@ func getEnvironmentInfo() string {
 Working directory: %s
 Is directory a git repo: %s
 Platform: %s
-%s</env>
+%s%s</env>
 <project_summary>
 %s
 </project_summary>
-%s`, cwd, boolToYesNo(isGit), platform, userDirs(), summary, extra)
+%s`, cwd, boolToYesNo(isGit), platform, modelLine, userDirs(), summary, extra)
+}
+
+// modelEnvLine is the one line that tells the model which model it is: the
+// id the provider was built with and, when the catalogue has one, its name.
+// Empty when no model is known, so a test render without config is unchanged.
+func modelEnvLine(model models.Model) string {
+	id := string(model.ID)
+	if id == "" {
+		return ""
+	}
+	if model.Name != "" && model.Name != id {
+		return fmt.Sprintf("Model: you are %s (%s). State this id, not a guess, when asked which model you are.\n", id, model.Name)
+	}
+	return fmt.Sprintf("Model: you are %s. State this id, not a guess, when asked which model you are.\n", id)
+}
+
+// configuredModel is the model the config assigns to an agent, or a bare id
+// when the catalogue does not know it, or the zero Model when nothing is
+// configured.
+func configuredModel(agent config.AgentName) models.Model {
+	cfg := config.Get()
+	if cfg == nil {
+		return models.Model{}
+	}
+	id := cfg.Agents[agent].Model
+	if id == "" {
+		return models.Model{}
+	}
+	if m, ok := models.SupportedModels[id]; ok {
+		return m
+	}
+	return models.Model{ID: id}
 }
 
 // userDirs tells the model where this machine actually keeps pictures,

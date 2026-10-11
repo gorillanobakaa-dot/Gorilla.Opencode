@@ -302,15 +302,32 @@ func (m statusCmp) chrome() statusChrome {
 	// switches off the prompt that stands between an agent and the user's
 	// files, so it must never be something you can forget you enabled — the
 	// same reasoning as the helper count beside it, one step louder.
+	// GORILLA OVERRIDE (2026-10-11): the standing mode too (/mode, Shift+Tab):
+	// anything other than "ask" is a standing grant, so it stays on screen.
 	yoloWidth := 0
-	if permission.SessionAutoApproved(m.session.ID) {
+	switch permission.EffectiveMode(m.session.ID) {
+	case config.PermissionAuto:
 		c.yolo = styles.Padded().
 			Background(t.Error()).
 			Foreground(t.Background()).
 			Bold(true).
-			Render("☢ YOLO — auto-approving")
-		yoloWidth = lipgloss.Width(c.yolo)
+			Render("☢ AUTO — approving without asking")
+	case config.PermissionAcceptEdits:
+		c.yolo = styles.Padded().
+			Background(t.Warning()).
+			Foreground(t.Background()).
+			Bold(true).
+			Render("EDITS auto-approved")
+	case config.PermissionPlan:
+		c.yolo = styles.Padded().
+			Background(t.Primary()).
+			Foreground(t.Background()).
+			Bold(true).
+			Render("PLAN — read-only")
+	default:
+		c.yolo = ""
 	}
+	yoloWidth = lipgloss.Width(c.yolo)
 
 	c.avail = max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(c.model)-lipgloss.Width(c.diagnostics)-tokenInfoWidth-helpersWidth-yoloWidth)
 	return c

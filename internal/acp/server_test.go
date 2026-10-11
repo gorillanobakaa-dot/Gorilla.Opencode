@@ -39,6 +39,9 @@ func (f *fakePerms) Grant(r permission.PermissionRequest) { f.note("grant") }
 func (f *fakePerms) GrantPersistant(r permission.PermissionRequest) {
 	f.note("grant-session")
 }
+func (f *fakePerms) GrantFamily(r permission.PermissionRequest, family string) {
+	f.note("grant-family:" + family)
+}
 func (f *fakePerms) Deny(r permission.PermissionRequest) { f.note("deny") }
 func (f *fakePerms) note(s string) {
 	f.mu.Lock()

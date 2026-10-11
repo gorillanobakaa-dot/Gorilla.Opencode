@@ -2,7 +2,10 @@ package permission
 
 import (
 	"errors"
+	"path/filepath"
+	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -101,6 +104,16 @@ type CreatePermissionRequest struct {
 	// confirmation_policy.py, MIT) reduced to the one level that matters here:
 	// everything else may be waved through, this may not. See mustAskAnyway.
 	Irreversible string `json:"irreversible,omitempty"`
+	// FamilySuggestion is the family the dialog proposes for "Allow family":
+	// a prefix of GrantKey, chosen by the caller from what this session has
+	// already asked (see AskedKeys). Empty means the dialog offers no family.
+	//
+	// GORILLA FIX (2026-10-11): measured on a 58-minute Nemotron session —
+	// 31 bash prompts, 30 distinct commands, 16 of them the same program with
+	// a different last argument. "Allow for session" keyed on the exact text
+	// could not help, and the person was asked thirty times for one answer.
+	// See GrantFamily for what a family is allowed to cover.
+	FamilySuggestion string `json:"family_suggestion,omitempty"`
 }
 
 type PermissionRequest struct {
@@ -115,6 +128,12 @@ type PermissionRequest struct {
 	GrantKey string `json:"grant_key"`
 	// Egress — see CreatePermissionRequest.Egress.
 	Egress bool `json:"egress"`
+	// Irreversible — see CreatePermissionRequest.Irreversible. Carried on the
+	// published request so a queued prompt can be judged by IsCovered with the
+	// same rule Request applies: a family never covers one of these.
+	Irreversible string `json:"irreversible,omitempty"`
+	// FamilySuggestion — see CreatePermissionRequest.FamilySuggestion.
+	FamilySuggestion string `json:"family_suggestion,omitempty"`
 	// AutoApproveOverridden records that this prompt is being shown DESPITE
 	// auto-approve being on, and why. The dialog says so: a prompt appearing
 	// in a mode the user believes is unattended is confusing unless it
@@ -159,7 +178,64 @@ type Service interface {
 	// has already settled. Asking them anyway is how "allow for session" came
 	// to mean "and now answer the same thing four more times".
 	IsCovered(p PermissionRequest) bool
+	// GrantFamily answers a pending request yes AND remembers, for the whole
+	// session tree, every later request of the same tool, action and path
+	// whose grant key the tool's FamilyMatcher places inside family.
+	//
+	// What a family never covers, however it was chosen: a request marked
+	// Irreversible, a request marked Egress, and any request raised while the
+	// turn is tainted. Those ask exactly as they did before families existed.
+	// A tool with no registered matcher, or a family the matcher does not
+	// accept for this request, degrades to a one-off allow and is logged.
+	GrantFamily(permission PermissionRequest, family string)
+	// AskedKeys returns the grant keys this tool has PROMPTED for in this
+	// session tree, oldest first, so a caller can propose a family from what
+	// the person has already been asked. Bounded; covered requests are not
+	// recorded, only ones that reached a person.
+	AskedKeys(sessionID, toolName string) []string
 }
+
+// FamilyMatcher decides whether grantKey falls inside a family a person
+// approved for this tool. It is the tool's own syntax that decides — for bash,
+// what counts as "the same command with a different tail" — so this package
+// never guesses: a tool that registers no matcher gets no family grants.
+type FamilyMatcher func(grantKey, family string) bool
+
+var (
+	familyMatchersMu sync.RWMutex
+	familyMatchers   = map[string]FamilyMatcher{}
+)
+
+// RegisterFamilyMatcher opts a tool into family grants. Called from the tool's
+// package init; the matcher must be a pure function of its two arguments.
+func RegisterFamilyMatcher(toolName string, m FamilyMatcher) {
+	if toolName == "" || m == nil {
+		return
+	}
+	familyMatchersMu.Lock()
+	familyMatchers[toolName] = m
+	familyMatchersMu.Unlock()
+}
+
+func familyMatcherFor(toolName string) (FamilyMatcher, bool) {
+	familyMatchersMu.RLock()
+	defer familyMatchersMu.RUnlock()
+	m, ok := familyMatchers[toolName]
+	return m, ok
+}
+
+// familyGrant is one "Allow family" answer: the tool, action and path of the
+// request it answered, and the family the person read on the dialog.
+type familyGrant struct {
+	SessionID string
+	ToolName  string
+	Action    string
+	Path      string
+	Family    string
+}
+
+// maxAskedKeys bounds the per-tool history AskedKeys returns.
+const maxAskedKeys = 64
 
 type permissionService struct {
 	*pubsub.Broker[PermissionRequest]
@@ -209,6 +285,12 @@ type permissionService struct {
 	//     model writes later from pages it reads. Consent to a category you
 	//     cannot read in advance is still consent, but only if it says so.
 	fleetGrants map[string]map[string]bool
+	// familyGrants are the "Allow family" answers, keyed by nothing: a scan
+	// over a slice that is a few entries long for the life of a session.
+	familyGrants []familyGrant
+	// askedKeys records, per root session and tool, the grant keys that were
+	// actually published as prompts, so the next prompt can propose a family.
+	askedKeys map[string][]string
 	// unattended is set by the non-interactive entry point.
 	unattended bool
 }
@@ -241,18 +323,136 @@ func (s *permissionService) RegisterChildSession(child, parent string) {
 
 func (s *permissionService) IsCovered(p PermissionRequest) bool {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
 	root := s.rootSession(p.SessionID)
 	if s.hasFleetGrantLocked(root, p.ToolName) {
+		s.mu.RUnlock()
 		return true
 	}
 	for _, g := range s.sessionPermissions {
 		if g.ToolName == p.ToolName && g.Action == p.Action &&
 			g.SessionID == root && g.Path == p.Path && g.GrantKey == p.GrantKey {
+			s.mu.RUnlock()
+			return true
+		}
+	}
+	s.mu.RUnlock()
+	// Outside the lock: the taint lookup takes this service's read lock itself.
+	return s.familyCovers(root, p.ToolName, p.Action, p.Path, p.GrantKey, p.Irreversible, p.Egress)
+}
+
+// familyCovers reports whether an "Allow family" answer covers this request.
+//
+// The three refusals come first and are unconditional. They are the same
+// three things a person is asked about even under auto-approve (mustAskAnyway),
+// because they are the cases where "the same command with a different tail"
+// is exactly the attack: an injected tail that deletes, that sends, or that
+// was written after the turn read something a stranger wrote.
+func (s *permissionService) familyCovers(root, toolName, action, path, grantKey, irreversible string, egress bool) bool {
+	if irreversible != "" || egress || grantKey == "" {
+		return false
+	}
+	if IsTainted(root) {
+		return false
+	}
+	m, ok := familyMatcherFor(toolName)
+	if !ok {
+		return false
+	}
+	s.mu.RLock()
+	grants := slices.Clone(s.familyGrants)
+	s.mu.RUnlock()
+	for _, g := range grants {
+		if g.ToolName != toolName || g.Action != action || g.SessionID != root {
+			continue
+		}
+		// The path is the scope the person saw: a family approved on a command
+		// naming C:\work\Fieldkit covers commands naming that folder or files
+		// inside it, never a different place outside the roots.
+		if !pathWithin(path, g.Path) {
+			continue
+		}
+		if m(grantKey, g.Family) {
 			return true
 		}
 	}
 	return false
+}
+
+// pathWithin reports whether p is dir itself or lies underneath it. Case is
+// ignored on Windows, where the filesystem ignores it too.
+func pathWithin(p, dir string) bool {
+	if p == "" || dir == "" {
+		return p == dir
+	}
+	p, dir = filepath.Clean(p), filepath.Clean(dir)
+	if runtime.GOOS == "windows" {
+		p, dir = strings.ToLower(p), strings.ToLower(dir)
+	}
+	if p == dir {
+		return true
+	}
+	return strings.HasPrefix(p, dir+string(filepath.Separator))
+}
+
+func (s *permissionService) GrantFamily(p PermissionRequest, family string) {
+	family = strings.TrimSpace(family)
+	m, ok := familyMatcherFor(p.ToolName)
+	switch {
+	case family == "":
+		logging.Warn("family grant without a family; allowing this one request only",
+			"tool", p.ToolName, "grant_key", p.GrantKey)
+		s.Grant(p)
+		return
+	case !ok:
+		logging.Warn("family grant for a tool that registered no family matcher; allowing this one request only",
+			"tool", p.ToolName, "family", family)
+		s.Grant(p)
+		return
+	case !m(p.GrantKey, family):
+		// The family must cover the very request it was chosen on, or the
+		// person approved a sentence that does not describe what just ran.
+		logging.Warn("family does not cover the request it was chosen on; allowing this one request only",
+			"tool", p.ToolName, "grant_key", p.GrantKey, "family", family)
+		s.Grant(p)
+		return
+	}
+	s.Grant(p)
+	s.mu.Lock()
+	s.familyGrants = append(s.familyGrants, familyGrant{
+		SessionID: p.SessionID, // already the tree root: Request stores it so
+		ToolName:  p.ToolName,
+		Action:    p.Action,
+		Path:      p.Path,
+		Family:    family,
+	})
+	s.mu.Unlock()
+	logging.Info("family grant recorded", "tool", p.ToolName, "action", p.Action,
+		"path", p.Path, "family", family, "session", p.SessionID)
+}
+
+func (s *permissionService) AskedKeys(sessionID, toolName string) []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	root := s.rootSession(sessionID)
+	return slices.Clone(s.askedKeys[root+"\x00"+toolName])
+}
+
+// recordAsked remembers a key that is about to be published as a prompt.
+func (s *permissionService) recordAsked(root, toolName, key string) {
+	if key == "" || key == GrantWholeTool {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.askedKeys == nil {
+		s.askedKeys = make(map[string][]string)
+	}
+	k := root + "\x00" + toolName
+	keys := append(s.askedKeys[k], key)
+	if len(keys) > maxAskedKeys {
+		keys = keys[len(keys)-maxAskedKeys:]
+	}
+	s.askedKeys[k] = keys
 }
 
 func (s *permissionService) GrantFleet(root string, tools []string) {
@@ -356,6 +556,20 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	fleet := s.hasFleetGrantLocked(root, opts.ToolName)
 	s.mu.RUnlock()
 
+	// GORILLA OVERRIDE (2026-10-11): the standing mode (config/permissionmode.go).
+	// See modeDecision in mode.go for plan and accept-edits; "auto" takes the
+	// same path /yolo always took, carve-outs included.
+	if config.PermissionMode() == config.PermissionAuto {
+		autoApproved = true
+	}
+	if decided, answer := s.modeDecision(opts, root); decided {
+		if !answer {
+			logging.Info("plan mode: refused without asking", "tool", opts.ToolName,
+				"action", opts.Action, "grant_key", opts.GrantKey, "session", root)
+		}
+		return answer
+	}
+
 	// GORILLA FIX (2026-08-19): this used to be an unconditional `return true`
 	// and it was the FIRST thing in the function — before grant matching,
 	// before anything. Auto-approve meant total, with zero carve-outs, so
@@ -401,6 +615,8 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 		Params:                opts.Params,
 		GrantKey:              opts.GrantKey,
 		Egress:                opts.Egress,
+		Irreversible:          opts.Irreversible,
+		FamilySuggestion:      opts.FamilySuggestion,
 		AutoApproveOverridden: override,
 	}
 
@@ -410,6 +626,17 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 			p.GrantKey == permission.GrantKey {
 			return true
 		}
+	}
+
+	// A family grant is checked AFTER the exact grants and, like them, AFTER
+	// the auto-approve carve-outs. It refuses on its own account the three
+	// things a carve-out would have asked about (see familyCovers), so turning
+	// auto-approve off never makes a family cover more.
+	if s.familyCovers(root, permission.ToolName, permission.Action, permission.Path,
+		permission.GrantKey, opts.Irreversible, opts.Egress) {
+		logging.Info("covered by a family grant", "tool", permission.ToolName,
+			"action", permission.Action, "grant_key", permission.GrantKey, "session", root)
+		return true
 	}
 
 	// A fleet grant is checked AFTER the exact-match grants and AFTER the
@@ -430,6 +657,9 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	s.pendingRequests.Store(permission.ID, pendingRequest{ch: respCh, sessionID: root})
 	defer s.pendingRequests.Delete(permission.ID)
 
+	// Recorded only for prompts that reach a person: a family is proposed
+	// from what they have already been asked, not from what was waved through.
+	s.recordAsked(root, permission.ToolName, permission.GrantKey)
 	s.Publish(pubsub.CreatedEvent, permission)
 
 	// Wait for an answer, but never forever. See PermissionWait.
@@ -520,6 +750,9 @@ func (s *permissionService) RevokeAutoApprove(sessionID string) {
 // IsAutoApproved answers for the whole session tree, so a helper cannot report
 // a different stance from the conversation it belongs to.
 func (s *permissionService) IsAutoApproved(sessionID string) bool {
+	if config.PermissionMode() == config.PermissionAuto {
+		return true
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return slices.Contains(s.autoApproveSessions, s.rootSession(sessionID)) ||
@@ -624,7 +857,15 @@ func (s *permissionService) mustAskAnyway(opts CreatePermissionRequest, root str
 		}
 		return "this sends a request off the machine"
 	}
-	if IsTainted(root) {
+	// GORILLA OVERRIDE (2026-10-11, owner decision "B"): after untrusted
+	// content, an EDIT INSIDE THE ROOTS no longer asks. It used to: one web
+	// page read made every later tool in the turn prompt, which turned auto
+	// mode back into ask mode for the whole of any research turn. What still
+	// asks after untrusted content: every non-edit tool (a shell command can
+	// do anything), egress (above), a path outside the roots (below) and an
+	// irreversible action (above). An edit inside the project is visible in
+	// the diff and in git, which is where the person reviews it anyway.
+	if IsTainted(root) && !editTools[opts.ToolName] {
 		reason, _ := TaintOf(root)
 		return "this turn has already read untrusted content (" + reason.Reason + ")"
 	}

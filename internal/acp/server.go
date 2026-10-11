@@ -46,6 +46,7 @@ type PermissionDesk interface {
 	pubsub.Suscriber[permission.PermissionRequest]
 	Grant(permission.PermissionRequest)
 	GrantPersistant(permission.PermissionRequest)
+	GrantFamily(permission.PermissionRequest, string)
 	Deny(permission.PermissionRequest)
 }
 
@@ -526,14 +527,24 @@ func (s *Server) askPermission(ctx context.Context, st *turnState, req permissio
 	if b, err := json.Marshal(req.Params); err == nil && string(b) != "null" {
 		tc["rawInput"] = json.RawMessage(b)
 	}
+	options := []map[string]any{
+		{"optionId": "allow", "name": "Allow", "kind": "allow_once"},
+		{"optionId": "allow-session", "name": "Allow for this session", "kind": "allow_always"},
+	}
+	// The family answer carries its whole prefix in the option's name: the
+	// editor shows that text, and that text is exactly what is granted.
+	if req.FamilySuggestion != "" {
+		options = append(options, map[string]any{
+			"optionId": "allow-family",
+			"name":     "Allow every command this session that begins with: " + req.FamilySuggestion,
+			"kind":     "allow_always",
+		})
+	}
+	options = append(options, map[string]any{"optionId": "deny", "name": "Deny", "kind": "reject_once"})
 	params := map[string]any{
 		"sessionId": st.sessionID,
 		"toolCall":  tc,
-		"options": []map[string]any{
-			{"optionId": "allow", "name": "Allow", "kind": "allow_once"},
-			{"optionId": "allow-session", "name": "Allow for this session", "kind": "allow_always"},
-			{"optionId": "deny", "name": "Deny", "kind": "reject_once"},
-		},
+		"options":   options,
 	}
 	raw, err := s.conn.call(ctx, "session/request_permission", params)
 	if err != nil {
@@ -556,6 +567,12 @@ func (s *Server) askPermission(ctx context.Context, st *turnState, req permissio
 		s.eng.Permissions.Grant(req)
 	case "allow-session":
 		s.eng.Permissions.GrantPersistant(req)
+	case "allow-family":
+		if req.FamilySuggestion == "" {
+			s.eng.Permissions.Grant(req)
+			return
+		}
+		s.eng.Permissions.GrantFamily(req, req.FamilySuggestion)
 	default:
 		s.eng.Permissions.Deny(req)
 	}

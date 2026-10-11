@@ -2,6 +2,7 @@ package shell
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -254,25 +255,68 @@ func (s *PersistentShell) execCommand(command string, timeout time.Duration, ctx
 		// The status file is written LAST, on purpose: the watcher below treats
 		// its existence as "the command is done", so anything written after it
 		// would be a race.
+		//
+		// GORILLA FIX (2026-10-11, rev 3): the command is no longer pasted into
+		// the wrapper's own text. It travels base64-encoded, is PARSED first,
+		// and only then runs as a script block. Measured on Windows PowerShell
+		// 5.1.26100 with `cd C:\x && python -m fieldkit --help`, three times in
+		// one Nemotron session:
+		//
+		//   - `&&` is a parse error in 5.1. PowerShell reported it at 320 ms —
+		//     on the shell's OWN stderr, which nobody reads — and then threw
+		//     away the whole chunk it had been handed, the four WriteAllText
+		//     lines included. No status file ever appeared, the watcher waited
+		//     the full 60 s timeout, stopRunning found no child to kill and
+		//     killed the shell itself, and the model was told "timed out",
+		//     which is the one diagnosis that was not true.
+		//   - an unterminated quote is worse: the parser waits for the rest of
+		//     the string for ever, so every later chunk is swallowed into it.
+		//   - a terminating error (`throw`, a .NET exception) at the top of the
+		//     block aborted the chunk the same way: output lost, no status.
+		//
+		// With the command parsed from a string, a syntax error is an ordinary
+		// error record with the parser's own message, exit code 2, at once; a
+		// throw is caught, the output collected before it is kept, and the
+		// shell lives on with its working directory intact. Set-Location inside
+		// a script block still moves the session, exactly as `& { }` did.
 		fullCommand = fmt.Sprintf(`
 $ErrorActionPreference = 'Continue'
 $global:LASTEXITCODE = $null
 $__enc = New-Object System.Text.UTF8Encoding $false
 $__err = New-Object System.Collections.ArrayList
-$__out = & {
-%s
-} 2>&1 | ForEach-Object {
-  if ($_ -is [System.Management.Automation.ErrorRecord]) {
+$__outl = New-Object System.Collections.ArrayList
+$__src = $__enc.GetString([System.Convert]::FromBase64String('%s'))
+$__tok = $null
+$__perr = $null
+[void][System.Management.Automation.Language.Parser]::ParseInput($__src, [ref]$__tok, [ref]$__perr)
+if ($__perr -ne $null -and $__perr.Count -gt 0) {
+  foreach ($__e in $__perr) {
+    [void]$__err.Add(("PowerShell could not parse the command (line " + $__e.Extent.StartLineNumber + ", column " + $__e.Extent.StartColumnNumber + "): " + $__e.Message + [char]10))
+  }
+  $__code = 2
+} else {
+  $__code = $null
+  try {
+    $__sb = [scriptblock]::Create($__src)
+    & $__sb 2>&1 | ForEach-Object {
+      if ($_ -is [System.Management.Automation.ErrorRecord]) {
+        [void]$__err.Add(($_ | Out-String -Width 4096))
+      } else { [void]$__outl.Add($_) }
+    }
+  } catch {
     [void]$__err.Add(($_ | Out-String -Width 4096))
-  } else { $_ }
+    $__code = 1
+  }
+  if ($__code -eq $null) {
+    $__code = if ($LASTEXITCODE -ne $null) { $LASTEXITCODE } elseif ($__err.Count -gt 0) { 1 } else { 0 }
+  }
 }
-$__code = if ($LASTEXITCODE -ne $null) { $LASTEXITCODE } elseif ($__err.Count -gt 0) { 1 } else { 0 }
-[System.IO.File]::WriteAllText(%s, ($__out | Out-String -Width 4096), $__enc)
+[System.IO.File]::WriteAllText(%s, ($__outl | Out-String -Width 4096), $__enc)
 [System.IO.File]::WriteAllText(%s, ($__err -join ''), $__enc)
 [System.IO.File]::WriteAllText(%s, (Get-Location).Path, $__enc)
 [System.IO.File]::WriteAllText(%s, [string]$__code, $__enc)
 `,
-			command,
+			base64.StdEncoding.EncodeToString([]byte(command)),
 			shellQuotePS(stdoutFile),
 			shellQuotePS(stderrFile),
 			shellQuotePS(cwdFile),
@@ -413,6 +457,11 @@ echo $EXEC_EXIT_CODE > %s
 	} else if interrupted {
 		exitCode = 143
 		stderr += "\nCommand execution timed out or was interrupted"
+	}
+	// The parser names the token; the model needs to be told what to write
+	// instead, or it tries `&&` again with different spacing.
+	if s.isPowerShell && strings.Contains(stderr, "is not a valid statement separator") {
+		stderr += "This shell is Windows PowerShell 5.1: separate commands with ';' — '&&' and '||' do not exist here.\n"
 	}
 
 	// GORILLA OVERRIDE (2026-09-01): only believe a working directory that is

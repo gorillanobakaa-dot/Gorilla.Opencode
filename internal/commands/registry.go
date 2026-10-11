@@ -597,6 +597,26 @@ var All = []Command{
 			"at them. Run it once per project, and again after big changes.",
 	},
 	{
+		Name:    "mode",
+		Aliases: []string{"permissions"},
+		Group:   GroupSession,
+		Summary: "How much the AI may do before asking. Shift+Tab cycles.",
+		Detail: "Four modes, saved so every conversation starts in the one you chose:\n\n" +
+			"ask — every change asks once; \"allow for session\" and \"allow family\" " +
+			"stop the repeats.\n" +
+			"accept-edits — file edits inside your project are approved; shell " +
+			"commands, the web and MCP servers still ask.\n" +
+			"plan — read-only: nothing is changed or run, the AI describes what " +
+			"it would do and you decide.\n" +
+			"auto — approved without asking, for every conversation, except an " +
+			"irreversible command, a request that leaves the machine after untrusted " +
+			"content was read, or a path outside your workspace. Those three still ask, " +
+			"in every mode, because they are the difference between an agent a web " +
+			"page can steer and one it cannot.\n\n" +
+			"/mode shows the current one; /mode <name> sets it; Shift+Tab cycles. " +
+			"The status bar shows the mode whenever it is not \"ask\".",
+	},
+	{
 		Name:    "yolo",
 		Aliases: []string{"auto", "autopilot", "goal"},
 		Group:   GroupHelpers,

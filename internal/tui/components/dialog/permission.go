@@ -23,13 +23,19 @@ type PermissionAction string
 const (
 	PermissionAllow           PermissionAction = "allow"
 	PermissionAllowForSession PermissionAction = "allow_session"
-	PermissionDeny            PermissionAction = "deny"
+	// PermissionAllowFamily approves the request AND, for the session, every
+	// later command that begins with the family shown on the dialog. See
+	// tools/commandfamily.go for what a family may cover and what it never does.
+	PermissionAllowFamily PermissionAction = "allow_family"
+	PermissionDeny        PermissionAction = "deny"
 )
 
 // PermissionResponseMsg represents the user's response to a permission request
 type PermissionResponseMsg struct {
 	Permission permission.PermissionRequest
 	Action     PermissionAction
+	// Family is the prefix the person chose, set only for PermissionAllowFamily.
+	Family string
 }
 
 // PermissionDialogCmp interface for permission dialog component
@@ -45,8 +51,11 @@ type permissionsMapping struct {
 	EnterSpace   key.Binding
 	Allow        key.Binding
 	AllowSession key.Binding
+	AllowFamily  key.Binding
 	Deny         key.Binding
 	Tab          key.Binding
+	FamilyLess   key.Binding
+	FamilyMore   key.Binding
 }
 
 var permissionsKeys = permissionsMapping{
@@ -70,6 +79,10 @@ var permissionsKeys = permissionsMapping{
 		key.WithKeys("s"),
 		key.WithHelp("s", "allow for session"),
 	),
+	AllowFamily: key.NewBinding(
+		key.WithKeys("f"),
+		key.WithHelp("f", "allow family"),
+	),
 	Deny: key.NewBinding(
 		key.WithKeys("d"),
 		key.WithHelp("d", "deny"),
@@ -77,6 +90,14 @@ var permissionsKeys = permissionsMapping{
 	Tab: key.NewBinding(
 		key.WithKeys("tab"),
 		key.WithHelp("tab", "switch options"),
+	),
+	FamilyLess: key.NewBinding(
+		key.WithKeys("["),
+		key.WithHelp("[", "shorter family"),
+	),
+	FamilyMore: key.NewBinding(
+		key.WithKeys("]"),
+		key.WithHelp("]", "longer family"),
 	),
 }
 
@@ -87,10 +108,63 @@ type permissionDialogCmp struct {
 	permission      permission.PermissionRequest
 	windowSize      tea.WindowSizeMsg
 	contentViewPort viewport.Model
-	selectedOption  int // 0: Allow, 1: Allow for session, 2: Deny
+	// options are the buttons offered for THIS request, left to right, and
+	// selectedOption indexes them. Deny is always last and always the default.
+	// "Allow family" is present only when the request carries a family
+	// suggestion, so a request that has none keeps the three buttons it had.
+	options        []PermissionAction
+	selectedOption int
+
+	// familyCandidates are the families the person may choose for a bash
+	// request, shortest first; familyIdx is the one currently shown.
+	familyCandidates []string
+	familyIdx        int
 
 	diffCache     map[string]string
 	markdownCache map[string]string
+}
+
+// family is the family currently offered, or "" when there is none.
+func (p *permissionDialogCmp) family() string {
+	if len(p.familyCandidates) == 0 || p.familyIdx < 0 || p.familyIdx >= len(p.familyCandidates) {
+		return ""
+	}
+	return p.familyCandidates[p.familyIdx]
+}
+
+func (p *permissionDialogCmp) hasOption(a PermissionAction) bool {
+	for _, o := range p.options {
+		if o == a {
+			return true
+		}
+	}
+	return false
+}
+
+// currentAction is the button under the highlight.
+func (p *permissionDialogCmp) currentAction() PermissionAction {
+	if len(p.options) == 0 {
+		return PermissionDeny
+	}
+	if p.selectedOption < 0 || p.selectedOption >= len(p.options) {
+		return PermissionDeny
+	}
+	return p.options[p.selectedOption]
+}
+
+func (p *permissionDialogCmp) respond(action PermissionAction) tea.Cmd {
+	msg := PermissionResponseMsg{Action: action, Permission: p.permission}
+	if action == PermissionAllowFamily {
+		fam := p.family()
+		if fam == "" {
+			// No family to grant: never widen silently. Treat the key as a
+			// plain allow of this one request.
+			msg.Action = PermissionAllow
+		} else {
+			msg.Family = fam
+		}
+	}
+	return util.CmdHandler(msg)
 }
 
 func (p *permissionDialogCmp) Init() tea.Cmd {
@@ -108,20 +182,39 @@ func (p *permissionDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.markdownCache = make(map[string]string)
 		p.diffCache = make(map[string]string)
 	case tea.KeyMsg:
+		n := len(p.options)
+		if n == 0 {
+			n = 1
+		}
 		switch {
 		case key.Matches(msg, permissionsKeys.Right) || key.Matches(msg, permissionsKeys.Tab):
-			p.selectedOption = (p.selectedOption + 1) % 3
+			p.selectedOption = (p.selectedOption + 1) % n
 			return p, nil
 		case key.Matches(msg, permissionsKeys.Left):
-			p.selectedOption = (p.selectedOption + 2) % 3
+			p.selectedOption = (p.selectedOption + n - 1) % n
 		case key.Matches(msg, permissionsKeys.EnterSpace):
 			return p, p.selectCurrentOption()
 		case key.Matches(msg, permissionsKeys.Allow):
-			return p, util.CmdHandler(PermissionResponseMsg{Action: PermissionAllow, Permission: p.permission})
+			return p, p.respond(PermissionAllow)
 		case key.Matches(msg, permissionsKeys.AllowSession):
-			return p, util.CmdHandler(PermissionResponseMsg{Action: PermissionAllowForSession, Permission: p.permission})
+			return p, p.respond(PermissionAllowForSession)
+		case key.Matches(msg, permissionsKeys.AllowFamily):
+			if !p.hasOption(PermissionAllowFamily) {
+				return p, nil
+			}
+			return p, p.respond(PermissionAllowFamily)
+		case key.Matches(msg, permissionsKeys.FamilyLess):
+			if p.familyIdx > 0 {
+				p.familyIdx--
+			}
+			return p, nil
+		case key.Matches(msg, permissionsKeys.FamilyMore):
+			if p.familyIdx+1 < len(p.familyCandidates) {
+				p.familyIdx++
+			}
+			return p, nil
 		case key.Matches(msg, permissionsKeys.Deny):
-			return p, util.CmdHandler(PermissionResponseMsg{Action: PermissionDeny, Permission: p.permission})
+			return p, p.respond(PermissionDeny)
 		default:
 			// Pass other keys to viewport
 			viewPort, cmd := p.contentViewPort.Update(msg)
@@ -134,58 +227,31 @@ func (p *permissionDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (p *permissionDialogCmp) selectCurrentOption() tea.Cmd {
-	var action PermissionAction
+	return p.respond(p.currentAction())
+}
 
-	switch p.selectedOption {
-	case 0:
-		action = PermissionAllow
-	case 1:
-		action = PermissionAllowForSession
-	case 2:
-		action = PermissionDeny
-	}
-
-	return util.CmdHandler(PermissionResponseMsg{Action: action, Permission: p.permission})
+// buttonLabels are the captions, in the order options lists them.
+var buttonLabels = map[PermissionAction]string{
+	PermissionAllow:           "Allow (a)",
+	PermissionAllowForSession: "Allow for session (s)",
+	PermissionAllowFamily:     "Allow family (f)",
+	PermissionDeny:            "Deny (d)",
 }
 
 func (p *permissionDialogCmp) renderButtons() string {
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
-
-	allowStyle := baseStyle
-	allowSessionStyle := baseStyle
-	denyStyle := baseStyle
 	spacerStyle := baseStyle.Background(styles.PanelBackground())
 
-	// Style the selected button
-	switch p.selectedOption {
-	case 0:
-		allowStyle = allowStyle.Background(t.Primary()).Foreground(t.Background())
-		allowSessionStyle = allowSessionStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
-		denyStyle = denyStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
-	case 1:
-		allowStyle = allowStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
-		allowSessionStyle = allowSessionStyle.Background(t.Primary()).Foreground(t.Background())
-		denyStyle = denyStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
-	case 2:
-		allowStyle = allowStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
-		allowSessionStyle = allowSessionStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
-		denyStyle = denyStyle.Background(t.Primary()).Foreground(t.Background())
+	parts := make([]string, 0, 2*len(p.options))
+	for i, o := range p.options {
+		style := baseStyle.Background(styles.PanelBackground()).Foreground(t.Primary())
+		if i == p.selectedOption {
+			style = baseStyle.Background(t.Primary()).Foreground(t.Background())
+		}
+		parts = append(parts, style.Padding(0, 1).Render(buttonLabels[o]), spacerStyle.Render("  "))
 	}
-
-	allowButton := allowStyle.Padding(0, 1).Render("Allow (a)")
-	allowSessionButton := allowSessionStyle.Padding(0, 1).Render("Allow for session (s)")
-	denyButton := denyStyle.Padding(0, 1).Render("Deny (d)")
-
-	content := lipgloss.JoinHorizontal(
-		lipgloss.Left,
-		allowButton,
-		spacerStyle.Render("  "),
-		allowSessionButton,
-		spacerStyle.Render("  "),
-		denyButton,
-		spacerStyle.Render("  "),
-	)
+	content := lipgloss.JoinHorizontal(lipgloss.Left, parts...)
 
 	remainingWidth := p.width - lipgloss.Width(content)
 	if remainingWidth > 0 {
@@ -304,8 +370,23 @@ func (p *permissionDialogCmp) renderBashContent() string {
 		// what you are about to allow.
 		content := fmt.Sprintf("```bash\n%s\n```", wrapCommand(pr.Command, p.width-14))
 
+		// GORILLA FIX (2026-10-11): the family, in full, under the command.
+		// The sentence the person reads IS the grant: every character of the
+		// prefix reaches the screen, wrapped not clipped, with the keys that
+		// move it and the one warning that matters (see BashFamilyNote).
+		cacheKey := p.permission.ID
+		if fam := p.family(); fam != "" {
+			content += fmt.Sprintf("\n**Allow family (f)** also allows, for this session, every command that begins with:\n```bash\n%s\n```\n`[` shorter, `]` longer (%d of %d)",
+				wrapCommand(fam, p.width-14), p.familyIdx+1, len(p.familyCandidates))
+			if note := tools.BashFamilyNote(pr.Command, fam); note != "" {
+				content += "\n\n" + note
+			}
+			content += "\n\nNever covered by a family: a dangerous command, a command raised after this turn read untrusted content, a command naming a different path."
+			cacheKey = fmt.Sprintf("%s#%d", p.permission.ID, p.familyIdx)
+		}
+
 		// Use the cache for markdown rendering
-		renderedContent := p.GetOrSetMarkdown(p.permission.ID, func() (string, error) {
+		renderedContent := p.GetOrSetMarkdown(cacheKey, func() (string, error) {
 			r := styles.GetMarkdownRenderer(p.width - 10)
 			s, err := r.Render(content)
 			return styles.ApplyPanelBackground(s), err
@@ -500,6 +581,11 @@ func (p *permissionDialogCmp) SetSize() tea.Cmd {
 		// path over four lines; the width is what makes it readable.
 		p.width = int(float64(p.windowSize.Width) * 0.8)
 		p.height = int(float64(p.windowSize.Height) * 0.4)
+		if p.family() != "" {
+			// The family block is a second command's worth of text plus its
+			// explanation; the box grows so neither is scrolled out of sight.
+			p.height = int(float64(p.windowSize.Height) * 0.7)
+		}
 	case tools.EditToolName:
 		p.width = int(float64(p.windowSize.Width) * 0.8)
 		p.height = int(float64(p.windowSize.Height) * 0.8)
@@ -521,13 +607,41 @@ func (p *permissionDialogCmp) SetSize() tea.Cmd {
 
 func (p *permissionDialogCmp) SetPermissions(permission permission.PermissionRequest) tea.Cmd {
 	p.permission = permission
+
+	// The family on offer, if the request brought a suggestion. The person
+	// can walk through every usable prefix of the command with [ and ], and
+	// the suggestion is where that walk starts.
+	p.familyCandidates = nil
+	p.familyIdx = 0
+	if permission.FamilySuggestion != "" {
+		if pr, ok := permission.Params.(tools.BashPermissionsParams); ok {
+			p.familyCandidates = tools.BashFamilyCandidates(pr.Command)
+			found := false
+			for i, c := range p.familyCandidates {
+				if c == permission.FamilySuggestion {
+					p.familyIdx, found = i, true
+					break
+				}
+			}
+			if !found {
+				p.familyCandidates = []string{permission.FamilySuggestion}
+				p.familyIdx = 0
+			}
+		}
+	}
+	p.options = []PermissionAction{PermissionAllow, PermissionAllowForSession}
+	if p.family() != "" {
+		p.options = append(p.options, PermissionAllowFamily)
+	}
+	p.options = append(p.options, PermissionDeny)
+
 	// GORILLA FIX (2026-08-18): reset the selection for every NEW request.
 	//
 	// The dialog is reused, and the highlight persisted. So after approving one
 	// thing, the next — different — request opened with an answer already
 	// chosen, and a single Enter accepted a question the user had not read.
 	// Consent has to be given per request, not inherited from the last one.
-	p.selectedOption = 2 // Deny
+	p.selectedOption = len(p.options) - 1 // Deny
 	return p.SetSize()
 }
 
@@ -576,6 +690,7 @@ func NewPermissionDialogCmp() PermissionDialogCmp {
 		// one costs a reflex — and a prompt that appears mid-typing can be
 		// answered by an Enter the user meant for something else. Defaulting to
 		// the refusal makes the accident harmless.
+		options:        []PermissionAction{PermissionAllow, PermissionAllowForSession, PermissionDeny},
 		selectedOption: 2, // Default to "Deny"
 		diffCache:      make(map[string]string),
 		markdownCache:  make(map[string]string),

