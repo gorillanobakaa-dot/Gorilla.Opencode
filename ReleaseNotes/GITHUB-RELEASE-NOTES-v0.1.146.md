@@ -300,6 +300,10 @@ From the same run, one helper's list of what it tried:
 
 **Found while testing this release.** The first build of 0.1.146 did not ask /osint for a plan: the sentence that asks for it had been added to /research only, while the /osint page told the user the model writes the parts first. A dossier run on that build called the research tool with no plan. The sentence now goes to both, a test requires it in both, and every test on this page was run again on the rebuilt file.
 
+**On real Linux, after publication.** Automatic checks on GitHub took the files from this page. The .deb was installed, started and removed on Ubuntu. The .rpm was installed, started and removed on Fedora. The Arch package was built on Arch Linux, installed, started and removed, and is attached below. The program, installed from the .deb, held a conversation with an AI running on the same Linux machine. All passed.
+
+**What the automatic checks caught after publication.** The program's own test run on GitHub failed once, on this page: a test requires every release page to show its pictures, and the first version of this page had none. The section below was added; the program itself is unchanged.
+
 **What was not tested.**
 
 - The `"trust": "local"` setting against a real Fieldkit server on this computer. Its tests use a stand-in server.
@@ -308,6 +312,21 @@ From the same run, one helper's list of what it tried:
 ## Known, not fixed in this version
 
 In a long session with NVIDIA's Nemotron 3 Ultra on 11 October, the permission question appeared for almost every shell command. "Allow for session" covers one exact command, and the model wrote each command slightly differently. This needs its own careful change.
+
+## No new pictures, and why
+
+Everything in this release is text the program prints, quoted above as printed.
+No new screenshot was taken. The two below are from earlier releases and show
+screens this release did not change, pinned to this version.
+
+**The normal window**, where every action is listed as it happens. This is the
+permission question.
+
+[![Gorilla OpenCode showing a Permission Required dialog for the patch port tool, naming the folder it will modify and the patch series it will apply, with the three choices Allow, Allow for session and Deny, proving the program asks before a tool changes files](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.146/docs/screenshots/gallery/v0132-patch-port-permission-prompt.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.146/docs/screenshots/gallery/v0132-patch-port-permission-prompt.png)
+
+**The command list.**
+
+[![The command reference filling a 200 column terminal in two balanced columns, headed Commands what each one does, with every command from slash clear through to slash help visible at once and no scrolling needed](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.146/docs/screenshots/gallery/v0132-help-two-columns-full-window.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.146/docs/screenshots/gallery/v0132-help-two-columns-full-window.png)
 
 ---
 
