@@ -1,0 +1,106 @@
+# What the source atlas shows the research helpers, and in what order: the sections, the sources picked for each,
+# and one line of advice per source. The grade, the reach and the address of every source come from
+# docs/source-registry.json, never from here. cmd/atlas renders source-atlas.txt from the two; a test fails
+# when the committed atlas is not what it renders. Edit this file or the registry, then:
+#     go run ./cmd/atlas > internal/llm/agent/source-atlas.txt
+# source: names the registry entry when the atlas shows a different name.
+header: |
+  SOURCE ATLAS — free research sources by domain, strongest first.
+  Reach: API = keyless HTTP API (web_fetch the endpoint). API-key = free after registration —
+  say so if unavailable. SearXNG = web_search engine bang (e.g. !crossref, !openalex, !pubmed,
+  !arxiv, "!google scholar"). SearXNG* = installed but off; note it for the user. Grade A/B is
+  the source-reliability PRIOR; claims are still graded independently at vetting.
+  This is the starting map, not the boundary: a source that is not listed here is still
+  fair game if web_search or web_fetch can reach it. This list is all you have been given.
+sections:
+- title: Scholarly & scientific literature
+  entries:
+  - name: OpenAlex
+  - name: Crossref
+  - name: arXiv
+    advice: |-
+      physics, maths, CS, quantitative biology;
+      full text free. The first place to look for anything computational or theoretical.
+  - name: bioRxiv / medRxiv
+    source: bioRxiv
+    advice: |-
+      preprints, unreviewed BY DEFINITION: grade
+      the source accordingly and say it is a preprint in the finding.
+  - name: PsyArXiv
+  - name: Semantic Scholar
+  - name: Google Scholar
+- title: Biomedical & life sciences
+  entries:
+  - name: Europe PMC
+  - name: PubMed
+  - name: UniProt
+  - name: Protein Data Bank (PDB)
+  - name: PubChem
+  - name: ClinVar
+  - name: WHO Global Health Observatory
+- title: Economics & finance
+  entries:
+  - name: World Bank Open Data
+  - name: IMF Data
+  - name: OECD Data Explorer
+  - name: UN Comtrade
+  - name: BIS Data Portal
+  - name: Eurostat Population
+- title: Development & humanitarian
+  entries:
+  - name: Humanitarian Data Exchange (HDX)
+    advice: 'also web_search source: humanitarian'
+  - name: ReliefWeb
+    advice: 'situation reports; fetch pages or source: web (its API wants a registered appname)'
+  - name: UNHCR Refugee Data Finder
+  - name: UNICEF Data Warehouse
+  - name: ILO Statistics
+  - name: FAOSTAT Food and Agriculture
+- title: Governance, conflict & security
+  entries:
+  - name: Uppsala Conflict Data Program (UCDP)
+  - name: GDELT Event Database
+  - name: OpenSanctions
+  - name: US OFAC Sanctions List
+  - name: V-Dem
+  - name: Global Terrorism Database
+- title: Companies & corporate
+  entries:
+  - name: OpenCorporates
+  - name: SEC Company Facts
+  - name: Global LEI Foundation
+  - name: Companies House
+  - name: ICIJ Offshore Leaks Database
+- title: News & current events
+  entries:
+  - name: GDELT Global Knowledge Graph
+  - name: Reuters
+  - name: Google News
+  - name: Wayback Machine
+  - name: Media Cloud
+- title: Earth, climate & environment
+  entries:
+  - name: NASA Earthdata
+  - name: NOAA Data
+  - name: Copernicus Climate Data Store
+  - name: USGS ScienceBase
+  - name: ERA5
+- title: Physics, space & materials
+  entries:
+  - name: CERN Open Data
+  - name: Materials Project
+  - name: NIST Chemistry WebBook
+  - name: JPL Horizons
+- title: Standards, patents & law
+  entries:
+  - name: W3C
+  - name: Google Patents
+  - name: Espacenet
+  - name: EUR-Lex
+  - name: GovInfo
+- title: Official statistics
+  entries:
+  - name: UNdata
+  - name: US Census International Database
+  - name: World Values Survey
+  - name: UNDP Human Development Data
