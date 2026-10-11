@@ -93,14 +93,23 @@ func routeOsint(args string, researchOn, dossierOn bool) researchRoute {
 
 func isBlank(s string) bool { return strings.TrimSpace(s) == "" }
 
+// planInstruction asks the model in charge for the research tool's `plan`.
+//
+// GORILLA FIX (2026-10-11): it was written into researchPrompt only, while the
+// commit that added it said "/osint asks for a plan" and the /osint page tells
+// the user the model writes the question's parts first. Measured on the v0.1.146
+// build with Gemini 3.6 Flash: a dossier run called research with no plan. Both
+// prompts now carry the same sentence.
+const planInstruction = "Before calling it, write the 3 to 7 sub-questions the answer depends on, most important " +
+	"first, each answerable by one sourced statement, and pass them as `plan`: every helper works from them. "
+
 // researchPrompt is the instruction a confirmed /research sends to the model.
 func researchPrompt(mode string, agents int, question string) string {
 	return fmt.Sprintf(
 		"Use the research tool to investigate the following. "+
 			"Set mode=%q and agents=%d exactly as given — the user chose these and they decide what this costs. "+
 			"Pass everything already established in this conversation as `context` so no helper pays to re-derive it. "+
-			"Before calling it, write the 3 to 7 sub-questions the answer depends on, most important first, each "+
-			"answerable by one sourced statement, and pass them as `plan`: every helper works from them. "+
+			planInstruction+
 			"When the helpers report, check at least one load-bearing claim yourself, carry the evidence tiers through, "+
 			"and say plainly what nobody established.\n\nQUESTION: %s",
 		mode, agents, question)
@@ -124,6 +133,7 @@ func osintPrompt(mode string, agents int, question string) string {
 			"the user chose these on the warning screen and they decide what this costs. "+
 			"Do not pass `roles`: a dossier runs its own open-source lanes and none of them searches this machine. "+
 			"Pass everything already established in this conversation as `context` so no helper pays to re-derive it. "+
+			planInstruction+
 			"When the helpers report: a follow-up call is OPTIONAL and allowed at most once, only for a gap the answer "+
 			"depends on (the tool refuses a second); verify at least one load-bearing claim yourself, carry every "+
 			"two-axis grade through unchanged, and assemble the dossier product "+

@@ -187,6 +187,13 @@ func TestOsintPromptStatesTheFollowUpAsOptionalAndBounded(t *testing.T) {
 	if strings.Contains(r, "doctrine") {
 		t.Error("the /research prompt mentions a doctrine; the everyday run has none")
 	}
+	// Both commands ask for the plan. /osint did not, while its page said the
+	// model writes the question's parts first (found on the v0.1.146 build).
+	for name, prompt := range map[string]string{"/osint": p, "/research": r} {
+		if !strings.Contains(prompt, "pass them as `plan`") {
+			t.Errorf("the %s prompt does not ask for the plan:\n%s", name, prompt)
+		}
+	}
 }
 
 // ─── the help texts ───
