@@ -161,7 +161,7 @@ No telemetry was added and none exists. Nothing new leaves your computer, and no
 ```
 certutil -hashfile gorilla-opencode.exe SHA256
 ```
-✓ It prints 0ba2ba0b2fd742195d53f9690649fb6073e7fedb51c2d3685047fc22b3ddaf00. On Linux, run sha256sum -c SHA256SUMS-v0.1.147.txt --ignore-missing in a terminal in your Downloads folder; it prints the file name followed by OK.
+✓ It prints b73c7ba54c072167ab22b5fde41f8852974210e84c323f0abf2297b4a7781a50. On Linux, run sha256sum -c SHA256SUMS-v0.1.147.txt --ignore-missing in a terminal in your Downloads folder; it prints the file name followed by OK.
 
 **Step 3:** Windows: install it. Type the command below and press Enter.
 ```
@@ -360,7 +360,7 @@ for, and why the bottom bar never stops showing which one you are in.
 - Replay of session 9af3336f through the real gate: 31 calls, 0 banned, 0
   read-only; 31 prompts if every call asked, 30 with "allow for session", 7
   with "allow family".
-- Windows binary (the published file) against local.nvidia/nemotron-3-super-120b-a12b: 7 of 7 harness scenarios valid (4 s to 44 s each).
+- Windows binary (the published file, sha256 b73c7ba5...) against local.nvidia/nemotron-3-super-120b-a12b: 7 of 7 harness scenarios valid; the same seven were also valid on the first build of this source (sha256 0ba2ba0b...).
 - PowerShell 5.1.26100: `cd C:\ && echo hi` returns in under a second with exit
   2 and the hint; an unterminated quote and a `throw` likewise; `Set-Location`
   persists across commands; non-ASCII, both quote kinds and newlines survive
@@ -377,12 +377,59 @@ for, and why the bottom bar never stops showing which one you are in.
   `agent.go`: the Claude Code auto-mode classifier refused that edit three
   times during the build. Next version.
 - Plain mode and ACP do not show the quoted-string note under a family.
+- Seen once while taking the pictures, in the default inline interface, after
+  the console window was resized by the tool: the permission dialog drew with an
+  empty interior and /settings drew nothing. Not reproduced by hand. The pictures
+  were taken with the alternate screen on, where it did not occur.
 
-## No new pictures, and why
+## The pictures: the new modes and the new answer, on the shipped build
 
-The dialog change is three lines of text under a command and one more button.
-A screenshot would show a terminal with a question in it. The text above says
-what the question says.
+Taken with `scripts/model-tests/tui_shots.py`, which starts the installed
+program in its own console window on an isolated configuration (NVIDIA Nemotron
+3 Super, alternate screen on, a workspace holding one README) and photographs
+the window; nothing was drawn by hand. Same source as the published file, built
+a few minutes before the release commit.
+
+### /help lists /mode under "Your conversation"
+
+[![The command reference open inside Gorilla OpenCode with the new /mode command listed under Your conversation, described as how much the AI may do before asking, proving the command is discoverable from /help](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-help-lists-mode.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-help-lists-mode.png)
+
+### /mode says which mode you are in and what it means
+
+[![Gorilla OpenCode after typing /mode, the status line reading Permission mode ask, every change asks once, with the four options ask accept-edits plan auto and the Shift+Tab hint, proving the command explains the current mode](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-mode-command-explains.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-mode-command-explains.png)
+
+### Shift+Tab: accept-edits, plan, auto — and the bar at the bottom says so
+
+[![Gorilla OpenCode after one Shift+Tab, the conversation showing the accept-edits explanation and the bottom bar carrying a red EDITS auto-approved chip, proving the mode change is visible on every frame](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-shift-tab-accept-edits.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-shift-tab-accept-edits.png)
+
+[![Gorilla OpenCode after a second Shift+Tab, the bottom bar carrying a PLAN read-only chip and the conversation explaining that nothing is changed or run, proving plan mode is announced where the user looks](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-shift-tab-plan.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-shift-tab-plan.png)
+
+[![Gorilla OpenCode after a third Shift+Tab, the conversation stating the auto mode exceptions irreversible commands, requests leaving the machine after untrusted content, paths outside the workspace, and the bottom bar carrying a red AUTO approving without asking chip, proving auto mode is never silent](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-shift-tab-auto.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-shift-tab-auto.png)
+
+### The same setting in /settings, with its explanation
+
+[![The /settings dialog of Gorilla OpenCode with the Permission mode row showing the value ask, the four accepted values and the default, under the Conversation group, proving the mode is a documented setting](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-settings-permission-mode.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-settings-permission-mode.png)
+
+### A shell command: the dialog offers Allow family, and shows the family
+
+The model was asked to run `python -m pip --version`. The dialog shows the
+command, the family it proposes (`python -m pip`), the keys that change it, and
+what no family ever covers.
+
+[![The Permission Required dialog of Gorilla OpenCode for the bash command python -m pip --version, showing the Allow family button, the proposed family python -m pip, the bracket keys to shorten or lengthen it with the count 3 of 3, the list of what a family never covers, and the four buttons with Deny highlighted, proving the family is shown in full before it is approved](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-allow-family-dialog.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-allow-family-dialog.png)
+
+### After f: the command ran, and the next one in the family did not ask
+
+[![Gorilla OpenCode after Allow family was pressed, the conversation showing the PowerShell command python -m pip --version with its output pip 25.0.1 and the model's reply quoting it, proving the approved command ran](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-after-family-answer.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-after-family-answer.png)
+
+`python -m pip list` followed, inside the family: it ran with no dialog (the
+tool's record says `asked: False`).
+
+[![Gorilla OpenCode after a second command in the same family, python -m pip list, whose package table fills the screen with no permission dialog in sight, proving the family covered it without asking](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-second-command-no-prompt.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-second-command-no-prompt.png)
+
+### Plan mode: a change is refused at once, nobody is asked
+
+[![Gorilla OpenCode in plan mode, asked to create hello.txt, showing Permission denied so nothing was run and no answer was produced, the write tool marked Error Permission denied, and the bottom bar carrying the PLAN read-only chip, proving plan mode refuses changes without a dialog](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-plan-mode-refuses.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.147/docs/screenshots/gallery/v0147-plan-mode-refuses.png)
 
 ---
 
@@ -407,7 +454,7 @@ permission.Service gains GrantFamily and AskedKeys; CreatePermissionRequest/Perm
 ### Toolchain
 
 ```
-go1.27.0 windows/amd64. Windows: `go build -ldflags "-s -w -X github.com/opencode-ai/opencode/internal/version.Version=v0.1.147" -o gorilla-opencode.exe .`. Linux: same flags with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64`. Windows binary sha256 0ba2ba0b2fd742195d53f9690649fb6073e7fedb51c2d3685047fc22b3ddaf00, built from the committed tree, tested, published unchanged. Linux binary sha256 5fde6b356ae24370faf00666e16fdfd065db89b9fab874e2e9a004f293d004d4. .deb and .rpm by nfpm.
+go1.27.0 windows/amd64. Windows: `go build -ldflags "-s -w -X github.com/opencode-ai/opencode/internal/version.Version=v0.1.147" -o gorilla-opencode.exe .`. Linux: same flags with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64`. Windows binary sha256 b73c7ba54c072167ab22b5fde41f8852974210e84c323f0abf2297b4a7781a50, built from the committed tree, tested, published unchanged. Linux binary sha256 46b2f684c06a3d2db572d1e2751597e126d35cea77025993ec7eff5cff18104f. .deb and .rpm by nfpm.
 ```
 
 ### Resource Deltas
@@ -442,7 +489,7 @@ gorilla-opencode.exe: 55,220,736 bytes (0.1.146) -> 55,270,912 bytes (+50,176).
 
 - **Added:** permission/family_test.go (coverage, boundary, tool/action/path/tree binding, pathWithin, never Irreversible/Egress/tainted, under auto-approve, invalid family not recorded, no matcher no grant, IsCovered, AskedKeys); permission/mode_test.go (ask unchanged; accept-edits in-root only, not bash, not outside; plan refuses without publishing, web still asks; auto for every session with carve-outs; cycle and spellings); tools/commandfamily_test.go (the Nemotron commands verbatim, pytest pipes, fallback suggestions, chained/redirected/substituted/unbalanced tails under both shells, quote rules per shell, note, candidates, banned/dangerous/tainted still ask on the real service, read-only gate unchanged, covered requests return without publishing); shell/parse_error_test.go (&& fails at once with the hint and the shell lives, unterminated quote, throw keeps output, Set-Location persists, UTF-8/quotes/newlines round trip, native exit code); prompt/model_line_test.go; dialog/permission_family_test.go. carveout_test.go updated for decision B.
 - **Removed:** Not available in the source material.
-- **Notes:** Complete suite passes on Windows (go test ./... exit 0). Replay of session 9af3336f: 31 bash calls, 0 banned, 0 read-only; 31 prompts if every call asked, 30 with "allow for session" per distinct command, 7 with "allow family". Windows binary (the published file) against local.nvidia/nemotron-3-super-120b-a12b: 7 of 7 harness scenarios valid (4 s to 44 s each). Adversarial review (three reviewers, verifiers) confirmed one finding, left as designed and disclosed: a family ending inside a quoted string (the fieldkit prefix ends inside python -c "...") constrains nothing after it, so arbitrary interpreter code is repeatable without a prompt; the dialog says so under the family; plain mode and ACP show the family without that note. NOT RUN: an interactive session on Linux; the plan-mode refusal sentence (PlanModeRefusal) is defined but not wired in agent.go, so plan mode returns "Permission denied" (the Claude Code auto-mode classifier denied that edit three times during the build).
+- **Notes:** Complete suite passes on Windows (go test ./... exit 0). Replay of session 9af3336f: 31 bash calls, 0 banned, 0 read-only; 31 prompts if every call asked, 30 with "allow for session" per distinct command, 7 with "allow family". Windows binary (the published file, sha256 b73c7ba5...) against local.nvidia/nemotron-3-super-120b-a12b: 7 of 7 harness scenarios valid; the same seven were also valid on the first build of this source (sha256 0ba2ba0b...). Adversarial review (three reviewers, verifiers) confirmed one finding, left as designed and disclosed: a family ending inside a quoted string (the fieldkit prefix ends inside python -c "...") constrains nothing after it, so arbitrary interpreter code is repeatable without a prompt; the dialog says so under the family; plain mode and ACP show the family without that note. Pictures: scripts/model-tests/tui_shots.py drives the installed program in its own conhost window on an isolated configuration (alternate screen on) and grabs the window's pixels; the ten pictures on the page were taken on a build of the same source made before the commit, binary sha256 560ef625e751298b195ef434a02a5f071b8fdc2d42f402d5ea6898a379897622 (the published file embeds the commit id, hence a different hash for identical source). Observed while taking them, in the default inline (scrollback) interface: after the console window was resized by the tool, the permission dialog drew with an empty interior and /settings drew nothing; not reproduced by hand, listed under Known. NOT RUN: an interactive session on Linux; the plan-mode refusal sentence (PlanModeRefusal) is defined but not wired in agent.go, so plan mode returns "Permission denied" (the Claude Code auto-mode classifier denied that edit three times during the build).
 
 ### Security Posture
 
@@ -459,7 +506,7 @@ gh release download v0.1.147 -R gorillanobakaa-dot/Gorilla.Opencode
 # Expected: exe, linux-amd64 binary, .deb, .rpm, SHA256SUMS-v0.1.147.txt.
 # verify
 sha256sum -c SHA256SUMS-v0.1.147.txt --ignore-missing
-# Expected: Each present file followed by OK. Windows exe: 0ba2ba0b2fd742195d53f9690649fb6073e7fedb51c2d3685047fc22b3ddaf00.
+# Expected: Each present file followed by OK. Windows exe: b73c7ba54c072167ab22b5fde41f8852974210e84c323f0abf2297b4a7781a50.
 # install
 .\gorilla-opencode.exe install
 # Expected: Install path and shortcuts.
@@ -502,7 +549,7 @@ gorilla-opencode --version
 | 31 prompts, 30 distinct, 16 variants | 📄 stated in input | session 9af3336f counted from gorilla-opencode.db |
 | Replay 31 -> 7 | 📄 stated in input | TestReplaySessionPrompts output |
 | Parse error mechanism | 📄 stated in input | probe: ParserError at 320 ms on the shell's stderr; AFTER never printed; status file absent |
-| Binary hash and size | 📄 stated in input | sha256 0ba2ba0b2fd742195d53f9690649fb6073e7fedb51c2d3685047fc22b3ddaf00, 55,270,912 bytes |
+| Binary hash and size | 📄 stated in input | sha256 b73c7ba54c072167ab22b5fde41f8852974210e84c323f0abf2297b4a7781a50, 55,270,912 bytes |
 | Scope | 📄 stated in input | 37 files changed, 2931 insertions, 130 deletions |
 | Claude Code classifier denials | 📄 stated in input | three Edit calls refused with the labels [Create Unsafe Agents] and [Auto-Mode Bypass] on 2026-10-11 |
 | Reviewer finding on quoted families | 📄 stated in input | reproduced on the real permission service by two verifiers |
