@@ -197,7 +197,7 @@ Which shell runs the commands the AI asks for. Change this only if your shell li
 - **Setting:** `shell.path`
 - **Type:** text
 - **Accepts:** text
-- **Default:** `C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe`
+- **Default:** `/bin/bash`
 
 ### Shell flags
 
@@ -235,7 +235,7 @@ Where this program keeps its database and logs. One folder for the whole machine
 - **Setting:** `data.directory`
 - **Type:** text
 - **Accepts:** text
-- **Default:** `~\.local\share\gorilla-opencode`
+- **Default:** `~/.local/share/gorilla-opencode`
 - **Takes effect:** next launch
 
 ## Appearance

@@ -381,7 +381,7 @@ func (p *permissionDialogCmp) renderBashContent() string {
 			if note := tools.BashFamilyNote(pr.Command, fam); note != "" {
 				content += "\n\n" + note
 			}
-			content += "\n\nNever covered by a family: a dangerous command, a command raised after this turn read untrusted content, a command naming a different path."
+			content += "\n\nNever covered by a family: a dangerous command, anything after untrusted content was read, a different path."
 			cacheKey = fmt.Sprintf("%s#%d", p.permission.ID, p.familyIdx)
 		}
 

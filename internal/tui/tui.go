@@ -2557,7 +2557,10 @@ func (a appModel) setPermissionMode(mode string) tea.Cmd {
 	}
 	text := fmt.Sprintf("Permission mode: %s — %s", mode, config.PermissionModeLayman(mode))
 	if mode == config.PermissionAuto {
-		return util.ReportWarn("☢ " + text + ". This is persisted: every conversation runs this way until you change it.")
+		// Info, not Warn: a warning is drawn untruncated and pushed the AUTO
+		// chip off the end of the status line (measured on Windows console).
+		// The red chip beside it is the standing warning.
+		return util.ReportInfo(text + ". Persisted: every conversation runs this way until you change it.")
 	}
 	return util.ReportInfo(text)
 }

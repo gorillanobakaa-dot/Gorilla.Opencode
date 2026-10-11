@@ -311,7 +311,9 @@ func (m statusCmp) chrome() statusChrome {
 			Background(t.Error()).
 			Foreground(t.Background()).
 			Bold(true).
-			Render("☢ AUTO — approving without asking")
+			// ASCII on purpose: the radiation sign is double-width in a
+			// Windows console and pushed this chip off the end of the line.
+			Render("AUTO - approving without asking")
 	case config.PermissionAcceptEdits:
 		c.yolo = styles.Padded().
 			Background(t.Warning()).
