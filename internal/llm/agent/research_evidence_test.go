@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -189,7 +190,9 @@ func TestTheEvidenceRecordIsWhatFieldkitReads(t *testing.T) {
 	if strings.Join(types, ",") != "run,lane,claim,claim,claim,fetched,lane" {
 		t.Errorf("records %v", types)
 	}
-	if info, _ := os.Stat(path); info.Mode().Perm() != findingsFileMode {
+	// Windows has no Unix permission bits: Go reports any writable file as
+	// 0666 there, so the mode is checkable only elsewhere.
+	if info, _ := os.Stat(path); runtime.GOOS != "windows" && info.Mode().Perm() != findingsFileMode {
 		t.Errorf("record mode %v, want %v", info.Mode().Perm(), findingsFileMode)
 	}
 	if writeEvidenceRecord(md, "q?", "", "call_1", roles, parses, fetched) != "" {
