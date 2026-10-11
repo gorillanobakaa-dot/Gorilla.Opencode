@@ -816,7 +816,8 @@ func (r *researchTool) infoBase() tools.ToolInfo {
 			"agents": map[string]any{
 				"type": "integer",
 				"description": fmt.Sprintf("How many helpers, %d to %d (default %d). %d runs the mandatory "+
-					"lanes only. Each one is a sequential LLM session — scale to the question, not to the maximum.",
+					"lanes only. Each one is a full LLM session (run together in parallel mode, one after another in "+
+					"sequential mode) — scale to the question, not to the maximum.",
 					ResearchMinAgents, ResearchMaxAgents, ResearchDefaultAgents, ResearchMinAgents),
 			},
 			"mode": map[string]any{
@@ -879,44 +880,102 @@ func selectRolesFor(doctrine, spec string, want int) ([]researchRole, string) {
 		byID[role.ID] = role
 	}
 
-	var chosen []researchRole
 	var notes []string
-
-	if strings.TrimSpace(spec) != "" {
-		seen := make(map[string]bool)
-		for _, raw := range strings.Split(spec, ",") {
-			id := strings.ToLower(strings.TrimSpace(raw))
-			if id == "" || seen[id] {
-				continue
-			}
-			role, ok := byID[id]
-			if !ok {
-				notes = append(notes, fmt.Sprintf("unknown role %q ignored (this run's roles are: %s)",
-					id, strings.Join(roleIDs(library), ", ")))
-				continue
-			}
-			seen[id] = true
-			chosen = append(chosen, role)
+	var explicit []researchRole
+	seen := make(map[string]bool)
+	for _, raw := range strings.Split(spec, ",") {
+		id := strings.ToLower(strings.TrimSpace(raw))
+		if id == "" || seen[id] {
+			continue
 		}
-		// Top up from the library so the mandatory lanes are never silently lost.
-		for _, role := range library {
-			if len(chosen) >= want {
-				break
-			}
-			if !seen[role.ID] {
-				seen[role.ID] = true
-				chosen = append(chosen, role)
-				notes = append(notes, fmt.Sprintf("added %s to reach the %d-agent minimum", role.ID, ResearchMinAgents))
-			}
+		role, ok := byID[id]
+		if !ok {
+			notes = append(notes, fmt.Sprintf("unknown role %q ignored (this run's roles are: %s)",
+				id, strings.Join(roleIDs(library), ", ")))
+			continue
 		}
-	} else {
-		chosen = append(chosen, library...)
+		seen[id] = true
+		explicit = append(explicit, role)
+	}
+	if len(explicit) == 0 {
+		chosen := append([]researchRole(nil), library...)
+		if len(chosen) > want {
+			chosen = chosen[:want]
+		}
+		return chosen, strings.Join(notes, "; ")
 	}
 
-	if len(chosen) > want {
-		chosen = chosen[:want]
+	// GORILLA FIX (2026-10-11): the mandatory lanes are placed FIRST and are
+	// never cut. This topped the explicit roles up from the library and then
+	// truncated to `want`, so roles="cost" at four helpers ran cost, local,
+	// prior_art and primary_source: the requirement lane, which checks the
+	// answer against what was actually asked, was silently gone. The test that
+	// covered it counted lanes and never asked which.
+	mandatory := library
+	if len(mandatory) > ResearchMinAgents {
+		mandatory = mandatory[:ResearchMinAgents]
+	}
+	chosen := append([]researchRole(nil), mandatory...)
+	inChosen := make(map[string]bool, len(library))
+	for _, role := range chosen {
+		inChosen[role.ID] = true
+	}
+	var dropped []string
+	for _, role := range explicit {
+		switch {
+		case inChosen[role.ID]:
+		case len(chosen) < want:
+			chosen = append(chosen, role)
+			inChosen[role.ID] = true
+		default:
+			dropped = append(dropped, role.ID)
+		}
+	}
+	if len(dropped) > 0 {
+		notes = append(notes, fmt.Sprintf("%s not run: the %d mandatory lanes and the roles before it fill the %d helpers of this run (ask for more helpers to add it)",
+			strings.Join(dropped, ", "), len(mandatory), want))
+	}
+	for _, role := range library {
+		if len(chosen) >= want {
+			break
+		}
+		if !inChosen[role.ID] {
+			inChosen[role.ID] = true
+			chosen = append(chosen, role)
+			notes = append(notes, fmt.Sprintf("added %s to fill the %d helpers", role.ID, want))
+		}
 	}
 	return chosen, strings.Join(notes, "; ")
+}
+
+// laneOutcome is one helper's result in a run.
+type laneOutcome struct {
+	reply string
+	err   error
+	spend helperSpend
+}
+
+// peerDigest is what the second-wave (peeking) lanes read: every blind lane's
+// report and, on a supervised run, that lane's audit beneath it.
+//
+// GORILLA FIX (2026-10-11): the audits were computed before the second wave
+// "so the verifier reads audited work", and then never given to it. The
+// verifier re-checked claims a supervisor had already rejected, and missed
+// the ones it had flagged WEAK.
+func peerDigest(roles []researchRole, results []laneOutcome, audits []string, wave []int) string {
+	var peers strings.Builder
+	for _, i := range wave {
+		if results[i].err != nil {
+			continue
+		}
+		fmt.Fprintf(&peers, "### %s\n%s\n\n", roles[i].Title, strings.TrimSpace(results[i].reply))
+		if i < len(audits) {
+			if a := strings.TrimSpace(audits[i]); a != "" {
+				fmt.Fprintf(&peers, "#### Supervisor's audit of this lane\n%s\n\n", a)
+			}
+		}
+	}
+	return peers.String()
 }
 
 // buildPrompt assembles one helper's instructions. Everything the helper knows
@@ -1134,7 +1193,7 @@ const dossierDutiesFooter = `
 
 3. THE FILE. Write the complete dossier as markdown into a NEW file under
    %s (create the folder if missing), filename
-   dossier-<YY-MM-DD-HH-MM>-<three-word-slug>.md, and tell the user the exact
+   dossier-<YY-MM-DD-HH-MM>-<four-word-slug>.md, and tell the user the exact
    path. NEVER write it into the working folder: working folders end up in git
    repositories, and a private question must never end up in a public commit.
    In the conversation, give the bottom line and key findings only.
@@ -1422,12 +1481,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	// the roles that must READ the others (verifier, completeness critic) go
 	// second, once there is something to read. Splitting on that dependency is
 	// the only ordering this actually needs.
-	type outcome struct {
-		reply string
-		err   error
-		spend helperSpend
-	}
-	results := make([]outcome, len(roles))
+	results := make([]laneOutcome, len(roles))
 	var mu sync.Mutex
 	var supervisorSpend helperSpend
 
@@ -1469,7 +1523,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 			case sem <- struct{}{}:
 			case <-hctx.Done():
 				SetSubAgentState(entry.ID, SubAgentKilled)
-				results[i] = outcome{err: hctx.Err()}
+				results[i] = laneOutcome{err: hctx.Err()}
 				return
 			}
 			defer func() { <-sem }()
@@ -1485,7 +1539,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 			default:
 				SetSubAgentState(entry.ID, SubAgentDone)
 			}
-			results[i] = outcome{reply: reply, err: err, spend: spend}
+			results[i] = laneOutcome{reply: reply, err: err, spend: spend}
 		})
 	}
 
@@ -1596,13 +1650,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	}
 
 	if len(secondWave) > 0 {
-		var peers strings.Builder
-		for _, i := range firstWave {
-			if results[i].err == nil {
-				fmt.Fprintf(&peers, "### %s\n%s\n\n", roles[i].Title, strings.TrimSpace(results[i].reply))
-			}
-		}
-		runWave(secondWave, peers.String())
+		runWave(secondWave, peerDigest(roles, results, audits, firstWave))
 	}
 
 	// One write for the whole run: N goroutines doing read-modify-write on the
@@ -1769,7 +1817,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	for i, o := range results {
 		replies[i] = o.reply
 	}
-	if saved := writeRawFindings(params.Question, roles, replies, audits, params.Doctrine); saved != "" {
+	if saved := writeRawFindings(params.Question, roles, replies, audits, params.Doctrine, call.ID); saved != "" {
 		fmt.Fprintf(&out, "\n## Findings already saved\n\n"+
 			"Every lane's report is on disk at:\n\n    %s\n\n"+
 			"That happened automatically, before you were asked to do anything, so this run "+

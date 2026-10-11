@@ -75,6 +75,10 @@ stations, and the loop is the point:
 
 **Plan → Collect → Vet → Assess gaps → (one bounded gap round) → Report**
 
+> Status (2026-10-11): there is no separate planning stage in the code. The
+> lanes are fixed, and each lane plans its own ground under the lane method.
+> Step 1 below describes the intended planning step.
+
 1. **Plan.** Before touching a single source, the orchestrator (the agent in
    charge) breaks your question into 3–7 ranked sub-questions, each specific
    enough to be answered by one short sourced statement. For competing
@@ -142,9 +146,11 @@ tracing, one targeted gap round, and the formal dossier product.
 
 ## Where it looks: the source atlas
 
-The tool ships with a built-in source atlas backed by a registry of **985
-sources**, classified by how they can be reached for free. The real counts,
-from the registry file itself:
+The tool ships with a built-in source atlas (about 60 entries, embedded from
+`internal/llm/agent/source-atlas.txt`) distilled from a registry of **985
+sources**, classified by how they can be reached for free. The registry is
+documentation: the helpers are given the atlas, not the registry, and reach
+the rest by searching. The real counts, from the registry file itself:
 
 | Count | What it means |
 |---|---|
@@ -332,7 +338,9 @@ used.
 
 ## What it will not do
 
-- It will not cite a source it did not actually open.
+- It will not cite a source it did not actually open. (Every helper is told
+  this. Nothing in code checks it yet: the helpers' own fetches are in the
+  session store, and checking each cited URL against them is planned.)
 - It will not present one echoed press release as consensus.
 - It will not manufacture certainty. Research reduces uncertainty; it does
   not eliminate it. The leftover risk is stated and left with you.

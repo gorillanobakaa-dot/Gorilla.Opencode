@@ -221,8 +221,10 @@ func osintContent() []osintLine {
 	add(para("red", "", "LEAVES: your question, in full, goes to the provider of the model you are using — to every helper "+
 		"session, not one. The search terms the helpers write go to the search and scholarly services they query "+
 		"(the scholarly indexes, the statistics and filings sites, and your SearXNG or the sites lynx fetches), "+
-		"and the pages they open see the request. Those requests carry this program's name, not yours, but the "+
-		"words of the query are the query. Helpers are told to keep your name, email and exact location out of "+
+		"and the pages they open see the request. Scholarly and data services are told this program's name; "+
+		"pages a helper opens see an ordinary Firefox (GORILLA_OPENCODE_USER_AGENT=honest names the program there too); "+
+		"SEC EDGAR and Unpaywall get the contact address you set in GORILLA_OPENCODE_CONTACT_EMAIL. None of them gets "+
+		"your name from this program, but the words of the query are the query. Helpers are told to keep your name, email and exact location out of "+
 		"search terms; nothing checks that they did. Do not put in the question what must not leave the machine.")...)
 	add(para("", "", "The program asks your permission before helpers search, unless you have already allowed it for the session.")...)
 	add(blank)

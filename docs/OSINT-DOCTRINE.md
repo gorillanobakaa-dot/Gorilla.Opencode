@@ -129,8 +129,9 @@ requires **independent** confirmation — which is where the next rule comes in.
 ATP 2-22.9 treats circular reporting as the open web's defining disease: many
 outlets echoing one origin is one voice amplified, not corroboration. The
 port is mechanical: every evidence entry records the claim's ultimate origin;
-two entries tracing to the same origin count as ONE source. Enforced twice —
-inside each lane, and again at orchestrator merge time.
+two entries tracing to the same origin count as ONE source. Each lane is told
+to apply it; the orchestrator is told to apply it again when it merges the
+lanes. Both are instructions: no code groups claims by origin yet.
 
 ### 2.5 The honesty sections
 
