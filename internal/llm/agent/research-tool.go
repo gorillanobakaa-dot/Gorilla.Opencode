@@ -130,6 +130,32 @@ type ResearchParams struct {
 	// the assessment format. Gated on the /context dossier row: the schema
 	// only offers it when armed, and Run refuses it when not.
 	Doctrine string `json:"doctrine"`
+	// Plan is the investigation's sub-questions, ranked, written by the model
+	// in charge before the helpers start: every helper gets them, and each
+	// says which it could not answer. See ResearchMaxPlan.
+	Plan []string `json:"plan"`
+}
+
+// ResearchMaxPlan bounds the plan. GORILLA OVERRIDE (2026-10-11): the doctrine
+// (FM 2-0, ATP 2-22.9) and OSINT-DOCTRINE.md call for 3 to 7 ranked
+// sub-questions before collection; the code had no planning stage at all.
+// More than seven is a list, not a plan, and every helper pays to read it.
+const ResearchMaxPlan = 7
+
+// cleanPlan trims the plan and refuses one that is not a plan. An empty plan
+// is allowed: it is optional, and a run without one works as it always has.
+func cleanPlan(raw []string) ([]string, string) {
+	var plan []string
+	for _, q := range raw {
+		if q = strings.Join(strings.Fields(q), " "); q != "" {
+			plan = append(plan, q)
+		}
+	}
+	if len(plan) > ResearchMaxPlan {
+		return nil, fmt.Sprintf("the plan has %d sub-questions; at most %d. Rank them and keep the %d the answer "+
+			"depends on most: every helper reads all of them.", len(plan), ResearchMaxPlan, ResearchMaxPlan)
+	}
+	return plan, ""
 }
 
 // researchRole is one investigator's lane. Lane is what it must cover;
@@ -837,6 +863,13 @@ func (r *researchTool) infoBase() tools.ToolInfo {
 					"report before you see it, returning APPROVED / WEAK / REJECTED with the problems named — " +
 					"up to DOUBLE the sessions and the tokens (" + supervisedCost + "), for when being wrong is expensive.",
 			},
+			"plan": map[string]any{
+				"type":  "array",
+				"items": map[string]any{"type": "string"},
+				"description": fmt.Sprintf("Optional, recommended: the %d-%d sub-questions the answer depends on, most important "+
+					"first, each answerable by one sourced statement. Every helper gets them; more than %d is refused.",
+					3, ResearchMaxPlan, ResearchMaxPlan),
+			},
 			"roles": map[string]any{
 				"type": "string",
 				"description": "Optional comma-separated role IDs to run instead of the default set: " +
@@ -987,7 +1020,7 @@ func peerDigest(roles []researchRole, results []laneOutcome, audits []string, wa
 
 // buildPrompt assembles one helper's instructions. Everything the helper knows
 // is here: it cannot see the conversation or the other helpers.
-func buildPrompt(role researchRole, question, sharedContext, peerFindings string, index, total int, doctrine string) string {
+func buildPrompt(role researchRole, question, sharedContext, peerFindings string, index, total int, doctrine string, plan ...string) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "You are helper %d of %d in a research investigation. Your role is:\n\n%s\n\n",
@@ -996,6 +1029,14 @@ func buildPrompt(role researchRole, question, sharedContext, peerFindings string
 	fmt.Fprintf(&b, "WHY YOUR LANE IS NARROW: %s\n\n", role.Prevents)
 	fmt.Fprintf(&b, "THE QUESTION UNDER INVESTIGATION:\n%s\n\n", question)
 
+	if len(plan) > 0 {
+		b.WriteString("THE PLAN — the sub-questions this investigation must answer, most important first. Answer the ones " +
+			"your lane can reach; in NOT ESTABLISHED, name by number each one your lane could not:\n")
+		for i, q := range plan {
+			fmt.Fprintf(&b, "  %d. %s\n", i+1, q)
+		}
+		b.WriteString("\n")
+	}
 	if strings.TrimSpace(sharedContext) != "" {
 		fmt.Fprintf(&b, "ALREADY ESTABLISHED — treat as given, do NOT re-derive any of this:\n%s\n\n", sharedContext)
 	}
@@ -1360,6 +1401,10 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	if strings.TrimSpace(params.Question) == "" {
 		return tools.NewTextErrorResponse("question is required"), nil
 	}
+	plan, planErr := cleanPlan(params.Plan)
+	if planErr != "" {
+		return tools.NewTextErrorResponse(planErr), nil
+	}
 
 	// GORILLA OVERRIDE: the dossier is user-armed, never model-volunteered.
 	// The schema only offers it when the /context row is on, but a model can
@@ -1469,6 +1514,13 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	started := time.Now()
 	var out strings.Builder
 	fmt.Fprintf(&out, "# Research: %s\n\n", strings.TrimSpace(params.Question))
+	if len(plan) > 0 {
+		out.WriteString("The plan every helper was given:\n")
+		for i, q := range plan {
+			fmt.Fprintf(&out, "%d. %s\n", i+1, q)
+		}
+		out.WriteString("\n")
+	}
 	switch mode {
 	case ModeSequential:
 		fmt.Fprintf(&out, "%d helpers, one at a time. %s %s\n\n", len(roles), clampNote, roleNote)
@@ -1537,7 +1589,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 			defer func() { <-sem }()
 
 			SetSubAgentState(entry.ID, SubAgentRunning)
-			prompt := buildPrompt(roles[i], params.Question, params.Context, peers, i, len(roles), params.Doctrine)
+			prompt := buildPrompt(roles[i], params.Question, params.Context, peers, i, len(roles), params.Doctrine, plan...)
 			reply, spend, err := r.runHelper(hctx, sessionID, call.ID, roles[i], prompt, entry.ID, params.Doctrine)
 			switch {
 			case err != nil && hctx.Err() != nil:

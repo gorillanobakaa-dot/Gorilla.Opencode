@@ -230,3 +230,26 @@ func TestASubHeadingInsideFindingsDoesNotEndIt(t *testing.T) {
 		t.Errorf("claims under a sub-heading were lost: %+v", p.Claims)
 	}
 }
+
+// The plan reaches every helper, numbered, and a plan longer than a plan is
+// refused rather than cut: which seven to keep is the orchestrator's call.
+func TestThePlanReachesEveryHelperAndIsBounded(t *testing.T) {
+	plan, msg := cleanPlan([]string{"  who decided it? ", "", "when\n did it start?"})
+	if msg != "" || len(plan) != 2 || plan[1] != "when did it start?" {
+		t.Fatalf("plan %q, msg %q", plan, msg)
+	}
+	p := buildPrompt(researchRoles[0], "q", "", "", 0, 4, "", plan...)
+	if !strings.Contains(p, "THE PLAN") || !strings.Contains(p, "  1. who decided it?\n  2. when did it start?") {
+		t.Errorf("the plan is not in the prompt:\n%s", p)
+	}
+	if strings.Contains(buildPrompt(researchRoles[0], "q", "", "", 0, 4, ""), "THE PLAN") {
+		t.Error("a run without a plan was given an empty one")
+	}
+	long := make([]string, ResearchMaxPlan+1)
+	for i := range long {
+		long[i] = "q"
+	}
+	if _, msg := cleanPlan(long); !strings.Contains(msg, "at most 7") {
+		t.Errorf("an eight-part plan was not refused: %q", msg)
+	}
+}

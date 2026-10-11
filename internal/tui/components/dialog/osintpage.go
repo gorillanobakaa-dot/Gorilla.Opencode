@@ -161,8 +161,10 @@ func osintContent() []osintLine {
 	add(blank)
 
 	add(osintLine{"h2", "What actually happens when you run it"})
-	add(para("", "1. LANES   — ", fmt.Sprintf("there is no planning stage. The program works the question in fixed lanes, one "+
-		"helper agent per lane, and you choose how many (%d to %d). The first %d always run:", minHelpers, maxHelpers, minHelpers))...)
+	add(para("", "1. LANES   — ", fmt.Sprintf("the model in charge first writes the question's parts (at most %d, most "+
+		"important first; the program refuses more) and every helper is given them. The program then works the "+
+		"question in fixed lanes, one helper agent per lane, and you choose how many (%d to %d). The first %d always run:",
+		agent.ResearchMaxPlan, minHelpers, maxHelpers, minHelpers))...)
 	for _, title := range mandatory {
 		add(para("", "               * ", title)...)
 	}

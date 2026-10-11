@@ -242,7 +242,7 @@ func TestResearchHelpStatesWhatTheCodeDoes(t *testing.T) {
 // sources and a gap hunt that do not exist, and never said the question leaves.
 func TestOsintHelpStatesWhatTheCodeDoes(t *testing.T) {
 	d := detailOf(t, "osint")
-	for _, gone := range []string{"sub-questions", "plans your", "hundreds", "hunts its own gaps", "985"} {
+	for _, gone := range []string{"plans your", "hundreds", "hunts its own gaps", "985", "indicators"} {
 		if strings.Contains(d, gone) {
 			t.Errorf("/osint help still claims %q", gone)
 		}

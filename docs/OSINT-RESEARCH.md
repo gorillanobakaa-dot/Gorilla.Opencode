@@ -75,9 +75,11 @@ stations, and the loop is the point:
 
 **Plan → Collect → Vet → Assess gaps → (one bounded gap round) → Report**
 
-> Status (2026-10-11): there is no separate planning stage in the code. The
-> lanes are fixed, and each lane plans its own ground under the lane method.
-> Step 1 below describes the intended planning step.
+> Status (2026-10-11): the plan is the research tool's `plan` parameter. The
+> model in charge writes up to 7 ranked sub-questions, the program refuses
+> more, every helper gets them, and each lane names in NOT ESTABLISHED the
+> ones it could not answer. The lanes themselves are fixed. Confirm/kill
+> indicators (below) are not implemented: no code asks for or checks them.
 
 1. **Plan.** Before touching a single source, the orchestrator (the agent in
    charge) breaks your question into 3–7 ranked sub-questions, each specific
