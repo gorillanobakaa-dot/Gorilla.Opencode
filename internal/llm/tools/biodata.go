@@ -197,6 +197,9 @@ var bioSources = map[string]bioSource{
 
 type bioDataTool struct {
 	permissions permission.Service
+	// client is nil in production (newSafeClient); a test sets one that
+	// reaches its loopback stub.
+	client *http.Client
 }
 
 func NewBioDataTool(permissions permission.Service) BaseTool {
@@ -285,7 +288,10 @@ func (b *bioDataTool) Run(ctx context.Context, call ToolCall) (ToolResponse, err
 	// matters here — the per-host politeness limiter. These are public
 	// scientific APIs with real budgets, and a research run that fires eleven
 	// helpers at NCBI is exactly what earns a block.
-	client := newSafeClient(bioTimeout)
+	client := b.client
+	if client == nil {
+		client = newSafeClient(bioTimeout)
+	}
 	req, err := http.NewRequestWithContext(ctx, "GET", target, nil)
 	if err != nil {
 		return NewTextErrorResponse(fmt.Sprintf("could not build the request: %s", err)), nil
@@ -324,7 +330,13 @@ func (b *bioDataTool) Run(ctx context.Context, call ToolCall) (ToolResponse, err
 		return NewTextErrorResponse(fmt.Sprintf(
 			"%s returned something that is not JSON: %s", src.label, err)), nil
 	}
-	return NewTextResponse(renderBioRecords(src, q, target, parsed, limit)), nil
+	// GORILLA FIX (2026-10-11): this returned the records raw, while web_fetch
+	// and web_search fence and taint theirs. A record's free text (a gene
+	// summary, a compound synonym, a structure title) is written by whoever
+	// deposited it: evidence, never instruction.
+	sessionID, _ := GetContextValues(ctx)
+	permission.MarkTainted(sessionID, fmt.Sprintf("%s records for %q", src.label, q))
+	return NewUntrustedTextResponse(src.label+" record", target, "", renderBioRecords(src, q, target, parsed, limit)), nil
 }
 
 // gunzipIfNeeded unwraps a body that is STILL gzip after net/http has already

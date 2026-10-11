@@ -11,7 +11,7 @@ Scholarly & scientific literature:
   Crossref [A API] api.crossref.org
   arXiv [A API] export.arxiv.org/api/query — physics, maths, CS, quantitative biology;
     full text free. The first place to look for anything computational or theoretical.
-  bioRxiv / medRxiv [A API] api.biorxiv.org — preprints, unreviewed BY DEFINITION: grade
+  bioRxiv / medRxiv [B API] api.biorxiv.org — preprints, unreviewed BY DEFINITION: grade
     the source accordingly and say it is a preprint in the finding.
   PsyArXiv [A API] api.osf.io/v2
   Semantic Scholar [A SearXNG] www.semanticscholar.org
@@ -35,7 +35,7 @@ Economics & finance:
   Eurostat Population [A API] ec.europa.eu/eurostat/api/dissemination
 
 Development & humanitarian:
-  Humanitarian Data Exchange (HDX) [A API] data.humdata.org/api — also web_search source: humanitarian
+  Humanitarian Data Exchange (HDX) [B API] data.humdata.org/api — also web_search source: humanitarian
   ReliefWeb [A web] reliefweb.int — situation reports; fetch pages or source: web (its API wants a registered appname)
   UNHCR Refugee Data Finder [A API] api.unhcr.org/population/v1
   UNICEF Data Warehouse [A API] sdmx.data.unicef.org

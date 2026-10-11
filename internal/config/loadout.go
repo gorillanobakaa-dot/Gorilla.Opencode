@@ -1572,6 +1572,30 @@ func BrowserUserAgent() string {
 	return defaultBrowserUserAgent
 }
 
+// ResearchContactEmail is the address the two fair-access APIs that demand one
+// (Unpaywall's email= parameter, SEC EDGAR's User-Agent) are given.
+//
+// GORILLA FIX (2026-10-11): it was the owner's own address, compiled in, so every
+// build anyone made identified itself to those services as the owner. It is the
+// running user's now, from GORILLA_OPENCODE_CONTACT_EMAIL, and "" when unset:
+// the two backends then refuse with the variable's name rather than send a
+// made-up address, which SEC 403s anyway.
+func ResearchContactEmail() string {
+	v := strings.TrimSpace(os.Getenv("GORILLA_OPENCODE_CONTACT_EMAIL"))
+	if v == "" {
+		if cfg := Get(); cfg != nil {
+			v = strings.TrimSpace(cfg.ContactEmail)
+		}
+	}
+	if !strings.Contains(v, "@") || strings.ContainsAny(v, " \t\r\n()<>") {
+		return ""
+	}
+	return v
+}
+
+// ErrNoContactEmail names the setting a fair-access backend needs.
+const ErrNoContactEmail = "this source requires a contact email: set \"contactEmail\" in config.json, or GORILLA_OPENCODE_CONTACT_EMAIL=you@example.org (it is sent to the source and nowhere else)"
+
 const (
 	// A current, common desktop Firefox on Linux — authentic for this project's
 	// own audience, which runs a Linux distribution with a Firefox fork.

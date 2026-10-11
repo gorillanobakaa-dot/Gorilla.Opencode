@@ -71,17 +71,20 @@ func loadTestConfig(t *testing.T) {
 // ─── O1: the page describes lanes, because lanes are what runs ───
 
 // Before: "1. PLAN — your question is broken into sub-questions, each with
-// indicators", "helper agents work the sub-questions". No planning code exists.
+// indicators", "helper agents work the sub-questions". No planning code existed.
+// Since 2026-10-11 it does (the research tool's `plan`, at most
+// ResearchMaxPlan parts, refused beyond): the page says that, and no more.
+// Indicators are still not implemented and must not be claimed.
 func TestOsintPageDescribesFixedLanesNotAPlanningStage(t *testing.T) {
 	loadTestConfig(t)
 	page := pageText()
 
-	for _, gone := range []string{"sub-question", "PLAN ", "indicators", "plan what would answer"} {
+	for _, gone := range []string{"indicators", "plan what would answer", "there is no planning stage"} {
 		if strings.Contains(page, gone) {
-			t.Errorf("the page still describes a planning stage (%q); there is none", gone)
+			t.Errorf("the page still says %q", gone)
 		}
 	}
-	for _, want := range []string{"there is no planning stage", "fixed lanes", "No lane searches your own machine"} {
+	for _, want := range []string{"the question's parts (at most 7", "fixed lanes", "No lane searches your own machine"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page does not say %q", want)
 		}

@@ -62,6 +62,14 @@ func TestTheSuggestionListIsAScreenfulHoweverLargeTheFolder(t *testing.T) {
 // A typed query still finds a file that is far down the tree, and the answer is
 // still capped.
 func TestATypedQueryStillFindsAFileDeepInTheFolder(t *testing.T) {
+	// GORILLA FIX (2026-10-11): this test is about how FAR a typed query scans
+	// (completionScan) and the cap, not about time; the time budget has its own
+	// test above. Under a full parallel `go test ./...` the 1.5 s budget ran out
+	// before ripgrep had listed 3000 files, and the test failed about one run in
+	// two, on the unchanged code as well. The budget is lifted here only.
+	old := completionBudget
+	completionBudget = time.Minute
+	t.Cleanup(func() { completionBudget = old })
 	bigTree(t, 3000)
 	cg := &filesAndFoldersContextGroup{prefix: "file"}
 	got, err := cg.getFiles("file02987")

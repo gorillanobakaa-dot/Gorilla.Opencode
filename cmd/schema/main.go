@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
@@ -164,6 +165,15 @@ func generateSchema() map[string]any {
 						"type": "string",
 					},
 				},
+				// GORILLA OVERRIDE (2026-10-10): see config.MCPServer.Trust.
+				"trust": map[string]any{
+					"type": "string",
+					"description": "\"local\": a stdio server you installed and trust on this machine labels each " +
+						"answer (_meta.untrusted, _meta.egress) and goes online only for calls that say " +
+						"\"network\": true, so read-only calls need no extra question. Leave unset for any server " +
+						"you did not write or check.",
+					"enum": []string{"local"},
+				},
 			},
 			"required": []string{"command"},
 		},
@@ -242,6 +252,13 @@ func generateSchema() map[string]any {
 	for modelID := range models.SupportedModels {
 		modelEnum = append(modelEnum, string(modelID))
 	}
+	// GORILLA FIX (2026-10-10): SupportedModels is a map, so the enum came out
+	// in a different order on every run. The committed opencode-schema.json
+	// could therefore never match its generator, a one-line schema change
+	// regenerated as a reshuffle of every model, and the file fell 77 entries
+	// behind without anyone noticing (found by `fieldkit drift`).
+	// TestTheCommittedSchemaMatchesItsGenerator holds both facts.
+	sort.Strings(modelEnum)
 	agentSchema["additionalProperties"].(map[string]any)["properties"].(map[string]any)["model"].(map[string]any)["enum"] = modelEnum
 
 	// Add specific agent properties

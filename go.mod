@@ -133,10 +133,12 @@ require (
 	// access list. Same version already in the build; go.sum already holds it.
 	golang.org/x/sys v0.32.0
 	golang.org/x/term v0.31.0
-	golang.org/x/text v0.24.0 // indirect
+	// GORILLA: direct since 2026-10-11 (the research evidence check folds
+	// quotes and pages to NFKC before comparing them). Same version as before.
+	golang.org/x/text v0.24.0
 	google.golang.org/genai v1.64.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
 	google.golang.org/grpc v1.71.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1
 )

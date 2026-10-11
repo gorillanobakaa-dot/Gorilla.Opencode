@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -263,6 +264,7 @@ type searchHit struct {
 	Title    string
 	Authors  string
 	Year     string
+	Date     string // YYYY-MM-DD when the source dates to the day (see isoDate)
 	Venue    string
 	DOI      string
 	URL      string
@@ -661,7 +663,11 @@ func (t *webSearchTool) searchUnpaywall(ctx context.Context, q string, _ int) ([
 			HostType  string `json:"host_type"`
 		} `json:"best_oa_location"`
 	}
-	u := unpaywallAPI + url.PathEscape(doi) + "?email=" + url.QueryEscape("gorillanobakaa@gmail.com")
+	email := config.ResearchContactEmail()
+	if email == "" {
+		return nil, errors.New(config.ErrNoContactEmail)
+	}
+	u := unpaywallAPI + url.PathEscape(doi) + "?email=" + url.QueryEscape(email)
 	if err := t.getJSON(ctx, u, &out); err != nil {
 		return nil, err
 	}
@@ -1195,7 +1201,9 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 			fmt.Fprintf(&sb, "   authors: %s\n", h.Authors)
 		}
 		meta := []string{}
-		if h.Year != "" && h.Year != "0" {
+		if h.Date != "" {
+			meta = append(meta, h.Date)
+		} else if h.Year != "" && h.Year != "0" {
 			meta = append(meta, h.Year)
 		}
 		if h.Venue != "" {
@@ -1215,7 +1223,7 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		}
 		if a := strings.TrimSpace(h.Abstract); a != "" {
 			if len(a) > 700 {
-				a = a[:700] + "... [abstract truncated; web_fetch the url for the full text]"
+				a = cutAtRune(a, 700) + "... [abstract truncated; web_fetch the url for the full text]"
 			}
 			fmt.Fprintf(&sb, "   abstract: %s\n", a)
 		}

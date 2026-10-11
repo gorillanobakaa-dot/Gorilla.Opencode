@@ -56,7 +56,7 @@ func TestFindingsAreSavedBeforeAnyModelTouchesThem(t *testing.T) {
 	}
 	audits := []string{"APPROVED", "WEAK — one source", ""}
 
-	path := writeRawFindings("who is Kelexine?", roles, replies, audits, "dossier")
+	path := writeRawFindings("who is Kelexine?", roles, replies, audits, "dossier", "")
 	if path == "" {
 		t.Fatal("nothing was saved; an expensive run would be recoverable only from the session store")
 	}
@@ -102,7 +102,7 @@ func TestFallsBackToHomeWhenDocumentsIsUnusable(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(home, "Documents"), []byte("not a directory"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got := writeRawFindings("q", []researchRole{{ID: "local", Title: "LOCAL"}}, []string{"x"}, nil, "dossier")
+	got := writeRawFindings("q", []researchRole{{ID: "local", Title: "LOCAL"}}, []string{"x"}, nil, "dossier", "")
 	if got == "" {
 		t.Fatal("nothing saved; the run's findings would exist only in the session store")
 	}
@@ -141,7 +141,7 @@ func TestSaveFailureIsSurvivable(t *testing.T) {
 			"disk-refuses path cannot be exercised here")
 	}
 
-	if got := writeRawFindings("q", []researchRole{{ID: "local", Title: "LOCAL"}}, []string{"x"}, nil, "dossier"); got != "" {
+	if got := writeRawFindings("q", []researchRole{{ID: "local", Title: "LOCAL"}}, []string{"x"}, nil, "dossier", ""); got != "" {
 		t.Errorf("expected an empty path when the disk refuses, got %q", got)
 	}
 	// Reaching this line at all is the assertion: no panic, no error escaping

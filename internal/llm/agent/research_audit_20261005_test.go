@@ -101,8 +101,12 @@ func TestADossierRefusesAnEngineeringLaneByName(t *testing.T) {
 			t.Fatal("roles=\"local\" put the search-this-machine lane into a dossier")
 		}
 	}
-	if roles[0].ID != "dissent" {
-		t.Errorf("the valid explicit role should lead, got %q", roles[0].ID)
+	found := false
+	for _, r := range roles {
+		found = found || r.ID == "dissent"
+	}
+	if !found {
+		t.Errorf("the valid explicit role must run, got %v", roleIDs(roles))
 	}
 	if !strings.Contains(note, `"local"`) || !strings.Contains(note, "official") {
 		t.Errorf("the refusal must name the role and list the ones that exist; note=%q", note)
@@ -402,8 +406,8 @@ func TestFindingsFilesArePrivateAndNeverOverwritten(t *testing.T) {
 
 	// The same question, back to back: well inside one second, let alone the one
 	// minute the old stamp resolved to.
-	first := writeRawFindings("is my landlord allowed to do this?", roles, []string{"first run"}, nil, "")
-	second := writeRawFindings("is my landlord allowed to do this?", roles, []string{"second run"}, nil, "")
+	first := writeRawFindings("is my landlord allowed to do this?", roles, []string{"first run"}, nil, "", "")
+	second := writeRawFindings("is my landlord allowed to do this?", roles, []string{"second run"}, nil, "", "")
 	if first == "" || second == "" {
 		t.Fatal("a findings file was not written")
 	}
@@ -439,7 +443,7 @@ func TestFindingsRecordTheirDoctrine(t *testing.T) {
 
 	read := func(doctrine, reply string) string {
 		t.Helper()
-		path := writeRawFindings("q", roles, []string{reply}, nil, doctrine)
+		path := writeRawFindings("q", roles, []string{reply}, nil, doctrine, "")
 		body, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)

@@ -554,7 +554,7 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		// what to do about it.
 		excerpt := strings.TrimSpace(decodeBody(res.body, res.contentType))
 		if len(excerpt) > 2000 {
-			excerpt = excerpt[:2000] + "\n...[error body truncated]"
+			excerpt = cutAtRune(excerpt, 2000) + "\n...[error body truncated]"
 		}
 		msg := fmt.Sprintf("Request failed with status %d (%s).", status, http.StatusText(status))
 		if excerpt != "" {
@@ -666,7 +666,7 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	// the decision it informs is coarse enough that precision does not matter.
 	if est := len(out) / 4; est > maxTokens {
 		keep := maxTokens * 4
-		out = out[:keep] + fmt.Sprintf(
+		out = cutAtRune(out, keep) + fmt.Sprintf(
 			"\n\n[CUT AT THE TOKEN BUDGET: this document is ~%d tokens and only the "+
 				"first ~%d were kept. THE REST WAS NOT READ - do not summarise this as "+
 				"though it were complete. To read it properly, call web_fetch again with "+

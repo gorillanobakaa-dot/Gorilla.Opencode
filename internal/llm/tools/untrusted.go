@@ -133,7 +133,7 @@ func NewUntrustedTextResponse(channel, sender, trustedPrefix, body string) ToolR
 		budget = 0
 	}
 	if len(body) > budget {
-		body = body[:budget] + fmt.Sprintf(
+		body = cutAtRune(body, budget) + fmt.Sprintf(
 			"\n\n[TRUNCATED: this source returned %d bytes; %d were kept. "+
 				"The content is incomplete — narrow the request rather than "+
 				"drawing conclusions from this fragment.]", len(body), budget)

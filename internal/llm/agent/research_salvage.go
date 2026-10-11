@@ -71,6 +71,10 @@ const DoctrineStandard = "standard"
 // discipline produced it. See FindingsDoctrine.
 const doctrineLinePrefix = "Doctrine: "
 
+// callLinePrefix opens the line that records which research call produced the
+// file. See FindingsCallID.
+const callLinePrefix = "Call: "
+
 func doctrineName(doctrine string) string {
 	if doctrine == DoctrineDossier {
 		return DoctrineDossier
@@ -83,7 +87,7 @@ func doctrineName(doctrine string) string {
 // It never returns an error to the caller: a research run that produced good
 // findings must not be reported as failed because a disk write went wrong. A
 // failure is logged and the path is simply absent from the report.
-func writeRawFindings(question string, roles []researchRole, replies []string, audits []string, doctrine string) string {
+func writeRawFindings(question string, roles []researchRole, replies []string, audits []string, doctrine, callID string) string {
 	dir := config.DossierDir()
 	if err := os.MkdirAll(dir, findingsDirMode); err != nil {
 		logging.Error("could not create the dossier directory; findings stay in the session store only",
@@ -106,6 +110,12 @@ func writeRawFindings(question string, roles []researchRole, replies []string, a
 	fmt.Fprintf(&b, "Saved automatically at %s, before any model was asked to assemble them.\n\n",
 		time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Fprintf(&b, "%s%s\n\n", doctrineLinePrefix, doctrineName(doctrine))
+	// GORILLA FIX (2026-10-11): the call id is recorded, so recovery can tell
+	// this file's run from another run of the same question. See
+	// ListRecoverableRuns.
+	if callID != "" {
+		fmt.Fprintf(&b, "%s%s\n\n", callLinePrefix, callID)
+	}
 	b.WriteString("**This is not the finished write-up.** It is every lane's report, exactly as\n")
 	b.WriteString("returned, so that the work survives even if the write-up step fails — which is the\n")
 	b.WriteString("normal outcome of an interrupted run on a slow link. To have it written up, run\n")
@@ -183,6 +193,18 @@ func createFindingsFile(dir, stamp, slug string, body []byte) (string, error) {
 		return path, nil
 	}
 	return "", lastErr
+}
+
+// FindingsCallID reads back which research call produced a findings document.
+// "" for a file written before the line existed (2026-10-11).
+func FindingsCallID(body string) string {
+	header, _, _ := strings.Cut(body, "\n---")
+	for _, line := range strings.Split(header, "\n") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(line), callLinePrefix); ok {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }
 
 // FindingsDoctrine reads back which discipline produced a findings document.

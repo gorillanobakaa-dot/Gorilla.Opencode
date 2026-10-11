@@ -366,7 +366,7 @@ func readTextFile(filePath string, offset, limit int) (string, int, error) {
 		lineCount++
 		lineText := scanner.Text()
 		if len(lineText) > MaxLineLength {
-			lineText = lineText[:MaxLineLength] + "..."
+			lineText = cutAtRune(lineText, MaxLineLength) + "..."
 		}
 		lines = append(lines, lineText)
 	}

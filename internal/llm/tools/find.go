@@ -711,7 +711,7 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	if rawBytes > findMaxBytes {
 		// Truncation always SAYS so: a model handed a silent fragment reasons
 		// about the fragment as though it were the whole answer.
-		body = body[:findMaxBytes] + fmt.Sprintf(
+		body = cutAtRune(body, findMaxBytes) + fmt.Sprintf(
 			"\n\n[TRUNCATED: %d bytes matched, %d kept. This result is INCOMPLETE — "+
 				"narrow the search with path or glob rather than concluding from it.]",
 			rawBytes, findMaxBytes)

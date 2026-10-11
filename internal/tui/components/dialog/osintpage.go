@@ -161,8 +161,10 @@ func osintContent() []osintLine {
 	add(blank)
 
 	add(osintLine{"h2", "What actually happens when you run it"})
-	add(para("", "1. LANES   — ", fmt.Sprintf("there is no planning stage. The program works the question in fixed lanes, one "+
-		"helper agent per lane, and you choose how many (%d to %d). The first %d always run:", minHelpers, maxHelpers, minHelpers))...)
+	add(para("", "1. LANES   — ", fmt.Sprintf("the model in charge first writes the question's parts (at most %d, most "+
+		"important first; the program refuses more) and every helper is given them. The program then works the "+
+		"question in fixed lanes, one helper agent per lane, and you choose how many (%d to %d). The first %d always run:",
+		agent.ResearchMaxPlan, minHelpers, maxHelpers, minHelpers))...)
 	for _, title := range mandatory {
 		add(para("", "               * ", title)...)
 	}
@@ -190,13 +192,18 @@ func osintContent() []osintLine {
 	add(osintLine{"h2", "What the helpers are instructed to do — instructions, not guarantees"})
 	add(para("", "", "These are written into every helper's orders. The program does not check that a model obeyed "+
 		"them, and models do disobey. They are listed so you know what to hold the dossier to:")...)
-	add(para("", "  * ", "Cite only a source it actually opened; a link built from memory counts as an invention.")...)
+	add(para("", "  * ", "Cite only a source it actually opened, and quote the words that say it. THE PROGRAM CHECKS "+
+		"THIS ONE: every cited link is matched against the pages that helper fetched, and every quote against "+
+		"the text it got back; a claim that fails is marked UNSUPPORTED in the report before the dossier is "+
+		"written.")...)
 	add(para("", "  * ", "Trace a claim to its origin before counting a second source as confirmation: ten outlets "+
 		"repeating one press release are one source.")...)
 	add(para("", "  * ", "Say what it could NOT establish instead of papering over it.")...)
 	add(para("", "  * ", "Keep every grade attached to its claim.")...)
 	add(para("", "", "What the program itself does enforce: the lanes, the helper count, the one follow-up, no "+
-		"local-file tools for dossier helpers, and saving every lane's report to disk before the write-up.")...)
+		"local-file tools for dossier helpers, the report format and the grades, cited-but-never-opened and "+
+		"quotes that are not on the page, and saving every lane's report to disk before the write-up (with a "+
+		".jsonl record beside it that `fieldkit evidence check` can re-check later).")...)
 	add(blank)
 
 	add(osintLine{"h2", "How it states what it thinks (and why that is the anti-nonsense part)"})
@@ -221,8 +228,11 @@ func osintContent() []osintLine {
 	add(para("red", "", "LEAVES: your question, in full, goes to the provider of the model you are using — to every helper "+
 		"session, not one. The search terms the helpers write go to the search and scholarly services they query "+
 		"(the scholarly indexes, the statistics and filings sites, and your SearXNG or the sites lynx fetches), "+
-		"and the pages they open see the request. Those requests carry this program's name, not yours, but the "+
-		"words of the query are the query. Helpers are told to keep your name, email and exact location out of "+
+		"and the pages they open see the request. Scholarly and data services are told this program's name; "+
+		"pages a helper opens see an ordinary Firefox (GORILLA_OPENCODE_USER_AGENT=honest names the program there too); "+
+		"SEC EDGAR and Unpaywall get the contact address you set (\"contactEmail\" in config.json, or "+
+		"GORILLA_OPENCODE_CONTACT_EMAIL). None of them gets "+
+		"your name from this program, but the words of the query are the query. Helpers are told to keep your name, email and exact location out of "+
 		"search terms; nothing checks that they did. Do not put in the question what must not leave the machine.")...)
 	add(para("", "", "The program asks your permission before helpers search, unless you have already allowed it for the session.")...)
 	add(blank)

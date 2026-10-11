@@ -71,6 +71,10 @@ type RecoverableRun struct {
 	Lanes    int // helper sessions belonging to the run
 	Covered  int // of those, how many actually reported
 	Tokens   int64
+
+	// fileCall is the call id a findings file records (CallID stays empty for
+	// a file, because FromDisk means exactly that).
+	fileCall string
 }
 
 // FromDisk reports whether this run was already saved as a findings file — the
@@ -192,25 +196,43 @@ func ListRecoverableRuns(ctx context.Context, sessions session.Service, messages
 	// look like the user ran everything twice. Observed live the first time this
 	// screen was driven: eleven entries for six runs.
 	//
-	// Matched on the question because nothing links a file back to its call id —
-	// the file is generated FROM those sessions, so the two are equivalent and
-	// the file is the one that survives a database reset.
-	saved := make(map[string]bool, len(files))
+	// GORILLA FIX (2026-10-11): matched on the CALL ID, which files now record.
+	// Matching on the question alone hid every store run of a question that had
+	// ever been saved once: ask the same thing again, have the second write-up
+	// fail before its findings were saved, and the second run (the one that
+	// still needed recovering) was not offered. A file written before the call
+	// line existed is still matched on its question, but only to a run that
+	// started before the file was written: a file cannot hold a later run.
+	savedCalls := make(map[string]bool, len(files))
+	legacy := map[string][]time.Time{}
 	for _, f := range files {
-		if q := normaliseQuestion(f.Question); q != "" {
-			saved[q] = true
+		if f.fileCall != "" {
+			savedCalls[f.fileCall] = true
+		} else if q := normaliseQuestion(f.Question); q != "" {
+			legacy[q] = append(legacy[q], f.When)
 		}
 	}
 
 	runs := files
 	for _, r := range recoverableSessions(ctx, sessions, messages) {
-		if saved[normaliseQuestion(r.Question)] {
+		if savedCalls[r.CallID] || savedBefore(legacy[normaliseQuestion(r.Question)], r.When) {
 			continue
 		}
 		runs = append(runs, r)
 	}
 	sort.Slice(runs, func(i, j int) bool { return runs[i].When.After(runs[j].When) })
 	return runs
+}
+
+// savedBefore reports whether any legacy file of the same question was written
+// at or after the run started.
+func savedBefore(fileTimes []time.Time, runStart time.Time) bool {
+	for _, t := range fileTimes {
+		if !t.Before(runStart) {
+			return true
+		}
+	}
+	return false
 }
 
 // normaliseQuestion folds the differences that do not make two questions
@@ -249,6 +271,7 @@ func recoverableFiles() []RecoverableRun {
 			// six-lane run as thirty — measured on a recovered file.
 			run.Covered, run.Lanes = parseCoverage(s)
 			run.Doctrine = FindingsDoctrine(s)
+			run.fileCall = FindingsCallID(s)
 		}
 		out = append(out, run)
 	}
@@ -288,7 +311,7 @@ func recoverableSessions(ctx context.Context, sessions session.Service, messages
 			groups[callID] = g
 		}
 		g.lanes = append(g.lanes, s)
-		g.tokens += s.PromptTokens + s.CompletionTokens
+		g.tokens += laneSpend(s)
 		if t := time.Unix(s.CreatedAt, 0); g.when.IsZero() || t.Before(g.when) {
 			g.when = t
 		}
@@ -323,6 +346,20 @@ func recoverableSessions(ctx context.Context, sessions session.Service, messages
 		out = append(out, run)
 	}
 	return out
+}
+
+// laneSpend is what one helper session cost in tokens.
+//
+// GORILLA FIX (2026-10-11): PromptTokens and CompletionTokens are the CURRENT
+// context occupancy (assigned per turn, reset by compaction), so a helper that
+// made twenty calls was reported as costing its last one. The cumulative
+// fields are the spend. A row written before they existed has them at zero
+// and falls back to occupancy, the best number it has.
+func laneSpend(s session.Session) int64 {
+	if c := s.CumulativePromptTokens + s.CumulativeCompletionTokens; c > 0 {
+		return c
+	}
+	return s.PromptTokens + s.CompletionTokens
 }
 
 // questionFromLane pulls the investigated question back out of a helper's
@@ -474,7 +511,7 @@ func RecoverFindings(ctx context.Context, run RecoverableRun, sessions session.S
 	// read from the lanes' own instructions; a run whose instructions cannot be
 	// read is saved as standard, because claiming grades that may not be there is
 	// the worse of the two mistakes.
-	path := writeRawFindings(question, roles, replies, auditList, doctrine)
+	path := writeRawFindings(question, roles, replies, auditList, doctrine, run.CallID)
 	if path == "" {
 		return "", "", fmt.Errorf("recovered the findings but could not write them to %s", config.DossierDir())
 	}

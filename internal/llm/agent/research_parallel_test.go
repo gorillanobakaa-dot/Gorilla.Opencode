@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -116,20 +117,58 @@ func TestContractCheckerFlagsMissingHeadings(t *testing.T) {
 }
 
 func TestSelectRolesClampsAndKeepsMandatoryLanes(t *testing.T) {
-	// Asking for one custom role must still yield the mandatory four.
+	// The four mandatory lanes, BY NAME. This test counted lanes, so it passed
+	// while roles="cost" at four helpers dropped the requirement lane.
+	mandatory := roleIDs(researchRoles[:ResearchMinAgents])
+	has := func(roles []researchRole, id string) bool {
+		for _, r := range roles {
+			if r.ID == id {
+				return true
+			}
+		}
+		return false
+	}
 	roles, note := selectRoles("cost", ResearchMinAgents)
 	if len(roles) != ResearchMinAgents {
 		t.Fatalf("got %d roles, want %d", len(roles), ResearchMinAgents)
 	}
-	if !strings.Contains(note, "minimum") {
-		t.Errorf("top-up should be reported to the user, note=%q", note)
+	for _, id := range mandatory {
+		if !has(roles, id) {
+			t.Errorf("mandatory lane %q dropped for an explicit role", id)
+		}
 	}
-	if roles[0].ID != "cost" {
-		t.Errorf("explicit role should lead, got %q", roles[0].ID)
+	if has(roles, "cost") || !strings.Contains(note, "cost not run") {
+		t.Errorf("an explicit role that does not fit must be named as not run, note=%q", note)
+	}
+	// With room for it, the explicit role runs, ahead of any top-up.
+	roles, _ = selectRoles("cost", ResearchMinAgents+2)
+	if !has(roles, "cost") || roles[ResearchMinAgents].ID != "cost" {
+		t.Errorf("explicit role should follow the mandatory block, got %v", roleIDs(roles))
+	}
+	for _, id := range mandatory {
+		if !has(roles, id) {
+			t.Errorf("mandatory lane %q missing at %d helpers", id, ResearchMinAgents+2)
+		}
 	}
 	// Never more than the library holds.
 	if all, _ := selectRoles("", ResearchMaxAgents); len(all) > len(researchRoles) {
 		t.Errorf("selected %d roles from a library of %d", len(all), len(researchRoles))
+	}
+}
+
+// The verifier must read the supervisor's audit of each lane, not only the lane.
+func TestPeerDigestCarriesTheAudits(t *testing.T) {
+	roles := []researchRole{{ID: "local", Title: "LOCAL"}, {ID: "prior_art", Title: "PRIOR ART"}, {ID: "x", Title: "FAILED"}}
+	results := []laneOutcome{{reply: "lane one"}, {reply: "lane two"}, {err: errors.New("boom")}}
+	audits := []string{"REJECTED: claim 2 unsupported", "", "never shown"}
+	got := peerDigest(roles, results, audits, []int{0, 1, 2})
+	for _, want := range []string{"### LOCAL\nlane one", "REJECTED: claim 2 unsupported", "### PRIOR ART\nlane two"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("digest lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "FAILED") || strings.Count(got, "Supervisor's audit") != 1 {
+		t.Errorf("a failed lane or an empty audit leaked into the digest:\n%s", got)
 	}
 }
 

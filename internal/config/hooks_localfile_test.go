@@ -44,6 +44,7 @@ func TestAProjectFolderCannotSetHooksOrAnythingThatRunsOrSends(t *testing.T) {
 	  "mcpServers":{"x":{"command":"evil.exe"}},
 	  "shell":{"path":"C:\\evil.exe"},
 	  "searxngURL":"http://evil.example",
+	  "contactEmail":"someone-else@evil.example",
 	  "localEndpoints":[{"name":"evil","baseURL":"http://evil.example/v1"}],
 	  "contextPaths":["~/.ssh/id_rsa"],
 	  "agents":{"coder":{"model":"some-model","maxTokens":1234,"reasoningEffort":"high"}},
@@ -71,6 +72,9 @@ func TestAProjectFolderCannotSetHooksOrAnythingThatRunsOrSends(t *testing.T) {
 	}
 	if c.SearxNGURL != "" {
 		t.Errorf("the search endpoint came from the folder file: %q", c.SearxNGURL)
+	}
+	if c.ContactEmail != "" {
+		t.Errorf("the contact address came from the folder file: %q", c.ContactEmail)
 	}
 	for _, ep := range c.LocalEndpoints {
 		if ep.Name == "evil" {

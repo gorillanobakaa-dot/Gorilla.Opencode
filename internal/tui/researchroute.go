@@ -99,6 +99,8 @@ func researchPrompt(mode string, agents int, question string) string {
 		"Use the research tool to investigate the following. "+
 			"Set mode=%q and agents=%d exactly as given — the user chose these and they decide what this costs. "+
 			"Pass everything already established in this conversation as `context` so no helper pays to re-derive it. "+
+			"Before calling it, write the 3 to 7 sub-questions the answer depends on, most important first, each "+
+			"answerable by one sourced statement, and pass them as `plan`: every helper works from them. "+
 			"When the helpers report, check at least one load-bearing claim yourself, carry the evidence tiers through, "+
 			"and say plainly what nobody established.\n\nQUESTION: %s",
 		mode, agents, question)

@@ -11,8 +11,10 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/session"
@@ -233,5 +235,78 @@ func TestARunAlreadySavedIsNotListedTwice(t *testing.T) {
 	}
 	if !runs[0].FromDisk() {
 		t.Errorf("the saved file should win: it survives a database reset, the sessions do not")
+	}
+}
+
+// A second run of a question already saved once is a different run. Matching
+// on the question alone hid it, and it was the one that still needed
+// recovering.
+func TestASecondRunOfASavedQuestionIsStillListed(t *testing.T) {
+	home := tempHome(t)
+	dir := filepath.Join(home, "Documents", "Gorilla-OSINT-Dossiers")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	q := "Who is Kelexine?"
+	body := "# Raw findings — " + q + "\n\nDoctrine: dossier\n\nCall: call_first\n\n---\n\n## LOCAL\n\nx\n\n1 of 1 lanes produced findings.\n"
+	if err := os.WriteFile(filepath.Join(dir, "findings-26-08-18-00-00-00-who.md"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sessions := &fakeSessions{helpers: []session.Session{
+		{ID: "call_first-local", Title: "Research: local"},
+		{ID: "call_second-local", Title: "Research: local"},
+	}}
+	runs := ListRecoverableRuns(context.Background(), sessions, &fakeMessages{question: q})
+	var calls []string
+	for _, r := range runs {
+		calls = append(calls, r.CallID)
+	}
+	if len(runs) != 2 || !slices.Contains(calls, "call_second") || slices.Contains(calls, "call_first") {
+		t.Fatalf("want the file and call_second, got calls %q", calls)
+	}
+}
+
+// A file written before the call line existed cannot hold a run that started
+// after it was written.
+func TestALegacyFileDoesNotHideALaterRun(t *testing.T) {
+	home := tempHome(t)
+	dir := filepath.Join(home, "Documents", "Gorilla-OSINT-Dossiers")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	q := "Who is Kelexine?"
+	path := filepath.Join(dir, "findings-26-08-18-00-00-who.md")
+	if err := os.WriteFile(path, []byte("# Raw findings — "+q+"\n\n1 of 1 lanes produced findings.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	written := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(path, written, written); err != nil {
+		t.Fatal(err)
+	}
+	sessions := &fakeSessions{helpers: []session.Session{
+		{ID: "call_old-local", Title: "Research: local", CreatedAt: written.Add(-time.Minute).Unix()},
+		{ID: "call_new-local", Title: "Research: local", CreatedAt: written.Add(time.Minute).Unix()},
+	}}
+	runs := ListRecoverableRuns(context.Background(), sessions, &fakeMessages{question: q})
+	var calls []string
+	for _, r := range runs {
+		calls = append(calls, r.CallID)
+	}
+	if len(runs) != 2 || !slices.Contains(calls, "call_new") {
+		t.Fatalf("want the file and call_new, got calls %q", calls)
+	}
+}
+
+// The picker's token figure is what the run cost, not what its last turn held.
+func TestRecoveredRunReportsCumulativeSpend(t *testing.T) {
+	tempHome(t)
+	sessions := &fakeSessions{helpers: []session.Session{
+		{ID: "call_x-local", Title: "Research: local", PromptTokens: 9000, CompletionTokens: 1000,
+			CumulativePromptTokens: 180000, CumulativeCompletionTokens: 20000},
+		{ID: "call_x-prior_art", Title: "Research: prior_art", PromptTokens: 500, CompletionTokens: 50},
+	}}
+	runs := ListRecoverableRuns(context.Background(), sessions, &fakeMessages{question: "q"})
+	if len(runs) != 1 || runs[0].Tokens != 200000+550 {
+		t.Fatalf("want 200550 tokens (cumulative, occupancy only for a legacy row), got %+v", runs)
 	}
 }

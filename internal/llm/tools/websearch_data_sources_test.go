@@ -8,6 +8,7 @@ package tools
 
 import (
 	"context"
+	"github.com/opencode-ai/opencode/internal/config"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -77,6 +78,45 @@ func TestWorldBankParsesDocumentsMap(t *testing.T) {
 	}
 }
 
+// The API's relevance order is the order of the object's keys. A Go map lost
+// it, and every run shuffled the list.
+func TestWorldBankKeepsTheAPIsOrder(t *testing.T) {
+	stubAPI(t, &worldBankAPI, `{"documents":{
+	  "D9":{"display_title":"first","docdt":"2023-06-30T04:00:00Z"},
+	  "facets":{},
+	  "D1":{"display_title":"second"},
+	  "D5":{"display_title":"third"},
+	  "D3":{"display_title":"fourth"}}}`)
+	for run := 0; run < 20; run++ {
+		hits, err := stubTool().searchWorldBank(context.Background(), "kenya", 3)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, h := range hits {
+			got = append(got, h.Title)
+		}
+		if strings.Join(got, ",") != "first,second,third" {
+			t.Fatalf("run %d: order %v, want the API's (and at most n)", run, got)
+		}
+		if hits[0].Date != "2023-06-30" {
+			t.Fatalf("date reduced: %+v", hits[0])
+		}
+	}
+}
+
+func TestIsoDateReadsEveryShapeTheSourcesUse(t *testing.T) {
+	for in, want := range map[string]string{
+		"2026-08-15T12:00:00Z": "2026-08-15", "20260815T120000Z": "2026-08-15", "2024-01-30": "2024-01-30",
+		"2026-08-15 12:00:00": "2026-08-15", "20260815": "2026-08-15", "2026": "", "": "", "not a date at all": "",
+		"2026-8-15": "",
+	} {
+		if got := isoDate(in); got != want {
+			t.Errorf("isoDate(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestHDXParsesDatasets(t *testing.T) {
 	// CKAN wraps everything in {success, result:{results:[…]}}; the dataset URL
 	// is reconstructed from the slug. This source replaced ReliefWeb's API,
@@ -103,6 +143,7 @@ func TestHDXParsesDatasets(t *testing.T) {
 }
 
 func TestSECEDGARBuildsArchiveURLs(t *testing.T) {
+	t.Setenv("GORILLA_OPENCODE_CONTACT_EMAIL", "tester@example.org")
 	stubAPI(t, &secEdgarAPI, `{"hits":{"hits":[{
 	  "_id":"0001628280-24-000123:tsla-10k.htm",
 	  "_source":{"display_names":["Tesla Inc"],"file_date":"2024-01-30","file_type":"10-K","ciks":["0001318605"]}}]}}`)
@@ -122,6 +163,55 @@ func TestSECEDGARBuildsArchiveURLs(t *testing.T) {
 	}
 	if !strings.Contains(h.Title, "Tesla") || !strings.Contains(h.Title, "10-K") {
 		t.Errorf("title mapping wrong: %q", h.Title)
+	}
+}
+
+// The contact address is the running user's, never one compiled in, and a
+// fair-access source with none set is refused by name rather than sent a guess.
+func TestFairAccessSourcesUseTheRunningUsersContact(t *testing.T) {
+	var gotUA string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotUA = r.Header.Get("User-Agent")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"hits":{"hits":[]}}`))
+	}))
+	t.Cleanup(srv.Close)
+	oldAPI := secEdgarAPI
+	secEdgarAPI = srv.URL
+	t.Cleanup(func() { secEdgarAPI = oldAPI })
+
+	t.Setenv("GORILLA_OPENCODE_CONTACT_EMAIL", "")
+	if _, err := stubTool().searchSECEDGAR(context.Background(), "x", 1); err == nil || !strings.Contains(err.Error(), "GORILLA_OPENCODE_CONTACT_EMAIL") {
+		t.Errorf("SEC without a contact must refuse by the variable's name, err=%v", err)
+	}
+	if _, err := stubTool().searchUnpaywall(context.Background(), "10.1038/nature12373", 1); err == nil || !strings.Contains(err.Error(), "GORILLA_OPENCODE_CONTACT_EMAIL") {
+		t.Errorf("Unpaywall without a contact must refuse by the variable's name, err=%v", err)
+	}
+	if gotUA != "" {
+		t.Fatalf("a request went out without a contact: UA=%q", gotUA)
+	}
+
+	t.Setenv("GORILLA_OPENCODE_CONTACT_EMAIL", "tester@example.org")
+	_, _ = stubTool().searchSECEDGAR(context.Background(), "x", 1)
+	if !strings.Contains(gotUA, "(tester@example.org)") {
+		t.Errorf("SEC User-Agent does not carry the user's contact: %q", gotUA)
+	}
+
+	// config.json's contactEmail, when the variable is not set; the variable
+	// wins when both are.
+	cfg := config.Get()
+	old := cfg.ContactEmail
+	cfg.ContactEmail = "fromconfig@example.org"
+	t.Cleanup(func() { cfg.ContactEmail = old })
+	t.Setenv("GORILLA_OPENCODE_CONTACT_EMAIL", "")
+	_, _ = stubTool().searchSECEDGAR(context.Background(), "x", 1)
+	if !strings.Contains(gotUA, "(fromconfig@example.org)") {
+		t.Errorf("config.json contactEmail not used: %q", gotUA)
+	}
+	t.Setenv("GORILLA_OPENCODE_CONTACT_EMAIL", "fromenv@example.org")
+	_, _ = stubTool().searchSECEDGAR(context.Background(), "x", 1)
+	if !strings.Contains(gotUA, "(fromenv@example.org)") {
+		t.Errorf("the variable must win over config.json: %q", gotUA)
 	}
 }
 

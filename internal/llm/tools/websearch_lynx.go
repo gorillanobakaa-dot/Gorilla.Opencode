@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"strings"
 	"unicode"
+
+	"github.com/opencode-ai/opencode/internal/politehttp"
 )
 
 // GORILLA OVERRIDE: general web search with no service, no key and no config,
@@ -322,10 +324,15 @@ func lynxSnippet(lines []string, from int) string {
 	}
 	s := strings.Join(parts, " ")
 	if len(s) > 400 {
-		s = s[:400] + "..."
+		s = cutAtRune(s, 400) + "..."
 	}
 	return s
 }
+
+// lynxWait paces lynx's requests per host, sharing the state (and the
+// cross-process file) of politehttp's Transport. A variable so a test can see
+// it is called.
+var lynxWait = func(host string) { (&politehttp.Limiter{CrossProcess: true}).Wait(host) }
 
 // runLynx renders one URL and returns the dump.
 func runLynx(ctx context.Context, bin, target string) (string, error) {
@@ -351,7 +358,16 @@ func (t *webSearchTool) searchLynx(ctx context.Context, q string, n int) ([]sear
 
 	var tried []string
 	for _, e := range lynxEngines {
-		dump, err := runLynx(ctx, bin, fmt.Sprintf(e.queryURL, esc))
+		target := fmt.Sprintf(e.queryURL, esc)
+		// GORILLA FIX (2026-10-11): lynx makes its own connection, so the
+		// politeness limiter every http.Client here goes through never saw
+		// it. Eleven research helpers falling back to lynx at once hit one
+		// public engine eleven times in a second: exactly the burst that
+		// earns a CAPTCHA, which then reads as "no results".
+		if u, perr := url.Parse(target); perr == nil {
+			lynxWait(u.Hostname())
+		}
+		dump, err := runLynx(ctx, bin, target)
 		if err != nil && strings.TrimSpace(dump) == "" {
 			tried = append(tried, fmt.Sprintf("%s (no response: %v)", e.name, err))
 			continue

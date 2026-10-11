@@ -3,6 +3,8 @@ package tools
 import (
 	"context"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -260,6 +262,32 @@ func TestLiveLynxSearch(t *testing.T) {
 	for i, h := range hits {
 		if i < 4 {
 			t.Logf("  %s — %s", h.Title, h.URL)
+		}
+	}
+}
+
+// lynx makes its own connections, so it must ask the politeness limiter itself.
+func TestSearchLynxWaitsItsTurnPerHost(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake lynx is a shell script")
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "lynx"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	var hosts []string
+	old := lynxWait
+	lynxWait = func(h string) { hosts = append(hosts, h) }
+	t.Cleanup(func() { lynxWait = old })
+
+	_, _ = newTestTool().searchLynx(context.Background(), "anything", 5)
+	if len(hosts) != len(lynxEngines) {
+		t.Fatalf("want one wait per engine tried (%d), got %q", len(lynxEngines), hosts)
+	}
+	for _, h := range hosts {
+		if h == "" || strings.ContainsAny(h, "/:") {
+			t.Errorf("waited on %q, not a host name", h)
 		}
 	}
 }

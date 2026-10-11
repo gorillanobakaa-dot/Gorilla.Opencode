@@ -95,8 +95,9 @@ var All = []Command{
 		// handed a source atlas of tens), and "hunts its own gaps" (the model may
 		// ask for one follow-up; nothing ran one). It also said nothing about the
 		// question leaving the machine. It now describes what runs.
-		Detail: "A professional intelligence assessment, not a chat answer. It works " +
-			"your question in fixed lanes, one helper per lane: the official record, " +
+		Detail: "A professional intelligence assessment, not a chat answer. The model in charge " +
+			"first breaks the question into up to 7 ranked parts, which every helper is given; then it works " +
+			"the question in fixed lanes, one helper per lane: the official record, " +
 			"the scholarly literature and data, the reporting, and the strongest case " +
 			"against, with more lanes as you add helpers. No lane searches your own " +
 			"machine. Helpers start from a built-in atlas of free sources (scholarly " +

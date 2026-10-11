@@ -2416,7 +2416,7 @@
    "category": "humanitarian",
    "free": true,
    "reliability": "A",
-   "url": "https://api.reliefweb.int",
+   "url": "https://reliefweb.int",
    "note": "Report pages fetchable + indexed by web search; the v2 API asks for a registered appname, so the websearch tool uses HDX (same org, keyless) for structured humanitarian data instead. 2026-08-17 coverage decision."
   },
   {

@@ -130,6 +130,32 @@ type ResearchParams struct {
 	// the assessment format. Gated on the /context dossier row: the schema
 	// only offers it when armed, and Run refuses it when not.
 	Doctrine string `json:"doctrine"`
+	// Plan is the investigation's sub-questions, ranked, written by the model
+	// in charge before the helpers start: every helper gets them, and each
+	// says which it could not answer. See ResearchMaxPlan.
+	Plan []string `json:"plan"`
+}
+
+// ResearchMaxPlan bounds the plan. GORILLA OVERRIDE (2026-10-11): the doctrine
+// (FM 2-0, ATP 2-22.9) and OSINT-DOCTRINE.md call for 3 to 7 ranked
+// sub-questions before collection; the code had no planning stage at all.
+// More than seven is a list, not a plan, and every helper pays to read it.
+const ResearchMaxPlan = 7
+
+// cleanPlan trims the plan and refuses one that is not a plan. An empty plan
+// is allowed: it is optional, and a run without one works as it always has.
+func cleanPlan(raw []string) ([]string, string) {
+	var plan []string
+	for _, q := range raw {
+		if q = strings.Join(strings.Fields(q), " "); q != "" {
+			plan = append(plan, q)
+		}
+	}
+	if len(plan) > ResearchMaxPlan {
+		return nil, fmt.Sprintf("the plan has %d sub-questions; at most %d. Rank them and keep the %d the answer "+
+			"depends on most: every helper reads all of them.", len(plan), ResearchMaxPlan, ResearchMaxPlan)
+	}
+	return plan, ""
 }
 
 // researchRole is one investigator's lane. Lane is what it must cover;
@@ -706,7 +732,14 @@ from a checked one once it is written down.
 
 ## FINDINGS
 One bullet per finding, each in this exact shape:
-- CLAIM: <one sentence> | EVIDENCE: <URL, commit, file:line, version, or command output> | TIER: <tier>
+- CLAIM: <one sentence> | EVIDENCE: <URL, commit, file:line, version, or command output> | QUOTE: "<the exact words in that source that say it, copied, at most 30 words>" | TIER: <tier>
+
+CODE CHECKS THESE LINES before anyone reads your answer. A URL in EVIDENCE that
+you did not open with web_fetch in this lane is flagged as cited-not-opened; a
+QUOTE that is not in the page you fetched is flagged as quote-not-found. Either
+marks the claim UNSUPPORTED. A search result's snippet is not the page: fetch
+it, or do not cite it. When the evidence is not a page (a file, a command's
+output), write QUOTE: none.
 
 TIER must be one of, strongest first:
   primary_source    a commit, spec, source file, release note, or official doc
@@ -816,7 +849,8 @@ func (r *researchTool) infoBase() tools.ToolInfo {
 			"agents": map[string]any{
 				"type": "integer",
 				"description": fmt.Sprintf("How many helpers, %d to %d (default %d). %d runs the mandatory "+
-					"lanes only. Each one is a sequential LLM session — scale to the question, not to the maximum.",
+					"lanes only. Each one is a full LLM session (run together in parallel mode, one after another in "+
+					"sequential mode) — scale to the question, not to the maximum.",
 					ResearchMinAgents, ResearchMaxAgents, ResearchDefaultAgents, ResearchMinAgents),
 			},
 			"mode": map[string]any{
@@ -828,6 +862,13 @@ func (r *researchTool) infoBase() tools.ToolInfo {
 					"rate-limited key. 'supervised' is parallel PLUS a second agent auditing each blind lane's " +
 					"report before you see it, returning APPROVED / WEAK / REJECTED with the problems named — " +
 					"up to DOUBLE the sessions and the tokens (" + supervisedCost + "), for when being wrong is expensive.",
+			},
+			"plan": map[string]any{
+				"type":  "array",
+				"items": map[string]any{"type": "string"},
+				"description": fmt.Sprintf("Optional, recommended: the %d-%d sub-questions the answer depends on, most important "+
+					"first, each answerable by one sourced statement. Every helper gets them; more than %d is refused.",
+					3, ResearchMaxPlan, ResearchMaxPlan),
 			},
 			"roles": map[string]any{
 				"type": "string",
@@ -879,49 +920,107 @@ func selectRolesFor(doctrine, spec string, want int) ([]researchRole, string) {
 		byID[role.ID] = role
 	}
 
-	var chosen []researchRole
 	var notes []string
-
-	if strings.TrimSpace(spec) != "" {
-		seen := make(map[string]bool)
-		for _, raw := range strings.Split(spec, ",") {
-			id := strings.ToLower(strings.TrimSpace(raw))
-			if id == "" || seen[id] {
-				continue
-			}
-			role, ok := byID[id]
-			if !ok {
-				notes = append(notes, fmt.Sprintf("unknown role %q ignored (this run's roles are: %s)",
-					id, strings.Join(roleIDs(library), ", ")))
-				continue
-			}
-			seen[id] = true
-			chosen = append(chosen, role)
+	var explicit []researchRole
+	seen := make(map[string]bool)
+	for _, raw := range strings.Split(spec, ",") {
+		id := strings.ToLower(strings.TrimSpace(raw))
+		if id == "" || seen[id] {
+			continue
 		}
-		// Top up from the library so the mandatory lanes are never silently lost.
-		for _, role := range library {
-			if len(chosen) >= want {
-				break
-			}
-			if !seen[role.ID] {
-				seen[role.ID] = true
-				chosen = append(chosen, role)
-				notes = append(notes, fmt.Sprintf("added %s to reach the %d-agent minimum", role.ID, ResearchMinAgents))
-			}
+		role, ok := byID[id]
+		if !ok {
+			notes = append(notes, fmt.Sprintf("unknown role %q ignored (this run's roles are: %s)",
+				id, strings.Join(roleIDs(library), ", ")))
+			continue
 		}
-	} else {
-		chosen = append(chosen, library...)
+		seen[id] = true
+		explicit = append(explicit, role)
+	}
+	if len(explicit) == 0 {
+		chosen := append([]researchRole(nil), library...)
+		if len(chosen) > want {
+			chosen = chosen[:want]
+		}
+		return chosen, strings.Join(notes, "; ")
 	}
 
-	if len(chosen) > want {
-		chosen = chosen[:want]
+	// GORILLA FIX (2026-10-11): the mandatory lanes are placed FIRST and are
+	// never cut. This topped the explicit roles up from the library and then
+	// truncated to `want`, so roles="cost" at four helpers ran cost, local,
+	// prior_art and primary_source: the requirement lane, which checks the
+	// answer against what was actually asked, was silently gone. The test that
+	// covered it counted lanes and never asked which.
+	mandatory := library
+	if len(mandatory) > ResearchMinAgents {
+		mandatory = mandatory[:ResearchMinAgents]
+	}
+	chosen := append([]researchRole(nil), mandatory...)
+	inChosen := make(map[string]bool, len(library))
+	for _, role := range chosen {
+		inChosen[role.ID] = true
+	}
+	var dropped []string
+	for _, role := range explicit {
+		switch {
+		case inChosen[role.ID]:
+		case len(chosen) < want:
+			chosen = append(chosen, role)
+			inChosen[role.ID] = true
+		default:
+			dropped = append(dropped, role.ID)
+		}
+	}
+	if len(dropped) > 0 {
+		notes = append(notes, fmt.Sprintf("%s not run: the %d mandatory lanes and the roles before it fill the %d helpers of this run (ask for more helpers to add it)",
+			strings.Join(dropped, ", "), len(mandatory), want))
+	}
+	for _, role := range library {
+		if len(chosen) >= want {
+			break
+		}
+		if !inChosen[role.ID] {
+			inChosen[role.ID] = true
+			chosen = append(chosen, role)
+			notes = append(notes, fmt.Sprintf("added %s to fill the %d helpers", role.ID, want))
+		}
 	}
 	return chosen, strings.Join(notes, "; ")
 }
 
+// laneOutcome is one helper's result in a run.
+type laneOutcome struct {
+	reply string
+	err   error
+	spend helperSpend
+}
+
+// peerDigest is what the second-wave (peeking) lanes read: every blind lane's
+// report and, on a supervised run, that lane's audit beneath it.
+//
+// GORILLA FIX (2026-10-11): the audits were computed before the second wave
+// "so the verifier reads audited work", and then never given to it. The
+// verifier re-checked claims a supervisor had already rejected, and missed
+// the ones it had flagged WEAK.
+func peerDigest(roles []researchRole, results []laneOutcome, audits []string, wave []int) string {
+	var peers strings.Builder
+	for _, i := range wave {
+		if results[i].err != nil {
+			continue
+		}
+		fmt.Fprintf(&peers, "### %s\n%s\n\n", roles[i].Title, strings.TrimSpace(results[i].reply))
+		if i < len(audits) {
+			if a := strings.TrimSpace(audits[i]); a != "" {
+				fmt.Fprintf(&peers, "#### Supervisor's audit of this lane\n%s\n\n", a)
+			}
+		}
+	}
+	return peers.String()
+}
+
 // buildPrompt assembles one helper's instructions. Everything the helper knows
 // is here: it cannot see the conversation or the other helpers.
-func buildPrompt(role researchRole, question, sharedContext, peerFindings string, index, total int, doctrine string) string {
+func buildPrompt(role researchRole, question, sharedContext, peerFindings string, index, total int, doctrine string, plan ...string) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "You are helper %d of %d in a research investigation. Your role is:\n\n%s\n\n",
@@ -930,6 +1029,14 @@ func buildPrompt(role researchRole, question, sharedContext, peerFindings string
 	fmt.Fprintf(&b, "WHY YOUR LANE IS NARROW: %s\n\n", role.Prevents)
 	fmt.Fprintf(&b, "THE QUESTION UNDER INVESTIGATION:\n%s\n\n", question)
 
+	if len(plan) > 0 {
+		b.WriteString("THE PLAN — the sub-questions this investigation must answer, most important first. Answer the ones " +
+			"your lane can reach; in NOT ESTABLISHED, name by number each one your lane could not:\n")
+		for i, q := range plan {
+			fmt.Fprintf(&b, "  %d. %s\n", i+1, q)
+		}
+		b.WriteString("\n")
+	}
 	if strings.TrimSpace(sharedContext) != "" {
 		fmt.Fprintf(&b, "ALREADY ESTABLISHED — treat as given, do NOT re-derive any of this:\n%s\n\n", sharedContext)
 	}
@@ -1134,7 +1241,7 @@ const dossierDutiesFooter = `
 
 3. THE FILE. Write the complete dossier as markdown into a NEW file under
    %s (create the folder if missing), filename
-   dossier-<YY-MM-DD-HH-MM>-<three-word-slug>.md, and tell the user the exact
+   dossier-<YY-MM-DD-HH-MM>-<four-word-slug>.md, and tell the user the exact
    path. NEVER write it into the working folder: working folders end up in git
    repositories, and a private question must never end up in a public commit.
    In the conversation, give the bottom line and key findings only.
@@ -1265,11 +1372,12 @@ func dossierHelperTools(all []tools.BaseTool) []tools.BaseTool {
 // the synthesis — a malformed reply read as a finding is how a guess becomes a
 // fact.
 func checkContract(reply string) []string {
+	// GORILLA FIX (2026-10-11): headings are matched as heading LINES. This was
+	// a substring test, so a reply that merely mentioned "## FINDINGS" in a
+	// sentence, or a heading word inside a quoted page, passed as structured.
 	var missing []string
-	for _, heading := range []string{"## ANSWER", "## FINDINGS", "## SOURCES TRIED", "## CONFIDENCE", "## NOT ESTABLISHED"} {
-		if !strings.Contains(strings.ToUpper(reply), heading) {
-			missing = append(missing, heading)
-		}
+	for _, h := range parseLane(reply).Missing {
+		missing = append(missing, "## "+h)
 	}
 	return missing
 }
@@ -1292,6 +1400,10 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	}
 	if strings.TrimSpace(params.Question) == "" {
 		return tools.NewTextErrorResponse("question is required"), nil
+	}
+	plan, planErr := cleanPlan(params.Plan)
+	if planErr != "" {
+		return tools.NewTextErrorResponse(planErr), nil
 	}
 
 	// GORILLA OVERRIDE: the dossier is user-armed, never model-volunteered.
@@ -1402,6 +1514,13 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	started := time.Now()
 	var out strings.Builder
 	fmt.Fprintf(&out, "# Research: %s\n\n", strings.TrimSpace(params.Question))
+	if len(plan) > 0 {
+		out.WriteString("The plan every helper was given:\n")
+		for i, q := range plan {
+			fmt.Fprintf(&out, "%d. %s\n", i+1, q)
+		}
+		out.WriteString("\n")
+	}
 	switch mode {
 	case ModeSequential:
 		fmt.Fprintf(&out, "%d helpers, one at a time. %s %s\n\n", len(roles), clampNote, roleNote)
@@ -1422,12 +1541,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	// the roles that must READ the others (verifier, completeness critic) go
 	// second, once there is something to read. Splitting on that dependency is
 	// the only ordering this actually needs.
-	type outcome struct {
-		reply string
-		err   error
-		spend helperSpend
-	}
-	results := make([]outcome, len(roles))
+	results := make([]laneOutcome, len(roles))
 	var mu sync.Mutex
 	var supervisorSpend helperSpend
 
@@ -1469,13 +1583,13 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 			case sem <- struct{}{}:
 			case <-hctx.Done():
 				SetSubAgentState(entry.ID, SubAgentKilled)
-				results[i] = outcome{err: hctx.Err()}
+				results[i] = laneOutcome{err: hctx.Err()}
 				return
 			}
 			defer func() { <-sem }()
 
 			SetSubAgentState(entry.ID, SubAgentRunning)
-			prompt := buildPrompt(roles[i], params.Question, params.Context, peers, i, len(roles), params.Doctrine)
+			prompt := buildPrompt(roles[i], params.Question, params.Context, peers, i, len(roles), params.Doctrine, plan...)
 			reply, spend, err := r.runHelper(hctx, sessionID, call.ID, roles[i], prompt, entry.ID, params.Doctrine)
 			switch {
 			case err != nil && hctx.Err() != nil:
@@ -1485,7 +1599,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 			default:
 				SetSubAgentState(entry.ID, SubAgentDone)
 			}
-			results[i] = outcome{reply: reply, err: err, spend: spend}
+			results[i] = laneOutcome{reply: reply, err: err, spend: spend}
 		})
 	}
 
@@ -1596,13 +1710,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	}
 
 	if len(secondWave) > 0 {
-		var peers strings.Builder
-		for _, i := range firstWave {
-			if results[i].err == nil {
-				fmt.Fprintf(&peers, "### %s\n%s\n\n", roles[i].Title, strings.TrimSpace(results[i].reply))
-			}
-		}
-		runWave(secondWave, peers.String())
+		runWave(secondWave, peerDigest(roles, results, audits, firstWave))
 	}
 
 	// One write for the whole run: N goroutines doing read-modify-write on the
@@ -1720,6 +1828,14 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	// Report in role order, not completion order, so the output is the same
 	// every run and diffable.
 	completed, failed := 0, 0
+	// The evidence check (research_evidence.go): each lane's claims against
+	// what that lane's helper actually fetched.
+	parses := make([]laneParse, len(roles))
+	fetches := make([]map[string]string, len(roles))
+	for i := range parses {
+		parses[i] = parseLane("") // a lane that failed is recorded as uncovered
+	}
+	evidenceProblems := 0
 	for i, role := range roles {
 		o := results[i]
 		fmt.Fprintf(&out, "## %s\n\n", role.Title)
@@ -1739,6 +1855,11 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 			fmt.Fprintf(&out, "**Contract not followed — missing %s. Read this reply with suspicion; unstructured findings carry no evidence tiers.**\n\n",
 				strings.Join(missing, ", "))
 		}
+		parses[i] = parseLane(o.reply)
+		fetches[i] = laneFetches(ctx, r.messages, helperSessionID(call.ID, role))
+		laneFindings := auditLane(parses[i], fetches[i], params.Doctrine)
+		evidenceProblems += len(laneFindings)
+		writeEvidenceSection(&out, parses[i], laneFindings, r.messages != nil)
 		out.WriteString(strings.TrimSpace(o.reply))
 		if a := strings.TrimSpace(audits[i]); a != "" {
 			out.WriteString("\n\n### Supervisor audit of this lane\n\n")
@@ -1757,6 +1878,10 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 		"2. Carry evidence tiers through. A `single_claim` stays a single claim when you repeat it.\n" +
 		"3. Say what nobody established. A gap reported is cheaper than a gap discovered later.\n" +
 		"4. If the honest answer is no, give it plainly rather than offering hope.\n")
+	if evidenceProblems > 0 {
+		fmt.Fprintf(&out, "5. The evidence check found %d problem(s), listed under their lanes. Those claims are UNSUPPORTED: "+
+			"drop them, or fetch the page and confirm them yourself before you repeat them.\n", evidenceProblems)
+	}
 
 	// GORILLA OVERRIDE (2026-08-18): save the graded findings to disk NOW, from
 	// Go, before the model is asked to assemble anything. A run on 2026-08-17
@@ -1769,7 +1894,11 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	for i, o := range results {
 		replies[i] = o.reply
 	}
-	if saved := writeRawFindings(params.Question, roles, replies, audits, params.Doctrine); saved != "" {
+	saved := writeRawFindings(params.Question, roles, replies, audits, params.Doctrine, call.ID)
+	if record := writeEvidenceRecord(saved, params.Question, params.Doctrine, call.ID, roles, parses, fetches); record != "" {
+		logging.Info("research evidence record saved", "path", record)
+	}
+	if saved != "" {
 		fmt.Fprintf(&out, "\n## Findings already saved\n\n"+
 			"Every lane's report is on disk at:\n\n    %s\n\n"+
 			"That happened automatically, before you were asked to do anything, so this run "+

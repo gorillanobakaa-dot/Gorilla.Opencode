@@ -11,10 +11,15 @@ package tools
 // Endpoints are vars, not consts, solely so tests can stub them with httptest.
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/opencode-ai/opencode/internal/config"
 )
 
 var (
@@ -56,6 +61,7 @@ func (t *webSearchTool) searchGDELT(ctx context.Context, q string, n int) ([]sea
 		hits = append(hits, searchHit{
 			Title:   a.Title,
 			Year:    year,
+			Date:    isoDate(a.SeenDate),
 			Venue:   venue,
 			URL:     a.URL,
 			Backend: "GDELT",
@@ -70,22 +76,32 @@ func (t *webSearchTool) searchGDELT(ctx context.Context, q string, n int) ([]sea
 func (t *webSearchTool) searchWorldBank(ctx context.Context, q string, n int) ([]searchHit, error) {
 	u := fmt.Sprintf("%s?format=json&qterm=%s&rows=%d&fl=display_title,pdfurl,txturl,docdt,docty,count",
 		worldBankAPI, url.QueryEscape(q), n)
+	// GORILLA FIX (2026-10-11): "documents" is a JSON OBJECT keyed by document
+	// id, in the API's relevance order. Decoded into a Go map, that order was
+	// lost and replaced by Go's randomised map iteration: the same query gave
+	// a differently ordered list each run, and the best match was as likely
+	// last as first. The keys are read in the order they arrive.
 	var out struct {
-		Documents map[string]struct {
-			DisplayTitle string `json:"display_title"`
-			PDFURL       string `json:"pdfurl"`
-			TxtURL       string `json:"txturl"`
-			DocDate      string `json:"docdt"` // 2023-06-30T04:00:00Z
-			DocType      string `json:"docty"`
-		} `json:"documents"`
+		Documents json.RawMessage `json:"documents"`
 	}
 	if err := t.getJSON(ctx, u, &out); err != nil {
 		return nil, err
 	}
-	hits := make([]searchHit, 0, len(out.Documents))
-	for key, d := range out.Documents {
-		if key == "facets" || d.DisplayTitle == "" {
-			continue
+	type wbDoc struct {
+		DisplayTitle string `json:"display_title"`
+		PDFURL       string `json:"pdfurl"`
+		TxtURL       string `json:"txturl"`
+		DocDate      string `json:"docdt"` // 2023-06-30T04:00:00Z
+		DocType      string `json:"docty"`
+	}
+	hits := make([]searchHit, 0, n)
+	err := forEachInOrder(out.Documents, func(key string, raw json.RawMessage) bool {
+		if key == "facets" {
+			return true
+		}
+		var d wbDoc
+		if json.Unmarshal(raw, &d) != nil || d.DisplayTitle == "" {
+			return true
 		}
 		link := d.PDFURL
 		if link == "" {
@@ -98,11 +114,16 @@ func (t *webSearchTool) searchWorldBank(ctx context.Context, q string, n int) ([
 		hits = append(hits, searchHit{
 			Title:   d.DisplayTitle,
 			Year:    year,
+			Date:    isoDate(d.DocDate),
 			Venue:   strings.TrimSpace("World Bank " + d.DocType),
 			URL:     link,
 			FreePDF: d.PDFURL, // World Bank documents are open access by policy
 			Backend: "World Bank",
 		})
+		return len(hits) < n
+	})
+	if err != nil {
+		return nil, fmt.Errorf("World Bank answered with documents that could not be read: %w", err)
 	}
 	return hits, nil
 }
@@ -151,6 +172,7 @@ func (t *webSearchTool) searchHDX(ctx context.Context, q string, n int) ([]searc
 		hits = append(hits, searchHit{
 			Title:   d.Title,
 			Year:    year,
+			Date:    isoDate(d.LastModified),
 			Venue:   venue,
 			URL:     "https://data.humdata.org/dataset/" + d.Name,
 			Backend: "HDX",
@@ -179,9 +201,13 @@ func (t *webSearchTool) searchSECEDGAR(ctx context.Context, q string, n int) ([]
 		} `json:"hits"`
 	}
 	// SEC's fair-access policy requires an email-form User-Agent and 403s
-	// anything else (measured live 2026-08-17). The address is the project's
-	// public git-author contact; owner-approved, one line to change.
-	if err := t.getJSONUA(ctx, u, "gorilla-opencode research tool (gorillanobakaa@gmail.com)", &out); err != nil {
+	// anything else (measured live 2026-08-17). The address is the running
+	// user's (config.ResearchContactEmail), never one compiled in.
+	email := config.ResearchContactEmail()
+	if email == "" {
+		return nil, errors.New(config.ErrNoContactEmail)
+	}
+	if err := t.getJSONUA(ctx, u, "gorilla-opencode research tool ("+email+")", &out); err != nil {
 		return nil, err
 	}
 	hits := make([]searchHit, 0)
@@ -206,10 +232,61 @@ func (t *webSearchTool) searchSECEDGAR(ctx context.Context, q string, n int) ([]
 		hits = append(hits, searchHit{
 			Title:   strings.TrimSpace(name + " — " + h.Source.FileType),
 			Year:    year,
+			Date:    isoDate(h.Source.FileDate),
 			Venue:   "SEC EDGAR",
 			URL:     link,
 			Backend: "SEC EDGAR",
 		})
 	}
 	return hits, nil
+}
+
+// forEachInOrder calls fn for each member of a JSON object in document order,
+// stopping when fn returns false. An absent or null object is no members.
+func forEachInOrder(obj json.RawMessage, fn func(key string, value json.RawMessage) bool) error {
+	if len(bytes.TrimSpace(obj)) == 0 || string(bytes.TrimSpace(obj)) == "null" {
+		return nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(obj))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return fmt.Errorf("not a JSON object")
+	}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		key, _ := tok.(string)
+		var v json.RawMessage
+		if err := dec.Decode(&v); err != nil {
+			return err
+		}
+		if !fn(key, v) {
+			return nil
+		}
+	}
+	return nil
+}
+
+// isoDate reduces the date shapes these APIs use to YYYY-MM-DD, or "" when the
+// value is not a date: "2026-08-15T12:00:00Z", "20260815T120000Z",
+// "2024-01-30", "2026-08-15 12:00:00".
+func isoDate(v string) string {
+	v = strings.TrimSpace(v)
+	switch {
+	case len(v) >= 10 && v[4] == '-' && v[7] == '-' && allDigits(v[:4]+v[5:7]+v[8:10]):
+		return v[:10]
+	case len(v) >= 8 && allDigits(v[:8]) && (len(v) == 8 || v[8] == 'T'):
+		return v[:4] + "-" + v[4:6] + "-" + v[6:8]
+	}
+	return ""
+}
+
+func allDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return s != ""
 }

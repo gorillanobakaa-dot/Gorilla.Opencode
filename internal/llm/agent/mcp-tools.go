@@ -53,7 +53,31 @@ func (b *mcpTool) Info() tools.ToolInfo {
 	}
 }
 
+// mcpAnswer is what a call returned, before it is turned into a tool response:
+// the text, and the server's _meta labels (nil when it sent none).
+type mcpAnswer struct {
+	text  string
+	meta  map[string]any
+	isErr bool
+	// failed is set when no answer came back at all (start-up, handshake or
+	// transport error); text then holds the error.
+	failed bool
+}
+
 func runTool(ctx context.Context, c MCPClient, serverName, toolName string, input string) (tools.ToolResponse, error) {
+	a := callMCP(ctx, c, toolName, input)
+	if a.failed {
+		return tools.NewTextErrorResponse(a.text), nil
+	}
+	// An MCP server is third-party code returning third-party content. It is
+	// exactly the shape untrusted.go exists for: the model must be able to
+	// tell a server's output from its operator's instructions.
+	return tools.NewUntrustedTextResponse("MCP server", serverName, "", a.text), nil
+}
+
+// callMCP initialises the server, makes one call and collects every content
+// block. It never panics on a malformed answer.
+func callMCP(ctx context.Context, c MCPClient, toolName string, input string) mcpAnswer {
 	defer c.Close()
 	initRequest := mcp.InitializeRequest{}
 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
@@ -64,19 +88,22 @@ func runTool(ctx context.Context, c MCPClient, serverName, toolName string, inpu
 
 	_, err := c.Initialize(ctx, initRequest)
 	if err != nil {
-		return tools.NewTextErrorResponse(err.Error()), nil
+		return mcpAnswer{text: err.Error(), failed: true}
 	}
 
 	toolRequest := mcp.CallToolRequest{}
 	toolRequest.Params.Name = toolName
 	var args map[string]any
 	if err = json.Unmarshal([]byte(input), &args); err != nil {
-		return tools.NewTextErrorResponse(fmt.Sprintf("error parsing parameters: %s", err)), nil
+		return mcpAnswer{text: fmt.Sprintf("error parsing parameters: %s", err), failed: true}
 	}
 	toolRequest.Params.Arguments = args
 	result, err := c.CallTool(ctx, toolRequest)
 	if err != nil {
-		return tools.NewTextErrorResponse(err.Error()), nil
+		return mcpAnswer{text: err.Error(), failed: true}
+	}
+	if result == nil {
+		return mcpAnswer{text: "the MCP server returned no result", failed: true}
 	}
 
 	// GORILLA FIX (2026-08-19): this was `output = v.Text` inside the loop —
@@ -96,11 +123,40 @@ func runTool(ctx context.Context, c MCPClient, serverName, toolName string, inpu
 			fmt.Fprintf(&out, "%v", v)
 		}
 	}
+	return mcpAnswer{text: out.String(), meta: result.Meta, isErr: result.IsError}
+}
 
-	// An MCP server is third-party code returning third-party content. It is
-	// exactly the shape untrusted.go exists for: the model must be able to
-	// tell a server's output from its operator's instructions.
-	return tools.NewUntrustedTextResponse("MCP server", serverName, "", out.String()), nil
+// GORILLA OVERRIDE (2026-10-10): the policy for a server marked "trust":
+// "local" (config.MCPServer.Trust), in two pure functions so each rule is
+// tested on its own.
+
+// declaresNetwork reports whether a call's arguments say it will go online:
+// a top-level "network": true. Anything else (absent, false, "true" as a
+// string, unparsable input) is "no", and a local server must then refuse to go
+// online; if it goes online anyway, localAnswerTrusted catches the lie.
+func declaresNetwork(input string) bool {
+	var args map[string]any
+	if json.Unmarshal([]byte(input), &args) != nil {
+		return false
+	}
+	v, ok := args["network"].(bool)
+	return ok && v
+}
+
+// localAnswerTrusted decides whether an answer from a local server may skip the
+// taint. Fail closed: only an explicit _meta.untrusted == false counts, and an
+// answer that reports egress the call did not declare is never trusted.
+func localAnswerTrusted(meta map[string]any, declaredNetwork bool) (bool, string) {
+	if meta == nil {
+		return false, "the server sent no _meta labels"
+	}
+	if eg, ok := meta["egress"].(bool); ok && eg && !declaredNetwork {
+		return false, "the server reports it went online for a call that did not declare network"
+	}
+	if u, ok := meta["untrusted"].(bool); !ok || u {
+		return false, "the answer carries text someone else wrote"
+	}
+	return true, ""
 }
 
 func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolResponse, error) {
@@ -108,6 +164,8 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 	if sessionID == "" || messageID == "" {
 		return tools.ToolResponse{}, fmt.Errorf("session ID and message ID are required for creating a new file")
 	}
+	local := b.mcpConfig.LocalTrust()
+	declared := local && declaresNetwork(params.Input)
 	permissionDescription := fmt.Sprintf("execute %s with the following parameters: %s", b.Info().Name, params.Input)
 	if who := describeMCPServer(b.mcpName); who != "" {
 		permissionDescription = who + "\n\n" + permissionDescription
@@ -128,7 +186,10 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 			// An MCP server may be a remote HTTP endpoint. Stdio servers are
 			// local processes, but a local process is free to open a socket,
 			// so both count as egress for the auto-approve carve-out.
-			Egress: true,
+			// GORILLA OVERRIDE (2026-10-10): except a server the owner marked
+			// "trust": "local", which goes online only for a call that says
+			// "network": true (see config.MCPServer.Trust).
+			Egress: !local || declared,
 		},
 	)
 	if !p {
@@ -144,6 +205,9 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 		)
 		if err != nil {
 			return tools.NewTextErrorResponse(err.Error()), nil
+		}
+		if local {
+			return runLocalTool(ctx, c, sessionID, b.mcpName, b.tool.Name, params.Input, declared), nil
 		}
 		tools.MarkMCPTaint(sessionID, b.mcpName)
 		return runTool(ctx, c, b.mcpName, b.tool.Name, params.Input)
@@ -169,6 +233,25 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 	}
 
 	return tools.NewTextErrorResponse("invalid mcp type"), nil
+}
+
+// runLocalTool is runTool for a server marked "trust": "local": the taint and
+// the untrusted fence are applied only when localAnswerTrusted says so, and the
+// reason is logged when they are.
+func runLocalTool(ctx context.Context, c MCPClient, sessionID, serverName, toolName, input string, declared bool) tools.ToolResponse {
+	a := callMCP(ctx, c, toolName, input)
+	if a.failed {
+		return tools.NewTextErrorResponse(a.text)
+	}
+	if ok, why := localAnswerTrusted(a.meta, declared); !ok {
+		logging.Debug("local MCP answer treated as untrusted", "server", serverName, "tool", toolName, "why", why)
+		tools.MarkMCPTaint(sessionID, serverName)
+		return tools.NewUntrustedTextResponse("MCP server", serverName, "", a.text)
+	}
+	if a.isErr {
+		return tools.NewTextErrorResponse(a.text)
+	}
+	return tools.NewTextResponse(a.text)
 }
 
 func NewMcpTool(name string, tool mcp.Tool, permissions permission.Service, mcpConfig config.MCPServer) tools.BaseTool {
