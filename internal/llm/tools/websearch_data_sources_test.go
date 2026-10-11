@@ -8,6 +8,7 @@ package tools
 
 import (
 	"context"
+	"github.com/opencode-ai/opencode/internal/config"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -175,9 +176,9 @@ func TestFairAccessSourcesUseTheRunningUsersContact(t *testing.T) {
 		_, _ = w.Write([]byte(`{"hits":{"hits":[]}}`))
 	}))
 	t.Cleanup(srv.Close)
-	old := secEdgarAPI
+	oldAPI := secEdgarAPI
 	secEdgarAPI = srv.URL
-	t.Cleanup(func() { secEdgarAPI = old })
+	t.Cleanup(func() { secEdgarAPI = oldAPI })
 
 	t.Setenv("GORILLA_OPENCODE_CONTACT_EMAIL", "")
 	if _, err := stubTool().searchSECEDGAR(context.Background(), "x", 1); err == nil || !strings.Contains(err.Error(), "GORILLA_OPENCODE_CONTACT_EMAIL") {
@@ -194,6 +195,23 @@ func TestFairAccessSourcesUseTheRunningUsersContact(t *testing.T) {
 	_, _ = stubTool().searchSECEDGAR(context.Background(), "x", 1)
 	if !strings.Contains(gotUA, "(tester@example.org)") {
 		t.Errorf("SEC User-Agent does not carry the user's contact: %q", gotUA)
+	}
+
+	// config.json's contactEmail, when the variable is not set; the variable
+	// wins when both are.
+	cfg := config.Get()
+	old := cfg.ContactEmail
+	cfg.ContactEmail = "fromconfig@example.org"
+	t.Cleanup(func() { cfg.ContactEmail = old })
+	t.Setenv("GORILLA_OPENCODE_CONTACT_EMAIL", "")
+	_, _ = stubTool().searchSECEDGAR(context.Background(), "x", 1)
+	if !strings.Contains(gotUA, "(fromconfig@example.org)") {
+		t.Errorf("config.json contactEmail not used: %q", gotUA)
+	}
+	t.Setenv("GORILLA_OPENCODE_CONTACT_EMAIL", "fromenv@example.org")
+	_, _ = stubTool().searchSECEDGAR(context.Background(), "x", 1)
+	if !strings.Contains(gotUA, "(fromenv@example.org)") {
+		t.Errorf("the variable must win over config.json: %q", gotUA)
 	}
 }
 

@@ -706,7 +706,14 @@ from a checked one once it is written down.
 
 ## FINDINGS
 One bullet per finding, each in this exact shape:
-- CLAIM: <one sentence> | EVIDENCE: <URL, commit, file:line, version, or command output> | TIER: <tier>
+- CLAIM: <one sentence> | EVIDENCE: <URL, commit, file:line, version, or command output> | QUOTE: "<the exact words in that source that say it, copied, at most 30 words>" | TIER: <tier>
+
+CODE CHECKS THESE LINES before anyone reads your answer. A URL in EVIDENCE that
+you did not open with web_fetch in this lane is flagged as cited-not-opened; a
+QUOTE that is not in the page you fetched is flagged as quote-not-found. Either
+marks the claim UNSUPPORTED. A search result's snippet is not the page: fetch
+it, or do not cite it. When the evidence is not a page (a file, a command's
+output), write QUOTE: none.
 
 TIER must be one of, strongest first:
   primary_source    a commit, spec, source file, release note, or official doc
@@ -1324,11 +1331,12 @@ func dossierHelperTools(all []tools.BaseTool) []tools.BaseTool {
 // the synthesis — a malformed reply read as a finding is how a guess becomes a
 // fact.
 func checkContract(reply string) []string {
+	// GORILLA FIX (2026-10-11): headings are matched as heading LINES. This was
+	// a substring test, so a reply that merely mentioned "## FINDINGS" in a
+	// sentence, or a heading word inside a quoted page, passed as structured.
 	var missing []string
-	for _, heading := range []string{"## ANSWER", "## FINDINGS", "## SOURCES TRIED", "## CONFIDENCE", "## NOT ESTABLISHED"} {
-		if !strings.Contains(strings.ToUpper(reply), heading) {
-			missing = append(missing, heading)
-		}
+	for _, h := range parseLane(reply).Missing {
+		missing = append(missing, "## "+h)
 	}
 	return missing
 }
@@ -1768,6 +1776,14 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	// Report in role order, not completion order, so the output is the same
 	// every run and diffable.
 	completed, failed := 0, 0
+	// The evidence check (research_evidence.go): each lane's claims against
+	// what that lane's helper actually fetched.
+	parses := make([]laneParse, len(roles))
+	fetches := make([]map[string]string, len(roles))
+	for i := range parses {
+		parses[i] = parseLane("") // a lane that failed is recorded as uncovered
+	}
+	evidenceProblems := 0
 	for i, role := range roles {
 		o := results[i]
 		fmt.Fprintf(&out, "## %s\n\n", role.Title)
@@ -1787,6 +1803,11 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 			fmt.Fprintf(&out, "**Contract not followed — missing %s. Read this reply with suspicion; unstructured findings carry no evidence tiers.**\n\n",
 				strings.Join(missing, ", "))
 		}
+		parses[i] = parseLane(o.reply)
+		fetches[i] = laneFetches(ctx, r.messages, helperSessionID(call.ID, role))
+		laneFindings := auditLane(parses[i], fetches[i], params.Doctrine)
+		evidenceProblems += len(laneFindings)
+		writeEvidenceSection(&out, parses[i], laneFindings, r.messages != nil)
 		out.WriteString(strings.TrimSpace(o.reply))
 		if a := strings.TrimSpace(audits[i]); a != "" {
 			out.WriteString("\n\n### Supervisor audit of this lane\n\n")
@@ -1805,6 +1826,10 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 		"2. Carry evidence tiers through. A `single_claim` stays a single claim when you repeat it.\n" +
 		"3. Say what nobody established. A gap reported is cheaper than a gap discovered later.\n" +
 		"4. If the honest answer is no, give it plainly rather than offering hope.\n")
+	if evidenceProblems > 0 {
+		fmt.Fprintf(&out, "5. The evidence check found %d problem(s), listed under their lanes. Those claims are UNSUPPORTED: "+
+			"drop them, or fetch the page and confirm them yourself before you repeat them.\n", evidenceProblems)
+	}
 
 	// GORILLA OVERRIDE (2026-08-18): save the graded findings to disk NOW, from
 	// Go, before the model is asked to assemble anything. A run on 2026-08-17
@@ -1817,7 +1842,11 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	for i, o := range results {
 		replies[i] = o.reply
 	}
-	if saved := writeRawFindings(params.Question, roles, replies, audits, params.Doctrine, call.ID); saved != "" {
+	saved := writeRawFindings(params.Question, roles, replies, audits, params.Doctrine, call.ID)
+	if record := writeEvidenceRecord(saved, params.Question, params.Doctrine, call.ID, roles, parses, fetches); record != "" {
+		logging.Info("research evidence record saved", "path", record)
+	}
+	if saved != "" {
 		fmt.Fprintf(&out, "\n## Findings already saved\n\n"+
 			"Every lane's report is on disk at:\n\n    %s\n\n"+
 			"That happened automatically, before you were asked to do anything, so this run "+

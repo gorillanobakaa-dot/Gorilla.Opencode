@@ -194,6 +194,12 @@ type Config struct {
 	// json tags, and a field it cannot match becomes write-only. That is exactly
 	// how WorkingDir's `json:"wd"` silently never loaded back.
 	SearxNGURL string `json:"searxngURL,omitempty" mapstructure:"searxngURL"`
+	// GORILLA OVERRIDE (2026-10-11): the address the two research sources that
+	// demand one (Unpaywall, SEC EDGAR) are given. GORILLA_OPENCODE_CONTACT_EMAIL
+	// wins when set. Never read from a folder's .gorilla-opencode.json (see
+	// filterFolderSettings): a cloned repository must not choose who you say
+	// you are.
+	ContactEmail string `json:"contactEmail,omitempty" mapstructure:"contactEmail"`
 	// GORILLA OVERRIDE: the user's personal model shortlist, shown above every
 	// provider in the picker. Model IDs in the order they were added — see
 	// bookmarks.go for why IDs rather than names or list positions.

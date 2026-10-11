@@ -338,9 +338,13 @@ used.
 
 ## What it will not do
 
-- It will not cite a source it did not actually open. (Every helper is told
-  this. Nothing in code checks it yet: the helpers' own fetches are in the
-  session store, and checking each cited URL against them is planned.)
+- It will not cite a source it did not actually open. Code checks this: every
+  URL a lane cites is matched against the pages that lane's helper fetched,
+  and every QUOTE against the text it got back. A claim that fails is marked
+  UNSUPPORTED under its lane before the answer is written
+  (`internal/llm/agent/research_evidence.go`), and the run is saved as a
+  `.jsonl` record beside the findings file, which `fieldkit evidence check`
+  re-checks later, against kept snapshots of the pages.
 - It will not present one echoed press release as consensus.
 - It will not manufacture certainty. Research reduces uncertainty; it does
   not eliminate it. The leftover risk is stated and left with you.

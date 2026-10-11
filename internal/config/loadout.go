@@ -1582,6 +1582,11 @@ func BrowserUserAgent() string {
 // made-up address, which SEC 403s anyway.
 func ResearchContactEmail() string {
 	v := strings.TrimSpace(os.Getenv("GORILLA_OPENCODE_CONTACT_EMAIL"))
+	if v == "" {
+		if cfg := Get(); cfg != nil {
+			v = strings.TrimSpace(cfg.ContactEmail)
+		}
+	}
 	if !strings.Contains(v, "@") || strings.ContainsAny(v, " \t\r\n()<>") {
 		return ""
 	}
@@ -1589,7 +1594,7 @@ func ResearchContactEmail() string {
 }
 
 // ErrNoContactEmail names the setting a fair-access backend needs.
-const ErrNoContactEmail = "this source requires a contact email: set GORILLA_OPENCODE_CONTACT_EMAIL=you@example.org (it is sent to the source and nowhere else)"
+const ErrNoContactEmail = "this source requires a contact email: set \"contactEmail\" in config.json, or GORILLA_OPENCODE_CONTACT_EMAIL=you@example.org (it is sent to the source and nowhere else)"
 
 const (
 	// A current, common desktop Firefox on Linux — authentic for this project's
