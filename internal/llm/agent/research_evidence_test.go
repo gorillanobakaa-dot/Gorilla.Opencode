@@ -68,7 +68,7 @@ func TestOneSpellingPerPage(t *testing.T) {
 }
 
 func TestQuoteMatchingIgnoresWhatDoesNotMatter(t *testing.T) {
-	page := "Șapte: the “quick”  brown\nfox — jumps over the evi-\ndence."
+	page := "Été: the “quick”  brown\nfox — jumps over the evi-\ndence."
 	for _, q := range []string{`the "QUICK" brown fox - jumps`, "jumps over the evidence"} {
 		if !quoteIn(page, q) {
 			t.Errorf("%q should be found", q)

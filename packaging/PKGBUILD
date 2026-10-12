@@ -1,4 +1,4 @@
-# Maintainer: gorillanobakaa <gorillanobakaa@gmail.com>
+# Maintainer: gorillanobakaa-dot <279212134+gorillanobakaa-dot@users.noreply.github.com>
 # GORILLA OVERRIDE: this PKGBUILD builds gorilla-opencode from source using the
 # Go toolchain. It produces the same binary the Debian package ships: stripped
 # (-s -w), version-stamped, no CGO.

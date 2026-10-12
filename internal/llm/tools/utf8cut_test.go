@@ -7,7 +7,7 @@ import (
 )
 
 func TestCutAtRuneNeverSplitsACharacter(t *testing.T) {
-	s := "Băiatul și fata — 東京 🦍 end"
+	s := "Grüße, façade — 東京 🦍 end"
 	for n := -1; n <= len(s)+1; n++ {
 		got := cutAtRune(s, n)
 		if !utf8.ValidString(got) || !strings.HasPrefix(s, got) || len(got) > max(n, 0) {
@@ -19,7 +19,7 @@ func TestCutAtRuneNeverSplitsACharacter(t *testing.T) {
 // The truncation that guards every untrusted answer is the one most likely to
 // cut foreign text.
 func TestUntrustedTruncationKeepsValidUTF8(t *testing.T) {
-	body := strings.Repeat("ș", MaxToolResponseBytes)
+	body := strings.Repeat("ß", MaxToolResponseBytes)
 	resp := NewUntrustedTextResponse("web page", "https://example.org", "", body)
 	if !utf8.ValidString(resp.Content) {
 		t.Fatal("a truncated untrusted answer is not valid UTF-8")

@@ -97,12 +97,12 @@ func TestChangingDirectoryStillPersists(t *testing.T) {
 // newlines must all come out the other side intact.
 func TestTheCommandSurvivesTheEncoding(t *testing.T) {
 	s := psOnly(t)
-	cmd := "Write-Output 'ăâîșț — \"double\" and ''single'''\nWrite-Output second_line"
+	cmd := "Write-Output 'äöüßé — \"double\" and ''single'''\nWrite-Output second_line"
 	out, stderr, code := exec1(t, s, cmd)
 	if code != 0 {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
-	for _, want := range []string{"ăâîșț", `"double"`, "'single'", "second_line"} {
+	for _, want := range []string{"äöüßé", `"double"`, "'single'", "second_line"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q: %q", want, out)
 		}

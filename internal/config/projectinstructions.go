@@ -124,7 +124,7 @@ func remoteOwner(remote string) (string, bool) {
 // ownerLooksLikeUs compares the remote's account against the local git
 // identity. Substring matching in BOTH directions, case-folded, because
 // accounts and names diverge in small ways ("gorillanobakaa-dot" against
-// "gorillanobakaa@gmail.com") that an equality test would miss.
+// "279212134+gorillanobakaa-dot@users.noreply.github.com") that an equality test would miss.
 func ownerLooksLikeUs(dir, owner string) bool {
 	owner = strings.ToLower(owner)
 	if owner == "" {

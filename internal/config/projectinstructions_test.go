@@ -44,7 +44,7 @@ func gitRepo(t *testing.T, remote, name, email string) string {
 
 func TestOwnRepositoryLoadsItsInstructions(t *testing.T) {
 	dir := gitRepo(t, "https://github.com/gorillanobakaa-dot/Gorilla.Opencode",
-		"gorillanobakaa-dot", "gorillanobakaa@gmail.com")
+		"gorillanobakaa-dot", "279212134+gorillanobakaa-dot@users.noreply.github.com")
 	v := AutoLoadProjectInstructions(dir)
 	if !v.Loaded {
 		t.Fatalf("own repository was refused: %s", v.Reason)
@@ -57,7 +57,7 @@ func TestOwnRepositoryLoadsItsInstructions(t *testing.T) {
 // git clone && cd must not be prompt injection.
 func TestSomeoneElsesRepositoryDoesNotLoadAutomatically(t *testing.T) {
 	dir := gitRepo(t, "https://github.com/attacker/totally-normal-lib",
-		"gorillanobakaa-dot", "gorillanobakaa@gmail.com")
+		"gorillanobakaa-dot", "279212134+gorillanobakaa-dot@users.noreply.github.com")
 	v := AutoLoadProjectInstructions(dir)
 	if v.Loaded {
 		t.Fatal("a cloned stranger's AGENTS.md was spliced into the system prompt with no prompt and no tool call")
@@ -107,7 +107,7 @@ func TestRemoteOwnerParsesTheCommonSpellings(t *testing.T) {
 // in small ways an equality test would miss — but it must not be so fuzzy that
 // it matches anyone.
 func TestIdentityMatchingIsNotJustAnythingGoes(t *testing.T) {
-	dir := gitRepo(t, "https://github.com/microsoft/vscode", "gorillanobakaa-dot", "gorillanobakaa@gmail.com")
+	dir := gitRepo(t, "https://github.com/microsoft/vscode", "gorillanobakaa-dot", "279212134+gorillanobakaa-dot@users.noreply.github.com")
 	if v := AutoLoadProjectInstructions(dir); v.Loaded {
 		t.Fatal("an unrelated account matched the local git identity")
 	}
