@@ -301,20 +301,39 @@ Note that suppressing the deltas still produced the correct final answer, from t
 `result` line. That is the failure the test exists to catch: right in the
 transcript, broken on screen.
 
+### The tool bridge
+
+`--tools ""` strips every built-in Claude Code tool, and this program's own are
+served back over a loopback MCP server on `127.0.0.1`, with a bearer token
+generated per turn and never written to disk.
+
+SSE rather than stdio, deliberately: an MCP stdio server is a command the CHILD
+spawns, so the tools would run in a third process with no route back to the
+terminal, losing the permission prompt the user answers and the receipt. Over
+SSE this program is the server, so `Run()` executes here, on the same permission
+system every other provider goes through.
+
+Without `--allowedTools` the child DENIES every bridged tool. Measured against
+claude 2.1.296: the call comes back "the session has no approval surface, so the
+permission prompt was denied automatically" and lands in the result's
+`permission_denials`, and the model then explains the failure instead of doing
+the work. The allowlist is built from our own tool names, so a tool this program
+did not supply cannot be on it.
+
+Calls the child already ran come back as `ExecutedToolCalls`, not `ToolCalls`,
+and are marked `message.ToolCall.Executed` by the agent. They are RECORDED, so
+the transcript and the receipt show them, and never DISPATCHED, because the
+child has already run them.
+
 ### Not done yet
 
-**Tools.** `--tools ""` means Claude cannot act. `mark3labs/mcp-go` is already in
-`go.mod`, so the next step is for gorilla-opencode to host an MCP server exposing
-its own tool set and pass it with `--mcp-config`, leaving the child with our tools
-and only our tools. Executed in this process, through this program's permission
-system, recorded in this program's receipt.
+**Attachments.** The models declare `SupportsAttachments: true` on the strength of
+the underlying models supporting images. The `-p` path has a `--file` flag that
+has not been wired up or tested here, so this is **unverified** and should be
+treated as not working until someone proves otherwise.
 
 **The rate-limit meter.** `rate_limit_event` carries exactly what the footer
 wants: `five_hour` and `seven_day` utilisation with reset timestamps, plus
 `overageStatus`. It is currently logged at debug level and nothing displays it.
 `internal/auth/meters.go` already does this job for the other sign-in providers.
 
-**Attachments.** The models declare `SupportsAttachments: true` on the strength of
-the underlying models supporting images. The `-p` path has a `--file` flag that
-has not been wired up or tested here, so this is **unverified** and should be
-treated as not working until someone proves otherwise.
