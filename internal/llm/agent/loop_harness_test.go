@@ -36,6 +36,10 @@ import (
 type reply struct {
 	text  string
 	calls []message.ToolCall
+	// executed are calls the PROVIDER already ran, as the Claude CLI provider
+	// returns them. The loop must record these and must not dispatch them.
+	executed    []message.ToolCall
+	executedRes []message.ToolResult
 }
 
 type scriptedProvider struct {
@@ -75,6 +79,7 @@ func (p *scriptedProvider) StreamResponse(_ context.Context, msgs []message.Mess
 		}
 		ch <- provider.ProviderEvent{Type: provider.EventComplete, Response: &provider.ProviderResponse{
 			Content: r.text, ToolCalls: r.calls, FinishReason: finish,
+			ExecutedToolCalls: r.executed, ExecutedToolResults: r.executedRes,
 		}}
 	}()
 	return ch

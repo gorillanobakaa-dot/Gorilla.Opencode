@@ -225,6 +225,7 @@ func TestEveryPortalRowIsHandled(t *testing.T) {
 	handled := map[string]bool{
 		"antigravity":  true,
 		"chatgpt":      true,
+		"claude-cli":   true,
 		"google-oauth": true,
 		"gcp-custom":   true,
 		"nvidia-nim":   true,

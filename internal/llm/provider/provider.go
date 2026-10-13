@@ -75,10 +75,24 @@ type TokenUsage struct {
 }
 
 type ProviderResponse struct {
-	Content      string
-	ToolCalls    []message.ToolCall
-	Usage        TokenUsage
-	FinishReason message.FinishReason
+	Content   string
+	ToolCalls []message.ToolCall
+	// GORILLA OVERRIDE: calls the PROVIDER already ran, which the agent loop
+	// must RECORD but must not dispatch.
+	//
+	// Every other provider returns tool calls as work to do. The Claude CLI
+	// provider cannot: the child process runs its own agent loop, so by the time
+	// a turn ends the calls have already happened. Returning them in ToolCalls
+	// would run everything a second time; returning nothing made the receipt say
+	// "No tool was called" after a turn that had read a file, which is the
+	// receipt lying and is worse than having no receipt.
+	//
+	// So they come back here instead, paired with their results, and the agent
+	// writes both into the session record exactly as if it had made them.
+	ExecutedToolCalls   []message.ToolCall
+	ExecutedToolResults []message.ToolResult
+	Usage               TokenUsage
+	FinishReason        message.FinishReason
 }
 
 type ProviderEvent struct {
@@ -111,6 +125,9 @@ type providerClientOptions struct {
 	anthropicOptions []AnthropicOption
 	openaiOptions    []OpenAIOption
 	geminiOptions    []GeminiOption
+	// GORILLA OVERRIDE: the Claude CLI provider is a child process, not an
+	// HTTP client, so its options are about the program to run.
+	claudeCLIOptions []ClaudeCLIOption
 }
 
 type ProviderClientOption func(*providerClientOptions)
@@ -185,6 +202,16 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 		return &baseProvider[ChatGPTClient]{
 			options: clientOptions,
 			client:  newChatGPTClient(clientOptions),
+		}, nil
+	// GORILLA OVERRIDE: Claude models through the user's OWN signed-in `claude`
+	// binary, spawned as a child process. Not an HTTP client at all: a Claude
+	// Pro/Max subscription is not an API credential and reaching it over HTTP
+	// would mean impersonating Claude Code, which Anthropic blocks. See
+	// internal/llm/provider/claudecli.go.
+	case models.ProviderClaudeCLI:
+		return &baseProvider[ClaudeCLIClient]{
+			options: clientOptions,
+			client:  newClaudeCLIClient(clientOptions),
 		}, nil
 	case models.ProviderOpenRouter:
 		clientOptions.openaiOptions = append(clientOptions.openaiOptions,
@@ -377,6 +404,14 @@ func WithOpenAIOptions(openaiOptions ...OpenAIOption) ProviderClientOption {
 func WithGeminiOptions(geminiOptions ...GeminiOption) ProviderClientOption {
 	return func(options *providerClientOptions) {
 		options.geminiOptions = geminiOptions
+	}
+}
+
+// GORILLA OVERRIDE: see claudecli.go. Used by tests to point the provider at a
+// stub program; the application always uses the real `claude` on PATH.
+func WithClaudeCLIOptions(claudeCLIOptions ...ClaudeCLIOption) ProviderClientOption {
+	return func(options *providerClientOptions) {
+		options.claudeCLIOptions = claudeCLIOptions
 	}
 }
 

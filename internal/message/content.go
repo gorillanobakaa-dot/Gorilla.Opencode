@@ -91,6 +91,19 @@ type ToolCall struct {
 	// signature that MUST be echoed back verbatim when the call is
 	// replayed in history (API 400s otherwise). Stored base64.
 	ThoughtSignature string `json:"thought_signature,omitempty"`
+	// GORILLA OVERRIDE (2026-10-12): the PROVIDER already ran this call, so the
+	// agent loop must record it and must not dispatch it.
+	//
+	// Only the Claude CLI provider sets this. It drives a child process that
+	// runs its own agent loop, so its calls are finished before the turn ends.
+	// They still have to appear in the transcript and the receipt, and the
+	// receipt reads tool calls off the assistant message, so they are stored
+	// there like any other. Without this flag streamAndHandleEvents would then
+	// run every one of them a second time, repeating each edit and command.
+	//
+	// A separate flag rather than reusing Finished: Finished is set on ordinary
+	// calls too, by EventToolUseStop, so it cannot tell the two apart.
+	Executed bool `json:"executed,omitempty"`
 }
 
 func (ToolCall) isPart() {}

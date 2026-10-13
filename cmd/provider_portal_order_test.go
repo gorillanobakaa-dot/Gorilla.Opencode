@@ -52,7 +52,18 @@ func TestPortalRowOrder(t *testing.T) {
 	// Everything that needs a card sorts below everything that does not. This is
 	// the directive-§8 half of the rule and the one most likely to be undone by
 	// somebody adding a provider in a hurry.
-	needsCard := map[string]bool{"anthropic": true, "openai": true, "xai": true, "deepseek": true, "openrouter": true}
+	//
+	// GORILLA OVERRIDE (2026-10-12): "claude-cli" is counted as paid even though
+	// it never asks for a card, a key, or anything else. It runs the user's own
+	// signed-in Claude Code, and a Claude plan is bought with a card. Grouping it
+	// with the free sign-ins because its SIGN-IN is free would put a paid route
+	// above the no-card ones, which is the exact thing this check exists to stop.
+	// It sits at the head of the paid block instead: the best paid route, because
+	// no credential is typed into this program at all.
+	needsCard := map[string]bool{
+		"anthropic": true, "openai": true, "xai": true, "deepseek": true,
+		"openrouter": true, "claude-cli": true,
+	}
 	lastFree, firstPaid := -1, len(rows)
 	for i, r := range rows {
 		if needsCard[r.ID] {

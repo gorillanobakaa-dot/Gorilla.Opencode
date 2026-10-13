@@ -6,6 +6,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -16,6 +17,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/auth"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
+	"github.com/opencode-ai/opencode/internal/llm/provider"
 	"github.com/opencode-ai/opencode/internal/tui/startup"
 )
 
@@ -157,6 +159,13 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 	agReady := agCreds != nil && agCreds.AccessToken != ""
 	cgCreds, _ := auth.LoadChatGPTCreds()
 	cgReady := cgCreds != nil && cgCreds.AccessToken != ""
+	// GORILLA OVERRIDE: the Claude CLI route holds no credential of its own, so
+	// there is nothing here to load. Readiness is what the `claude` program
+	// itself reports, which costs no tokens and took 237ms when measured on
+	// 2026-10-12. Asking it is better than inferring from a file: this is the
+	// one provider where a cheap authoritative check exists.
+	ccStatus, _ := provider.CheckClaudeCLI(context.Background())
+	ccReady := ccStatus.OnSubscription()
 	// Cloudflare's baseURL contains the account id, so it cannot be matched by a
 	// fixed constant the way NIM and Ollama are.
 	var cfEp config.LocalEndpoint
@@ -322,9 +331,9 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			Secret:      true,
 			// Refuse a value that cannot be an NVIDIA key BEFORE it is saved.
 			// See checkNIMKey.
-			Check: checkNIMKey,
-			Configured:  nimReady,
-			Active:      curEndpoint == nimName,
+			Check:      checkNIMKey,
+			Configured: nimReady,
+			Active:     curEndpoint == nimName,
 		},
 		// Everything else that costs nothing: your own machine, then free keys.
 		//
@@ -394,6 +403,22 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			Active:      curProv == models.ProviderCerebras,
 		},
 		// Paid. Last, deliberately — see the ordering note above.
+		// The third sign-in: an Anthropic Claude account, through the user's own
+		// Claude Code program.
+		{
+			ID:   "claude-cli",
+			Free: false,
+			Name: "Claude sign-in - Anthropic models through your own Claude Code",
+			What: "Uses the `claude` program already installed and signed in on this " +
+				"computer, started as a helper. No API key is ever asked for and none is " +
+				"stored: the work counts against the Claude plan you already pay for. " +
+				portalModelSummary(models.ProviderClaudeCLI),
+			Warning: "Needs Claude Code installed and `claude login` run once. " +
+				"Limited by your plan's five-hour and seven-day windows rather than by " +
+				"money, so heavy use pauses until the window resets instead of costing more.",
+			Configured: ccReady,
+			Active:     curProv == models.ProviderClaudeCLI,
+		},
 		{
 			ID:          "openrouter",
 			Name:        "OpenRouter - API key (many models, one key)",
@@ -569,6 +594,34 @@ func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
 		fmt.Printf("\nStart chatting - %s is selected; /model to switch.\n", models.SupportedModels[coder].Name)
 		return nil
 
+	// GORILLA OVERRIDE: the only portal row that performs NO sign-in of its own.
+	// Signing in is `claude login`, run by the user against Anthropic's own flow,
+	// and this program deliberately has no part in it: it never sees the token,
+	// never stores one, and has nothing to refresh. All this step does is confirm
+	// the program is there and signed in, then point the agents at it.
+	case "claude-cli":
+		st, err := provider.CheckClaudeCLI(ctx)
+		if err != nil {
+			return err
+		}
+		if !st.LoggedIn {
+			return errors.New("Claude Code is installed but not signed in. " +
+				"Run `claude login` in a terminal, choose your Claude account, then pick this row again")
+		}
+		if !st.OnSubscription() {
+			return fmt.Errorf("the claude program is signed in with %q rather than a Claude account. "+
+				"This row uses your Claude plan; for an API key use the Anthropic row instead", st.AuthMethod)
+		}
+		// Same in-session registration as the OAuth rows above: config.Load ran
+		// before this choice existed, so without it every agent silently reverts
+		// to Gemini for the rest of the session.
+		if err := config.UpsertProviderKey(models.ProviderClaudeCLI, oauthLoginPlaceholder); err != nil {
+			return err
+		}
+		// Opus for the coder, Haiku for titles and summaries. On this route the
+		// scarce resource is the plan's usage window, not money, so the cheap
+		// model does the background work rather than the strongest one.
+		return applyAgentModels(models.ClaudeCLIOpus, models.ClaudeCLIHaiku)
 	case "chatgpt":
 		if err := runChatGPTPortalLogin(ctx); err != nil {
 			return err

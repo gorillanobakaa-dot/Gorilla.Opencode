@@ -722,8 +722,20 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 		return assistantMsg, a.cancelPendingToolCalls(&assistantMsg), incomplete
 	}
 
-	toolResults := make([]message.ToolResult, len(assistantMsg.ToolCalls()))
-	toolCalls := assistantMsg.ToolCalls()
+	// GORILLA OVERRIDE (2026-10-12): calls the PROVIDER already ran are recorded
+	// on the message, for the transcript and the receipt, but must never be
+	// dispatched here. See message.ToolCall.Executed.
+	//
+	// This loop runs assistantMsg.ToolCalls() whatever the finish reason, so
+	// simply storing them was enough to make the Claude CLI provider do every
+	// edit and command twice.
+	toolCalls := make([]message.ToolCall, 0, len(assistantMsg.ToolCalls()))
+	for _, tc := range assistantMsg.ToolCalls() {
+		if !tc.Executed {
+			toolCalls = append(toolCalls, tc)
+		}
+	}
+	toolResults := make([]message.ToolResult, len(toolCalls))
 	// ran[i] is true once call i has been attempted, whatever came of it. A
 	// call that was cancelled or refused stays false. See aftertool.go.
 	ran := make([]bool, len(toolCalls))
@@ -1071,6 +1083,42 @@ func (a *agent) processEvent(ctx context.Context, sessionID string, assistantMsg
 		return event.Error
 	case provider.EventComplete:
 		assistantMsg.SetToolCalls(event.Response.ToolCalls)
+		// GORILLA OVERRIDE (2026-10-12): calls the provider already ran.
+		//
+		// The Claude CLI provider drives a child process that runs its own loop,
+		// so its tool calls are finished before the turn ends. They are recorded
+		// here, with their results, and deliberately NOT dispatched: the finish
+		// reason stays end_turn, so the dispatch branch below is never entered.
+		//
+		// Without this the receipt printed "No tool was called" after a turn
+		// that had read a file and quoted it back. The receipt is the one thing
+		// in this program the model cannot write, so a receipt that is wrong is
+		// worse than no receipt at all.
+		if len(event.Response.ExecutedToolCalls) > 0 {
+			// Marked here, not trusted from the provider: the field is named
+			// ExecutedToolCalls, so arriving in it IS the claim. A provider that
+			// forgot to set the flag would otherwise have every one of its calls
+			// run a second time, which is the expensive way to find the omission.
+			done := make([]message.ToolCall, 0, len(event.Response.ExecutedToolCalls))
+			for _, tc := range event.Response.ExecutedToolCalls {
+				tc.Executed = true
+				done = append(done, tc)
+			}
+			assistantMsg.SetToolCalls(done)
+			if err := a.messages.Update(ctx, *assistantMsg); err != nil {
+				return fmt.Errorf("failed to record the provider's tool calls: %w", err)
+			}
+			parts := make([]message.ContentPart, 0, len(event.Response.ExecutedToolResults))
+			for _, tr := range event.Response.ExecutedToolResults {
+				parts = append(parts, tr)
+			}
+			if len(parts) > 0 {
+				if _, err := a.messages.Create(ctx, sessionID,
+					message.CreateMessageParams{Role: message.Tool, Parts: parts}); err != nil {
+					return fmt.Errorf("failed to record the provider's tool results: %w", err)
+				}
+			}
+		}
 		// GORILLA OVERRIDE (2026-08-18): if the model wrote a tool call as TEXT
 		// instead of making one, say so rather than printing the raw JSON as the
 		// answer. Labelled only, never dispatched — see leakedtoolcall.go.

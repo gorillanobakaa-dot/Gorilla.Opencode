@@ -2020,6 +2020,11 @@ var backgroundModelByProvider = map[models.ModelProvider]models.ModelID{
 	// On a free plan the cooldown is the scarce resource, and spending GPT-5.5
 	// on conversation titles brings it forward for no benefit the user sees.
 	models.ProviderChatGPT: models.ChatGPT54Mini,
+	// A Claude plan is also one pool, so this is the cheap model against the
+	// same five-hour window rather than a separate quota. Spending Opus on
+	// conversation titles brings the window's end forward for nothing the user
+	// can see.
+	models.ProviderClaudeCLI: models.ClaudeCLIHaiku,
 }
 
 // helperTargetFor returns the model a background agent should move to when the
