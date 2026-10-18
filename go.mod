@@ -118,11 +118,6 @@ require (
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
 	github.com/yuin/goldmark-emoji v1.0.5 // indirect
-	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 // indirect
-	go.opentelemetry.io/otel v1.35.0 // indirect
-	go.opentelemetry.io/otel/metric v1.35.0 // indirect
-	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/image v0.26.0 // indirect
@@ -142,3 +137,7 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+// No OpenTelemetry linked (owner rule 2026-10-18): the only importer, cloud.google.com/go/auth/httptransport, telemetry-ok: says it was removed
+// is a local copy with those two imports removed. See third_party/google-auth-no-otel/CHANGES-GORILLA.md.
+replace cloud.google.com/go/auth => ./third_party/google-auth-no-otel
