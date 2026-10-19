@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/opencode-ai/opencode/internal/fieldkit"
@@ -23,6 +24,15 @@ func TestTheFieldkitHintIsDrawnAsOneLine(t *testing.T) {
 	want := "Fieldkit tools offered to the AI: hdmi-status, "
 	if len(got) < len(want) || got[:len(want)] != want {
 		t.Fatalf("line %q, want it to start %q", got, want)
+	}
+	// 2026-10-20: a recipe offered beside the tools is marked as one
+	r := "build a Go program for an old Mac on High Sierra 10.13"
+	withRecipe := message.Message{Role: message.User, Parts: []message.ContentPart{
+		message.TextContent{Text: r},
+		message.TextContent{Text: fieldkit.Hint(c, r, 5)},
+	}}
+	if l := fieldkitHintLine(withRecipe); !strings.Contains(l, "go-binary-for-macos-10-13 (recipe)") {
+		t.Errorf("the recipe is not marked in %q", l)
 	}
 	plain := message.Message{Role: message.User, Parts: []message.ContentPart{message.TextContent{Text: q}}}
 	if l := fieldkitHintLine(plain); l != "" {

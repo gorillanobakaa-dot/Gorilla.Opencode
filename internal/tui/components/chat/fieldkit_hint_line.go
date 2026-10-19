@@ -30,7 +30,12 @@ func fieldkitHintLine(msg message.Message) string {
 		for _, l := range strings.Split(tc.Text, "\n") {
 			if strings.HasPrefix(l, "- ") {
 				if f := strings.Fields(l[2:]); len(f) > 0 {
-					ids = append(ids, f[0])
+					id := f[0]
+					// a recipe is read, not run: the person sees which is which
+					if strings.Contains(l, "[RECIPE") {
+						id += " (recipe)"
+					}
+					ids = append(ids, id)
 				}
 			}
 		}

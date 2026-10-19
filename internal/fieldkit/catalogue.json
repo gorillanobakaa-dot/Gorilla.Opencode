@@ -1,6 +1,6 @@
 {
- "schema": 1,
- "fieldkit_commit": "f30d589",
+ "schema": 2,
+ "fieldkit_commit": "725070d",
  "tools": [
   {
    "id": "academic-accessed",
@@ -5215,6 +5215,82 @@
    "safety": "read-only",
    "online": false,
    "inputs": []
+  }
+ ],
+ "recipes": [
+  {
+   "id": "claude-code-on-macos-10-13",
+   "title": "Run Claude Code (the terminal version) on macOS 10.13, where the current release will not start",
+   "problem": "Claude Code 2.1.113 and later is a single native binary built for macOS 13.0 (Bun runtime, SDK 26.5); it cannot start on 10.13.",
+   "tags": [
+    "claude",
+    "old mac",
+    "high sierra",
+    "node",
+    "macports",
+    "npm"
+   ],
+   "platforms": [
+    "macos"
+   ]
+  },
+  {
+   "id": "double-click-installer-for-mac",
+   "title": "Make a double-click installer for a command-line program on macOS without a developer certificate",
+   "problem": "People who never open Terminal must install a command-line program on a Mac, safely, and be able to go back.",
+   "tags": [
+    "installer",
+    "gatekeeper",
+    "quarantine",
+    "icns",
+    "app bundle",
+    "trash",
+    "put back",
+    "unsigned"
+   ],
+   "platforms": [
+    "macos"
+   ]
+  },
+  {
+   "id": "go-binary-for-macos-10-13",
+   "title": "Build a Go program that runs on macOS 10.13 High Sierra (old Intel Macs)",
+   "problem": "A Go program built with the stock toolchain stops at once on macOS 10.13 with \"Symbol not found: _SecTrustEvaluateWithError\", because crypto/x509 calls a Security.framework function that only exists from 10.14.",
+   "tags": [
+    "high sierra",
+    "old mac",
+    "golang",
+    "crypto",
+    "x509",
+    "security framework",
+    "legacy",
+    "cross compile"
+   ],
+   "platforms": [
+    "macos",
+    "windows",
+    "linux"
+   ]
+  },
+  {
+   "id": "inline-tui-debris-after-narrowing",
+   "title": "Stop leftover lines when a terminal window running an inline TUI is made narrower",
+   "problem": "A Bubble Tea program drawn inline (not in the alternate screen) leaves its old, wider lines on screen every time the window is narrowed: a second status bar, two dividers.",
+   "tags": [
+    "bubbletea",
+    "terminal",
+    "resize",
+    "rewrap",
+    "reflow",
+    "sigwinch",
+    "status bar",
+    "tui"
+   ],
+   "platforms": [
+    "windows",
+    "linux",
+    "macos"
+   ]
   }
  ]
 }

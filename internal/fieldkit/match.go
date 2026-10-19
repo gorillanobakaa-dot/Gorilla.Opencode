@@ -41,13 +41,29 @@ type Tool struct {
 		Name     string `json:"name"`
 		Required bool   `json:"required"`
 	} `json:"inputs"`
+	// Recipe marks a recipe offered beside the tools (never from the file:
+	// Match sets it). A recipe is read with fieldkit_describe, never run.
+	Recipe bool `json:"-"`
+}
+
+// Recipe is how something was done before, kept so a model does not have to
+// work it out again (Fieldkit desk/recipes.yaml, published ones only). The
+// steps stay behind fieldkit_describe; the catalogue carries what a match
+// needs. Schema 2, 2026-10-20.
+type Recipe struct {
+	ID        string   `json:"id"`
+	Title     string   `json:"title"`
+	Problem   string   `json:"problem"`
+	Tags      []string `json:"tags"`
+	Platforms []string `json:"platforms"`
 }
 
 // Catalogue is the embedded file.
 type Catalogue struct {
-	Schema         int    `json:"schema"`
-	FieldkitCommit string `json:"fieldkit_commit"`
-	Tools          []Tool `json:"tools"`
+	Schema         int      `json:"schema"`
+	FieldkitCommit string   `json:"fieldkit_commit"`
+	Tools          []Tool   `json:"tools"`
+	Recipes        []Recipe `json:"recipes"`
 }
 
 var (
@@ -106,25 +122,42 @@ func Match(c Catalogue, request string, limit int) []Tool {
 		t     Tool
 		score float64
 	}
-	// A rare word says more than a common one (measured 2026-10-19: "cooling
-	// profile" put the Firefox profile tools first, because "profile" is in a
-	// dozen titles and "cooling" in one). Each word is weighted by how few
-	// tools mention it: log(N / tools mentioning it).
-	df := map[string]int{}
-	for _, t := range c.Tools {
-		d := words(t.Title + " " + t.ID)
-		for w := range d {
-			df[w]++
-		}
+	// Tools and recipes are searched together (the same as Fieldkit's
+	// discover): what was done before is as findable as what can be run. A
+	// recipe's problem and tags count as a tool's inputs do.
+	type entry struct {
+		t     Tool
+		extra map[string]bool
 	}
-	n := float64(len(c.Tools))
-	var hits []scored
+	pool := make([]entry, 0, len(c.Tools)+len(c.Recipes))
 	for _, t := range c.Tools {
-		title, id := words(t.Title), words(t.ID)
 		in := map[string]bool{}
 		for _, i := range t.Inputs {
 			in[i.Name] = true
 		}
+		pool = append(pool, entry{t, in})
+	}
+	for _, r := range c.Recipes {
+		pool = append(pool, entry{Tool{ID: r.ID, Title: r.Title, Trust: "recipe", Recipe: true},
+			words(r.Problem + " " + strings.Join(r.Tags, " "))})
+	}
+	// A rare word says more than a common one (measured 2026-10-19: "cooling
+	// profile" put the Firefox profile tools first, because "profile" is in a
+	// dozen titles and "cooling" in one). Each word is weighted by how few
+	// entries mention it: log(N / entries mentioning it).
+	df := map[string]int{}
+	for _, e := range pool {
+		d := words(e.t.Title + " " + e.t.ID)
+		for w := range d {
+			df[w]++
+		}
+	}
+	n := float64(len(pool))
+	var hits []scored
+	for _, e := range pool {
+		t := e.t
+		title, id := words(t.Title), words(t.ID)
+		in := e.extra
 		s := 0.0
 		for _, w := range q {
 			weight := 1.0
@@ -147,6 +180,11 @@ func Match(c Catalogue, request string, limit int) []Tool {
 			// network=true, and gave up; hdmi-status answers offline).
 			if t.Online {
 				s *= 0.9
+			}
+			// A tool that answers ranks before a recipe that explains, at the
+			// same fit (the factor Fieldkit's discover uses).
+			if t.Recipe {
+				s *= 0.85
 			}
 			hits = append(hits, scored{t, s + 0.01*float64(trustRank[t.Trust])})
 		}
@@ -176,8 +214,14 @@ func Hint(c Catalogue, request string, limit int) string {
 	}
 	var b strings.Builder
 	b.WriteString("[Gorilla: Fieldkit tools that match this request. Prefer one of these to guessing or doing it by " +
-		"hand: call fieldkit_describe with the exact name, then fieldkit_run. A read-only tool changes nothing.]\n")
+		"hand: call fieldkit_describe with the exact name, then fieldkit_run. A read-only tool changes nothing. " +
+		"A RECIPE is how this was done before on this computer: read it with fieldkit_describe and follow it; " +
+		"never run it.]\n")
 	for _, t := range hits {
+		if t.Recipe {
+			fmt.Fprintf(&b, "- %s [RECIPE: read it with fieldkit_describe, never run it] %s\n", t.ID, t.Title)
+			continue
+		}
 		var ins []string
 		for _, i := range t.Inputs {
 			n := i.Name
