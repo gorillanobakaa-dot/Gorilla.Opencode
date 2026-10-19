@@ -967,6 +967,9 @@ func runAntigravityLogin(ctx context.Context) error {
 		who = "your Google account"
 	}
 	fmt.Printf("\nSigned in as %s.\n", who)
+	// Before setup, so it is shown even when setup fails: the data goes to
+	// Google from the first request either way.
+	fmt.Printf("\n%s\n\n", auth.AntigravityDataWarning)
 	fmt.Println("Setting up your Antigravity access and reading your plan...")
 	if err := creds.SetupProject(ctx); err != nil {
 		// Sign-in landed; only project discovery hiccuped. It retries on first

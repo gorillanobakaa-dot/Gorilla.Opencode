@@ -84,6 +84,24 @@ type AntigravityCreds struct {
 	PlanChecked time.Time `json:"plan_checked,omitempty"`
 }
 
+// AntigravityDataWarning is printed at every Antigravity sign-in, free or paid.
+//
+// Measured 2026-10-19: loadCodeAssist's privacyNotice (showNotice: true, on a
+// Google AI Pro account too) says Google collects prompts, code, output and
+// edits to improve its products and machine-learning models, that human
+// reviewers may read them disconnected from the account, kept up to 18 months.
+// The opt-out it mentions is NOT reachable from this sign-in:
+// setCodeAssistGlobalUserSetting {freeTierDataCollectionOptin: false} answered
+// 403 PERMISSION_DENIED on both backends. Owner, same day: accept it, but
+// "put a nice warning there". Many users are children; it is written for them.
+const AntigravityDataWarning = `HEADS UP: on this Google sign-in nothing is free. You are the product.
+  Google keeps what you type here, your code and the AI's answers, and uses
+  them to train its own AI (Gemini). People at Google may read them: Google
+  says it removes your name first and keeps those copies for up to 18 months.
+  This sign-in cannot switch that off (Google refuses the opt-out).
+  So never type passwords, your real name, your address, your school, or
+  anything you would not show a stranger.`
+
 // planRecheck is how old a plan reading may be before SetupProject runs again.
 const planRecheck = 24 * time.Hour
 
