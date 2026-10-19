@@ -69,3 +69,18 @@ func TestMatchingIsFast(t *testing.T) {
 		t.Errorf("one match took %v; it runs on every message", per)
 	}
 }
+
+// 2026-10-19: Gemma took hdmi-diag (it goes online; Fieldkit refused it
+// without network=true) and gave up. The offline status tool must lead, and a
+// tool that goes online must say so in the hint.
+func TestTheOfflineToolLeadsAndOnlineToolsSaySo(t *testing.T) {
+	c, _ := Load()
+	hits := Match(c, "Is my laptop's TV connected over HDMI right now?", 5)
+	if len(hits) == 0 || hits[0].ID != "hdmi-status" {
+		t.Fatalf("first hit %v, want hdmi-status", hits)
+	}
+	h := Hint(c, "Is my laptop's TV connected over HDMI right now?", 5)
+	if !strings.Contains(h, "hdmi-diag [") || !strings.Contains(h, "goes online: run it with network=true") {
+		t.Errorf("the online tool is not marked: %q", h)
+	}
+}

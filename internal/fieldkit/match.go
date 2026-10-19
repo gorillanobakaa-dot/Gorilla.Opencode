@@ -35,6 +35,8 @@ type Tool struct {
 	Title  string `json:"title"`
 	Trust  string `json:"trust"`
 	Safety string `json:"safety"`
+	// Online: the tool goes off the machine (its card has the network effect).
+	Online bool `json:"online"`
 	Inputs []struct {
 		Name     string `json:"name"`
 		Required bool   `json:"required"`
@@ -140,6 +142,12 @@ func Match(c Catalogue, request string, limit int) []Tool {
 			}
 		}
 		if s > 0 {
+			// A tool that goes online ranks after an offline one of the same fit
+			// (2026-10-19: Gemma picked hdmi-diag, which Fieldkit refused without
+			// network=true, and gave up; hdmi-status answers offline).
+			if t.Online {
+				s *= 0.9
+			}
 			hits = append(hits, scored{t, s + 0.01*float64(trustRank[t.Trust])})
 		}
 	}
@@ -182,7 +190,11 @@ func Hint(c Catalogue, request string, limit int) string {
 		if len(ins) > 0 {
 			inputs = strings.Join(ins, ", ")
 		}
-		fmt.Fprintf(&b, "- %s [%s, %s] %s (inputs: %s)\n", t.ID, t.Trust, t.Safety, t.Title, inputs)
+		online := ""
+		if t.Online {
+			online = ", goes online: run it with network=true"
+		}
+		fmt.Fprintf(&b, "- %s [%s, %s%s] %s (inputs: %s)\n", t.ID, t.Trust, t.Safety, online, t.Title, inputs)
 	}
 	return b.String()
 }
