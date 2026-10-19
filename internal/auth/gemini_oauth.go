@@ -39,7 +39,7 @@ import (
 const (
 	// Public installed-app credentials from the open-source Gemini CLI.
 	geminiOAuthClientID     = "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com"
-	geminiOAuthClientSecret = "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"
+	geminiOAuthClientSecret = "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" // public: shipped in the open-source Gemini CLI, see docs/CLIENT-SECRETS-EXPLAINED.md; privacy-scan: allow
 
 	googleAuthURL  = "https://accounts.google.com/o/oauth2/v2/auth"
 	googleTokenURL = "https://oauth2.googleapis.com/token"

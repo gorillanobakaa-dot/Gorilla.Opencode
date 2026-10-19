@@ -35,15 +35,23 @@ import (
 const (
 	// Antigravity CLI installed-app OAuth credentials (public, embedded in agy).
 	antigravityClientID     = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
-	antigravityClientSecret = "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"
+	antigravityClientSecret = "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" // public: shipped inside agy itself, see docs/CLIENT-SECRETS-EXPLAINED.md; privacy-scan: allow
 
 	// AntigravityEndpoint is the backend serving the free Antigravity tier.
 	AntigravityEndpoint = "https://daily-cloudcode-pa.googleapis.com"
 	AntigravityVersion  = "v1internal"
 
 	// AntigravityUserAgent identifies every Antigravity request (onboarding AND
-	// generation use the same one — unlike the Gemini path). Measured verbatim.
-	AntigravityUserAgent = "antigravity/cli/1.1.10 (aidev_client; os_type=linux; arch=amd64; auth_method=consumer)"
+	// generation use the same one — unlike the Gemini path).
+	//
+	// 2026-10-19, measured with the same login: Google's model list depends on
+	// the client version in this header. As agy 1.1.10 (the value measured on
+	// 2026-08-03) it listed 23 models; as the Antigravity app 2.24.0 it listed 26,
+	// adding Gemini 3.8 Flash High/Medium/Low, and generateContent on
+	// gemini-3.8-flash-low answered (200, "OK"). The installed app on that day
+	// was 2.24.0. Gemini 4 Argon is NOT served to this sign-in under either
+	// version (404); it is reachable with an AI Studio key (Gemini provider).
+	AntigravityUserAgent = "antigravity/2.24.0 (aidev_client; os_type=windows; arch=amd64; auth_method=consumer)"
 
 	// AntigravityRequestUA is the top-level "userAgent" field the envelope
 	// carries (distinct from the HTTP header above). Measured value: "antigravity".
