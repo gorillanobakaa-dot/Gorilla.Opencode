@@ -1238,7 +1238,7 @@ func (m ArsenalCmp) View() string {
 	// GORILLA FIX (2026-10-19): minus the rows drawn UNDER the page as well (the
 	// prompt and the status lines; see overlayFooterReserve). Without them the
 	// frame was taller than the window at 80x24 and the top border and title
-	// scrolled away. Measured with scripts/model-tests/tui_sizes.py.
+	// scrolled away. Measured with the tui-sizes tool (Fieldkit).
 	budget := max(5, m.height-4-overlayFooterReserve)
 
 	lines := m.lines()

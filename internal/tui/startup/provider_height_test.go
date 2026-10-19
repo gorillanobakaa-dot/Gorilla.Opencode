@@ -10,7 +10,7 @@ import (
 
 // 2026-10-19: on the owner's 11-inch MacBook Air Terminal opens at 80x24, and
 // the portal (17 providers) was taller than that: "Choose a provider" scrolled
-// off the top. Measured with scripts/model-tests/tui_sizes.py on v0.1.148.
+// off the top. Measured with the tui-sizes tool (Fieldkit) on v0.1.148.
 func TestThePortalFitsTheAirsTerminalSizes(t *testing.T) {
 	rows := make([]ProviderRow, 17)
 	for i := range rows {

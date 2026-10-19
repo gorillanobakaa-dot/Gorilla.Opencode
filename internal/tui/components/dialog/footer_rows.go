@@ -6,7 +6,7 @@ package dialog
 // context ..." and "tokens ..."). /models and /settings had their height
 // budgets tuned against the narrow three, so on the owner's MacBook Air at
 // 138x37 both were two rows taller than the window and lost their top border
-// and title (measured with scripts/model-tests/tui_sizes.py).
+// and title (measured with the tui-sizes tool (Fieldkit)).
 //
 // The app measures the real number on every resize and sets it here; a dialog
 // whose budget assumed the narrow footer subtracts FooterExtraRows().

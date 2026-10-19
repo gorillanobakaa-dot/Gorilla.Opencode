@@ -3,7 +3,7 @@ package tui
 // GORILLA FIX (2026-10-19): the chat frame left debris when the window was made
 // narrower. The owner drags the window on an 11-inch MacBook Air (Terminal from
 // 169x43 down to 80x24 and back), and every shrink left the old, wider status
-// bar and divider behind (measured with scripts/model-tests/tui_sizes.py
+// bar and divider behind (measured with the tui-sizes tool (Fieldkit)
 // --resize).
 //
 // Why: the chat is drawn inline, below the conversation, not in the alternate

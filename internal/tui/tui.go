@@ -806,7 +806,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// GORILLA FIX (2026-10-19): these were sized once, when opened, and never
 		// told about a resize. Dragging the window narrower left /help drawn for
 		// the old width, cut off on the right with its title off the top
-		// (measured with scripts/model-tests/tui_sizes.py --resize). The owner
+		// (measured with the tui-sizes tool (Fieldkit) --resize). The owner
 		// resizes the window while working, so every panel follows the window.
 		a.commandHelp.SetSize(msg.Width, msg.Height)
 		a.researchDialog.SetSize(msg.Width, msg.Height)
