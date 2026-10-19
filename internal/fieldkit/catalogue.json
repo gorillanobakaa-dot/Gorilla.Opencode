@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "fieldkit_commit": "228272c",
+ "fieldkit_commit": "f30d589",
  "tools": [
   {
    "id": "academic-accessed",
@@ -3735,7 +3735,7 @@
   {
    "id": "harvest-find",
    "title": "Which of the owner's scripts does this job? Search every script by what it does",
-   "trust": "carded",
+   "trust": "verified",
    "safety": "read-only",
    "online": false,
    "inputs": [
@@ -3853,7 +3853,7 @@
   {
    "id": "inventory",
    "title": "Count code, tests, config and skills per project folder",
-   "trust": "carded",
+   "trust": "verified",
    "safety": "read-only",
    "online": false,
    "inputs": [
@@ -3982,7 +3982,7 @@
   {
    "id": "model-eval",
    "title": "Rank language models by honesty under pressure: runs scripted research tasks against paid model providers",
-   "trust": "carded",
+   "trust": "tested",
    "safety": "irreversible",
    "online": true,
    "inputs": [
@@ -4128,7 +4128,7 @@
   {
    "id": "office-check",
    "title": "Check an Office or PDF file is not broken before sending it",
-   "trust": "carded",
+   "trust": "verified",
    "safety": "read-only",
    "online": false,
    "inputs": [
@@ -4275,7 +4275,7 @@
   {
    "id": "photokit",
    "title": "Photos: contact sheets, near-duplicate candidates + side-by-side compare, mapping check, sort into per-item folders, fetch report photos, doctor",
-   "trust": "carded",
+   "trust": "tested",
    "safety": "reversible",
    "online": true,
    "inputs": [
@@ -4343,7 +4343,7 @@
   {
    "id": "refcheck",
    "title": "Which files named in a list (manifest), link or import do not exist",
-   "trust": "carded",
+   "trust": "verified",
    "safety": "read-only",
    "online": false,
    "inputs": [
@@ -4420,7 +4420,7 @@
   {
    "id": "searchfox",
    "title": "Search Firefox source on Mozilla's Searchfox index: matching lines with file and line number",
-   "trust": "carded",
+   "trust": "tested",
    "safety": "reversible",
    "online": true,
    "inputs": [
@@ -4740,7 +4740,7 @@
   },
   {
    "id": "thermal-profile",
-   "title": "Everyday cooling on Windows: show or choose quiet, balanced, performance or off (the monitor follows it)",
+   "title": "Which cooling profile the laptop is on now (run it with no value), or switch to quiet, balanced, performance or off (Windows)",
    "trust": "carded",
    "safety": "reversible",
    "online": false,
