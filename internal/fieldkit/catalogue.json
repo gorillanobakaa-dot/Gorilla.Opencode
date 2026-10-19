@@ -1,0 +1,4894 @@
+{
+ "schema": 1,
+ "fieldkit_commit": "e8f981b",
+ "tools": [
+  {
+   "id": "academic-accessed",
+   "title": "Stamp a web source with today's date (once), in the profile's style and language",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "folder",
+     "required": true
+    },
+    {
+     "name": "url",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "academic-brief",
+   "title": "Read the assignment brief: type, word count, module, learning outcomes, AI rules and hidden AI instructions",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "folder",
+     "required": true
+    },
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-build",
+   "title": "A finished Word document, slide deck or poster from the draft, in the country's layout",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "draft",
+     "required": true
+    },
+    {
+     "name": "as",
+     "required": false
+    },
+    {
+     "name": "to",
+     "required": false
+    },
+    {
+     "name": "contents",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-check",
+   "title": "Every pre-submission check in order, one verdict and the first fix; the work delivered only when it passes",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "folder",
+     "required": true
+    },
+    {
+     "name": "draft",
+     "required": true
+    },
+    {
+     "name": "offline",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-countries",
+   "title": "The seven countries a student can study in, and what each sets (style, page, plagiarism tool)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "academic-dashes",
+   "title": "Long dashes in the work, where the country counts them against the student",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "academic-date",
+   "title": "The submission date the brief or a deadline note states (a suggestion: setup still asks the dates)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "folder",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "academic-extract",
+   "title": "Read every study file in the assignment folder into the searchable library",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "folder",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "academic-finish",
+   "title": "A Word file written by hand: Student ID header, page numbers, page size, language, no author name",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "academic-init",
+   "title": "Start a student's profile (asks the name and country when they are missing)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "name",
+     "required": false
+    },
+    {
+     "name": "country",
+     "required": false
+    },
+    {
+     "name": "university",
+     "required": false
+    },
+    {
+     "name": "programme",
+     "required": false
+    },
+    {
+     "name": "style",
+     "required": false
+    },
+    {
+     "name": "language",
+     "required": false
+    },
+    {
+     "name": "ui",
+     "required": false
+    },
+    {
+     "name": "student_id",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-language",
+   "title": "Sentences in the wrong language, and British/American spelling",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    },
+    {
+     "name": "language",
+     "required": false
+    },
+    {
+     "name": "spelling",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-local",
+   "title": "Assignments in OneDrive/Dropbox/Google Drive copied onto this computer, proven, the cloud copy renamed (never deleted)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-menu",
+   "title": "The numbered menu for a person at the keyboard (English or Romanian); an agent runs the commands instead",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "academic-next",
+   "title": "Days left to the deadline or upload, and the student's one next step",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "folder",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "academic-plagiarism",
+   "title": "Runs of words copied from the study sources, quoted or not, before the upload",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    },
+    {
+     "name": "sources",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "academic-portfolio",
+   "title": "A portfolio draft (.md) as a finished Word document in the student's layout",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "draft",
+     "required": true
+    },
+    {
+     "name": "to",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-preflight",
+   "title": "The academic tools proven by building real files and measuring them: PREFLIGHT OK or which rule broke",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "academic-record",
+   "title": "The student's marks and what markers keep saying (each fault with the marker's own sentence)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "action",
+     "required": true
+    },
+    {
+     "name": "what",
+     "required": false
+    },
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-refs",
+   "title": "Citations against the reference list: missing, unused, duplicates, order, quotations without a page",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "academic-search",
+   "title": "Find words or a quoted phrase in the study materials, with the page or slide to cite",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "folder",
+     "required": true
+    },
+    {
+     "name": "query",
+     "required": true
+    },
+    {
+     "name": "any",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-setup",
+   "title": "Set up an assignment folder: asks the deadline and the upload date, then writes the checklist, skeleton and template",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "folder",
+     "required": true
+    },
+    {
+     "name": "deadline",
+     "required": false
+    },
+    {
+     "name": "upload",
+     "required": false
+    },
+    {
+     "name": "type",
+     "required": false
+    },
+    {
+     "name": "words",
+     "required": false
+    },
+    {
+     "name": "module",
+     "required": false
+    },
+    {
+     "name": "title",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-shortcut",
+   "title": "A Fieldkit Academic shortcut on the desktop and in the Start menu that opens the menu (only its own removed)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "check",
+     "required": false
+    },
+    {
+     "name": "remove",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-structure",
+   "title": "The sections a document type asks for, present or missing (headings in any of six languages)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    },
+    {
+     "name": "type",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "academic-style",
+   "title": "Reference entries and citations in the shape the referencing style asks for",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    },
+    {
+     "name": "style",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-template",
+   "title": "A Word/PowerPoint template of a document type, headings in the work language",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "type",
+     "required": true
+    },
+    {
+     "name": "folder",
+     "required": false
+    },
+    {
+     "name": "guidance",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-types",
+   "title": "The 32 academic document types, or one type's sections and word shares",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "type",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "academic-words",
+   "title": "Assessed word count (no title, references or appendices) against a target +/-10%",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    },
+    {
+     "name": "target",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-about-pages",
+   "title": "Every about: page of a copy of the installed build opened, read and judged; compared with the last other build",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "only",
+     "required": false
+    },
+    {
+     "name": "walk",
+     "required": false
+    },
+    {
+     "name": "dwell",
+     "required": false
+    },
+    {
+     "name": "countdown",
+     "required": false
+    },
+    {
+     "name": "visible",
+     "required": false
+    },
+    {
+     "name": "timeout",
+     "required": false
+    },
+    {
+     "name": "shots",
+     "required": false
+    },
+    {
+     "name": "change",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-about-registry",
+   "title": "Every about: page the source can register (tree and pristine), what the newest build registered, the owner's verdict",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-accept",
+   "title": "The owner accepts waiting adapted ports in one go (applied, judged by meaning, checkpointed)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "steps",
+     "required": false
+    },
+    {
+     "name": "all",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-api-drift",
+   "title": "Upstream API changes (build/api-drift/firefox.yaml) found in the ported C/C++ files; --apply fixes them",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-approve",
+   "title": "The owner approves the planned steps of a task (nothing runs before this)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-archive-gap",
+   "title": "Files the last archived (Linux-built) patch set changed that this port never touched",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "archive",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-audit",
+   "title": "Audit the supervisor from the evidence - vault intact, owner settings untouched, journal hash chain, no answer keys",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-awake",
+   "title": "Keep the machine from idle-sleeping until a given process exits",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "pid",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "bh-binary-patches",
+   "title": "Every git binary patch of the set (pictures, icons) in the tree by hash; --apply restores the missing ones",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-brief",
+   "title": "One brief in full (brief show ID), or an owner-file-edit brief for a repo file (brief REPO PATH [--do SENTENCE])",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "what",
+     "required": true
+    },
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "technical",
+     "required": false
+    },
+    {
+     "name": "do",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-briefs",
+   "title": "Every open decision of a task as a full brief (decisions, deferred steps, owner edits, dispositions, claims)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "technical",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-build-gate",
+   "title": "Before the compile - every step done, final checks passed, no hand edits/skips/answer keys; records the tree",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "harness",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-build-run",
+   "title": "The build loop on Windows - gate, owner's preflight, owner's build stage under watch, known stops fixed, package",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "force",
+     "required": false
+    },
+    {
+     "name": "park",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-build-verify",
+   "title": "After the compile - tree unchanged since the gate, fresh real artifacts, pinned version, BuildID, about pages",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-calibrate",
+   "title": "Every check passes the known-good package and fails a copy broken the way it guards against",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "only",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-capture",
+   "title": "Network forensics of the built package on Windows - decrypted requests (mitm), DNS names, packets (admin)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "packets_only",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-carry",
+   "title": "Record that a hand step is already carried by named patches of the set (export-hand then skips it)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "commit",
+     "required": true
+    },
+    {
+     "name": "patches",
+     "required": true
+    },
+    {
+     "name": "note",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "bh-check-change",
+   "title": "The check after every source change - recorded, journal chain, UI rules, decisions, export-hand, replay",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "note",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-claims",
+   "title": "What the public patch set claims, held against the tree and the installed build (writes the audit report)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "retire_stale",
+     "required": false
+    },
+    {
+     "name": "strict",
+     "required": false
+    },
+    {
+     "name": "report",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-clip-check",
+   "title": "Is dialog text cut in the installed build? repeated, against stock Firefox of the same version",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "repeats",
+     "required": false
+    },
+    {
+     "name": "stock",
+     "required": false
+    },
+    {
+     "name": "version",
+     "required": false
+    },
+    {
+     "name": "surface",
+     "required": false
+    },
+    {
+     "name": "swap",
+     "required": false
+    },
+    {
+     "name": "try",
+     "required": false
+    },
+    {
+     "name": "pref",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-companions",
+   "title": "A compile error naming a missing declaration -> its other half from the archived patch sets (dry-run with git)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "log",
+     "required": false
+    },
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-compare",
+   "title": "Hold a task's result against a person-made result folder (the answer key), file by file",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "reference",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "bh-creep",
+   "title": "Excision creep - upstream files with new references to symbols Gorilla excised",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-decide",
+   "title": "The maintainer records the answer to a brief, in their own words (real terminal only)",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "brief",
+     "required": true
+    },
+    {
+     "name": "option",
+     "required": true
+    },
+    {
+     "name": "words",
+     "required": true
+    },
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-decisions",
+   "title": "The maintainer's product decision register checked against the tree and the installed build",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "strict",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-decode-test",
+   "title": "Does the installed browser decode video on the GPU's video engine (D-158-06)? measured, not assumed",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-deferred",
+   "title": "Steps parked because what they change is gone upstream - list, explain one, or (owner) drop it",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "step",
+     "required": false
+    },
+    {
+     "name": "technical",
+     "required": false
+    },
+    {
+     "name": "do",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-describe",
+   "title": "One step of a task in full words (the current step by default), for messages and window titles",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "step",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-drive",
+   "title": "Drive a task with a local model - one fresh Gorilla OpenCode run per job, until done or blocked",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "agent",
+     "required": false
+    },
+    {
+     "name": "max_jobs",
+     "required": false
+    },
+    {
+     "name": "job_timeout",
+     "required": false
+    },
+    {
+     "name": "tools",
+     "required": false
+    },
+    {
+     "name": "line_ops",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-drop",
+   "title": "Drop whole patches from a running port as their author said, files back to pristine, kept patches re-applied",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "patches",
+     "required": true
+    },
+    {
+     "name": "keep",
+     "required": false
+    },
+    {
+     "name": "note",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "bh-export-hand",
+   "title": "Hand-edit checkpoints of a task become patches in the owner's patch set (21.PORT.FIXES / 22.EGRESS.LOCKDOWN)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "dry_run",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-fluent-check",
+   "title": "Fluent (.ftl) strings of the ported tree checked - syntax, orphans, moved and missing messages",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-follow",
+   "title": "A window log's milestones as they are written; exits with the run's own exit code (124 at the timeout)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "log",
+     "required": false
+    },
+    {
+     "name": "cmd",
+     "required": false
+    },
+    {
+     "name": "every",
+     "required": false
+    },
+    {
+     "name": "timeout",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-herald",
+   "title": "The spoken herald - say one sentence, or speak up while a run goes on (battery warnings, run finished)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "words",
+     "required": false
+    },
+    {
+     "name": "name",
+     "required": false
+    },
+    {
+     "name": "pid",
+     "required": false
+    },
+    {
+     "name": "log",
+     "required": false
+    },
+    {
+     "name": "every",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-hidden-pages-doc",
+   "title": "The hidden about: pages explained page by page (English public, Romanian private), rendered and checked",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "write",
+     "required": false
+    },
+    {
+     "name": "release",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-images",
+   "title": "Every picture packaged in the installed build - count, bytes, exact duplicates",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-install",
+   "title": "Install a verified build - backup of install and profiles, install, verify, startup caches cleared, icon cache rebuilt",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    },
+    {
+     "name": "no_backup",
+     "required": false
+    },
+    {
+     "name": "restore",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-latest",
+   "title": "The latest STABLE Firefox or kernel release and exactly where its source comes from",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "product",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "bh-leakgate",
+   "title": "Run the leak gate on the task's built package - quiet machine, mitm, DNS and packet sensors, judged by policy",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "release",
+     "required": false
+    },
+    {
+     "name": "repeat",
+     "required": false
+    },
+    {
+     "name": "soak",
+     "required": false
+    },
+    {
+     "name": "firewall",
+     "required": false
+    },
+    {
+     "name": "only",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-leakgate-approve",
+   "title": "The owner approves proposed allowlist entries (by id, default every *proposed*) - real terminal only",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "ids",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-leakgate-baseline",
+   "title": "The owner saves the leak-gate baseline from a release PASS (or the first one), with decisions enforced and claims clean",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-leakgate-context",
+   "title": "Each host in the install's omni.ja with path:line and context, as disposition evidence",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "hosts",
+     "required": false
+    },
+    {
+     "name": "run",
+     "required": false
+    },
+    {
+     "name": "width",
+     "required": false
+    },
+    {
+     "name": "per",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-leakgate-dispositions",
+   "title": "The owner approves the newest proposed dispositions (blanket for approvable ones; KEY names an owner-decision one)",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "keys",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-leakgate-proposal",
+   "title": "Reviewers' result rows -> proposed-dispositions-<label>.json (approval null) plus the owner's review document",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "results",
+     "required": true
+    },
+    {
+     "name": "override",
+     "required": false
+    },
+    {
+     "name": "label",
+     "required": false
+    },
+    {
+     "name": "notes",
+     "required": false
+    },
+    {
+     "name": "run",
+     "required": false
+    },
+    {
+     "name": "review",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-leakgate-propose",
+   "title": "Propose allowlist entries from the newest gate run's events (nothing is approved)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-leakgate-rejudge",
+   "title": "The same gate evidence judged again by the current judge and allowlist; updates the owner's result if it is that run",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "run",
+     "required": false
+    },
+    {
+     "name": "note",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-leakgate-scope",
+   "title": "What changed since the last passed gate, and whether any of it can reach the network (report only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "from",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-leakgate-selftest",
+   "title": "Can the leak gate run on this Linux machine (root, ip, nft, ...)? Changes nothing; needs no task",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "bh-leakgate-status",
+   "title": "A (running) leak gate - runs started of expected, alive, result, CPU since start; safe while it runs",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "run",
+     "required": false
+    },
+    {
+     "name": "thermal",
+     "required": false
+    },
+    {
+     "name": "hot",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-leakgate-summary",
+   "title": "A gate run scene by scene in plain words, for the release page",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "log",
+     "required": false
+    },
+    {
+     "name": "out",
+     "required": false
+    },
+    {
+     "name": "build",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-lessons",
+   "title": "Lessons recorded with hand ports that no harness rule covers yet (--all adds the ruled ones)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "all",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-lists-refresh",
+   "title": "HSTS preload, key-pin and CT log lists from the upstream repository, taken only when pure data and fresher",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "ref",
+     "required": false
+    },
+    {
+     "name": "write",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-log",
+   "title": "The last 40 journal events of a task",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-loss-audit",
+   "title": "Every line every Gorilla patch ever added (git history + patchset-* folders), counted in the ported tree",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "folders",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-migrate",
+   "title": "Migration control - stages S0-S9, gates, SITREP, intents, intake, consistency, park/unpark tickets",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "sub",
+     "required": true
+    },
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "rest",
+     "required": false
+    },
+    {
+     "name": "only",
+     "required": false
+    },
+    {
+     "name": "task_opt",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-netbench",
+   "title": "Network benches B1-B5 against local servers through an emulated link (headless throwaway copy); or compare two results",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "compare",
+     "required": false
+    },
+    {
+     "name": "bench",
+     "required": false
+    },
+    {
+     "name": "profile",
+     "required": false
+    },
+    {
+     "name": "links",
+     "required": false
+    },
+    {
+     "name": "label",
+     "required": false
+    },
+    {
+     "name": "repeat",
+     "required": false
+    },
+    {
+     "name": "out",
+     "required": false
+    },
+    {
+     "name": "moz_log",
+     "required": false
+    },
+    {
+     "name": "keep_profile",
+     "required": false
+    },
+    {
+     "name": "no_images",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-next",
+   "title": "The next job packet of a task (runs the script steps before it, then hands out one model step)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-platform-steps",
+   "title": "What to do on THIS operating system for the task, computed from the machine",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-post-install",
+   "title": "The proof rows of the installed build - profile, prefs, excised, startup, egress, adblock, leaks, decisions, UI ...",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    },
+    {
+     "name": "only",
+     "required": false
+    },
+    {
+     "name": "drive",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-pref-bisect",
+   "title": "Which of our graphics pref changes costs dropped frames, by halving (isolated, measured)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-preflight",
+   "title": "What must be true before a job starts - stale git locks, disk, fan control, model server (PASS/FAIL rows)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "build",
+     "required": false
+    },
+    {
+     "name": "model",
+     "required": false
+    },
+    {
+     "name": "fix_locks",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-probe",
+   "title": "Ask a throwaway copy of the installed build a question, or try a JS/CSS fix in it, without a build",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "js",
+     "required": true
+    },
+    {
+     "name": "url",
+     "required": false
+    },
+    {
+     "name": "wait",
+     "required": false
+    },
+    {
+     "name": "timeout",
+     "required": false
+    },
+    {
+     "name": "visible",
+     "required": false
+    },
+    {
+     "name": "profile",
+     "required": false
+    },
+    {
+     "name": "change",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-probe-compare",
+   "title": "Two saved probe outputs (TOK|... lines) compared - LOST, changed, now-set",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "a",
+     "required": true
+    },
+    {
+     "name": "b",
+     "required": true
+    },
+    {
+     "name": "prefix",
+     "required": false
+    },
+    {
+     "name": "keys",
+     "required": false
+    },
+    {
+     "name": "value",
+     "required": false
+    },
+    {
+     "name": "limit",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-profile-check",
+   "title": "Every profile and which version last ran it, every launcher and the profile it names, the menu cache",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "profile",
+     "required": false
+    },
+    {
+     "name": "paint",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-profile-diff",
+   "title": "The same probe on a fresh profile and on a copy of the real profile; exit 3 when they differ",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "probe",
+     "required": true
+    },
+    {
+     "name": "profile",
+     "required": true
+    },
+    {
+     "name": "install",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-profile-fresh",
+   "title": "The person's data into a fresh profile, none of the old version's settings; lists user.js settings the build lacks",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "from",
+     "required": true
+    },
+    {
+     "name": "to",
+     "required": true
+    },
+    {
+     "name": "machine",
+     "required": false
+    },
+    {
+     "name": "apply",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-profile-keep",
+   "title": "Which profile holds the saved logins and which install opens it; FAIL when the install would open an empty one",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "install",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-proposals",
+   "title": "The adapted ports waiting for the owner, with why each was adapted",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-rebase-set",
+   "title": "Bring the patch set onto the new release - failing patches superseded, 23.REBASE.<major> generated (dry unless write=1)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "write",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-record",
+   "title": "Record a person's edit as a task step (kind=privacy|port), then check and export it at once (check-change)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "kind",
+     "required": false
+    },
+    {
+     "name": "files",
+     "required": false
+    },
+    {
+     "name": "note",
+     "required": true
+    },
+    {
+     "name": "park",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-release-check",
+   "title": "Is this build releasable? techniques, decisions --strict, replay, claims, post-install, leak gate, release docs",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "build",
+     "required": false
+    },
+    {
+     "name": "fast",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-release-cover",
+   "title": "The release page names every decision made since the last release and fits GitHub's 125000-character limit",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "page",
+     "required": true
+    },
+    {
+     "name": "previous",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-release-page",
+   "title": "Assemble RELEASE-BODY.md from a draft folder's PAGE.parts, then hold it to release-cover (every decision named, under GitHub's limit)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "dir",
+     "required": true
+    },
+    {
+     "name": "previous",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-release-roundtrip",
+   "title": "Remove the installed browser, download the published .deb from GitHub, check, install and verify it",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "tag",
+     "required": true
+    },
+    {
+     "name": "repo",
+     "required": false
+    },
+    {
+     "name": "asset",
+     "required": false
+    },
+    {
+     "name": "keep",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-repair",
+   "title": "Repair known port failures in the tree (dangling excision, moved member), each proven with node --check",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "park",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-replay",
+   "title": "The replay proof - the public patch set on pristine upstream must give exactly the compiled tree",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-report",
+   "title": "Recorder report of a whole model run - incidents from the session, journal and MCP logs",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "session",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-repro",
+   "title": "The binary reproduced - plan (reads only), --run a second build in another folder, --compare packages byte for byte",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "run",
+     "required": false
+    },
+    {
+     "name": "compare",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-rewind",
+   "title": "Undo a step that passed but is wrong - working copy reset to the checkpoint before it, later steps pending",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "step",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "bh-satellite",
+   "title": "Satellite mode judged on a copy - identity and scripts per level and per kind of site, call sites included",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "need_list",
+     "required": false
+    },
+    {
+     "name": "change",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-search-strip",
+   "title": "D-158-13 leftovers (other search engines' icons and wordmarks) in the source; --apply removes them",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-set-proof",
+   "title": "Pristine upstream + each platform's selection of the patch set must apply; excluded dependencies named",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "patchset",
+     "required": false
+    },
+    {
+     "name": "version",
+     "required": false
+    },
+    {
+     "name": "platform",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-snapshot",
+   "title": "Capture the truth of a built tree against the pristine vault copy as a complete patch set (optional --prove)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "version",
+     "required": true
+    },
+    {
+     "name": "out",
+     "required": false
+    },
+    {
+     "name": "prove",
+     "required": false
+    },
+    {
+     "name": "harness",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-start",
+   "title": "Plan a Firefox port task for the latest stable release (or a pinned one) and make it the current task",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "product",
+     "required": true
+    },
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "pin",
+     "required": false
+    },
+    {
+     "name": "source",
+     "required": false
+    },
+    {
+     "name": "budget",
+     "required": false
+    },
+    {
+     "name": "workdir",
+     "required": false
+    },
+    {
+     "name": "harness",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-stats",
+   "title": "The task journal counted - builds, attempts, stops, hand edits, automation, installs, heat",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "since",
+     "required": false
+    },
+    {
+     "name": "until",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-status",
+   "title": "A task's step counts, checkpoints and current step",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-stops",
+   "title": "Every window run that did not pass, classified - the browser, the check or the machine - and false alarms per check",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "since",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-submit",
+   "title": "Check the current step's change in the working copy; pass = checkpoint, fail = change put back",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "note",
+     "required": false
+    },
+    {
+     "name": "dry_run",
+     "required": false
+    },
+    {
+     "name": "hand",
+     "required": false
+    },
+    {
+     "name": "adapted",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-symptom",
+   "title": "The tool already built and proven for a visible problem - the first command for a screenshot or complaint",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "words",
+     "required": false
+    },
+    {
+     "name": "all",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-techniques",
+   "title": "The ideas behind Gorilla's fixes - does each still hold in this tree?",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-timebombs",
+   "title": "Every date compiled into the tree that switches a protection off, judged against a date plus a margin (D-157-42)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "margin",
+     "required": false
+    },
+    {
+     "name": "at",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-truthbound",
+   "title": "Is every change the port made explained by the owner's 155 truth tree or a recorded step?",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "truth_task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-ui-check",
+   "title": "Prove what a user sees is readable and works - theme and UI rules, contrast, script errors, empty menus",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "static",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-unblock",
+   "title": "The owner unblocks a step - retry (fresh attempts), hand (a person ports it) or skip (owner at a real terminal)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "step",
+     "required": true
+    },
+    {
+     "name": "how",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "bh-vault",
+   "title": "The upstream vault - measure, fetch, verify, restore, restore-files, list untouched release sources",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "sub",
+     "required": true
+    },
+    {
+     "name": "product",
+     "required": false
+    },
+    {
+     "name": "workdir",
+     "required": false
+    },
+    {
+     "name": "paths",
+     "required": false
+    },
+    {
+     "name": "version",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-verify",
+   "title": "The verifier - what the tree really holds per hunk, false completions, stray edits, missing new files",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "reopen",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-visual",
+   "title": "Crisp icons and aligned pages - static rules on the tree, then a headless throwaway copy of the install",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "static",
+     "required": false
+    },
+    {
+     "name": "only",
+     "required": false
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    },
+    {
+     "name": "change",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-watch",
+   "title": "Live recorder - every incident of the model session and the task journal as it appears (Ctrl+C to stop)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    },
+    {
+     "name": "session",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-weigh",
+   "title": "RAM and CPU per page - the installed build against the same build with a change (or another install)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "pages",
+     "required": false
+    },
+    {
+     "name": "reps",
+     "required": false
+    },
+    {
+     "name": "clean",
+     "required": false
+    },
+    {
+     "name": "settle",
+     "required": false
+    },
+    {
+     "name": "before",
+     "required": false
+    },
+    {
+     "name": "change",
+     "required": true
+    },
+    {
+     "name": "install_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-whole-files",
+   "title": "Every NEW_FILES/REPLACE_FILES file of the patch set against the tree - missing or differing",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "bh-withdraw",
+   "title": "Take back one waiting proposal with a reason (moved to proposals/withdrawn, step ends obsolete)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    },
+    {
+     "name": "step",
+     "required": true
+    },
+    {
+     "name": "note",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "canary",
+   "title": "Prove a CHECK can fail - each check on a planted input it must flag and a clean control it must pass; a second witness reads the artifact",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "action",
+     "required": true
+    },
+    {
+     "name": "ids",
+     "required": false
+    },
+    {
+     "name": "registry",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "catchup",
+   "title": "Machine catch-up handover: repos (ahead/behind, token-free remotes), collect (memory, instructions, private tools, unpushed diffs/patches/untracked, bundles for repos with no remote), check (secrets fail it), public-check (Romanian text and private names before anything goes public), pack (verified zip to a stick, never overwrites)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "command",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "code-review",
+   "title": "Run the installed static analysers on a folder or file and return verified findings as JSON (builds the target: trusted code only)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "target",
+     "required": false
+    },
+    {
+     "name": "profile",
+     "required": false
+    },
+    {
+     "name": "diff",
+     "required": false
+    },
+    {
+     "name": "all_files",
+     "required": false
+    },
+    {
+     "name": "max_files",
+     "required": false
+    },
+    {
+     "name": "jobs",
+     "required": false
+    },
+    {
+     "name": "timeout",
+     "required": false
+    },
+    {
+     "name": "deep",
+     "required": false
+    },
+    {
+     "name": "no_stage3",
+     "required": false
+    },
+    {
+     "name": "compile_commands_dir",
+     "required": false
+    },
+    {
+     "name": "results_dir",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "code-review-doctor",
+   "title": "Which code analysers are installed for a project's languages, what is missing and how to install it",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "target",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "dual-track-cleanup",
+   "title": "Move the working files out of a docs folder once its Markdown is committed and pushed (refuses otherwise)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "output_dir",
+     "required": true
+    },
+    {
+     "name": "trash",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "dual-track-code-render",
+   "title": "Turn the filled document specs into Markdown and check them (structure, banned phrases, a quality score)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "source_file",
+     "required": true
+    },
+    {
+     "name": "output_dir",
+     "required": true
+    },
+    {
+     "name": "format",
+     "required": false
+    },
+    {
+     "name": "min_score",
+     "required": false
+    },
+    {
+     "name": "no_validate",
+     "required": false
+    },
+    {
+     "name": "output",
+     "required": false
+    },
+    {
+     "name": "output_layman",
+     "required": false
+    },
+    {
+     "name": "output_dev",
+     "required": false
+    },
+    {
+     "name": "output_audit",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "dual-track-generator",
+   "title": "Prepare plain-language and developer documents for a source file or folder: writes the fill-in specs, no model, no network",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "source_file",
+     "required": true
+    },
+    {
+     "name": "output_dir",
+     "required": true
+    },
+    {
+     "name": "format",
+     "required": false
+    },
+    {
+     "name": "context",
+     "required": false
+    },
+    {
+     "name": "payload",
+     "required": false
+    },
+    {
+     "name": "no_auto_context",
+     "required": false
+    },
+    {
+     "name": "no_precheck",
+     "required": false
+    },
+    {
+     "name": "no_rules",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "dual-track-precheck",
+   "title": "Rule check of source files or a patch for left-behind defects: no model, no network",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "target",
+     "required": true
+    },
+    {
+     "name": "output_dir",
+     "required": true
+    },
+    {
+     "name": "no_rules",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "dual-track-release-prep",
+   "title": "Prepare release notes from a changelog or diff file: no model, no network",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "input",
+     "required": true
+    },
+    {
+     "name": "output_dir",
+     "required": true
+    },
+    {
+     "name": "project",
+     "required": false
+    },
+    {
+     "name": "version",
+     "required": false
+    },
+    {
+     "name": "previous",
+     "required": false
+    },
+    {
+     "name": "target",
+     "required": false
+    },
+    {
+     "name": "date",
+     "required": false
+    },
+    {
+     "name": "no_auto_context",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "dual-track-release-render",
+   "title": "Turn the filled release-note specs into Markdown and check them",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "output_dir",
+     "required": true
+    },
+    {
+     "name": "layman_json",
+     "required": false
+    },
+    {
+     "name": "dev_json",
+     "required": false
+    },
+    {
+     "name": "meta",
+     "required": false
+    },
+    {
+     "name": "project",
+     "required": false
+    },
+    {
+     "name": "version",
+     "required": false
+    },
+    {
+     "name": "previous",
+     "required": false
+    },
+    {
+     "name": "target",
+     "required": false
+    },
+    {
+     "name": "date",
+     "required": false
+    },
+    {
+     "name": "min_score",
+     "required": false
+    },
+    {
+     "name": "no_validate",
+     "required": false
+    },
+    {
+     "name": "output",
+     "required": false
+    },
+    {
+     "name": "output_layman",
+     "required": false
+    },
+    {
+     "name": "output_dev",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "dual-track-session-prep",
+   "title": "Prepare documents about the work done in a git folder (recent changes and commits, optional notes): no model, no network",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "target",
+     "required": true
+    },
+    {
+     "name": "output_dir",
+     "required": true
+    },
+    {
+     "name": "format",
+     "required": false
+    },
+    {
+     "name": "narrative",
+     "required": false
+    },
+    {
+     "name": "payload",
+     "required": false
+    },
+    {
+     "name": "since",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "dual-track-session-render",
+   "title": "Turn the filled session specs into Markdown and check them",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "target",
+     "required": true
+    },
+    {
+     "name": "output_dir",
+     "required": true
+    },
+    {
+     "name": "format",
+     "required": false
+    },
+    {
+     "name": "min_score",
+     "required": false
+    },
+    {
+     "name": "no_validate",
+     "required": false
+    },
+    {
+     "name": "output",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "eta",
+   "title": "How long will it take - from a plan, past runs, live progress or a timed trial on the same disk; never a guess",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "action",
+     "required": true
+    },
+    {
+     "name": "args",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "evidence-check",
+   "title": "Check every claim of a research run: the output contract, cited-but-never-opened, snapshots, quotes",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    },
+    {
+     "name": "store",
+     "required": false
+    },
+    {
+     "name": "run",
+     "required": false
+    },
+    {
+     "name": "fetched",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "evidence-fetch",
+   "title": "Fetch pages as evidence: kept by hash with their words, robots.txt obeyed, private addresses refused",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "urls",
+     "required": true
+    },
+    {
+     "name": "run",
+     "required": false
+    },
+    {
+     "name": "quote",
+     "required": false
+    },
+    {
+     "name": "store",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "evidence-import",
+   "title": "A research run's findings file as records: one per lane, one per claim (tier or grade, URLs, quote)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    },
+    {
+     "name": "out",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "evidence-render",
+   "title": "A checked research run as a report (.md, .docx, .pdf): unsupported claims first, every claim with its sources",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    },
+    {
+     "name": "out",
+     "required": true
+    },
+    {
+     "name": "store",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "evidence-search",
+   "title": "Search a free scholarly or data API as JSON: OpenAlex, Crossref, Europe PMC, preprints, DOAJ, GDELT, World Bank, HDX, SEC and more",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "source",
+     "required": true
+    },
+    {
+     "name": "query",
+     "required": false
+    },
+    {
+     "name": "limit",
+     "required": false
+    },
+    {
+     "name": "run",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "evidence-show",
+   "title": "The latest snapshot of a URL: when, status, hash, and where its bytes and words are",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "url",
+     "required": true
+    },
+    {
+     "name": "store",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "evidence-sources-check",
+   "title": "Check the source registry as data: fields, access classes, grades, addresses",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "registry",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "evidence-sources-find",
+   "title": "Find research sources in the 985-source registry: by words, category, free access and grade, best first",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "words",
+     "required": false
+    },
+    {
+     "name": "category",
+     "required": false
+    },
+    {
+     "name": "free",
+     "required": false
+    },
+    {
+     "name": "grade",
+     "required": false
+    },
+    {
+     "name": "limit",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "evidence-sources-probe",
+   "title": "Is each registry source still at its address? Fetches each one (robots.txt obeyed, paced), lists the dead",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "category",
+     "required": false
+    },
+    {
+     "name": "limit",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "explain",
+   "title": "A written explanation read from a file: no model, no tokens, no variance",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "topic",
+     "required": false
+    },
+    {
+     "name": "lang",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "fieldkit-audio",
+   "title": "Linux sound chain - every stage the sound passes through, what is done twice, and the fix (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "fieldkit-backup",
+   "title": "A complete, dated, verified zip of the Fieldkit folder into the owner's backup folder",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "to",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "fieldkit-backup-remind",
+   "title": "How old the last backup copy on a USB stick is, and a reminder (aloud at most once a day) when it is due",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "quiet",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "fieldkit-backup-usb",
+   "title": "Copy the newest backup to a USB stick and prove it there (never deletes, moves or overwrites anything on the stick)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "drive",
+     "required": false
+    },
+    {
+     "name": "check",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "fieldkit-icons-cache",
+   "title": "Why the desktop icons are soft - the icon caches, their age and size (read-only; the fix is a person's --apply)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "thumbs",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size",
+   "title": "How big folders are and where the space went, biggest first (every core, read-only, links never followed)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "paths",
+     "required": false
+    },
+    {
+     "name": "depth",
+     "required": false
+    },
+    {
+     "name": "number",
+     "required": false
+    },
+    {
+     "name": "files",
+     "required": false
+    },
+    {
+     "name": "disk",
+     "required": false
+    },
+    {
+     "name": "links",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-age",
+   "title": "Files by age, newest or oldest first - what changed during the build",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "paths",
+     "required": false
+    },
+    {
+     "name": "number",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-apply",
+   "title": "Carry out a plan written for a large move or recycle, after it was reviewed; refused when the files changed",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "plan",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-bench",
+   "title": "Two programs, or the calibrated thread count against every core, timed alternately - a verdict or INCONCLUSIVE",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "profile",
+     "required": false
+    },
+    {
+     "name": "rounds",
+     "required": false
+    },
+    {
+     "name": "threads",
+     "required": false
+    },
+    {
+     "name": "args",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-compare",
+   "title": "Two saved measurements compared - what grew, shrank, appeared or went, optionally as a folder tree",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "old",
+     "required": true
+    },
+    {
+     "name": "new",
+     "required": true
+    },
+    {
+     "name": "tree",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-copy",
+   "title": "Copy with every byte compared after, journalled for undo; an existing target is refused or kept aside",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "sources",
+     "required": true
+    },
+    {
+     "name": "to",
+     "required": true
+    },
+    {
+     "name": "overwrite",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-dupes",
+   "title": "The same bytes in more than one place - size, then the first 64 KiB, then the whole file compared by hash",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "paths",
+     "required": true
+    },
+    {
+     "name": "min_size",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-empty",
+   "title": "Empty folders and zero-byte files - the leftovers of failed builds",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "path",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-find",
+   "title": "Every file or folder matching name, extension, size or age - folder sizes included (fd cannot do that)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "paths",
+     "required": false
+    },
+    {
+     "name": "name",
+     "required": false
+    },
+    {
+     "name": "ext",
+     "required": false
+    },
+    {
+     "name": "min_size",
+     "required": false
+    },
+    {
+     "name": "older",
+     "required": false
+    },
+    {
+     "name": "type",
+     "required": false
+    },
+    {
+     "name": "number",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-free",
+   "title": "Free space on every drive with its kind (NVMe, SSD, HDD, removable) - preflight for builds and gates",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "gorilla-size-hash",
+   "title": "SHA-256 of files or whole folders, on the CPU's SHA instructions when it has them - proof for releases and vaults",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "paths",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-move",
+   "title": "Move - a rename on one drive, a verified copy then recycle across drives; journalled, a plan above the threshold",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "sources",
+     "required": true
+    },
+    {
+     "name": "to",
+     "required": true
+    },
+    {
+     "name": "plan",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-profile",
+   "title": "This machine as gorilla-size sees it - CPU, P/E cores, SHA path, the fastest thread count per disk",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "recalibrate",
+     "required": false
+    },
+    {
+     "name": "rounds",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-recycle",
+   "title": "To the Recycle Bin / trash, verified in the bin's own records; refused where Windows would destroy instead",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "paths",
+     "required": true
+    },
+    {
+     "name": "plan",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-reparse",
+   "title": "Every junction and symlink with its target, broken ones flagged - never followed",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "path",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-trash",
+   "title": "What is in the Recycle Bin / trash (original place, size, date) and putting items back",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "action",
+     "required": false
+    },
+    {
+     "name": "items",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-types",
+   "title": "Bytes and file counts by extension - \"is it the .pcapng or the .etl\" in one call",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "paths",
+     "required": false
+    },
+    {
+     "name": "exclude",
+     "required": false
+    },
+    {
+     "name": "gitignore",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-undo",
+   "title": "Reverse a journal - copies recycled, moves and recycled items put back - refusing anything that changed since",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "journal",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "gorilla-size-watch",
+   "title": "Re-measure a folder every N seconds and raise an alert when it grows faster than a limit (a build filling the disk)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "path",
+     "required": true
+    },
+    {
+     "name": "every",
+     "required": true
+    },
+    {
+     "name": "count",
+     "required": false
+    },
+    {
+     "name": "alert_growth",
+     "required": false
+    },
+    {
+     "name": "exclude",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "handover",
+   "title": "Fixes to someone else's tool as a handover - before/after, why, test, proof; checked to apply on their copy",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "fixes",
+     "required": true
+    },
+    {
+     "name": "target",
+     "required": false
+    },
+    {
+     "name": "out",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "harvest-find",
+   "title": "Which of the owner's scripts does this job? Search every script by what it does",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "words",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "hdmi-diag",
+   "title": "Check the laptop and the TV: about 25 checks, each with what it measured and advice, changing nothing (about a minute)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "area",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "hdmi-doctor",
+   "title": "Does this computer have what the HDMI Harness needs (Python, packages, the helper task)? Installs nothing",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "hdmi-fix",
+   "title": "Connect the TV now: activate it in the configured topology; if the driver is stuck (TV seen, 0 modes), restart the GPU driver - the repair the harness exists for. Elevated (Windows asks)",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": []
+  },
+  {
+   "id": "hdmi-profile-list",
+   "title": "The TV's EDID: the best HDMI mode for each profile and every mode with its score (the TV must be active)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "arg",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "hdmi-status",
+   "title": "Is the TV on the cable and active: the signal, the background helper and the confirmed mode (Windows)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "hdmi-test-quick",
+   "title": "Live HDMI checks H01-H08 (read-only), then the TV back in the configured topology; on a stuck driver that is the same repair as fix. Elevated (Windows asks)",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "only",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "hdmi-tv-info",
+   "title": "Find the Samsung TV on the local network and show its device info (model, power, network)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "hdmi-tv-wake",
+   "title": "Turn the TV on with a Wake-on-LAN packet",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": []
+  },
+  {
+   "id": "hdmi-tv-wifi-report",
+   "title": "What would stop the TV joining a Wi-Fi network (hidden, WPA3-only, 6 GHz)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "arg",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "inventory",
+   "title": "Count code, tests, config and skills per project folder",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "dirs",
+     "required": true
+    },
+    {
+     "name": "skip_src",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "laptop-alerts-say",
+   "title": "Hear the three alert sentences an AI assistant's state is spoken with (done, focus, look)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "kind",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "laptop-cpu",
+   "title": "Is the processor locked slow by the firmware (BD PROCHOT)? Measured under load; guard unlocks and proves it",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "action",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "laptop-rules",
+   "title": "The rule files AI tools read (CLAUDE.md, GEMINI.md, AGENTS.md ...): one source, every copy identical",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "action",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "laptop-sound",
+   "title": "Low sound on Windows: diagnose (read-only), the safe fix with its undo, the driver listed for the exact chip",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "action",
+     "required": false
+    },
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "laptop-video",
+   "title": "An NVIDIA card without its Control Panel app (DCH drivers): found; --apply installs it from the Store",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "laptop-volume",
+   "title": "The master volume: read it, or set it (and unmute) on Windows and Linux",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "set",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "leakgate-runs",
+   "title": "Every leak-gate run - verdict, build, size and every file that cites it; only uncited runs are free to remove",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "lifecycle",
+   "title": "Install, verify, (upgrade,) uninstall a program and report anything it left behind",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "spec",
+     "required": true
+    },
+    {
+     "name": "approve",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "model-eval",
+   "title": "Rank language models by honesty under pressure: runs scripted research tasks against paid model providers",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "provider",
+     "required": false
+    },
+    {
+     "name": "model",
+     "required": false
+    },
+    {
+     "name": "sweep",
+     "required": false
+    },
+    {
+     "name": "scenario",
+     "required": false
+    },
+    {
+     "name": "resume",
+     "required": false
+    },
+    {
+     "name": "retry_errors",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "model-eval-grade",
+   "title": "Score the saved model-eval runs offline: no model, no network, the same runs always get the same score",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "verbose",
+     "required": false
+    },
+    {
+     "name": "json",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "mutate",
+   "title": "Prove a test can fail - break a rule on purpose, run the test, put the file back byte for byte",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "file",
+     "required": false
+    },
+    {
+     "name": "swap",
+     "required": false
+    },
+    {
+     "name": "count",
+     "required": false
+    },
+    {
+     "name": "plan",
+     "required": false
+    },
+    {
+     "name": "cwd",
+     "required": false
+    },
+    {
+     "name": "timeout",
+     "required": false
+    },
+    {
+     "name": "test",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "net-antenna",
+   "title": "What antenna the cellular bands in use actually require, with the loss budget",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "bands",
+     "required": true
+    },
+    {
+     "name": "cable_m",
+     "required": false
+    },
+    {
+     "name": "cable",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "net-route",
+   "title": "Which interface the internet actually goes out of, before you measure anything",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "next-step",
+   "title": "The one next thing to do in a build pipeline (DO, BLOCKED, CANNOT HERE or DONE)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "pipeline",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "office-check",
+   "title": "Check an Office or PDF file is not broken before sending it",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "office-deliver",
+   "title": "Make a Word, Excel, PowerPoint or PDF file safe to send (check, remove names, recheck, privacy scan)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "office-read",
+   "title": "Read a Word, Excel, PowerPoint or PDF file as plain text",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "office-scrub",
+   "title": "Remove people's names from the hidden properties of a Word, Excel or PowerPoint file",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "file",
+     "required": true
+    },
+    {
+     "name": "term",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "peers-list",
+   "title": "The AI sessions running on this computer that can take a message (Gorilla OpenCode 0.1.145+, fieldkit waits)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "peers-send",
+   "title": "Send one short text message to another AI session on this computer (same account only; it cannot be unsent)",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "to",
+     "required": true
+    },
+    {
+     "name": "text",
+     "required": true
+    },
+    {
+     "name": "as_name",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "peers-wait",
+   "title": "Be a session for a while and return the messages that arrive (fenced: text from another program, not orders)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "seconds",
+     "required": false
+    },
+    {
+     "name": "count",
+     "required": false
+    },
+    {
+     "name": "as_name",
+     "required": false
+    },
+    {
+     "name": "notify",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "pfind",
+   "title": "Hybrid local search in one Python file (name, content, meaning, snippet)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "query",
+     "required": true
+    },
+    {
+     "name": "paths",
+     "required": false
+    },
+    {
+     "name": "names",
+     "required": false
+    },
+    {
+     "name": "content",
+     "required": false
+    },
+    {
+     "name": "exact",
+     "required": false
+    },
+    {
+     "name": "ext",
+     "required": false
+    },
+    {
+     "name": "limit",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "photokit",
+   "title": "Photos: contact sheets, near-duplicate candidates + side-by-side compare, mapping check, sort into per-item folders, fetch report photos, doctor",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "command",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "pipeline-plan",
+   "title": "What a pipeline would do, fully resolved, and what changed since its last run (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "name",
+     "required": true
+    },
+    {
+     "name": "var",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "platform-check",
+   "title": "Hold every tool card's platforms to its tests; a new single-system card needs a port or a reason",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "pref-conflicts",
+   "title": "One pref, one value - no two definitions the Firefox patch set adds may disagree (also in set-proof and the build gate)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "task",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "privacy-scan",
+   "title": "Find secrets, personal paths, emails and private names before publishing",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "paths",
+     "required": true
+    },
+    {
+     "name": "git",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "refcheck",
+   "title": "Which files named in a list (manifest), link or import do not exist",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "rule",
+     "required": true
+    },
+    {
+     "name": "target",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "release-check",
+   "title": "Prove a release - the published files are the tested ones and every claim in the notes is proven",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "spec",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "repro-compare",
+   "title": "Two builds of the same source compared byte for byte, and what differs named (inside archives) with its cause",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "a",
+     "required": true
+    },
+    {
+     "name": "b",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "room",
+   "title": "The shared room - every AI session on this machine sees what the others did on shared ground (commits, history changes, shared-file edits, process starts and stops, network and heavy steps, messages and owner approvals), written by a hook, not by memory",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "action",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "searchfox",
+   "title": "Search Firefox source on Mozilla's Searchfox index: matching lines with file and line number",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "query",
+     "required": true
+    },
+    {
+     "name": "path",
+     "required": false
+    },
+    {
+     "name": "case",
+     "required": false
+    },
+    {
+     "name": "regexp",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "searchfox-blast-radius",
+   "title": "Every Firefox file that mentions a name, with how many times (impact map), from Searchfox",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "name",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "searchfox-deps",
+   "title": "The include lines of one Firefox file, from Searchfox",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "path",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "searchfox-file",
+   "title": "The Searchfox web address of a Firefox source file (works offline)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "path",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "searchfox-includers",
+   "title": "Firefox files that include a header, from Searchfox",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "header",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "searchfox-map",
+   "title": "Where a Firefox class is defined, plus usages with nearby lines, from Searchfox",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "symbol",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "searchfox-svg-keeplist",
+   "title": "Is an SVG referenced anywhere in Firefox, from Searchfox? (zero hits is not proof it is unused)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "svg",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "searchfox-symbol",
+   "title": "Where a Firefox symbol is defined and used, from Searchfox",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "name",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "ship",
+   "title": "The git side of shipping - status, sync a squash-merged branch (merge -s ours), push, audit, release, prune; never forces",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "action",
+     "required": true
+    },
+    {
+     "name": "tag",
+     "required": false
+    },
+    {
+     "name": "offline",
+     "required": false
+    },
+    {
+     "name": "archive_unproven",
+     "required": false
+    },
+    {
+     "name": "scaffold",
+     "required": false
+    },
+    {
+     "name": "wait",
+     "required": false
+    },
+    {
+     "name": "base",
+     "required": false
+    },
+    {
+     "name": "repo",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "shot-speedtest",
+   "title": "Pull download, upload and ping off a speedtest screenshot (never guesses)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "files",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "shot-verdict",
+   "title": "From several speedtest shots, say WHICH LAYER is limiting",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "files",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "sitrep",
+   "title": "A situation report a reader can take in a few seconds at a time: template, check, render (six languages), doctor",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "action",
+     "required": true
+    },
+    {
+     "name": "file",
+     "required": false
+    },
+    {
+     "name": "lang",
+     "required": false
+    },
+    {
+     "name": "order",
+     "required": false
+    },
+    {
+     "name": "md",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "snapshot-diff",
+   "title": "Show exactly what changed between two recorded snapshots",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "before",
+     "required": true
+    },
+    {
+     "name": "after",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "speaker-loudness-fix",
+   "title": "Loudness compressor for quiet laptop speakers (PipeWire/PulseAudio); undo puts back the output you had. A missing SC4 plugin stops it with the sudo command to run (never waits on a password)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": []
+  },
+  {
+   "id": "speaker-loudness-status",
+   "title": "Is the speaker loudness compressor installed and active? (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "survey",
+   "title": "Facts about a repository before reading it - languages, build systems, tests, licence, big files, privacy, git",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "paths",
+     "required": true
+    },
+    {
+     "name": "no_privacy",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "teach",
+   "title": "A teaching log from a session transcript: every command a session ran, in order, with what came back",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "session",
+     "required": false
+    },
+    {
+     "name": "out",
+     "required": true
+    },
+    {
+     "name": "since",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "telemetry",
+   "title": "Telemetry off and cut out - a project's source scanned for telemetry SDKs, endpoints and collectors; this machine's toolchain opt-outs and firewall blocks checked",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "action",
+     "required": true
+    },
+    {
+     "name": "path",
+     "required": false
+    },
+    {
+     "name": "fix",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "terminal",
+   "title": "Open a terminal window in front of a person with a command ready: ask waits for their Enter, run runs at once",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "action",
+     "required": true
+    },
+    {
+     "name": "command",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "thermal-profile",
+   "title": "Everyday cooling on Windows: show or choose quiet, balanced, performance or off (the monitor follows it)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "value",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "toolrouter",
+   "title": "Tool router - a command that does by hand what a harness tool does (recursive file search, folder sizes, text search over a tree) is refused with the tool's command, for Claude Code and Antigravity",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "command",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "triage",
+   "title": "Name a build failure from its log (Firefox, kernel, Debian packaging)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "log",
+     "required": true
+    },
+    {
+     "name": "set",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "update-check",
+   "title": "What on this machine is behind what was published, and the line that fixes it",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "only",
+     "required": false
+    },
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "version-sync",
+   "title": "Every place a project states its version agrees - manifests, lock file, packaging, installer, headers, the built program",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "path",
+     "required": false
+    },
+    {
+     "name": "expect",
+     "required": false
+    },
+    {
+     "name": "binary",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "videokit",
+   "title": "Phone video: doctor (check/install + per-video VFR/HDR/rotation), analyse (cached, real timestamps), events/draft, shake/shakecompare (phase-correlation jitter), flow (freezes, hard joins), lock (OpenCV gimbal/tripod/similarity, streamed), render (best-second waits, per-segment stabiliser by measured jitter, dissolves, gamma, sharpen)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "command",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "voice-clean",
+   "title": "Remove voice models that are not the chosen one, only once it works",
+   "trust": "carded",
+   "safety": "changes-things",
+   "inputs": [
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "voice-doctor",
+   "title": "What this machine has for speech, what it needs, and how it will SOUND",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "voice-install",
+   "title": "Fetch and wire up the neural voice, system-wide, user-level only",
+   "trust": "carded",
+   "safety": "changes-things",
+   "inputs": [
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "voice-say",
+   "title": "Speak one sentence through whatever this machine is configured to use",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "text",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "watchdog-install",
+   "title": "Start the watchdog at login (Linux only; Windows already has a scheduled task)",
+   "trust": "carded",
+   "safety": "changes-things",
+   "inputs": [
+    {
+     "name": "apply",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "watchdog-pause",
+   "title": "Stop the alarm for a while, for a deliberate offline test",
+   "trust": "carded",
+   "safety": "changes-things",
+   "inputs": [
+    {
+     "name": "minutes",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "watchdog-status",
+   "title": "Is this laptop online, on which network, and is the alarm paused",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "watchdog-test",
+   "title": "Say the offline alarm once, to hear what it sounds like",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "wifi-card",
+   "title": "What this machine's radio can really tune, read from the card not guessed",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "wifi-channels",
+   "title": "Which 2.4 GHz channel is actually free, with the argument for the choice",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "band",
+     "required": false
+    },
+    {
+     "name": "check",
+     "required": false
+    },
+    {
+     "name": "avoid",
+     "required": false
+    },
+    {
+     "name": "profile",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "wifi-doctor",
+   "title": "The link, the card's real limits, and which layer is the bottleneck",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "wifi-scan",
+   "title": "Every network in range, with the band named honestly rather than from the SSID",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "wifi-upgrade",
+   "title": "Can this machine's wifi card be replaced, and what cannot be known from software",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "win11-app-debloat",
+   "title": "Remove preinstalled apps by tier: light, moderate or super",
+   "trust": "carded",
+   "safety": "irreversible",
+   "inputs": [
+    {
+     "name": "tier",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "win11-app-debloat-check",
+   "title": "Remove preinstalled apps by tier: light, moderate or super: what is on now (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "win11-copilot",
+   "title": "Turn Copilot off (settings; optionally remove the app)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "remove_app",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "win11-copilot-check",
+   "title": "Turn Copilot off: what is on now (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "win11-fit",
+   "title": "Which service-profile entries would be WRONG on this PC (no SIM, WSL, shares, printers...): run before a services profile",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": [
+    {
+     "name": "profile",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "win11-modules",
+   "title": "The Windows 11 tweaks modules: is each complete (its check, its change with a preview, its undo)?",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "win11-oem",
+   "title": "Who made this PC, and are the maker's hardware-button services present (protected on Lenovo)?",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "win11-onedrive",
+   "title": "Block OneDrive on this machine (policy and scheduled tasks)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "no_files",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "win11-onedrive-check",
+   "title": "Block OneDrive on this machine: what is on now (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "win11-recommendations",
+   "title": "Turn off Start menu recommendations, tips and suggestions (per user)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "include_observed",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "win11-recommendations-check",
+   "title": "Turn off Start menu recommendations, tips and suggestions: what is on now (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "win11-services",
+   "title": "Disable background services by profile: light, moderate or super (cumulative)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "profile",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "win11-services-check",
+   "title": "Disable background services by profile: light, moderate or super: what is on now (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "win11-text-input-guard",
+   "title": "Install a guard that ends a stuck TextInputHost (the touch-keyboard host) when it eats the CPU",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "interval_minutes",
+     "required": false
+    },
+    {
+     "name": "threshold_percent",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "win11-text-input-guard-check",
+   "title": "Install a guard that ends a stuck TextInputHost: what is on now (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "win11-update-deferral",
+   "title": "Hold Windows feature updates for 3, 6 or 12 months (security updates still install)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "months",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "win11-update-deferral-check",
+   "title": "Hold Windows feature updates for 3, 6 or 12 months: what is on now (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "win11-update-distribution",
+   "title": "Stop Windows Update sharing downloads with other PCs (Delivery Optimization peering)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "steps",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "win11-update-distribution-check",
+   "title": "Stop Windows Update sharing downloads with other PCs: what is on now (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "win11-visual-effects",
+   "title": "Turn off Windows animation and transparency effects (per user)",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": [
+    {
+     "name": "layers",
+     "required": false
+    }
+   ]
+  },
+  {
+   "id": "win11-visual-effects-check",
+   "title": "Turn off Windows animation and transparency effects: what is on now (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  },
+  {
+   "id": "win11-xbox-services",
+   "title": "Disable the Xbox background services",
+   "trust": "carded",
+   "safety": "reversible",
+   "inputs": []
+  },
+  {
+   "id": "win11-xbox-services-check",
+   "title": "Disable the Xbox background services: what is on now (read-only)",
+   "trust": "carded",
+   "safety": "read-only",
+   "inputs": []
+  }
+ ]
+}

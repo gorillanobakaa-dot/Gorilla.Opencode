@@ -650,6 +650,13 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 
 func (a *agent) createUserMessage(ctx context.Context, sessionID, content string, attachmentParts []message.ContentPart) (message.Message, error) {
 	parts := []message.ContentPart{message.TextContent{Text: content}}
+	// GORILLA (2026-10-19): the main conversation gets the Fieldkit tools that
+	// fit the request beside it, as its own part (see fieldkit_hint.go).
+	if a.agentName == config.AgentCoder {
+		if hint := fieldkitHint(content); hint != "" {
+			parts = append(parts, message.TextContent{Text: hint})
+		}
+	}
 	parts = append(parts, attachmentParts...)
 	return a.messages.Create(ctx, sessionID, message.CreateMessageParams{
 		Role:  message.User,
