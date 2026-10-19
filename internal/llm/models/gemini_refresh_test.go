@@ -118,6 +118,32 @@ func TestTheGeminiListComesFromGoogleNotFromThisProgram(t *testing.T) {
 	}
 }
 
+// 2026-10-19: Google's live list for the owner's AI Studio key offered
+// "gemini-4-argon" (Gemini 4 Argon), which users asked for and the Antigravity
+// sign-in refuses (404). A new major version with a codename must pass the
+// chat filter and land in the picker after /update; the image and speech
+// siblings listed the same day must not.
+func TestGemini4ArgonFromTheLiveListIsOffered(t *testing.T) {
+	defer snapshotGemini()()
+	raw := `{"models":[
+	  {"name":"models/gemini-4-argon","displayName":"Gemini 4 Argon","inputTokenLimit":1048576,"outputTokenLimit":65536,
+	   "supportedGenerationMethods":["generateContent","countTokens","batchGenerateContent"]},
+	  {"name":"models/gemini-3-pro-image","displayName":"Nano Banana Pro","supportedGenerationMethods":["generateContent"]},
+	  {"name":"models/gemini-3.8-flash-tts","displayName":"Gemini 3.8 Flash TTS","supportedGenerationMethods":["generateContent"]}]}`
+	res, err := RefreshGemini(t.TempDir(), []byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := SupportedModels["gemini-4-argon"]; !ok || res.Usable != 1 {
+		t.Fatalf("Gemini 4 Argon not offered (usable %d, added %v)", res.Usable, res.Added)
+	}
+	for _, not := range []ModelID{"gemini-3-pro-image", "gemini-3.8-flash-tts"} {
+		if _, ok := SupportedModels[not]; ok {
+			t.Errorf("%s is not a chat model and must not be offered", not)
+		}
+	}
+}
+
 func TestAnEmptyOrBrokenGeminiListChangesNothing(t *testing.T) {
 	defer snapshotGemini()()
 	before := len(SupportedModels)
