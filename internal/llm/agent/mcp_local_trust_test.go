@@ -212,3 +212,43 @@ func TestAServerNotMarkedLocalIsAsStrictAsBefore(t *testing.T) {
 		t.Error("an unmarked server's answer was not fenced")
 	}
 }
+
+// 2026-10-19: the owner was asked to approve every Fieldkit discover/describe.
+// A tool the owner lists in readOnlyTools runs without the question, on a
+// local-trusted server only, and never for a call that declares the network.
+func TestOwnerListedReadOnlyToolsRunWithoutAsking(t *testing.T) {
+	cases := []struct {
+		name  string
+		trust string
+		tool  string
+		input string
+		asks  bool
+	}{
+		{"listed tool, local server", "local", "discover", `{"goal":"tv"}`, false},
+		{"tool not listed", "local", "run", `{"tool":"x"}`, true},
+		{"listed tool, server not local", "", "discover", `{"goal":"tv"}`, true},
+		{"listed tool, call declares network", "local", "discover", `{"goal":"tv","network":true}`, true},
+	}
+	for _, c := range cases {
+		if _, err := config.Load(t.TempDir(), false); err != nil {
+			t.Fatalf("config.Load: %v", err)
+		}
+		session := "ro-" + c.name
+		permission.ClearTaint(session)
+		perms := &recordingMCPPermissions{}
+		cfg := config.MCPServer{Type: config.MCPStdio, Command: os.Args[0], Trust: c.trust,
+			ReadOnlyTools: []string{"discover", "describe"},
+			Args:          []string{"-test.run=^TestFakeLocalMCPServer$"},
+			Env:           []string{`GORILLA_FAKE_MCP_META={"untrusted":false,"egress":false}`}}
+		tool := NewMcpTool("fake", mcp.Tool{Name: c.tool}, perms, cfg)
+		ctx := context.WithValue(context.Background(), tools.SessionIDContextKey, session)
+		ctx = context.WithValue(ctx, tools.MessageIDContextKey, "m1")
+		if _, err := tool.Run(ctx, tools.ToolCall{ID: "c1", Name: "fake_" + c.tool, Input: c.input}); err != nil {
+			t.Fatalf("%s: Run: %v", c.name, err)
+		}
+		if asked := len(perms.calls) > 0; asked != c.asks {
+			t.Errorf("%s: asked=%v, want %v", c.name, asked, c.asks)
+		}
+		permission.ClearTaint(session)
+	}
+}

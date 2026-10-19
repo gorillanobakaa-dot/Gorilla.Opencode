@@ -58,11 +58,33 @@ type MCPServer struct {
 	// Ignored for sse servers (remote by definition) and for any other value.
 	// Only config.json can set it: folder settings drop mcpServers entirely.
 	Trust string `json:"trust,omitempty"`
+	// ReadOnlyTools names this server's tools that only read and may run
+	// without asking (2026-10-19: the owner was asked to approve every lookup
+	// while searching Fieldkit for one tool). The OWNER lists them here; a
+	// server's own claim to be read-only is not trusted (and the pinned mcp-go
+	// drops MCP's readOnlyHint anyway). Honored only for a "local" stdio
+	// server and only for a call that does not declare "network": true.
+	ReadOnlyTools []string `json:"readOnlyTools,omitempty"`
 }
 
 // LocalTrust reports whether this server is a stdio server marked "local".
 func (m MCPServer) LocalTrust() bool {
 	return m.Type == MCPStdio && m.Trust == MCPTrustLocal
+}
+
+// RunsWithoutAsking reports whether a call to tool may skip the permission
+// question: the owner listed it in readOnlyTools, the server is local-trusted,
+// and the call does not go online. Fail closed on everything else.
+func (m MCPServer) RunsWithoutAsking(tool string, declaresNetwork bool) bool {
+	if !m.LocalTrust() || declaresNetwork {
+		return false
+	}
+	for _, t := range m.ReadOnlyTools {
+		if t == tool {
+			return true
+		}
+	}
+	return false
 }
 
 type AgentName string

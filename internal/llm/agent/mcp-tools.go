@@ -170,7 +170,10 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 	if who := describeMCPServer(b.mcpName); who != "" {
 		permissionDescription = who + "\n\n" + permissionDescription
 	}
-	p := b.permissions.Request(
+	// GORILLA OVERRIDE (2026-10-19): a tool the owner listed in readOnlyTools
+	// for a local-trusted server runs without the question; its answer still
+	// goes through runLocalTool's taint check below.
+	p := b.mcpConfig.RunsWithoutAsking(b.tool.Name, declaresNetwork(params.Input)) || b.permissions.Request(
 		permission.CreatePermissionRequest{
 			SessionID:   sessionID,
 			Path:        config.WorkingDirectory(),
