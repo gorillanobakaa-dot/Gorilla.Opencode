@@ -239,7 +239,7 @@ func convertToolsCA(ts []tools.BaseTool) []caTool {
 			Parameters: map[string]any{
 				"type":       "object",
 				"properties": info.Parameters,
-				"required":   info.Required,
+				"required":   requiredList(info.Required),
 			},
 		})
 	}

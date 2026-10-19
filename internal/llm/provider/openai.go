@@ -177,13 +177,26 @@ func (o *openaiClient) convertTools(tools []tools.BaseTool) []openai.ChatComplet
 				Parameters: openai.FunctionParameters{
 					"type":       "object",
 					"properties": info.Parameters,
-					"required":   info.Required,
+					"required":   requiredList(info.Required),
 				},
 			},
 		}
 	}
 
 	return openaiTools
+}
+
+// requiredList is a tool's required parameters as a JSON array, never null.
+// 2026-10-19: a tool with no required parameters went out as "required": null,
+// and LM Studio rejected the whole request (400, "Expected array, received
+// null") before the model saw it: every local-model turn failed, on 0.1.147
+// too. chatgpt.go already guarded against this; the OpenAI-compatible path and
+// Code Assist did not.
+func requiredList(req []string) []string {
+	if req == nil {
+		return []string{}
+	}
+	return req
 }
 
 func (o *openaiClient) finishReason(reason string) message.FinishReason {
