@@ -170,6 +170,16 @@ func renderUserMessage(msg message.Message, isFocused bool, width int, position 
 		}
 	}
 
+	// GORILLA (2026-10-19): the Fieldkit hint is a second text part of the
+	// message, sent to the model; it was never drawn, so the person could not
+	// see what the model had been shown. One dim line names the tools.
+	if line := fieldkitHintLine(msg); line != "" {
+		info = append([]string{styles.BaseStyle().
+			Width(width - 1).
+			Foreground(t.TextMuted()).
+			Render(" " + line)}, info...)
+	}
+
 	content := ""
 	if len(styledAttachments) > 0 {
 		attachmentContent := styles.BaseStyle().Width(width).Render(lipgloss.JoinHorizontal(lipgloss.Left, styledAttachments...))
