@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build Gorilla OpenCode for Intel Macs on macOS 10.13 High Sierra (and 10.14+).
 # Usage: VERSION=0.1.147 scripts/build-darwin-legacy.sh [output-path]
-#   MIRROR=1  fetch golang.org/x, google.golang.org, cloud.google.com, go.opentelemetry.io,
+#   MIRROR=1  fetch golang.org/x, google.golang.org, cloud.google.com,
 #             go.uber.org, gopkg.in deps from their GitHub mirrors (for sandboxes that
 #             block proxy.golang.org / golang.org). Never touches the repo's go.mod/go.sum.
 # Idempotent: rebuilds the patched GOROOT copy every run; safe to re-run after failure.
@@ -63,8 +63,7 @@ import re, sys
 m = [('golang.org/x/','github.com/golang/'),('google.golang.org/grpc','github.com/grpc/grpc-go'),
  ('google.golang.org/protobuf','github.com/protocolbuffers/protobuf-go'),('google.golang.org/genai','github.com/googleapis/go-genai'),
  ('google.golang.org/genproto','github.com/googleapis/go-genproto'),('cloud.google.com/go','github.com/googleapis/google-cloud-go'),
- ('go.opentelemetry.io/otel','github.com/open-telemetry/opentelemetry-go'),('go.opentelemetry.io/auto','github.com/open-telemetry/opentelemetry-go-instrumentation'),
- ('go.opentelemetry.io/contrib','github.com/open-telemetry/opentelemetry-go-contrib'),('go.uber.org/multierr','github.com/uber-go/multierr'),
+ ('go.uber.org/multierr','github.com/uber-go/multierr'),
  ('gopkg.in/yaml.v3','github.com/go-yaml/yaml/v3')]
 for p, v in re.findall(r'^\s*(\S+)\s+(v\S+)', open(sys.argv[1]).read(), re.M):
     for k, r in m:
