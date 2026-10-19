@@ -1657,9 +1657,64 @@ def rrf_fuse(rankings, k, weights=None):
 # ---------------------------------------------------------------------------
 # Chroma Second Brain Semantic Seam
 # ---------------------------------------------------------------------------
+# Owner rule 2026-10-18: telemetry is cut out, not switched off. Chroma ships a
+# usage-reporting client that writes ~/.cache/chroma/telemetry_user_id and reports
+# by default, and its default embedding model downloads itself from S3 when it
+# is missing. pfind replaces both: that client is made unimportable, Chroma's
+# telemetry slot is filled with a class that does nothing, and the model is
+# used only if it is already on disk.
+_NO_TELEMETRY_MODULE = "gorilla_pfind_no_telemetry"
+
+
+def _cut_chroma_doors():
+    """Import chromadb with its telemetry and model download cut out.
+
+    Returns (chromadb, Settings kwargs, embedding function class)."""
+    import types
+    sys.modules["posthog"] = None  # telemetry-ok: blocks the client; importing it now fails
+    os.environ["ANONYMIZED_TELEMETRY"] = "False"
+    import chromadb
+    from chromadb.telemetry.product import ProductTelemetryClient
+    from chromadb.utils.embedding_functions.onnx_mini_lm_l6_v2 import ONNXMiniLM_L6_V2
+
+    def capture(self, event):
+        return None
+
+    def no_user_id(self):  # never creates telemetry_user_id
+        return self.UNKNOWN_USER_ID
+
+    def no_download(self, url, fname, chunk_size=1024):
+        raise RuntimeError("semantic model not on disk and pfind never downloads; "
+                           f"place it at {self.DOWNLOAD_PATH}")
+
+    # Chroma's base classes use the `overrides` metaclass, which rejects a
+    # method defined in a class body here (it cannot see local classes'
+    # parents); the methods are therefore attached after the class exists.
+    class NoTelemetry(ProductTelemetryClient):
+        pass
+    NoTelemetry.capture = capture
+    NoTelemetry.user_id = property(no_user_id)
+    NoTelemetry.__abstractmethods__ = frozenset()
+
+    class LocalModelOnly(ONNXMiniLM_L6_V2):
+        pass
+    LocalModelOnly._download = no_download
+
+    mod = types.ModuleType(_NO_TELEMETRY_MODULE)
+    mod.NoTelemetry = NoTelemetry
+    sys.modules[_NO_TELEMETRY_MODULE] = mod
+    impl = f"{_NO_TELEMETRY_MODULE}.NoTelemetry"
+    settings = {
+        "anonymized_telemetry": False,
+        "chroma_product_telemetry_impl": impl,
+        "chroma_telemetry_impl": impl,
+    }
+    return chromadb, settings, LocalModelOnly
+
+
 def semantic_brain(query, collection, top_k):
     try:
-        import chromadb
+        chromadb, settings, LocalModelOnly = _cut_chroma_doors()
     except ImportError:
         print("pfind: --brain semantic needs chromadb (import failed); using lexical only.", file=sys.stderr)
         return []
@@ -1670,8 +1725,9 @@ def semantic_brain(query, collection, top_k):
         print(f"pfind: brain store not found at {BRAIN_CHROMA}; lexical only.", file=sys.stderr)
         return []
     try:
-        client = chromadb.PersistentClient(path=str(BRAIN_CHROMA))
-        col = client.get_collection(collection)
+        from chromadb.config import Settings
+        client = chromadb.PersistentClient(path=str(BRAIN_CHROMA), settings=Settings(**settings))
+        col = client.get_collection(collection, embedding_function=LocalModelOnly())
         res = col.query(query_texts=[query], n_results=top_k)
         docs = (res.get("documents") or [[]])[0]
         metas = (res.get("metadatas") or [[]])[0]
