@@ -228,9 +228,14 @@ func (m *modelDialogCmp) visibleRows() int {
 	if m.height <= 0 {
 		return numVisibleModels // not sized yet
 	}
-	n := m.height - chrome
-	if n < numVisibleModels {
-		n = numVisibleModels
+	n := m.height - chrome - FooterExtraRows()
+	// GORILLA FIX (2026-10-19): the floor of 14 rows was applied on every
+	// window, so on 80x24 (the owner's 11-inch MacBook Air, Terminal's default)
+	// the dialog was 3 rows taller than the window and its title scrolled off
+	// the top. The floor now stands only for a window not yet measured; a short
+	// window gets fewer rows and the list scrolls, but never fewer than 3.
+	if n < 3 {
+		n = 3
 	}
 	// GORILLA OVERRIDE (2026-08-20): the 30-row ceiling is gone. It was an
 	// arbitrary cap, not a safety one — the frame can never exceed the window

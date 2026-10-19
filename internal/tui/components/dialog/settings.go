@@ -231,7 +231,7 @@ func (m *settingsDialogCmp) visibleRows() int {
 	if m.height <= 0 {
 		return 20
 	}
-	avail := m.height - settingsVChrome - m.furnitureLines()
+	avail := m.height - settingsVChrome - m.furnitureLines() - FooterExtraRows() // see footer_rows.go
 	if avail < 2 {
 		// Below this the dialog cannot show a single setting AND its chrome.
 		// Returning 2 keeps one row visible and lets the height clamp below
@@ -661,7 +661,7 @@ func (m *settingsDialogCmp) View() string {
 	// and wrecks the layout — so trim the body rather than trust the arithmetic.
 	// settingsVChrome accounts for the border and padding this Render adds.
 	if m.height > 0 {
-		maxLines := m.height - settingsVChrome
+		maxLines := m.height - settingsVChrome - FooterExtraRows()
 		if maxLines < 1 {
 			maxLines = 1
 		}

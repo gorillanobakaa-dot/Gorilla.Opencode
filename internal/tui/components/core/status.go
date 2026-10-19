@@ -331,9 +331,35 @@ func (m statusCmp) chrome() statusChrome {
 	}
 	yoloWidth = lipgloss.Width(c.yolo)
 
-	c.avail = max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(c.model)-lipgloss.Width(c.diagnostics)-tokenInfoWidth-helpersWidth-yoloWidth)
+	// GORILLA FIX (2026-10-19): the help chip was subtracted as helpWidget, a
+	// package variable that is never set, so its 13 columns were counted as free.
+	helpW := lipgloss.Width(getHelpWidget())
+	c.avail = max(0, m.width-helpW-lipgloss.Width(c.model)-lipgloss.Width(c.diagnostics)-tokenInfoWidth-helpersWidth-yoloWidth)
+
+	// GORILLA FIX (2026-10-19): a narrow terminal (80x24, the default on the
+	// owner's 11-inch MacBook Air) left the message 1 column: "/mode" printed
+	// "P". The chips that only repeat a state give way first: the mode chip keeps
+	// its word, an empty diagnostics chip goes. What the AI may do stays on screen.
+	if c.avail-infoPadding < minStatusMsg {
+		switch permission.EffectiveMode(m.session.ID) {
+		case config.PermissionAuto:
+			c.yolo = styles.Padded().Background(t.Error()).Foreground(t.Background()).Bold(true).Render("AUTO")
+		case config.PermissionAcceptEdits:
+			c.yolo = styles.Padded().Background(t.Warning()).Foreground(t.Background()).Bold(true).Render("EDITS")
+		case config.PermissionPlan:
+			c.yolo = styles.Padded().Background(t.Primary()).Foreground(t.Background()).Bold(true).Render("PLAN")
+		}
+		if m.projectDiagnostics() == "No diagnostics" {
+			c.diagnostics = ""
+		}
+		c.avail = max(0, m.width-helpW-lipgloss.Width(c.model)-lipgloss.Width(c.diagnostics)-tokenInfoWidth-helpersWidth-lipgloss.Width(c.yolo))
+	}
 	return c
 }
+
+// minStatusMsg is the fewest columns a status message may get before the chips
+// beside it are shortened.
+const minStatusMsg = 30
 
 // InfoBudget is how many COLUMNS a status message actually gets before
 // truncateStatusMsg cuts it — the same number View passes to that function, not

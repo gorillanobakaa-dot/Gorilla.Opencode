@@ -80,6 +80,7 @@ type providerModel struct {
 	canKeep bool // esc continues only if something already works
 	sel     int
 	width   int
+	height  int // 0 until the terminal reports it; then the frame never exceeds it
 	// key-entry state
 	entering bool
 	input    []rune
@@ -96,7 +97,7 @@ func (m *providerModel) Init() tea.Cmd { return nil }
 func (m *providerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
+		m.width, m.height = msg.Width, msg.Height
 		return m, nil
 
 	case tea.KeyMsg:
@@ -318,7 +319,33 @@ func (m *providerModel) View() string {
 	writeWrapped(dim, "Enter continues with the highlighted one.")
 	b.WriteString("\n")
 
-	for i, r := range m.rows {
+	// GORILLA FIX (2026-10-19): on an 80x24 terminal (the default on the owner's
+	// 11-inch MacBook Air) the frame was taller than the window and the title
+	// scrolled off the top. The list now shows only the rows that fit, around the
+	// cursor, and says how many are above and below.
+	first, last := 0, len(m.rows)
+	if m.height > 0 {
+		// everything that is not a provider row: the title block, the
+		// description block and the key line, as this function renders them
+		fixed := strings.Count(b.String(), "\n") + 1 + len(wrapTo(m.rows[m.sel].What, w)) + 1 +
+			len(wrapTo(dimKeys(m), w))
+		if m.rows[m.sel].Warning != "" {
+			fixed += len(wrapTo(m.rows[m.sel].Warning, w))
+		}
+		if m.entering {
+			fixed += 6
+		}
+		if m.hint != "" {
+			fixed += len(wrapTo(m.hint, w))
+		}
+		// -1: the frame ends with a newline, and the terminal gives that a row too
+		first, last = visibleWindow(len(m.rows), m.sel, m.height-fixed-1)
+	}
+	if first > 0 {
+		b.WriteString(dim.Render(fmt.Sprintf("  ^ %d more above", first)) + "\n")
+	}
+	for i := first; i < last; i++ {
+		r := m.rows[i]
 		cursor := "  "
 		if i == m.sel {
 			cursor = "> "
@@ -339,6 +366,9 @@ func (m *providerModel) View() string {
 			st = st.Bold(true)
 		}
 		b.WriteString(st.Render(label) + dim.Render(tag) + "\n")
+	}
+	if last < len(m.rows) {
+		b.WriteString(dim.Render(fmt.Sprintf("  v %d more below", len(m.rows)-last)) + "\n")
 	}
 
 	// Description of the SELECTED row only. Rendering all eleven would make
@@ -384,15 +414,51 @@ func (m *providerModel) View() string {
 	}
 
 	b.WriteString("\n")
-	keys := "up/down move | enter select | esc keep current setup | ctrl+c quit"
-	if !m.canKeep {
-		keys = "up/down move | enter select | esc/ctrl+c quit"
-	}
-	if cur.Configured && cur.NeedsInput {
-		keys = "up/down move | enter select | r replace saved key | esc keep current | ctrl+c quit"
-	}
-	writeWrapped(dim, keys)
+	writeWrapped(dim, dimKeys(m))
 	return b.String()
+}
+
+// dimKeys is the key line under the portal. One definition, because View both
+// renders it and counts its wrapped height.
+func dimKeys(m *providerModel) string {
+	cur := m.rows[m.sel]
+	switch {
+	case cur.Configured && cur.NeedsInput:
+		return "up/down move | enter select | r replace saved key | esc keep current | ctrl+c quit"
+	case !m.canKeep:
+		return "up/down move | enter select | esc/ctrl+c quit"
+	}
+	return "up/down move | enter select | esc keep current setup | ctrl+c quit"
+}
+
+// visibleWindow is the slice [first, last) of n list rows to draw when only
+// room rows fit, keeping sel inside it. One of the room rows on each side that
+// is cut off is taken by its "N more" line. room below 3 still shows the
+// selected row: a list that shows nothing cannot be used.
+func visibleWindow(n, sel, room int) (first, last int) {
+	if room >= n {
+		return 0, n
+	}
+	if room < 3 {
+		room = 3
+	}
+	show := room - 2 // both "more" lines, the worst case
+	first = sel - show/2
+	if first < 0 {
+		first = 0
+	}
+	last = first + show
+	if last > n {
+		last = n
+		first = max(0, n-show)
+	}
+	// a side with nothing cut off does not need its "more" line: give it back
+	if first == 0 {
+		last = min(n, room-1)
+	} else if last == n {
+		first = max(0, n-(room-1))
+	}
+	return first, last
 }
 
 // inputLine renders the typed value. Secrets render as bullets with a length

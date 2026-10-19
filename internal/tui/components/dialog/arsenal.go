@@ -1235,7 +1235,11 @@ func (m ArsenalCmp) View() string {
 	// so the frame is a window on any screen wider than that.
 	boxW := m.boxWidth()
 	w := m.textWidth()
-	budget := max(5, m.height-4)
+	// GORILLA FIX (2026-10-19): minus the rows drawn UNDER the page as well (the
+	// prompt and the status lines; see overlayFooterReserve). Without them the
+	// frame was taller than the window at 80x24 and the top border and title
+	// scrolled away. Measured with scripts/model-tests/tui_sizes.py.
+	budget := max(5, m.height-4-overlayFooterReserve)
 
 	lines := m.lines()
 	// The notice and the overflow marker are part of the budget, not extra.

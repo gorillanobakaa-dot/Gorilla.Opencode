@@ -514,11 +514,14 @@ func TestThePageFillsTheScreenExactly(t *testing.T) {
 // the budget, and the overflow marker still appears when content is cut.
 func TestTheNoticeAndTheOverflowMarkerLiveInsideTheBudget(t *testing.T) {
 	m := NewArsenalCmp()
-	m.SetSize(100, 14) // deliberately short: content cannot fit
+	// deliberately short: content cannot fit. 2026-10-19: the page's budget is
+	// the window minus the rows the app draws under it (overlayFooterReserve),
+	// so a window that tall plus the reserve gives a 14-row frame.
+	m.SetSize(100, 14+overlayFooterReserve)
 	m.notice = "selected 2 — press p to measure the cost."
 	out := m.View()
-	// Content cannot fit at this height, so the frame DOES fill it — that is
-	// the case the budget arithmetic exists for.
+	// Content cannot fit at this height, so the frame DOES fill its budget —
+	// that is the case the budget arithmetic exists for.
 	if lipgloss.Height(out) != 14 {
 		t.Fatalf("frame is %d rows, want 14", lipgloss.Height(out))
 	}

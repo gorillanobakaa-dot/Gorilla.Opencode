@@ -59,6 +59,7 @@ type connModel struct {
 	choice   ConnChoice
 	done     bool
 	width    int
+	height   int // 0 until the terminal reports it
 }
 
 // NewConnModel builds the picker. The cursor starts on the ACTIVE profile, not
@@ -79,7 +80,7 @@ func (m *connModel) Init() tea.Cmd { return nil }
 func (m *connModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
+		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
@@ -132,13 +133,14 @@ func (m *connModel) View() string {
 	// The measurement, hedged on purpose. One sample on a high-latency link
 	// under-reports, so this is a floor and must read like one. A confident
 	// wrong number is worse than an honest vague one.
+	// 2026-10-19: wrapped like the rest; unwrapped it ran past an 80-column edge.
 	if m.measured != "" {
-		b.WriteString(dim.Render("Measured "+m.measured+
+		b.WriteString(dim.Render(wrapPlain("Measured "+m.measured+
 			" from traffic already sent - nothing extra was downloaded to find out. "+
-			"It is a lower bound; your link may be faster.") + "\n")
+			"It is a lower bound; your link may be faster.", w)) + "\n")
 	} else {
-		b.WriteString(dim.Render("Nothing measured yet, so there is no suggestion below. "+
-			"Pick whichever line sounds like your connection.") + "\n")
+		b.WriteString(dim.Render(wrapPlain("Nothing measured yet, so there is no suggestion below. "+
+			"Pick whichever line sounds like your connection.", w)) + "\n")
 	}
 	b.WriteString("\n")
 
@@ -165,13 +167,36 @@ func (m *connModel) View() string {
 		b.WriteString(line + "\n")
 	}
 
+	// The explanation of the highlighted line. GORILLA FIX (2026-10-19): on
+	// 80x24 (the owner's 11-inch MacBook Air) all four blocks made the frame
+	// taller than the window and the title scrolled away. When they do not fit,
+	// the least important go first: the advice, then the "typical of" line, then
+	// the description. The effect, which says what the choice does, stays.
+	// Recomputed on every frame, so it follows the window as it is resized.
 	sel := m.rows[m.cursor]
-	b.WriteString("\n")
-	b.WriteString(wrapPlain(sel.Links, w) + "\n\n")
-	b.WriteString(wrapPlain(sel.What, w) + "\n\n")
-	b.WriteString(dim.Render(wrapPlain(sel.Effect, w)) + "\n")
+	blocks := []string{wrapPlain(sel.Links, w), wrapPlain(sel.What, w), dim.Render(wrapPlain(sel.Effect, w)), ""}
 	if sel.Advice != "" {
-		b.WriteString("\n" + wrapPlain(sel.Advice, w) + "\n")
+		blocks[3] = wrapPlain(sel.Advice, w)
+	}
+	height := func() int {
+		n := strings.Count(b.String(), "\n") + 2 // the key line and the blank above it
+		for _, x := range blocks {
+			if x != "" {
+				n += strings.Count(x, "\n") + 2
+			}
+		}
+		return n
+	}
+	for _, drop := range []int{3, 0, 1} {
+		if m.height <= 0 || height() <= m.height {
+			break
+		}
+		blocks[drop] = ""
+	}
+	for _, x := range blocks {
+		if x != "" {
+			b.WriteString("\n" + x + "\n")
+		}
 	}
 	b.WriteString("\n" + dim.Render("up/down move | enter choose | esc keep current | ctrl+c quit") + "\n")
 	return b.String()

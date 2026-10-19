@@ -227,6 +227,8 @@ var logsKeyReturnKey = key.NewBinding(
 
 type appModel struct {
 	width, height int
+	// frames repairs the inline frame after the window is made narrower; see reflow.go.
+	frames *frameTracker
 	// GORILLA OVERRIDE: scrollback means the alternate screen is OFF, so the
 	// conversation is printed into the terminal's own output and only the prompt is
 	// drawn in place. Dialogs still need a whole screen, so they are shown by
@@ -716,6 +718,9 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			statusHeight = 1
 		}
 		msg.Height -= statusHeight
+		if a.scrollback {
+			a.frames.resized(msg.Width, terminalRewraps())
+		}
 		a.width, a.height = msg.Width, msg.Height
 
 		// GORILLA OVERRIDE: nothing is scrolled or padded here. The frame is drawn
@@ -730,6 +735,12 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.status = s.(core.StatusCmp)
 		a.pages[a.currentPage], cmd = a.pages[a.currentPage].Update(msg)
 		cmds = append(cmds, cmd)
+		// What is drawn under a dialog depends on the width (two information
+		// lines appear on a wide window); the dialogs budget against the real
+		// number. See components/dialog/footer_rows.go.
+		if a.scrollback {
+			dialog.SetRowsUnderOverlay(lipgloss.Height(a.footerView()) - statusHeight)
+		}
 
 		prm, permCmd := a.permissions.Update(msg)
 		a.permissions = prm.(dialog.PermissionDialogCmp)
@@ -791,6 +802,26 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, connectSizeCmd)
 
 		a.initDialog.SetSize(msg.Width, msg.Height)
+
+		// GORILLA FIX (2026-10-19): these were sized once, when opened, and never
+		// told about a resize. Dragging the window narrower left /help drawn for
+		// the old width, cut off on the right with its title off the top
+		// (measured with scripts/model-tests/tui_sizes.py --resize). The owner
+		// resizes the window while working, so every panel follows the window.
+		a.commandHelp.SetSize(msg.Width, msg.Height)
+		a.researchDialog.SetSize(msg.Width, msg.Height)
+		a.osintDialog.SetSize(msg.Width, msg.Height)
+		a.osintPage.SetSize(msg.Width, msg.Height)
+		a.osintRecover.SetSize(msg.Width, msg.Height)
+		a.infoPage.SetSize(msg.Width, msg.Height)
+		a.arsenalPage.SetSize(msg.Width, msg.Height)
+		a.sessionsMgr.SetSize(msg.Width, msg.Height)
+		followModel, followCmd := a.modelFollowDialog.Update(msg)
+		a.modelFollowDialog = followModel.(dialog.ModelFollowDialogCmp)
+		cmds = append(cmds, followCmd)
+		themeModel, themeCmd := a.themeDialog.Update(msg)
+		a.themeDialog = themeModel.(dialog.ThemeDialog)
+		cmds = append(cmds, themeCmd)
 
 		if a.showMultiArgumentsDialog {
 			a.multiArgumentsDialog.SetSize(msg.Width, msg.Height)
@@ -2726,6 +2757,13 @@ func (a appModel) placeOverlay(overlay, bg string) string {
 }
 
 func (a appModel) View() string {
+	if !a.scrollback {
+		return a.view()
+	}
+	return a.frames.frame(a.view(), a.width)
+}
+
+func (a appModel) view() string {
 	// GORILLA OVERRIDE: with the alternate screen off and no dialog open, the frame
 	// is only the footer. Rendering the full-screen layout here would paint a whole
 	// window's worth of panels on top of text already printed to the terminal, and
@@ -2999,6 +3037,7 @@ func SetProgram(p *tea.Program) { runningProgram.Store(p) }
 func New(app *app.App) tea.Model {
 	startPage := page.ChatPage
 	model := &appModel{
+		frames:         &frameTracker{},
 		currentPage:    startPage,
 		loadedPages:    make(map[page.PageID]bool),
 		status:         core.NewStatusCmp(app.LSPClients),

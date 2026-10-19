@@ -130,6 +130,11 @@ checksums.sha256
 # every commit author, and in the packager field of every Arch package already
 # shipped — where it is meant to be, so users know who built it.
 !/scripts/build-arch.sh
+# GORILLA: exception (2026-10-19) — build-darwin-legacy.sh is PUBLISHED. It builds
+# the macOS 10.13 (High Sierra, Intel) binary with a patched copy of Go 1.24's
+# crypto/x509 (SecTrustEvaluateWithError is 10.14+). Checked: no credentials, no
+# personal paths; it writes only under $TMPDIR and dist/.
+!/scripts/build-darwin-legacy.sh
 
 # Third-party leaked prompts kept LOCAL for study, not redistributed
 system-prompts/reference/
