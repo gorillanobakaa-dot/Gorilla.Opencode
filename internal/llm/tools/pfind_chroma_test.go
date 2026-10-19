@@ -52,7 +52,7 @@ sys.argv = ["pfind"]
 spec.loader.exec_module(pfind)
 store = Path(os.environ["PFIND_TEST_STORE"])
 chromadb, settings, LocalModelOnly = pfind._cut_chroma_doors()
-from chromadb.config import Settings
+from chromadb.config import Settings  # telemetry-ok: the settings come from pfind._cut_chroma_doors() above
 c = chromadb.PersistentClient(path=str(store), settings=Settings(**settings))
 col = c.create_collection("notes", embedding_function=LocalModelOnly())
 col.add(ids=["1"], embeddings=[[0.1] * 384], documents=["d"])
