@@ -1660,9 +1660,11 @@ def rrf_fuse(rankings, k, weights=None):
 # Owner rule 2026-10-18: telemetry is cut out, not switched off. Chroma ships a
 # usage-reporting client that writes ~/.cache/chroma/telemetry_user_id and reports
 # by default, and its default embedding model downloads itself from S3 when it
-# is missing. pfind replaces both: that client is made unimportable, Chroma's
-# telemetry slot is filled with a class that does nothing, and the model is
-# used only if it is already on disk.
+# is missing. pfind replaces both: Chroma's telemetry slot is filled with a
+# class that does nothing, so the reporting client is never imported (a test
+# runs the real chromadb and checks it), and the model is used only if it is
+# already on disk. The client is not named in this file: the program embeds
+# it, and the shipped binary must hold no telemetry vendor's name at all.
 _NO_TELEMETRY_MODULE = "gorilla_pfind_no_telemetry"
 
 
@@ -1671,7 +1673,6 @@ def _cut_chroma_doors():
 
     Returns (chromadb, Settings kwargs, embedding function class)."""
     import types
-    sys.modules["posthog"] = None  # telemetry-ok: blocks the client; importing it now fails
     os.environ["ANONYMIZED_TELEMETRY"] = "False"
     import chromadb
     from chromadb.telemetry.product import ProductTelemetryClient
