@@ -1,0 +1,5 @@
+#!/bin/bash
+# The executable inside "Gorilla OpenCode.app". A Mac app opens no Terminal
+# window of its own, and Gorilla OpenCode lives in Terminal, so the app asks
+# Terminal to run the launcher that sits beside it in the app's Resources.
+exec open -a Terminal "$(cd "$(dirname "$0")/../Resources" && pwd)/Gorilla OpenCode.command"
