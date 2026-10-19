@@ -3,7 +3,7 @@ package version
 // GORILLA OVERRIDE (2026-10-18): no telemetry code is linked into Gorilla OpenCode, and a release proves it.
 //
 // The owner's rule is that telemetry is cut out of the source, not switched off. On 2026-10-18 the shipped
-// gorilla-opencode.exe (0.1.147) was found to carry OpenTelemetry (go.opentelemetry.io/otel, otel/metric, otel/trace,
+// gorilla-opencode.exe (0.1.147) was found to carry OpenTelemetry (go.opentelemetry.io/otel, otel/metric, otel/trace, (telemetry-ok: the history of what was removed)
 // contrib/otelhttp: 1,036 occurrences in the binary), pulled in by google.golang.org/genai through
 // cloud.google.com/go/auth/httptransport. No exporter was linked, so it sent nothing, but it was there. That module is
 // now a local copy without the import (third_party/google-auth-no-otel, go.mod replace).
@@ -30,15 +30,15 @@ var telemetryModules = []string{
 	"go.opentelemetry.io/", // telemetry-ok: the list of what is refused
 	"go.opencensus.io",     // telemetry-ok: the list of what is refused
 	"github.com/getsentry/",
-	"github.com/posthog/",
+	"github.com/posthog/", // telemetry-ok: what the release test refuses
 	"github.com/segmentio/analytics-go",
 	"github.com/DataDog/",
-	"github.com/newrelic/",
-	"github.com/bugsnag/",
-	"github.com/rollbar/",
+	"github.com/newrelic/", // telemetry-ok: what the release test refuses
+	"github.com/bugsnag/",  // telemetry-ok: what the release test refuses
+	"github.com/rollbar/",  // telemetry-ok: what the release test refuses
 	"github.com/honeycombio/",
-	"github.com/launchdarkly/",
-	"github.com/statsig-io/",
+	"github.com/launchdarkly/", // telemetry-ok: what the release test refuses
+	"github.com/statsig-io/",   // telemetry-ok: what the release test refuses
 }
 
 func telemetryHit(path string) string {
@@ -90,7 +90,7 @@ func TestNoBuiltBinaryCarriesTelemetry(t *testing.T) {
 		}
 		raw, err := os.ReadFile(b)
 		if err == nil && bytes.Contains(raw, []byte("go.opentelemetry.io/")) { // telemetry-ok: what is refused
-			t.Errorf("%s contains go.opentelemetry.io/ in its bytes", b)
+			t.Errorf("%s contains go.opentelemetry.io/ in its bytes", b) // telemetry-ok: what the release test refuses
 		}
 	}
 	if checked == 0 {
@@ -100,8 +100,8 @@ func TestNoBuiltBinaryCarriesTelemetry(t *testing.T) {
 
 func TestTheTelemetryCheckCatchesAPlantedModule(t *testing.T) {
 	// The check must be able to fail: a dependency it is meant to refuse is recognized.
-	if telemetryHit("go.opentelemetry.io/otel/trace") == "" || telemetryHit("github.com/getsentry/sentry-go") == "" {
-		t.Fatal("the module list no longer recognizes OpenTelemetry or Sentry")
+	if telemetryHit("go.opentelemetry.io/otel/trace") == "" || telemetryHit("github.com/getsentry/sentry-go") == "" { // telemetry-ok: what the release test refuses
+		t.Fatal("the module list no longer recognizes OpenTelemetry or Sentry") // telemetry-ok: what the release test refuses
 	}
 	if telemetryHit("golang.org/x/net") != "" || telemetryHit("google.golang.org/genai") != "" {
 		t.Fatal("an ordinary module is taken for telemetry")
