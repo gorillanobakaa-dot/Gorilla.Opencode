@@ -234,12 +234,17 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 			// GORILLA OVERRIDE (2026-10-05): the model names are READ from the
 			// registry. This sentence used to say "Claude Sonnet/Opus 4.6" long
 			// after Google had stopped listing either.
-			What: "Signs in with your Google account and uses your free Google " +
-				"Antigravity tier: Claude, GPT-OSS and Gemini models. " +
+			// 2026-10-19: this said "your free Google Antigravity tier" to a
+			// paying Google AI Pro owner. The plan is read at sign-in and shown
+			// there and in /usage; this line names no plan.
+			What: "Signs in with your Google account and uses its Antigravity " +
+				"allowance (free tier, or your Google AI plan if you pay for one): " +
+				"Claude, GPT-OSS and Gemini models. " +
 				portalModelSummary(models.ProviderAntigravity) +
-				" No API key, no cost - it is your account's own entitlement.",
+				" No API key, no money - but Google keeps what you type and may " +
+				"train on it; the sign-in says so.",
 			Warning: "Weekly quotas apply per model group (Gemini separate from " +
-				"Claude/GPT). Unofficial: it speaks the Antigravity CLI's protocol, so " +
+				"Claude/GPT). Unofficial: it speaks the Antigravity app's protocol, so " +
 				"a Google-side change could break it without notice.",
 			Configured: agReady,
 			Active:     curProv == models.ProviderAntigravity,
