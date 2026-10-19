@@ -31,8 +31,8 @@ const (
 var AntigravityModels = map[ModelID]Model{
 	AGClaudeSonnet46: {
 		ID:                  AGClaudeSonnet46,
-		Name:                "Claude Sonnet 4.6 (Antigravity free)",
-		Description:         "Anthropic Claude Sonnet 4.6 via your free Google Antigravity tier. Strong general coding model.",
+		Name:                "Claude Sonnet 4.6 (Antigravity)",
+		Description:         "Anthropic Claude Sonnet 4.6 via your Google Antigravity sign-in. Strong general coding model.",
 		Provider:            ProviderAntigravity,
 		APIModel:            "claude-sonnet-4-6",
 		ContextWindow:       200_000,
@@ -43,8 +43,8 @@ var AntigravityModels = map[ModelID]Model{
 	},
 	AGClaudeOpus46: {
 		ID:                  AGClaudeOpus46,
-		Name:                "Claude Opus 4.6 Thinking (Antigravity free)",
-		Description:         "Anthropic Claude Opus 4.6 with extended thinking, via your free Google Antigravity tier. Strongest reasoning; shared weekly quota.",
+		Name:                "Claude Opus 4.6 Thinking (Antigravity)",
+		Description:         "Anthropic Claude Opus 4.6 with extended thinking, via your Google Antigravity sign-in. Strongest reasoning; shared weekly quota.",
 		Provider:            ProviderAntigravity,
 		APIModel:            "claude-opus-4-6-thinking",
 		ContextWindow:       200_000,
@@ -55,8 +55,8 @@ var AntigravityModels = map[ModelID]Model{
 	},
 	AGGPTOSS120B: {
 		ID:                  AGGPTOSS120B,
-		Name:                "GPT-OSS 120B (Antigravity free)",
-		Description:         "OpenAI GPT-OSS 120B via your free Google Antigravity tier.",
+		Name:                "GPT-OSS 120B (Antigravity)",
+		Description:         "OpenAI GPT-OSS 120B via your Google Antigravity sign-in.",
 		Provider:            ProviderAntigravity,
 		APIModel:            "gpt-oss-120b-medium",
 		ContextWindow:       128_000,
@@ -67,7 +67,7 @@ var AntigravityModels = map[ModelID]Model{
 	},
 	AGGemini36Flash: {
 		ID:                  AGGemini36Flash,
-		Name:                "Gemini 3.6 Flash (Antigravity free)",
+		Name:                "Gemini 3.6 Flash (Antigravity)",
 		Description:         "Google Gemini 3.6 Flash via the Antigravity tier. Fast, large context; shares the Gemini weekly quota.",
 		Provider:            ProviderAntigravity,
 		APIModel:            "gemini-3.6-flash-medium",
@@ -79,7 +79,7 @@ var AntigravityModels = map[ModelID]Model{
 	},
 	AGGemini31Pro: {
 		ID:                  AGGemini31Pro,
-		Name:                "Gemini 3.1 Pro (Antigravity free)",
+		Name:                "Gemini 3.1 Pro (Antigravity)",
 		Description:         "Google Gemini 3.1 Pro via the Antigravity tier. Deep reasoning, large context; shares the Gemini weekly quota.",
 		Provider:            ProviderAntigravity,
 		APIModel:            "gemini-3.1-pro-high",

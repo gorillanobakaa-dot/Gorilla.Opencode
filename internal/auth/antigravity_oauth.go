@@ -74,6 +74,50 @@ type AntigravityCreds struct {
 	// the Gemini free tier), discovered via loadCodeAssist and sent on every
 	// generation call.
 	ProjectID string `json:"project_id,omitempty"`
+	// Tier is loadCodeAssist's currentTier id ("free-tier" for every personal
+	// account, paid or not). PlanID/PlanName are its paidTier, empty on a free
+	// account. PlanChecked is when they were last read: a plan bought or
+	// cancelled is picked up within a day, not only at the next sign-in.
+	Tier        string    `json:"tier,omitempty"`
+	PlanID      string    `json:"plan_id,omitempty"`
+	PlanName    string    `json:"plan_name,omitempty"`
+	PlanChecked time.Time `json:"plan_checked,omitempty"`
+}
+
+// planRecheck is how old a plan reading may be before SetupProject runs again.
+const planRecheck = 24 * time.Hour
+
+// NeedsSetup reports whether SetupProject should run before the next call: no
+// project yet, or no plan reading (a login saved by a build that never read
+// one), or a reading older than a day.
+func (c *AntigravityCreds) NeedsSetup(now time.Time) bool {
+	return c.ProjectID == "" || c.Tier == "" || now.Sub(c.PlanChecked) > planRecheck
+}
+
+// PlanLabel is what the user is told they are on: the paid plan's own name
+// ("Google AI Pro") when Google reports one, else "free tier". Never a plan
+// Google did not report.
+func (c *AntigravityCreds) PlanLabel() string {
+	if c.PlanName != "" {
+		return c.PlanName
+	}
+	if c.PlanID != "" {
+		return c.PlanID
+	}
+	return "free tier"
+}
+
+// applyPlan records the tier and plan from a loadCodeAssist answer.
+func (c *AntigravityCreds) applyPlan(load loadCodeAssistResp, now time.Time) {
+	c.Tier = "free-tier"
+	if load.CurrentTier != nil && load.CurrentTier.ID != "" {
+		c.Tier = load.CurrentTier.ID
+	}
+	c.PlanID, c.PlanName = "", ""
+	if load.PaidTier != nil {
+		c.PlanID, c.PlanName = load.PaidTier.ID, load.PaidTier.Name
+	}
+	c.PlanChecked = now
 }
 
 // AntigravityCredsPath returns ~/.config/gorilla-opencode/antigravity-oauth.json.
@@ -253,9 +297,11 @@ func (c *AntigravityCreds) Ensure(ctx context.Context) (string, error) {
 	return c.AccessToken, nil
 }
 
-// SetupProject discovers the managed free-tier project via loadCodeAssist on
-// daily-cloudcode-pa and stores it. Reuses the caTier/loadCodeAssistResp types
-// declared in gemini_oauth.go (same package).
+// SetupProject discovers the managed project AND the account's plan via
+// loadCodeAssist on daily-cloudcode-pa and stores both. Reuses the
+// caTier/loadCodeAssistResp types declared in gemini_oauth.go (same package).
+// A free account and a paid one get the same project and the same calls; only
+// the recorded plan differs.
 func (c *AntigravityCreds) SetupProject(ctx context.Context) error {
 	token, err := c.Ensure(ctx)
 	if err != nil {
@@ -269,6 +315,7 @@ func (c *AntigravityCreds) SetupProject(ctx context.Context) error {
 	if load.CloudaicompanionProject != "" {
 		c.ProjectID = load.CloudaicompanionProject
 	}
+	c.applyPlan(load, time.Now())
 	if c.ProjectID == "" {
 		return fmt.Errorf("no project returned; account may not be provisioned for the free tier")
 	}
@@ -301,8 +348,10 @@ type QuotaSummary struct {
 
 // RetrieveQuota fetches the weekly-limit summary (agy's /usage screen data).
 func (c *AntigravityCreds) RetrieveQuota(ctx context.Context) (*QuotaSummary, error) {
-	if c.ProjectID == "" {
-		if err := c.SetupProject(ctx); err != nil {
+	if c.NeedsSetup(time.Now()) {
+		// A failed plan re-check is not a failed quota read when a project is
+		// already known: the old plan reading stands until the next try.
+		if err := c.SetupProject(ctx); err != nil && c.ProjectID == "" {
 			return nil, err
 		}
 	}
@@ -335,6 +384,16 @@ func (c *AntigravityCreds) QuotaSummaryLine(ctx context.Context) (string, error)
 // the footer line from a QuotaSummary it already fetched for the full /usage
 // panel — one request, two views.
 func FormatQuotaLine(q *QuotaSummary, now time.Time) string {
+	return FormatQuotaLineFor(q, now, "")
+}
+
+// FormatQuotaLineFor is FormatQuotaLine naming the plan the quota belongs to
+// ("Antigravity (Google AI Pro) weekly quota — ..."); plan "" names none.
+func FormatQuotaLineFor(q *QuotaSummary, now time.Time, plan string) string {
+	head := "Antigravity weekly quota — "
+	if plan != "" {
+		head = "Antigravity (" + plan + ") weekly quota — "
+	}
 	var parts []string
 	for _, g := range q.Groups {
 		if len(g.Buckets) == 0 {
@@ -354,7 +413,7 @@ func FormatQuotaLine(q *QuotaSummary, now time.Time) string {
 	if len(parts) == 0 {
 		return "Antigravity: no quota groups reported"
 	}
-	return "Antigravity weekly quota — " + strings.Join(parts, " · ")
+	return head + strings.Join(parts, " · ")
 }
 
 // callAntigravity POSTs {endpoint}/{version}:{method} with the Antigravity UA.

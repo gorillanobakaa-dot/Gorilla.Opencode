@@ -111,16 +111,17 @@ func BuildAntigravityModels(rows []AntigravityRow) map[ModelID]Model {
 		id := ModelID("antigravity." + r.ID)
 		out[id] = Model{
 			ID:       id,
-			Name:     displayNameFor(r) + " (Antigravity free)",
+			Name:     displayNameFor(r) + antigravityNameSuffix,
 			Provider: ProviderAntigravity,
 			APIModel: r.ID,
-			Description: fmt.Sprintf("%s via your free Google Antigravity tier. Reported by the backend on %s.",
+			Description: fmt.Sprintf("%s via your Google Antigravity sign-in (free tier or your Google AI plan). Reported by the backend on %s.",
 				displayNameFor(r), time.Now().Format("2006-01-02")),
 			ContextWindow:       r.MaxTokens,
 			DefaultMaxTokens:    r.MaxOutputTokens,
 			CanReason:           r.SupportsThinking,
 			SupportsAttachments: r.SupportsImages,
-			// The entitlement is the user's own free tier: no per-token charge.
+			// The entitlement is the user's own (free tier or a Google AI plan):
+			// no per-token charge.
 			CostPer1MIn:  0,
 			CostPer1MOut: 0,
 		}

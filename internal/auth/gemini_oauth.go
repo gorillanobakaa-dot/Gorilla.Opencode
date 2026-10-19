@@ -320,13 +320,20 @@ func postToken(ctx context.Context, form url.Values) (*tokenResponse, error) {
 
 type caTier struct {
 	ID        string `json:"id"`
+	Name      string `json:"name"`
 	IsDefault bool   `json:"isDefault"`
 }
 
 type loadCodeAssistResp struct {
-	CurrentTier             *caTier  `json:"currentTier"`
-	AllowedTiers            []caTier `json:"allowedTiers"`
-	CloudaicompanionProject string   `json:"cloudaicompanionProject"`
+	CurrentTier  *caTier  `json:"currentTier"`
+	AllowedTiers []caTier `json:"allowedTiers"`
+	// PaidTier is the Google One AI plan the account holds (measured
+	// 2026-10-19 on a Google AI Pro account: {"id": "g1-pro-tier", "name":
+	// "Google AI Pro"}). ABSENT on a free account. currentTier stays
+	// "free-tier" either way, so reading only currentTier calls every paying
+	// user free.
+	PaidTier                *caTier `json:"paidTier"`
+	CloudaicompanionProject string  `json:"cloudaicompanionProject"`
 }
 
 type onboardUserResp struct {

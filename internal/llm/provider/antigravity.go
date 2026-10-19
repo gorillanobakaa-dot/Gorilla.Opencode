@@ -121,7 +121,7 @@ func antigravityErr(resp *http.Response) error {
 	if json.Unmarshal(body, &e) == nil && e.Error.Message != "" {
 		msg := strings.TrimRight(e.Error.Message, ".")
 		if resp.StatusCode == http.StatusTooManyRequests {
-			return fmt.Errorf("Antigravity free tier: %s — this model's weekly quota may be spent; try another model", msg)
+			return fmt.Errorf("Antigravity: %s — this model's weekly quota may be spent; try another model", msg)
 		}
 		return fmt.Errorf("Antigravity: %s (HTTP %d)", msg, resp.StatusCode)
 	}

@@ -508,9 +508,10 @@ var All = []Command{
 		Group:   GroupModels,
 		Summary: "Show your quota and balances — how many bananas are left.",
 		Detail: "Shows what you have left to spend, in plain words. If you signed in " +
-			"with the Antigravity free tier: how much of your weekly allowance " +
-			"remains — Gemini has a separate pool from Claude and GPT-OSS — and " +
-			"when each resets. If you have a DeepSeek or OpenRouter key: your " +
+			"with Antigravity: which plan Google reports (free tier, or e.g. " +
+			"Google AI Pro), how much of your weekly allowance remains — Gemini " +
+			"has a separate pool from Claude and GPT-OSS — and when each resets. " +
+			"If you have a DeepSeek or OpenRouter key: your " +
 			"remaining balance there too. A one-line summary also appears on its " +
 			"own at the start of each session.",
 	},

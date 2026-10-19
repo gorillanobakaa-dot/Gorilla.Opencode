@@ -954,7 +954,7 @@ func applyCloudflare(account, token string) error {
 // managed free-tier project. Prints plainly because the portal runs before the
 // TUI owns the screen (same as runGoogleLogin).
 func runAntigravityLogin(ctx context.Context) error {
-	fmt.Println("\nStarting Google sign-in (Antigravity free tier)...")
+	fmt.Println("\nStarting Google sign-in (Antigravity)...")
 	creds, err := auth.AntigravityLogin(ctx)
 	if err != nil {
 		return fmt.Errorf("sign-in failed: %w", err)
@@ -967,7 +967,7 @@ func runAntigravityLogin(ctx context.Context) error {
 		who = "your Google account"
 	}
 	fmt.Printf("\nSigned in as %s.\n", who)
-	fmt.Println("Setting up your Antigravity free tier...")
+	fmt.Println("Setting up your Antigravity access and reading your plan...")
 	if err := creds.SetupProject(ctx); err != nil {
 		// Sign-in landed; only project discovery hiccuped. It retries on first
 		// use, so do not fail the whole login.
@@ -975,7 +975,7 @@ func runAntigravityLogin(ctx context.Context) error {
 		fmt.Fprintln(os.Stderr, "Your token is saved; it will retry on first use.")
 		return nil
 	}
-	fmt.Printf("Ready. Project: %s\n", creds.ProjectID)
+	fmt.Printf("Ready. Plan: %s. Project: %s\n", creds.PlanLabel(), creds.ProjectID)
 	return nil
 }
 
@@ -1089,7 +1089,7 @@ func portalModelSummary(p models.ModelProvider) string {
 			continue
 		}
 		name := m.Name
-		for _, suffix := range []string{" (Antigravity free)", " (ChatGPT sign-in)"} {
+		for _, suffix := range []string{" (Antigravity)", " (Antigravity free)", " (ChatGPT sign-in)"} {
 			name = strings.TrimSuffix(name, suffix)
 		}
 		rank := m.Rank

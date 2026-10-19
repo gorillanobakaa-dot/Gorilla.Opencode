@@ -36,7 +36,19 @@ import (
 	"strings"
 )
 
-const antigravityNameSuffix = " (Antigravity free)"
+// antigravityNameSuffix carries no plan: the same model list serves a free
+// account and a Google AI Pro one, and a name saying "free" told a paying user
+// they were on the free tier (2026-10-19). The plan is shown where the plan is
+// read: sign-in, /usage. legacyAntigravitySuffix is what older builds wrote into
+// the model cache; it is repaired when the cache is read.
+const (
+	antigravityNameSuffix   = " (Antigravity)"
+	legacyAntigravitySuffix = " (Antigravity free)"
+)
+
+func trimAntigravitySuffix(s string) string {
+	return strings.TrimSuffix(strings.TrimSuffix(s, legacyAntigravitySuffix), antigravityNameSuffix)
+}
 
 var agVersionRe = regexp.MustCompile(`\d+(?:\.\d+)?`)
 
@@ -60,7 +72,7 @@ type agKey struct {
 }
 
 func antigravityKey(label string) agKey {
-	s := strings.ToLower(strings.TrimSuffix(label, antigravityNameSuffix))
+	s := strings.ToLower(trimAntigravitySuffix(label))
 	k := agKey{family: agFamilyOther, effort: 1}
 	switch {
 	case strings.Contains(s, "lite"):
@@ -101,6 +113,12 @@ func finishAntigravity(set map[ModelID]Model) {
 	ids := make([]ModelID, 0, len(set))
 	for id := range set {
 		ids = append(ids, id)
+		// A name an older build wrote ("... (Antigravity free)") is given the
+		// current suffix, so a cached list stops calling a paid plan free.
+		if m := set[id]; strings.HasSuffix(m.Name, legacyAntigravitySuffix) {
+			m.Name = strings.TrimSuffix(m.Name, legacyAntigravitySuffix) + antigravityNameSuffix
+			set[id] = m
+		}
 	}
 
 	// Names first: a label shared by several ids gets each id appended.
@@ -140,7 +158,7 @@ func finishAntigravity(set map[ModelID]Model) {
 
 // agBaseLabel is the backend's label with nothing of ours on it.
 func agBaseLabel(m Model) string {
-	s := strings.TrimSuffix(m.Name, antigravityNameSuffix)
+	s := trimAntigravitySuffix(m.Name)
 	if i := strings.LastIndex(s, " ["); i >= 0 && strings.HasSuffix(s, "]") {
 		s = s[:i]
 	}

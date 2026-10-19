@@ -82,11 +82,11 @@ func TestNoTwoAntigravityModelsShareAName(t *testing.T) {
 	}
 	// The label is still the backend's; the id is added, not substituted.
 	got := built["antigravity.gemini-2.5-flash"].Name
-	if got != "Gemini 3.5 Flash Lite [gemini-2.5-flash] (Antigravity free)" {
+	if got != "Gemini 3.5 Flash Lite [gemini-2.5-flash] (Antigravity)" {
 		t.Errorf("shared label rendered as %q", got)
 	}
 	// A label nobody shares is left exactly as the backend wrote it.
-	if got := built["antigravity.claude-opus-5-5-high"].Name; got != "Claude Opus 5.5 (High) (Antigravity free)" {
+	if got := built["antigravity.claude-opus-5-5-high"].Name; got != "Claude Opus 5.5 (High) (Antigravity)" {
 		t.Errorf("unique label was altered: %q", got)
 	}
 }
@@ -229,6 +229,10 @@ func TestAnOldAntigravityCacheIsRepairedWhenRead(t *testing.T) {
 	}
 	if SupportedModels[id].Rank != 1 {
 		t.Errorf("Opus 5.5 rank = %d, want 1", SupportedModels[id].Rank)
+	}
+	// 2026-10-19: an old cache's "(Antigravity free)" told a Google AI Pro user he was free.
+	if got := SupportedModels[id].Name; got != "Claude Opus 5.5 (High) (Antigravity)" {
+		t.Errorf("an old cached name was not repaired: %q", got)
 	}
 	a, b := SupportedModels["antigravity.gemini-2.5-flash"].Name, SupportedModels["antigravity.gemini-3.5-flash-lite"].Name
 	if a == b {
