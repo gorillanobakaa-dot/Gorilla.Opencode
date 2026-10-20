@@ -225,6 +225,15 @@ var logsKeyReturnKey = key.NewBinding(
 	key.WithHelp("esc/q", "go back"),
 )
 
+// isReturnKey: Esc closes whatever is open; on the logs page q and Backspace go
+// back too. GORILLA FIX (2026-10-20): the second half read key.Matches(msg) with
+// no binding, which is always false, so q and Backspace never left the logs
+// page (found in a July cloud-session branch that never merged). The logs keys
+// count ONLY on the logs page: Backspace while typing must never close a dialog.
+func isReturnKey(msg tea.KeyMsg, onLogsPage bool) bool {
+	return key.Matches(msg, returnKey) || (onLogsPage && key.Matches(msg, logsKeyReturnKey))
+}
+
 type appModel struct {
 	width, height int
 	// frames repairs the inline frame after the window is made narrower; see reflow.go.
@@ -2236,7 +2245,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			fmt.Print("\x1b[?1000h\x1b[?1002h\x1b[?1006h")
 			return a, util.ReportInfo("Selection mode DISABLED: TUI mouse scrolling active")
-		case key.Matches(msg, returnKey) || key.Matches(msg):
+		case isReturnKey(msg, a.currentPage == page.LogsPage):
 			if msg.String() == quitKey {
 				if a.currentPage == page.LogsPage {
 					return a, a.moveToPage(page.ChatPage)
