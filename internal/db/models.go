@@ -47,4 +47,5 @@ type Session struct {
 	CallsPriced                int64          `json:"calls_priced"`
 	CallsUnpriced              int64          `json:"calls_unpriced"`
 	LastCallCost               float64        `json:"last_call_cost"`
+	ResentTokens               int64          `json:"resent_tokens"`
 }

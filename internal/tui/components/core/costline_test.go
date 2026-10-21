@@ -9,9 +9,12 @@ import (
 )
 
 func TestCostDetailSaysWhyAndWhatIsMissing(t *testing.T) {
-	s := session.Session{Cost: 10, CostReread: 7.2, LastCallCost: 0.0564, CallsUnpriced: 3}
+	// The 2026-10-21 Antigravity session: 596,340 input tokens, ~90% of them repeats,
+	// while the cache share of the cost was 2%. The chip must say 90, not 2.
+	s := session.Session{Cost: 0.39, CostReread: 0.008, CumulativePromptTokens: 596_340, ResentTokens: 536_706,
+		LastCallCost: 0.0564, CallsUnpriced: 3}
 	got := costDetail(s)
-	for _, want := range []string{"72% re-reading", "last call $0.056", "3 call(s) unpriced"} {
+	for _, want := range []string{"90% re-sent", "last call $0.056", "3 call(s) unpriced"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("costDetail = %q, missing %q", got, want)
 		}
@@ -51,14 +54,14 @@ func TestCostWarningOncePerStep(t *testing.T) {
 // On a wide line the chip says why; on the 80-column MacBook Air the detail is
 // the first thing to go, and the dollar figure stays.
 func TestCostDetailGivesWayOnANarrowLine(t *testing.T) {
-	s := session.Session{ID: "s1", Cost: 4.82, CostReread: 1.83, LastCallCost: 0.056, CallsPriced: 69}
+	s := session.Session{ID: "s1", Cost: 4.82, CumulativePromptTokens: 1000, ResentTokens: 380, LastCallCost: 0.056, CallsPriced: 69}
 	wide := statusCmp{width: 240, session: s}
-	if got := ansi.Strip(wide.chrome().tokens); !strings.Contains(got, "38% re-reading") || !strings.Contains(got, "~$4.82 est") {
+	if got := ansi.Strip(wide.chrome().tokens); !strings.Contains(got, "38% re-sent") || !strings.Contains(got, "~$4.82 est") {
 		t.Errorf("wide chip = %q", got)
 	}
 	narrow := statusCmp{width: 80, session: s}
 	got := ansi.Strip(narrow.chrome().tokens)
-	if strings.Contains(got, "re-reading") || !strings.Contains(got, "~$4.82 est") {
+	if strings.Contains(got, "re-sent") || !strings.Contains(got, "~$4.82 est") {
 		t.Errorf("80-column chip = %q: the detail should give way, the cost should stay", got)
 	}
 }

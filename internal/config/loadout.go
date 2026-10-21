@@ -152,6 +152,10 @@ var LoadoutComponents = []LoadoutComponent{
 	// the endpoint admits only this user account. 230 is a guess; calibration
 	// measures the two tools at startup.
 	{PeersComponentID, "Session messaging — /peers", "this session cannot see or message the other Gorilla OpenCode sessions on this computer, and they cannot see or message it: no local endpoint is opened and nothing is registered", 230, true, false},
+	// GORILLA (2026-10-21): one call answers "what has this cost / how much is
+	// left". Without it a model asked about "bananas" was measured spending 30
+	// tool calls hunting through files and the session database for it.
+	{UsageComponentID, "Usage and cost — what /usage shows", "asked about cost, quota or what is left, the agent cannot read it and goes looking through your files instead (measured: 30 calls for one question)", 120, true, false},
 	// GORILLA OVERRIDE: env estimate was 150 when the block was a recursive
 	// 1000-file tree dump (real cost often 10k–30k). After the shallow
 	// project_summary refactor it really is ~100–200 tokens; calibrate
@@ -250,6 +254,8 @@ const (
 	// PeersComponentID gates session-to-session messaging: the peers and
 	// send_message tools, the local endpoint and the register entry.
 	PeersComponentID = "tool.peers"
+	// UsageComponentID gates the usage tool (session cost + allowance left).
+	UsageComponentID = "tool.usage"
 	// GORILLA FIX (2026-08-17): "EXPENSIVE" left the NAME. It sat beside the
 	// per-turn token column and read as a claim about that number — which is
 	// the smallest on the screen, because arming this only adds a paragraph to
@@ -455,6 +461,10 @@ var lowBandwidthKeep = map[string]string{
 		"less. Now default ON, so the preset genuinely has to leave it alone rather " +
 		"than merely not arm it -- which is why this entry moved from a note about " +
 		"a switched-off row to a real decision.",
+	UsageComponentID: "it SAVES bandwidth: one call answers a question about cost or " +
+		"quota that otherwise took a model 30 tool calls, each re-sending the whole " +
+		"conversation (measured 2026-10-21). Its own reading is the provider already " +
+		"in use, cached for a minute.",
 	"prompt.env": "cheap since the shallow project_summary change (~130 measured " +
 		"tokens) and MORE useful on a remote link, not less: knowing the cwd, OS and " +
 		"git state prevents a wasted round trip, which is the expensive thing here.",

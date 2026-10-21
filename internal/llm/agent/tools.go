@@ -178,6 +178,9 @@ func coderToolSet(
 	if spawners {
 		add(config.PeersComponentID, tools.NewPeersTool())
 		add(config.PeersComponentID, tools.NewSendMessageTool(permissions))
+		// GORILLA (2026-10-21): the main conversation's cost and allowance, in
+		// one call. Main conversation only: it reports THIS session's ledger.
+		add(config.UsageComponentID, tools.NewUsageTool(sessions))
 	}
 
 	return append(coderTools, otherTools...)

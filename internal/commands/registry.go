@@ -513,7 +513,10 @@ var All = []Command{
 			"has a separate pool from Claude and GPT-OSS — and when each resets. " +
 			"If you have a DeepSeek or OpenRouter key: your " +
 			"remaining balance there too. A one-line summary also appears on its " +
-			"own at the start of each session.",
+			"own at the start of each session. Below it: what this conversation " +
+			"has cost so far, and how much of what was sent was the conversation " +
+			"sent again — the reason long sessions get expensive. The AI can read " +
+			"the same answer with its usage tool, so you can simply ask it.",
 	},
 
 	// ─── Cost, speed and behaviour ───────────────────────────────────

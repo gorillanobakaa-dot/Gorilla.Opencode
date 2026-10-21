@@ -67,7 +67,11 @@ import (
 const (
 	// Re-measured 2026-10-06 (v0.1.143): the find, research, review, bash and
 	// web_search descriptions all grew with the audit fixes.
-	measuredDefaultToolSchemaTokens = 9947
+	// Re-measured 2026-10-21: 10,204. The usage tool is 96 of the +257; the
+	// rest is description growth between v0.1.143 and v0.1.149 that stayed
+	// inside the band. The usage tool earns its 96: without it one question
+	// about cost took a model 30 tool calls.
+	measuredDefaultToolSchemaTokens = 10204
 	measuredBasePromptTokens        = 2250
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.

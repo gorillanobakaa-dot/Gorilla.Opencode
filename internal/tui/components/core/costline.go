@@ -20,8 +20,13 @@ import (
 // silently leaves calls out reads lower than it is.
 func costDetail(s session.Session) string {
 	var parts []string
-	if s.Cost > 0 && s.CostReread > 0 {
-		parts = append(parts, fmt.Sprintf("%d%% re-reading", int(math.Round(100*s.CostReread/s.Cost))))
+	// GORILLA FIX (2026-10-21, same day): this said "N% re-reading" from the
+	// cost of CACHE reads, and read "2%" on an Antigravity session where nine
+	// tenths of the input was the conversation sent again: the cache caught a
+	// fifth of the repeats and the rest were billed as fresh input. The share
+	// of input that was repetition is what tells the user to start fresh.
+	if share := resentShare(s); share > 0 {
+		parts = append(parts, fmt.Sprintf("%d%% re-sent", share))
 	}
 	if s.LastCallCost > 0 {
 		parts = append(parts, fmt.Sprintf("last call $%.3f", s.LastCallCost))
@@ -30,6 +35,12 @@ func costDetail(s session.Session) string {
 		parts = append(parts, fmt.Sprintf("%d call(s) unpriced", s.CallsUnpriced))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// resentShare is the percentage of this session's input that was the
+// conversation sent again, 0 when nothing is known yet.
+func resentShare(s session.Session) int {
+	return int(math.Round(100 * s.ResentShare()))
 }
 
 // costWarning returns the warning for a session whose cost has passed a new

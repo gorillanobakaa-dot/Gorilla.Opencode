@@ -2,7 +2,7 @@
 
 This document follows the [Gorilla Open Source Philosophy](../PHILOSOPHY.md): the work is explained twice, once in plain language and once with technical precision. Both tracks cover the same facts. Neither is a summary of the other.
 
-It covers the work after v0.1.149 (2026-10-21): the sourced price table, the cost detail and warning in the status bar, and the Gemini and Antigravity token counts.
+It covers the work after v0.1.149 (2026-10-21): the sourced price table, the cost detail and warning in the status bar, the Gemini and Antigravity token counts, and the `usage` tool that lets the AI answer "what has this cost, what is left" in one step.
 
 ---
 
@@ -18,7 +18,9 @@ The status bar already showed a cost. It now also shows how much of that cost wa
 
 Done and tried on the real program, on Gemini 3.6 Flash through Antigravity: the cost of a two-call session was exactly what the price page gives by hand ($0.020061).
 
-Not tried on a real program: the warning on a long session, Anthropic's own prices (no Anthropic key on the test computer), and the re-reading share (the short test session had no re-sent conversation for Google to report). All three are covered by tests with made-up numbers.
+Also tried for real: asked "how many bananas have I got left?", Gemini 3.8 Flash answered with ONE `usage` call (58% of the weekly Gemini allowance left, and this session's cost); the whole run cost $0.02 over 2 calls. Earlier the same day, without the tool, the same question took it 30 tool calls and most of a $0.39 session, including opening the sign-in file and running SQL against the live session database.
+
+Not tried on a real program: the warning on a long session, and Anthropic's own prices (no Anthropic key on the test computer). Both are covered by tests with made-up numbers.
 
 ## Worst case if something is wrong
 
@@ -30,7 +32,11 @@ A model the table does not know (for example `gemini-flash-latest`, a name that 
 
 **The cost in the status bar**
 - Before: `Cost: ~$4.82 est`
-- After:  `Cost: ~$4.82 est (38% re-reading, last call $0.056)`. On a narrow window (80 columns) the part in brackets is left out and the cost stays.
+- After:  `Cost: ~$4.82 est (90% re-sent, last call $0.056)`. On a narrow window (80 columns) the part in brackets is left out and the cost stays.
+
+**"How much is left?" in one step**
+- Before: the AI could not read what `/usage` shows, so it went looking through your files and settings (measured: 30 calls for one question).
+- After:  it has a `usage` tool: one call returns this session's cost and the allowance left with the provider you are using. `/usage` shows you the same session lines.
 
 **A warning before it hurts**
 - Before: nothing.
@@ -43,7 +49,8 @@ A model the table does not know (for example `gemini-flash-latest`, a name that 
 ## What you can do now
 
 - Change the warning: put `"costWarnUSD": 10` in your settings file for $10, or `0` to switch it off.
-- Read the "% re-reading" figure: if it is high, a fresh session is the cheapest thing you can do.
+- Read the "% re-sent" figure: it is how much of what you paid for was the old conversation sent again. If it is high, a fresh session is the cheapest thing you can do.
+- Ask the AI "how many bananas have I got left?" or "what has this cost?": it answers with one `usage` call.
 
 ## What is still missing
 
@@ -62,7 +69,7 @@ No new connection was added. Prices travel inside the program file. The settings
 
 ## Glossary
 
-- **Re-reading**: the part of each message's cost that pays for sending the earlier conversation again (the provider calls it "cache reads").
+- **Re-sent**: the part of what each message sends that is the earlier conversation again. Some providers make part of it cheaper ("cache reads"); the rest is charged as new.
 - **Unpriced**: a message on a model for which no price was published; counted, not guessed.
 
 ---
@@ -137,3 +144,11 @@ Live: a `-p` run on `antigravity.gemini-3.6-flash-medium` with `XDG_DATA_HOME` i
 - Prices: https://platform.claude.com/docs/en/about-claude/pricing, https://cloud.google.com/vertex-ai/generative-ai/pricing, https://ai.google.dev/gemini-api/docs/pricing (fetched 2026-10-21; sha256 in `prices.json`).
 - 72% / $303 / $0.189 vs $0.051 per call: Fieldkit `session_cost.py` on Claude Code session 98ea1ad9, 2026-10-21.
 - Gemini usage fields: `google.golang.org/genai@v1.64.0/types.go`, `GenerateContentResponseUsageMetadata`.
+
+## Addendum: the usage tool and the re-sent share (same day, second commit)
+
+- `internal/usage/` (new): `SessionLines`, `AllowanceLines` (active provider only; Antigravity quota through the same request `/usage` makes; DeepSeek/OpenRouter balance only when that is the provider in use; cached 60 s), `Report`. No account e-mail in the answer.
+- `internal/llm/tools/usage.go` (new): the `usage` tool, no parameters, read-only, main conversation only; loadout row `tool.usage` (default ON, 96 measured tokens a turn; kept by the low-bandwidth preset because it saves round trips). `calibrate.go` measures it; `measuredDefaultToolSchemaTokens` 9,947 -> 10,204 (usage is 96; the rest was earlier drift inside the band), quoted in `docs/WHAT-A-CURIOUS-USER-COSTS.md`.
+- Re-sent share: migration `20261021180000` adds `resent_tokens`; `addCall` adds `min(previous prompt + previous reply, this prompt)` before the gauge is overwritten (the summary path now books its call before resetting the gauge). The chip reads `N% re-sent` from `Session.ResentShare()`. Rows written before the migration start at 0, so an old session's share reads low.
+- `/usage` prints `This session:` with the same `SessionLines` the tool returns.
+- Live: `-p "how many bananas have i got left?"` on `antigravity.gemini-3.8-flash-medium`, isolated data folder: 1 tool call (`usage`), 2 model calls, $0.020304.

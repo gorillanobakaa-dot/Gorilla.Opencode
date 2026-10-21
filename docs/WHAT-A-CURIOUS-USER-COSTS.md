@@ -241,13 +241,14 @@ exists.
 TestDefaultToolSchemaCost -v`:
 
 ```
-tool schemas, default ON                             ~9,947 tokens   79%
+tool schemas, default ON                            ~10,204 tokens   79%
 base system prompt (coder-modern)                    ~2,314 tokens   18%
-prompt blocks, default ON                              ~369 tokens    3%
+prompt blocks, default ON                              ~397 tokens    3%
                                                      ------------
-per-turn total, before any CLAUDE.md                ~12,630 tokens
+per-turn total, before any CLAUDE.md                ~12,915 tokens
 
-(re-measured 2026-10-06, v0.1.143; the 2026-09 figures were 9,733 / 1,791 / 94 = 11,618)
+(re-measured 2026-10-21 with the usage tool, 96 tokens; 2026-10-06, v0.1.143: 9,947 / 2,314 / 369 = 12,630;
+the 2026-09 figures were 9,733 / 1,791 / 94 = 11,618)
 
 largest single rows:
   tool.bash        1,415

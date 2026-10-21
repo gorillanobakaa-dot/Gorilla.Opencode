@@ -60,7 +60,8 @@ SET
     cost_reread = ?,
     calls_priced = ?,
     calls_unpriced = ?,
-    last_call_cost = ?
+    last_call_cost = ?,
+    resent_tokens = ?
 WHERE id = ?
 RETURNING *;
 

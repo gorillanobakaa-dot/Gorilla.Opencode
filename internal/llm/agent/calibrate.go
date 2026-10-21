@@ -78,6 +78,8 @@ func CalibrateLoadout(
 	// GORILLA (2026-10-10): one row, two tools; the row costs both schemas.
 	config.SetLoadoutTokens(config.PeersComponentID,
 		toolTokens(tools.NewPeersTool())+toolTokens(tools.NewSendMessageTool(permissions)))
+	// The schema does not depend on the session store, so nil measures it.
+	set(config.UsageComponentID, tools.NewUsageTool(nil))
 	// The search tool's own schema is fixed, so an empty catalogue measures it
 	// correctly -- the catalogue affects what it FINDS, never what it costs to
 	// declare.

@@ -37,6 +37,11 @@ type Session struct {
 	CallsPriced   int64
 	CallsUnpriced int64
 	LastCallCost  float64
+	// ResentTokens is the input that was the conversation sent again: for each
+	// call, the previous call's prompt and reply, capped at this call's prompt.
+	// Divided by CumulativePromptTokens it is the share of input that was
+	// repetition, whether or not the provider's cache made it cheaper.
+	ResentTokens int64
 	CreatedAt                  int64
 	UpdatedAt                  int64
 	// StartedIn is the primary working directory the session was created in.
@@ -69,6 +74,16 @@ func (s Session) TotalTokens() int64 {
 		return s.TotalPromptTokens + s.TotalCompletionTokens
 	}
 	return s.PromptTokens + s.CompletionTokens
+}
+
+// ResentShare is the fraction (0..1) of this session's input that was the
+// conversation sent again; 0 when nothing has been counted yet. Read by the
+// status bar and the usage tool, so the person and the AI see one number.
+func (s Session) ResentShare() float64 {
+	if s.CumulativePromptTokens <= 0 || s.ResentTokens <= 0 {
+		return 0
+	}
+	return float64(s.ResentTokens) / float64(s.CumulativePromptTokens)
 }
 
 type Service interface {
@@ -362,6 +377,7 @@ func (s *service) Save(ctx context.Context, session Session) (Session, error) {
 		CallsPriced:   session.CallsPriced,
 		CallsUnpriced: session.CallsUnpriced,
 		LastCallCost:  session.LastCallCost,
+		ResentTokens:  session.ResentTokens,
 	})
 	if err != nil {
 		return Session{}, err
@@ -422,6 +438,7 @@ func (s service) fromDBItem(item db.Session) Session {
 		CallsPriced:                item.CallsPriced,
 		CallsUnpriced:              item.CallsUnpriced,
 		LastCallCost:               item.LastCallCost,
+		ResentTokens:               item.ResentTokens,
 		CreatedAt:                  item.CreatedAt,
 		UpdatedAt:                  item.UpdatedAt,
 		StartedIn:                  item.StartedIn,

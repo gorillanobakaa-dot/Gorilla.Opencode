@@ -71,3 +71,29 @@ func TestLedgerAccumulatesCostRereadAndCalls(t *testing.T) {
 			s.Cost, s.CostReread, s.CallsPriced, s.LastCallCost)
 	}
 }
+
+// Each call's prompt repeats the previous prompt and reply; that part is counted
+// as re-sent whether or not the provider's cache discounted it.
+func TestLedgerCountsTheConversationSentAgain(t *testing.T) {
+	m := models.Model{Provider: "antigravity", APIModel: "gemini-3.8-flash"}
+	var s session.Session
+	step := func(in, read, out int64) {
+		u := provider.TokenUsage{InputTokens: in, CacheReadTokens: read, OutputTokens: out}
+		addCall(&s, callCost(m, u, oct21))
+		// what TrackUsage does after addCall
+		s.PromptTokens, s.CompletionTokens = in+read, out
+		s.CumulativePromptTokens += in + read
+	}
+	step(10_000, 0, 500)      // first call: nothing was sent before
+	step(10_000, 2_000, 300)  // 12,000 sent; 10,500 of it was the previous prompt + reply
+	step(13_000, 0, 200)      // no cache hit at all: still 12,300 repeated
+	if s.ResentTokens != 10_500+12_300 {
+		t.Fatalf("re-sent = %d, want %d", s.ResentTokens, 10_500+12_300)
+	}
+	// compaction: the new prompt is smaller than the old one; capped at the new prompt
+	s.PromptTokens, s.CompletionTokens = 50_000, 0
+	addCall(&s, callCost(m, provider.TokenUsage{InputTokens: 3_000}, oct21))
+	if s.ResentTokens != 10_500+12_300+3_000 {
+		t.Fatalf("re-sent after compaction = %d, want capped at the 3,000-token prompt", s.ResentTokens)
+	}
+}

@@ -43,7 +43,13 @@ func callCost(model models.Model, usage provider.TokenUsage, now time.Time) cost
 
 // addCall books one priced or unpriced call on the session's ledger. An
 // unpriced call is counted, never added to Cost.
+//
+// It must run BEFORE the caller overwrites PromptTokens/CompletionTokens with
+// this call's figures: those still hold the previous call's prompt and reply,
+// which is exactly what this call sent again (capped at this call's prompt,
+// because compaction can make the new prompt smaller than the old one).
 func addCall(s *session.Session, r cost.Result) {
+	s.ResentTokens += min(s.PromptTokens+s.CompletionTokens, r.Context)
 	if !r.Priced {
 		s.CallsUnpriced++
 		return

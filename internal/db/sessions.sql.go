@@ -39,7 +39,7 @@ INSERT INTO sessions (
     null,
     strftime('%s', 'now'),
     strftime('%s', 'now')
-) RETURNING id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens, cost_reread, calls_priced, calls_unpriced, last_call_cost
+) RETURNING id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens, cost_reread, calls_priced, calls_unpriced, last_call_cost, resent_tokens
 `
 
 type CreateSessionParams struct {
@@ -87,6 +87,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 		&i.CallsPriced,
 		&i.CallsUnpriced,
 		&i.LastCallCost,
+		&i.ResentTokens,
 	)
 	return i, err
 }
@@ -102,7 +103,7 @@ func (q *Queries) DeleteSession(ctx context.Context, id string) error {
 }
 
 const getSessionByID = `-- name: GetSessionByID :one
-SELECT id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens, cost_reread, calls_priced, calls_unpriced, last_call_cost
+SELECT id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens, cost_reread, calls_priced, calls_unpriced, last_call_cost, resent_tokens
 FROM sessions
 WHERE id = ? LIMIT 1
 `
@@ -128,12 +129,13 @@ func (q *Queries) GetSessionByID(ctx context.Context, id string) (Session, error
 		&i.CallsPriced,
 		&i.CallsUnpriced,
 		&i.LastCallCost,
+		&i.ResentTokens,
 	)
 	return i, err
 }
 
 const listSessions = `-- name: ListSessions :many
-SELECT id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens, cost_reread, calls_priced, calls_unpriced, last_call_cost
+SELECT id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens, cost_reread, calls_priced, calls_unpriced, last_call_cost, resent_tokens
 FROM sessions
 WHERE parent_session_id is NULL
 ORDER BY created_at DESC
@@ -166,6 +168,7 @@ func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {
 			&i.CallsPriced,
 			&i.CallsUnpriced,
 			&i.LastCallCost,
+			&i.ResentTokens,
 		); err != nil {
 			return nil, err
 		}
@@ -181,7 +184,7 @@ func (q *Queries) ListSessions(ctx context.Context) ([]Session, error) {
 }
 
 const listSessionsByDir = `-- name: ListSessionsByDir :many
-SELECT id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens, cost_reread, calls_priced, calls_unpriced, last_call_cost
+SELECT id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens, cost_reread, calls_priced, calls_unpriced, last_call_cost, resent_tokens
 FROM sessions
 WHERE parent_session_id is NULL
   AND (started_in = ? OR started_in = '')
@@ -215,6 +218,7 @@ func (q *Queries) ListSessionsByDir(ctx context.Context, startedIn string) ([]Se
 			&i.CallsPriced,
 			&i.CallsUnpriced,
 			&i.LastCallCost,
+			&i.ResentTokens,
 		); err != nil {
 			return nil, err
 		}
@@ -242,9 +246,10 @@ SET
     cost_reread = ?,
     calls_priced = ?,
     calls_unpriced = ?,
-    last_call_cost = ?
+    last_call_cost = ?,
+    resent_tokens = ?
 WHERE id = ?
-RETURNING id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens, cost_reread, calls_priced, calls_unpriced, last_call_cost
+RETURNING id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost, updated_at, created_at, summary_message_id, started_in, cumulative_prompt_tokens, cumulative_completion_tokens, cost_reread, calls_priced, calls_unpriced, last_call_cost, resent_tokens
 `
 
 type UpdateSessionParams struct {
@@ -259,6 +264,7 @@ type UpdateSessionParams struct {
 	CallsPriced                int64          `json:"calls_priced"`
 	CallsUnpriced              int64          `json:"calls_unpriced"`
 	LastCallCost               float64        `json:"last_call_cost"`
+	ResentTokens               int64          `json:"resent_tokens"`
 	ID                         string         `json:"id"`
 }
 
@@ -275,6 +281,7 @@ func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) (S
 		arg.CallsPriced,
 		arg.CallsUnpriced,
 		arg.LastCallCost,
+		arg.ResentTokens,
 		arg.ID,
 	)
 	var i Session
@@ -296,6 +303,7 @@ func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) (S
 		&i.CallsPriced,
 		&i.CallsUnpriced,
 		&i.LastCallCost,
+		&i.ResentTokens,
 	)
 	return i, err
 }

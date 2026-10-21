@@ -378,3 +378,17 @@ func TestAgentToolDescriptionIsTrueForEveryRole(t *testing.T) {
 		t.Errorf("role enum = %v", role["enum"])
 	}
 }
+
+// The usage tool answers "what has this cost / what is left" in one call. It
+// belongs to the main conversation (it reads that session's ledger), and is
+// on by default: without it a model was measured taking 30 calls for that
+// question.
+func TestTheMainConversationHasTheUsageTool(t *testing.T) {
+	loadRoleConfig(t)
+	if !toolNames(CoderAgentTools(nil, nil, nil, nil, nil))[tools.UsageToolName] {
+		t.Fatal("the main coder has no usage tool")
+	}
+	if toolNames(SubCoderAgentTools(nil, nil, nil, nil, nil))[tools.UsageToolName] {
+		t.Fatal("a helper got the usage tool; it reports the main session's ledger")
+	}
+}

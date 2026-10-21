@@ -1348,6 +1348,9 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 			return
 		}
 		oldSession.SummaryMessageID = msg.ID
+		// Booked BEFORE the gauge is reset: addCall reads the previous prompt
+		// to count what the summary call sent again (all of it, usually).
+		addCall(&oldSession, callCost(a.summarizeProvider.Model(), response.Usage, time.Now()))
 		// The context has genuinely been emptied and refilled with a summary,
 		// so the gauge resets. The cumulative counters do not — summarising
 		// costs real tokens, and a ledger that forgets them at every
@@ -1358,9 +1361,6 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 		oldSession.CumulativeCompletionTokens += response.Usage.OutputTokens
 		oldSession.CumulativePromptTokens += response.Usage.InputTokens +
 			response.Usage.CacheCreationTokens + response.Usage.CacheReadTokens
-		model := a.summarizeProvider.Model()
-		usage := response.Usage
-		addCall(&oldSession, callCost(model, usage, time.Now()))
 		_, err = a.sessions.Save(summarizeCtx, oldSession)
 		if err != nil {
 			event = AgentEvent{

@@ -27,6 +27,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/quota"
 	"github.com/opencode-ai/opencode/internal/session"
+	"github.com/opencode-ai/opencode/internal/usage"
 	"github.com/opencode-ai/opencode/internal/tui/components/chat"
 	"github.com/opencode-ai/opencode/internal/tui/components/core"
 	"github.com/opencode-ai/opencode/internal/tui/components/dialog"
@@ -486,6 +487,8 @@ func formatQuotaScrollbackLine(at time.Time, line string) string {
 // figure without a time is not a measurement. The toast stays for immediacy.
 type quotaLineMsg struct {
 	line string
+	// typed marks the reading the person asked for with /usage.
+	typed bool
 	kind util.InfoType
 	// summary, when non-nil, renders the full Models & Quota panel into the
 	// scrollback (bars, plain-language "left/used", green->red colour). Set only
@@ -616,6 +619,20 @@ func configuredBalances(ctx context.Context) []quota.Reading {
 }
 
 // nothing); quiet=false reports the reason (used by /usage on demand).
+// typedUsageCmd is /usage: the allowance reading, marked as asked for so the
+// session's own ledger is printed with it.
+func typedUsageCmd() tea.Cmd {
+	inner := antigravityUsageCmd(false)
+	return func() tea.Msg {
+		m := inner()
+		if q, ok := m.(quotaLineMsg); ok {
+			q.typed = true
+			return q
+		}
+		return m
+	}
+}
+
 func antigravityUsageCmd(quiet bool) tea.Cmd {
 	return func() tea.Msg {
 		// Antigravity is not the active provider: do not fetch its weekly quota
@@ -856,6 +873,14 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			out := formatQuotaScrollbackLine(time.Now(), msg.line)
 			if len(msg.meters) > 0 || len(msg.balances) > 0 {
 				out += "\n\n" + renderQuotaPanel(msg.meters, msg.balances, a.width, time.Now()) + "\n"
+			}
+			// GORILLA (2026-10-21): what THIS session has cost, in the same words
+			// the usage tool gives the AI, so the two can never disagree. Only on
+			// a typed /usage, never on the quiet start-up line.
+			if msg.typed && a.selectedSession.ID != "" && a.app != nil && a.app.Sessions != nil {
+				if s, err := a.app.Sessions.Get(context.Background(), a.selectedSession.ID); err == nil {
+					out += "\nThis session:\n  " + strings.Join(usage.SessionLines(s), "\n  ") + "\n"
+				}
 			}
 			cmds = append(cmds, tea.Println(out))
 		}
@@ -1930,7 +1955,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// GORILLA OVERRIDE: /usage — Antigravity weekly quota. Typed commands
 			// dispatch through this switch, NOT the command palette, so a palette
 			// RegisterCommand alone left `/usage` reported as "Unknown command".
-			return a, antigravityUsageCmd(false)
+			return a, typedUsageCmd()
 		case "login":
 			// GORILLA OVERRIDE: /login — run the browser OAuth flow
 			// to sign in with Google (Code Assist free tier).
