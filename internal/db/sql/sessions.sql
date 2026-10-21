@@ -56,7 +56,11 @@ SET
     cumulative_prompt_tokens = ?,
     cumulative_completion_tokens = ?,
     summary_message_id = ?,
-    cost = ?
+    cost = ?,
+    cost_reread = ?,
+    calls_priced = ?,
+    calls_unpriced = ?,
+    last_call_cost = ?
 WHERE id = ?
 RETURNING *;
 

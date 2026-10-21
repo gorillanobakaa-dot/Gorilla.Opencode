@@ -240,6 +240,11 @@ type Config struct {
 	TUI              TUIConfig                         `json:"tui"`
 	Shell            ShellConfig                       `json:"shell,omitempty"`
 	AutoCompact      bool                              `json:"autoCompact,omitempty"`
+	// GORILLA (2026-10-21): the status bar warns, once per step, each time a
+	// session's cost passes another multiple of this many dollars, and the cost
+	// chip turns red. Default 5; 0 switches it off. No omitempty: an explicit 0
+	// must survive a save, or "off" would quietly come back as the default.
+	CostWarnUSD float64 `json:"costWarnUSD"`
 	// GORILLA OVERRIDE (2026-10-09): user-configured lifecycle hooks — local
 	// commands run before/after a tool call and at the end of a turn. None ship
 	// configured. Declared here also so updateCfgFile, which round-trips
@@ -427,6 +432,7 @@ func setDefaults(debug bool) {
 	viper.SetDefault("contextPaths", defaultContextPaths)
 	viper.SetDefault("tui.theme", "opencode")
 	viper.SetDefault("autoCompact", true)
+	viper.SetDefault("costWarnUSD", 5.0)
 
 	// GORILLA OVERRIDE (2026-09-01): do NOT default shell.path here.
 	//

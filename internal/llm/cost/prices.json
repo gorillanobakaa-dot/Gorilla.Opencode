@@ -1,0 +1,71 @@
+{
+  "about": "US dollars per million tokens, one table per provider. Every number was read from the provider's own price page on the date in 'fetched' (page copies in the fieldkit evidence store, by sha256). Never type a price from memory: re-fetch the page, update the numbers and the date. Keys: input, output, cache_read (cache hits), cache_write_5m / cache_write_1h (Anthropic prompt-cache writes). 'from'/'to' are inclusive UTC dates for dated prices. 'over' holds the prices for a call whose prompt (input + cache reads + cache writes) is over 'prompt_tokens'. 'fast' holds fast-mode input/output prices; the page says caching multipliers apply on top, so cache prices scale by the same factor.",
+  "suffixes_stripped": ["-low", "-medium", "-high", "-xhigh", "-max", "-thinking"],
+  "suffixes_why": "Effort or thinking-level variants of one public model, priced as that model (the variants claude-opus-5-5-low/-max and gemini-4-argon-low/-high sit next to the public names in Antigravity's language_server.exe, 2026-10-21). Any other internal name stays unpriced unless the user passes --assume NAME=PUBLIC.",
+  "providers": {
+    "anthropic": {
+      "label": "Anthropic Claude API (first party)",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "fetched": "2026-10-21",
+      "sha256": "6e7d5097d0290fd3bb01152cbb045fc8e6939e9aa80f964a7f8976668356184c",
+      "notes": "Used for Claude Code (CLI and the desktop app's Code tab). inference_geo 'us' costs 1.1x on Claude 4.6 and later. Claude 4.6 and later (except Haiku 5.5) bill the full 1M context at standard prices.",
+      "us_geo_multiplier": 1.1,
+      "models": {
+        "claude-fable-5-1": [{"input": 10, "output": 50, "cache_write_5m": 12.5, "cache_write_1h": 20, "cache_read": 0.25}],
+        "claude-mythos-5-1": [{"input": 10, "output": 50, "cache_write_5m": 12.5, "cache_write_1h": 20, "cache_read": 0.25}],
+        "claude-fable-5": [{"input": 10, "output": 50, "cache_write_5m": 12.5, "cache_write_1h": 20, "cache_read": 1}],
+        "claude-mythos-5": [{"input": 10, "output": 50, "cache_write_5m": 12.5, "cache_write_1h": 20, "cache_read": 1}],
+        "claude-opus-5-5": [{"input": 4, "output": 20, "cache_write_5m": 5, "cache_write_1h": 8, "cache_read": 0.2,
+                             "fast": {"input": 8, "output": 40}}],
+        "claude-opus-5": [{"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.5,
+                           "fast": {"input": 10, "output": 50}}],
+        "claude-opus-4-8": [{"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.5,
+                             "fast": {"input": 10, "output": 50}}],
+        "claude-opus-4-7": [{"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.5}],
+        "claude-opus-4-6": [{"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.5}],
+        "claude-opus-4-5": [{"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.5}],
+        "claude-opus-4-1": [{"input": 15, "output": 75, "cache_write_5m": 18.75, "cache_write_1h": 30, "cache_read": 1.5}],
+        "claude-opus-4": [{"input": 15, "output": 75, "cache_write_5m": 18.75, "cache_write_1h": 30, "cache_read": 1.5}],
+        "claude-sonnet-5-5": [{"input": 2, "output": 10, "cache_write_5m": 2.5, "cache_write_1h": 4, "cache_read": 0.1}],
+        "claude-sonnet-5": [{"input": 2, "output": 10, "cache_write_5m": 2.5, "cache_write_1h": 4, "cache_read": 0.2}],
+        "claude-haiku-5-5": [{"input": 0.1, "output": 0.5, "cache_write_5m": 0.125, "cache_write_1h": 0.2, "cache_read": 0.01,
+                              "over": {"prompt_tokens": 100000, "input": 0.5, "output": 2.5, "cache_write_5m": 0.625,
+                                       "cache_write_1h": 1, "cache_read": 0.05}}]
+      }
+    },
+    "google-cloud-claude": {
+      "label": "Claude on Google Cloud (Vertex AI / Agent Platform), global endpoint",
+      "source": "https://cloud.google.com/vertex-ai/generative-ai/pricing",
+      "fetched": "2026-10-21",
+      "sha256": "cafefddaf4c4911525d646d36db8532bdd992a94e8d1b02ae5d0f30b3e983837",
+      "notes": "Used for Antigravity running Claude (api_provider API_PROVIDER_ANTHROPIC_VERTEX). The page redirects to cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing. Antigravity never records cache writes, so its Claude totals are a lower bound.",
+      "models": {
+        "claude-opus-5-5": [{"input": 4, "output": 20, "cache_write_5m": 5, "cache_write_1h": 8, "cache_read": 0.2}],
+        "claude-opus-4-6": [{"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.5}]
+      }
+    },
+    "gemini-api": {
+      "label": "Google Gemini Developer API, Standard paid tier",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing",
+      "fetched": "2026-10-21",
+      "page_updated": "2026-10-19",
+      "sha256": "2206316e17b5c99f1483c9ea820bdbad7472a3f52121ce7cc454282c3c8e96b1",
+      "notes": "Used for Antigravity running Gemini (api_provider API_PROVIDER_GOOGLE_GEMINI). Output includes thinking tokens. Context-cache storage (per hour) is not counted: Antigravity records only cache hits.",
+      "models": {
+        "gemini-4-argon": [
+          {"to": "2026-11-30", "input": 2, "output": 10, "cache_read": 0.1},
+          {"from": "2026-12-01", "input": 4, "output": 20, "cache_read": 0.2}],
+        "gemini-3.8-flash": [
+          {"to": "2026-12-31", "input": 0.75, "output": 3.75, "cache_read": 0.075},
+          {"from": "2027-01-01", "input": 1.5, "output": 7.5, "cache_read": 0.15}],
+        "gemini-3.6-flash": [
+          {"to": "2026-12-31", "input": 0.75, "output": 3.75, "cache_read": 0.075},
+          {"from": "2027-01-01", "input": 1.5, "output": 7.5, "cache_read": 0.15}],
+        "gemini-3.5-flash-lite": [{"input": 0.3, "output": 2.5, "cache_read": 0.03}],
+        "gemini-3.1-flash-lite": [{"input": 0.25, "output": 1.5, "cache_read": 0.025}],
+        "gemini-3.1-pro-preview": [{"input": 2, "output": 12, "cache_read": 0.2,
+                                    "over": {"prompt_tokens": 200000, "input": 4, "output": 18, "cache_read": 0.4}}]
+      }
+    }
+  }
+}

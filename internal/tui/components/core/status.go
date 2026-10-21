@@ -51,6 +51,9 @@ type statusCmp struct {
 	liveHelperCost float64
 	// GORILLA OVERRIDE: show the "cost is an estimate" note once per run.
 	costNoticeShown bool
+	// costWarnStep is the last multiple of config CostWarnUSD already announced
+	// for the session on screen, so each step is said once (see costWarning).
+	costWarnStep int
 	// GORILLA FIX (2026-08-18): msgSeq is the generation of the message
 	// currently shown. Every message increments it and arms a clear stamped with
 	// it; a clear only fires if its stamp still matches. Without this, each
@@ -109,14 +112,26 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		return m, nil
 	case chat.SessionSelectedMsg:
+		if msg.ID != m.session.ID {
+			m.costWarnStep = 0
+		}
 		m.session = msg
 	case chat.SessionClearedMsg:
 		m.session = session.Session{}
+		m.costWarnStep = 0
 	case pubsub.Event[session.Session]:
 		if msg.Type == pubsub.UpdatedEvent {
 			if m.session.ID == msg.Payload.ID {
 				m.session = msg.Payload
 			}
+		}
+		// GORILLA (2026-10-21): past each multiple of costWarnUSD, say so loudly,
+		// once per step, with the reason and what to do about it. A warning
+		// takes the place of the one-time estimate note below.
+		if warn, step := costWarning(m.session, m.session.Cost+m.liveHelperCost, costWarnUSD(), m.costWarnStep); warn != "" {
+			m.costWarnStep = step
+			m.costNoticeShown = true
+			return m, util.CmdHandler(util.InfoMsg{Type: util.InfoTypeWarn, Msg: warn, TTL: errorMessageTTL})
 		}
 		// GORILLA OVERRIDE: the first time a session shows a non-zero
 		// cost, remind the user (once) that it's only an estimate — on
@@ -125,7 +140,7 @@ func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.costNoticeShown = true
 			return m, util.CmdHandler(util.InfoMsg{
 				Type: util.InfoTypeInfo,
-				Msg:  "That cost is a rough estimate from a static price table — on a free or flat-rate tier your real bill is $0, genius.",
+				Msg:  "That cost is what these calls cost at API prices (dated price table) — on a free or flat-rate tier your real bill is $0, genius.",
 				TTL:  10 * time.Second,
 			})
 		}
@@ -258,6 +273,7 @@ func (m statusCmp) chrome() statusChrome {
 	c := statusChrome{model: m.model()}
 
 	tokenInfoWidth := 0
+	shortTokens := ""
 	if m.session.ID != "" {
 		// GORILLA FIX (2026-08-17): count the helpers too. This read
 		// m.session.PromptTokens + CompletionTokens, which is the CONVERSATION
@@ -270,7 +286,8 @@ func (m statusCmp) chrome() statusChrome {
 		// were never in this model's window; dividing it by the window is what
 		// printed "169%" beside a header saying 14%.
 		contextTokens := m.session.PromptTokens + m.session.CompletionTokens
-		tokens := formatTokensAndCost(contextTokens, totalTokens, model.ContextWindow, m.session.Cost+m.liveHelperCost)
+		spend := m.session.Cost + m.liveHelperCost
+		tokens := formatTokensAndCost(contextTokens, totalTokens, model.ContextWindow, spend)
 		tokensStyle := styles.Padded().
 			Background(t.Text()).
 			Foreground(t.BackgroundSecondary())
@@ -278,8 +295,20 @@ func (m statusCmp) chrome() statusChrome {
 		if percentage > 80 {
 			tokensStyle = tokensStyle.Background(t.Warning())
 		}
+		// Past the cost threshold the chip stays red until the session ends:
+		// the warning message scrolls away, the colour does not.
+		if overCostThreshold(spend, costWarnUSD()) {
+			tokensStyle = tokensStyle.Background(t.Error()).Foreground(t.Background())
+		}
+		// The "why" (re-reading share, last call, unpriced calls) goes first
+		// when the line is short: see the narrow-terminal block below.
+		short := tokens
+		if d := costDetail(m.session); d != "" {
+			tokens += " (" + d + ")"
+		}
 		tokenInfoWidth = lipgloss.Width(tokens) + 2
 		c.tokens = tokensStyle.Render(tokens)
+		shortTokens = tokensStyle.Render(short)
 	}
 
 	c.diagnostics = styles.Padded().
@@ -341,6 +370,10 @@ func (m statusCmp) chrome() statusChrome {
 	// "P". The chips that only repeat a state give way first: the mode chip keeps
 	// its word, an empty diagnostics chip goes. What the AI may do stays on screen.
 	if c.avail-infoPadding < minStatusMsg {
+		if shortTokens != "" {
+			c.tokens = shortTokens
+			tokenInfoWidth = lipgloss.Width(shortTokens)
+		}
 		switch permission.EffectiveMode(m.session.ID) {
 		case config.PermissionAuto:
 			c.yolo = styles.Padded().Background(t.Error()).Foreground(t.Background()).Bold(true).Render("AUTO")
@@ -553,4 +586,13 @@ func humanTokens(n int64) string {
 	}
 	s = strings.Replace(s, ".0K", "K", 1)
 	return strings.Replace(s, ".0M", "M", 1)
+}
+
+// costWarnUSD is the configured warning step in dollars; 0 when off or before
+// the configuration is loaded.
+func costWarnUSD() float64 {
+	if cfg := config.Get(); cfg != nil {
+		return cfg.CostWarnUSD
+	}
+	return 0
 }

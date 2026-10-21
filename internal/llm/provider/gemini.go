@@ -507,12 +507,10 @@ func (g *geminiClient) usage(resp *genai.GenerateContentResponse) TokenUsage {
 		return TokenUsage{}
 	}
 
-	return TokenUsage{
-		InputTokens:         int64(resp.UsageMetadata.PromptTokenCount),
-		OutputTokens:        int64(resp.UsageMetadata.CandidatesTokenCount),
-		CacheCreationTokens: 0, // Not directly provided by Gemini
-		CacheReadTokens:     int64(resp.UsageMetadata.CachedContentTokenCount),
-	}
+	u := resp.UsageMetadata
+	// Gemini reports no cache writes (implicit caching); see geminiUsage.
+	return geminiUsage(int64(u.PromptTokenCount), int64(u.CandidatesTokenCount),
+		int64(u.CachedContentTokenCount), int64(u.ThoughtsTokenCount))
 }
 
 func WithGeminiDisableCache() GeminiOption {

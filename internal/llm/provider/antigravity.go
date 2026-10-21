@@ -149,7 +149,7 @@ func (c *antigravityClient) send(ctx context.Context, messages []message.Message
 	return &ProviderResponse{
 		Content:      text,
 		ToolCalls:    calls,
-		Usage:        TokenUsage{InputTokens: r.Response.UsageMetadata.PromptTokenCount, OutputTokens: r.Response.UsageMetadata.CandidatesTokenCount},
+		Usage:        r.Response.UsageMetadata.usage(),
 		FinishReason: mapFinish(cand.FinishReason, len(calls) > 0),
 	}, nil
 }
@@ -207,11 +207,8 @@ func (c *antigravityClient) stream(ctx context.Context, messages []message.Messa
 			if cand.FinishReason != "" {
 				finish = cand.FinishReason
 			}
-			if chunk.Response.UsageMetadata.CandidatesTokenCount > 0 {
-				usage = TokenUsage{
-					InputTokens:  chunk.Response.UsageMetadata.PromptTokenCount,
-					OutputTokens: chunk.Response.UsageMetadata.CandidatesTokenCount,
-				}
+			if u := chunk.Response.UsageMetadata; u.CandidatesTokenCount > 0 || u.ThoughtsTokenCount > 0 {
+				usage = u.usage()
 			}
 		}
 		if err := scanner.Err(); err != nil && ctx.Err() == nil {

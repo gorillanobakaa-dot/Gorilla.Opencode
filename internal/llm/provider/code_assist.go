@@ -136,11 +136,21 @@ type caResponse struct {
 			} `json:"content"`
 			FinishReason string `json:"finishReason"`
 		} `json:"candidates"`
-		UsageMetadata struct {
-			PromptTokenCount     int64 `json:"promptTokenCount"`
-			CandidatesTokenCount int64 `json:"candidatesTokenCount"`
-		} `json:"usageMetadata"`
+		UsageMetadata caUsage `json:"usageMetadata"`
 	} `json:"response"`
+}
+
+// caUsage is Gemini's usageMetadata as the Code Assist and Antigravity
+// endpoints send it (the same field names as the Gemini API).
+type caUsage struct {
+	PromptTokenCount        int64 `json:"promptTokenCount"`
+	CandidatesTokenCount    int64 `json:"candidatesTokenCount"`
+	CachedContentTokenCount int64 `json:"cachedContentTokenCount"`
+	ThoughtsTokenCount      int64 `json:"thoughtsTokenCount"`
+}
+
+func (u caUsage) usage() TokenUsage {
+	return geminiUsage(u.PromptTokenCount, u.CandidatesTokenCount, u.CachedContentTokenCount, u.ThoughtsTokenCount)
 }
 
 // ---- conversion (mirrors gemini.go convertMessages/convertTools) -----------
@@ -406,7 +416,7 @@ func (c *codeAssistClient) send(ctx context.Context, messages []message.Message,
 	return &ProviderResponse{
 		Content:      text,
 		ToolCalls:    calls,
-		Usage:        TokenUsage{InputTokens: r.Response.UsageMetadata.PromptTokenCount, OutputTokens: r.Response.UsageMetadata.CandidatesTokenCount},
+		Usage:        r.Response.UsageMetadata.usage(),
 		FinishReason: mapFinish(cand.FinishReason, len(calls) > 0),
 	}, nil
 }
@@ -478,11 +488,8 @@ func (c *codeAssistClient) stream(ctx context.Context, messages []message.Messag
 			if cand.FinishReason != "" {
 				finish = cand.FinishReason
 			}
-			if chunk.Response.UsageMetadata.CandidatesTokenCount > 0 {
-				usage = TokenUsage{
-					InputTokens:  chunk.Response.UsageMetadata.PromptTokenCount,
-					OutputTokens: chunk.Response.UsageMetadata.CandidatesTokenCount,
-				}
+			if u := chunk.Response.UsageMetadata; u.CandidatesTokenCount > 0 || u.ThoughtsTokenCount > 0 {
+				usage = u.usage()
 			}
 		}
 		if err := scanner.Err(); err != nil && ctx.Err() == nil {

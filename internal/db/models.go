@@ -43,4 +43,8 @@ type Session struct {
 	StartedIn                  string         `json:"started_in"`
 	CumulativePromptTokens     int64          `json:"cumulative_prompt_tokens"`
 	CumulativeCompletionTokens int64          `json:"cumulative_completion_tokens"`
+	CostReread                 float64        `json:"cost_reread"`
+	CallsPriced                int64          `json:"calls_priced"`
+	CallsUnpriced              int64          `json:"calls_unpriced"`
+	LastCallCost               float64        `json:"last_call_cost"`
 }

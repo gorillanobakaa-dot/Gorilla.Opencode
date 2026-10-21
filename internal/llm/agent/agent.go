@@ -1133,12 +1133,7 @@ func (a *agent) TrackUsage(ctx context.Context, sessionID string, model models.M
 		return fmt.Errorf("failed to get session: %w", err)
 	}
 
-	cost := model.CostPer1MInCached/1e6*float64(usage.CacheCreationTokens) +
-		model.CostPer1MOutCached/1e6*float64(usage.CacheReadTokens) +
-		model.CostPer1MIn/1e6*float64(usage.InputTokens) +
-		model.CostPer1MOut/1e6*float64(usage.OutputTokens)
-
-	sess.Cost += cost
+	addCall(&sess, callCost(model, usage, time.Now()))
 	// GORILLA FIX (2026-08-19): a cache READ is INPUT, not output.
 	//
 	// Upstream did `CompletionTokens = OutputTokens + CacheReadTokens` and left
@@ -1365,11 +1360,7 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 			response.Usage.CacheCreationTokens + response.Usage.CacheReadTokens
 		model := a.summarizeProvider.Model()
 		usage := response.Usage
-		cost := model.CostPer1MInCached/1e6*float64(usage.CacheCreationTokens) +
-			model.CostPer1MOutCached/1e6*float64(usage.CacheReadTokens) +
-			model.CostPer1MIn/1e6*float64(usage.InputTokens) +
-			model.CostPer1MOut/1e6*float64(usage.OutputTokens)
-		oldSession.Cost += cost
+		addCall(&oldSession, callCost(model, usage, time.Now()))
 		_, err = a.sessions.Save(summarizeCtx, oldSession)
 		if err != nil {
 			event = AgentEvent{

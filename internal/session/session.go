@@ -29,6 +29,14 @@ type Session struct {
 	CumulativeCompletionTokens int64
 	SummaryMessageID           string
 	Cost                       float64
+	// CostReread is the part of Cost paid for re-sending old context (cache
+	// reads); CallsPriced/CallsUnpriced count the calls behind Cost and the
+	// ones no price table knows (not in Cost); LastCallCost is the newest
+	// priced call. Written by agent.TrackUsage, read by the status bar.
+	CostReread    float64
+	CallsPriced   int64
+	CallsUnpriced int64
+	LastCallCost  float64
 	CreatedAt                  int64
 	UpdatedAt                  int64
 	// StartedIn is the primary working directory the session was created in.
@@ -349,7 +357,11 @@ func (s *service) Save(ctx context.Context, session Session) (Session, error) {
 			String: session.SummaryMessageID,
 			Valid:  session.SummaryMessageID != "",
 		},
-		Cost: session.Cost,
+		Cost:          session.Cost,
+		CostReread:    session.CostReread,
+		CallsPriced:   session.CallsPriced,
+		CallsUnpriced: session.CallsUnpriced,
+		LastCallCost:  session.LastCallCost,
 	})
 	if err != nil {
 		return Session{}, err
@@ -406,6 +418,10 @@ func (s service) fromDBItem(item db.Session) Session {
 		CumulativeCompletionTokens: item.CumulativeCompletionTokens,
 		SummaryMessageID:           item.SummaryMessageID.String,
 		Cost:                       item.Cost,
+		CostReread:                 item.CostReread,
+		CallsPriced:                item.CallsPriced,
+		CallsUnpriced:              item.CallsUnpriced,
+		LastCallCost:               item.LastCallCost,
 		CreatedAt:                  item.CreatedAt,
 		UpdatedAt:                  item.UpdatedAt,
 		StartedIn:                  item.StartedIn,
