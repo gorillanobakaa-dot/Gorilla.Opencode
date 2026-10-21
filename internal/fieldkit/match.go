@@ -103,6 +103,10 @@ var stopWords = map[string]bool{
 	"them": true, "their": true, "our": true, "its": true, "he": true, "she": true, "his": true, "her": true,
 	"far": true, "thing": true, "things": true, "something": true, "anything": true, "ok": true,
 	"okay": true, "yes": true, "hi": true, "hello": true, "thanks": true, "thank": true, "more": true, "less": true, "again": true, "into": true, "out": true, "over": true, "these": true, "those": true,
+	// "id" is a fragment of file names far more often than a subject: "show me
+	// .ssh/id_rsa" split into id + rsa and offered three tools whose titles say
+	// "ID" (2026-10-21, on the 0.1.149 release build).
+	"id": true, "ids": true,
 }
 
 // minShare is how close to the best match a hit must come to be offered: a hit

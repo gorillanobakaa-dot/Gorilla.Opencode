@@ -104,3 +104,12 @@ func TestEverydayWordsOfferNothingAndWeakHitsAreDropped(t *testing.T) {
 		t.Errorf("cooling profile: got %v, want only thermal-profile", ids)
 	}
 }
+
+// A file name is not a subject: "id_rsa" split into "id" + "rsa", and "id" is in
+// three tool titles. Measured on the 0.1.149 release build, 2026-10-21.
+func TestAFileNameOffersNoTools(t *testing.T) {
+	c, _ := Load()
+	if h := Hint(c, "Use the view tool to show me the file .ssh/id_rsa", 5); h != "" {
+		t.Errorf("offered tools for a file name:\n%s", h)
+	}
+}
