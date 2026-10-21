@@ -182,6 +182,9 @@ func coderToolSet(
 		// one call. Main conversation only: it reports THIS session's ledger.
 		add(config.UsageComponentID, tools.NewUsageTool(sessions))
 	}
+	// GORILLA (2026-10-21): binary and forensics toolkit, phase 1 (pure Go).
+	add(config.BinaryInspectComponentID, tools.NewBinaryInspectTool())
+	add(config.ArchiveComponentID, tools.NewArchiveTool(permissions))
 
 	return append(coderTools, otherTools...)
 }
@@ -207,6 +210,10 @@ func loadoutIDForTool(name string) (string, bool) {
 		return "tool.fetch", true
 	case AgentToolName:
 		return "tool.agent", true
+	case tools.BinaryInspectToolName:
+		return config.BinaryInspectComponentID, true
+	case tools.ArchiveToolName:
+		return config.ArchiveComponentID, true
 	}
 	return "", false
 }
@@ -288,7 +295,7 @@ func deferredToolNames() map[string]bool {
 	for _, name := range []string{
 		tools.ReviewToolName, tools.PatchPortToolName, tools.BioDataToolName,
 		tools.SparseToolName, tools.WebSearchToolName, tools.FetchToolName,
-		AgentToolName,
+		AgentToolName, tools.BinaryInspectToolName, tools.ArchiveToolName,
 	} {
 		if tools.IsDeferrable(name) {
 			out[name] = true

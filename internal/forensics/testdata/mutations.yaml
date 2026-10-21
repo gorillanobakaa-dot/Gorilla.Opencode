@@ -1,0 +1,75 @@
+# Rules the forensics tests must hold. Each line breaks one on purpose; every
+# one must be CAUGHT. Run from the repository root:
+#   fieldkit mutate --plan internal/forensics/testdata/mutations.yaml --cwd . -- go test ./internal/forensics/ ./internal/llm/tools/ -run "^Test(ELF|PE|MachO|Legacy|Strings|Entropy|ListCap|Refuses|Clean|Omni|Large|Tar|Single|Stream|Unsupported|Safe|Traversal|Extract|BinaryInspect|ArchiveTool)"
+- file: internal/forensics/archive.go
+  swap: ['case seg == "..":', 'case seg == "...":']
+  why: an entry name with a .. segment must be refused (path traversal)
+- file: internal/forensics/archive.go
+  swap: ['case strings.HasPrefix(n, "/"):', 'case strings.HasPrefix(n, "//"):']
+  why: an absolute entry name must be refused
+- file: internal/forensics/archive.go
+  swap: ['case strings.Contains(n, ":"):', 'case strings.Contains(n, "::"):']
+  why: drive letters and alternate data streams must be refused
+- file: internal/forensics/archive.go
+  swap: ['case isWindowsDevice(seg):', 'case false && isWindowsDevice(seg):']
+  why: Windows device names (CON, COM1, ...) must be refused
+- file: internal/forensics/archive.go
+  swap: ['if fi.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 || !fi.IsDir() {', 'if false {']
+  why: a link or junction inside the destination must not carry the write elsewhere
+- file: internal/forensics/archive.go
+  swap: ['if _, err := os.Lstat(target); err == nil {', 'if false {']
+  why: an existing file is never overwritten, and the refusal says so
+- file: internal/forensics/archive.go
+  swap: ['case e.size > maxBytes:', 'case e.size > maxBytes*1000:']
+  why: an entry over the extraction cap is refused before writing
+- file: internal/forensics/archive.go
+  swap: ['case e.kind != kindFile:', 'case e.kind == "never":']
+  why: links are never extracted
+- file: internal/forensics/archive.go
+  swap: ['*c.capped = true', '_ = c.capped']
+  why: a decompression stream cut off at the cap says so
+- file: internal/forensics/strings.go
+  swap: ['if haveLow[p] && c == 0 {', 'if haveLow[p] && c == 1 {']
+  why: UTF-16LE strings are found
+- file: internal/forensics/strings.go
+  swap: ['for p := 0; p < 2; p++ {', 'for p := 0; p < 1; p++ {']
+  why: a UTF-16LE string at an odd offset is found
+- file: internal/forensics/strings.go
+  swap: ['if len(asc) >= min {', 'if len(asc) >= min-1 {']
+  why: strings shorter than the minimum are not reported
+- file: internal/forensics/strings.go
+  swap: ['e -= p * math.Log2(p)', 'e += p * math.Log2(p)']
+  why: entropy is computed correctly
+- file: internal/forensics/binary.go
+  swap: ['if src == "LC_BUILD_VERSION" {', 'if src == "never" {']
+  why: a minimum from LC_BUILD_VERSION is not a refusal on 10.13 (Gorilla's own build carries 11.0 and runs)
+- file: internal/forensics/binary.go
+  swap: ['			return x < y', '			return x > y']
+  why: macOS versions compare numerically
+- file: internal/forensics/binary.go
+  swap: ['if cpu != macho.CpuAmd64 && cpu != macho.Cpu386 {', 'if cpu == macho.CpuPpc {']
+  why: an arm64 slice never passes the Intel Air check
+- file: internal/forensics/binary.go
+  swap: ['		if i == max {', '		if i == max+1000 {']
+  why: lists are capped and the cap is reported
+- file: internal/forensics/binary.go
+  swap: ['if strings.Contains(strings.ToLower(it), lf) {', 'if true {']
+  why: filter narrows a list
+- file: internal/forensics/binary.go
+  swap: ['runpath, _ := f.DynString(elf.DT_RUNPATH)', 'runpath, _ := f.DynString(elf.DT_RPATH)']
+  why: ELF runpath is reported
+- file: internal/forensics/binary.go
+  swap: ['case lcVersionMinMacOSX:', 'case 0xffff:']
+  why: the 10.13-era minimum (LC_VERSION_MIN_MACOSX) is read
+- file: internal/llm/tools/forensics.go
+  swap: ['if !t.permissions.Request(permission.CreatePermissionRequest{', 'if false && !t.permissions.Request(permission.CreatePermissionRequest{']
+  why: extraction asks first
+- file: internal/llm/tools/forensics.go
+  swap: ['	if !inside {', '	if false {']
+  why: extraction writes only inside the project
+- file: internal/llm/tools/forensics.go
+  swap: ['return NewUntrustedTextResponse("binary strings", path, "", out), nil', 'return NewTextResponse(out), nil']
+  why: strings from a binary are fenced as untrusted
+- file: internal/llm/tools/forensics.go
+  swap: ['if why := RefuseSensitiveRead(p); why != "" {', 'if why := RefuseSensitiveRead(p); why == "never" {']
+  why: both tools keep the credential guard

@@ -241,13 +241,14 @@ exists.
 TestDefaultToolSchemaCost -v`:
 
 ```
-tool schemas, default ON                            ~10,204 tokens   79%
-base system prompt (coder-modern)                    ~2,314 tokens   18%
+tool schemas, default ON                            ~10,562 tokens   80%
+base system prompt (coder-modern)                    ~2,314 tokens   17%
 prompt blocks, default ON                              ~397 tokens    3%
                                                      ------------
-per-turn total, before any CLAUDE.md                ~12,915 tokens
+per-turn total, before any CLAUDE.md                ~13,273 tokens
 
-(re-measured 2026-10-21 with the usage tool, 96 tokens; 2026-10-06, v0.1.143: 9,947 / 2,314 / 369 = 12,630;
+(re-measured 2026-10-21 again with binary_inspect 180 + archive 178 = 358, the forensics toolkit;
+earlier 2026-10-21 with the usage tool, 96 tokens: 10,204 / 2,314 / 397 = 12,915; 2026-10-06, v0.1.143: 9,947 / 2,314 / 369 = 12,630;
 the 2026-09 figures were 9,733 / 1,791 / 94 = 11,618)
 
 largest single rows:

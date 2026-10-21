@@ -1,0 +1,4 @@
+# Fixtures are compared byte for byte; git must never touch their line endings.
+* binary
+*.c text eol=lf
+*.md text eol=lf

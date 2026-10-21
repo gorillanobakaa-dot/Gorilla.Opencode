@@ -156,6 +156,14 @@ var LoadoutComponents = []LoadoutComponent{
 	// left". Without it a model asked about "bananas" was measured spending 30
 	// tool calls hunting through files and the session database for it.
 	{UsageComponentID, "Usage and cost — what /usage shows", "asked about cost, quota or what is left, the agent cannot read it and goes looking through your files instead (measured: 30 calls for one question)", 120, true, false},
+	// GORILLA (2026-10-21): the binary and forensics toolkit, phase 1. Pure Go,
+	// read-only, no network. ON by default with deliberately short
+	// descriptions: on Windows and macOS 10.13 there is no readelf, nm,
+	// strings or unzip to fall back on, so without these the agent is blind
+	// to executables and archives. The figures are guesses; calibration
+	// measures both schemas at startup.
+	{BinaryInspectComponentID, "Binary inspection (ELF, PE, Mach-O)", "agent can't look inside programs and libraries: no architecture, linked libraries, minimum macOS, sections or strings unless some external tool happens to be installed (on Windows and macOS usually none is)", 150, true, false},
+	{ArchiveComponentID, "Archives (zip, jar, omni.ja, tar, gz, bz2)", "agent can't list or search an archive or take one file out of it; on Windows it falls back to whatever unzip tool is installed, if any", 150, true, false},
 	// GORILLA OVERRIDE: env estimate was 150 when the block was a recursive
 	// 1000-file tree dump (real cost often 10k–30k). After the shallow
 	// project_summary refactor it really is ~100–200 tokens; calibrate
@@ -256,6 +264,10 @@ const (
 	PeersComponentID = "tool.peers"
 	// UsageComponentID gates the usage tool (session cost + allowance left).
 	UsageComponentID = "tool.usage"
+	// BinaryInspectComponentID and ArchiveComponentID gate the forensics
+	// toolkit's two tools (internal/forensics).
+	BinaryInspectComponentID = "tool.binary_inspect"
+	ArchiveComponentID       = "tool.archive"
 	// GORILLA FIX (2026-08-17): "EXPENSIVE" left the NAME. It sat beside the
 	// per-turn token column and read as a claim about that number — which is
 	// the smallest on the screen, because arming this only adds a paragraph to
@@ -427,6 +439,10 @@ var lowBandwidthOff = map[string]bool{
 	// edit/build loop. Dropping it also closes the local endpoint at the next
 	// start, which on this preset's terms is a door closed, not a loss.
 	PeersComponentID: true,
+	// GORILLA (2026-10-21): the forensics tools are read-only and local, but
+	// their schemas ride every turn and neither is part of an edit/build loop.
+	BinaryInspectComponentID: true,
+	ArchiveComponentID:       true,
 
 	// Components that ship OFF still belong here. The coverage test used to
 	// skip them, reasoning that something off by default costs nothing -- true

@@ -80,6 +80,8 @@ func CalibrateLoadout(
 		toolTokens(tools.NewPeersTool())+toolTokens(tools.NewSendMessageTool(permissions)))
 	// The schema does not depend on the session store, so nil measures it.
 	set(config.UsageComponentID, tools.NewUsageTool(nil))
+	set(config.BinaryInspectComponentID, tools.NewBinaryInspectTool())
+	set(config.ArchiveComponentID, tools.NewArchiveTool(permissions))
 	// The search tool's own schema is fixed, so an empty catalogue measures it
 	// correctly -- the catalogue affects what it FINDS, never what it costs to
 	// declare.

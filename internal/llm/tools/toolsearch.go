@@ -70,6 +70,9 @@ var deferredByDefault = map[string]bool{
 	// the alternative is an import cycle. Guarded by a test that fails if the
 	// two ever disagree.
 	"agent": true,
+	// GORILLA (2026-10-21): the forensics pair, used on demand.
+	BinaryInspectToolName: true,
+	ArchiveToolName:       true,
 }
 
 // NeverDeferred are the tools that must always be present, whatever else
