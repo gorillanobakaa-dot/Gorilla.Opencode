@@ -84,9 +84,9 @@ func TestLedgerCountsTheConversationSentAgain(t *testing.T) {
 		s.PromptTokens, s.CompletionTokens = in+read, out
 		s.CumulativePromptTokens += in + read
 	}
-	step(10_000, 0, 500)      // first call: nothing was sent before
-	step(10_000, 2_000, 300)  // 12,000 sent; 10,500 of it was the previous prompt + reply
-	step(13_000, 0, 200)      // no cache hit at all: still 12,300 repeated
+	step(10_000, 0, 500)     // first call: nothing was sent before
+	step(10_000, 2_000, 300) // 12,000 sent; 10,500 of it was the previous prompt + reply
+	step(13_000, 0, 200)     // no cache hit at all: still 12,300 repeated
 	if s.ResentTokens != 10_500+12_300 {
 		t.Fatalf("re-sent = %d, want %d", s.ResentTokens, 10_500+12_300)
 	}
@@ -95,5 +95,20 @@ func TestLedgerCountsTheConversationSentAgain(t *testing.T) {
 	addCall(&s, callCost(m, provider.TokenUsage{InputTokens: 3_000}, oct21))
 	if s.ResentTokens != 10_500+12_300+3_000 {
 		t.Fatalf("re-sent after compaction = %d, want capped at the 3,000-token prompt", s.ResentTokens)
+	}
+}
+
+// GORILLA (2026-10-21): a rolling alias has no price, the version that answered
+// does. Without a modelVersion it stays unpriced, never guessed.
+func TestARollingAliasIsPricedByTheVersionThatAnswered(t *testing.T) {
+	m := models.Model{Provider: "gemini", APIModel: "gemini-flash-latest"}
+	u := provider.TokenUsage{InputTokens: 1e6, OutputTokens: 1e6}
+	if r := callCost(m, u, oct21); r.Priced {
+		t.Fatalf("alias without a version was priced: %+v", r)
+	}
+	u.ModelVersion = "gemini-3.8-flash"
+	r := callCost(m, u, oct21)
+	if !r.Priced || r.PricedAs != "gemini-3.8-flash" || !near(r.USD, 4.5) {
+		t.Errorf("got %+v, want priced as gemini-3.8-flash, $4.50", r)
 	}
 }

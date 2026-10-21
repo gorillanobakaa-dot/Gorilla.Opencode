@@ -22,11 +22,22 @@ import (
 func callCost(model models.Model, usage provider.TokenUsage, now time.Time) cost.Result {
 	if table := cost.TableFor(string(model.Provider), model.APIModel); table != "" {
 		if p, err := cost.Load(); err == nil {
-			return p.Price(cost.Call{
+			call := cost.Call{
 				Table: table, Model: model.APIModel, Time: now,
 				Input: usage.InputTokens, CacheWrite5m: usage.CacheCreationTokens,
 				CacheRead: usage.CacheReadTokens, Output: usage.OutputTokens,
-			})
+			}
+			r := p.Price(call)
+			// A rolling alias (gemini-flash-latest) has no price; the version
+			// the provider says answered may have one. Priced as that version,
+			// and PricedAs says so.
+			if !r.Priced && usage.ModelVersion != "" {
+				call.Model = usage.ModelVersion
+				if v := p.Price(call); v.Priced {
+					return v
+				}
+			}
+			return r
 		}
 	}
 	reread := model.CostPer1MOutCached / 1e6 * float64(usage.CacheReadTokens)

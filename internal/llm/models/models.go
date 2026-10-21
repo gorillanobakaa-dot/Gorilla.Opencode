@@ -1,6 +1,11 @@
 package models
 
-import "maps"
+import (
+	"maps"
+	"time"
+
+	"github.com/opencode-ai/opencode/internal/llm/cost"
+)
 
 type (
 	ModelID       string
@@ -88,4 +93,15 @@ func init() {
 	// OAuth sign-in the app itself controls (Antigravity, ChatGPT, Code Assist).
 	maps.Copy(SupportedModels, GeminiModels)
 	maps.Copy(SupportedModels, OpenRouterGeneratedModels)
+}
+
+// Rates are the input and output prices per million tokens used for a
+// FORECAST: the sourced, dated table (internal/llm/cost) where the provider
+// bills per token and the table knows the model, the catalogue's numbers
+// otherwise. GORILLA (2026-10-21).
+func (m Model) Rates() (in, out float64) {
+	if in, out, ok := cost.ListRates(string(m.Provider), m.APIModel, time.Now()); ok {
+		return in, out
+	}
+	return m.CostPer1MIn, m.CostPer1MOut
 }

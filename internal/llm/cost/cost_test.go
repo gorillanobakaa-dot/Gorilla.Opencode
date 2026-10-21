@@ -115,3 +115,19 @@ func TestPricesMatchFieldkitKit(t *testing.T) {
 		t.Fatalf("internal/llm/cost/prices.json differs from %s: copy the newer one over", kit)
 	}
 }
+
+// GORILLA (2026-10-21): forecasts read the same table as the meter, for a
+// provider that bills per token; a subscription is never given a bill.
+func TestListRatesForBilledProvidersOnly(t *testing.T) {
+	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+	in, out, ok := ListRates("anthropic", "claude-opus-5-5", now)
+	if !ok || in != 4 || out != 20 {
+		t.Errorf("anthropic opus 5.5 = %v %v %v, want 4 20 true", in, out, ok)
+	}
+	if _, _, ok := ListRates("antigravity", "gemini-3.8-flash", now); ok {
+		t.Errorf("a subscription was given per-token forecast rates")
+	}
+	if _, _, ok := ListRates("anthropic", "claude-made-up-9", now); ok {
+		t.Errorf("an unknown model was given a price")
+	}
+}

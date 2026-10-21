@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/opencode-ai/opencode/internal/llm/tools"
 	"github.com/opencode-ai/opencode/internal/message"
 	"github.com/opencode-ai/opencode/internal/session"
 )
@@ -234,12 +235,17 @@ func writeMessage(b *strings.Builder, m message.Message, sessionStart time.Time,
 			}
 			b.WriteString("\n\n")
 
-			if c := strings.TrimSpace(tr.Content); c != "" {
+			// GORILLA FIX (2026-10-21): an export is a file people pass on.
+			// Rows stored before the metadata was masked still hold
+			// credentials, so they are masked again on the way out.
+			content, _ := tools.MaskSecrets(name, tr.Content)
+			metadata, _ := tools.MaskSecrets(name, tr.Metadata)
+			if c := strings.TrimSpace(content); c != "" {
 				fmt.Fprintf(b, "```\n%s\n```\n\n", c)
 			} else {
 				b.WriteString("_(empty result)_\n\n")
 			}
-			if md := strings.TrimSpace(tr.Metadata); md != "" && md != "{}" {
+			if md := strings.TrimSpace(metadata); md != "" && md != "{}" {
 				fmt.Fprintf(b, "<sub>metadata: `%s`</sub>\n\n", md)
 			}
 		}

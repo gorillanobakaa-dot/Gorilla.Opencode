@@ -139,25 +139,29 @@ func (m ModelFollowDialogCmp) lines() []costLine {
 
 	add(kindHeader, "WHAT IT COSTS YOU")
 	fromModel, fromKnown := models.SupportedModels[m.moves[0].From]
+	// The sourced, dated table where the provider bills per token (see
+	// models.Model.Rates), the catalogue's numbers otherwise.
+	toIn, _ := toModel.Rates()
+	fromIn, _ := fromModel.Rates()
 	switch {
 	case !toKnown || !fromKnown:
 		add(kindMuted, "No published price for one of these models, so there is no")
 		add(kindMuted, "before-and-after figure to show you.")
-	case toModel.CostPer1MIn == 0 && fromModel.CostPer1MIn == 0:
+	case toIn == 0 && fromIn == 0:
 		add(kindMuted, "Neither model bills per token — both are on a flat or free tier.")
 		add(kindQuota, "You are not spending more MONEY. You are spending your «QUOTA» faster,")
 		add(kindQuota, "because the new model is the one doing all of it now.")
-	case fromModel.CostPer1MIn == 0:
+	case fromIn == 0:
 		add(kindMoney, "These jobs used to cost nothing per token. Now they cost %s per 1M in.",
-			amount(toModel.CostPer1MIn))
+			amount(toIn))
 		add(kindDanger, "That is a NEW bill that did not exist five seconds ago.")
-	case toModel.CostPer1MIn == 0:
+	case toIn == 0:
 		add(kindMeasured, "These jobs got CHEAPER: %s per 1M in -> no per-token rate.",
-			amount(fromModel.CostPer1MIn))
+			amount(fromIn))
 	default:
-		ratio := toModel.CostPer1MIn / fromModel.CostPer1MIn
+		ratio := toIn / fromIn
 		add(kindMoney, "Per million words in: %s  ->  %s",
-			amount(fromModel.CostPer1MIn), amount(toModel.CostPer1MIn))
+			amount(fromIn), amount(toIn))
 		switch {
 		case ratio >= 1.1:
 			add(kindDanger, "Background jobs now cost about «%.0f times» what they did.", ratio)
@@ -187,7 +191,7 @@ func (m ModelFollowDialogCmp) lines() []costLine {
 			wasteful = append(wasteful, whatEachAgentDoes[mv.Agent])
 		}
 	}
-	if len(wasteful) > 0 && toKnown && toModel.CostPer1MIn > 0 {
+	if len(wasteful) > 0 && toKnown && toIn > 0 {
 		add(kindAssumed, "")
 		add(kindAssumed, "PROBABLY NOT WORTH IT for: %s.", strings.Join(wasteful, "; "))
 		add(kindMuted, "   Those jobs do not get better on a stronger model. They are")

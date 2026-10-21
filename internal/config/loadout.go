@@ -895,7 +895,8 @@ func LoadoutCost() (dollars, per1MIn float64, modelName string, priced bool) {
 	if name == "" {
 		name = string(m.ID)
 	}
-	return float64(tokens) / 1e6 * m.CostPer1MIn, m.CostPer1MIn, name, true
+	in, _ := m.Rates()
+	return float64(tokens) / 1e6 * in, in, name, true
 }
 
 // ResearchCost prices research helpers, and reports the BURN RATE.
@@ -1011,7 +1012,8 @@ func ResearchCost(inFlight int) (perHelper, perMinute, per1MIn float64, modelNam
 		label = string(m.ID)
 	}
 	perHelper, perMinute = helperSessionForecast(m, inFlight)
-	return perHelper, perMinute, m.CostPer1MIn, label, true
+	rateIn, _ := m.Rates()
+	return perHelper, perMinute, rateIn, label, true
 }
 
 // helperSessionForecast prices one helper session on model m, and the peak burn
@@ -1033,7 +1035,8 @@ func ResearchCost(inFlight int) (perHelper, perMinute, per1MIn float64, modelNam
 // count cancels out of the money entirely.
 func helperSessionForecast(m models.Model, inFlight int) (perHelper, perMinute float64) {
 	in, out, _, _ := ResearchHelperSessionTokens()
-	perHelper = float64(in)/1e6*m.CostPer1MIn + float64(out)/1e6*m.CostPer1MOut
+	rateIn, rateOut := m.Rates()
+	perHelper = float64(in)/1e6*rateIn + float64(out)/1e6*rateOut
 	if inFlight < 1 {
 		inFlight = 1
 	}
@@ -1193,7 +1196,7 @@ func ResearchPaidEquivalent(helperModel models.Model, inFlight int) (perMin, per
 	}
 
 	// Already metered: the real rate IS the answer, no equivalent needed.
-	if helperModel.CostPer1MIn > 0 {
+	if in, _ := helperModel.Rates(); in > 0 {
 		pm, ph := price(helperModel)
 		return pm, ph, "", true
 	}
@@ -1203,7 +1206,7 @@ func ResearchPaidEquivalent(helperModel models.Model, inFlight int) (perMin, per
 	bestScore := 0
 	var bestID models.ModelID
 	for id, m := range models.SupportedModels {
-		if m.CostPer1MIn <= 0 || m.DefaultMaxTokens <= 0 {
+		if in, _ := m.Rates(); in <= 0 || m.DefaultMaxTokens <= 0 {
 			continue
 		}
 		score := 0
@@ -1672,15 +1675,16 @@ func ResearchOrchestratorCost(sessions int) (dollars float64, modelName string, 
 	if label == "" {
 		label = string(m.ID)
 	}
-	if m.CostPer1MIn <= 0 && m.CostPer1MOut <= 0 {
+	rateIn, rateOut := m.Rates()
+	if rateIn <= 0 && rateOut <= 0 {
 		// Free tier or flat-rate: real, and not billed per token.
 		return 0, label, false
 	}
 	launchIn, synthIn := ResearchOrchestratorTokens(sessions)
 	// Output on both turns is unmeasured; ResearchOutputPerStep is the same
 	// stated assumption used everywhere else on this screen.
-	in := float64(launchIn+synthIn) / 1e6 * m.CostPer1MIn
-	out := float64(2*ResearchOutputPerStep) / 1e6 * m.CostPer1MOut
+	in := float64(launchIn+synthIn) / 1e6 * rateIn
+	out := float64(2*ResearchOutputPerStep) / 1e6 * rateOut
 	return in + out, label, true
 }
 

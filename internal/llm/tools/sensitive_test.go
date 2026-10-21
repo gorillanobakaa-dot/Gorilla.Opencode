@@ -143,3 +143,46 @@ func TestAnEnvFileInsideTheWorkspaceIsStillExempt(t *testing.T) {
 		t.Errorf("refused a file inside the workspace: %s", why)
 	}
 }
+
+// GORILLA FIX (2026-10-21): a session started in the home folder must not make
+// the home folder's credentials "project files". MEASURED before the fix: a
+// HOME session read ~/.config/gorilla-opencode/antigravity-oauth.json.
+func TestAHomeFolderWorkspaceIsNotAProject(t *testing.T) {
+	wd := config.WorkingDirectory()
+	if wd == "" {
+		t.Skip("no workspace")
+	}
+	t.Setenv("HOME", wd)
+	t.Setenv("USERPROFILE", wd)
+	for _, p := range []string{
+		filepath.Join(wd, ".ssh", "id_rsa"),
+		filepath.Join(wd, ".aws", "credentials"),
+		filepath.Join(wd, ".netrc"),
+		filepath.Join(wd, ".env"),
+	} {
+		if why := RefuseSensitiveRead(p); why == "" {
+			t.Errorf("ALLOWED a credential read in a home-folder workspace: %s", p)
+		}
+	}
+	if why := refuseSensitiveGlob(".ssh/**", wd); why == "" {
+		t.Errorf("ALLOWED a search into .ssh from a home-folder workspace")
+	}
+	// CAPABILITY GUARD: ordinary files in the home folder stay readable.
+	if why := RefuseSensitiveRead(filepath.Join(wd, "notes.md")); why != "" {
+		t.Errorf("refused an ordinary file in a home-folder workspace: %s", why)
+	}
+}
+
+// The program's own configuration holds the sign-in tokens, so it is refused
+// even when it lies inside the workspace.
+func TestTheProgramsOwnConfigIsRefusedEvenInsideTheWorkspace(t *testing.T) {
+	wd := config.WorkingDirectory()
+	if wd == "" {
+		t.Skip("no workspace")
+	}
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(wd, "cfg"))
+	p := filepath.Join(config.ConfigBase(), "antigravity-oauth.json")
+	if why := RefuseSensitiveRead(p); why == "" {
+		t.Errorf("ALLOWED reading the program's own sign-in file inside the workspace: %s", p)
+	}
+}

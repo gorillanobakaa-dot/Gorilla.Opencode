@@ -173,7 +173,10 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 	// GORILLA OVERRIDE (2026-10-19): a tool the owner listed in readOnlyTools
 	// for a local-trusted server runs without the question; its answer still
 	// goes through runLocalTool's taint check below.
-	p := b.mcpConfig.RunsWithoutAsking(b.tool.Name, declaresNetwork(params.Input)) || b.permissions.Request(
+	// GORILLA (2026-10-21): and a Fieldkit run of a read-only, offline tool when
+	// the owner wrote "run:read-only" there (fieldkit_readonly_run.go).
+	p := b.mcpConfig.RunsWithoutAsking(b.tool.Name, declaresNetwork(params.Input)) ||
+		fieldkitReadOnlyRun(b.mcpName, b.tool.Name, b.mcpConfig, params.Input) || b.permissions.Request(
 		permission.CreatePermissionRequest{
 			SessionID:   sessionID,
 			Path:        config.WorkingDirectory(),

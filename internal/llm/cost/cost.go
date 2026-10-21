@@ -238,3 +238,33 @@ func (p *Prices) Source(table string) (url, fetched string) {
 	t := p.Providers[table]
 	return t.Source, t.Fetched
 }
+
+// ListRates returns the sourced input and output price per million tokens for
+// a model BILLED per token, on day now, at the base tier. ok is false for a
+// provider with no sourced table, for a subscription (antigravity: nothing is
+// billed per call, so a forecast of a bill must stay zero there), and for a
+// model the table does not know; the caller then keeps its own numbers.
+//
+// GORILLA (2026-10-21): the forecasts on the /context screen and the
+// model-change dialog used the catalogue's typed numbers while the status bar
+// used this table, so the two could disagree about the same model.
+func ListRates(provider, apiModel string, now time.Time) (in, out float64, ok bool) {
+	var table string
+	switch provider {
+	case "anthropic":
+		table = "anthropic"
+	case "gemini":
+		table = "gemini-api"
+	default:
+		return 0, 0, false
+	}
+	p, err := Load()
+	if err != nil {
+		return 0, 0, false
+	}
+	r, why := p.Rate(table, p.Canonical(apiModel), now.UTC().Format("2006-01-02"), 0, false)
+	if why != "" {
+		return 0, 0, false
+	}
+	return r.Input, r.Output, true
+}

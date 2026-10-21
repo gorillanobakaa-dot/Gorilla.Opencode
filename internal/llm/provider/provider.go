@@ -72,6 +72,17 @@ type TokenUsage struct {
 	OutputTokens        int64
 	CacheCreationTokens int64
 	CacheReadTokens     int64
+	// ModelVersion is the model the provider says answered (Gemini's
+	// modelVersion), when it says. GORILLA (2026-10-21): a rolling alias such as
+	// gemini-flash-latest has no price of its own; the version that answered
+	// does, so the cost meter prices the call by it.
+	ModelVersion string
+}
+
+// withModel returns the usage with the answering model's version set.
+func (u TokenUsage) withModel(version string) TokenUsage {
+	u.ModelVersion = version
+	return u
 }
 
 type ProviderResponse struct {

@@ -22,14 +22,24 @@ func psOnly(t *testing.T) *PersistentShell {
 	if !s.isPowerShell {
 		t.Skip("PowerShell-specific: the bash wrapper has no parse-then-run step")
 	}
+	// GORILLA FIX (2026-10-21): the first command in a new PowerShell pays for
+	// its start-up, which under a full parallel `go test ./...` took 7.6 s once
+	// and failed the 5 s bound below with no bug present. Warmed here, so the
+	// timings measure the parse error only.
+	exec1(t, s, "Write-Output warm")
 	return s
 }
+
+// parseBound is how long a parse error may take. The bug these tests guard
+// against waits out exec1's whole 25 s timeout; a bound at half of it catches
+// that, and is not tripped by a loaded machine.
+const parseBound = 12 * time.Second
 
 func TestAnAmpersandChainFailsAtOnceWithTheRealReason(t *testing.T) {
 	s := psOnly(t)
 	start := time.Now()
 	stdout, stderr, code := exec1(t, s, `cd C:\ && echo hi`)
-	if d := time.Since(start); d > 5*time.Second {
+	if d := time.Since(start); d > parseBound {
 		t.Fatalf("took %s: the parse error is still waiting for the timeout", d)
 	}
 	if code == 0 {
@@ -53,7 +63,7 @@ func TestAnUnterminatedQuoteFailsAtOnce(t *testing.T) {
 	s := psOnly(t)
 	start := time.Now()
 	_, stderr, code := exec1(t, s, `Write-Output 'never closed`)
-	if d := time.Since(start); d > 5*time.Second {
+	if d := time.Since(start); d > parseBound {
 		t.Fatalf("took %s: the parser is still waiting for the rest of the string", d)
 	}
 	if code == 0 || !strings.Contains(strings.ToLower(stderr), "could not parse") {

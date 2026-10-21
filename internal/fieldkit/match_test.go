@@ -84,3 +84,23 @@ func TestTheOfflineToolLeadsAndOnlineToolsSaySo(t *testing.T) {
 		t.Errorf("the online tool is not marked: %q", h)
 	}
 }
+
+// GORILLA FIX (2026-10-21): everyday words offer nothing, and a hit far below
+// the best is dropped. MEASURED before: "how many bananas have i got left"
+// offered hdmi-doctor, searchfox-blast-radius, academic-next,
+// dual-track-precheck and installer-test, about 290 tokens re-sent on every
+// later call; "cooling profile" also offered four bh-profile tools.
+func TestEverydayWordsOfferNothingAndWeakHitsAreDropped(t *testing.T) {
+	c, _ := Load()
+	if h := Hint(c, "how many bananas have i got left", 5); h != "" {
+		t.Errorf("offered tools for a question about bananas:\n%s", h)
+	}
+	hits := Match(c, "make the cooling profile quieter", 5)
+	if len(hits) != 1 || hits[0].ID != "thermal-profile" {
+		var ids []string
+		for _, h := range hits {
+			ids = append(ids, h.ID)
+		}
+		t.Errorf("cooling profile: got %v, want only thermal-profile", ids)
+	}
+}

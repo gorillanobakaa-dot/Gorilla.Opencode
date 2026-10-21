@@ -30,6 +30,11 @@ func finishToolResults(sessionID string, calls []message.ToolCall, results []mes
 			continue
 		}
 		masked, n := tools.MaskSecrets(calls[i].Name, results[i].Content)
+		// GORILLA FIX (2026-10-21): the metadata too. view kept the whole file
+		// in its metadata, which is stored in the session database and written
+		// into exports: MEASURED, an Antigravity access and refresh token sat
+		// there in cleartext while the content beside it showed [REDACTED].
+		results[i].Metadata, _ = tools.MaskSecrets(calls[i].Name, results[i].Metadata)
 
 		// Recorded BEFORE any note is appended: the note changes with the
 		// count, and a result that differs every time is never a repeat.

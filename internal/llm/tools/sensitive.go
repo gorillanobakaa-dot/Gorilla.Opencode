@@ -32,6 +32,7 @@ package tools
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -90,14 +91,24 @@ func RefuseSensitiveRead(path string) string {
 	// (.ssh.\id_rsa.), and a junction inside the project that points at
 	// ~\.ssh, which also counted as "inside the workspace" and was exempt.
 	abs := realForGuard(lexical)
+	lowAbs := strings.ToLower(abs)
 
-	// Inside the workspace the user has already chosen this ground. Both the
-	// path as written AND where it leads must be inside: a link in the project
-	// that leads out of it is not the project.
-	if _, ok := config.RootFor(lexical); ok {
-		if _, okReal := config.RootFor(abs); okReal || strings.EqualFold(abs, lexical) {
-			return ""
-		}
+	// The application's own configuration holds provider API keys and the
+	// sign-in tokens. Refused BEFORE the workspace exemption: no project
+	// legitimately contains this program's own sign-in.
+	// Case-insensitively (Windows opens .CONFIG as .config), and wherever the
+	// configuration really is: with XDG_CONFIG_HOME set it is not under .config.
+	if strings.Contains(lowAbs, strings.ToLower(filepath.Join(".config", "gorilla-opencode"))) ||
+		strings.Contains(lowAbs, strings.ToLower(filepath.Join(".config", "opencode"))) {
+		return reason(abs, "it holds this program's own provider API keys and sign-in tokens")
+	}
+	if base := strings.ToLower(filepath.Clean(config.ConfigBase())); len(base) > 3 &&
+		(lowAbs == base || strings.HasPrefix(lowAbs, base+string(filepath.Separator))) {
+		return reason(abs, "it holds this program's own provider API keys and sign-in tokens")
+	}
+
+	if inWorkspace(lexical, abs) {
+		return ""
 	}
 
 	base := filepath.Base(abs)
@@ -115,19 +126,6 @@ func RefuseSensitiveRead(path string) string {
 		if strings.HasSuffix(lower, suf) {
 			return reason(abs, "it looks like key material ("+suf+")")
 		}
-	}
-
-	// The application's own configuration holds provider API keys.
-	// Case-insensitively (Windows opens .CONFIG as .config), and wherever the
-	// configuration really is: with XDG_CONFIG_HOME set it is not under .config.
-	lowAbs := strings.ToLower(abs)
-	if strings.Contains(lowAbs, strings.ToLower(filepath.Join(".config", "gorilla-opencode"))) ||
-		strings.Contains(lowAbs, strings.ToLower(filepath.Join(".config", "opencode"))) {
-		return reason(abs, "it holds this program's own provider API keys")
-	}
-	if base := strings.ToLower(filepath.Clean(config.ConfigBase())); len(base) > 3 &&
-		(lowAbs == base || strings.HasPrefix(lowAbs, base+string(filepath.Separator))) {
-		return reason(abs, "it holds this program's own provider API keys")
 	}
 
 	for _, seg := range strings.Split(abs, string(filepath.Separator)) {
@@ -172,9 +170,47 @@ func resolveForGuard(path string) string {
 	return filepath.Clean(filepath.Join(config.WorkingDirectory(), path))
 }
 
+// inWorkspace reports whether the workspace exemption applies: inside a root
+// the user has already chosen this ground. Both the path as written AND where
+// it leads must be inside: a link in the project that leads out of it is not
+// the project.
+//
+// GORILLA FIX (2026-10-21): a root that is the home folder, or above it, is not
+// a project. MEASURED: a session started in HOME read
+// ~/.config/gorilla-opencode/antigravity-oauth.json because everything under
+// HOME counted as "inside the workspace", and ~/.ssh/id_rsa would have passed
+// the same way. The exemption exists for a project's test fixtures; a home
+// folder holds the real credentials it was written to protect.
+func inWorkspace(lexical, abs string) bool {
+	root, ok := config.RootFor(lexical)
+	if !ok || isHomeOrAbove(root) {
+		return false
+	}
+	_, okReal := config.RootFor(abs)
+	return okReal || strings.EqualFold(abs, lexical)
+}
+
+// isHomeOrAbove reports whether root is the user's home folder or one of its
+// parents (C:\Users, C:\, /home, /).
+func isHomeOrAbove(root string) bool {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return false
+	}
+	h := strings.ToLower(filepath.Clean(home))
+	r := strings.ToLower(filepath.Clean(root))
+	if h == r {
+		return true
+	}
+	if !strings.HasSuffix(r, string(filepath.Separator)) {
+		r += string(filepath.Separator)
+	}
+	return strings.HasPrefix(h, r)
+}
+
 func reason(path, why string) string {
 	return fmt.Sprintf(
-		"Refusing to read %s: %s, and it is outside this project. Anything read here "+
+		"Refusing to read %s: %s, and it is not part of a project. Anything read here "+
 			"goes into the model's context, over the network to the configured provider, "+
 			"and into the session database. If you genuinely need it, copy the part you "+
 			"need into the project first.",
@@ -214,7 +250,7 @@ func refuseSensitiveGlob(glob, searchRoot string) string {
 	if strings.TrimSpace(glob) == "" {
 		return ""
 	}
-	if _, inside := config.RootFor(realForGuard(resolveForGuard(searchRoot))); inside {
+	if root, inside := config.RootFor(realForGuard(resolveForGuard(searchRoot))); inside && !isHomeOrAbove(root) {
 		return ""
 	}
 	for _, seg := range strings.FieldsFunc(strings.TrimPrefix(glob, "!"), func(r rune) bool { return r == '/' || r == '\\' }) {

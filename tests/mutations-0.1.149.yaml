@@ -1,0 +1,38 @@
+# fieldkit mutate --plan tests/mutations-0.1.149.yaml --cwd . -- go test ./internal/llm/tools/ ./internal/llm/agent/ ./internal/app/ ./internal/fieldkit/ ./internal/llm/cost/ -count=1 -run "HomeFolder|OwnConfig|Credential|MetadataIsMasked|StoredCredentials|EverydayWords|RollingAlias|ListRates|ReadOnlyRunRule"
+# Every rule added for 0.1.149, broken on purpose; each must be CAUGHT.
+- file: internal/llm/tools/sensitive.go
+  swap: ["if !ok || isHomeOrAbove(root) {", "if !ok {"]
+  why: a home-folder workspace counts as a project again
+- file: internal/llm/tools/sensitive.go
+  swap: ["inside && !isHomeOrAbove(root) {", "inside {"]
+  why: a search from a home-folder workspace may reach into .ssh again
+- file: internal/llm/tools/sensitive.go
+  swap: ["return reason(abs, \"it holds this program's own provider API keys and sign-in tokens\")\n\t}\n\n\tif inWorkspace", "}\n\n\tif inWorkspace"]
+  why: the program's own config is exempt inside the workspace again
+- file: internal/llm/agent/aftertool.go
+  swap: ["results[i].Metadata, _ = tools.MaskSecrets(calls[i].Name, results[i].Metadata)", "_ = results[i].Metadata"]
+  why: metadata is stored unmasked again
+- file: internal/app/scrub.go
+  swap: ["if masked, n := mask(parts); n > 0 {", "if masked, n := mask(parts); n > 99 {"]
+  why: stored rows are never rewritten
+- file: internal/fieldkit/match.go
+  swap: ["if s > 0 && rare {", "if s > 0 {"]
+  why: a hit needs no rare word
+- file: internal/fieldkit/match.go
+  swap: ["|| h.score < minShare*hits[0].score {", "{"]
+  why: weak hits beside a strong one are offered again
+- file: internal/fieldkit/match.go
+  swap: ["\"have\": true, ", ""]
+  why: an everyday word counts again
+- file: internal/llm/agent/callcost.go
+  swap: ["if !r.Priced && usage.ModelVersion != \"\" {", "if false {"]
+  why: an alias is never priced by the version that answered
+- file: internal/llm/cost/cost.go
+  swap: ["\tcase \"gemini\":\n\t\ttable = \"gemini-api\"\n\tdefault:", "\tdefault:\n\t\ttable = \"gemini-api\"\n\t\tif provider == \"anthropic\" {\n\t\t\ttable = \"anthropic\"\n\t\t}\n\tcase \"x\":"]
+  why: a subscription is given per-token forecast rates
+- file: internal/llm/agent/fieldkit_readonly_run.go
+  swap: ["return t.Safety == \"read-only\" && !t.Online", "return true"]
+  why: any catalogue tool runs without asking
+- file: internal/llm/agent/fieldkit_readonly_run.go
+  swap: ["if server != \"fieldkit\" || tool != \"run\" || !cfg.RunsWithoutAsking(readOnlyRunRule, declaresNetwork(input)) {", "if server != \"fieldkit\" || tool != \"run\" {"]
+  why: no owner rule, no local trust, network calls pass

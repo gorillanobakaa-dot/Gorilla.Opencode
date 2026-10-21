@@ -46,6 +46,7 @@ type App struct {
 
 func New(ctx context.Context, conn *sql.DB) (*App, error) {
 	q := db.New(conn)
+	scrubStoredSecretsAtStart(ctx, conn)
 	sessions := session.NewService(q)
 	messages := message.NewService(q)
 	files := history.NewService(q, conn)

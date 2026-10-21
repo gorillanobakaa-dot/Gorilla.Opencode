@@ -93,7 +93,26 @@ var stopWords = map[string]bool{
 	// profile and which version..." and outranked the cooling tool).
 	"which": true, "where": true, "when": true, "who": true, "why": true, "does": true, "are": true, "was": true,
 	"current": true, "currently": true, "there": true, "about": true, "tell": true, "show": true,
+	// Words of everyday speech that name no subject (2026-10-21: "how many
+	// bananas have i got left" offered five unrelated tools, about 290 tokens
+	// re-sent on every later call).
+	"have": true, "has": true, "had": true, "many": true, "much": true, "left": true, "got": true, "get": true,
+	"am": true, "im": true, "will": true, "would": true, "could": true, "should": true, "some": true, "just": true,
+	"want": true, "need": true, "know": true, "did": true, "here": true, "been": true, "like": true, "still": true,
+	"also": true, "than": true, "then": true, "very": true, "too": true, "only": true, "really": true, "they": true,
+	"them": true, "their": true, "our": true, "its": true, "he": true, "she": true, "his": true, "her": true,
+	"far": true, "thing": true, "things": true, "something": true, "anything": true, "ok": true,
+	"okay": true, "yes": true, "hi": true, "hello": true, "thanks": true, "thank": true, "more": true, "less": true, "again": true, "into": true, "out": true, "over": true, "these": true, "those": true,
 }
+
+// minShare is how close to the best match a hit must come to be offered: a hit
+// scoring under half the best one is noise beside it.
+const minShare = 0.5
+
+// rareShare decides which words are rare enough to carry a match: a word in
+// more than one entry in 25 (at least 3) is common. A hit must match at least
+// one rare word in its title or id; common words only rank among those.
+const rareShare = 25
 
 func words(s string) map[string]bool {
 	out := map[string]bool{}
@@ -107,7 +126,9 @@ var trustRank = map[string]int{"verified": 3, "tested": 2, "carded": 1}
 
 // Match returns up to limit tools for a request, best first: the same scoring
 // as Fieldkit's discover (a word in the title 3, in the id 2, in an input 1),
-// trust breaking ties. A request that matches nothing returns nothing.
+// trust breaking ties. A request that matches nothing returns nothing; nor does
+// one that matches only common words, and a hit far below the best is dropped
+// (2026-10-21, see stopWords).
 func Match(c Catalogue, request string, limit int) []Tool {
 	var q []string
 	for _, w := range word.FindAllString(strings.ToLower(request), -1) {
@@ -153,13 +174,21 @@ func Match(c Catalogue, request string, limit int) []Tool {
 		}
 	}
 	n := float64(len(pool))
+	rareDF := len(pool) / rareShare
+	if rareDF < 3 {
+		rareDF = 3
+	}
 	var hits []scored
 	for _, e := range pool {
 		t := e.t
 		title, id := words(t.Title), words(t.ID)
 		in := e.extra
 		s := 0.0
+		rare := false
 		for _, w := range q {
+			if (title[w] || id[w]) && df[w] <= rareDF {
+				rare = true
+			}
 			weight := 1.0
 			if df[w] > 0 {
 				weight = math.Log(n/float64(df[w])) + 0.1
@@ -174,7 +203,7 @@ func Match(c Catalogue, request string, limit int) []Tool {
 				s += weight
 			}
 		}
-		if s > 0 {
+		if s > 0 && rare {
 			// A tool that goes online ranks after an offline one of the same fit
 			// (2026-10-19: Gemma picked hdmi-diag, which Fieldkit refused without
 			// network=true, and gave up; hdmi-status answers offline).
@@ -197,7 +226,7 @@ func Match(c Catalogue, request string, limit int) []Tool {
 	})
 	out := make([]Tool, 0, limit)
 	for _, h := range hits {
-		if len(out) == limit {
+		if len(out) == limit || h.score < minShare*hits[0].score {
 			break
 		}
 		out = append(out, h.t)
