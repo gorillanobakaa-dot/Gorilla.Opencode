@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,16 +36,19 @@ const (
 	PartSections = "sections"
 )
 
+// stringScanCap is how much of a file a default strings scan reads. A variable only so a test can
+// lower it; full=true reads the whole file.
+var stringScanCap int64 = 256 << 20
+
 // Caps. Each one is reported when hit, never applied silently.
 const (
-	maxSections   = 40
-	maxLibs       = 40
-	maxSymbols    = 150
-	maxStrings    = 150
-	maxStringLen  = 160
-	entropyCap    = 32 << 20  // bytes read per section for entropy
-	stringScanCap = 256 << 20 // bytes of file scanned for strings
-	highEntropy   = 7.2       // bits/byte: packed, compressed or encrypted
+	maxSections  = 40
+	maxLibs      = 40
+	maxSymbols   = 150
+	maxStrings   = 150
+	maxStringLen = 160
+	entropyCap   = 32 << 20 // bytes read per section for entropy
+	highEntropy  = 7.2      // bits/byte: packed, compressed or encrypted
 )
 
 // Options selects what Inspect reports.
@@ -52,6 +56,17 @@ type Options struct {
 	Part   string // summary (default), sections, imports, symbols, strings
 	Filter string // case-insensitive substring for symbols, imports and strings
 	MinLen int    // shortest string reported (default 6)
+	// Full lifts every cap: for a person or a large model. The small defaults are for a small
+	// local model; with Full the caller (the tool) spills an oversized result to a file.
+	Full bool
+}
+
+// limit is n, or no limit with Full.
+func (o Options) limit(n int) int {
+	if o.Full {
+		return math.MaxInt32
+	}
+	return n
 }
 
 // Inspect reports on the executable at path. It never runs it.
@@ -147,7 +162,7 @@ func inspectELF(b *strings.Builder, r io.ReaderAt, o Options) error {
 			}
 		}
 		libs, _ := f.ImportedLibraries()
-		writeList(b, "needed libraries", libs, maxLibs, "")
+		writeList(b, "needed libraries", libs, o.limit(maxLibs), "")
 		rpath, _ := f.DynString(elf.DT_RPATH)
 		runpath, _ := f.DynString(elf.DT_RUNPATH)
 		if len(rpath)+len(runpath) > 0 {
@@ -165,7 +180,7 @@ func inspectELF(b *strings.Builder, r io.ReaderAt, o Options) error {
 		writeELFSections(b, f, o)
 	case PartImports:
 		libs, _ := f.ImportedLibraries()
-		writeList(b, "needed libraries", libs, maxLibs, o.Filter)
+		writeList(b, "needed libraries", libs, o.limit(maxLibs), o.Filter)
 		is, _ := f.ImportedSymbols()
 		var lines []string
 		for _, s := range is {
@@ -178,7 +193,7 @@ func inspectELF(b *strings.Builder, r io.ReaderAt, o Options) error {
 			}
 			lines = append(lines, l)
 		}
-		writeList(b, "imported symbols", lines, maxSymbols, o.Filter)
+		writeList(b, "imported symbols", lines, o.limit(maxSymbols), o.Filter)
 	case PartSymbols:
 		var lines []string
 		syms, err := f.Symbols()
@@ -204,7 +219,7 @@ func inspectELF(b *strings.Builder, r io.ReaderAt, o Options) error {
 			}
 			lines = append(lines, fmt.Sprintf("0x%x %s %s", s.Value, kind, s.Name))
 		}
-		writeList(b, "symbols", lines, maxSymbols, o.Filter)
+		writeList(b, "symbols", lines, o.limit(maxSymbols), o.Filter)
 	}
 	return nil
 }
@@ -242,7 +257,7 @@ func writeELFSections(b *strings.Builder, f *elf.File, o Options) {
 		}
 		rows = append(rows, fmt.Sprintf("%-22s %10d %5s %s", clean(s.Name), s.Size, ent, flags))
 	}
-	writeSectionRows(b, rows)
+	writeSectionRows(b, rows, o)
 }
 
 // ── PE ──────────────────────────────────────────────────────────────────────
@@ -290,7 +305,7 @@ func inspectPE(b *strings.Builder, r io.ReaderAt, o Options) error {
 		for _, d := range dlls {
 			rows = append(rows, fmt.Sprintf("%s (%d functions)", d, len(imports[d])))
 		}
-		writeList(b, "imported DLLs", rows, maxLibs, "")
+		writeList(b, "imported DLLs", rows, o.limit(maxLibs), "")
 		if peDir(dirs, pe.IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT) {
 			b.WriteString("delay-load imports: present, not listed\n")
 		}
@@ -302,9 +317,9 @@ func inspectPE(b *strings.Builder, r io.ReaderAt, o Options) error {
 		if peDir(dirs, pe.IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR) {
 			b.WriteString(".NET: yes (managed code)\n")
 		}
-		writePESections(b, f)
+		writePESections(b, f, o)
 	case PartSections:
-		writePESections(b, f)
+		writePESections(b, f, o)
 	case PartImports:
 		var lines []string
 		for _, d := range dlls {
@@ -312,7 +327,7 @@ func inspectPE(b *strings.Builder, r io.ReaderAt, o Options) error {
 				lines = append(lines, d+"!"+fn)
 			}
 		}
-		writeList(b, "imported functions", lines, maxSymbols, o.Filter)
+		writeList(b, "imported functions", lines, o.limit(maxSymbols), o.Filter)
 	case PartSymbols:
 		var lines []string
 		for _, s := range f.Symbols {
@@ -322,7 +337,7 @@ func inspectPE(b *strings.Builder, r io.ReaderAt, o Options) error {
 			b.WriteString("no COFF symbols (normal for a linked EXE/DLL); part=imports lists what it calls\n")
 			return nil
 		}
-		writeList(b, "COFF symbols", lines, maxSymbols, o.Filter)
+		writeList(b, "COFF symbols", lines, o.limit(maxSymbols), o.Filter)
 	}
 	return nil
 }
@@ -331,7 +346,7 @@ func peDir(dirs []pe.DataDirectory, i int) bool {
 	return i < len(dirs) && dirs[i].VirtualAddress != 0 && dirs[i].Size != 0
 }
 
-func writePESections(b *strings.Builder, f *pe.File) {
+func writePESections(b *strings.Builder, f *pe.File, o Options) {
 	var rows []string
 	for _, s := range f.Sections {
 		flags := ""
@@ -347,7 +362,7 @@ func writePESections(b *strings.Builder, f *pe.File) {
 		}
 		rows = append(rows, fmt.Sprintf("%-22s %10d %5s %s", clean(s.Name), s.Size, ent, flags))
 	}
-	writeSectionRows(b, rows)
+	writeSectionRows(b, rows, o)
 }
 
 func peMachine(m uint16) string {
@@ -431,7 +446,7 @@ func writeMachOSlice(b *strings.Builder, f *macho.File, o Options) {
 		}
 		fmt.Fprintf(b, "macOS %s (MacBook Air 2011, Intel) check: %s\n", legacyMacOS, legacyVerdict(f.Cpu, min, src))
 		libs, _ := f.ImportedLibraries()
-		writeList(b, "libraries", libs, maxLibs, "")
+		writeList(b, "libraries", libs, o.limit(maxLibs), "")
 		var rp []string
 		for _, l := range f.Loads {
 			if r, ok := l.(*macho.Rpath); ok {
@@ -449,14 +464,14 @@ func writeMachOSlice(b *strings.Builder, f *macho.File, o Options) {
 		if f.Symtab != nil {
 			fmt.Fprintf(b, "symbols: %d (part=symbols lists them)\n", len(f.Symtab.Syms))
 		}
-		writeMachOSections(b, f)
+		writeMachOSections(b, f, o)
 	case PartSections:
-		writeMachOSections(b, f)
+		writeMachOSections(b, f, o)
 	case PartImports:
 		libs, _ := f.ImportedLibraries()
-		writeList(b, "libraries", libs, maxLibs, o.Filter)
+		writeList(b, "libraries", libs, o.limit(maxLibs), o.Filter)
 		is, _ := f.ImportedSymbols()
-		writeList(b, "imported symbols", is, maxSymbols, o.Filter)
+		writeList(b, "imported symbols", is, o.limit(maxSymbols), o.Filter)
 	case PartSymbols:
 		var lines []string
 		if f.Symtab != nil {
@@ -468,7 +483,7 @@ func writeMachOSlice(b *strings.Builder, f *macho.File, o Options) {
 				lines = append(lines, fmt.Sprintf("0x%x %s %s", s.Value, kind, s.Name))
 			}
 		}
-		writeList(b, "symbols", lines, maxSymbols, o.Filter)
+		writeList(b, "symbols", lines, o.limit(maxSymbols), o.Filter)
 	}
 }
 
@@ -548,7 +563,7 @@ func versionLE(a, b string) bool {
 	return true
 }
 
-func writeMachOSections(b *strings.Builder, f *macho.File) {
+func writeMachOSections(b *strings.Builder, f *macho.File, o Options) {
 	var rows []string
 	for _, s := range f.Sections {
 		ent := "-"
@@ -558,7 +573,7 @@ func writeMachOSections(b *strings.Builder, f *macho.File) {
 		}
 		rows = append(rows, fmt.Sprintf("%-22s %10d %5s", clean(s.Seg+","+s.Name), s.Size, ent))
 	}
-	writeSectionRows(b, rows)
+	writeSectionRows(b, rows, o)
 }
 
 func machoCPU(c macho.Cpu) string {
@@ -612,11 +627,11 @@ func machoFlags(fl uint32) string {
 
 // ── shared output helpers ───────────────────────────────────────────────────
 
-func writeSectionRows(b *strings.Builder, rows []string) {
+func writeSectionRows(b *strings.Builder, rows []string, o Options) {
 	fmt.Fprintf(b, "sections (%d): name, bytes, entropy bits/byte (>%.1f = packed/compressed/encrypted), x=exec w=write\n", len(rows), highEntropy)
 	for i, r := range rows {
-		if i == maxSections {
-			fmt.Fprintf(b, "  ... %d more sections not shown (capped at %d)\n", len(rows)-maxSections, maxSections)
+		if i == o.limit(maxSections) {
+			fmt.Fprintf(b, "  ... %d more sections not shown (capped at %d; full=true lists all)\n", len(rows)-maxSections, maxSections)
 			break
 		}
 		b.WriteString("  " + r + "\n")
@@ -640,7 +655,7 @@ func writeList(b *strings.Builder, title string, items []string, max int, filter
 	}
 	for i, it := range items {
 		if i == max {
-			fmt.Fprintf(b, "  ... %d more not shown (capped at %d; use filter to narrow)\n", len(items)-max, max)
+			fmt.Fprintf(b, "  ... %d more not shown (capped at %d; use filter to narrow, or full=true)\n", len(items)-max, max)
 			break
 		}
 		b.WriteString("  " + clean(it) + "\n")

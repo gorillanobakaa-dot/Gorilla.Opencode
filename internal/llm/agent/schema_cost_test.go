@@ -76,7 +76,9 @@ const (
 	// docs/FORENSICS-TOOLKIT.dual-track.md for why ON. A machine whose own
 	// loadout.json switches tool_search on reads 287 more here (10,849): that
 	// row is default OFF, and the band absorbs it.
-	measuredDefaultToolSchemaTokens = 10562
+	// 2026-10-22: 10,610. +48 is the full=true switch on both forensics tools (24 each): a person or
+	// a large model can lift the caps that keep a small local model's results short.
+	measuredDefaultToolSchemaTokens = 10610
 	measuredBasePromptTokens        = 2250
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.

@@ -7,6 +7,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"encoding/binary"
+	"fmt"
 	"hash/crc32"
 	"os"
 	"os/exec"
@@ -157,7 +158,7 @@ func TestOmniJaFixtureIsTheOptimizedLayout(t *testing.T) {
 }
 
 func TestOmniJaListFindExtract(t *testing.T) {
-	out, err := ListArchive("testdata/omni.ja", "")
+	out, err := ListArchive("testdata/omni.ja", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +169,7 @@ func TestOmniJaListFindExtract(t *testing.T) {
 		"chrome.manifest",
 		"res/",
 	)
-	found, err := ListArchive("testdata/omni.ja", "*.mjs")
+	found, err := ListArchive("testdata/omni.ja", "*.mjs", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +177,7 @@ func TestOmniJaListFindExtract(t *testing.T) {
 	if strings.Contains(found, "chrome.manifest") {
 		t.Errorf("find listed a non-match:\n%s", found)
 	}
-	sub, _ := ListArchive("testdata/omni.ja", "PREF")
+	sub, _ := ListArchive("testdata/omni.ja", "PREF", false)
 	wantAll(t, sub, `matching "PREF": 1`, "defaults/pref/gorilla.js")
 
 	dest := t.TempDir()
@@ -203,7 +204,7 @@ func TestLargeOptimizedJarStillOpens(t *testing.T) {
 	entries := append([]jarEntry{{name: "big.bin", data: big}}, omniJaEntries...)
 	p := filepath.Join(t.TempDir(), "big-omni.ja")
 	os.WriteFile(p, writeOptimizedJar(entries), 0o644)
-	out, err := ListArchive(p, "")
+	out, err := ListArchive(p, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +222,7 @@ func TestLargeOptimizedJarStillOpens(t *testing.T) {
 // ── tar, gzip, bzip2 ────────────────────────────────────────────────────────
 
 func TestTarBzip2Fixture(t *testing.T) {
-	out, err := ListArchive("testdata/fx.tar.bz2", "")
+	out, err := ListArchive("testdata/fx.tar.bz2", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +238,7 @@ func TestTarBzip2Fixture(t *testing.T) {
 }
 
 func TestSingleBzip2Fixture(t *testing.T) {
-	out, err := ListArchive("testdata/single.txt.bz2", "")
+	out, err := ListArchive("testdata/single.txt.bz2", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +266,7 @@ func TestTarGzAndPlainGzip(t *testing.T) {
 	gw.Close()
 	tgz := filepath.Join(dir, "x.tgz")
 	os.WriteFile(tgz, gzb.Bytes(), 0o644)
-	out, err := ListArchive(tgz, "")
+	out, err := ListArchive(tgz, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +279,7 @@ func TestTarGzAndPlainGzip(t *testing.T) {
 	gw.Close()
 	gz := filepath.Join(dir, "whatever.gz")
 	os.WriteFile(gz, one.Bytes(), 0o644)
-	out, err = ListArchive(gz, "")
+	out, err = ListArchive(gz, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,17 +303,39 @@ func TestStreamCapIsReported(t *testing.T) {
 	gw.Close()
 	p := filepath.Join(t.TempDir(), "bomb.tar.gz")
 	os.WriteFile(p, gzb.Bytes(), 0o644)
-	out, err := ListArchive(p, "")
+	out, err := ListArchive(p, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	wantAll(t, out, "stream capped: stopped after 2048")
 }
 
+func TestFullListsEveryEntry(t *testing.T) {
+	var zb bytes.Buffer
+	zw := zip.NewWriter(&zb)
+	for i := 0; i < maxListed+50; i++ {
+		w, _ := zw.Create(fmt.Sprintf("dir/file%03d.js", i))
+		w.Write([]byte("x"))
+	}
+	zw.Close()
+	p := filepath.Join(t.TempDir(), "many.zip")
+	os.WriteFile(p, zb.Bytes(), 0o644)
+	capped, _ := ListArchive(p, "", false)
+	wantAll(t, capped, "... 50 more not shown (capped at 200", "or full=true")
+	full, _ := ListArchive(p, "", true)
+	if strings.Contains(full, "more not shown") || !strings.Contains(full, "dir/file249.js") {
+		t.Errorf("full=true still capped")
+	}
+	found, _ := ListArchive(p, "*.js", true)
+	if strings.Contains(found, "more not shown") {
+		t.Errorf("full find still capped")
+	}
+}
+
 func TestUnsupportedFormatsSaySo(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "x.xz")
 	os.WriteFile(p, []byte{0xfd, '7', 'z', 'X', 'Z', 0, 1, 2}, 0o644)
-	if _, err := ListArchive(p, ""); err == nil || !strings.Contains(err.Error(), "it is xz") {
+	if _, err := ListArchive(p, "", false); err == nil || !strings.Contains(err.Error(), "it is xz") {
 		t.Errorf("xz: err = %v", err)
 	}
 }

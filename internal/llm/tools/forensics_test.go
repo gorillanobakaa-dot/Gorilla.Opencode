@@ -50,6 +50,38 @@ func TestBinaryInspectToolSummaryAndStrings(t *testing.T) {
 	}
 }
 
+func TestFullReachesBothTools(t *testing.T) {
+	r, _ := forensicsCall(t, NewBinaryInspectTool(), map[string]any{"path": forensicsFixture(t, "fx.pe"), "part": "imports", "full": true})
+	if r.IsError || strings.Contains(r.Content, "more not shown") || !strings.Contains(r.Content, "KERNEL32.dll!VirtualQuery") {
+		t.Errorf("binary_inspect full:\n%s", r.Content)
+	}
+	r, _ = forensicsCall(t, NewArchiveTool(&recordingPermissions{}), map[string]any{"path": forensicsFixture(t, "omni.ja"), "full": true})
+	if r.IsError || !strings.Contains(r.Content, "entries: 4") {
+		t.Errorf("archive full:\n%s", r.Content)
+	}
+	// A list longer than the cap, so a dropped full shows up as a capped result.
+	var data []byte
+	for i := 0; i < 200; i++ {
+		data = append(data, []byte("stringnumber")...)
+		data = append(data, 0)
+	}
+	many := filepath.Join(t.TempDir(), "many.bin")
+	os.WriteFile(many, data, 0o644)
+	r, _ = forensicsCall(t, NewBinaryInspectTool(), map[string]any{"path": many, "part": "strings", "full": true})
+	if r.IsError || strings.Contains(r.Content, "more not shown") {
+		t.Errorf("binary_inspect dropped full: %s", r.Content[:200])
+	}
+	r, _ = forensicsCall(t, NewBinaryInspectTool(), map[string]any{"path": many, "part": "strings"})
+	if !strings.Contains(r.Content, "more not shown") {
+		t.Error("binary_inspect default is not capped")
+	}
+	for _, tool := range []BaseTool{NewBinaryInspectTool(), NewArchiveTool(nil)} {
+		if _, ok := tool.Info().Parameters["full"]; !ok {
+			t.Errorf("%s has no full parameter", tool.Info().Name)
+		}
+	}
+}
+
 func TestBinaryInspectToolKeepsTheCredentialGuard(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	r, _ := forensicsCall(t, NewBinaryInspectTool(), map[string]any{"path": filepath.Join(home, ".ssh", "id_rsa"), "part": "strings"})

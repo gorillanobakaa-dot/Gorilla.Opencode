@@ -203,6 +203,35 @@ func TestStringsCapIsReported(t *testing.T) {
 	wantAll(t, out, "ASCII + UTF-16LE): 175", "... 25 more not shown (capped at 150")
 }
 
+// The three users (owner, 2026-10-22): a person and a large model ask for full=true and get every
+// line; a small local model gets the capped default. Both are held here.
+func TestFullLiftsEveryCap(t *testing.T) {
+	var data []byte
+	for i := 0; i < maxStrings+25; i++ {
+		data = append(data, []byte("stringnumber")...)
+		data = append(data, 0)
+	}
+	p := filepath.Join(t.TempDir(), "many.bin")
+	os.WriteFile(p, data, 0o644)
+	full := mustInspect(t, p, Options{Part: PartStrings, Full: true})
+	if strings.Contains(full, "more not shown") || strings.Count(full, " a stringnumber") != maxStrings+25 {
+		t.Errorf("full=true still capped:\n%s", full[len(full)-300:])
+	}
+	wantAll(t, mustInspect(t, p, Options{Part: PartStrings}), "or full=true")
+
+	old := stringScanCap
+	stringScanCap = 64
+	defer func() { stringScanCap = old }()
+	wantAll(t, mustInspect(t, p, Options{Part: PartStrings}), "scan capped: only the first 64 of")
+	if strings.Contains(mustInspect(t, p, Options{Part: PartStrings, Full: true}), "scan capped") {
+		t.Error("full=true still stopped the scan")
+	}
+
+	if (Options{}).limit(40) != 40 || (Options{Full: true}).limit(40) < 1<<30 {
+		t.Error("limit() does not follow Full")
+	}
+}
+
 func TestEntropy(t *testing.T) {
 	zeros := make([]byte, 4096)
 	if got := entropyOf(bytes.NewReader(zeros), 4096); got != "0.00" {

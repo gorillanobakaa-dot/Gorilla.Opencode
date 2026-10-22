@@ -61,6 +61,18 @@
 - file: internal/forensics/binary.go
   swap: ['case lcVersionMinMacOSX:', 'case 0xffff:']
   why: the 10.13-era minimum (LC_VERSION_MIN_MACOSX) is read
+- file: internal/forensics/binary.go
+  swap: ['if o.Full {', 'if false && o.Full {']
+  why: full=true lifts every list cap (person, large model)
+- file: internal/forensics/strings.go
+  swap: ['		scanLimit = size', '		_ = size']
+  why: full=true scans the whole file for strings
+- file: internal/forensics/archive.go
+  swap: ['if full {', 'if false && full {']
+  why: full=true lists every archive entry
+- file: internal/llm/tools/forensics.go
+  swap: ['MinLen: p.MinLen, Full: p.Full}', 'MinLen: p.MinLen}']
+  why: the tool passes full through
 - file: internal/llm/tools/forensics.go
   swap: ['if !t.permissions.Request(permission.CreatePermissionRequest{', 'if false && !t.permissions.Request(permission.CreatePermissionRequest{']
   why: extraction asks first

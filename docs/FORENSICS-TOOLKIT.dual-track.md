@@ -141,6 +141,10 @@ No tool. `bash` + whatever binaries the machine had.
 - Behavior inside a live model conversation (Gemma 4 E2B or any other): not run. The token cost is measured; whether Gemma picks the right `part`/`action` is not.
 - The patched legacy-darwin go1.24 toolchain is not on this laptop. Checked instead: `GOOS=darwin GOARCH=amd64` build of the whole program with stock go1.24.13 (`~/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.24.13.windows-amd64`) and `go test ./internal/forensics` on go1.24.13.
 
+## Addendum 2026-10-22: full=true, three users
+
+The owner: Gorilla OpenCode is used "locally/manually by a person, big model such as yourself and in cases of extreme emergencies, like a last hail mary by a local SLM". The caps above were sized only for the small model. Both tools now take `full=true`: every list cap is lifted and `strings` reads the whole file; a result over the 400 KB response limit is kept whole in a file by the existing spill (`clampToolContent`). Every capped line now ends "or full=true". Cost: +24 tokens per tool (204 + 202 measured). Tests: `TestFullLiftsEveryCap`, `TestFullListsEveryEntry`, `TestFullReachesBothTools`; four more mutations in `testdata/mutations.yaml`.
+
 ## Open Items
 
 - Exports (PE export directory, ELF defined dynamic symbols as a list), PE resources/version info, Authenticode and Mach-O signature verification.

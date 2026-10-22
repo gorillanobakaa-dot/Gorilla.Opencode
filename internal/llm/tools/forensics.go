@@ -19,6 +19,11 @@ import (
 // read without running anything. Descriptions are kept short on purpose: they
 // ride every turn, and the bar is Gemma 4 E2B on CPU.
 
+// fullDescription: the tools serve a person, a large model, and a small local model as the last
+// resort (owner, 2026-10-22). Defaults are capped for the small model; full lifts the caps, and a
+// result over the response limit is kept whole in a file (clampToolContent / spill.go).
+const fullDescription = "No caps: everything (long; big results go to a file)"
+
 const (
 	BinaryInspectToolName = "binary_inspect"
 	ArchiveToolName       = "archive"
@@ -29,6 +34,7 @@ type binaryInspectParams struct {
 	Part   string `json:"part"`
 	Filter string `json:"filter"`
 	MinLen int    `json:"min_len"`
+	Full   bool   `json:"full"`
 }
 
 type binaryInspectTool struct{}
@@ -50,6 +56,7 @@ func (binaryInspectTool) Info() ToolInfo {
 			},
 			"filter":  map[string]any{"type": "string", "description": "Only lines containing this text"},
 			"min_len": map[string]any{"type": "integer", "description": "Shortest string for part=strings (default 6)"},
+			"full":    map[string]any{"type": "boolean", "description": fullDescription},
 		},
 		Required: []string{"path"},
 	}
@@ -64,7 +71,7 @@ func (binaryInspectTool) Run(ctx context.Context, call ToolCall) (ToolResponse, 
 	if refusal != "" {
 		return NewTextErrorResponse(refusal), nil
 	}
-	out, err := forensics.Inspect(path, forensics.Options{Part: p.Part, Filter: p.Filter, MinLen: p.MinLen})
+	out, err := forensics.Inspect(path, forensics.Options{Part: p.Part, Filter: p.Filter, MinLen: p.MinLen, Full: p.Full})
 	if err != nil {
 		return NewTextErrorResponse(err.Error()), nil
 	}
@@ -82,6 +89,7 @@ type archiveParams struct {
 	Pattern string `json:"pattern"`
 	Entry   string `json:"entry"`
 	Dest    string `json:"dest"`
+	Full    bool   `json:"full"`
 }
 
 type archiveTool struct {
@@ -108,6 +116,7 @@ func (archiveTool) Info() ToolInfo {
 			"pattern": map[string]any{"type": "string", "description": "find: glob (*.js) or text"},
 			"entry":   map[string]any{"type": "string", "description": "extract: exact entry name"},
 			"dest":    map[string]any{"type": "string", "description": "extract: folder inside the project"},
+			"full":    map[string]any{"type": "boolean", "description": fullDescription},
 		},
 		Required: []string{"path"},
 	}
@@ -124,12 +133,12 @@ func (t archiveTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 	}
 	switch strings.ToLower(strings.TrimSpace(p.Action)) {
 	case "", "list":
-		return archiveText(forensics.ListArchive(path, ""))
+		return archiveText(forensics.ListArchive(path, "", p.Full))
 	case "find":
 		if strings.TrimSpace(p.Pattern) == "" {
 			return NewTextErrorResponse("find needs a pattern, e.g. *.js or a word in the name"), nil
 		}
-		return archiveText(forensics.ListArchive(path, p.Pattern))
+		return archiveText(forensics.ListArchive(path, p.Pattern, p.Full))
 	case "extract":
 		return t.extract(ctx, path, p)
 	}

@@ -151,12 +151,16 @@ func writeStrings(b *strings.Builder, r io.Reader, size int64, o Options) {
 	lf := strings.ToLower(o.Filter)
 	var shown []foundString
 	matched := 0
-	total, scanned := scanStrings(r, min, stringScanCap, func(s foundString) bool {
+	scanLimit := int64(stringScanCap)
+	if o.Full {
+		scanLimit = size
+	}
+	total, scanned := scanStrings(r, min, scanLimit, func(s foundString) bool {
 		if lf != "" && !strings.Contains(strings.ToLower(s.Text), lf) {
 			return true
 		}
 		matched++
-		if len(shown) < maxStrings {
+		if len(shown) < o.limit(maxStrings) {
 			shown = append(shown, s)
 		}
 		return true
@@ -175,7 +179,7 @@ func writeStrings(b *strings.Builder, r io.Reader, size int64, o Options) {
 		fmt.Fprintf(b, "  0x%x %s %s\n", s.Off, k, clean(s.Text))
 	}
 	if matched > len(shown) {
-		fmt.Fprintf(b, "  ... %d more not shown (capped at %d; use filter to narrow)\n", matched-len(shown), maxStrings)
+		fmt.Fprintf(b, "  ... %d more not shown (capped at %d; use filter to narrow, or full=true)\n", matched-len(shown), maxStrings)
 	}
 	if scanned < size {
 		fmt.Fprintf(b, "scan capped: only the first %d of %d bytes were read\n", scanned, size)

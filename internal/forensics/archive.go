@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -61,7 +62,7 @@ type openedArchive struct {
 // tar.bz2, gzip or bzip2 file. A non-empty pattern turns it into a find:
 // a glob (*, ?, [) is matched against the full name and the base name,
 // anything else is a case-insensitive substring.
-func ListArchive(p string, pattern string) (string, error) {
+func ListArchive(p string, pattern string, full bool) (string, error) {
 	a, err := openArchive(p)
 	if err != nil {
 		return "", err
@@ -79,6 +80,9 @@ func ListArchive(p string, pattern string) (string, error) {
 	limit := maxListed
 	if pattern != "" {
 		limit = maxFound
+	}
+	if full {
+		limit = math.MaxInt32
 	}
 	err = a.walk(func(e archiveEntry, _ func() (io.Reader, error)) bool {
 		total++
@@ -124,7 +128,7 @@ func ListArchive(p string, pattern string) (string, error) {
 		b.WriteString("  " + r + "\n")
 	}
 	if matched > len(rows) {
-		fmt.Fprintf(&b, "  ... %d more not shown (capped at %d; use a pattern to narrow)\n", matched-len(rows), limit)
+		fmt.Fprintf(&b, "  ... %d more not shown (capped at %d; use a pattern to narrow, or full=true)\n", matched-len(rows), limit)
 	}
 	if *a.capped {
 		fmt.Fprintf(&b, "stream capped: stopped after %d decompressed bytes; the listing is incomplete\n", int64(streamReadCap))
