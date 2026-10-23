@@ -21,8 +21,17 @@ func bashRequestPath(command string) string {
 	home, _ := os.UserHomeDir()
 	for _, seg := range splitShellCommands(command) {
 		words := shellWords(seg)
+		// GORILLA FIX (2026-10-23): the command word is the first word that is
+		// not an environment assignment. Only i == 0 was skipped, so in
+		// `PYTHONPATH=... /usr/local/bin/python3 -m fieldkit.core.doctor` the
+		// program itself counted as a place outside the roots and the run asked
+		// (MacBook Air, air-2026-10-23-perms-dialog-4.png).
+		cmdWord := 0
+		for cmdWord < len(words) && strings.Contains(words[cmdWord], "=") && !strings.HasPrefix(words[cmdWord], "-") {
+			cmdWord++
+		}
 		for i, w := range words {
-			if i == 0 || strings.HasPrefix(w, "-") || strings.Contains(w, "://") {
+			if i <= cmdWord || strings.HasPrefix(w, "-") || strings.Contains(w, "://") {
 				continue
 			}
 			// A redirection target or an option value may be glued on.

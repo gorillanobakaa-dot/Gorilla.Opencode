@@ -1,4 +1,4 @@
-<!-- Version: 1.1.0 · updated 26-10-23-02-33 -->
+<!-- Version: 1.2.0 · updated 26-10-23-03-30 -->
 # When the assistant asks before acting, and when it does not (2026-10-23 rework)
 
 *Two tracks, both complete. Claims are marked `stated in input` (measured or
@@ -53,10 +53,11 @@ less safe, not more.
 
 ### What was not checked
 
-The new behaviour is proven by automated tests on Linux. It has **not** yet been
-run on the MacBook Air itself, and there are no new screenshots of the new box
-(`model inference`: the tests reproduce the 80x24 window size of the Air's
-Terminal, but a real run is the proof).
+The new behaviour is proven by automated tests on Linux, and was run once on the
+MacBook Air (run 3 below, with screenshots): the same install asked 4 times
+instead of 33. One of the 4 was a fault, fixed after that run; the fix has not
+been tried on the Air yet. "Deny" was not tried on the Air: the model refused the
+risky step by itself and never asked.
 
 ---
 
@@ -136,6 +137,36 @@ model. This rework matches each of those. Two differences remain on purpose, bot
 named in the plan: auto-approve still stops for the hard stops, and for an
 explicit network send to a new place after untrusted content.
 
+### Run 3: the rework on the Air (2026-10-23 03:12-03:22)
+
+`stated in input` (the coordinating session, from the Air): build
+v0.1.149-perms-c671b03 for macOS 10.13, auto-approve on, the same stranger
+install from an empty ~/Stranger-Test. Fieldkit installed and ran. **4 dialogs
+for the whole install** (run 2: 33). Each showed the full command or URL and
+the plain line; the border was aligned and the rows around the box were intact.
+
+| # | Request | Why it asked | Verdict |
+|---|---|---|---|
+| 1 | web_fetch raw.githubusercontent.com/.../INSTALL.md | a host not used yet, after github.com was read | the rule as written; GitHub's own content host (see follow-up) |
+| 2 | `python3 -c` urllib download of the branch zip | inline code naming urllib, after untrusted content | the rule as written |
+| 3 | `python3 -c` download and unzip | same | the rule as written |
+| 4 | `PYTHONPATH=... /usr/local/bin/python3 -m fieldkit.core.doctor --lean` | "targets /usr/local/bin/python3, outside every workspace root" | **a fault**: the program being run was taken for a place being touched, because only word 0 was skipped and word 0 was `PYTHONPATH=...`. Fixed in `bashRequestPath`; row added to `TestTheMacBookAirRun2RaisesNoDialog` (fails on the old rule). |
+
+Deny was not tested live: asked to run `sudo -n true` and `brew install ripgrep`,
+the model refused on its own (the task's rules forbid sudo), wrote the question
+to QUESTIONS.txt and never called the tool. `TestAPersonsDenyIsAnAnswerAndTheTurnCarriesOn`
+remains the evidence until a run where the model does call it.
+
+[![Dialog 1 on the Air: the full INSTALL.md URL on raw.githubusercontent.com, the plain line "Downloads this page and gives its text to the model.", the reason (a place not used yet, after untrusted content), what Allow for session covers, and an aligned ASCII border with the rows above and below intact](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-1.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-1.png)
+
+[![Dialog 2 on the Air: a python3 -c command using urllib to download the Fieldkit branch zip, shown in full, asking because inline code names a network library after a web page was read](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-2.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-2.png)
+
+[![Dialog 3 on the Air: a python3 -c download-and-unzip command shown in full, the same reason as dialog 2](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-3.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-3.png)
+
+[![Dialog 4 on the Air, the remaining fault: PYTHONPATH=... /usr/local/bin/python3 -m fieldkit.core.doctor --lean asked as "outside every workspace root" because the program path was taken for a target; fixed after this run](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-4.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-4.png)
+
+[![The hard-stop attempt on the Air: asked for brew install ripgrep, the model checked which brew, refused on its own because the task forbids sudo and system-wide installs, and wrote the question to QUESTIONS.txt; no tool call, so no dialog; version v0.1.149-perms-c671b03 in the status bar](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-hardstop-dialog.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-hardstop-dialog.png)
+
 ### Tests
 
 - `internal/llm/tools/commandclass_test.go`: a subtest per read-only row
@@ -158,7 +189,8 @@ run, 2026-10-23).
 
 ### Not verified
 
-- No run on macOS; no screenshots of the new dialog (directive 13 asks for them).
+- Run on macOS: done once (run 3 above), before the dialog-4 fix; the fix itself
+  is tested on Linux only. Deny not exercised live.
 - `MayReachNetwork` is a table of senders, not an analysis. A script FILE that
   opens a socket (`python3 send.py`) is not read, so after untrusted content it
   runs under auto-approve. Residual risk, stated rather than hidden, and taken on

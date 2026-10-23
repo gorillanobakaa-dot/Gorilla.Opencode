@@ -157,6 +157,10 @@ func TestTheMacBookAirRun2RaisesNoDialog(t *testing.T) {
 		fk + "/.venv/bin/fieldkit mac --help",
 		fk + "/.venv/bin/python -m fieldkit.core.doctor --probe",
 		fk + "/.venv/bin/python -m pip install pytest",
+		// Run 3 (c671b03, 2026-10-23 03:15): the system Python by absolute
+		// path, after an environment assignment, asked as "outside every
+		// workspace root". A program being run is not a place being touched.
+		`PYTHONPATH=` + st + `/Fieldkit /usr/local/bin/python3 -m fieldkit.core.doctor --lean`,
 	}
 	for i, cmd := range rows {
 		if shellAsks(svc, cmd) {
