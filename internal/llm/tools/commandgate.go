@@ -100,6 +100,11 @@ var unsafeFlags = []string{
 	"-exec", "-toolexec", "-vettool", "-o", "-w", "--output", "--no-index", "--ext-diff",
 	"-d", "-D", "--delete", "-m", "-M", "--move", "-f", "--force", "-c", "-C",
 	"--upload-pack", "--exec", "add", "remove", "rename", "set-url", "prune",
+	// GORILLA OVERRIDE (2026-10-23): find and rg joined the read-only list
+	// (commandclass.go). These are the flags by which they delete, write a
+	// file or run another program.
+	"-delete", "-execdir", "-ok", "-okdir", "-fprint", "-fprint0", "-fprintf", "-fls",
+	"--pre", "--install", "--switch", "--reset",
 }
 
 // hasUnsafeFlag reports whether any word of a segment is, or starts with, one
@@ -216,10 +221,15 @@ func BannedCommandIn(cmd string, banned []string) string {
 //  2. EVERY chained segment independently matches the read-only list.
 //
 // A command that fails either test is not refused; it is merely asked about.
+//
+// GORILLA OVERRIDE (2026-10-23): output thrown away or merged (`2>/dev/null`,
+// `2>&1`) is removed before the test, `<program> --version` counts as a read,
+// and a segment naming a credential file does not. See commandclass.go.
 func IsSafeReadOnly(cmd string, safe []string) bool {
 	if strings.TrimSpace(cmd) == "" {
 		return false
 	}
+	cmd = stripBenignRedirects(cmd)
 	if hasOpaqueConstruct(cmd) {
 		return false
 	}
@@ -228,11 +238,26 @@ func IsSafeReadOnly(cmd string, safe []string) bool {
 		return false
 	}
 	for _, seg := range segments {
-		if !segmentIsReadOnly(seg, safe) || hasUnsafeFlag(seg) {
+		if isVersionQuery(seg) {
+			continue
+		}
+		if !segmentIsReadOnly(seg, safe) {
 			return false
 		}
+		// test and [ only evaluate: their -d, -f, -o are predicates (is a
+		// directory, is a file, or), not git's delete, force or output.
+		if w := segmentWords(seg); len(w) == 0 || (w[0] != "test" && w[0] != "[") {
+			if hasUnsafeFlag(seg) {
+				return false
+			}
+		}
+		if w := segmentWords(seg); len(w) > 0 && w[0] == "sysctl" && strings.Contains(seg, "=") {
+			return false // sysctl name=value sets a kernel value
+		} else if len(w) > 2 && w[0] == "xcode-select" {
+			return false // only the bare -p / --print-path query is a read
+		}
 	}
-	return true
+	return !namesSensitivePath(cmd)
 }
 
 // segmentIsReadOnly matches ONE simple command against the read-only list. The

@@ -114,6 +114,27 @@ type CreatePermissionRequest struct {
 	// could not help, and the person was asked thirty times for one answer.
 	// See GrantFamily for what a family is allowed to cover.
 	FamilySuggestion string `json:"family_suggestion,omitempty"`
+	// HardStop, when not empty, is the plain sentence saying why auto-approve
+	// does not cover this request although it can be undone: it installs
+	// software system-wide or runs as the administrator ("installs packages
+	// with brew", "runs as the administrator (sudo)"). The caller sets it.
+	//
+	// GORILLA OVERRIDE (2026-10-23): one of the two things auto-approve still
+	// stops for (see mustAskAnyway). Unlike Irreversible, an unattended run
+	// logs it and goes ahead: a script that installs its own dependencies is
+	// what -p is for.
+	HardStop string `json:"hard_stop,omitempty"`
+	// MayReachNetwork marks a shell command whose job is to send to another
+	// machine (ssh, scp, git push, a URL on the line). Running a local script
+	// is NOT this: see tools.MayReachNetwork for why. It changes nothing in an
+	// ordinary turn. In a turn that has read
+	// untrusted content it is the shell's exfiltration path, so auto-approve
+	// asks. See mustAskAnyway.
+	MayReachNetwork bool `json:"may_reach_network,omitempty"`
+	// SessionClass is the class "Allow for session" remembers for this request,
+	// as a family of GrantKey (bash: `pip3 install`), or "" for the exact key.
+	// The place is Path. The dialog prints both before the person answers.
+	SessionClass string `json:"session_class,omitempty"`
 }
 
 type PermissionRequest struct {
@@ -134,6 +155,10 @@ type PermissionRequest struct {
 	Irreversible string `json:"irreversible,omitempty"`
 	// FamilySuggestion — see CreatePermissionRequest.FamilySuggestion.
 	FamilySuggestion string `json:"family_suggestion,omitempty"`
+	// HardStop, MayReachNetwork, SessionClass — see CreatePermissionRequest.
+	HardStop        string `json:"hard_stop,omitempty"`
+	MayReachNetwork bool   `json:"may_reach_network,omitempty"`
+	SessionClass    string `json:"session_class,omitempty"`
 	// AutoApproveOverridden records that this prompt is being shown DESPITE
 	// auto-approve being on, and why. The dialog says so: a prompt appearing
 	// in a mode the user believes is unattended is confusing unless it
@@ -145,7 +170,11 @@ type Service interface {
 	pubsub.Suscriber[PermissionRequest]
 	GrantPersistant(permission PermissionRequest)
 	Grant(permission PermissionRequest)
+	// Deny is a PERSON saying no: the model is told and the turn carries on.
 	Deny(permission PermissionRequest)
+	// Refuse answers no when nobody answered (input closed, the editor went
+	// away): the turn ends, as a timeout does. See TakePersonDenial.
+	Refuse(permission PermissionRequest)
 	Request(opts CreatePermissionRequest) bool
 	AutoApproveSession(sessionID string)
 	// RevokeAutoApprove turns YOLO mode back off for a session.
@@ -293,6 +322,16 @@ type permissionService struct {
 	askedKeys map[string][]string
 	// unattended is set by the non-interactive entry point.
 	unattended bool
+	// knownEgress records, per root session, the egress grant keys (a fetch's
+	// scheme://host, a search tool's "*") that have already been let through
+	// in this conversation. Under auto-approve a tainted turn asks only for a
+	// key NOT in here: reading a second page on the site the person named is
+	// not an exfiltration path; a site the page just suggested is.
+	knownEgress map[string]map[string]bool
+	// personDenied records, per root session, that the last refusal came from a
+	// person pressing Deny (not a timeout, not an unattended refusal). The
+	// agent takes it to decide whether the turn carries on. See TakePersonDenial.
+	personDenied map[string]bool
 }
 
 // rootSession walks a helper session up to the conversation it belongs to.
@@ -329,8 +368,7 @@ func (s *permissionService) IsCovered(p PermissionRequest) bool {
 		return true
 	}
 	for _, g := range s.sessionPermissions {
-		if g.ToolName == p.ToolName && g.Action == p.Action &&
-			g.SessionID == root && g.Path == p.Path && g.GrantKey == p.GrantKey {
+		if g.SessionID == root && sessionGrantCovers(g, p.ToolName, p.Action, p.Path, p.GrantKey) {
 			s.mu.RUnlock()
 			return true
 		}
@@ -502,6 +540,16 @@ func (s *permissionService) HasFleetGrant(sessionID, toolName string) bool {
 	return s.hasFleetGrantLocked(s.rootSession(sessionID), toolName)
 }
 
+// GrantPersistant is "Allow for session": a class plus a place.
+//
+// GORILLA OVERRIDE (2026-10-23): it remembered one exact string, so a person
+// who allowed `pip3 install --user rich` was asked again for `pip3 install
+// --user typer`. It now remembers the CLASS the dialog printed (the request's
+// SessionClass, recorded as a family, so a bash class is bounded by the same
+// rules as "Allow family": plain tail, same place, never irreversible, never
+// egress, never in a tainted turn) and, for file-changing tools, every change
+// inside the same workspace root (see sessionGrantCovers). The exact request
+// is still stored too, so a request no class covers is answered as before.
 func (s *permissionService) GrantPersistant(permission PermissionRequest) {
 	if v, ok := s.pendingRequests.Load(permission.ID); ok {
 		if p, ok := v.(pendingRequest); ok {
@@ -510,7 +558,48 @@ func (s *permissionService) GrantPersistant(permission PermissionRequest) {
 	}
 	s.mu.Lock()
 	s.sessionPermissions = append(s.sessionPermissions, permission)
+	if c := strings.TrimSpace(permission.SessionClass); c != "" && permission.Irreversible == "" {
+		if m, ok := familyMatcherFor(permission.ToolName); ok && m(permission.GrantKey, c) {
+			s.familyGrants = append(s.familyGrants, familyGrant{
+				SessionID: permission.SessionID, ToolName: permission.ToolName,
+				Action: permission.Action, Path: permission.Path, Family: c,
+			})
+		}
+	}
 	s.mu.Unlock()
+}
+
+// sessionGrantCovers reports whether a remembered "Allow for session" answer
+// covers a request. The exact match is the rule for every tool. File-changing
+// tools also match by place: a change anywhere inside the same root, by any of
+// the edit tools, because the dialog said "every file change inside <root>"
+// and a diff in git is where such a change is reviewed anyway.
+func sessionGrantCovers(g PermissionRequest, toolName, action, path, grantKey string) bool {
+	if g.ToolName == toolName && g.Action == action && g.Path == path && g.GrantKey == grantKey {
+		return true
+	}
+	return editTools[g.ToolName] && editTools[toolName] && g.Path != "" && g.Path == path &&
+		g.Irreversible == ""
+}
+
+// SessionScope is the sentence the dialog prints next to "Allow for session":
+// exactly what the answer will cover, in the words a person reads.
+func SessionScope(p PermissionRequest) string {
+	place := p.Path
+	switch {
+	case p.Irreversible != "":
+		return "this exact command, once more in this session"
+	case editTools[p.ToolName] && place != "":
+		return "every file change inside " + place
+	case strings.TrimSpace(p.SessionClass) != "":
+		return "every `" + strings.TrimSpace(p.SessionClass) + " ...` command run in " + place +
+			" (one command each, no chaining; not after untrusted content was read)"
+	case p.GrantKey == GrantWholeTool:
+		return "every call of " + p.ToolName + " in this session"
+	case p.Egress && strings.Contains(p.GrantKey, "://"):
+		return "every page on " + p.GrantKey
+	}
+	return "this exact request"
 }
 
 func (s *permissionService) Grant(permission PermissionRequest) {
@@ -524,10 +613,54 @@ func (s *permissionService) Grant(permission PermissionRequest) {
 func (s *permissionService) Deny(permission PermissionRequest) {
 	if v, ok := s.pendingRequests.Load(permission.ID); ok {
 		if p, ok := v.(pendingRequest); ok {
+			// Recorded BEFORE the waiter wakes, so the tool's error and this
+			// mark reach the agent in that order.
+			s.mu.Lock()
+			if s.personDenied == nil {
+				s.personDenied = make(map[string]bool)
+			}
+			s.personDenied[p.sessionID] = true
+			s.mu.Unlock()
 			p.ch <- false
 		}
 	}
 }
+
+func (s *permissionService) Refuse(permission PermissionRequest) {
+	if v, ok := s.pendingRequests.Load(permission.ID); ok {
+		if p, ok := v.(pendingRequest); ok {
+			p.ch <- false
+		}
+	}
+}
+
+// TakePersonDenial reports, once, whether the last refusal in this session
+// tree was a person pressing Deny, and clears the mark.
+//
+// GORILLA FIX (2026-10-23): a Deny ended the whole turn (the agent finished the
+// message as "permission denied"), so the model never learned what the person
+// wanted instead and the screen sat on the last tool until the person typed
+// again. Observed on the MacBook Air: one Deny on a probe and the stranger
+// install stopped dead. A person's Deny is now an answer the model reads; a
+// timeout or an unattended refusal still ends the turn, because nobody is
+// there to read what the model does next.
+func TakePersonDenial(sessionID string) bool {
+	svc, ok := active.(*permissionService)
+	if !ok || sessionID == "" {
+		return false
+	}
+	svc.mu.Lock()
+	defer svc.mu.Unlock()
+	root := svc.rootSession(sessionID)
+	was := svc.personDenied[root]
+	delete(svc.personDenied, root)
+	return was
+}
+
+// DeniedByPersonResult is what the model reads after a person pressed Deny.
+const DeniedByPersonResult = "Denied by the person: they saw this request and said no, so it was NOT run. " +
+	"Do not retry it or a variant of it. Carry on with the rest of the task another way, " +
+	"or ask the person about it in plain text in your reply."
 
 // hasGrant reports whether a remembered session grant covers this exact
 // request. Exposed for tests so the matching rule can be asserted directly
@@ -583,6 +716,7 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	if autoApproved {
 		override = s.mustAskAnyway(opts, root)
 		if override == "" {
+			s.noteEgress(root, opts)
 			return true
 		}
 		s.mu.RLock()
@@ -601,6 +735,7 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 			logging.Warn("auto-approving under a carve-out because nobody is watching",
 				"tool", opts.ToolName, "action", opts.Action, "reason", override,
 				"grant_key", opts.GrantKey, "session", root)
+			s.noteEgress(root, opts)
 			return true
 		}
 	}
@@ -617,13 +752,16 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 		Egress:                opts.Egress,
 		Irreversible:          opts.Irreversible,
 		FamilySuggestion:      opts.FamilySuggestion,
+		HardStop:              opts.HardStop,
+		MayReachNetwork:       opts.MayReachNetwork,
+		SessionClass:          opts.SessionClass,
 		AutoApproveOverridden: override,
 	}
 
 	for _, p := range grants {
-		if p.ToolName == permission.ToolName && p.Action == permission.Action &&
-			p.SessionID == permission.SessionID && p.Path == permission.Path &&
-			p.GrantKey == permission.GrantKey {
+		if p.SessionID == permission.SessionID &&
+			sessionGrantCovers(p, permission.ToolName, permission.Action, permission.Path, permission.GrantKey) {
+			s.noteEgress(root, opts)
 			return true
 		}
 	}
@@ -636,6 +774,7 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 		permission.GrantKey, opts.Irreversible, opts.Egress) {
 		logging.Info("covered by a family grant", "tool", permission.ToolName,
 			"action", permission.Action, "grant_key", permission.GrantKey, "session", root)
+		s.noteEgress(root, opts)
 		return true
 	}
 
@@ -647,6 +786,7 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 		logging.Info("covered by a fleet grant approved for this run",
 			"tool", permission.ToolName, "action", permission.Action,
 			"grant_key", permission.GrantKey, "session", root)
+		s.noteEgress(root, opts)
 		return true
 	}
 
@@ -667,6 +807,9 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	defer timer.Stop()
 	select {
 	case resp := <-respCh:
+		if resp {
+			s.noteEgress(root, opts)
+		}
 		return resp
 	case <-timer.C:
 		logging.Warn("permission request timed out with no answer — denying so the tool fails instead of hanging",
@@ -831,18 +974,102 @@ func PermissionWaitForTest(d time.Duration) func() {
 	return func() { permissionWait = prev }
 }
 
+// noteEgress remembers an egress key that was let through, so a later request
+// to the same place is not "a new destination" (see mustAskAnyway).
+func (s *permissionService) noteEgress(root string, opts CreatePermissionRequest) {
+	if !opts.Egress || opts.GrantKey == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.knownEgress == nil {
+		s.knownEgress = make(map[string]map[string]bool)
+	}
+	if s.knownEgress[root] == nil {
+		s.knownEgress[root] = make(map[string]bool)
+	}
+	s.knownEgress[root][opts.ToolName+"\x00"+egressPlace(opts.GrantKey)] = true
+}
+
+// sameOwnerHosts are hosts run by one operator, so a request to one is not a
+// new destination after another was used. Only hosts whose server the operator
+// itself runs and whose logs no user can read: GitHub's content hosts serve any
+// user's files, but nobody but GitHub sees who asked for them. github.io is NOT
+// here: a Pages site can sit behind a custom domain whose owner sees requests.
+//
+// GORILLA OVERRIDE (2026-10-23, owner's decision): run 3 on the MacBook Air
+// asked for raw.githubusercontent.com/.../INSTALL.md right after the README on
+// github.com, the same project's file on GitHub's own content host.
+var sameOwnerHosts = map[string]string{
+	"github.com": "github", "www.github.com": "github", "api.github.com": "github",
+	"codeload.github.com": "github", "gist.github.com": "github",
+	"raw.githubusercontent.com": "github", "objects.githubusercontent.com": "github",
+	"gist.githubusercontent.com": "github", "user-images.githubusercontent.com": "github",
+	"avatars.githubusercontent.com": "github", "media.githubusercontent.com": "github",
+}
+
+// egressPlace is the place an egress grant key names: "https://host" reduced
+// to its operator when the host is in sameOwnerHosts, else the key itself.
+func egressPlace(key string) string {
+	host := strings.ToLower(key)
+	if i := strings.Index(host, "://"); i >= 0 {
+		host = host[i+3:]
+	}
+	if i := strings.IndexAny(host, "/:"); i >= 0 {
+		host = host[:i]
+	}
+	if owner, ok := sameOwnerHosts[host]; ok {
+		return "operator:" + owner
+	}
+	return key
+}
+
+func (s *permissionService) egressKnown(root string, opts CreatePermissionRequest) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.knownEgress[root][opts.ToolName+"\x00"+egressPlace(opts.GrantKey)]
+}
+
 // mustAskAnyway returns the reason auto-approve does NOT cover this request,
 // or "" if it does.
 //
-// Three carve-outs, and each one is a sink rather than a source:
+// GORILLA OVERRIDE (2026-10-23): auto-approve now stops only for what is
+// destructive or can carry data away. Measured on the MacBook Air the same
+// day (v0.1.149-dev, Gemini 3.8 Flash High, auto-approve on): one stranger
+// install raised four dialogs, for a probe of /Library, a README fetch, a
+// second page on the same site and `python3 --version && git --version`. None
+// of the four could do harm. The owner: "asa nu se poate lucra cu un coding
+// agent". Each earlier fear, and what still answers it, is in
+// docs/PERMISSIONS.md; in short:
 //
-//  1. Egress. Whatever a hostile page talked the model into, it has to leave
-//     the machine to matter. This is the single control that turns "the model
-//     was tricked" into "the model was tricked and could not act on it".
-//  2. A path outside every configured root. Auto-approve is a statement about
-//     the work in front of you; it is not consent to touch ~/.ssh.
-//  3. A tainted turn. The conversation has read something a stranger wrote,
-//     so the next action is not necessarily the user's idea.
+//  1. Irreversible (a wiped disk, a forced push): asks. Unchanged.
+//  2. HardStop (a system-wide install, sudo): asks. New: these ran unasked
+//     before whenever the turn was not tainted.
+//  3. Egress: was "every request off the machine asks". Now asks only for a
+//     destination this conversation has not used, and only after untrusted
+//     content was read: that is the exfiltration path the 2026-08-19 fear
+//     named (a poisoned page steering the model to its own server). The site
+//     the person named, and further pages on it, do not ask.
+//  4. Taint: was "every non-edit tool asks after untrusted content". For the
+//     shell it now asks only for a command that explicitly sends to another
+//     machine (MayReachNetwork; run 2 on the Air: 26 local Python commands
+//     each asked under the old rule). `python3 --version` and other read-only
+//     commands never reach this function at all (bash's read-only gate).
+//     Other non-edit tools keep the old rule.
+//  5. A path outside every root (a write, a delete, a non-read-only command
+//     naming that place): asks. Unchanged. Reads outside the roots are not
+//     requests: view never asks, and read-only shell commands skip the gate.
+//
+// The rule as it stood until 2026-10-23, kept so the change is readable:
+//
+//	Three carve-outs, and each one is a sink rather than a source:
+//	 1. Egress. Whatever a hostile page talked the model into, it has to leave
+//	    the machine to matter. This is the single control that turns "the model
+//	    was tricked" into "the model was tricked and could not act on it".
+//	 2. A path outside every configured root. Auto-approve is a statement about
+//	    the work in front of you; it is not consent to touch ~/.ssh.
+//	 3. A tainted turn. The conversation has read something a stranger wrote,
+//	    so the next action is not necessarily the user's idea.
 //
 // It does not deny anything. It only declines to skip the question.
 func (s *permissionService) mustAskAnyway(opts CreatePermissionRequest, root string) string {
@@ -851,11 +1078,15 @@ func (s *permissionService) mustAskAnyway(opts CreatePermissionRequest, root str
 	if opts.Irreversible != "" {
 		return "this cannot be undone: " + opts.Irreversible
 	}
+	if opts.HardStop != "" {
+		return opts.HardStop
+	}
+	reason, tainted := TaintOf(root)
 	if opts.Egress {
-		if reason, ok := TaintOf(root); ok {
-			return "this leaves the machine, and this turn has already read untrusted content (" + reason.Reason + ")"
+		if tainted && !s.egressKnown(root, opts) {
+			return "this sends a request to a place this conversation has not used, after reading untrusted content (" + reason.Reason + ")"
 		}
-		return "this sends a request off the machine"
+		return ""
 	}
 	// GORILLA OVERRIDE (2026-10-11, owner decision "B"): after untrusted
 	// content, an EDIT INSIDE THE ROOTS no longer asks. It used to: one web
@@ -865,9 +1096,14 @@ func (s *permissionService) mustAskAnyway(opts CreatePermissionRequest, root str
 	// do anything), egress (above), a path outside the roots (below) and an
 	// irreversible action (above). An edit inside the project is visible in
 	// the diff and in git, which is where the person reviews it anyway.
-	if IsTainted(root) && !editTools[opts.ToolName] {
-		reason, _ := TaintOf(root)
-		return "this turn has already read untrusted content (" + reason.Reason + ")"
+	//
+	// GORILLA OVERRIDE (2026-10-23): "every non-edit tool" is narrowed for the
+	// shell to commands that can reach the network or run a script; see the
+	// function comment, point 4.
+	if tainted && !editTools[opts.ToolName] {
+		if opts.ToolName != shellToolName || opts.MayReachNetwork {
+			return "this turn has already read untrusted content (" + reason.Reason + "), and this sends to another machine"
+		}
 	}
 	// GORILLA OVERRIDE (2026-09-01): the filepath.IsAbs precondition is gone.
 	//
@@ -888,3 +1124,7 @@ func (s *permissionService) mustAskAnyway(opts CreatePermissionRequest, root str
 	}
 	return ""
 }
+
+// shellToolName is the bash tool's name. Spelled here rather than imported:
+// the tools package imports this one.
+const shellToolName = "bash"

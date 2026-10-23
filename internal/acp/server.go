@@ -48,6 +48,8 @@ type PermissionDesk interface {
 	GrantPersistant(permission.PermissionRequest)
 	GrantFamily(permission.PermissionRequest, string)
 	Deny(permission.PermissionRequest)
+	// Refuse is "no answer came" (see permission.Service.Refuse).
+	Refuse(permission.PermissionRequest)
 }
 
 // Runner runs one prompt turn and can cancel it.
@@ -549,7 +551,7 @@ func (s *Server) askPermission(ctx context.Context, st *turnState, req permissio
 	raw, err := s.conn.call(ctx, "session/request_permission", params)
 	if err != nil {
 		logging.Warn("acp: permission question not answered; denied", "tool", req.ToolName, "err", err)
-		s.eng.Permissions.Deny(req)
+		s.eng.Permissions.Refuse(req)
 		return
 	}
 	var out struct {
@@ -559,7 +561,7 @@ func (s *Server) askPermission(ctx context.Context, st *turnState, req permissio
 		} `json:"outcome"`
 	}
 	if json.Unmarshal(raw, &out) != nil || out.Outcome.Outcome != "selected" {
-		s.eng.Permissions.Deny(req)
+		s.eng.Permissions.Refuse(req)
 		return
 	}
 	switch out.Outcome.OptionID {

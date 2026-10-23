@@ -248,6 +248,12 @@ type bashVerdict struct {
 	Irreversible string
 	// Description is the sentence shown on the prompt.
 	Description string
+	// HardStop is why auto-approve still asks (sudo, a system-wide install),
+	// or "". See commandclass.go.
+	HardStop string
+	// MayReachNetwork: the command can send data off the machine or run code
+	// that can. Only consulted in a turn that read untrusted content.
+	MayReachNetwork bool
 }
 
 func bashGateVerdict(command string) bashVerdict {
@@ -255,7 +261,11 @@ func bashGateVerdict(command string) bashVerdict {
 	if v.Banned = BannedCommandIn(command, bannedCommands); v.Banned != "" {
 		return v
 	}
-	v.ReadOnly = IsSafeReadOnly(command, safeReadOnlyCommands)
+	v.ReadOnly = IsSafeReadOnly(command, readOnlyList())
+	if !v.ReadOnly {
+		v.HardStop = HardStopIn(command)
+		v.MayReachNetwork = MayReachNetwork(command)
+	}
 	// GORILLA OVERRIDE (2026-10-04): a command that cannot be taken back says so
 	// in the prompt, is never treated as read-only, and is asked about even
 	// when auto-approve is on. See dangerous.go.
@@ -274,9 +284,14 @@ func (b *bashTool) bashPermissionRequest(sessionID, command string, v bashVerdic
 	// already asked, so the second variant of a command can be the last
 	// prompt for it. Never for an irreversible command: the family grant
 	// would refuse to cover it anyway, and the dialog must not suggest one.
-	family := ""
+	family, class := "", ""
 	if v.Irreversible == "" {
 		family = SuggestCommandFamily(command, b.permissions.AskedKeys(sessionID, BashToolName))
+		// GORILLA OVERRIDE (2026-10-23): "Allow for session" remembers the
+		// class (program and subcommand, `pip3 install`) in this place, not
+		// the one exact string. Same bounds as a family; see
+		// permission.GrantPersistant.
+		class = SuggestCommandFamily(command, nil)
 	}
 	return permission.CreatePermissionRequest{
 		SessionID: sessionID,
@@ -296,6 +311,9 @@ func (b *bashTool) bashPermissionRequest(sessionID, command string, v bashVerdic
 		GrantKey:         command,
 		Description:      v.Description,
 		Irreversible:     v.Irreversible,
+		HardStop:         v.HardStop,
+		MayReachNetwork:  v.MayReachNetwork,
+		SessionClass:     class,
 		FamilySuggestion: family,
 		Params: BashPermissionsParams{
 			Command: command,
