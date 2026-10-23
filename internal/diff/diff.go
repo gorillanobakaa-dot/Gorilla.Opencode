@@ -512,9 +512,17 @@ func SyntaxHighlight(w io.Writer, source, fileName, formatter string, bg lipglos
 	r := strings.NewReader(syntaxThemeXml)
 	style := chroma.MustNewXMLStyle(r)
 
-	// Modify the style to use the provided background
+	// Modify the style to use the provided background. No background at all
+	// (NoColor, or nil) means none on any token: NoColor's RGBA is black, and a
+	// per-token black on a 256-colour terminal is the blotch rowBackgrounds
+	// exists to avoid.
+	_, noBg := bg.(lipgloss.NoColor)
 	s, err := style.Builder().Transform(
 		func(t chroma.StyleEntry) chroma.StyleEntry {
+			if bg == nil || noBg {
+				t.Background = 0
+				return t
+			}
 			r, g, b, _ := bg.RGBA()
 			t.Background = chroma.NewColour(uint8(r>>8), uint8(g>>8), uint8(b>>8))
 			return t
@@ -582,12 +590,35 @@ func highlightLine(fileName string, line string, bg lipgloss.TerminalColor) stri
 
 // createStyles generates the lipgloss styles needed for rendering diffs
 func createStyles(t theme.Theme) (removedLineStyle, addedLineStyle, contextLineStyle, lineNumberStyle lipgloss.Style) {
-	removedLineStyle = lipgloss.NewStyle().Background(t.DiffRemovedBg())
-	addedLineStyle = lipgloss.NewStyle().Background(t.DiffAddedBg())
-	contextLineStyle = lipgloss.NewStyle().Background(t.DiffContextBg())
+	removedLineStyle = withRowBg(lipgloss.NewStyle(), t.DiffRemovedBg())
+	addedLineStyle = withRowBg(lipgloss.NewStyle(), t.DiffAddedBg())
+	contextLineStyle = withRowBg(lipgloss.NewStyle(), t.DiffContextBg())
 	lineNumberStyle = lipgloss.NewStyle().Foreground(t.DiffLineNumber())
 
 	return
+}
+
+// rowBackgrounds reports whether diff rows may carry a background colour.
+//
+// GORILLA FIX (2026-10-23, MacBook Air, Terminal.app, 256 colours): the row
+// backgrounds are near-black shades chosen to sit just off a #212121 terminal.
+// On a 256-colour terminal they are rounded to visible greys, and on the black
+// "Pro" profile every row became a grey slab padded to its column, context rows
+// and per-token syntax backgrounds in blocks of different widths
+// (air-2026-10-23-032550-owner-grey-blotches.png). Below 24-bit colour the
+// diff uses no row background: added and removed lines are told apart by the
+// coloured +/- marker and line number, and the changed characters keep their
+// highlight.
+func rowBackgrounds() bool {
+	return lipgloss.ColorProfile() == termenv.TrueColor
+}
+
+// withRowBg sets a row background only where rowBackgrounds allows it.
+func withRowBg(s lipgloss.Style, c lipgloss.TerminalColor) lipgloss.Style {
+	if !rowBackgrounds() {
+		return s
+	}
+	return s.Background(c)
 }
 
 // -------------------------------------------------------------------------
@@ -709,7 +740,7 @@ func renderLeftColumn(fileName string, dl *DiffLine, colWidth int) string {
 	t := theme.CurrentTheme()
 
 	if dl == nil {
-		contextLineStyle := lipgloss.NewStyle().Background(t.DiffContextBg())
+		contextLineStyle := withRowBg(lipgloss.NewStyle(), t.DiffContextBg())
 		return contextLineStyle.Width(colWidth).Render("")
 	}
 
@@ -722,7 +753,7 @@ func renderLeftColumn(fileName string, dl *DiffLine, colWidth int) string {
 	case LineRemoved:
 		marker = removedLineStyle.Foreground(t.DiffRemoved()).Render("-")
 		bgStyle = removedLineStyle
-		lineNumberStyle = lineNumberStyle.Foreground(t.DiffRemoved()).Background(t.DiffRemovedLineNumberBg())
+		lineNumberStyle = withRowBg(lineNumberStyle.Foreground(t.DiffRemoved()), t.DiffRemovedLineNumberBg())
 	case LineAdded:
 		marker = "?"
 		bgStyle = contextLineStyle
@@ -769,7 +800,7 @@ func renderRightColumn(fileName string, dl *DiffLine, colWidth int) string {
 	t := theme.CurrentTheme()
 
 	if dl == nil {
-		contextLineStyle := lipgloss.NewStyle().Background(t.DiffContextBg())
+		contextLineStyle := withRowBg(lipgloss.NewStyle(), t.DiffContextBg())
 		return contextLineStyle.Width(colWidth).Render("")
 	}
 
@@ -782,7 +813,7 @@ func renderRightColumn(fileName string, dl *DiffLine, colWidth int) string {
 	case LineAdded:
 		marker = addedLineStyle.Foreground(t.DiffAdded()).Render("+")
 		bgStyle = addedLineStyle
-		lineNumberStyle = lineNumberStyle.Foreground(t.DiffAdded()).Background(t.DiffAddedLineNumberBg())
+		lineNumberStyle = withRowBg(lineNumberStyle.Foreground(t.DiffAdded()), t.DiffAddedLineNumberBg())
 	case LineRemoved:
 		marker = "?"
 		bgStyle = contextLineStyle
