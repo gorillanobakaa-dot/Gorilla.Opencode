@@ -47,6 +47,14 @@ func TestTheDialogShowsTheCommandAndURLInFull(t *testing.T) {
 			GrantKey: "python3 install.py --prefix /Users/stranger/Stranger-Test", AutoApproveOverridden: reason,
 			Params: tools.BashPermissionsParams{Command: "python3 install.py --prefix /Users/stranger/Stranger-Test"},
 		}, "python3install.py--prefix/Users/stranger/Stranger-Test"},
+		// The live clue from the Mac (2026-10-23 02:05): a long command with a
+		// family showed (the family made the old box 70% high), a SHORT one
+		// without a family rendered empty, as did every URL.
+		{"bash, short single line", permission.PermissionRequest{
+			ID: "b2", ToolName: tools.BashToolName, Action: "execute", Path: "/Users/stranger/Stranger-Test",
+			GrantKey: "brew install git", AutoApproveOverridden: reason,
+			Params: tools.BashPermissionsParams{Command: "brew install git"},
+		}, "brewinstallgit"},
 		{"fetch, evidence row 3", permission.PermissionRequest{
 			ID: "f1", ToolName: tools.FetchToolName, Action: "fetch", Path: "/Users/stranger/Stranger-Test",
 			GrantKey: "https://evil.example", Egress: true, AutoApproveOverridden: reason,
