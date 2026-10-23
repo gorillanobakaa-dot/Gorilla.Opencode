@@ -129,7 +129,8 @@ func antigravityErr(resp *http.Response) error {
 }
 
 func (c *antigravityClient) send(ctx context.Context, messages []message.Message, ts []tools.BaseTool) (*ProviderResponse, error) {
-	resp, err := c.post(ctx, "generateContent", c.buildEnvelope(messages, ts))
+	env := c.buildEnvelope(messages, ts)
+	resp, err := postRetryingServerErrors(ctx, func() (*http.Response, error) { return c.post(ctx, "generateContent", env) })
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +160,8 @@ func (c *antigravityClient) stream(ctx context.Context, messages []message.Messa
 	go func() {
 		defer close(eventChan)
 
-		resp, err := c.post(ctx, "streamGenerateContent", c.buildEnvelope(messages, ts))
+		env := c.buildEnvelope(messages, ts)
+		resp, err := postRetryingServerErrors(ctx, func() (*http.Response, error) { return c.post(ctx, "streamGenerateContent", env) })
 		if err != nil {
 			eventChan <- ProviderEvent{Type: EventError, Error: err}
 			return
