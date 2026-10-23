@@ -16,7 +16,10 @@ export GOTOOLCHAIN=local   # a toolchain switch would bypass the patched GOROOT
 SRC_GOROOT="$(go env GOROOT)"
 case "$(go env GOVERSION)" in go1.24.*) ;; *) echo "warn: patch written against go1.24.x, have $(go env GOVERSION); anchors are checked" >&2 ;; esac
 
-rm -rf "$GR" && mkdir -p "$WORK" && cp -a "$SRC_GOROOT" "$GR" && chmod -R u+w "$GR/src/crypto/x509/internal/macos"
+# -L follows symlinks: Debian's GOROOT (/usr/lib/go-1.24) holds relative links
+# (src, api, lib, misc -> ../../share/go-1.24/...) that no longer resolve once
+# copied under $WORK (2026-10-23). BSD cp takes the last of -P/-L, so -aL works there too.
+rm -rf "$GR" && mkdir -p "$WORK" && cp -aL "$SRC_GOROOT" "$GR" && chmod -R u+w "$GR/src/crypto/x509/internal/macos"
 M="$GR/src/crypto/x509/internal/macos"
 python3 -I - "$M/security.go" "$M/security.s" <<'PY'
 import sys
