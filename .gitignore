@@ -130,6 +130,22 @@ checksums.sha256
 # every commit author, and in the packager field of every Arch package already
 # shipped — where it is meant to be, so users know who built it.
 !/scripts/build-arch.sh
+# GORILLA: exception (2026-10-23) - build-deb.sh, build-tarball.sh and build-rpm.sh are PUBLISHED, with the
+# owner's express approval ("le putem salva in proiect cu aprobarea mea expresa si le putem urca pe github in
+# main"). This narrows the "packaging scripts stay untracked" line above once more; the release tooling stays
+# untracked.
+#
+# WHY. Fieldkit's one-command build (fieldkit pipeline run gorilla-opencode) now makes every release file from
+# one Linux machine: linux, .exe, macOS 10.13, .deb, .rpm, Arch, the portable tarball and SHA256SUMS. With these
+# three only on the build machine, a fresh clone could not do the same, and the owner asked that it can. The same
+# loss argument as build-arch.sh: an untracked recipe has no history and dies with the machine.
+#
+# SAFE TO PUBLISH, checked (fieldkit privacy scan, 2026-10-23): no credentials, no API keys, no internal paths
+# (everything is relative to $ROOT or a mktemp folder). The one finding is the maintainer e-mail in the .deb
+# control file, already public in every commit author and every shipped .deb.
+!/scripts/build-deb.sh
+!/scripts/build-tarball.sh
+!/scripts/build-rpm.sh
 # GORILLA: exception (2026-10-19) — build-darwin-legacy.sh is PUBLISHED. It builds
 # the macOS 10.13 (High Sierra, Intel) binary with a patched copy of Go 1.24's
 # crypto/x509 (SecTrustEvaluateWithError is 10.14+). Checked: no credentials, no
