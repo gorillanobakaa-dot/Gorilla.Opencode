@@ -63,7 +63,7 @@ Not tried: the tools inside a conversation with a real AI model. They were teste
 
 - The `.xz`, `.zst`, `.7z` and `.rar` formats: the tool says it cannot open them and that an external tool is needed.
 - Comparing two builds ("what changed"), reading GTK theme resources, video checks: later phases.
-- Checking that a signature is genuine: the tool only says whether there is one.
+- Checking that a signature is genuine: the tool only says whether there is one and whose name is on it (see the addendum below).
 
 ## How to check that the new parts work on your computer
 
@@ -80,6 +80,19 @@ No new connection was added. Nothing is downloaded or installed, no other progra
 - **Entropy**: how random the bytes in a part of a file look, from 0 to 8. Above about 7.2 usually means compressed, packed or encrypted.
 - **Fat (universal) Mac program**: one file holding versions for several processors, for example Intel and Apple Silicon.
 - **omni.ja**: the zip file in which Firefox keeps most of its own scripts and settings.
+- **Export**: a function or value a library offers to other programs, by name or by number.
+- **Forwarder**: an export that only points to a function in another library ("ask KERNEL32 for this one").
+- **Ad-hoc signature**: a Mac signature with no name on it; anyone can make one.
+
+## Addendum 2026-10-22 (night run): what a library offers, version labels, signer names
+
+`binary_inspect` now also shows:
+
+- **What a library offers to other programs** (ask for `part=exports`): for Windows `.dll` files, Linux `.so` files and Mac libraries. On Windows it also shows exports that only point to another library, and exports that have a number but no name.
+- **The version label** of a Windows program (file version, product version, company, product name, original file name, description). The tool says plainly that whoever built the file wrote this label, so it proves nothing about who really made it.
+- **The name on a signature**: who signed a Windows program, and who issued that signer's certificate; for a Mac program, the name it signed itself with, and whether the signature is "ad-hoc" (no name at all). Every one of these lines says **NOT verified**: the tool reads the name, it does not check that the signature is genuine or that the file is unchanged. Real checking is a later job.
+
+Tried on test files built on this laptop, and on a fake signature made inside the tests (a real signed test file cannot be made without the internet). Cost: about 11 more tokens per message (10,610 → 10,621).
 
 ---
 
@@ -139,22 +152,32 @@ No tool. `bash` + whatever binaries the machine had.
 
 - That 10.13 ignores `LC_BUILD_VERSION` in general. The evidence is one binary (0.1.149-dev) that runs there; hence UNPROVEN, not OK.
 - Behavior inside a live model conversation (Gemma 4 E2B or any other): not run. The token cost is measured; whether Gemma picks the right `part`/`action` is not.
-- The patched legacy-darwin go1.24 toolchain is not on this laptop. Checked instead: `GOOS=darwin GOARCH=amd64` build of the whole program with stock go1.24.13 (`~/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.24.13.windows-amd64`) and `go test ./internal/forensics` on go1.24.13.
+- The patched legacy-darwin go1.24 toolchain is not on this laptop. Checked instead: `GOOS=darwin GOARCH=amd64` build of the whole program with stock go1.24.13 (the golang.org/toolchain module, version v0.0.1-go1.24.13.windows-amd64) and `go test ./internal/forensics` on go1.24.13.
 
 ## Addendum 2026-10-22: full=true, three users
 
 The owner: Gorilla OpenCode is used "locally/manually by a person, big model such as yourself and in cases of extreme emergencies, like a last hail mary by a local SLM". The caps above were sized only for the small model. Both tools now take `full=true`: every list cap is lifted and `strings` reads the whole file; a result over the 400 KB response limit is kept whole in a file by the existing spill (`clampToolContent`). Every capped line now ends "or full=true". Cost: +24 tokens per tool (204 + 202 measured). Tests: `TestFullLiftsEveryCap`, `TestFullListsEveryEntry`, `TestFullReachesBothTools`; four more mutations in `testdata/mutations.yaml`.
 
+## Addendum 2026-10-22 (night run, job 2): exports, PE version info, signer names
+
+- **`part=exports`** (new files `pe_extra.go`, `macho_extra.go`; `elfExports` in `binary.go`). PE: `IMAGE_EXPORT_DIRECTORY` read by RVA through the section that holds it; one line per non-zero `AddressOfFunctions` slot, `ord = Base + index`, names joined via `AddressOfNameOrdinals`; an RVA inside the export directory is a forwarder string (`-> KERNEL32.GetTickCount`); ordinal-only exports say so; a table claiming more than 2^20 entries is refused. ELF: dynamic symbols that are defined, `STB_GLOBAL`/`STB_WEAK`, and `STT_FUNC`/`OBJECT`/`TLS`/`GNU_IFUNC`, with `@version` when present. Mach-O: the dyld export trie (`LC_DYLD_INFO[_ONLY]` export_off/size or `LC_DYLD_EXPORTS_TRIE`) read from `__LINKEDIT` via `Segment.ReadAt` (so fat slices work), iterative DFS in trie order, flags re-export / weak / TLS / absolute / resolver; a revisited node or truncation stops the walk with a visible line; without a trie, the symbol table (`N_EXT`, defined, no stab). Same cap (150), `filter` and `full=true` as the other lists; the summary prints only the count.
+- **PE version info in the summary.** Resource tree root → type 16 (`RT_VERSION`) → first name → first language → data entry (`OffsetToData` is an RVA). `VS_VERSIONINFO` walked as nested `{wLength, wValueLength, wType, key, value, children}` blocks, 32-bit aligned, text value lengths in UTF-16 units, depth capped at 4; first StringTable wins per key; `VS_FIXEDFILEINFO` (signature `0xFEEF04BD`) printed as `numeric:`. Heading: "version info (written by whoever built the file)".
+- **Signer names, NOT verified.** `cms.go` splits DER with `encoding/asn1` RawValues (struct tags cannot express SignedData's optional `[0]`/`[1]` RawValue fields: a RawValue field accepts any tag), parses certificates with `crypto/x509`, and matches each SignerInfo's sid by issuer + serial or by `[0]` subject key id; an unmatched signer is named by its issuer from the sid. PE: `WIN_CERTIFICATE` entries at the security directory's file offset (not an RVA), 8-byte aligned, type `0x0002`; block read capped at 16 MiB. Mach-O: `LC_CODE_SIGNATURE` SuperBlob `0xfade0cc0`, CodeDirectory (slot 0, `0xfade0c02`) identifier and `CS_ADHOC` flag, CMS wrapper (slot `0x10000`, `0xfade0b01`). Every signature line says "NOT verified (chain and hash not checked)". Nested Authenticode signatures (unsigned attribute 1.3.6.1.4.1.311.2.4.1) are not listed.
+- **Fixtures** (`testdata/README.md`): `fxlib.pedll` (zig 0.16 `cc -shared` with `fxlib.def` for a forwarder and an ordinal-only export, `zig rc` for `fxlib.rc`), `fxlib.elfso`, `fxlib.machodylib`; odd extensions because the repository ignores `*.dll`, `*.so`, `*.dylib`. No signed fixture can be made offline: the tests build a two-certificate PKCS#7 (root first, so a match on issuer alone would name the root), append it to a copy of `fx.pe` as a `WIN_CERTIFICATE`, and hand-build a SuperBlob with a CMS blob.
+- **Cost**: `binary_inspect` 204 → 215 tokens (enum gains `exports`; the description names version info and unverified signer names); default ON total 10,610 → 10,621.
+- **Mutation plan**: 21 new rules in `testdata/mutations.yaml`.
+- **Not covered by a mutation**: the ELF binding check (`STB_GLOBAL`/`STB_WEAK`; no fixture has a local dynamic symbol), the RT_VERSION type match (the fixture has no other resource type), the `__LINKEDIT` bounds check.
+
 ## Open Items
 
-- Exports (PE export directory, ELF defined dynamic symbols as a list), PE resources/version info, Authenticode and Mach-O signature verification.
+- Authenticode and Mach-O signature verification (chain, page hashes, Authenticode digest); nested Authenticode signatures.
 - xz/zstd (no stdlib decoder; card per PLAN.md).
 - Phase 1b: GResource/GVDB, build-to-build diff on top of this package.
 
 ## How to verify this work is correct
 
     go test ./internal/forensics/ ./internal/llm/tools/ ./internal/llm/agent/ ./internal/config/
-    fieldkit mutate --plan internal/forensics/testdata/mutations.yaml --cwd . -- go test ./internal/forensics/ ./internal/llm/tools/ -run "^Test(ELF|PE|MachO|Legacy|Strings|Entropy|ListCap|Refuses|Clean|Omni|Large|Tar|Single|Stream|Unsupported|Safe|Traversal|Extract|BinaryInspect|ArchiveTool)"
+    fieldkit mutate --plan internal/forensics/testdata/mutations.yaml --cwd . -- go test ./internal/forensics/ ./internal/llm/tools/ -run "^Test(ELF|PE|MachO|Legacy|Strings|Entropy|ListCap|Refuses|Clean|Omni|Large|Tar|Single|Stream|Unsupported|Safe|Traversal|Extract|BinaryInspect|ArchiveTool|Full|Version|ExportTrie|CMS)"
     go test ./internal/llm/agent/ -run TestDefaultToolSchemaCost -v
 
 ## Technical Debt
@@ -166,5 +189,6 @@ The owner: Gorilla OpenCode is used "locally/manually by a person, big model suc
 
 - Mozilla jar layout: `python/mozbuild/mozpack/mozjar.py`, `JarWriter.finish` (Firefox source tree), and the `unzip -l` warning on the fixture ("320 extra bytes at beginning"), which is what unzip says of an optimized jar.
 - archive/zip base-offset rule: `src/archive/zip/reader.go`, `readDirectoryEnd`, go1.24.13.
-- Load command numbers: `<mach-o/loader.h>` (`LC_VERSION_MIN_MACOSX 0x24`, `LC_BUILD_VERSION 0x32`, `LC_CODE_SIGNATURE 0x1d`, `PLATFORM_MACOS 1`).
+- Load command numbers: `<mach-o/loader.h>` (`LC_VERSION_MIN_MACOSX 0x24`, `LC_BUILD_VERSION 0x32`, `LC_CODE_SIGNATURE 0x1d`, `PLATFORM_MACOS 1`, `LC_DYLD_INFO_ONLY 0x80000022`, `LC_DYLD_EXPORTS_TRIE 0x80000033`, `EXPORT_SYMBOL_FLAGS_*`).
+- PE export directory, resource tree, `WIN_CERTIFICATE`: Microsoft PE/COFF specification; `VS_VERSIONINFO`: Win32 `VS_VERSIONINFO`/`String` structure docs; code-signing blob magics: Apple `cs_blobs.h` (xnu).
 - Timings and the 0.1.149-dev reading: run 2026-10-21 on this laptop (Firefox 157 build of 2026-10-10 under Fieldkit `state/build-harness/leakgate`).

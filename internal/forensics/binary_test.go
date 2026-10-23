@@ -86,7 +86,7 @@ func TestMachOFatFixture(t *testing.T) {
 		"minimum macOS: 11.0",
 		"from LC_BUILD_VERSION",
 		"check: NO: arm64 slice, the Air is Intel",
-		"code signature: present (NOT verified)",
+		"code signature: present, NOT verified (chain and hash not checked)",
 	)
 	imp := mustInspect(t, "testdata/fx-fat.macho", Options{Part: PartImports})
 	if strings.Count(imp, "_puts") != 2 {

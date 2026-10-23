@@ -160,3 +160,15 @@ func TestArchiveToolExtractAsksAndStaysInTheProject(t *testing.T) {
 		}
 	}
 }
+
+// part=exports is offered in the schema and reaches the inspector (night run 2026-10-22, job 2).
+func TestBinaryInspectToolExports(t *testing.T) {
+	enum := NewBinaryInspectTool().Info().Parameters["part"].(map[string]any)["enum"].([]string)
+	if !strings.Contains(strings.Join(enum, ","), "exports") {
+		t.Errorf("part enum lacks exports: %v", enum)
+	}
+	r, _ := forensicsCall(t, NewBinaryInspectTool(), map[string]any{"path": forensicsFixture(t, "fxlib.pedll"), "part": "exports"})
+	if r.IsError || !strings.Contains(r.Content, "ord 13 -> KERNEL32.GetTickCount gorilla_forwarded") {
+		t.Errorf("exports through the tool:\n%s", r.Content)
+	}
+}

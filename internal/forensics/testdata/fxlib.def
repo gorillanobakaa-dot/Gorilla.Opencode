@@ -1,0 +1,7 @@
+LIBRARY fxlib.dll
+EXPORTS
+    gorilla_export_add
+    gorilla_export_mul
+    gorilla_export_data DATA
+    gorilla_forwarded=KERNEL32.GetTickCount
+    gorilla_by_ordinal=gorilla_use @9 NONAME

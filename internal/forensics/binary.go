@@ -34,6 +34,7 @@ const (
 	PartSymbols  = "symbols"
 	PartStrings  = "strings"
 	PartSections = "sections"
+	PartExports  = "exports"
 )
 
 // stringScanCap is how much of a file a default strings scan reads. A variable only so a test can
@@ -53,7 +54,7 @@ const (
 
 // Options selects what Inspect reports.
 type Options struct {
-	Part   string // summary (default), sections, imports, symbols, strings
+	Part   string // summary (default), sections, imports, exports, symbols, strings
 	Filter string // case-insensitive substring for symbols, imports and strings
 	MinLen int    // shortest string reported (default 6)
 	// Full lifts every cap: for a person or a large model. The small defaults are for a small
@@ -75,9 +76,9 @@ func Inspect(path string, o Options) (string, error) {
 		o.Part = PartSummary
 	}
 	switch o.Part {
-	case PartSummary, PartSections, PartImports, PartSymbols, PartStrings:
+	case PartSummary, PartSections, PartImports, PartExports, PartSymbols, PartStrings:
 	default:
-		return "", fmt.Errorf("unknown part %q: use summary, sections, imports, symbols or strings", o.Part)
+		return "", fmt.Errorf("unknown part %q: use summary, sections, imports, exports, symbols or strings", o.Part)
 	}
 	f, err := os.Open(path)
 	if err != nil {
@@ -175,6 +176,9 @@ func inspectELF(b *strings.Builder, r io.ReaderAt, o Options) error {
 		} else {
 			fmt.Fprintf(b, "symbols: %d in .symtab, %d dynamic (part=symbols lists them)\n", len(syms), len(dyn))
 		}
+		if n := len(elfExports(f)); n > 0 {
+			fmt.Fprintf(b, "exports: %d (part=exports lists them)\n", n)
+		}
 		writeELFSections(b, f, o)
 	case PartSections:
 		writeELFSections(b, f, o)
@@ -194,6 +198,8 @@ func inspectELF(b *strings.Builder, r io.ReaderAt, o Options) error {
 			lines = append(lines, l)
 		}
 		writeList(b, "imported symbols", lines, o.limit(maxSymbols), o.Filter)
+	case PartExports:
+		writeList(b, "exported dynamic symbols", elfExports(f), o.limit(maxSymbols), o.Filter)
 	case PartSymbols:
 		var lines []string
 		syms, err := f.Symbols()
@@ -222,6 +228,44 @@ func inspectELF(b *strings.Builder, r io.ReaderAt, o Options) error {
 		writeList(b, "symbols", lines, o.limit(maxSymbols), o.Filter)
 	}
 	return nil
+}
+
+// elfExports lists the dynamic symbols a library offers others: defined, global
+// or weak, and code, data or thread-local.
+func elfExports(f *elf.File) []string {
+	dyn, _ := f.DynamicSymbols()
+	var lines []string
+	for _, s := range dyn {
+		if s.Section == elf.SHN_UNDEF || s.Name == "" {
+			continue
+		}
+		bind := elf.ST_BIND(s.Info)
+		if bind != elf.STB_GLOBAL && bind != elf.STB_WEAK {
+			continue
+		}
+		kind := ""
+		switch elf.ST_TYPE(s.Info) {
+		case elf.STT_FUNC:
+			kind = "func"
+		case elf.STT_OBJECT:
+			kind = "data"
+		case elf.STT_TLS:
+			kind = "tls"
+		case elf.STT_GNU_IFUNC:
+			kind = "ifunc"
+		default:
+			continue
+		}
+		if bind == elf.STB_WEAK {
+			kind += ",weak"
+		}
+		name := s.Name
+		if s.Version != "" {
+			name += "@" + s.Version
+		}
+		lines = append(lines, fmt.Sprintf("0x%x %s %s", s.Value, kind, name))
+	}
+	return lines
 }
 
 func elfType(t elf.Type) string {
@@ -309,11 +353,15 @@ func inspectPE(b *strings.Builder, r io.ReaderAt, o Options) error {
 		if peDir(dirs, pe.IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT) {
 			b.WriteString("delay-load imports: present, not listed\n")
 		}
-		if peDir(dirs, pe.IMAGE_DIRECTORY_ENTRY_SECURITY) {
-			b.WriteString("signature: Authenticode block present (NOT verified)\n")
-		} else {
-			b.WriteString("signature: none\n")
+		if dll, ex, err := peExports(f, dirs); err != nil {
+			fmt.Fprintf(b, "exports: %s\n", clean(err.Error()))
+		} else if len(ex) > 0 {
+			fmt.Fprintf(b, "exports: %d as %s (part=exports lists them)\n", len(ex), orDash([]string{dll}))
 		}
+		if vi, ok := peVersionInfo(f, dirs); ok {
+			writeVersionInfo(b, vi)
+		}
+		peSignature(b, r, dirs)
 		if peDir(dirs, pe.IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR) {
 			b.WriteString(".NET: yes (managed code)\n")
 		}
@@ -328,6 +376,15 @@ func inspectPE(b *strings.Builder, r io.ReaderAt, o Options) error {
 			}
 		}
 		writeList(b, "imported functions", lines, o.limit(maxSymbols), o.Filter)
+	case PartExports:
+		dll, ex, err := peExports(f, dirs)
+		if err != nil {
+			return err
+		}
+		if dll != "" {
+			fmt.Fprintf(b, "export name: %s\n", clean(dll))
+		}
+		writeList(b, "exported functions (ordinal, RVA or -> forwarder, name)", ex, o.limit(maxSymbols), o.Filter)
 	case PartSymbols:
 		var lines []string
 		for _, s := range f.Symbols {
@@ -438,7 +495,7 @@ func writeMachOSlice(b *strings.Builder, f *macho.File, o Options) {
 	switch o.Part {
 	case PartSummary:
 		fmt.Fprintf(b, "arch: %s, type: %s, flags: %s\n", machoCPU(f.Cpu), machoType(f.Type), machoFlags(f.Flags))
-		min, sdk, src, signed := machoVersions(f)
+		min, sdk, src := machoVersions(f)
 		if min == "" {
 			b.WriteString("minimum macOS: not recorded (no version load command)\n")
 		} else {
@@ -456,13 +513,12 @@ func writeMachOSlice(b *strings.Builder, f *macho.File, o Options) {
 		if len(rp) > 0 {
 			fmt.Fprintf(b, "rpath: %s\n", clean(strings.Join(rp, "; ")))
 		}
-		if signed {
-			b.WriteString("code signature: present (NOT verified)\n")
-		} else {
-			b.WriteString("code signature: none\n")
-		}
+		machoSignature(b, f)
 		if f.Symtab != nil {
 			fmt.Fprintf(b, "symbols: %d (part=symbols lists them)\n", len(f.Symtab.Syms))
+		}
+		if ex, src := machoExports(f); len(ex) > 0 {
+			fmt.Fprintf(b, "exports: %d from the %s (part=exports lists them)\n", len(ex), src)
 		}
 		writeMachOSections(b, f, o)
 	case PartSections:
@@ -472,6 +528,9 @@ func writeMachOSlice(b *strings.Builder, f *macho.File, o Options) {
 		writeList(b, "libraries", libs, o.limit(maxLibs), o.Filter)
 		is, _ := f.ImportedSymbols()
 		writeList(b, "imported symbols", is, o.limit(maxSymbols), o.Filter)
+	case PartExports:
+		ex, src := machoExports(f)
+		writeList(b, "exported symbols ("+src+")", ex, o.limit(maxSymbols), o.Filter)
 	case PartSymbols:
 		var lines []string
 		if f.Symtab != nil {
@@ -488,9 +547,8 @@ func writeMachOSlice(b *strings.Builder, f *macho.File, o Options) {
 }
 
 // machoVersions reads the minimum OS and SDK from LC_BUILD_VERSION (macOS 10.14
-// SDK and later) or LC_VERSION_MIN_MACOSX (older), and whether the binary
-// carries a code signature.
-func machoVersions(f *macho.File) (min, sdk, src string, signed bool) {
+// SDK and later) or LC_VERSION_MIN_MACOSX (older).
+func machoVersions(f *macho.File) (min, sdk, src string) {
 	for _, l := range f.Loads {
 		raw := l.Raw()
 		if len(raw) < 8 {
@@ -505,8 +563,6 @@ func machoVersions(f *macho.File) (min, sdk, src string, signed bool) {
 			if len(raw) >= 20 && f.ByteOrder.Uint32(raw[8:]) == platformMacOS {
 				min, sdk, src = machoVer(f.ByteOrder.Uint32(raw[12:])), machoVer(f.ByteOrder.Uint32(raw[16:])), "LC_BUILD_VERSION"
 			}
-		case lcCodeSignature:
-			signed = true
 		}
 	}
 	return

@@ -46,12 +46,12 @@ func (binaryInspectTool) Info() ToolInfo {
 	return ToolInfo{
 		Name: BinaryInspectToolName,
 		Description: "Inspect an executable or library without running it: ELF, PE (.exe/.dll), Mach-O (fat too). " +
-			"Default summary: arch, type, needed libraries, rpath, signature, sections with entropy, " +
+			"Default summary: arch, type, needed libraries, rpath, PE version info, signer names (unverified), sections with entropy, " +
 			"Mach-O minimum macOS with a 10.13 check. Lists are capped and say so. Read-only.",
 		Parameters: map[string]any{
 			"path": map[string]any{"type": "string", "description": "File to inspect"},
 			"part": map[string]any{
-				"type": "string", "enum": []string{"summary", "sections", "imports", "symbols", "strings"},
+				"type": "string", "enum": []string{"summary", "sections", "imports", "exports", "symbols", "strings"},
 				"description": "What to list (default summary)",
 			},
 			"filter":  map[string]any{"type": "string", "description": "Only lines containing this text"},

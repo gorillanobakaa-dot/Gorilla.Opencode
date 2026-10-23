@@ -78,7 +78,9 @@ const (
 	// row is default OFF, and the band absorbs it.
 	// 2026-10-22: 10,610. +48 is the full=true switch on both forensics tools (24 each): a person or
 	// a large model can lift the caps that keep a small local model's results short.
-	measuredDefaultToolSchemaTokens = 10610
+	// 2026-10-22 (night run, job 2): 10,621. +11 is binary_inspect naming part=exports and saying the
+	// summary now carries PE version info and signer names, unverified (204 -> 215).
+	measuredDefaultToolSchemaTokens = 10621
 	measuredBasePromptTokens        = 2250
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.

@@ -1,6 +1,6 @@
 # Rules the forensics tests must hold. Each line breaks one on purpose; every
 # one must be CAUGHT. Run from the repository root:
-#   fieldkit mutate --plan internal/forensics/testdata/mutations.yaml --cwd . -- go test ./internal/forensics/ ./internal/llm/tools/ -run "^Test(ELF|PE|MachO|Legacy|Strings|Entropy|ListCap|Refuses|Clean|Omni|Large|Tar|Single|Stream|Unsupported|Safe|Traversal|Extract|BinaryInspect|ArchiveTool)"
+#   fieldkit mutate --plan internal/forensics/testdata/mutations.yaml --cwd . -- go test ./internal/forensics/ ./internal/llm/tools/ -run "^Test(ELF|PE|MachO|Legacy|Strings|Entropy|ListCap|Refuses|Clean|Omni|Large|Tar|Single|Stream|Unsupported|Safe|Traversal|Extract|BinaryInspect|ArchiveTool|Full|Version|ExportTrie|CMS)"
 - file: internal/forensics/archive.go
   swap: ['case seg == "..":', 'case seg == "...":']
   why: an entry name with a .. segment must be refused (path traversal)
@@ -85,3 +85,67 @@
 - file: internal/llm/tools/forensics.go
   swap: ['if why := RefuseSensitiveRead(p); why != "" {', 'if why := RefuseSensitiveRead(p); why == "never" {']
   why: both tools keep the credential guard
+# Night run 2026-10-22, job 2: exports, PE version info, signer names.
+- file: internal/forensics/pe_extra.go
+  swap: ['if rva >= d.VirtualAddress && rva < d.VirtualAddress+d.Size {', 'if false {']
+  why: a PE export forwarder is shown as "-> DLL.Function", not as an address
+- file: internal/forensics/pe_extra.go
+  swap: ['ord := base + i', 'ord := i']
+  why: PE export ordinals start at the directory's ordinal base
+- file: internal/forensics/pe_extra.go
+  swap: ['idx := uint32(le.Uint16(ords[i*2:]))', 'idx := uint32(i)']
+  why: each export name goes to the function its ordinal table points at
+- file: internal/forensics/pe_extra.go
+  swap: ['vlen *= 2 // text values count UTF-16 units, not bytes', 'vlen *= 1']
+  why: a version string is read whole (its length counts UTF-16 units)
+- file: internal/forensics/pe_extra.go
+  swap: ['	v := align4(k)', '	v := k']
+  why: version-info values are 32-bit aligned
+- file: internal/forensics/pe_extra.go
+  swap: ['path[1] == "StringFileInfo" && typ == 1:', 'path[1] == "VarFileInfo" && typ == 1:']
+  why: the version strings come from StringFileInfo
+- file: internal/forensics/pe_extra.go
+  swap: ['"version info (written by whoever built the file):\n"', '"version info:\n"']
+  why: version info says who wrote it
+- file: internal/forensics/pe_extra.go
+  swap: ['const notVerified = "NOT verified (chain and hash not checked)"', 'const notVerified = "signed"']
+  why: every signer name says it was not verified
+- file: internal/forensics/pe_extra.go
+  swap: ['if ctype == winCertTypePKCSSigned {', 'if ctype == 0x7777 {']
+  why: an Authenticode PKCS#7 entry in the certificate table is read
+- file: internal/forensics/cms.go
+  swap: ['c.SerialNumber.Cmp(serial) == 0', 'true']
+  why: the signer certificate is matched by serial number, not by issuer alone
+- file: internal/forensics/cms.go
+  swap: ['bytes.Equal(c.SubjectKeyId, sid.Bytes)', 'len(c.SubjectKeyId) > 1']
+  why: a signer named by key id is matched by that key id
+- file: internal/forensics/cms.go
+  swap: ['if err != nil || len(top) < 2 {', 'if err != nil {']
+  why: a blob that is not a PKCS#7 ContentInfo is refused, not misread
+- file: internal/forensics/binary.go
+  swap: ['if s.Section == elf.SHN_UNDEF || s.Name == "" {', 'if s.Name == "" {']
+  why: an ELF symbol a file imports is not listed as exported
+- file: internal/forensics/macho_extra.go
+  swap: ['if flags&exportReexport != 0 {', 'if false {']
+  why: a Mach-O re-export is shown as one, with the library it comes from
+- file: internal/forensics/macho_extra.go
+  swap: ['if flags&exportWeak != 0 {', 'if false {']
+  why: a weak Mach-O export is marked weak
+- file: internal/forensics/macho_extra.go
+  swap: ['if seen[n.off] || len(seen)', 'if len(seen)']
+  why: a looping export trie stops at once
+- file: internal/forensics/macho_extra.go
+  swap: ['s.Type&nStab == 0 && s.Type&nExt != 0 && s.Type&nType != 0', 's.Type&nType != 0']
+  why: the symbol-table fallback lists only external, defined, non-debug symbols
+- file: internal/forensics/macho_extra.go
+  swap: ['case slot == csSlotCMS && magic == csMagicCMS:', 'case false:']
+  why: the Mach-O CMS signer is read
+- file: internal/forensics/macho_extra.go
+  swap: ['adhoc = be.Uint32(blob[12:])&csFlagAdhoc != 0', 'adhoc = false']
+  why: an ad-hoc Mach-O signature is called ad-hoc
+- file: internal/forensics/macho_extra.go
+  swap: ['fmt.Fprintf(b, "  identifier: %s (written by whoever signed it)\n", clean(id))', '_ = id']
+  why: the code signature identifier is shown and marked as the signer's own words
+- file: internal/llm/tools/forensics.go
+  swap: ['"imports", "exports", "symbols"', '"imports", "symbols"']
+  why: the schema offers part=exports
