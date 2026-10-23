@@ -151,6 +151,15 @@ checksums.sha256
 # crypto/x509 (SecTrustEvaluateWithError is 10.14+). Checked: no credentials, no
 # personal paths; it writes only under $TMPDIR and dist/.
 !/scripts/build-darwin-legacy.sh
+# GORILLA: exception (2026-10-23) — the Mac release packager is PUBLISHED. It turns
+# the darwin binary and packaging/macos into the folder, .tar.gz, SHA256SUMS and
+# .zip that "Install Gorilla OpenCode.command" expects; written 2026-10-19 but left
+# untracked, so a fresh clone could not build the Mac release. Checked: no
+# credentials, no personal paths; it writes only into the out-dir it is given.
+# Only this file: the rest of scripts/packaging/ stays local.
+!/scripts/packaging/
+/scripts/packaging/*
+!/scripts/packaging/build_mac_legacy_package.py
 
 # Third-party leaked prompts kept LOCAL for study, not redistributed
 system-prompts/reference/
