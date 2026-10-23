@@ -1,4 +1,4 @@
-// Version: 1.0.0 · updated 26-10-23-02-25
+// Version: 1.1.0 · updated 26-10-23-02-33
 // GORILLA OVERRIDE (2026-10-23): what a shell command IS, for the permission
 // rules: read-only (never asks), a hard stop (asks even under auto-approve),
 // or able to reach the network (asks under auto-approve only after the turn
@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/tools/shell"
 )
 
@@ -110,6 +111,10 @@ type hardStop struct {
 	// unless names words whose presence anywhere in the segment means the
 	// row does not apply (`pip install --user` is not system-wide).
 	unless []string
+	// venvOK: the row does not apply when the program is run by path from a
+	// virtual environment or from inside a workspace root (`.venv/bin/python
+	// -m pip install`): that installs into the project, not the machine.
+	venvOK bool
 	why    string
 }
 
@@ -143,9 +148,9 @@ var hardStops = []hardStop{
 	{words: []string{"installer"}, why: "it installs a package for the whole machine (macOS installer)"},
 	{words: []string{"softwareupdate"}, why: "it changes the operating system (softwareupdate)"},
 	{words: []string{"xcode-select", "--install"}, why: "it installs the Command Line Tools for the whole machine"},
-	{words: []string{"pip", "install"}, unless: []string{"--user", "--target", "-t", "--prefix"}, why: "it installs Python packages outside a project (pip)"},
-	{words: []string{"pip3", "install"}, unless: []string{"--user", "--target", "-t", "--prefix"}, why: "it installs Python packages outside a project (pip3)"},
-	{words: []string{"*", "-m", "pip", "install"}, unless: []string{"--user", "--target", "-t", "--prefix"}, why: "it installs Python packages outside a project (pip)"},
+	{words: []string{"pip", "install"}, unless: []string{"--user", "--target", "-t", "--prefix"}, venvOK: true, why: "it installs Python packages outside a project (pip)"},
+	{words: []string{"pip3", "install"}, unless: []string{"--user", "--target", "-t", "--prefix"}, venvOK: true, why: "it installs Python packages outside a project (pip3)"},
+	{words: []string{"*", "-m", "pip", "install"}, unless: []string{"--user", "--target", "-t", "--prefix"}, venvOK: true, why: "it installs Python packages outside a project (pip)"},
 	{words: []string{"npm", "install", "-g"}, why: "it installs a program for the whole machine (npm -g)"},
 	{words: []string{"npm", "i", "-g"}, why: "it installs a program for the whole machine (npm -g)"},
 	{words: []string{"npm", "install", "--global"}, why: "it installs a program for the whole machine (npm --global)"},
@@ -170,6 +175,35 @@ func segmentWords(seg string) []string {
 	return f
 }
 
+// projectLocalProgram reports whether a segment's program is named by a path
+// inside a virtual environment or a workspace root, so whatever it installs
+// lands in the project. Measured 2026-10-23 (run 2, row 22):
+// `.venv/bin/python -m pip install pytest` asked as if it were system-wide.
+func projectLocalProgram(seg string) bool {
+	f := strings.Fields(seg)
+	for len(f) > 0 && strings.Contains(f[0], "=") && !strings.HasPrefix(f[0], "-") {
+		f = f[1:]
+	}
+	if len(f) == 0 {
+		return false
+	}
+	prog := strings.Trim(f[0], `"'`)
+	if !strings.ContainsAny(prog, `/\`) {
+		return false
+	}
+	low := strings.ToLower(filepath.ToSlash(prog))
+	for _, v := range []string{"/.venv/", "/venv/", "/.virtualenvs/", ".venv/", "venv/"} {
+		if strings.Contains(low, v) {
+			return true
+		}
+	}
+	if filepath.IsAbs(prog) {
+		_, inside := config.RootFor(filepath.Clean(prog))
+		return inside
+	}
+	return false
+}
+
 // HardStopIn returns why auto-approve must still ask about this command, or
 // "" when nothing in it is a hard stop. Every segment is checked.
 func HardStopIn(cmd string) string {
@@ -189,7 +223,7 @@ func HardStopIn(cmd string) string {
 			if !match {
 				continue
 			}
-			excused := false
+			excused := h.venvOK && projectLocalProgram(seg)
 			for _, u := range h.unless {
 				for _, x := range w[len(h.words):] {
 					if x == u || strings.HasPrefix(x, u+"=") {
@@ -205,46 +239,47 @@ func HardStopIn(cmd string) string {
 	return ""
 }
 
-// localPrograms change only local files and start nothing else: after
-// untrusted content they still run under auto-approve. Anything NOT here is
-// treated as able to reach the network (fail closed): an interpreter, a
-// package manager, ssh, make, a script by path, a program this list does not
-// know. A second program reached through an argument (find -exec, xargs) is
-// caught by unsafeFlags or is simply not on this list.
-var localPrograms = map[string]bool{
-	"mkdir": true, "cp": true, "mv": true, "touch": true, "rm": true, "rmdir": true,
-	"ln": true, "chmod": true, "chown": true, "tar": true, "unzip": true, "zip": true,
-	"gzip": true, "gunzip": true, "xz": true, "bzip2": true, "cd": true, "pwd": true,
-	"echo": true, "true": true, "false": true, "export": true, "ls": true, "cat": true,
-	"head": true, "tail": true, "wc": true, "sort": true, "uniq": true, "cut": true,
-	"tr": true, "diff": true, "patch": true, "mktemp": true, "test": true, "[": true,
-	"grep": true, "find": true, "stat": true, "file": true, "du": true, "df": true,
-	"which": true, "basename": true, "dirname": true, "realpath": true, "date": true,
+// HISTORY (2026-10-23, the same day): the first version of this check was
+// fail-closed. Any program not on a localPrograms table (mkdir, cp, tar, ls,
+// grep...) counted as able to reach the network: every interpreter, every
+// package manager, every script by path, every unknown program. Run 2 on the
+// MacBook Air (PERMISSIONS-REWORK-PLAN.md, "Evidence, run 2") showed what that
+// costs: one install raised 26 dialogs after a web page was read, one per
+// `python3 -m fieldkit...` and `.venv/bin/fieldkit ...`, every one inside
+// ~/Stranger-Test, none risky. Under that rule all 26 would still have asked.
+// The owner's direction the same night: Claude Code's model, which has no
+// taint at all, is the reference; this program is allowed to be stricter only
+// where data actually leaves the machine. So the table is now of SENDERS.
+
+// networkSenders send to another machine by design. After untrusted content,
+// a shell command naming one asks under auto-approve.
+var networkSenders = map[string]bool{
+	"ssh": true, "scp": true, "sftp": true, "rsync": true, "ftp": true, "mosh": true,
+	"socat": true, "ncat": true, "open": true, "xdg-open": true, "gh": true,
+	"aws": true, "gcloud": true, "az": true, "rclone": true, "s3cmd": true,
+	"mail": true, "sendmail": true, "mutt": true, "smbclient": true,
 }
 
-// runsAProgram are flags by which a program on localPrograms starts another
-// program: tar's --to-command and checkpoint actions, a compressor named with
-// -I, zip's test command, find's -exec family.
-var runsAProgram = []string{
-	"--to-command", "--checkpoint-action", "--use-compress-program", "-I",
-	"-TT", "--unzip-command", "-exec", "-execdir", "-ok", "-okdir",
+// remoteGitSubcommands contact a remote.
+var remoteGitSubcommands = map[string]bool{
+	"push": true, "fetch": true, "pull": true, "clone": true, "ls-remote": true,
+	"submodule": true, "send-email": true, "request-pull": true,
 }
 
-// localGitSubcommands are the git subcommands that never contact a remote.
-var localGitSubcommands = map[string]bool{
-	"status": true, "log": true, "diff": true, "show": true, "add": true, "commit": true,
-	"checkout": true, "switch": true, "restore": true, "stash": true, "init": true,
-	"mv": true, "rm": true, "merge": true, "rebase": true, "reset": true, "branch": true,
-	"tag": true, "rev-parse": true, "ls-files": true, "blame": true, "grep": true,
-	"config": true, "describe": true, "cherry-pick": true, "revert": true, "clean": true,
-}
+// pushSubcommands of container tools upload an image.
+var pushSubcommands = map[string]bool{"docker": true, "podman": true, "buildah": true}
 
-// MayReachNetwork reports whether a command can send data off the machine or
-// run code that can. Used only when the turn has read untrusted content: that
-// is the shell's exfiltration path, and the one place taint still makes the
-// shell ask under auto-approve.
+// inlineNetworkCode marks interpreter code passed on the command line (-c,
+// -e) that names a networking library. A script FILE is not read: that is a
+// residual, stated in docs/PERMISSIONS.md.
+var inlineNetworkCode = regexp.MustCompile(`(?i)\b(urllib|requests|http\.client|httpx|aiohttp|socket|smtplib|ftplib|fetch\(|XMLHttpRequest|net/http|Net::HTTP|LWP|IO::Socket|Invoke-WebRequest|Invoke-RestMethod|WebClient)\b`)
+
+// MayReachNetwork reports whether a command explicitly sends something to
+// another machine: a sender program, a remote git subcommand, an image push,
+// a URL anywhere in the line, or inline interpreter code naming a network
+// library. Used only when the turn has read untrusted content.
 func MayReachNetwork(cmd string) bool {
-	if strings.Contains(cmd, "://") || hasOpaqueConstruct(stripBenignRedirects(cmd)) {
+	if strings.Contains(cmd, "://") {
 		return true
 	}
 	for _, seg := range splitShellCommands(stripBenignRedirects(cmd)) {
@@ -252,24 +287,23 @@ func MayReachNetwork(cmd string) bool {
 		if len(w) == 0 {
 			continue
 		}
-		if w[0] == "git" {
-			if len(w) < 2 || !localGitSubcommands[w[1]] {
-				return true
-			}
-			continue
-		}
-		if !localPrograms[w[0]] {
+		switch {
+		case networkSenders[w[0]]:
+			return true
+		case w[0] == "git" && len(w) > 1 && remoteGitSubcommands[w[1]]:
+			return true
+		case pushSubcommands[w[0]] && len(w) > 1 && w[1] == "push":
 			return true
 		}
+		// rsync/scp-style host:path targets on any program.
 		for _, x := range w[1:] {
-			for _, f := range runsAProgram {
-				if x == f || strings.HasPrefix(x, f+"=") {
-					return true
-				}
+			if i := strings.Index(x, ":"); i > 0 && strings.Contains(x, "@") && i > strings.Index(x, "@") {
+				return true
 			}
 		}
 	}
-	return false
+	// The splitter cuts inside quotes, so the code is checked on the whole line.
+	return inlineNetworkCode.MatchString(cmd) && regexp.MustCompile(`(^|\s)-[ce](\s|$)`).MatchString(cmd)
 }
 
 // CommandPurpose is the one plain line the dialog prints above a command:

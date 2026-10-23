@@ -1,4 +1,4 @@
-<!-- Version: 1.0.0 · updated 26-10-23-02-25 -->
+<!-- Version: 1.1.0 · updated 26-10-23-02-33 -->
 # When the assistant asks before acting, and when it does not (2026-10-23 rework)
 
 *Two tracks, both complete. Claims are marked `stated in input` (measured or
@@ -39,8 +39,10 @@ less safe, not more.
   touches the whole machine (deleting a disk, `sudo`, installing software for the
   whole computer, writing outside your project folders), and what could carry
   your data away (after the assistant has read a web page, sending anything to a
-  site it has not used yet in this conversation, or running a program that could
-  reach the internet).
+  site it has not used yet in this conversation, or a command whose job is to
+  send to another machine, such as `scp`, `ssh` or `git push`). Running Python or
+  Fieldkit inside your folder does not ask, and nor does installing into the
+  project's own `.venv`.
 - **Every question box shows the full command or web address first**, then one
   plain line saying what it does, then why it is asking.
 - **"Deny" is an answer.** The assistant is told "the person said no, do not try
@@ -95,7 +97,7 @@ v0.1.149-dev, macOS 10.13, Gemini 3.8 Flash High, auto-approve ON:
 | Relaxed rule | Earlier fear (source) | What still covers it |
 |---|---|---|
 | Every egress asks under auto-approve | A poisoned page steers the model to send data to the attacker's server (carveout_test.go, 2026-08-19; taint.go) | After untrusted content, a destination this conversation has not used asks (`knownEgress`). The attacker's host is by definition new. A host already used was chosen before the poison, by the person or the first read. |
-| Taint makes every non-edit tool ask | "a shell command can do anything" (decision B comment, 2026-10-11) | For bash, taint asks when `tools.MayReachNetwork`: fail-closed, any program not on `localPrograms` (interpreters, package managers, ssh, make, `./script`, anything unknown), any `://`, any opaque construct, `find -exec`. Other non-edit tools keep the old rule unchanged. |
+| Taint makes every non-edit tool ask | "a shell command can do anything" (decision B comment, 2026-10-11) | For bash, taint asks only when the command explicitly sends to another machine (`tools.MayReachNetwork`): a sender program (ssh, scp, rsync, sftp, gh, aws, open...), a remote git subcommand, an image push, a `user@host:` target, any `://`, or inline `-c`/`-e` code naming a network library. Other non-edit tools keep the old rule unchanged. |
 | `>` disqualifies read-only | Redirection writes a file (commandgate.go, 2026-08-18) | Only `>/dev/null`, `2>/dev/null`, `&>/dev/null`, `2>&1`, `2>$null` are removed before analysis; any other `>` still disqualifies. The regex needs a word boundary, so `/dev/nullx` is not stripped. |
 | `cat`, `head`, `grep`, `find`, `rg`, `type` (bash) and more now read-only | Reading credentials into the transcript (sensitive.go, 2026-08-18); `type` = Get-Content in PowerShell (2026-10-05) | `namesSensitivePath` runs `RefuseSensitiveRead` on every path word and refuses `/proc/*/environ`; the after-tool secret mask still masks keys and private-key blocks; `type` is added only when the shell is not PowerShell. `find -delete/-exec/-ok/-fprint*`, `rg --pre` are in `unsafeFlags`. |
 | `<program> --version` is read-only | An arbitrary program runs (2026-08-18: wrappers like `timeout` hide the real command) | Exactly two words, second in `{--version, -version, --help, version}`, program without a path (so not a file the model just wrote). Wrappers are not affected: `timeout 5 curl` is three words. |
@@ -110,12 +112,37 @@ apt/apt-get/dnf/yum/pacman/zypper/snap/flatpak installs, `dpkg -i`, `installer`,
 `--target`/`--prefix`, `npm -g`, `gem install` without `--user-install`,
 `cargo install`. Unattended (`-p`) logs and proceeds, as the egress carve-out did.
 
+### Run 2, and why the first version of the shell rule was replaced the same night
+
+`stated in input` (PERMISSIONS-REWORK-PLAN.md, "Evidence, run 2", relayed by the
+coordinating session): one successful install on the Air cost 33 dialogs with
+auto-approve on, 26 of them one per bash command, every command inside
+~/Stranger-Test (`python3 -m fieldkit...`, `.venv/bin/fieldkit ...`,
+`.venv/bin/python -m pip install pytest`), 13 with the Command field empty.
+
+The first commit of this rework (b9d3648) made taint ask for any shell command
+not on a table of local programs. Every one of those 26 runs Python, so all of
+them would still have asked. Replaced by the senders table above; venv and
+in-project pip installs are not a hard stop (`projectLocalProgram`).
+`TestTheMacBookAirRun2RaisesNoDialog` holds the 13 visible rows: 13 dialogs
+under the old taint rule (mutation run, this session), 0 now.
+
+`stated in input` (the owner, 2026-10-23, relayed): the over-cautious rules were
+insisted on by an earlier model against the owner's wishes; they are not settled
+decisions. The owner's reference is Claude Code's model: read-only tools never
+ask, even outside the project; "don't ask again" remembers a prefix or a domain;
+the prompt shows the full command; no blanket taint; a denial returns to the
+model. This rework matches each of those. Two differences remain on purpose, both
+named in the plan: auto-approve still stops for the hard stops, and for an
+explicit network send to a new place after untrusted content.
+
 ### Tests
 
 - `internal/llm/tools/commandclass_test.go`: a subtest per read-only row
   (`TestReadOnlyCommandsNeverAsk`), per must-ask row (`TestTheseStillAsk`), hard
   stops, network rows, and the evidence table (`TestTheMacBookAirEvidenceRaisesNoDialog`,
-  0 dialogs) plus `TestTheStrangerTaskStillStopsWhereItShould` (7 dialogs).
+  0 dialogs), run 2 (`TestTheMacBookAirRun2RaisesNoDialog`, 0 dialogs), plus
+  `TestTheStrangerTaskStillStopsWhereItShould` (7 dialogs).
 - `internal/tui/components/dialog/permission_content_test.go`: command and URL
   shown in full at 80x24, 100x30, 160x45; no row wider or taller than the window;
   a grant button never without its sentence.
@@ -132,8 +159,8 @@ run, 2026-10-23).
 ### Not verified
 
 - No run on macOS; no screenshots of the new dialog (directive 13 asks for them).
-- `MayReachNetwork` is a table, not an analysis. The known ways a program on
-  `localPrograms` starts another (`tar --to-command`, `--checkpoint-action`,
-  `-I`, `zip -TT`, `find -exec`) are in `runsAProgram` and tested; one this list
-  does not know is a residual risk, stated rather than hidden. `sed` and `awk`
-  are deliberately absent (both can run commands).
+- `MayReachNetwork` is a table of senders, not an analysis. A script FILE that
+  opens a socket (`python3 send.py`) is not read, so after untrusted content it
+  runs under auto-approve. Residual risk, stated rather than hidden, and taken on
+  purpose: see "Run 2" below. Claude Code, the owner's reference, has no taint
+  at all, so this is still stricter than the reference.

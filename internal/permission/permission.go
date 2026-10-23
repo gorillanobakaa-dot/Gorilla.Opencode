@@ -124,9 +124,10 @@ type CreatePermissionRequest struct {
 	// logs it and goes ahead: a script that installs its own dependencies is
 	// what -p is for.
 	HardStop string `json:"hard_stop,omitempty"`
-	// MayReachNetwork marks a shell command that can send data off the machine
-	// or run code that can (ssh, git push, pip, an interpreter running a
-	// script). It changes nothing in an ordinary turn. In a turn that has read
+	// MayReachNetwork marks a shell command whose job is to send to another
+	// machine (ssh, scp, git push, a URL on the line). Running a local script
+	// is NOT this: see tools.MayReachNetwork for why. It changes nothing in an
+	// ordinary turn. In a turn that has read
 	// untrusted content it is the shell's exfiltration path, so auto-approve
 	// asks. See mustAskAnyway.
 	MayReachNetwork bool `json:"may_reach_network,omitempty"`
@@ -1017,8 +1018,9 @@ func (s *permissionService) egressKnown(root string, opts CreatePermissionReques
 //     named (a poisoned page steering the model to its own server). The site
 //     the person named, and further pages on it, do not ask.
 //  4. Taint: was "every non-edit tool asks after untrusted content". For the
-//     shell it now asks only for a command that can reach the network or run
-//     a script (MayReachNetwork). `python3 --version` and other read-only
+//     shell it now asks only for a command that explicitly sends to another
+//     machine (MayReachNetwork; run 2 on the Air: 26 local Python commands
+//     each asked under the old rule). `python3 --version` and other read-only
 //     commands never reach this function at all (bash's read-only gate).
 //     Other non-edit tools keep the old rule.
 //  5. A path outside every root (a write, a delete, a non-read-only command
@@ -1067,7 +1069,7 @@ func (s *permissionService) mustAskAnyway(opts CreatePermissionRequest, root str
 	// function comment, point 4.
 	if tainted && !editTools[opts.ToolName] {
 		if opts.ToolName != shellToolName || opts.MayReachNetwork {
-			return "this turn has already read untrusted content (" + reason.Reason + "), and this can send data off the machine"
+			return "this turn has already read untrusted content (" + reason.Reason + "), and this sends to another machine"
 		}
 	}
 	// GORILLA OVERRIDE (2026-09-01): the filepath.IsAbs precondition is gone.
