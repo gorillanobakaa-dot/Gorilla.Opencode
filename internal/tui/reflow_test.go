@@ -9,7 +9,7 @@ import (
 // the prompt, and the status bar.
 func TestExtraRowsCountsWhatTheTerminalRewrapped(t *testing.T) {
 	divider := strings.Repeat("─", 138)
-	frame := []string{divider, " >", " ctrl+? help" + strings.Repeat(" ", 100) + "AUTO"}
+	frame := []string{divider, " >", " ? help" + strings.Repeat(" ", 100) + "AUTO"}
 	if got := extraRows(frame, 138, 80); got != 1 {
 		t.Errorf("138 -> 80: %d extra rows, want 1 (the divider wraps to 2 rows; the last line is below the cursor)", got)
 	}

@@ -152,6 +152,10 @@ const overflowArrow = "^"
 
 // HeightCapped is implemented by a component that can be told the most rows it
 // may occupy. The frame owner knows the window size; the component does not.
+// ToggleHelpMsg asks the app to open or close the key help. The editor sends it
+// for "?" typed on an empty prompt.
+type ToggleHelpMsg struct{}
+
 type HeightCapped interface {
 	SetHeightCeiling(rows int)
 }
@@ -435,6 +439,14 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.attachments = append(m.attachments, msg.Attachment)
 	case tea.KeyMsg:
+		// "?" on an empty prompt opens help instead of typing a lone "?". It is
+		// the one help key every terminal can send: ctrl+? cannot be typed in
+		// macOS Terminal.app (MacBook Air, 2026-10-23). A question that merely
+		// ENDS in "?" is unaffected; only a "?" as the very first keystroke is.
+		if msg.Type == tea.KeyRunes && !msg.Paste && string(msg.Runes) == "?" &&
+			m.textarea.Value() == "" && len(m.attachments) == 0 {
+			return m, util.CmdHandler(ToggleHelpMsg{})
+		}
 		if key.Matches(msg, DeleteKeyMaps.AttachmentDeleteMode) {
 			m.deleteMode = true
 			return m, nil

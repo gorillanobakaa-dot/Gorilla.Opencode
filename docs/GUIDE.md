@@ -32,7 +32,7 @@ you which "brain" replied.
   "No modified files" means it hasn't touched anything yet.
 
 **Bottom bar — the important numbers:**
-- **ctrl+? help** — press Ctrl and ? together for the key list.
+- **? help**: press ? while the prompt is empty for the key list (F1 also works; Ctrl+? only where the terminal sends it, not in macOS Terminal).
 - **Context: 6.9K** — how much text (measured in "tokens", roughly
   ¾ of a word each) the assistant sends to the AI *every single message*
   — its instructions, its tools, and the conversation so far. Smaller is

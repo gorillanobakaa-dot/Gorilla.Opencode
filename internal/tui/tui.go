@@ -162,9 +162,15 @@ var keys = keyMap{
 		key.WithKeys("ctrl+c"),
 		key.WithHelp("ctrl+c", "quit"),
 	),
+	// GORILLA FIX (2026-10-23): ctrl+? cannot be typed in macOS Terminal.app
+	// (it is not an ASCII control code, and Cmd belongs to Terminal's menus), so
+	// the owner on the MacBook Air had no way to open help. "?" on an empty
+	// prompt (chat.ToggleHelpMsg, sent by the editor) works on every terminal
+	// and is what the status bar shows; F1 is an alias; ctrl+? still works
+	// where the terminal sends it.
 	Help: key.NewBinding(
-		key.WithKeys("ctrl+_", "ctrl+h"),
-		key.WithHelp("ctrl+?", "toggle help"),
+		key.WithKeys("f1", "ctrl+_", "ctrl+h"),
+		key.WithHelp("? / f1", "toggle help (? on an empty prompt)"),
 	),
 
 	SwitchSession: key.NewBinding(
@@ -738,6 +744,12 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		a.pages[a.currentPage], cmd = a.pages[a.currentPage].Update(msg)
 		return a, cmd
+	case chat.ToggleHelpMsg:
+		// "?" typed on an empty prompt: the help key every terminal can send.
+		if !a.showQuit {
+			a.showHelp = !a.showHelp
+		}
+		return a, nil
 	case tea.WindowSizeMsg:
 		statusHeight := lipgloss.Height(a.status.View())
 		if statusHeight < 1 {

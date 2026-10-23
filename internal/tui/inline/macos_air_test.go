@@ -103,10 +103,10 @@ func TestTheAirSizesKeepTheStatusBarUnderThePrompt(t *testing.T) {
 		tm := typeIntoTheApp(t, sz[0], sz[1])
 		rows := tm.Screen()
 		last := tm.LastNonEmpty()
-		if tm.CountOnScreen("ctrl+? help") != 1 || last < 0 || !strings.Contains(rows[last], "ctrl+? help") {
+		if tm.CountOnScreen("? help") != 1 || last < 0 || !strings.Contains(rows[last], "? help") {
 			dump(t, tm)
 			t.Errorf("%dx%d: status bar on screen %d times; want once, as the last row",
-				sz[0], sz[1], tm.CountOnScreen("ctrl+? help"))
+				sz[0], sz[1], tm.CountOnScreen("? help"))
 		}
 	}
 }
