@@ -27,3 +27,23 @@ Commands (Git Bash, offline; nothing downloaded):
     bzip2 -9 fx.tar
 
 `--strip-debug` matters: zig's glibc start files carry debug info with the build machine's folder names, which would otherwise end up in a public repository.
+
+## Exports, version info and signer names (2026-10-22)
+
+| File | What it is | Built with |
+|---|---|---|
+| `fxlib.c` | the source of the three libraries: two exported functions, one exported data object, one static function | - |
+| `fxlib.def` | PE export list: adds a forwarder (`gorilla_forwarded=KERNEL32.GetTickCount`) and an ordinal-only export (`@9 NONAME`) | - |
+| `fxlib.rc` | PE `VERSIONINFO` resource | - |
+| `fxlib.pedll` | PE32+ x86_64 DLL with exports and a version resource | zig 0.16.0 (`zig rc`, `zig cc`) |
+| `fxlib.elfso` | ELF64 x86_64 shared library | zig 0.16.0 |
+| `fxlib.machodylib` | thin x86_64 Mach-O dylib, LC_VERSION_MIN_MACOSX 10.13, export trie | zig 0.16.0 |
+
+The odd extensions keep them clear of the repository's `*.dll`, `*.so` and `*.dylib` ignore rules. Checked with `strings` before committing: no folder names of the build machine.
+
+    zig rc -x fxlib.rc fxlib.res
+    zig cc -target x86_64-windows-gnu -shared -Os -fno-ident -s -o fxlib.pedll fxlib.c fxlib.def fxlib.res
+    zig cc -target x86_64-linux-gnu -shared -fPIC -O1 -g0 -fno-ident -Wl,--build-id=none -o fxlib.elfso fxlib.c
+    zig cc -target x86_64-macos.10.13 -shared -O1 -g0 -fno-ident -o fxlib.machodylib fxlib.c
+
+No signed fixture can be made offline (a real signature needs a certificate from someone else). The signer tests in `binary_extra_test.go` build a minimal PKCS#7 SignedData with two throwaway certificates instead, append it to a copy of `fx.pe` as a `WIN_CERTIFICATE`, and hand-build a Mach-O SuperBlob around it. `fxlib.res` is an intermediate and is not kept.
