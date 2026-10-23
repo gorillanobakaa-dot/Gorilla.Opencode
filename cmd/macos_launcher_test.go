@@ -121,6 +121,56 @@ func TestMacLauncherCellSize(t *testing.T) {
 	}
 }
 
+// gorilla_mac_resize runs inside $(...). On the Air (2026-10-23) its size request
+// went to stdout, so it landed in the captured state, never reached Terminal, and
+// broke the arithmetic that placed the window. Here the function is cut out of
+// the launcher and run with the macOS reader stubbed: the request must reach the
+// tty, and the captured output must be the state alone.
+func TestMacLauncherResizeRequestReachesTheTerminal(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("no bash on PATH")
+	}
+	if runtime.GOOS == "windows" && strings.Contains(strings.ToLower(bash), `\windows\system32\`) {
+		t.Skip("bash here is WSL's, not Git Bash")
+	}
+	src, err := os.ReadFile("../packaging/macos/Gorilla OpenCode.command")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(src)
+	start := strings.Index(text, "gorilla_mac_resize() {")
+	if start < 0 {
+		t.Fatal("gorilla_mac_resize not found in the launcher")
+	}
+	end := strings.Index(text[start:], "\n}\n")
+	if end < 0 {
+		t.Fatal("end of gorilla_mac_resize not found")
+	}
+	fn := text[start : start+end+3]
+	tty := filepath.Join(t.TempDir(), "tty")
+	script := fn + `
+gorilla_mac_state() { echo "0 23 1366 710 10 32 1356 724 167 39"; }
+out=$(gorilla_mac_resize "$TTY" 167 39) || exit 9
+printf '%s' "$out"
+`
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bash, "-c", script)
+	cmd.Env = append(os.Environ(), "TTY="+filepath.ToSlash(tty))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if got := string(out); got != "0 23 1366 710 10 32 1356 724 167 39" {
+		t.Errorf("captured %q, want the state alone", got)
+	}
+	sent, _ := os.ReadFile(tty)
+	if string(sent) != "\x1b[8;39;167t" {
+		t.Errorf("the tty got %q, want the size request", sent)
+	}
+}
+
 func TestMacLauncherCenterClampsToTheFrame(t *testing.T) {
 	// Too big to fit: pinned to the top-left corner of the frame, not centered off it.
 	got := launcherBash(t, "gorilla_center", 0, 22, 800, 500, 1000, 600)

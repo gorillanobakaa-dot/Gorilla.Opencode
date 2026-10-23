@@ -2,4 +2,9 @@
 # The executable inside "Gorilla OpenCode.app". A Mac app opens no Terminal
 # window of its own, and Gorilla OpenCode lives in Terminal, so the app asks
 # Terminal to run the launcher that sits beside it in the app's Resources.
-exec open -a Terminal "$(cd "$(dirname "$0")/../Resources" && pwd)/Gorilla OpenCode.command"
+#
+# -F starts Terminal "fresh": without it, a Terminal that was quit with windows
+# open brings them back beside this one (seen on the Air, 2026-10-23: a restored
+# 169x37 window behind the program). The cost: those windows' saved contents are
+# not restored. A Terminal that is already running is not affected.
+exec open -F -a Terminal "$(cd "$(dirname "$0")/../Resources" && pwd)/Gorilla OpenCode.command"

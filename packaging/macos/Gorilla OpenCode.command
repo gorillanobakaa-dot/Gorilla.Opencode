@@ -78,13 +78,17 @@ if [ "${BASH_SOURCE[0]}" != "$0" ]; then return 0; fi
 
 # --- macOS from here on ---
 
+# What the placement measured and any osascript error, rewritten at each launch.
+# A local file only: when the window opens in the wrong place, this says why.
+GORILLA_WINDOW_LOG="${TMPDIR:-/tmp}/gorilla-opencode-window.log"
+
 # Prints "vf_x vf_y vf_w vf_h left top right bottom cols rows" for the Terminal
 # window whose tab runs on tty $1: the visible frame (the screen without the menu
 # bar and the Dock, wherever the Dock is and whether it hides) turned to Terminal's
 # top-left origin, then the window's bounds and size in cells. Whole points only,
 # so no locale's decimal comma gets in.
 gorilla_mac_state() {
-  osascript - "$1" <<'APPLESCRIPT' 2>/dev/null
+  osascript - "$1" <<'APPLESCRIPT' 2>>"$GORILLA_WINDOW_LOG"
 use framework "AppKit"
 use scripting additions
 on rect4(r)
@@ -121,7 +125,7 @@ APPLESCRIPT
 # this launch) it also closes the empty window Terminal opens at start: one that
 # runs nothing, shows no restored session and holds at most two lines of text.
 gorilla_mac_place() {
-  osascript - "$@" <<'APPLESCRIPT' >/dev/null 2>&1
+  osascript - "$@" <<'APPLESCRIPT' >/dev/null 2>>"$GORILLA_WINDOW_LOG"
 on run argv
   set myTty to item 1 of argv
   set nb to {(item 2 of argv) as integer, (item 3 of argv) as integer, (item 4 of argv) as integer, (item 5 of argv) as integer}
@@ -159,10 +163,12 @@ APPLESCRIPT
 }
 
 # Asks Terminal for COLSxROWS (an xterm window-size request) and waits until the
-# tab reports that size or about a second has passed. Prints the state.
+# tab reports that size or about a second has passed. Prints the state. The
+# request goes to the terminal itself: this runs inside $(...), whose output is
+# captured, and on 2026-10-23 the request went into the captured state instead.
 gorilla_mac_resize() {
   local tty=$1 c=$2 r=$3 s i=0
-  printf '\033[8;%d;%dt' "$r" "$c"
+  printf '\033[8;%d;%dt' "$r" "$c" >"$tty"
   while :; do
     s=$(gorilla_mac_state "$tty") || return 1
     set -- $s
@@ -197,6 +203,7 @@ gorilla_place_window() {
   set -- $s1
   bounds=$(gorilla_center "$1" "$2" "$3" "$4" $(( $7 - $5 )) $(( $8 - $6 )))
   gorilla_terminal_fresh && fresh=1
+  echo "tty $tty want ${want_c}x$want_r | before $s0 | cell $cell fit $fit | after $s1 | bounds $bounds fresh $fresh" >>"$GORILLA_WINDOW_LOG"
   gorilla_mac_place "$tty" $bounds "$fresh"
 }
 
@@ -210,6 +217,7 @@ fi
 want="${GORILLA_WINDOW:-167x39}"
 cols="${want%x*}"; rows="${want#*x}"
 case "$cols$rows" in *[!0-9]*|"") cols=167; rows=39 ;; esac
+: >"$GORILLA_WINDOW_LOG" 2>/dev/null || GORILLA_WINDOW_LOG=/dev/null
 gorilla_place_window "$cols" "$rows"
 clear
 
