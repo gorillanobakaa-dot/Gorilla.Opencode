@@ -81,6 +81,17 @@ func TestAutoApproveDoesNotCoverEgress(t *testing.T) {
 	if fetch("https://evil.example") {
 		t.Fatal("a fetch to a new place left the machine under YOLO after untrusted content, with no question asked")
 	}
+	// Owner's decision 2026-10-23 (run 3, dialog 1): GitHub's own content
+	// hosts are the same place as github.com. github.io is not.
+	if !fetch("https://raw.githubusercontent.com") {
+		t.Fatal("raw.githubusercontent.com asked after github.com was used; it is GitHub's own host")
+	}
+	if fetch("https://someone.github.io") {
+		t.Fatal("a github.io site counted as GitHub; its owner can see requests")
+	}
+	if fetch("https://raw.githubusercontent.com.evil.example") {
+		t.Fatal("a look-alike host counted as GitHub")
+	}
 }
 
 // But it must fall THROUGH to grant matching, not deny outright — otherwise

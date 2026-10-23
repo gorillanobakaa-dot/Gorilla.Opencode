@@ -1,4 +1,4 @@
-<!-- Version: 1.2.0 · updated 26-10-23-03-30 -->
+<!-- Version: 1.2.0 · updated 26-10-23-03-32 -->
 # When the assistant asks before acting, and when it does not (2026-10-23 rework)
 
 *Two tracks, both complete. Claims are marked `stated in input` (measured or
@@ -55,8 +55,9 @@ less safe, not more.
 
 The new behaviour is proven by automated tests on Linux, and was run once on the
 MacBook Air (run 3 below, with screenshots): the same install asked 4 times
-instead of 33. One of the 4 was a fault, fixed after that run; the fix has not
-been tried on the Air yet. "Deny" was not tried on the Air: the model refused the
+instead of 33. One of the 4 was a fault, fixed after that run, and a second is
+gone by the owner's decision (GitHub's hosts count as one place); with both, the
+same install should ask twice. Neither change has been tried on the Air yet. "Deny" was not tried on the Air: the model refused the
 risky step by itself and never asked.
 
 ---
@@ -147,7 +148,7 @@ the plain line; the border was aligned and the rows around the box were intact.
 
 | # | Request | Why it asked | Verdict |
 |---|---|---|---|
-| 1 | web_fetch raw.githubusercontent.com/.../INSTALL.md | a host not used yet, after github.com was read | the rule as written; GitHub's own content host (see follow-up) |
+| 1 | web_fetch raw.githubusercontent.com/.../INSTALL.md | a host not used yet, after github.com was read | the rule as written then. **Owner's decision 2026-10-23**: GitHub's own hosts (github.com, raw/objects/gist.githubusercontent.com, codeload, api) are one place (`sameOwnerHosts`), since nobody but GitHub sees who requested a file there. github.io is excluded: a Pages site's owner can see requests. Tested in `TestAutoApproveDoesNotCoverEgress`. |
 | 2 | `python3 -c` urllib download of the branch zip | inline code naming urllib, after untrusted content | the rule as written |
 | 3 | `python3 -c` download and unzip | same | the rule as written |
 | 4 | `PYTHONPATH=... /usr/local/bin/python3 -m fieldkit.core.doctor --lean` | "targets /usr/local/bin/python3, outside every workspace root" | **a fault**: the program being run was taken for a place being touched, because only word 0 was skipped and word 0 was `PYTHONPATH=...`. Fixed in `bashRequestPath`; row added to `TestTheMacBookAirRun2RaisesNoDialog` (fails on the old rule). |

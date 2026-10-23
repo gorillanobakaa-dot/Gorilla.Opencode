@@ -988,13 +988,46 @@ func (s *permissionService) noteEgress(root string, opts CreatePermissionRequest
 	if s.knownEgress[root] == nil {
 		s.knownEgress[root] = make(map[string]bool)
 	}
-	s.knownEgress[root][opts.ToolName+"\x00"+opts.GrantKey] = true
+	s.knownEgress[root][opts.ToolName+"\x00"+egressPlace(opts.GrantKey)] = true
+}
+
+// sameOwnerHosts are hosts run by one operator, so a request to one is not a
+// new destination after another was used. Only hosts whose server the operator
+// itself runs and whose logs no user can read: GitHub's content hosts serve any
+// user's files, but nobody but GitHub sees who asked for them. github.io is NOT
+// here: a Pages site can sit behind a custom domain whose owner sees requests.
+//
+// GORILLA OVERRIDE (2026-10-23, owner's decision): run 3 on the MacBook Air
+// asked for raw.githubusercontent.com/.../INSTALL.md right after the README on
+// github.com, the same project's file on GitHub's own content host.
+var sameOwnerHosts = map[string]string{
+	"github.com": "github", "www.github.com": "github", "api.github.com": "github",
+	"codeload.github.com": "github", "gist.github.com": "github",
+	"raw.githubusercontent.com": "github", "objects.githubusercontent.com": "github",
+	"gist.githubusercontent.com": "github", "user-images.githubusercontent.com": "github",
+	"avatars.githubusercontent.com": "github", "media.githubusercontent.com": "github",
+}
+
+// egressPlace is the place an egress grant key names: "https://host" reduced
+// to its operator when the host is in sameOwnerHosts, else the key itself.
+func egressPlace(key string) string {
+	host := strings.ToLower(key)
+	if i := strings.Index(host, "://"); i >= 0 {
+		host = host[i+3:]
+	}
+	if i := strings.IndexAny(host, "/:"); i >= 0 {
+		host = host[:i]
+	}
+	if owner, ok := sameOwnerHosts[host]; ok {
+		return "operator:" + owner
+	}
+	return key
 }
 
 func (s *permissionService) egressKnown(root string, opts CreatePermissionRequest) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.knownEgress[root][opts.ToolName+"\x00"+opts.GrantKey]
+	return s.knownEgress[root][opts.ToolName+"\x00"+egressPlace(opts.GrantKey)]
 }
 
 // mustAskAnyway returns the reason auto-approve does NOT cover this request,
