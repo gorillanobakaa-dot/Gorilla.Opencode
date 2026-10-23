@@ -50,18 +50,36 @@ func TestAutoApproveStillCoversOrdinaryWork(t *testing.T) {
 
 // Egress is the sink. Whatever a hostile page talked the model into, it has to
 // leave the machine to matter.
+//
+// GORILLA OVERRIDE (2026-10-23): the sink that matters is a NEW place after
+// untrusted content. Until this date every egress asked under auto-approve,
+// so reading the README the person named raised a dialog (MacBook Air,
+// evidence row 2). The same fear is still tested: after a page was read, a
+// host this conversation has not used asks; the host already used does not
+// (evidence row 3, INSTALL.md on the same site).
 func TestAutoApproveDoesNotCoverEgress(t *testing.T) {
 	s := autoApproved(t)
 	denyPrompts(t, s)
-	if s.Request(CreatePermissionRequest{
-		SessionID: "conversation",
-		ToolName:  "web_fetch",
-		Action:    "fetch",
-		Path:      config.WorkingDirectory(),
-		GrantKey:  "https://evil.example",
-		Egress:    true,
-	}) {
-		t.Fatal("a fetch left the machine under YOLO with no question asked")
+	fetch := func(host string) bool {
+		return s.Request(CreatePermissionRequest{
+			SessionID: "conversation",
+			ToolName:  "web_fetch",
+			Action:    "fetch",
+			Path:      config.WorkingDirectory(),
+			GrantKey:  host,
+			Egress:    true,
+		})
+	}
+	if !fetch("https://github.com") {
+		t.Fatal("the first fetch of a turn asked under auto-approve (evidence row 2)")
+	}
+	MarkTainted("conversation", "web page fetched from https://github.com")
+	t.Cleanup(func() { ClearTaint("conversation") })
+	if !fetch("https://github.com") {
+		t.Fatal("a second page on the same site asked after the first was read (evidence row 3)")
+	}
+	if fetch("https://evil.example") {
+		t.Fatal("a fetch to a new place left the machine under YOLO after untrusted content, with no question asked")
 	}
 }
 
@@ -116,14 +134,27 @@ func TestTaintMakesTheNextActionAsk(t *testing.T) {
 
 	// GORILLA OVERRIDE (2026-10-11, owner decision "B"): a shell command asks;
 	// an edit inside the roots no longer does (it is reviewed in the diff).
+	//
+	// GORILLA OVERRIDE (2026-10-23): a shell command asks when it can reach the
+	// network or run a script (tools.MayReachNetwork); a local one does not.
 	if s.Request(CreatePermissionRequest{
+		SessionID:       "conversation",
+		ToolName:        "bash",
+		Action:          "execute",
+		Path:            config.WorkingDirectory(),
+		GrantKey:        "python3 send.py",
+		MayReachNetwork: true,
+	}) {
+		t.Fatal("a shell command that can reach the network went ahead unasked in a turn that had already read untrusted content")
+	}
+	if !s.Request(CreatePermissionRequest{
 		SessionID: "conversation",
 		ToolName:  "bash",
 		Action:    "execute",
 		Path:      config.WorkingDirectory(),
-		GrantKey:  "go build ./...",
+		GrantKey:  "mkdir -p build",
 	}) {
-		t.Fatal("a shell command went ahead unasked in a turn that had already read untrusted content")
+		t.Fatal("a local shell command asked after untrusted content; only the network path should")
 	}
 	if !s.Request(CreatePermissionRequest{
 		SessionID: "conversation",
@@ -218,6 +249,8 @@ func TestUnattendedRunsAreNotBlockedByACarveOut(t *testing.T) {
 func TestUnattendedIsOffForAnInteractiveSession(t *testing.T) {
 	s := autoApproved(t)
 	denyPrompts(t, s)
+	MarkTainted("conversation", "web page")
+	t.Cleanup(func() { ClearTaint("conversation") })
 	if s.Request(CreatePermissionRequest{
 		SessionID: "conversation",
 		ToolName:  "web_fetch",

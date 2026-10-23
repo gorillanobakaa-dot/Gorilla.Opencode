@@ -117,11 +117,20 @@ func TestAutoModeIsYoloForEverySessionWithTheSameCarveOuts(t *testing.T) {
 	if s.Request(r) {
 		t.Error("auto approved an irreversible command")
 	}
+	// GORILLA OVERRIDE (2026-10-23): a web read on its own runs under auto;
+	// after untrusted content, a place not used before asks.
 	web := CreatePermissionRequest{SessionID: "conversation", ToolName: "web_fetch", Action: "fetch",
 		Path: config.WorkingDirectory(), GrantKey: "https://example.test", Egress: true}
-	if s.Request(web) {
-		t.Error("auto approved egress without asking")
+	if !s.Request(web) {
+		t.Error("auto asked for an ordinary web read")
 	}
+	MarkTainted("conversation", "web page fetched from https://example.test")
+	t.Cleanup(func() { ClearTaint("conversation") })
+	web.GrantKey = "https://evil.example"
+	if s.Request(web) {
+		t.Error("auto approved a new destination after untrusted content")
+	}
+	ClearTaint("conversation")
 	outside := editReq()
 	outside.Path = t.TempDir()
 	if s.Request(outside) {

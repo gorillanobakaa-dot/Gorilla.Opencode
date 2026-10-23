@@ -173,14 +173,19 @@ func TestUnderAutoApproveAFamilyStillAsksForTheCarveOuts(t *testing.T) {
 	if s.Request(r) {
 		t.Error("auto-approve + family covered an irreversible request")
 	}
+	// GORILLA OVERRIDE (2026-10-23): egress and taint ask under auto-approve
+	// only together (a new destination, or a command that can reach the
+	// network, after untrusted content). Both are set here; see mustAskAnyway.
+	MarkTainted("conversation", "read a web page")
+	t.Cleanup(func() { ClearTaint("conversation") })
 	r = familyReq("fieldkit cards upload")
 	r.Egress = true
 	if s.Request(r) {
-		t.Error("auto-approve + family covered egress")
+		t.Error("auto-approve + family covered egress to a new place after untrusted content")
 	}
-	MarkTainted("conversation", "read a web page")
-	t.Cleanup(func() { ClearTaint("conversation") })
-	if s.Request(familyReq("fieldkit cards show")) {
+	r = familyReq("fieldkit cards show")
+	r.MayReachNetwork = true // fieldkit is a Python program: tools.MayReachNetwork says so
+	if s.Request(r) {
 		t.Error("auto-approve + family covered a tainted turn")
 	}
 }

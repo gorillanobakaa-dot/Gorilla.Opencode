@@ -27,21 +27,22 @@ type allowAllPerms struct {
 	*pubsub.Broker[permission.PermissionRequest]
 }
 
-func (p *allowAllPerms) GrantPersistant(permission.PermissionRequest)    {}
-func (p *allowAllPerms) Grant(permission.PermissionRequest)              {}
-func (p *allowAllPerms) Deny(permission.PermissionRequest)               {}
-func (p *allowAllPerms) Request(permission.CreatePermissionRequest) bool { return true }
-func (p *allowAllPerms) AutoApproveSession(string)                       {}
-func (p *allowAllPerms) RevokeAutoApprove(string)                        {}
-func (p *allowAllPerms) IsAutoApproved(string) bool                      { return true }
-func (p *allowAllPerms) RegisterChildSession(string, string)             {}
-func (p *allowAllPerms) SetUnattended(bool)                              {}
-func (p *allowAllPerms) GrantFleet(string, []string)                     {}
-func (p *allowAllPerms) RevokeFleet(string)                              {}
-func (p *allowAllPerms) HasFleetGrant(string, string) bool               { return true }
-func (p *allowAllPerms) IsCovered(permission.PermissionRequest) bool     { return true }
+func (p *allowAllPerms) GrantPersistant(permission.PermissionRequest)     {}
+func (p *allowAllPerms) Grant(permission.PermissionRequest)               {}
+func (p *allowAllPerms) Deny(permission.PermissionRequest)                {}
+func (p *allowAllPerms) Refuse(permission.PermissionRequest)              {}
+func (p *allowAllPerms) Request(permission.CreatePermissionRequest) bool  { return true }
+func (p *allowAllPerms) AutoApproveSession(string)                        {}
+func (p *allowAllPerms) RevokeAutoApprove(string)                         {}
+func (p *allowAllPerms) IsAutoApproved(string) bool                       { return true }
+func (p *allowAllPerms) RegisterChildSession(string, string)              {}
+func (p *allowAllPerms) SetUnattended(bool)                               {}
+func (p *allowAllPerms) GrantFleet(string, []string)                      {}
+func (p *allowAllPerms) RevokeFleet(string)                               {}
+func (p *allowAllPerms) HasFleetGrant(string, string) bool                { return true }
+func (p *allowAllPerms) IsCovered(permission.PermissionRequest) bool      { return true }
 func (p *allowAllPerms) GrantFamily(permission.PermissionRequest, string) {}
-func (p *allowAllPerms) AskedKeys(string, string) []string               { return nil }
+func (p *allowAllPerms) AskedKeys(string, string) []string                { return nil }
 
 func bashRun(t *testing.T, cmd string) (ToolResponse, time.Duration) {
 	t.Helper()

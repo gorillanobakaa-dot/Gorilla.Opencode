@@ -1,6 +1,12 @@
 <!-- Version: 1.0.0 · updated 26-08-18-22-28 -->
 # When the assistant runs a command: what it asks about, and what it doesn't
 
+> **Update 2026-10-23.** The read-only list was widened, `2>/dev/null` no longer
+> counts as a write, `<program> --version` counts as a read, and auto-approve now
+> stops only for hard stops and exfiltration paths. The rules below on splitting a
+> line into commands are unchanged. The fear-by-fear record is in
+> [PERMISSIONS.md](PERMISSIONS.md).
+
 *Two tracks, both complete. The plain-language one is not a simplified version of
 the technical one — it is the same facts in different language. Neither is a
 summary of the other.*

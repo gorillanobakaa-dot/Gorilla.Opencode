@@ -2,6 +2,7 @@ package dialog
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -349,6 +350,8 @@ func (p *permissionDialogCmp) renderHeader() string {
 	return lipgloss.NewStyle().Background(styles.PanelBackground()).Render(lipgloss.JoinVertical(lipgloss.Left, headerParts...))
 }
 
+// renderBashContent is no longer called (2026-10-23): bash requests are drawn
+// by renderCommandDialog. Kept for the history in its comments.
 func (p *permissionDialogCmp) renderBashContent() string {
 	baseStyle := styles.BaseStyle()
 
@@ -438,6 +441,8 @@ func (p *permissionDialogCmp) renderWriteContent() string {
 	return ""
 }
 
+// renderFetchContent is no longer called (2026-10-23): web_fetch requests are
+// drawn by renderCommandDialog. Kept for the history in its comments.
 func (p *permissionDialogCmp) renderFetchContent() string {
 	baseStyle := styles.BaseStyle()
 
@@ -503,7 +508,176 @@ func (p *permissionDialogCmp) styleViewport() string {
 	return contentStyle.Render(p.contentViewPort.View())
 }
 
+// renderCommandDialog draws a bash or web_fetch request: the command or URL
+// FIRST and in full, then one plain line of what it does, why it asks, where,
+// and what "Allow for session" will cover, then the buttons.
+//
+// GORILLA FIX (2026-10-23): the Command and URL fields rendered EMPTY. Measured
+// on the MacBook Air (80x24, auto-approve on) and reproduced headlessly in
+// permission_content_test.go: the box was 40% of the window high, the
+// auto-approve banner plus the Tool/Path header filled all of it, and the
+// viewport holding the command was given a height of zero or less. At 160x45
+// a URL was still empty. A person was asked to judge a request with the one
+// thing worth judging missing, which trains Allow by reflex.
+//
+// The box is now sized to its content and capped at the window; when rows run
+// short the optional lines go first and the command or URL is the last thing
+// to be cut, with a line saying how much was not shown.
+func (p *permissionDialogCmp) renderCommandDialog() string {
+	t := theme.CurrentTheme()
+	base := styles.BaseStyle()
+	// Border = 2 columns OUTSIDE Width; Padding(1,0,0,1) = 1 column INSIDE.
+	// One more column of slack on the right keeps wrapped text off the border.
+	tw := p.width - 2
+	if tw < 20 {
+		tw = 20
+	}
+	text := func(fg lipgloss.TerminalColor, bold bool, s string) []string {
+		st := base.Foreground(fg).Bold(bold)
+		var out []string
+		for _, l := range strings.Split(wrapCommand(s, tw), "\n") {
+			out = append(out, st.Render(l))
+		}
+		return out
+	}
+	blank := []string{""}
+
+	label, subject, purpose := "Command", "", ""
+	switch pr := p.permission.Params.(type) {
+	case tools.BashPermissionsParams:
+		subject = pr.Command
+		purpose = tools.CommandPurpose(pr.Command)
+	case tools.FetchPermissionsParams:
+		label, subject = "URL", pr.URL
+		purpose = "Downloads this page and gives its text to the model."
+	}
+	if subject == "" {
+		// Never an empty field: fall back to the request's own sentence.
+		subject = p.permission.Description
+	}
+	subjectLines := text(t.Text(), true, subject)
+
+	title := text(t.Primary(), true, "Permission Required")
+	head := append(text(t.TextMuted(), true, label), subjectLines...)
+
+	// Optional lines, each with a keep-priority (lower kept first) and a
+	// display order. The family text is the one whose loss also takes its
+	// button away: a grant must never be offered without its sentence.
+	type part struct {
+		prio  int
+		lines []string
+	}
+	var reason, scope, fam, what, where part
+	if r := p.permission.AutoApproveOverridden; r != "" {
+		reason = part{1, text(t.Warning(), false, "Asks even with auto-approve on: "+r)}
+	}
+	scope = part{2, text(t.TextMuted(), false, "Allow for session (s) covers: "+permission.SessionScope(p.permission))}
+	if f := p.family(); f != "" {
+		pr, _ := p.permission.Params.(tools.BashPermissionsParams)
+		block := text(t.Text(), false, fmt.Sprintf("Allow family (f) also allows, this session, every command beginning with ([ shorter, ] longer, %d of %d):",
+			p.familyIdx+1, len(p.familyCandidates)))
+		block = append(block, text(t.Text(), true, f)...)
+		if note := tools.BashFamilyNote(pr.Command, f); note != "" {
+			block = append(block, text(t.Warning(), false, note)...)
+		}
+		block = append(block, text(t.TextMuted(), false, "Never covered by a family: a dangerous command, anything after untrusted content was read, a different path.")...)
+		fam = part{3, block}
+	}
+	if purpose != "" {
+		what = part{4, text(t.TextMuted(), false, purpose)}
+	}
+	where = part{5, text(t.TextMuted(), false, "Tool: "+p.permission.ToolName+"   Path: "+p.permission.Path)}
+
+	// Rows available inside the window: border 2 + top padding 1, and one row
+	// of the window left free so the box never touches both edges.
+	budget := p.windowSize.Height - 4
+	if budget < 8 {
+		budget = 8
+	}
+	buttonsFor := func() []string { return strings.Split(p.renderButtonsWithin(tw), "\n") }
+	buttons := buttonsFor()
+	fixed := len(title) + 1 + len(head) + 1 + len(buttons)
+	if fixed > budget {
+		// Even the command does not fit: keep as much of it as there is room
+		// for and say how much was not shown.
+		keep := budget - (len(title) + 1 + 1 + 1 + 1 + len(buttons)) // title, blank, label, note, blank
+		if keep < 1 {
+			keep = 1
+		}
+		hidden := len(subjectLines) - keep
+		head = append(head[:1], subjectLines[:keep]...)
+		head = append(head, text(t.Warning(), false, fmt.Sprintf("... %d more line(s) not shown. Deny and ask the model to explain if you cannot judge it.", hidden))...)
+		reason, scope, fam, what, where = part{}, part{}, part{}, part{}, part{}
+		fixed = len(title) + 1 + len(head) + 1 + len(buttons)
+	}
+	room := budget - fixed - 1 // one blank row between the command and the rest
+	kept := map[int]bool{}
+	for _, c := range []part{reason, scope, fam, what, where} { // priority order
+		if len(c.lines) > 0 && len(c.lines) <= room {
+			kept[c.prio] = true
+			room -= len(c.lines)
+		}
+	}
+	if fam.lines != nil && !kept[fam.prio] && p.hasOption(PermissionAllowFamily) {
+		// No room to say what a family covers, so it is not offered.
+		p.options = slices.DeleteFunc(p.options, func(a PermissionAction) bool { return a == PermissionAllowFamily })
+		p.selectedOption = len(p.options) - 1
+		buttons = buttonsFor()
+	}
+	body := append(append(append([]string{}, title...), blank...), head...)
+	body = append(body, "")
+	for _, c := range []part{what, reason, where, fam, scope} { // display order
+		if kept[c.prio] {
+			body = append(body, c.lines...)
+		}
+	}
+	body = append(body, "")
+	body = append(body, buttons...)
+
+	return base.
+		Padding(1, 0, 0, 1).
+		Border(lipgloss.RoundedBorder()).
+		BorderBackground(styles.PanelBackground()).
+		BorderForeground(t.TextMuted()).
+		Width(p.width).
+		Render(strings.Join(body, "\n"))
+}
+
+// renderButtonsWithin lays the buttons out on one row when they fit in width
+// columns and on as many rows as they need when they do not. Four buttons
+// (with "Allow family") are 70 columns, wider than the 62-column text area of
+// an 80-column window.
+func (p *permissionDialogCmp) renderButtonsWithin(width int) string {
+	if row := p.renderButtons(); lipgloss.Width(row) <= width {
+		return row
+	}
+	t := theme.CurrentTheme()
+	base := styles.BaseStyle()
+	var rows []string
+	line := ""
+	for i, o := range p.options {
+		style := base.Background(styles.PanelBackground()).Foreground(t.Primary())
+		if i == p.selectedOption {
+			style = base.Background(t.Primary()).Foreground(t.Background())
+		}
+		b := style.Padding(0, 1).Render(buttonLabels[o])
+		if line != "" && lipgloss.Width(line)+2+lipgloss.Width(b) > width {
+			rows = append(rows, line)
+			line = ""
+		}
+		if line != "" {
+			line += "  "
+		}
+		line += b
+	}
+	return strings.Join(append(rows, line), "\n")
+}
+
 func (p *permissionDialogCmp) render() string {
+	switch p.permission.ToolName {
+	case tools.BashToolName, tools.FetchToolName:
+		return p.renderCommandDialog()
+	}
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 

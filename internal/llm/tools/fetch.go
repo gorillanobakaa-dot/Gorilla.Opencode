@@ -502,28 +502,7 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	if sessionID == "" || messageID == "" {
 		return ToolResponse{}, fmt.Errorf("session ID and message ID are required for web_fetch")
 	}
-	if !t.permissions.Request(permission.CreatePermissionRequest{
-		SessionID:   sessionID,
-		Path:        config.WorkingDirectory(),
-		ToolName:    FetchToolName,
-		Action:      "fetch",
-		Description: fmt.Sprintf("Fetch content from URL: %s", params.URL),
-		// GORILLA FIX (2026-08-19): scope the grant. Without it, "allow for
-		// session" on one fetch authorised every later fetch in the session —
-		// an exfiltration path, since a poisoned page can steer the model to a
-		// URL of its choosing and the user is never asked again.
-		//
-		// The key is the HOST, not the full URL. Per-URL was the first
-		// attempt and it is the wrong granularity: reading documentation means
-		// dozens of pages on one site, so a per-URL grant produces a prompt
-		// per page, and a prompt that fires constantly is a prompt that gets
-		// answered without being read. Per-host still asks the question that
-		// matters — "why is it talking to THAT site?" — which is the question
-		// an exfiltration attempt fails.
-		GrantKey: fetchGrantKey(params.URL),
-		Egress:   true,
-		Params:   FetchPermissionsParams(params),
-	}) {
+	if !t.permissions.Request(fetchPermissionRequest(sessionID, params)) {
 		return ToolResponse{}, permission.ErrorPermissionDenied
 	}
 
@@ -828,6 +807,33 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// fetchPermissionRequest is the question Run asks before a fetch. Split out so
+// the evidence tests (permission_evidence_test.go) ask exactly what Run asks.
+func fetchPermissionRequest(sessionID string, params FetchParams) permission.CreatePermissionRequest {
+	return permission.CreatePermissionRequest{
+		SessionID:   sessionID,
+		Path:        config.WorkingDirectory(),
+		ToolName:    FetchToolName,
+		Action:      "fetch",
+		Description: fmt.Sprintf("Fetch content from URL: %s", params.URL),
+		// GORILLA FIX (2026-08-19): scope the grant. Without it, "allow for
+		// session" on one fetch authorised every later fetch in the session —
+		// an exfiltration path, since a poisoned page can steer the model to a
+		// URL of its choosing and the user is never asked again.
+		//
+		// The key is the HOST, not the full URL. Per-URL was the first
+		// attempt and it is the wrong granularity: reading documentation means
+		// dozens of pages on one site, so a per-URL grant produces a prompt
+		// per page, and a prompt that fires constantly is a prompt that gets
+		// answered without being read. Per-host still asks the question that
+		// matters — "why is it talking to THAT site?" — which is the question
+		// an exfiltration attempt fails.
+		GrantKey: fetchGrantKey(params.URL),
+		Egress:   true,
+		Params:   FetchPermissionsParams(params),
+	}
 }
 
 // fetchGrantKey reduces a URL to the thing a session grant should cover: the

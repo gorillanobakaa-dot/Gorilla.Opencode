@@ -276,8 +276,9 @@ func (s *Session) askPermission(req permission.PermissionRequest) {
 	}
 
 	if !s.in.Scan() {
-		// stdin closed mid-turn: refuse rather than assume consent.
-		s.app.Permissions.Deny(req)
+		// stdin closed mid-turn: refuse rather than assume consent. Nobody
+		// answered, so the turn ends rather than carrying on without them.
+		s.app.Permissions.Refuse(req)
 		fmt.Fprintln(s.out, "\n(input closed — denied)")
 		return
 	}

@@ -853,6 +853,29 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 				Input: toolCall.Input,
 			})
 			if toolErr != nil {
+				if errors.Is(toolErr, permission.ErrorPermissionDenied) && permission.TakePersonDenial(sessionID) {
+					// GORILLA FIX (2026-10-23): a person pressing Deny is an
+					// answer, not the end of the turn. The model reads it and
+					// carries on; the other calls sent in the same message are
+					// still NOT run (they were planned on the assumption this
+					// one would happen), and the model may ask for them again
+					// one at a time. See permission.TakePersonDenial.
+					ran[i] = false
+					toolResults[i] = message.ToolResult{
+						ToolCallID: toolCall.ID,
+						Content:    permission.DeniedByPersonResult,
+						IsError:    true,
+					}
+					for j := i + 1; j < len(toolCalls); j++ {
+						toolResults[j] = message.ToolResult{
+							ToolCallID: toolCalls[j].ID,
+							Content: "Not run: the person denied an earlier call in the same message, " +
+								"and this one was planned together with it. Ask for it again on its own if it is still needed.",
+							IsError: true,
+						}
+					}
+					goto out
+				}
 				if errors.Is(toolErr, permission.ErrorPermissionDenied) {
 					ran[i] = false // the person said no; the model did not loop
 					// The tool may have wrapped the sentinel with its reason
