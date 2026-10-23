@@ -43,5 +43,5 @@ func (a *appModel) bannerCmd() tea.Cmd {
 		return nil
 	}
 	a.bannerShown = true
-	return tea.Println(banner)
+	return printAbove(banner)
 }

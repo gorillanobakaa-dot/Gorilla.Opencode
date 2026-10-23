@@ -747,6 +747,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.scrollback {
 			a.frames.resized(msg.Width, terminalRewraps())
 		}
+		msg.Width = usableWidth(msg.Width)
 		a.width, a.height = msg.Width, msg.Height
 
 		// GORILLA OVERRIDE: nothing is scrolled or padded here. The frame is drawn
@@ -882,7 +883,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					out += "\nThis session:\n  " + strings.Join(usage.SessionLines(s), "\n  ") + "\n"
 				}
 			}
-			cmds = append(cmds, tea.Println(out))
+			cmds = append(cmds, printAbove(out))
 		}
 		info := util.InfoMsg{Type: msg.kind, Msg: msg.line}
 		st, cmd := a.status.Update(info)
@@ -900,7 +901,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if a.scrollback {
 			for _, al := range msg.alerts {
-				cmds = append(cmds, tea.Println(formatQuotaScrollbackLine(time.Now(), al)))
+				cmds = append(cmds, printAbove(formatQuotaScrollbackLine(time.Now(), al)))
 			}
 		}
 		if len(msg.alerts) > 0 {
@@ -957,7 +958,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// One line, wrapped to the terminal. No blank lines, no rule: extra
 			// lines are just more that can render wrong, and the bookends already
 			// mark where the notice starts and ends.
-			cmds = append(cmds, tea.Println(style.Render(plain)))
+			cmds = append(cmds, printAbove(style.Render(plain)))
 		}
 		s, cmd := a.status.Update(msg)
 		a.status = s.(core.StatusCmp)
@@ -2740,6 +2741,42 @@ func clampToWidth(view string, width int) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// usableWidth is the width every component lays out to: the terminal's
+// columns minus one. The last column is never drawn in.
+//
+// GORILLA FIX (2026-10-23, MacBook Air, macOS 10.13 Terminal.app at 167x39
+// and 169x33): clampToWidth already kept every line within the terminal, but
+// "within" meant up to AND INCLUDING the last column, and the status bar, the
+// divider and every editor row were padded to exactly that width. A character
+// written in the last column leaves the cursor in the terminal's wrap state
+// (Terminal.app wraps it to the next row). bubbletea's inline renderer then
+// moves up by the number of LOGICAL lines it drew and paints without a
+// carriage return, so every redraw started a row too low or a column off: the
+// old input rows stayed on screen (" > h", " > he", " > hel", two cursor
+// blocks), the status bar was pushed off the bottom, and the banner printed
+// above the frame started mid-row ("orilla OpenCode" with a lone "G" in the
+// last column). Reproduced headlessly in internal/tui/inline/macos_air_test.go.
+//
+// Taking the column off at the SOURCE, before the size reaches any component,
+// is the same reasoning as clampToWidth being one choke point: twenty
+// components each subtracting one is twenty chances to forget.
+func usableWidth(cols int) int {
+	if cols > 1 {
+		return cols - 1
+	}
+	return cols
+}
+
+// printAbove is tea.Println with a leading carriage return, the same fix as
+// printLine in components/chat/printer.go: the renderer writes queued lines
+// straight after moving the cursor up, without returning to column 0, so the
+// first printed line starts wherever the previous frame left the cursor. The
+// banner was printed without it and started at column 41 of a 167-column
+// window in the headless reproduction.
+func printAbove(text string) tea.Cmd {
+	return tea.Println("\r" + text)
 }
 
 // placeOverlay composites one dialog onto the frame, centred, growing the canvas
