@@ -19,6 +19,12 @@ func GetMarkdownRenderer(width int) *glamour.TermRenderer {
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStyles(generateMarkdownStyleConfig()),
 		glamour.WithWordWrap(width),
+		// glamour's default is TrueColor whatever the terminal is. macOS 10.13
+		// Terminal.app has no 24-bit colour and reads "38;2;R;G;B" as SGR 2,
+		// FAINT: every reply came out dim grey and *emphasis* grey italic
+		// (MacBook Air, 2026-10-23). Use the profile lipgloss detected, as the
+		// rest of the interface already does.
+		glamour.WithColorProfile(lipgloss.ColorProfile()),
 	)
 	return r
 }

@@ -3,6 +3,7 @@ package diff
 import (
 	"bytes"
 	"fmt"
+	"image/color"
 	"io"
 	"regexp"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"github.com/aymanbagabas/go-udiff"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 	"github.com/sergi/go-diff/diffmatchpatch"
@@ -539,10 +541,39 @@ func getColor(adaptiveColor lipgloss.AdaptiveColor) string {
 	return adaptiveColor.Light
 }
 
+// terminalFormatter picks chroma's formatter for the colour profile lipgloss
+// detected. It was always "terminal16m" (24-bit), and macOS 10.13 Terminal.app
+// has no 24-bit colour: it reads "38;2;R;G;B" as SGR 2, FAINT, plus whatever the
+// numbers happen to mean, so highlighted code came out dim (MacBook Air,
+// 2026-10-23). Terminal.app is detected as ANSI256 and gets "terminal256".
+func terminalFormatter() string {
+	switch lipgloss.ColorProfile() {
+	case termenv.TrueColor:
+		return "terminal16m"
+	case termenv.ANSI256:
+		return "terminal256"
+	case termenv.ANSI:
+		return "terminal16"
+	default:
+		return "noop"
+	}
+}
+
+// sgr is the escape sequence for a colour in the detected profile, foreground
+// or background, or "" when the profile has no colour. Same reason as
+// terminalFormatter: a hand-written "38;2;" is FAINT on a 256-colour terminal.
+func sgr(c color.Color, background bool) string {
+	seq := lipgloss.ColorProfile().FromColor(c).Sequence(background)
+	if seq == "" {
+		return ""
+	}
+	return "\x1b[" + seq + "m"
+}
+
 // highlightLine applies syntax highlighting to a single line
 func highlightLine(fileName string, line string, bg lipgloss.TerminalColor) string {
 	var buf bytes.Buffer
-	err := SyntaxHighlight(&buf, line, fileName, "terminal16m", bg)
+	err := SyntaxHighlight(&buf, line, fileName, terminalFormatter(), bg)
 	if err != nil {
 		return line
 	}
@@ -653,12 +684,8 @@ func applyHighlighting(content string, segments []Segment, segmentType LineType,
 			currentStyle := ansiSequences[currentPos]
 
 			// Apply foreground and background highlight
-			sb.WriteString("\x1b[38;2;")
-			r, g, b, _ := fgColor.RGBA()
-			sb.WriteString(fmt.Sprintf("%d;%d;%dm", r>>8, g>>8, b>>8))
-			sb.WriteString("\x1b[48;2;")
-			r, g, b, _ = bgColor.RGBA()
-			sb.WriteString(fmt.Sprintf("%d;%d;%dm", r>>8, g>>8, b>>8))
+			sb.WriteString(sgr(fgColor, false))
+			sb.WriteString(sgr(bgColor, true))
 			sb.WriteString(char)
 			// Reset foreground and background
 			sb.WriteString("\x1b[39m")
