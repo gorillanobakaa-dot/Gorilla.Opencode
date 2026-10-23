@@ -3,6 +3,11 @@
 # The installer put it in the Trash as "gorilla-opencode vX.Y.Z". Undo copies
 # the newest one back and moves the version installed now to the Trash, so
 # running Undo again swaps them back.
+#
+# It also gives Terminal back its own "reopen windows after a quit" setting,
+# exactly as the installer found it (written down in
+# ~/.local/share/gorilla-opencode/terminal-window-restore.before), even when
+# there is no older version to go back to. Installing again turns it off again.
 
 BIN="$HOME/.local/bin"
 say() { printf '%s\n' "$*"; }
@@ -14,6 +19,36 @@ to_trash() {
   fi
   mkdir -p "$HOME/.Trash" && mv "$1" "$HOME/.Trash/$(basename "$1") $(date +%Y-%m-%d.%H.%M.%S)"
 }
+
+# Puts back what the installer's terminal_restore_off wrote down: "unset" (the
+# setting is removed again) or "TYPE VALUE". The record goes only once the value
+# is back; an unreadable record changes nothing.
+RESTORE_KEY=NSQuitAlwaysKeepsWindows
+RESTORE_REC="$HOME/.local/share/gorilla-opencode/terminal-window-restore.before"
+terminal_restore_back() {
+  local rec t v
+  [ -f "$RESTORE_REC" ] || return 0
+  rec=$(cat "$RESTORE_REC") || return 1
+  t=${rec%% *}; v=${rec#* }
+  case "$rec" in
+    unset)
+      defaults delete com.apple.Terminal "$RESTORE_KEY" 2>/dev/null ||
+        ! defaults read com.apple.Terminal "$RESTORE_KEY" >/dev/null 2>&1 || return 1 ;;
+    *" "*)
+      case "$t" in
+        boolean) case "$v" in 1|true|TRUE|YES|yes) v=true ;; 0|false|FALSE|NO|no) v=false ;; *) return 1 ;; esac
+                 defaults write com.apple.Terminal "$RESTORE_KEY" -bool "$v" || return 1 ;;
+        integer) defaults write com.apple.Terminal "$RESTORE_KEY" -int "$v" || return 1 ;;
+        float)   defaults write com.apple.Terminal "$RESTORE_KEY" -float "$v" || return 1 ;;
+        string)  defaults write com.apple.Terminal "$RESTORE_KEY" -string "$v" || return 1 ;;
+        *) return 1 ;;
+      esac ;;
+    *) return 1 ;;
+  esac
+  rm -f "$RESTORE_REC"
+}
+
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then return 0; fi
 
 say "Gorilla OpenCode - go back to the previous version"
 say "=================================================="
@@ -28,19 +63,32 @@ for f in "$HOME/.Trash"/gorilla-opencode\ v* "$BIN"/gorilla-opencode\ v*; do
   [ "$(version_of "$f")" = "$NOW" ] && continue
   if [ -z "$PREV" ] || [ "$f" -nt "$PREV" ]; then PREV="$f"; fi
 done
-if [ -z "$PREV" ]; then
+if [ -z "$PREV" ] && [ ! -f "$RESTORE_REC" ]; then
   say "There is no other version in the Trash to go back to. (Was the Trash emptied?)"
   finish 1
 fi
-PREV_V="$(version_of "$PREV")"
 say "Installed now:  ${NOW:-nothing}"
-say "Going back to:  $PREV_V"
+if [ -n "$PREV" ]; then
+  PREV_V="$(version_of "$PREV")"
+  say "Going back to:  $PREV_V"
+else
+  say "Going back to:  (no other version in the Trash; the program stays)"
+fi
+[ -f "$RESTORE_REC" ] && say "Terminal:       its setting for reopening old windows goes back to how it was"
 say ""
 read -rp "Type yes and press Enter to go back: " answer
 if [ "$answer" != "yes" ]; then
   say "Nothing was changed."
   finish 1
 fi
+if [ -f "$RESTORE_REC" ]; then
+  if terminal_restore_back; then
+    say "[ok] Terminal's setting for reopening old windows is back to how it was."
+  else
+    say "[--] Terminal's setting could not be put back; it stays off. Its record is kept: $RESTORE_REC"
+  fi
+fi
+[ -n "$PREV" ] || finish 0
 mkdir -p "$BIN"
 cp -p "$PREV" "$BIN/gorilla-opencode.restoring" || { say "STOPPED: could not copy it out of the Trash."; finish 1; }
 chmod +x "$BIN/gorilla-opencode.restoring"

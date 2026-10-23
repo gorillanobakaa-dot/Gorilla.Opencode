@@ -11,7 +11,11 @@
 #   5. tells macOS the files are yours, so it does not block them;
 #   6. lets you type  gorilla-opencode  in Terminal;
 #   7. installs "Gorilla OpenCode" in your Applications folder, with an icon
-#      on the Desktop: double-click it to start.
+#      on the Desktop: double-click it to start;
+#   8. tells Terminal not to reopen the windows that were open when it was
+#      quit, so the program starts in one window (owner's choice, 2026-10-23,
+#      after old windows came back behind it). Terminal's setting as it was
+#      before is written down first, and Undo puts it back exactly.
 # It stops at the first thing that is wrong and says what. Nothing is replaced
 # until the new program has been tested on this Mac.
 # "Undo Gorilla OpenCode.command" brings the previous version back.
@@ -20,6 +24,8 @@
 #   ~/.local/bin/gorilla-opencode               the program
 #   ~/Applications/Gorilla OpenCode.app         the app you double-click
 #   ~/Desktop/Gorilla OpenCode                  an icon pointing at that app
+#   ~/.local/share/gorilla-opencode/terminal-window-restore.before
+#                                               Terminal's setting before step 8
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BIN="$HOME/.local/bin"
@@ -42,6 +48,29 @@ to_trash() {
     return 0
   fi
   mkdir -p "$HOME/.Trash" && mv "$1" "$HOME/.Trash/$(basename "$1") $(date +%Y-%m-%d.%H.%M.%S)"
+}
+
+# Terminal's own "reopen windows after a quit" setting. It is written down once,
+# before the first change ("unset" when Terminal has none, otherwise its type and
+# value), so a second install never records the installer's own value as yours;
+# Undo puts it back and removes the record. Without a record nothing is changed.
+# cmd/macos_launcher_test.go runs this and Undo's terminal_restore_back with a
+# stand-in for defaults.
+RESTORE_KEY=NSQuitAlwaysKeepsWindows
+RESTORE_REC="$HOME/.local/share/gorilla-opencode/terminal-window-restore.before"
+terminal_restore_off() {
+  local v t
+  if [ ! -f "$RESTORE_REC" ]; then
+    mkdir -p "$(dirname "$RESTORE_REC")" || return 1
+    if v=$(defaults read com.apple.Terminal "$RESTORE_KEY" 2>/dev/null); then
+      t=$(defaults read-type com.apple.Terminal "$RESTORE_KEY" 2>/dev/null); t=${t#Type is }
+      case "$t" in boolean|integer|float|string) ;; *) return 1 ;; esac
+      printf '%s %s\n' "$t" "$v" >"$RESTORE_REC" || return 1
+    else
+      echo unset >"$RESTORE_REC" || return 1
+    fi
+  fi
+  defaults write com.apple.Terminal "$RESTORE_KEY" -bool false
 }
 
 say "Gorilla OpenCode installer"
@@ -121,6 +150,13 @@ xattr -dr com.apple.quarantine "$APP" 2>/dev/null
 touch "$APP"   # Finder re-reads the icon
 ln -s "$APP" "$HOME/Desktop/Gorilla OpenCode" 2>/dev/null || stop "the app is installed, but the Desktop icon could not be made"
 say "[ok] \"Gorilla OpenCode\" is in your Applications folder, with an icon on the Desktop."
+
+# 8. One window: Terminal stops reopening the windows open at its last quit.
+if terminal_restore_off; then
+  say "[ok] Terminal will not reopen old windows after a quit (Undo turns this back)."
+else
+  say "[--] Terminal's window setting was left as it is: it could not be read and written down first."
+fi
 
 rm -rf "$WORK"
 say ""
