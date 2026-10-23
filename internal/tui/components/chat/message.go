@@ -71,7 +71,12 @@ func renderMessageFlat(msg string, isUser bool, width int, info ...string) strin
 		style := lipgloss.NewStyle().Bold(true).Foreground(t.Secondary())
 		lines := strings.Split(strings.TrimRight(msg, "\n"), "\n")
 		for i, l := range lines {
-			lines[i] = style.Render("> " + l)
+			// Wrap at word boundaries before the hard wrap below. Without it a
+			// long question was cut at whatever character met the edge
+			// ("su" / "do", "questio" / "n"), seen on the MacBook Air
+			// 2026-10-23. ansi.Wrap still breaks a word longer than the line
+			// (a long URL), so the guarantee below has nothing left to do.
+			lines[i] = ansi.Wrap(style.Render("> "+l), width, "")
 		}
 		body = strings.Join(lines, "\n")
 	} else {

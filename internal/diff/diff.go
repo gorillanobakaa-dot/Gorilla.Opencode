@@ -3,6 +3,7 @@ package diff
 import (
 	"bytes"
 	"fmt"
+	"image/color"
 	"io"
 	"regexp"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"github.com/aymanbagabas/go-udiff"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 	"github.com/sergi/go-diff/diffmatchpatch"
@@ -510,9 +512,17 @@ func SyntaxHighlight(w io.Writer, source, fileName, formatter string, bg lipglos
 	r := strings.NewReader(syntaxThemeXml)
 	style := chroma.MustNewXMLStyle(r)
 
-	// Modify the style to use the provided background
+	// Modify the style to use the provided background. No background at all
+	// (NoColor, or nil) means none on any token: NoColor's RGBA is black, and a
+	// per-token black on a 256-colour terminal is the blotch rowBackgrounds
+	// exists to avoid.
+	_, noBg := bg.(lipgloss.NoColor)
 	s, err := style.Builder().Transform(
 		func(t chroma.StyleEntry) chroma.StyleEntry {
+			if bg == nil || noBg {
+				t.Background = 0
+				return t
+			}
 			r, g, b, _ := bg.RGBA()
 			t.Background = chroma.NewColour(uint8(r>>8), uint8(g>>8), uint8(b>>8))
 			return t
@@ -539,10 +549,39 @@ func getColor(adaptiveColor lipgloss.AdaptiveColor) string {
 	return adaptiveColor.Light
 }
 
+// terminalFormatter picks chroma's formatter for the colour profile lipgloss
+// detected. It was always "terminal16m" (24-bit), and macOS 10.13 Terminal.app
+// has no 24-bit colour: it reads "38;2;R;G;B" as SGR 2, FAINT, plus whatever the
+// numbers happen to mean, so highlighted code came out dim (MacBook Air,
+// 2026-10-23). Terminal.app is detected as ANSI256 and gets "terminal256".
+func terminalFormatter() string {
+	switch lipgloss.ColorProfile() {
+	case termenv.TrueColor:
+		return "terminal16m"
+	case termenv.ANSI256:
+		return "terminal256"
+	case termenv.ANSI:
+		return "terminal16"
+	default:
+		return "noop"
+	}
+}
+
+// sgr is the escape sequence for a colour in the detected profile, foreground
+// or background, or "" when the profile has no colour. Same reason as
+// terminalFormatter: a hand-written "38;2;" is FAINT on a 256-colour terminal.
+func sgr(c color.Color, background bool) string {
+	seq := lipgloss.ColorProfile().FromColor(c).Sequence(background)
+	if seq == "" {
+		return ""
+	}
+	return "\x1b[" + seq + "m"
+}
+
 // highlightLine applies syntax highlighting to a single line
 func highlightLine(fileName string, line string, bg lipgloss.TerminalColor) string {
 	var buf bytes.Buffer
-	err := SyntaxHighlight(&buf, line, fileName, "terminal16m", bg)
+	err := SyntaxHighlight(&buf, line, fileName, terminalFormatter(), bg)
 	if err != nil {
 		return line
 	}
@@ -551,12 +590,35 @@ func highlightLine(fileName string, line string, bg lipgloss.TerminalColor) stri
 
 // createStyles generates the lipgloss styles needed for rendering diffs
 func createStyles(t theme.Theme) (removedLineStyle, addedLineStyle, contextLineStyle, lineNumberStyle lipgloss.Style) {
-	removedLineStyle = lipgloss.NewStyle().Background(t.DiffRemovedBg())
-	addedLineStyle = lipgloss.NewStyle().Background(t.DiffAddedBg())
-	contextLineStyle = lipgloss.NewStyle().Background(t.DiffContextBg())
+	removedLineStyle = withRowBg(lipgloss.NewStyle(), t.DiffRemovedBg())
+	addedLineStyle = withRowBg(lipgloss.NewStyle(), t.DiffAddedBg())
+	contextLineStyle = withRowBg(lipgloss.NewStyle(), t.DiffContextBg())
 	lineNumberStyle = lipgloss.NewStyle().Foreground(t.DiffLineNumber())
 
 	return
+}
+
+// rowBackgrounds reports whether diff rows may carry a background colour.
+//
+// GORILLA FIX (2026-10-23, MacBook Air, Terminal.app, 256 colours): the row
+// backgrounds are near-black shades chosen to sit just off a #212121 terminal.
+// On a 256-colour terminal they are rounded to visible greys, and on the black
+// "Pro" profile every row became a grey slab padded to its column, context rows
+// and per-token syntax backgrounds in blocks of different widths
+// (air-2026-10-23-032550-owner-grey-blotches.png). Below 24-bit colour the
+// diff uses no row background: added and removed lines are told apart by the
+// coloured +/- marker and line number, and the changed characters keep their
+// highlight.
+func rowBackgrounds() bool {
+	return lipgloss.ColorProfile() == termenv.TrueColor
+}
+
+// withRowBg sets a row background only where rowBackgrounds allows it.
+func withRowBg(s lipgloss.Style, c lipgloss.TerminalColor) lipgloss.Style {
+	if !rowBackgrounds() {
+		return s
+	}
+	return s.Background(c)
 }
 
 // -------------------------------------------------------------------------
@@ -653,12 +715,8 @@ func applyHighlighting(content string, segments []Segment, segmentType LineType,
 			currentStyle := ansiSequences[currentPos]
 
 			// Apply foreground and background highlight
-			sb.WriteString("\x1b[38;2;")
-			r, g, b, _ := fgColor.RGBA()
-			sb.WriteString(fmt.Sprintf("%d;%d;%dm", r>>8, g>>8, b>>8))
-			sb.WriteString("\x1b[48;2;")
-			r, g, b, _ = bgColor.RGBA()
-			sb.WriteString(fmt.Sprintf("%d;%d;%dm", r>>8, g>>8, b>>8))
+			sb.WriteString(sgr(fgColor, false))
+			sb.WriteString(sgr(bgColor, true))
 			sb.WriteString(char)
 			// Reset foreground and background
 			sb.WriteString("\x1b[39m")
@@ -682,7 +740,7 @@ func renderLeftColumn(fileName string, dl *DiffLine, colWidth int) string {
 	t := theme.CurrentTheme()
 
 	if dl == nil {
-		contextLineStyle := lipgloss.NewStyle().Background(t.DiffContextBg())
+		contextLineStyle := withRowBg(lipgloss.NewStyle(), t.DiffContextBg())
 		return contextLineStyle.Width(colWidth).Render("")
 	}
 
@@ -695,7 +753,7 @@ func renderLeftColumn(fileName string, dl *DiffLine, colWidth int) string {
 	case LineRemoved:
 		marker = removedLineStyle.Foreground(t.DiffRemoved()).Render("-")
 		bgStyle = removedLineStyle
-		lineNumberStyle = lineNumberStyle.Foreground(t.DiffRemoved()).Background(t.DiffRemovedLineNumberBg())
+		lineNumberStyle = withRowBg(lineNumberStyle.Foreground(t.DiffRemoved()), t.DiffRemovedLineNumberBg())
 	case LineAdded:
 		marker = "?"
 		bgStyle = contextLineStyle
@@ -742,7 +800,7 @@ func renderRightColumn(fileName string, dl *DiffLine, colWidth int) string {
 	t := theme.CurrentTheme()
 
 	if dl == nil {
-		contextLineStyle := lipgloss.NewStyle().Background(t.DiffContextBg())
+		contextLineStyle := withRowBg(lipgloss.NewStyle(), t.DiffContextBg())
 		return contextLineStyle.Width(colWidth).Render("")
 	}
 
@@ -755,7 +813,7 @@ func renderRightColumn(fileName string, dl *DiffLine, colWidth int) string {
 	case LineAdded:
 		marker = addedLineStyle.Foreground(t.DiffAdded()).Render("+")
 		bgStyle = addedLineStyle
-		lineNumberStyle = lineNumberStyle.Foreground(t.DiffAdded()).Background(t.DiffAddedLineNumberBg())
+		lineNumberStyle = withRowBg(lineNumberStyle.Foreground(t.DiffAdded()), t.DiffAddedLineNumberBg())
 	case LineRemoved:
 		marker = "?"
 		bgStyle = contextLineStyle

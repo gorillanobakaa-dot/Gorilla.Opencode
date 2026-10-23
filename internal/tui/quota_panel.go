@@ -21,8 +21,8 @@ import (
 // colours it by how much is left, green fading to red — the reading a user can
 // check at a glance without knowing anything about the wire format.
 
-// quotaPanelMaxWidth caps the panel on wide terminals so the bar stays a
-// readable length instead of spanning 200 columns.
+// quotaPanelMaxWidth caps the BAR on wide terminals so it stays a readable
+// length instead of spanning 200 columns. The text is not capped.
 const quotaPanelMaxWidth = 80
 
 // quotaBarMaxCells is the bar length at full width, matching the agy CLI's own
@@ -333,13 +333,19 @@ func renderQuotaPanel(meters []quota.Meter, balances []quota.Reading, width int,
 	if len(meters) == 0 && len(balances) == 0 {
 		return "  No quota or balance information available"
 	}
+	// The cap is for the BAR only. It used to cap the text too, so on the
+	// MacBook Air (Terminal.app, 164 columns, 2026-10-23) "| resets in 1d"
+	// wrapped at column 80 with half the window empty beside it. The text
+	// wraps at the width the app lays out to, which already leaves the last
+	// column free (usableWidth in tui.go).
 	w := width
-	if w <= 0 || w > quotaPanelMaxWidth {
+	if w <= 0 {
 		w = quotaPanelMaxWidth
 	}
+	barW := min(w, quotaPanelMaxWidth)
 	cells := quotaBarMaxCells
 	// 4 indent + 2 brackets + 1 space + len("100.00%") = 14 columns of chrome.
-	if max := w - 14; cells > max {
+	if max := barW - 14; cells > max {
 		cells = max
 	}
 	if cells < 10 {

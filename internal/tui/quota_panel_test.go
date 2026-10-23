@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/opencode-ai/opencode/internal/auth"
 	"github.com/opencode-ai/opencode/internal/quota"
 )
@@ -382,5 +383,29 @@ func TestChatGPTMeterSaysWhenNoReadingYet(t *testing.T) {
 	}
 	if strings.Contains(got, "100.00%") || strings.Contains(got, "0.00%") {
 		t.Errorf("no reading must not be drawn as a bar:\n%s", got)
+	}
+}
+
+// MacBook Air, 2026-10-23 (air-2026-10-23-013256.png, 164 columns): the
+// status lines wrapped at column 80, "| resets in" / "1d", because the bar's
+// 80-column cap was applied to the text as well. On a wide window each status
+// line is one line; the bar keeps its cap.
+func TestQuotaPanelTextUsesTheWholeWidth(t *testing.T) {
+	t.Parallel()
+	const w = 163 // a 164-column Terminal.app less the last column
+	got := renderQuotaPanel(meterFixture("user@example.com"), nil, w, quotaNow)
+	for i, line := range strings.Split(got, "\n") {
+		if strings.TrimSpace(ansi.Strip(line)) != "" && strings.HasPrefix(strings.TrimSpace(ansi.Strip(line)), "in ") {
+			t.Errorf("line %d is a wrapped continuation on a %d-column window: %q\n%s", i, w, line, got)
+		}
+		if lw := lipgloss.Width(line); lw > w {
+			t.Errorf("line %d is %d columns wide, over %d", i, lw, w)
+		}
+		if strings.Contains(line, "[") && lipgloss.Width(line) > quotaPanelMaxWidth {
+			t.Errorf("bar line %d is %d columns; the bar keeps its %d-column cap", i, lipgloss.Width(line), quotaPanelMaxWidth)
+		}
+	}
+	if !strings.Contains(ansi.Strip(got), "| resets in ") {
+		t.Fatalf("fixture no longer has a reset clause; the test would pass vacuously:\n%s", got)
 	}
 }

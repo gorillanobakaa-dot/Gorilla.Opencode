@@ -181,7 +181,7 @@ var helpWidget = ""
 // getHelpWidget returns the help widget with current theme colors
 func getHelpWidget() string {
 	t := theme.CurrentTheme()
-	helpText := "ctrl+? help"
+	helpText := "? help"
 
 	return styles.Padded().
 		Background(t.TextMuted()).

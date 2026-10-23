@@ -230,7 +230,7 @@ func (m *messagesCmp) streamReasoning(msg message.Message) []tea.Cmd {
 func (m *messagesCmp) flushReasoning(msg message.Message) []tea.Cmd {
 	thinking := strings.TrimRight(msg.ReasoningContent().Thinking, "\n")
 	if strings.TrimSpace(thinking) == "" {
-		return reasoningSwitchedOffNotice()
+		return reasoningSwitchedOffNotice(m.width)
 	}
 	cmds := m.emitReasoning(msg, strings.Split(thinking, "\n"))
 	// GORILLA OVERRIDE: blank lines on BOTH sides of the closing marker.
@@ -276,17 +276,23 @@ var reasoningOffNoticed sync.Once
 //
 // Printed into the transcript rather than logged, because the person who needs
 // it is looking at the transcript and wondering where the thinking went.
-func reasoningSwitchedOffNotice() []tea.Cmd {
+//
+// Wrapped to the width like the reasoning itself (wrapReasoning). It was one
+// 230-column line, and on the MacBook Air (Terminal.app, 169 columns,
+// 2026-10-23) it ran past the right edge and was cut at "Som".
+func reasoningSwitchedOffNotice(width int) []tea.Cmd {
 	if !config.ExtraEnabled("extras-reasoning-show") ||
 		config.ExtraEnabled("extras-reasoning-generate") {
 		return nil
 	}
 	var cmds []tea.Cmd
 	reasoningOffNoticed.Do(func() {
-		cmds = append(cmds, printLine(styleReasoning(
-			"🦍 no thinking to show — \"Ask the model to think out loud\" is off in "+
-				"/context. \"Show that thinking on screen\" only displays reasoning "+
-				"the model was asked to produce. Some models reason anyway; most do not.")))
+		text := "🦍 no thinking to show: \"Ask the model to think out loud\" is off in " +
+			"/context. \"Show that thinking on screen\" only displays reasoning " +
+			"the model was asked to produce. Some models reason anyway; most do not."
+		for _, line := range wrapReasoning(text, width) {
+			cmds = append(cmds, printLine(styleReasoning(line)))
+		}
 	})
 	return cmds
 }

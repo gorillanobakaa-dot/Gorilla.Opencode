@@ -26,6 +26,11 @@ type term struct {
 	screen     [][]rune // exactly h rows of w cells
 	scrollback []string // rows that scrolled off the top
 	cx, cy     int
+	// lastColumnWrites counts characters written into the last column. On
+	// macOS Terminal.app such a character leaves the cursor in the wrap state
+	// and the next redraw lands off by a row or a column (MacBook Air,
+	// 2026-10-23), so the app must keep it at zero whatever the wrap model.
+	lastColumnWrites int
 }
 
 func newTerm(w, h int) *term {
@@ -71,6 +76,9 @@ func (t *term) clampAfterMove() {
 
 func (t *term) put(r rune) {
 	t.clampAfterMove()
+	if t.cx == t.w-1 {
+		t.lastColumnWrites++
+	}
 	t.screen[t.cy][t.cx] = r
 	t.cx++
 	if t.cx >= t.w {
