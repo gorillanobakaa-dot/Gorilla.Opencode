@@ -51,7 +51,7 @@ func TestAKeylessGrantStillCoversTheTool(t *testing.T) {
 // GORILLA OVERRIDE (2026-10-23): "Allow for session" remembers a class plus a
 // place. A bash class covers the same program and subcommand in the same place
 // with a plain tail, and nothing wider: not another place, not a chained
-// second command (the bash matcher refuses it), not after untrusted content.
+// second command (the bash matcher refuses it).
 func TestAllowForSessionRemembersAClassAndAPlace(t *testing.T) {
 	s := familyService(t)
 	RegisterFamilyMatcher("classtool", func(key, fam string) bool {
@@ -74,11 +74,6 @@ func TestAllowForSessionRemembersAClassAndAPlace(t *testing.T) {
 	chained.Path = "/work"
 	if s.Request(chained) {
 		t.Error("the class covered a chained second command")
-	}
-	MarkTainted("conversation", "web page")
-	t.Cleanup(func() { ClearTaint("conversation") })
-	if s.Request(same) {
-		t.Error("the class covered a request after untrusted content was read")
 	}
 }
 

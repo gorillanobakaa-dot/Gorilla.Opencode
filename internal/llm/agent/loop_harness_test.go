@@ -313,34 +313,10 @@ func TestRefusingOneActionStopsTheOthersSentWithIt(t *testing.T) {
 	}
 }
 
-// AUDIT FINDING 4. A turn that has read something a stranger wrote is marked,
-// and the mark makes the next risky action ask first. Only the person typing a
-// new message may clear it. A helper agent starting is the model acting, not
-// the person.
-//
-// Before v0.1.138 every agent cleared it. Remove the `agentName ==
-// config.AgentCoder` guard in processGeneration and the first half fails.
-func TestOnlyAMessageFromThePersonClearsTheUntrustedContentMark(t *testing.T) {
-	const sess = "tainted-session"
-	t.Cleanup(func() { permission.ClearTaint(sess) })
-
-	helper, _ := newLoopAgent(t, config.AgentTask, &scriptedProvider{script: []reply{{text: "helper done"}}})
-	permission.MarkTainted(sess, "a web page was read")
-	if ev := runTurn(t, helper, sess, "look into it"); ev.Error != nil {
-		t.Fatalf("helper turn failed: %v", ev.Error)
-	}
-	if !permission.IsTainted(sess) {
-		t.Fatal("a helper agent starting cleared the untrusted-content mark; the next action would be auto-approved")
-	}
-
-	coder, _ := newLoopAgent(t, config.AgentCoder, &scriptedProvider{script: []reply{{text: "ok"}}})
-	if ev := runTurn(t, coder, sess, "a new message typed by the person"); ev.Error != nil {
-		t.Fatalf("coder turn failed: %v", ev.Error)
-	}
-	if permission.IsTainted(sess) {
-		t.Error("a new message from the person did not clear the mark; every later action would ask for ever")
-	}
-}
+// AUDIT FINDING 4 (TestOnlyAMessageFromThePersonClearsTheUntrustedContentMark)
+// stood here until 2026-10-23: it tested who may clear the untrusted-content
+// mark. The mark was removed with everything that read it, on the owner's
+// order, so there is nothing left to clear.
 
 // AUDIT FINDING 14, in the loop. A connection that drops closes the stream with
 // neither a completion nor an error. That must end the turn as a failure, not

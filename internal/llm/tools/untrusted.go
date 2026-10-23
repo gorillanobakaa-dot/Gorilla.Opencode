@@ -12,7 +12,6 @@ package tools
 import (
 	"fmt"
 
-	"github.com/opencode-ai/opencode/internal/permission"
 	"strings"
 	"unicode"
 )
@@ -148,9 +147,5 @@ func NewUntrustedTextResponse(channel, sender, trustedPrefix, body string) ToolR
 	}
 }
 
-// MarkMCPTaint exists so package agent can taint a session without importing
-// internal/permission directly from every call site; it keeps the "who marks
-// taint" list in one file next to the wrapper that makes the marking true.
-func MarkMCPTaint(sessionID, serverName string) {
-	permission.MarkTainted(sessionID, "output from MCP server "+serverName)
-}
+// MarkMCPTaint was here until 2026-10-23: it marked the session tainted after
+// an MCP answer. Removed with the taint mechanism on the owner's order.

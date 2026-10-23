@@ -15,7 +15,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
-	"github.com/opencode-ai/opencode/internal/permission"
 )
 
 func TestTheRealFieldkitServerAsALocalServer(t *testing.T) {
@@ -30,8 +29,6 @@ func TestTheRealFieldkitServerAsALocalServer(t *testing.T) {
 	perms := &recordingMCPPermissions{}
 	call := func(session, tool, input string) tools.ToolResponse {
 		t.Helper()
-		permission.ClearTaint(session)
-		t.Cleanup(func() { permission.ClearTaint(session) })
 		ctx := context.WithValue(context.Background(), tools.SessionIDContextKey, session)
 		ctx = context.WithValue(ctx, tools.MessageIDContextKey, "m1")
 		resp, err := NewMcpTool("fieldkit", mcp.Tool{Name: tool}, perms, cfg).Run(ctx,
@@ -42,24 +39,25 @@ func TestTheRealFieldkitServerAsALocalServer(t *testing.T) {
 		return resp
 	}
 
-	// Fieldkit's own words: no egress question, no taint, no fence.
+	// Fieldkit's own words: no egress question, no fence. (The taint mark these
+	// lines also checked was removed on 2026-10-23, owner's order.)
 	resp := call("fk-own", "describe", `{"tool":"academic-refs"}`)
 	if !strings.HasPrefix(resp.Content, "academic-refs:") {
 		t.Fatalf("describe answered %q", resp.Content)
 	}
-	if permission.IsTainted("fk-own") || perms.calls[len(perms.calls)-1].Egress {
+	if strings.Contains(resp.Content, "UNTRUSTED CONTENT BEGINS") || perms.calls[len(perms.calls)-1].Egress {
 		t.Error("Fieldkit's own answer was treated as untrusted or as egress")
 	}
 
-	// A refusal names network=true for a tool that goes online, and taints nothing.
+	// A refusal names network=true for a tool that goes online.
 	resp = call("fk-net", "run", `{"tool":"release-check","inputs":{"spec":"x"}}`)
-	if !strings.Contains(resp.Content, "network=true") || permission.IsTainted("fk-net") {
-		t.Errorf("a network tool without network=true: %q (tainted=%v)", resp.Content, permission.IsTainted("fk-net"))
+	if !strings.Contains(resp.Content, "network=true") {
+		t.Errorf("a network tool without network=true: %q", resp.Content)
 	}
 
-	// Reading someone else's file taints, and the answer is fenced.
-	call("fk-read", "run", `{"tool":"office-read","inputs":{"file":"missing.docx"}}`)
-	if !permission.IsTainted("fk-read") {
-		t.Error("office-read (third-party text) did not taint")
+	// Reading someone else's file: the answer is fenced.
+	resp = call("fk-read", "run", `{"tool":"office-read","inputs":{"file":"missing.docx"}}`)
+	if !strings.Contains(resp.Content, "UNTRUSTED CONTENT BEGINS") {
+		t.Error("office-read (third-party text) was not fenced")
 	}
 }

@@ -215,7 +215,6 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 		if local {
 			return runLocalTool(ctx, c, sessionID, b.mcpName, b.tool.Name, params.Input, declared), nil
 		}
-		tools.MarkMCPTaint(sessionID, b.mcpName)
 		return runTool(ctx, c, b.mcpName, b.tool.Name, params.Input)
 	case config.MCPSse:
 		// GORILLA FIX (2026-08-19): this dialled whatever URL was in config
@@ -234,16 +233,15 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 		if err != nil {
 			return tools.NewTextErrorResponse(err.Error()), nil
 		}
-		tools.MarkMCPTaint(sessionID, b.mcpName)
 		return runTool(ctx, c, b.mcpName, b.tool.Name, params.Input)
 	}
 
 	return tools.NewTextErrorResponse("invalid mcp type"), nil
 }
 
-// runLocalTool is runTool for a server marked "trust": "local": the taint and
-// the untrusted fence are applied only when localAnswerTrusted says so, and the
-// reason is logged when they are.
+// runLocalTool is runTool for a server marked "trust": "local": the untrusted
+// fence is applied only when localAnswerTrusted says so, and the reason is
+// logged when it is. (Until 2026-10-23 a taint mark went with the fence.)
 func runLocalTool(ctx context.Context, c MCPClient, sessionID, serverName, toolName, input string, declared bool) tools.ToolResponse {
 	a := callMCP(ctx, c, toolName, input)
 	if a.failed {
@@ -251,7 +249,6 @@ func runLocalTool(ctx context.Context, c MCPClient, sessionID, serverName, toolN
 	}
 	if ok, why := localAnswerTrusted(a.meta, declared); !ok {
 		logging.Debug("local MCP answer treated as untrusted", "server", serverName, "tool", toolName, "why", why)
-		tools.MarkMCPTaint(sessionID, serverName)
 		return tools.NewUntrustedTextResponse("MCP server", serverName, "", a.text)
 	}
 	if a.isErr {

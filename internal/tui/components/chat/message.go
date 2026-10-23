@@ -254,7 +254,7 @@ func renderAssistantMessage(
 			info = append(info, baseStyle.
 				Width(width-1).
 				Foreground(t.TextMuted()).
-				Render(fmt.Sprintf(" %s (%s)", models.SupportedModels[msg.Model].Name, "permission denied")),
+				Render(fmt.Sprintf(" %s (%s)", models.SupportedModels[msg.Model].Name, "stopped at a permission question")),
 			)
 		}
 	}
@@ -320,7 +320,10 @@ func renderAssistantMessage(
 			case message.FinishReasonCanceled:
 				content = "*Canceled — no answer was produced.*"
 			case message.FinishReasonPermissionDenied:
-				content = "*Permission denied, so nothing was run and no answer was produced.*"
+				// GORILLA FIX (2026-10-23): not always a denial. A question
+				// nobody answered ends here too (MacBook Air, v0.1.150: the
+				// screen said "Permission denied" after a ten-minute timeout).
+				content = "*Stopped at a permission question: it was refused, or nobody answered in time. The tool's result says which; nothing after it was run.*"
 			case message.FinishReasonToolUse:
 				// GORILLA FIX: this is the COMMON case, and it was falling through
 				// to "Finished without output" — which reads like a failure for

@@ -48,49 +48,27 @@ func TestAutoApproveStillCoversOrdinaryWork(t *testing.T) {
 	}
 }
 
-// Egress is the sink. Whatever a hostile page talked the model into, it has to
-// leave the machine to matter.
+// Egress under auto-approve.
 //
-// GORILLA OVERRIDE (2026-10-23): the sink that matters is a NEW place after
-// untrusted content. Until this date every egress asked under auto-approve,
-// so reading the README the person named raised a dialog (MacBook Air,
-// evidence row 2). The same fear is still tested: after a page was read, a
-// host this conversation has not used asks; the host already used does not
-// (evidence row 3, INSTALL.md on the same site).
-func TestAutoApproveDoesNotCoverEgress(t *testing.T) {
+// GORILLA OVERRIDE (2026-10-23, owner's order): auto-approve covers egress,
+// whatever the turn has read. Earlier the same day a new host asked after a
+// web page had been read; before that every egress asked. The owner: "from
+// the source code GET RID OF THAT BULLSHIT ... every bloody 3 seconds there's
+// a dialog." Egress still asks in ask mode and reaches a person in plan mode.
+func TestAutoApproveCoversEgress(t *testing.T) {
 	s := autoApproved(t)
 	denyPrompts(t, s)
-	fetch := func(host string) bool {
-		return s.Request(CreatePermissionRequest{
+	for _, host := range []string{"https://github.com", "https://raw.githubusercontent.com", "https://evil.example"} {
+		if !s.Request(CreatePermissionRequest{
 			SessionID: "conversation",
 			ToolName:  "web_fetch",
 			Action:    "fetch",
 			Path:      config.WorkingDirectory(),
 			GrantKey:  host,
 			Egress:    true,
-		})
-	}
-	if !fetch("https://github.com") {
-		t.Fatal("the first fetch of a turn asked under auto-approve (evidence row 2)")
-	}
-	MarkTainted("conversation", "web page fetched from https://github.com")
-	t.Cleanup(func() { ClearTaint("conversation") })
-	if !fetch("https://github.com") {
-		t.Fatal("a second page on the same site asked after the first was read (evidence row 3)")
-	}
-	if fetch("https://evil.example") {
-		t.Fatal("a fetch to a new place left the machine under YOLO after untrusted content, with no question asked")
-	}
-	// Owner's decision 2026-10-23 (run 3, dialog 1): GitHub's own content
-	// hosts are the same place as github.com. github.io is not.
-	if !fetch("https://raw.githubusercontent.com") {
-		t.Fatal("raw.githubusercontent.com asked after github.com was used; it is GitHub's own host")
-	}
-	if fetch("https://someone.github.io") {
-		t.Fatal("a github.io site counted as GitHub; its owner can see requests")
-	}
-	if fetch("https://raw.githubusercontent.com.evil.example") {
-		t.Fatal("a look-alike host counted as GitHub")
+		}) {
+			t.Errorf("a fetch of %s asked under auto-approve", host)
+		}
 	}
 }
 
@@ -135,37 +113,23 @@ func TestAutoApproveDoesNotCoverPathsOutsideEveryRoot(t *testing.T) {
 	}
 }
 
-// The taint bit is what converts "the model was tricked" into "the model was
-// tricked and could not act on it".
-func TestTaintMakesTheNextActionAsk(t *testing.T) {
+// GORILLA OVERRIDE (2026-10-23, owner's order): this was
+// TestTaintMakesTheNextActionAsk. With the taint mechanism gone, auto-approve
+// covers a shell command and an edit inside the roots, network or not; a path
+// outside the roots still asks.
+func TestAutoApproveCoversWorkInsideTheRoots(t *testing.T) {
 	s := autoApproved(t)
 	denyPrompts(t, s)
-	MarkTainted("conversation", "web page fetched from https://evil.example")
-	t.Cleanup(func() { ClearTaint("conversation") })
-
-	// GORILLA OVERRIDE (2026-10-11, owner decision "B"): a shell command asks;
-	// an edit inside the roots no longer does (it is reviewed in the diff).
-	//
-	// GORILLA OVERRIDE (2026-10-23): a shell command asks when it can reach the
-	// network or run a script (tools.MayReachNetwork); a local one does not.
-	if s.Request(CreatePermissionRequest{
-		SessionID:       "conversation",
-		ToolName:        "bash",
-		Action:          "execute",
-		Path:            config.WorkingDirectory(),
-		GrantKey:        "python3 send.py",
-		MayReachNetwork: true,
-	}) {
-		t.Fatal("a shell command that can reach the network went ahead unasked in a turn that had already read untrusted content")
-	}
-	if !s.Request(CreatePermissionRequest{
-		SessionID: "conversation",
-		ToolName:  "bash",
-		Action:    "execute",
-		Path:      config.WorkingDirectory(),
-		GrantKey:  "mkdir -p build",
-	}) {
-		t.Fatal("a local shell command asked after untrusted content; only the network path should")
+	for _, cmd := range []string{`python3 -c "import urllib.request; print('urllib ok')"`, "scp notes.txt me@host:", "mkdir -p build"} {
+		if !s.Request(CreatePermissionRequest{
+			SessionID: "conversation",
+			ToolName:  "bash",
+			Action:    "execute",
+			Path:      config.WorkingDirectory(),
+			GrantKey:  cmd,
+		}) {
+			t.Errorf("%q asked under auto-approve", cmd)
+		}
 	}
 	if !s.Request(CreatePermissionRequest{
 		SessionID: "conversation",
@@ -174,7 +138,7 @@ func TestTaintMakesTheNextActionAsk(t *testing.T) {
 		Path:      config.WorkingDirectory(),
 		GrantKey:  config.WorkingDirectory() + "/main.go",
 	}) {
-		t.Fatal("an in-project edit asked after untrusted content; decision B lets it through")
+		t.Fatal("an in-project edit asked under auto-approve")
 	}
 	outside := t.TempDir()
 	if s.Request(CreatePermissionRequest{
@@ -184,42 +148,13 @@ func TestTaintMakesTheNextActionAsk(t *testing.T) {
 		Path:      outside,
 		GrantKey:  outside + "/x",
 	}) {
-		t.Fatal("an edit OUTSIDE the roots went ahead unasked in a tainted turn")
+		t.Fatal("an edit OUTSIDE the roots went ahead unasked")
 	}
 }
 
-// A helper session cannot launder untrusted content past the conversation that
-// spawned it: taint is keyed on the session tree root, like grants are.
-func TestTaintInAHelperReachesTheConversation(t *testing.T) {
-	s := autoApproved(t)
-	denyPrompts(t, s)
-	s.RegisterChildSession("helper-a1", "conversation")
-	MarkTainted("helper-a1", "web search results")
-	t.Cleanup(func() { ClearTaint("conversation") })
-
-	if !IsTainted("conversation") {
-		t.Fatal("a helper read untrusted content and the parent conversation did not know")
-	}
-}
-
-// Taint that never cleared would be set permanently after the first web search
-// and every egress would prompt forever — which is how a control gets switched
-// off in practice while still looking present in the source.
-func TestANewUserTurnClearsTaint(t *testing.T) {
-	s := autoApproved(t)
-	denyPrompts(t, s)
-	MarkTainted("conversation", "web page")
-	ClearTaint("conversation")
-
-	if !s.Request(CreatePermissionRequest{
-		SessionID: "conversation",
-		ToolName:  "edit",
-		Action:    "write",
-		Path:      config.WorkingDirectory(),
-	}) {
-		t.Fatal("taint outlived the turn that caused it")
-	}
-}
+// TestTaintInAHelperReachesTheConversation and TestANewUserTurnClearsTaint
+// stood here until 2026-10-23; the taint mechanism they tested was removed on
+// the owner's order.
 
 // GORILLA OVERRIDE (2026-08-19): the carve-outs assume a prompt can be
 // ANSWERED. In a -p run or a cron job there is no TUI subscribed to the
@@ -260,15 +195,14 @@ func TestUnattendedRunsAreNotBlockedByACarveOut(t *testing.T) {
 func TestUnattendedIsOffForAnInteractiveSession(t *testing.T) {
 	s := autoApproved(t)
 	denyPrompts(t, s)
-	MarkTainted("conversation", "web page")
-	t.Cleanup(func() { ClearTaint("conversation") })
 	if s.Request(CreatePermissionRequest{
 		SessionID: "conversation",
-		ToolName:  "web_fetch",
-		Action:    "fetch",
+		ToolName:  "bash",
+		Action:    "execute",
 		Path:      config.WorkingDirectory(),
-		Egress:    true,
+		GrantKey:  "sudo make install",
+		HardStop:  "it runs as the administrator (sudo)",
 	}) {
-		t.Fatal("an interactive session skipped the egress carve-out without SetUnattended")
+		t.Fatal("an interactive session skipped the sudo hard stop without SetUnattended")
 	}
 }

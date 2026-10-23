@@ -17,11 +17,11 @@ import (
 
 // The exact commands from the session, verbatim.
 const (
-	nemoPrefix = `python -c "import sys; sys.path.insert(0, r'C:\Users\gorilla1\Documents\Scripts\Fieldkit'); from fieldkit.cli import main;`
-	nemoHost   = nemoPrefix + ` main(['host'])"`
-	nemoCards  = nemoPrefix + ` main(['cards', 'list'])"`
-	nemoScan   = nemoPrefix + ` main(['privacy', 'scan', r'C:\Users\gorilla1\Documents\Scripts\Fieldkit', '--json'])"`
-	nemoSnap   = nemoPrefix + ` main(['snapshot', 'take', 'test-snap', '--path', r'C:\Users\gorilla1\Documents\Scripts\Fieldkit\fieldkit'])"`
+	nemoPrefix  = `python -c "import sys; sys.path.insert(0, r'C:\Users\gorilla1\Documents\Scripts\Fieldkit'); from fieldkit.cli import main;`
+	nemoHost    = nemoPrefix + ` main(['host'])"`
+	nemoCards   = nemoPrefix + ` main(['cards', 'list'])"`
+	nemoScan    = nemoPrefix + ` main(['privacy', 'scan', r'C:\Users\gorilla1\Documents\Scripts\Fieldkit', '--json'])"`
+	nemoSnap    = nemoPrefix + ` main(['snapshot', 'take', 'test-snap', '--path', r'C:\Users\gorilla1\Documents\Scripts\Fieldkit\fieldkit'])"`
 	nemoPyFirst = `python -m pytest C:\Users\gorilla1\Documents\Scripts\Fieldkit\tests -v --tb=short 2>&1 | Select-Object -First 100`
 	nemoPyLast  = `python -m pytest C:\Users\gorilla1\Documents\Scripts\Fieldkit\tests -v --tb=short 2>&1 | Select-Object -Last 100`
 	nemoPyLine  = `python -m pytest C:\Users\gorilla1\Documents\Scripts\Fieldkit\tests --tb=line -q 2>&1 | Select-Object -Last 50`
@@ -57,17 +57,17 @@ func TestThePytestFamilyCoversThePipedVariants(t *testing.T) {
 
 func TestFallbackSuggestionsAreProgramPlusSubcommand(t *testing.T) {
 	cases := map[string]string{
-		`pip install -e . --quiet`:                "pip install",
-		`go test ./...`:                           "go test",
-		`python -m pytest C:\x\tests -q`:          "python -m pytest",
-		`git log --oneline -5`:                    "git log",
-		`python --version`:                        "", // the only family would be `python`
-		`python`:                                  "",
-		`cd C:\x && python -m fieldkit --help`:    "", // a chain has no plain tail
-		`go test ./... ; python evil.py`:          "",
-		nemoHost:                                  "", // `python -c` alone would be "any code": never proposed unasked
-		`python -c "print(1)"`:                    "",
-		`powershell -Command "Remove-Item x"`:     "",
+		`pip install -e . --quiet`:             "pip install",
+		`go test ./...`:                        "go test",
+		`python -m pytest C:\x\tests -q`:       "python -m pytest",
+		`git log --oneline -5`:                 "git log",
+		`python --version`:                     "", // the only family would be `python`
+		`python`:                               "",
+		`cd C:\x && python -m fieldkit --help`: "", // a chain has no plain tail
+		`go test ./... ; python evil.py`:       "",
+		nemoHost:                               "", // `python -c` alone would be "any code": never proposed unasked
+		`python -c "print(1)"`:                 "",
+		`powershell -Command "Remove-Item x"`:  "",
 	}
 	for cmd, want := range cases {
 		if got := SuggestCommandFamily(cmd, nil); got != want {
@@ -274,7 +274,10 @@ func TestADangerousCommandStillAsksInsideAFamily(t *testing.T) {
 	}
 }
 
-func TestATaintedTurnStillAsksInsideAFamily(t *testing.T) {
+// TestATaintedTurnStillAsksInsideAFamily stood here until 2026-10-23. With the
+// taint mechanism removed on the owner's order, a family keeps covering its
+// commands after a web page was read.
+func TestAFamilyStillCoversAfterAWebPage(t *testing.T) {
 	svc := realPerms(t)
 	prompts := answerPrompts(t, svc, func(p permission.PermissionRequest) {
 		if p.FamilySuggestion != "" {
@@ -292,13 +295,6 @@ func TestATaintedTurnStillAsksInsideAFamily(t *testing.T) {
 	svc.Request(req)
 	if established == 0 || *prompts != established {
 		t.Fatalf("family not established as expected (prompts=%d, established=%d)", *prompts, established)
-	}
-	permission.MarkTainted("conversation", "read https://example.test")
-	t.Cleanup(func() { permission.ClearTaint("conversation") })
-	_, req = bashRequestOn(t, svc, `pip install evilpkg`)
-	svc.Request(req)
-	if *prompts != established+1 {
-		t.Fatalf("after reading untrusted content the next command in the family did not ask (prompts=%d)", *prompts)
 	}
 }
 

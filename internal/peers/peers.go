@@ -22,9 +22,9 @@
 //   - What a message can do: nothing. It is queued as text, shown to the person
 //     at once, and handed to the AI at the start of its next turn inside a fence
 //     that says it is not the user's instruction. No code path leads from a
-//     received message to a permission answer, a setting or a tool call; the
-//     agent also marks the turn as having read untrusted content, so auto-approve
-//     still asks before anything leaves the machine.
+//     received message to a permission answer, a setting or a tool call.
+//     (Until 2026-10-23 the turn was also marked as having read untrusted
+//     content, which made auto-approve ask; that mark was removed.)
 //   - Fail closed: a register entry whose endpoint is not the one this program
 //     would have created for that process is ignored; on Windows a connection is
 //     refused when the process on the other end of the pipe is not the process

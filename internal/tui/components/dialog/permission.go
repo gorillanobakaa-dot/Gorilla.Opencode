@@ -44,6 +44,8 @@ type PermissionDialogCmp interface {
 	tea.Model
 	layout.Bindings
 	SetPermissions(permission permission.PermissionRequest) tea.Cmd
+	// Current is the request on the dialog now.
+	Current() permission.PermissionRequest
 }
 
 type permissionsMapping struct {
@@ -384,7 +386,7 @@ func (p *permissionDialogCmp) renderBashContent() string {
 			if note := tools.BashFamilyNote(pr.Command, fam); note != "" {
 				content += "\n\n" + note
 			}
-			content += "\n\nNever covered by a family: a dangerous command, anything after untrusted content was read, a different path."
+			content += "\n\nNever covered by a family: a dangerous command, a different path."
 			cacheKey = fmt.Sprintf("%s#%d", p.permission.ID, p.familyIdx)
 		}
 
@@ -580,7 +582,7 @@ func (p *permissionDialogCmp) renderCommandDialog() string {
 		if note := tools.BashFamilyNote(pr.Command, f); note != "" {
 			block = append(block, text(t.Warning(), false, note)...)
 		}
-		block = append(block, text(t.TextMuted(), false, "Never covered by a family: a dangerous command, anything after untrusted content was read, a different path.")...)
+		block = append(block, text(t.TextMuted(), false, "Never covered by a family: a dangerous command, a different path.")...)
 		fam = part{3, block}
 	}
 	if purpose != "" {
@@ -783,6 +785,8 @@ func (p *permissionDialogCmp) SetSize() tea.Cmd {
 	}
 	return nil
 }
+
+func (p *permissionDialogCmp) Current() permission.PermissionRequest { return p.permission }
 
 func (p *permissionDialogCmp) SetPermissions(permission permission.PermissionRequest) tea.Cmd {
 	p.permission = permission

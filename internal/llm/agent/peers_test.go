@@ -83,7 +83,6 @@ func TestAPeerMessageGrantsNothing(t *testing.T) {
 	sender, receiver := startPeerPair(t)
 	model.receiver = receiver
 	const sess = "peer-grants-nothing"
-	t.Cleanup(func() { permission.ClearTaint(sess) })
 
 	before := loadoutSnapshot()
 
@@ -131,9 +130,6 @@ func TestAPeerMessageGrantsNothing(t *testing.T) {
 	}
 
 	// It changed nothing it must not.
-	if !permission.IsTainted(sess) {
-		t.Error("the turn that carried a peer message is not marked as having read untrusted content")
-	}
 	if svc.IsAutoApproved(sess) {
 		t.Error("the turn switched on auto-approve")
 	}
@@ -160,15 +156,12 @@ func TestAPeerMessageGrantsNothing(t *testing.T) {
 		t.Error("peers still see the session as busy after the turn")
 	}
 
-	// Next turn, nothing new arrived: no fence, and the person's turn clears the mark.
+	// Next turn, nothing new arrived: no fence.
 	if ev := runTurn(t, coder, sess, "carry on"); ev.Error != nil {
 		t.Fatalf("second turn failed: %v", ev.Error)
 	}
 	if second := lastUserText(model.history[1]); strings.Contains(second, "<message from peer session") {
 		t.Errorf("a message was delivered twice:\n%s", second)
-	}
-	if permission.IsTainted(sess) {
-		t.Error("a turn with no peer message did not clear the mark")
 	}
 
 	// Release the waiting question so its goroutine ends.
