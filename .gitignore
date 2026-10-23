@@ -238,3 +238,7 @@ internal/llm/tools/codereview/dist/
 # inside every published .deb and .rpm), and the Arch recipe lists it as a source.
 # Ignored, it was absent from the repository and the recipe could not build.
 !packaging/setup-searxng.sh
+# GORILLA: exception (2026-10-23) - build-mac-zip.sh is PUBLISHED, for the same reason as the package scripts
+# above: a fresh clone must be able to build every file on the release page, and the Mac zip is one of them.
+# No credentials, no internal paths; it only calls build-darwin-legacy.sh and packs packaging/macos/.
+!/scripts/build-mac-zip.sh

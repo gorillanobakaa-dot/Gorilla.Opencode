@@ -1,3 +1,20 @@
+## v0.1.150 (2026-10-23): a Mac download, a Mac screen that stays clean, readable colours, permission questions that ask less
+
+**Plain-language version:** the program was run on a 2011 MacBook Air with macOS
+10.13, and the owner photographed every fault. The screen filled with copies of
+the input line and the name at the top lost its first letter, because the
+program wrote up to the last column of the window, which the Mac's Terminal
+treats as "go to the next line"; it now leaves that column empty. Answers were a
+faint grey because the program sent colours in a form the old Terminal does not
+know; it now sends the form the terminal says it understands. Help opens with
+"?" on an empty line (or F1), because the old key could not be typed on a Mac.
+The permission questions stop asking about harmless things and show the command
+they ask about. And for the first time the release page has a Mac download: one
+zip, installed with a double-click, nothing outside your home folder.
+
+Full notes: `Changelogs/v0.1.150-release-notes.layman.md` and
+`Changelogs/v0.1.150-release-notes.developer.md`.
+
 ## v0.1.132 (2026-09-03): the Linux build, and what running it for the first time found
 
 **Plain-language version:** version 0.1.130 was the Windows build. It compiled
