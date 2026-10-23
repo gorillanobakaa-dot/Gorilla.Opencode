@@ -124,8 +124,9 @@ APPLESCRIPT
 # Moves the window on tty $1 to bounds $2..$5. With $6 = 1 (Terminal started for
 # this launch) it also closes the empty window Terminal opens at start: one that
 # runs nothing, shows no restored session and holds at most two lines of text.
+# Every other window, what was seen in it and whether it was closed, goes to the log.
 gorilla_mac_place() {
-  osascript - "$@" <<'APPLESCRIPT' >/dev/null 2>>"$GORILLA_WINDOW_LOG"
+  osascript - "$@" <<'APPLESCRIPT' >>"$GORILLA_WINDOW_LOG" 2>&1
 on run argv
   set myTty to item 1 of argv
   set nb to {(item 2 of argv) as integer, (item 3 of argv) as integer, (item 4 of argv) as integer, (item 5 of argv) as integer}
@@ -136,27 +137,41 @@ on run argv
         if tty of t is myTty then set mine to contents of w
       end repeat
     end repeat
-    if mine is missing value then return
+    if mine is missing value then return "placed: no window on " & myTty
     set bounds of mine to nb
-    if item 6 of argv is not "1" then return
+    set report to "placed: " & (count of windows) & " window(s)"
     set mineId to id of mine
-    repeat with w in (windows whose id is not mineId)
+    set others to id of every window whose id is not mineId
+    repeat with wid in others
+      set w to window id (contents of wid)
       set empty to true
+      set seen to ""
       repeat with t in tabs of w
         if busy of t then
           set empty to false
+          set seen to seen & " busy"
         else
           set h to history of t
-          if h contains "Restored session" then set empty to false
+          if h contains "Restored session" then
+            set empty to false
+            set seen to seen & " restored"
+          end if
           set n to 0
           repeat with p in paragraphs of h
             if length of (contents of p) > 0 then set n to n + 1
           end repeat
           if n > 2 then set empty to false
+          set seen to seen & " " & n & " lines"
         end if
       end repeat
-      if empty then close w
+      if empty and item 6 of argv is "1" then
+        close w
+        set report to report & " | window" & seen & ": closed"
+      else
+        set report to report & " | window" & seen & ": kept"
+      end if
     end repeat
+    return report
   end tell
 end run
 APPLESCRIPT
@@ -179,9 +194,13 @@ gorilla_mac_resize() {
 }
 
 # Did Terminal start for this launch? Its process is then less than a minute old.
+# The process ids and age go to the log: on the Air (2026-10-23) a launch right
+# after quitting Terminal still logged "fresh 0".
 gorilla_terminal_fresh() {
-  local et
-  et=$(ps -o etime= -p "$(pgrep -x Terminal | head -n 1)" 2>/dev/null | tr -d ' ')
+  local pids et
+  pids=$(pgrep -x Terminal 2>/dev/null | tr '\n' ' ')
+  et=$(ps -o etime= -p "${pids%% *}" 2>/dev/null | tr -d ' ')
+  echo "terminal pids [$pids] age [$et]" >>"$GORILLA_WINDOW_LOG"
   case "$et" in ''|*-*|*:*:*) return 1 ;; esac
   [ $(( 10#${et%%:*} )) -eq 0 ]
 }
