@@ -709,9 +709,9 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	}
 	// GORILLA FIX (2026-08-19): this returned the page raw. A fetched page is
 	// written by whoever controls that server; it is evidence, never
-	// instruction. MarkTainted is what stops the model acting on it — see
-	// permission.MarkTainted.
-	permission.MarkTainted(sessionID, fmt.Sprintf("web page fetched from %s", target))
+	// instruction, so it is fenced as untrusted text.
+	//
+	// GORILLA OVERRIDE (2026-10-23, owner's order): the taint mark that stood here is gone; it only ever raised permission dialogs. The fence stays: it labels the text for the model and asks nothing.
 	return NewUntrustedTextResponse("web page", target, header, out), nil
 }
 

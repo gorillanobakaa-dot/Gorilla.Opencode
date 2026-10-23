@@ -147,22 +147,22 @@ func TestAFamilyNeverCoversEgress(t *testing.T) {
 	}
 }
 
-func TestAFamilyNeverCoversATaintedTurn(t *testing.T) {
+// TestAFamilyNeverCoversATaintedTurn stood here until 2026-10-23: a family
+// stopped covering anything once the turn had read untrusted content. That
+// refusal went with the taint mechanism, on the owner's order. A family now
+// keeps covering its commands after a web page, as it did before.
+func TestAFamilyStillCoversAfterAWebPage(t *testing.T) {
 	s := familyService(t)
 	grantFamily(s, "fieldkit cards list", "fieldkit cards")
-	MarkTainted("conversation", "read a web page")
-	t.Cleanup(func() { ClearTaint("conversation") })
-	if s.Request(familyReq("fieldkit cards show")) {
-		t.Fatal("a family covered a command raised after the turn read untrusted content")
-	}
-	ClearTaint("conversation")
 	if !s.Request(familyReq("fieldkit cards show")) {
-		t.Fatal("after the taint cleared, the family did not cover the command again")
+		t.Fatal("a family did not cover its own program's next command")
 	}
 }
 
 // With auto-approve on, the carve-outs run first and a family must not undo
 // them: the same request asks exactly as it did before families existed.
+// Since 2026-10-23 the carve-outs are irreversible, hard stop and outside the
+// roots; egress and taint no longer ask under auto-approve.
 func TestUnderAutoApproveAFamilyStillAsksForTheCarveOuts(t *testing.T) {
 	s := familyService(t)
 	s.AutoApproveSession("conversation")
@@ -173,20 +173,12 @@ func TestUnderAutoApproveAFamilyStillAsksForTheCarveOuts(t *testing.T) {
 	if s.Request(r) {
 		t.Error("auto-approve + family covered an irreversible request")
 	}
-	// GORILLA OVERRIDE (2026-10-23): egress and taint ask under auto-approve
-	// only together (a new destination, or a command that can reach the
-	// network, after untrusted content). Both are set here; see mustAskAnyway.
-	MarkTainted("conversation", "read a web page")
-	t.Cleanup(func() { ClearTaint("conversation") })
-	r = familyReq("fieldkit cards upload")
-	r.Egress = true
+	// A hard stop asks; only a grant the person chose for it covers it (a
+	// carve-out falls through to grant matching, it does not deny).
+	r = familyReq("brew install git")
+	r.HardStop = "it installs software for the whole machine"
 	if s.Request(r) {
-		t.Error("auto-approve + family covered egress to a new place after untrusted content")
-	}
-	r = familyReq("fieldkit cards show")
-	r.MayReachNetwork = true // fieldkit is a Python program: tools.MayReachNetwork says so
-	if s.Request(r) {
-		t.Error("auto-approve + family covered a tainted turn")
+		t.Error("auto-approve covered a hard stop no grant covers")
 	}
 }
 

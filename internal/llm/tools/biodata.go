@@ -334,8 +334,8 @@ func (b *bioDataTool) Run(ctx context.Context, call ToolCall) (ToolResponse, err
 	// and web_search fence and taint theirs. A record's free text (a gene
 	// summary, a compound synonym, a structure title) is written by whoever
 	// deposited it: evidence, never instruction.
-	sessionID, _ := GetContextValues(ctx)
-	permission.MarkTainted(sessionID, fmt.Sprintf("%s records for %q", src.label, q))
+	//
+	// GORILLA OVERRIDE (2026-10-23, owner's order): the taint mark that stood here is gone; it only ever raised permission dialogs. The fence stays: it labels the text for the model and asks nothing.
 	return NewUntrustedTextResponse(src.label+" record", target, "", renderBioRecords(src, q, target, parsed, limit)), nil
 }
 

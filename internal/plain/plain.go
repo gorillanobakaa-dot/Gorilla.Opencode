@@ -171,7 +171,10 @@ func (s *Session) turn(ctx context.Context, prompt string) error {
 		// the shell without asking, which is not a decision to make on someone's
 		// behalf.
 		case req := <-perms:
-			s.askPermission(req.Payload)
+			// Only a new question is asked; a DeletedEvent says one was settled.
+			if req.Type == pubsub.CreatedEvent {
+				s.askPermission(req.Payload)
+			}
 
 		case result := <-done:
 			// Drain whatever is still queued so the tail of the reply is not lost

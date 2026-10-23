@@ -1021,6 +1021,16 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Permission
 	case pubsub.Event[permission.PermissionRequest]:
+		// GORILLA FIX (2026-10-23): a DeletedEvent says the question is settled
+		// (answered, timed out or cancelled). Take its dialog down, or drop it
+		// from the queue. A timed-out dialog used to stay on screen and take an
+		// Allow that reached nobody (MacBook Air, v0.1.150).
+		if msg.Type == pubsub.DeletedEvent {
+			// Two statements: in `return a, a.settlePermission(...)` the copy
+			// of a is taken before the call changes it.
+			cmd := a.settlePermission(msg.Payload.ID)
+			return a, cmd
+		}
 		// GORILLA FIX (2026-08-23): QUEUE, do not overwrite.
 		//
 		// This used to be an unconditional SetPermissions, and the dialog holds
@@ -2822,6 +2832,27 @@ func (a appModel) placeOverlay(overlay, bg string) string {
 // to", with a grey block beside and below the box (screenshots air-2026-10-23
 // 015446, 015712, 021438). Reproduced headlessly in
 // TestThePermissionDialogLeavesTheRowsAroundItAlone.
+// settlePermission removes a settled question: from the queue, or from the
+// screen, showing the next queued one if there is one.
+func (a *appModel) settlePermission(id string) tea.Cmd {
+	for i, p := range a.permissionQueue {
+		if p.ID == id {
+			a.permissionQueue = append(a.permissionQueue[:i], a.permissionQueue[i+1:]...)
+			return nil
+		}
+	}
+	if !a.showPermissions || a.permissions.Current().ID != id {
+		return nil
+	}
+	if len(a.permissionQueue) > 0 {
+		next := a.permissionQueue[0]
+		a.permissionQueue = a.permissionQueue[1:]
+		return a.permissions.SetPermissions(next)
+	}
+	a.showPermissions = false
+	return nil
+}
+
 // placePermissionDialog draws the permission dialog: no shadow (see below).
 func (a appModel) placePermissionDialog(overlay, bg string) string {
 	return a.placeOverlayShadow(overlay, bg, false)

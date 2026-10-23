@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -134,8 +135,6 @@ func runFakeServer(t *testing.T, session, trust, meta, input string) (tools.Tool
 	if _, err := config.Load(t.TempDir(), false); err != nil {
 		t.Fatalf("config.Load: %v", err)
 	}
-	permission.ClearTaint(session)
-	t.Cleanup(func() { permission.ClearTaint(session) })
 	perms := &recordingMCPPermissions{}
 	cfg := config.MCPServer{Type: config.MCPStdio, Command: os.Args[0], Trust: trust,
 		Args: []string{"-test.run=^TestFakeLocalMCPServer$"}, Env: []string{"GORILLA_FAKE_MCP_META=" + meta}}
@@ -152,13 +151,15 @@ func runFakeServer(t *testing.T, session, trust, meta, input string) (tools.Tool
 	return resp, perms
 }
 
-func TestALocalServersOwnAnswerNeitherAsksAsEgressNorTaints(t *testing.T) {
+// The taint mark these tests also checked was removed on 2026-10-23 (owner's
+// order). What a local server's labels still decide: whether the answer is
+// fenced as untrusted text, and whether the call asks as egress.
+func fenced(content string) bool { return strings.Contains(content, "UNTRUSTED CONTENT BEGINS") }
+
+func TestALocalServersOwnAnswerIsNeitherEgressNorFenced(t *testing.T) {
 	resp, perms := runFakeServer(t, "local-own", "local", `{"untrusted":false,"egress":false}`, `{"tool":"academic-refs"}`)
 	if perms.calls[0].Egress {
 		t.Error("a local call that did not declare the network was treated as egress")
-	}
-	if permission.IsTainted("local-own") {
-		t.Error("an answer labelled as the server's own tainted the session")
 	}
 	if resp.Content != "answer from the fake server" {
 		t.Errorf("own answer was wrapped or changed: %q", resp.Content)
@@ -166,37 +167,34 @@ func TestALocalServersOwnAnswerNeitherAsksAsEgressNorTaints(t *testing.T) {
 }
 
 func TestALocalCallThatDeclaresTheNetworkIsEgress(t *testing.T) {
-	_, perms := runFakeServer(t, "local-net", "local", `{"untrusted":false,"egress":true}`,
+	resp, perms := runFakeServer(t, "local-net", "local", `{"untrusted":false,"egress":true}`,
 		`{"tool":"jobs-search","network":true}`)
 	if !perms.calls[0].Egress {
 		t.Error("a call declaring network=true must ask as egress")
 	}
-	if permission.IsTainted("local-net") {
-		t.Error("an honest, own answer after a declared network call tainted the session")
+	if fenced(resp.Content) {
+		t.Error("an honest, own answer after a declared network call was fenced")
 	}
 }
 
-func TestALocalAnswerWithOtherPeoplesTextTaints(t *testing.T) {
+func TestALocalAnswerWithOtherPeoplesTextIsFenced(t *testing.T) {
 	resp, _ := runFakeServer(t, "local-third", "local", `{"untrusted":true,"egress":false}`, `{"tool":"office-read"}`)
-	if !permission.IsTainted("local-third") {
-		t.Error("an answer labelled untrusted did not taint")
-	}
 	if resp.Content == "answer from the fake server" {
 		t.Error("an untrusted answer was not fenced")
 	}
 }
 
 func TestALocalServerThatSendsNoLabelsIsTreatedAsToday(t *testing.T) {
-	runFakeServer(t, "local-none", "local", "none", `{"tool":"x"}`)
-	if !permission.IsTainted("local-none") {
-		t.Error("an answer with no _meta skipped the taint")
+	resp, _ := runFakeServer(t, "local-none", "local", "none", `{"tool":"x"}`)
+	if !fenced(resp.Content) {
+		t.Error("an answer with no _meta skipped the fence")
 	}
 }
 
 func TestALocalServerThatLiesAboutGoingOnlineLosesTheBenefit(t *testing.T) {
-	runFakeServer(t, "local-liar", "local", `{"untrusted":false,"egress":true}`, `{"tool":"x"}`)
-	if !permission.IsTainted("local-liar") {
-		t.Error("undeclared egress did not taint")
+	resp, _ := runFakeServer(t, "local-liar", "local", `{"untrusted":false,"egress":true}`, `{"tool":"x"}`)
+	if !fenced(resp.Content) {
+		t.Error("undeclared egress did not fence the answer")
 	}
 }
 
@@ -204,9 +202,6 @@ func TestAServerNotMarkedLocalIsAsStrictAsBefore(t *testing.T) {
 	resp, perms := runFakeServer(t, "plain", "", `{"untrusted":false,"egress":false}`, `{"tool":"x"}`)
 	if !perms.calls[0].Egress {
 		t.Error("an unmarked server lost its egress question")
-	}
-	if !permission.IsTainted("plain") {
-		t.Error("an unmarked server's answer did not taint")
 	}
 	if resp.Content == "answer from the fake server" {
 		t.Error("an unmarked server's answer was not fenced")
@@ -234,7 +229,6 @@ func TestOwnerListedReadOnlyToolsRunWithoutAsking(t *testing.T) {
 			t.Fatalf("config.Load: %v", err)
 		}
 		session := "ro-" + c.name
-		permission.ClearTaint(session)
 		perms := &recordingMCPPermissions{}
 		cfg := config.MCPServer{Type: config.MCPStdio, Command: os.Args[0], Trust: c.trust,
 			ReadOnlyTools: []string{"discover", "describe"},
@@ -249,6 +243,5 @@ func TestOwnerListedReadOnlyToolsRunWithoutAsking(t *testing.T) {
 		if asked := len(perms.calls) > 0; asked != c.asks {
 			t.Errorf("%s: asked=%v, want %v", c.name, asked, c.asks)
 		}
-		permission.ClearTaint(session)
 	}
 }

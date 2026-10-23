@@ -77,13 +77,6 @@ func TestAcceptEditsApprovesEditsInsideTheRootsOnly(t *testing.T) {
 	if s.Request(outside) {
 		t.Error("an edit outside every workspace root was approved under accept-edits")
 	}
-	// Owner decision "B": an in-project edit still goes through after
-	// untrusted content; a shell command does not.
-	MarkTainted("conversation", "read a web page")
-	t.Cleanup(func() { ClearTaint("conversation") })
-	if !s.Request(editReq()) {
-		t.Error("an in-project edit in a tainted turn asked under accept-edits (decision B)")
-	}
 }
 
 func TestPlanModeRefusesWithoutAskingButStillAsksForTheWeb(t *testing.T) {
@@ -117,20 +110,22 @@ func TestAutoModeIsYoloForEverySessionWithTheSameCarveOuts(t *testing.T) {
 	if s.Request(r) {
 		t.Error("auto approved an irreversible command")
 	}
-	// GORILLA OVERRIDE (2026-10-23): a web read on its own runs under auto;
-	// after untrusted content, a place not used before asks.
+	// GORILLA OVERRIDE (2026-10-23, owner's order): web reads run under auto,
+	// to any host, whatever the turn has read.
 	web := CreatePermissionRequest{SessionID: "conversation", ToolName: "web_fetch", Action: "fetch",
 		Path: config.WorkingDirectory(), GrantKey: "https://example.test", Egress: true}
 	if !s.Request(web) {
 		t.Error("auto asked for an ordinary web read")
 	}
-	MarkTainted("conversation", "web page fetched from https://example.test")
-	t.Cleanup(func() { ClearTaint("conversation") })
 	web.GrantKey = "https://evil.example"
-	if s.Request(web) {
-		t.Error("auto approved a new destination after untrusted content")
+	if !s.Request(web) {
+		t.Error("auto asked for a web read to another host")
 	}
-	ClearTaint("conversation")
+	sudo := bashReq()
+	sudo.HardStop = "it runs as the administrator (sudo)"
+	if s.Request(sudo) {
+		t.Error("auto approved sudo")
+	}
 	outside := editReq()
 	outside.Path = t.TempDir()
 	if s.Request(outside) {

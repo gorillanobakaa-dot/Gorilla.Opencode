@@ -335,7 +335,7 @@ func (s *Server) prompt(ctx context.Context, raw json.RawMessage) (any, error) {
 				st.render(ev.Payload)
 			}
 		case req := <-perms:
-			if req.Payload.SessionID == as.id {
+			if req.Payload.SessionID == as.id && req.Type == pubsub.CreatedEvent {
 				// The tool call that asks is announced before its question:
 				// both arrive at once and Go's select has no preference.
 				st.drain(msgs)

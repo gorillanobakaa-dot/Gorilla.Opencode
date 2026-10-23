@@ -251,9 +251,6 @@ type bashVerdict struct {
 	// HardStop is why auto-approve still asks (sudo, a system-wide install),
 	// or "". See commandclass.go.
 	HardStop string
-	// MayReachNetwork: the command can send data off the machine or run code
-	// that can. Only consulted in a turn that read untrusted content.
-	MayReachNetwork bool
 }
 
 func bashGateVerdict(command string) bashVerdict {
@@ -264,7 +261,6 @@ func bashGateVerdict(command string) bashVerdict {
 	v.ReadOnly = IsSafeReadOnly(command, readOnlyList())
 	if !v.ReadOnly {
 		v.HardStop = HardStopIn(command)
-		v.MayReachNetwork = MayReachNetwork(command)
 	}
 	// GORILLA OVERRIDE (2026-10-04): a command that cannot be taken back says so
 	// in the prompt, is never treated as read-only, and is asked about even
@@ -312,7 +308,6 @@ func (b *bashTool) bashPermissionRequest(sessionID, command string, v bashVerdic
 		Description:      v.Description,
 		Irreversible:     v.Irreversible,
 		HardStop:         v.HardStop,
-		MayReachNetwork:  v.MayReachNetwork,
 		SessionClass:     class,
 		FamilySuggestion: family,
 		Params: BashPermissionsParams{

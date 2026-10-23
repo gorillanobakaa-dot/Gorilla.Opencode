@@ -5,9 +5,9 @@
 // send_message goes through the permission service like any tool that acts
 // outside the conversation: the person is asked, per recipient, with the whole
 // text on the dialog, and the call is on the receipt. It is not marked Egress:
-// nothing leaves the machine. Auto-approve therefore covers it, except on a
-// turn that has read untrusted content (a web page, a search, an MCP result, or
-// a message from another session), where mustAskAnyway asks regardless.
+// nothing leaves the machine. Auto-approve therefore covers it. (Until
+// 2026-10-23 a turn that had read untrusted content asked regardless; that
+// rule was removed on the owner's order.)
 //
 // The descriptions are deliberately short: both ride every turn while the
 // /context row is on, and schema_cost_test.go holds the total to account.

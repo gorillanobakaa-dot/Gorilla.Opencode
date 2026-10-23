@@ -19,9 +19,10 @@ package config
 //	              is told to describe the plan instead. Web reads still ask.
 //	auto          what /yolo did for one conversation, for every
 //	              conversation — with the same carve-outs /yolo always had
-//	              (permission.mustAskAnyway): an irreversible command, a
-//	              request that leaves the machine after the turn read
-//	              untrusted content, a path outside every workspace root.
+//	              (permission.mustAskAnyway): an irreversible command, sudo
+//	              or an install for the whole machine, a path outside every
+//	              workspace root. (Until 2026-10-23 also a request leaving the
+//	              machine after the turn read untrusted content; removed.)
 //
 // The mode is shown in the status bar on every frame while it is not "ask",
 // for the same reason /yolo was. Who else can act through this: nobody new —
@@ -108,7 +109,7 @@ func PermissionModeLayman(mode string) string {
 	case PermissionPlan:
 		return "read-only: nothing is changed or run; the AI describes what it would do"
 	case PermissionAuto:
-		return "approved without asking, except an irreversible command, a request that leaves the machine after untrusted content was read, or a path outside your workspace"
+		return "approved without asking, except an irreversible command, sudo or an install for the whole computer, or a path outside your workspace"
 	}
 	return "every change asks once; answer \"allow for session\" or \"allow family\" to stop repeats"
 }
@@ -119,7 +120,7 @@ func init() {
 		Group: GroupConversation,
 		Name:  "Permission mode",
 		Layman: "How much the AI may do before asking you. ask: every change asks. accept-edits: file edits in your project are approved, commands and the web still ask. " +
-			"plan: read-only, the AI describes instead of doing. auto: approved without asking, except an irreversible command, a request that leaves the machine after untrusted content was read, or a path outside your workspace. " +
+			"plan: read-only, the AI describes instead of doing. auto: approved without asking, except an irreversible command, sudo or an install for the whole computer, or a path outside your workspace. " +
 			"Shift+Tab cycles through them; /mode sets one by name. Shown in the status bar whenever it is not \"ask\".",
 		Kind:    KindEnum,
 		Default: PermissionAsk,

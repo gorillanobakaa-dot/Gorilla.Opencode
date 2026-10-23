@@ -542,39 +542,19 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 	// GORILLA (2026-10-10): messages from other sessions open the user's turn,
 	// fenced as text from another program that grants nothing. A new variable,
 	// not a reassignment of content: the title goroutine above reads content.
-	var peerBlock, peerTaint string
+	var peerBlock string
 	var peerMsgs []peers.Message
 	if a.agentName == config.AgentCoder {
-		peerBlock, peerTaint, peerMsgs = takePeerMessages()
+		peerBlock, peerMsgs = takePeerMessages()
 	}
 	userMsg, err := a.createUserMessage(ctx, sessionID, withPeerBlock(peerBlock, content), attachmentParts)
 	if err != nil {
 		requeuePeerMessages(peerMsgs)
 		return a.err(fmt.Errorf("failed to create user message: %w", err))
 	}
-	// GORILLA FIX (2026-08-19): a new user turn clears the taint bit.
-	//
-	// The user typing IS the trust boundary — they have seen what the last
-	// turn did and are asking for the next thing. Taint that never cleared
-	// would be permanently set after the first web search, every egress would
-	// prompt forever, and a prompt that always fires is a prompt nobody reads.
-	// That is how a control gets switched off in practice while still looking
-	// present in the source. See internal/permission/taint.go.
-	//
-	// GORILLA FIX (2026-10-05): ... and ONLY the user typing. This line ran for
-	// every agent, and ClearTaint resolves a helper's session to its root. So a
-	// page that had tainted the turn only had to get the model to start a helper
-	// (the agent tool, or research) and the root's taint was wiped: the next
-	// action was auto-approved without the "this turn has read untrusted
-	// content" prompt. A helper starting is the model acting, not the person.
-	if a.agentName == config.AgentCoder {
-		permission.ClearTaint(sessionID)
-		// GORILLA (2026-10-10): ... unless this turn opens with a message from
-		// another session. The person typed, but the fenced text above their
-		// words was written by another program, so the turn starts tainted and
-		// auto-approve still asks before anything leaves the machine.
-		markPeerTaint(sessionID, peerTaint)
-	}
+	// The taint bit that was cleared here at each new user turn (2026-08-19,
+	// 2026-10-05, 2026-10-10) was removed on 2026-10-23 on the owner's order,
+	// with everything that read it.
 	// Same boundary, same reason: the person has seen the last turn. Whatever
 	// the model repeated then is not held against what they ask for now.
 	stuck.Reset(sessionID)
@@ -728,6 +708,9 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 	// call that was cancelled or refused stays false. See aftertool.go.
 	ran := make([]bool, len(toolCalls))
 	stuckStop := ""
+	// deniedStop: a refusal that ends the turn (not a person's Deny); the
+	// message is marked finished once the tool results are stored.
+	deniedStop := false
 	for i, toolCall := range toolCalls {
 		select {
 		case <-ctx.Done():
@@ -885,6 +868,12 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 					if msg := toolErr.Error(); len(msg) > len("permission denied") {
 						denied = strings.ToUpper(msg[:1]) + msg[1:]
 					}
+					// GORILLA FIX (2026-10-23): a question nobody answered is
+					// not a refusal by the person. The Air showed "Permission
+					// denied" after a ten-minute timeout nobody had seen.
+					if permission.TakeNoAnswer(sessionID) {
+						denied = permission.NoAnswerResult()
+					}
 					toolResults[i] = message.ToolResult{
 						ToolCallID: toolCall.ID,
 						Content:    denied,
@@ -897,7 +886,13 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 							IsError:    true,
 						}
 					}
-					a.finishMessage(ctx, &assistantMsg, message.FinishReasonPermissionDenied)
+					// GORILLA FIX (2026-10-23): the message is marked finished
+					// AFTER the tool results are stored (see below out:). Marking
+					// it first let the inline printer, which prints a
+					// permission-denied message at once, bake the unanswered
+					// call in as "Waiting for response..." for good (MacBook
+					// Air, v0.1.150, more than six minutes on screen).
+					deniedStop = true
 					// GORILLA FIX (2026-10-05): this was a bare `break`. It sits
 					// inside `select { default: }`, so it left the SELECT and the
 					// loop went on: the calls just marked "canceled by user" were
@@ -963,6 +958,9 @@ out:
 	})
 	if err != nil {
 		return assistantMsg, nil, fmt.Errorf("failed to create cancelled tool message: %w", err)
+	}
+	if deniedStop {
+		a.finishMessage(context.Background(), &assistantMsg, message.FinishReasonPermissionDenied)
 	}
 	if stuckStop != "" {
 		// The results are already stored, so the history is whole and the
