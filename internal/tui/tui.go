@@ -2761,6 +2761,24 @@ func clampToWidth(view string, width int) string {
 // rows the frame itself drew. That is the whole reason dialogs no longer switch
 // to the alternate screen — see bufferCmd in overlay_state.go.
 func (a appModel) placeOverlay(overlay, bg string) string {
+	return a.placeOverlayShadow(overlay, bg, true)
+}
+
+// placeOverlayShadow is placeOverlay with the drop shadow chosen by the caller.
+//
+// GORILLA FIX (2026-10-23): the permission dialog is drawn WITHOUT a shadow.
+// The shadow is one row taller and one column wider than the dialog, and in
+// the inline (scrollback) layout that extra row lands on the first real row
+// under the dialog: on the MacBook Air the rows behind it read "Waiting for
+// to", with a grey block beside and below the box (screenshots air-2026-10-23
+// 015446, 015712, 021438). Reproduced headlessly in
+// TestThePermissionDialogLeavesTheRowsAroundItAlone.
+// placePermissionDialog draws the permission dialog: no shadow (see below).
+func (a appModel) placePermissionDialog(overlay, bg string) string {
+	return a.placeOverlayShadow(overlay, bg, false)
+}
+
+func (a appModel) placeOverlayShadow(overlay, bg string, shadow bool) string {
 	oh := lipgloss.Height(overlay)
 
 	width := a.width
@@ -2778,7 +2796,7 @@ func (a appModel) placeOverlay(overlay, bg string) string {
 		// dialog in a canvas the footer already occupies and draw over it, taking
 		// the prompt and the session numbers off screen for as long as the dialog
 		// was up.
-		return layout.PlaceOverlay(col, 0, overlay, strings.Repeat("\n", oh)+bg, true)
+		return layout.PlaceOverlay(col, 0, overlay, strings.Repeat("\n", oh)+bg, shadow)
 	}
 
 	// On the alternate screen the canvas is already a whole screen, so the
@@ -2787,7 +2805,7 @@ func (a appModel) placeOverlay(overlay, bg string) string {
 	if row < 0 {
 		row = 0
 	}
-	return layout.PlaceOverlay(col, row, overlay, bg, true)
+	return layout.PlaceOverlay(col, row, overlay, bg, shadow)
 }
 
 func (a appModel) View() string {
@@ -3037,7 +3055,7 @@ func (a appModel) view() string {
 	// Pinned by TestBlockingOverlaysAreDrawnInReverseKeyOrder.
 	if a.showPermissions {
 		overlay := a.permissions.View()
-		appView = a.placeOverlay(overlay, appView)
+		appView = a.placePermissionDialog(overlay, appView)
 	}
 
 	if a.showQuit {

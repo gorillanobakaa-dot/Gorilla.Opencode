@@ -634,9 +634,14 @@ func (p *permissionDialogCmp) renderCommandDialog() string {
 	body = append(body, "")
 	body = append(body, buttons...)
 
+	// GORILLA FIX (2026-10-23): an ASCII border. On the MacBook Air the rounded
+	// box drew its top edge offset from the sides, with a stray bar and a
+	// doubled corner. Box-drawing glyphs are East Asian Ambiguous width (1 or
+	// 2 columns depending on the terminal); + - | are always 1. CLAUDE.md
+	// rule 4a.
 	return base.
 		Padding(1, 0, 0, 1).
-		Border(lipgloss.RoundedBorder()).
+		Border(lipgloss.ASCIIBorder()).
 		BorderBackground(styles.PanelBackground()).
 		BorderForeground(t.TextMuted()).
 		Width(p.width).
