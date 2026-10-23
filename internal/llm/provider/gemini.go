@@ -224,7 +224,7 @@ func (g *geminiClient) send(ctx context.Context, messages []message.Message, too
 				return nil, retryErr
 			}
 			if retry {
-				logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, retryCeiling()), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+				logging.WarnPersist(geminiRetryNotice(err, attempts), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
 					return nil, ctx.Err()
@@ -334,7 +334,7 @@ func (g *geminiClient) stream(ctx context.Context, messages []message.Message, t
 						return
 					}
 					if retry {
-						logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, retryCeiling()), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+						logging.WarnPersist(geminiRetryNotice(err, attempts), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 						select {
 						case <-ctx.Done():
 							if ctx.Err() != nil {
@@ -457,6 +457,16 @@ func (g *geminiClient) shouldRetry(attempts int, err error) (bool, int64, error)
 	// So we'll check the error message for rate limit indicators
 	if errors.Is(err, io.EOF) {
 		return false, 0, err
+	}
+
+	// GORILLA FIX (2026-10-23): a transient Google server error (500, 502,
+	// 503, 504, "internal error", "unavailable") is retried too, at most
+	// googleServerRetries times. See serverretry.go.
+	if _, ok := geminiServerError(err); ok {
+		if attempts > googleServerRetries {
+			return false, 0, fmt.Errorf("Google server error still there after %d retries: %w", googleServerRetries, err)
+		}
+		return true, int64(serverRetryWait(attempts) / time.Millisecond), nil
 	}
 
 	errMsg := err.Error()
@@ -607,4 +617,28 @@ func contains(s string, substrs ...string) bool {
 		}
 	}
 	return false
+}
+
+// geminiServerError reports whether err is a transient Google server error,
+// and its HTTP status when the SDK gives one.
+func geminiServerError(err error) (int, bool) {
+	var apiErr genai.APIError
+	if errors.As(err, &apiErr) {
+		if isTransientServerStatus(apiErr.Code) {
+			return apiErr.Code, true
+		}
+		if isTransientServerText(apiErr.Status + " " + apiErr.Message) {
+			return apiErr.Code, true
+		}
+		return 0, false
+	}
+	return 0, isTransientServerText(err.Error())
+}
+
+// geminiRetryNotice is the on-screen line before retry number attempts.
+func geminiRetryNotice(err error, attempts int) string {
+	if code, ok := geminiServerError(err); ok {
+		return serverRetryNotice(code, attempts)
+	}
+	return fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, retryCeiling())
 }
