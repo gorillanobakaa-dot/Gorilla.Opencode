@@ -16,7 +16,10 @@ export GOTOOLCHAIN=local   # a toolchain switch would bypass the patched GOROOT
 SRC_GOROOT="$(go env GOROOT)"
 case "$(go env GOVERSION)" in go1.24.*) ;; *) echo "warn: patch written against go1.24.x, have $(go env GOVERSION); anchors are checked" >&2 ;; esac
 
-rm -rf "$GR" && mkdir -p "$WORK" && cp -a "$SRC_GOROOT" "$GR" && chmod -R u+w "$GR/src/crypto/x509/internal/macos"
+# -L follows symlinks: Debian's GOROOT (/usr/lib/go-1.24) holds relative links
+# (src, api, lib, misc -> ../../share/go-1.24/...) that no longer resolve once
+# copied under $WORK (2026-10-23). BSD cp takes the last of -P/-L, so -aL works there too.
+rm -rf "$GR" && mkdir -p "$WORK" && cp -aL "$SRC_GOROOT" "$GR" && chmod -R u+w "$GR/src/crypto/x509/internal/macos"
 M="$GR/src/crypto/x509/internal/macos"
 python3 -I - "$M/security.go" "$M/security.s" <<'PY'
 import sys
@@ -80,14 +83,27 @@ mkdir -p "$(dirname "$OUT")"
 GOROOT="$GR" CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 \
   "$GR/bin/go" build "${BUILD_ARGS[@]}" -trimpath -ldflags="-s -w -X github.com/opencode-ai/opencode/internal/version.Version=v${VERSION:?set VERSION, e.g. VERSION=0.1.147}" -o "$OUT" .
 
-# Verify: the 10.14+ symbol is gone and no macOS 12+ chained-fixups load command exists.
-if grep -aq '_SecTrustEvaluateWithError' "$OUT"; then echo "FAIL: binary still imports SecTrustEvaluateWithError" >&2; exit 1; fi
+# Verify: the 10.14+ import is gone and no macOS 12+ chained-fixups load command exists.
+# The import names are read from __LINKEDIT (symbol table and bind info) only: a grep
+# of the whole file also hit the project's LESSONS, embedded in __TEXT, which quote
+# "Symbol not found: _SecTrustEvaluateWithError", and failed every good binary
+# (2026-10-23). _SecTrustEvaluate, which the patched Go still imports, must be found
+# there, or this check is not reading the import names at all.
+# internal/version/darwin_build_check_test.go runs this block on fake binaries.
 python3 -I - "$OUT" <<'PY'
 import struct, sys
-d = open(sys.argv[1], 'rb').read(); n = struct.unpack_from('<I', d, 16)[0]; o = 32
+d = open(sys.argv[1], 'rb').read()
+if len(d) < 32 or struct.unpack_from('<I', d, 0)[0] != 0xfeedfacf: sys.exit("FAIL: not a 64-bit Mach-O file")
+n = struct.unpack_from('<I', d, 16)[0]; o = 32; link = None
 for _ in range(n):
     c, sz = struct.unpack_from('<II', d, o)
     if c == 0x80000034: sys.exit("FAIL: LC_DYLD_CHAINED_FIXUPS present (needs macOS 12)")
+    if c == 0x19 and d[o + 8:o + 24].rstrip(b'\0') == b'__LINKEDIT':
+        off, size = struct.unpack_from('<QQ', d, o + 40)
+        link = d[off:off + size]
     o += sz
+if link is None: sys.exit("FAIL: no __LINKEDIT segment")
+if b'_SecTrustEvaluateWithError\0' in link: sys.exit("FAIL: binary still imports SecTrustEvaluateWithError (needs macOS 10.14)")
+if b'_SecTrustEvaluate\0' not in link: sys.exit("FAIL: no _SecTrustEvaluate in __LINKEDIT: the import names were not found")
 PY
 echo "OK: $OUT"
