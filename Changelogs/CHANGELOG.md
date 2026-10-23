@@ -1,3 +1,18 @@
+## v0.1.151 (2026-10-23): "auto" works on its own, an unanswered question is said plainly, Google server errors are retried
+
+**Plain-language version:** with "auto" on, the program used to keep stopping to
+ask before harmless commands once it had read any web page. That rule is gone;
+"auto" still stops before anything that cannot be undone, before administrator
+commands and before writing outside your folder. On the MacBook Air an install
+test that asked 33 questions now asks none. A question nobody answers is taken
+off the screen after ten minutes and the program says nobody answered, instead
+of "Permission denied" and a screen that never moves again. A passing error
+from Google's servers is tried again up to four times instead of ending the
+answer.
+
+Full notes: `Changelogs/v0.1.151-release-notes.layman.md` and
+`Changelogs/v0.1.151-release-notes.developer.md`.
+
 ## v0.1.150 (2026-10-23): a Mac download, a Mac screen that stays clean, readable colours, permission questions that ask less
 
 **Plain-language version:** the program was run on a 2011 MacBook Air with macOS
