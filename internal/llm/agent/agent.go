@@ -680,9 +680,19 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 	// Process each event in the stream.
 	for event := range eventChan {
 		clock.see(event)
+		// The speed is noted BEFORE processEvent: its TrackUsage publishes the
+		// session update that redraws the status bar, and a speed noted after
+		// it reached the bar only on the next redraw (seen on screen, v0.1.152
+		// release picture).
+		var speed *message.Speed
+		if event.Type == provider.EventComplete && event.Response != nil {
+			s := clock.speed(event.Response.Usage)
+			noteLastSpeed(sessionID, s)
+			speed = &s
+		}
 		processErr := a.processEvent(ctx, sessionID, &assistantMsg, event)
-		if processErr == nil && event.Type == provider.EventComplete && event.Response != nil {
-			a.recordSpeed(ctx, sessionID, &assistantMsg, clock.speed(event.Response.Usage))
+		if processErr == nil && speed != nil {
+			a.recordSpeed(ctx, sessionID, &assistantMsg, *speed)
 		}
 		if processErr != nil {
 			// GORILLA FIX: do NOT relabel a provider failure as "canceled".

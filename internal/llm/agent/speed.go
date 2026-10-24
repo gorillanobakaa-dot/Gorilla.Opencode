@@ -79,10 +79,15 @@ func LastSpeed(sessionID string) (message.Speed, bool) {
 	return s, ok
 }
 
-func (a *agent) recordSpeed(ctx context.Context, sessionID string, msg *message.Message, s message.Speed) {
+// noteLastSpeed keeps the newest call's speed for the status bar.
+func noteLastSpeed(sessionID string, s message.Speed) {
 	lastSpeedMu.Lock()
 	lastSpeed[sessionID] = s
 	lastSpeedMu.Unlock()
+}
+
+// recordSpeed stores the speed on the finished answer.
+func (a *agent) recordSpeed(ctx context.Context, sessionID string, msg *message.Message, s message.Speed) {
 	msg.SetSpeed(s)
 	if err := a.messages.Update(ctx, *msg); err != nil {
 		logging.Warn("could not store the call's speed", "err", err)

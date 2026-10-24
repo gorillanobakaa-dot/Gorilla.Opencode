@@ -1,11 +1,62 @@
 package agent
 
 import (
+	"context"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/provider"
+	"github.com/opencode-ai/opencode/internal/message"
+	"github.com/opencode-ai/opencode/internal/session"
 )
+
+// sessionsSeeingSpeed records, at every session save, whether the status bar
+// would already find a speed: a save is what redraws the bar.
+type sessionsSeeingSpeed struct {
+	memSessions
+	seenMu     sync.Mutex
+	savedWith  int
+	savedTotal int
+}
+
+func (s *sessionsSeeingSpeed) Save(ctx context.Context, sess session.Session) (session.Session, error) {
+	s.seenMu.Lock()
+	s.savedTotal++
+	if _, ok := LastSpeed(sess.ID); ok {
+		s.savedWith++
+	}
+	s.seenMu.Unlock()
+	return s.memSessions.Save(ctx, sess)
+}
+
+// Seen on the v0.1.152 release picture: the speed was under the answer but
+// not in the status bar, because it was noted after the save that redraws it.
+func TestTheStatusBarHasTheSpeedWhenTheSessionIsSaved(t *testing.T) {
+	p := &scriptedProvider{script: []reply{{text: "hello there"}}}
+	a, store := newLoopAgent(t, config.AgentCoder, p)
+	seen := &sessionsSeeingSpeed{}
+	a.sessions = seen
+	if ev := runTurn(t, a, "speed-bar", "hi"); ev.Error != nil {
+		t.Fatalf("turn failed: %v", ev.Error)
+	}
+	seen.seenMu.Lock()
+	defer seen.seenMu.Unlock()
+	if seen.savedTotal == 0 || seen.savedWith != seen.savedTotal {
+		t.Errorf("%d of %d session saves happened before the speed was known",
+			seen.savedTotal-seen.savedWith, seen.savedTotal)
+	}
+	answered := false
+	for _, m := range store.all {
+		if m.Role == message.Assistant && m.Speed() != nil {
+			answered = true
+		}
+	}
+	if !answered {
+		t.Error("the answer was stored without its speed")
+	}
+}
 
 // fakeNow is a clock the test moves by hand.
 type fakeNow struct{ t time.Time }
