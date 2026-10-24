@@ -22,7 +22,8 @@ the AI's memory, and no more false "conversation too big" stops.
 **Yes, if you switched thinking off.** LM Studio kept the AI thinking anyway; a
 three-word greeting took 30 seconds. Now it takes about 3.
 
-**Everyone else:** a safe update, nothing you rely on changes.
+**Everyone else:** a safe update, nothing you rely on changes; the program has a
+new icon, the gorilla in a cyan flame ring.
 
 **Debian, Ubuntu, Fedora and Mac:** the files for these are built on another
 machine and will be added to this page; until then 0.1.151 is the one to use.
@@ -51,7 +52,7 @@ LM Studio's own log showed what happened. Before its first word, the AI spent 4 
 
 **A speed line under every answer**
 - Before: you saw only how long an answer took in total, for example "Gemma 4 (3.0m)".
-- After: you also see when the first word came and how fast the rest came, for example `first word 4m27s, 3.5 tok/s, 231 tokens (216 thinking)`. The same line is in the bar at the bottom and in an exported conversation. "Thinking" is how much of the answer was the AI working things out before it replied.
+- After: you also see when the first word came and how fast the rest came, for example `first word 4m25s, 3.8 tok/s, 299 tokens (287 thinking)`, in bright red so it stands out on a dark or a white terminal. The same numbers are in a red label in the bar at the bottom, and in an exported conversation. "Thinking" is how much of the answer was the AI working things out before it replied.
 - Affects: everyone; it matters most with an AI on your own computer, where time is the cost.
 
 **"Ask the model to think out loud" switched off now works**
@@ -68,6 +69,11 @@ LM Studio's own log showed what happened. Before its first word, the AI spent 4 
 - Before: nothing said that the instructions and tools fill a large part of a small AI's memory before you type.
 - After: at the start of a conversation the program says so, for example "about 12.6K of Gemma 4's 20K window (62%)", names the parts that take the most room, and points to /context. It switches nothing off for you.
 - Affects: people with an AI on their own computer.
+
+**A new icon**
+- Before: a purple-cap gorilla.
+- After: the owner's new gorilla in a cyan flame ring. Every size Windows uses (16 to 256 pixels) is drawn separately from a 2048-pixel original, so it stays sharp on the taskbar, in Alt-Tab and on a large desktop. The same picture is used on Linux and on the Mac.
+- Affects: everyone, after installing this version.
 
 **"How many Fieldkit tools do I have?"**
 - Before: the AI repeated "hundreds" from a description.
@@ -111,6 +117,20 @@ You can now see where the time goes with an AI on your own computer, "thinking o
 
 ---
 
+# What the program actually printed
+
+Every block below is real output, copied from a run on the maintainer's computer. Nothing here is an illustration.
+
+## The pictures
+
+### The speed meter on a model running on this laptop
+
+Version 0.1.152 on Windows 11, Gemma 4 12B QAT served by LM Studio on the same laptop, "think out loud" switched on, asked "Say hello in five words." in a new conversation. Under the answer and in the bar at the bottom: 4 minutes 27 seconds before the first word (the AI reading 13,000 tokens of instructions and tools), then 3.8 words per second, 357 tokens, of which 345 were its thinking. The thinking itself is the cyan text above the answer.
+
+[![Gorilla OpenCode v0.1.152 on Windows with Gemma 4 12B in LM Studio: under the answer and in a red label in the bottom bar the speed reads first word 4m27s, 3.8 tok/s, 357 tokens (345 thinking), with the model's cyan reasoning above](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.152/docs/screenshots/gallery/v0152-speed-meter-gemma.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.152/docs/screenshots/gallery/v0152-speed-meter-gemma.png)
+
+---
+
 # For developers: how it works, and how to check it
 
 Written for someone who will audit, fork or change the code. It covers the same release as the plain-language part above; neither is a summary of the other.
@@ -126,6 +146,8 @@ Measured against the LM Studio 0.4.26 server log with google/gemma-4-12b-qat (20
 - `thinkingRequestOptions(modelID, local)`: with `extras-reasoning-generate` OFF and `Provider == ProviderLocal`, sends `reasoning_effort: "none"`. Rejection handling shared with `chat_template_kwargs` (`isParameterRejection` matches either; remembered per model; retried once before any content).
 - `EstimateRequestTokens` no longer counts `ReasoningContent` (no provider in `internal/llm/provider` sends it back). `MeasuredNextRequest` = previous call's reported prompt + (output - reasoning) + estimated new tool results; used by `overflowAfterTools` when the server reported usage.
 - On a real overflow after a tool round, `elideOldToolResults` replaces tool outputs > 400 chars from messages before the current turn with a sized stub, in the copy that is sent only; the turn continues with a persisted warning.
+- Speed rendering: `styles.SpeedColor` (adaptive #FF3333 / #D70000, not from the theme) bold in the chat footer; a white-on-red chip in the status bar, kept on narrow screens. The speed is noted (`noteLastSpeed`) before `processEvent`, whose `TrackUsage` session save redraws the bar.
+- Icon: the owner's cyan flame gorilla, rendered per size from the 2048 px source by `iconkit from-art` (alpha keyed from black outside an opaque core): winres 13 frames 16-256 (`rsrc_windows_*.syso` rebuilt with go-winres), assets PNG 128-1024, a 21-size .ico, the SVG's embedded master, the macOS .icns.
 - `crowdedLoadoutNotice`: `config.LoadoutCrowdsTheContext` (share >= 0.33) had no caller; now announced once per session at the first coder message with `LoadoutBiggestCuts(3)`.
 
 ### Known alternatives considered
@@ -153,6 +175,8 @@ File sizes are in "Measured on the published files". No new dependency. Status b
 - `internal/llm/provider/reasoning.go`, `openai.go`, `provider.go`.
 - `internal/tui/components/chat/message.go`, `internal/tui/components/core/status.go`, `internal/export/transcript.go`.
 - `internal/llm/tools/commandclass_test.go`: the `type` row asserts the PowerShell verdict on Windows.
+- `internal/tui/styles/styles.go` (`SpeedColor`, `Speed`).
+- `winres/`, `internal/assets/icons/`, `packaging/macos/gorilla.icns`, `rsrc_windows_*.syso`: new icon.
 
 ### Subsystem changes
 
@@ -161,7 +185,8 @@ Providers: OpenAI-compatible user endpoints receive an explicit reasoning-off. A
 ### Test coverage
 
 - `speed_test.go`: the clock split, reasoning as first token, no invented rate. `overflow_test.go`: the refused Gemma request fits when measured; old reasoning not counted; only earlier turns lose tool output; stored messages untouched. `reasoning_off_test.go`: off sent to a local endpoint, on never sends none, rejection falls back and is remembered, cloud unchanged, reasoning tokens read from stream usage. `crowded_test.go`.
-- `fieldkit mutate`: 7/7 caught on PR #13, 1/1 on the commandclass rule.
+- `TestTheStatusBarHasTheSpeedWhenTheSessionIsSaved`: every session save happens with the speed already known.
+- `fieldkit mutate`: 7/7 caught on PR #13, 1/1 on the commandclass rule, 2/2 on the status-bar ordering.
 - Field: `run_fieldkit_mcp_scenarios.py` 1.1.0 on the PR binary with Gemma 4 12B QAT: speeds stored per call (first token 267 s cold, 11.3 s with the cache warm); "how many tools" -> `fieldkit_readiness` -> measured count.
 
 ### Security posture
