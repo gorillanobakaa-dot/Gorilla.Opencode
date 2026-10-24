@@ -3,7 +3,15 @@
     "APP": {
       "0000": [
         "icons/icon-256.png",
+        "icons/icon-240.png",
+        "icons/icon-224.png",
+        "icons/icon-208.png",
+        "icons/icon-192.png",
+        "icons/icon-176.png",
+        "icons/icon-160.png",
+        "icons/icon-144.png",
         "icons/icon-128.png",
+        "icons/icon-112.png",
         "icons/icon-96.png",
         "icons/icon-80.png",
         "icons/icon-74.png",
