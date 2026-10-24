@@ -72,6 +72,11 @@ type TokenUsage struct {
 	OutputTokens        int64
 	CacheCreationTokens int64
 	CacheReadTokens     int64
+	// ReasoningTokens is the part of OutputTokens the model spent thinking,
+	// when the server says (completion_tokens_details.reasoning_tokens; LM
+	// Studio does). Zero means not reported OR none; it is shown, never priced
+	// apart, because OutputTokens already contains it.
+	ReasoningTokens int64
 	// ModelVersion is the model the provider says answered (Gemini's
 	// modelVersion), when it says. GORILLA (2026-10-21): a rolling alias such as
 	// gemini-flash-latest has no price of its own; the version that answered

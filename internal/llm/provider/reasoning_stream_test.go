@@ -211,7 +211,7 @@ func TestParameterRejectionFallsBackAndStillAnswers(t *testing.T) {
 		t.Error("the retry still carried chat_template_kwargs, so it would fail again")
 	}
 	// And it must remember, so every later turn skips the doomed attempt.
-	if thinkingWasRequested("test-model") {
+	if thinkingWasRequested("test-model", false) {
 		t.Error("the rejection was not remembered; every turn would pay for a failed request")
 	}
 }

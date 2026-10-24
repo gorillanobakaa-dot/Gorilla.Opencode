@@ -37,6 +37,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/config"
 
 	"github.com/opencode-ai/opencode/internal/llm/models"
+	"github.com/opencode-ai/opencode/internal/llm/provider"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 	"github.com/opencode-ai/opencode/internal/message"
 )
@@ -90,7 +91,12 @@ func EstimateRequestTokens(systemPrompt string, msgs []message.Message, toolset 
 	for _, m := range msgs {
 		total += perMessageOverhead
 		total += estimateTokens(m.Content().String())
-		total += estimateTokens(m.ReasoningContent().String())
+		// GORILLA FIX (2026-10-24): reasoning is NOT counted. No provider in
+		// internal/llm/provider sends an earlier turn's reasoning back (none
+		// reads ReasoningContent), so counting it refused a request that fit:
+		// LM Studio's log put the real next request at ~14.1K of a 17.2K
+		// budget, this estimate said 18K, and Gemma's turn died with its
+		// ~2,100 tokens of old reasoning counted as if they were re-sent.
 		for _, tc := range m.ToolCalls() {
 			total += estimateTokens(tc.Name) + estimateTokens(tc.Input) + perMessageOverhead
 		}
@@ -121,6 +127,32 @@ func EstimateRequestTokens(systemPrompt string, msgs []message.Message, toolset 
 	}
 
 	return total
+}
+
+// MeasuredNextRequest is the size of the request that follows a tool round,
+// from what the server MEASURED for the call that just ended plus an estimate
+// of only what is new: the answer it wrote (minus its reasoning, which is not
+// re-sent) and the tool results. ok is false when the server reported no
+// usage; the whole-history estimate is then all there is.
+//
+// GORILLA FIX (2026-10-24): the whole-history estimate errs high by design
+// (3.5 characters per token), and on a 20K local window the margin of error is
+// the whole margin. The server's own count for 13.6K of the history leaves only
+// a few hundred tokens to estimate.
+func MeasuredNextRequest(prev provider.TokenUsage, toolMsg message.Message) (tokens int, ok bool) {
+	prompt := prev.InputTokens + prev.CacheReadTokens + prev.CacheCreationTokens
+	if prompt <= 0 {
+		return 0, false
+	}
+	written := prev.OutputTokens - prev.ReasoningTokens
+	if written < 0 {
+		written = 0
+	}
+	total := int(prompt+written) + 2*perMessageOverhead
+	for _, tr := range toolMsg.ToolResults() {
+		total += estimateTokens(tr.Content) + perMessageOverhead
+	}
+	return total, true
 }
 
 // UsableWindow is how much of a model's context this request may occupy, leaving

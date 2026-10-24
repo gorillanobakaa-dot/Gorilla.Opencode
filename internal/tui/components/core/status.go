@@ -306,6 +306,11 @@ func (m statusCmp) chrome() statusChrome {
 		if d := costDetail(m.session); d != "" {
 			tokens += " (" + d + ")"
 		}
+		// GORILLA (2026-10-24): how fast the newest call was. On a local
+		// model this, not dollars, is the cost the person feels.
+		if s, ok := agent.LastSpeed(m.session.ID); ok {
+			tokens += " | " + s.Summary()
+		}
 		tokenInfoWidth = lipgloss.Width(tokens) + 2
 		c.tokens = tokensStyle.Render(tokens)
 		shortTokens = tokensStyle.Render(short)

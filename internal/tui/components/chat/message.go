@@ -236,8 +236,18 @@ func renderAssistantMessage(
 			info = append(info, baseStyle.
 				Width(width-1).
 				Foreground(t.TextMuted()).
-				Render(fmt.Sprintf(" %s (%s)", models.SupportedModels[msg.Model].Name, took)),
+				Render(fmt.Sprintf(" %s (%s)%s", models.SupportedModels[msg.Model].Name, took, speedSuffix(msg))),
 			)
+		// GORILLA (2026-10-24): a call that ended in a tool call cost time too,
+		// often most of the turn; it gets its speed line as well.
+		case message.FinishReasonToolUse:
+			if s := msg.Speed(); s != nil {
+				info = append(info, baseStyle.
+					Width(width-1).
+					Foreground(t.TextMuted()).
+					Render(fmt.Sprintf(" %s%s", models.SupportedModels[msg.Model].Name, speedSuffix(msg))),
+				)
+			}
 		case message.FinishReasonCanceled:
 			info = append(info, baseStyle.
 				Width(width-1).
@@ -953,6 +963,15 @@ func formatTimestampDiff(start, end int64) string {
 		return fmt.Sprintf("%.0fs", diffSeconds)
 	}
 	return fmt.Sprintf("%.1fm", diffSeconds/60)
+}
+
+// speedSuffix is " | first word 4m17s, 3.9 tok/s, 994 tokens (812 thinking)"
+// for an answer whose speed was measured, "" for one that was not (older rows).
+func speedSuffix(msg message.Message) string {
+	if s := msg.Speed(); s != nil {
+		return " | " + s.Summary()
+	}
+	return ""
 }
 
 // messageTime is the per-message clock shown when the timestamps extra is on.
