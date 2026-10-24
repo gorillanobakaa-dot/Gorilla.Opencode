@@ -113,14 +113,30 @@ var thinkingRejected sync.Map // model ID → struct{}
 // thinkingRequestOptions returns the extra body fields that ask an
 // OpenAI-compatible server to emit its reasoning, unless this model has already
 // refused them.
-func thinkingRequestOptions(modelID string) []option.RequestOption {
+//
+// local is true for a model on the user's own endpoint (LM Studio, Ollama...).
+// There OFF has to be SAID: GORILLA FIX (2026-10-24), measured on LM Studio
+// 0.4.26 with google/gemma-4-12b-qat, "Say hi in three words":
+//
+//	no field                                   142 tokens, 117 of them reasoning, 30.0 s
+//	reasoning_effort: "none"                    26 tokens,   0 of them reasoning,  3.3 s
+//	chat_template_kwargs {enable_thinking:false} 142 tokens, 117 reasoning (ignored)
+//
+// The server thinks by default, so a switch that only ever asked for MORE
+// reasoning was off on screen and on in the model: at ~4 tokens/s on a laptop
+// that is minutes per turn the person had declined. A cloud model keeps the
+// old behaviour; its reasoning_effort is the provider's own setting.
+func thinkingRequestOptions(modelID string, local bool) []option.RequestOption {
+	if _, refused := thinkingRejected.Load(modelID); refused {
+		return nil
+	}
 	// GORILLA OVERRIDE: the user's call, and it defaults to OFF. Reasoning makes
 	// the model emit substantially more output, so it is not switched on by a
 	// default nobody was shown — see config/extras.go and the first-run prompt.
 	if !config.ExtraEnabled("extras-reasoning-generate") {
-		return nil
-	}
-	if _, refused := thinkingRejected.Load(modelID); refused {
+		if local {
+			return []option.RequestOption{option.WithJSONSet("reasoning_effort", "none")}
+		}
 		return nil
 	}
 	return []option.RequestOption{
@@ -135,12 +151,8 @@ func noteThinkingRejected(modelID string) {
 
 // thinkingWasRequested reports whether the last attempt carried the parameter,
 // which decides whether a rejection is worth retrying without it.
-func thinkingWasRequested(modelID string) bool {
-	if !config.ExtraEnabled("extras-reasoning-generate") {
-		return false
-	}
-	_, refused := thinkingRejected.Load(modelID)
-	return !refused
+func thinkingWasRequested(modelID string, local bool) bool {
+	return len(thinkingRequestOptions(modelID, local)) > 0
 }
 
 // isParameterRejection identifies "I do not understand that field" as distinct
@@ -158,7 +170,7 @@ func isParameterRejection(err error) bool {
 	msg := strings.ToLower(err.Error())
 
 	// A 4xx that names our parameter is unambiguous.
-	if strings.Contains(msg, "chat_template_kwargs") {
+	if strings.Contains(msg, "chat_template_kwargs") || strings.Contains(msg, "reasoning_effort") {
 		return true
 	}
 	// Otherwise require both a client-error signal and unknown-field language,

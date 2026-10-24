@@ -476,6 +476,12 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 	if err != nil {
 		return a.err(fmt.Errorf("failed to list messages: %w", err))
 	}
+	if len(msgs) == 0 && a.agentName == config.AgentCoder {
+		if note := crowdedLoadoutNotice(sessionID); note != "" {
+			// Long enough to read while the first answer is still coming.
+			logging.WarnPersist(note, logging.PersistTimeArg, 45*time.Second)
+		}
+	}
 	if len(msgs) == 0 {
 		go func() {
 			defer logging.RecoverPanic("agent.Run", func() {
@@ -560,6 +566,8 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 	stuck.Reset(sessionID)
 	// Append the new user message to the conversation history.
 	msgHistory := append(msgs, userMsg)
+	// Messages from here on belong to this turn; see elideOldToolResults.
+	turnStart := len(msgs)
 
 	for {
 		// Check for cancellation before each iteration
@@ -610,13 +618,21 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 			// vendor JSON after a wasted upload. The turn's work is not lost:
 			// everything up to this point is already recorded, so /compact
 			// carries it forward.
-			if over := ContextOverflowMessage(
-				EstimateRequestTokens(a.prov().SystemPrompt(), a.wireView(msgHistory), a.visibleTools(sessionID)),
-				a.prov().Model(),
-			); over != "" {
-				agentMessage.AddFinish(message.FinishReasonError)
-				a.messages.Update(context.Background(), agentMessage)
-				return a.err(errors.New(over))
+			if over := a.overflowAfterTools(sessionID, msgHistory, *toolResults); over != "" {
+				// GORILLA FIX (2026-10-24): before giving the turn up, drop the
+				// bodies of tool results from EARLIER turns from what is sent
+				// (the stored conversation keeps them). The model already acted
+				// on them; this turn's own results stay whole.
+				trimmed, dropped := elideOldToolResults(msgHistory, turnStart)
+				if dropped == 0 || ContextOverflowMessage(a.estimateRequest(sessionID, trimmed), a.prov().Model()) != "" {
+					agentMessage.AddFinish(message.FinishReasonError)
+					a.messages.Update(context.Background(), agentMessage)
+					return a.err(errors.New(over))
+				}
+				msgHistory = trimmed
+				logging.WarnPersist(fmt.Sprintf(
+					"The conversation was about to overflow %s, so %d old tool output(s) from earlier turns were left out of what is sent (they stay in the transcript). The next answer re-reads the shortened history from the start.",
+					a.prov().Model().Name, dropped))
 			}
 			continue
 		}
@@ -646,6 +662,7 @@ func (a *agent) createUserMessage(ctx context.Context, sessionID, content string
 
 func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msgHistory []message.Message) (message.Message, *message.Message, error) {
 	ctx = context.WithValue(ctx, tools.SessionIDContextKey, sessionID)
+	clock := newStreamClock()
 	eventChan := a.prov().StreamResponse(ctx, msgHistory, a.visibleTools(sessionID))
 
 	assistantMsg, err := a.messages.Create(ctx, sessionID, message.CreateMessageParams{
@@ -662,7 +679,12 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 
 	// Process each event in the stream.
 	for event := range eventChan {
-		if processErr := a.processEvent(ctx, sessionID, &assistantMsg, event); processErr != nil {
+		clock.see(event)
+		processErr := a.processEvent(ctx, sessionID, &assistantMsg, event)
+		if processErr == nil && event.Type == provider.EventComplete && event.Response != nil {
+			a.recordSpeed(ctx, sessionID, &assistantMsg, clock.speed(event.Response.Usage))
+		}
+		if processErr != nil {
 			// GORILLA FIX: do NOT relabel a provider failure as "canceled".
 			//
 			// processEvent's EventError branch has just recorded

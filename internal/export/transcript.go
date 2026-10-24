@@ -206,6 +206,9 @@ func writeMessage(b *strings.Builder, m message.Message, sessionStart time.Time,
 			fmt.Fprintf(b, "```json\n%s\n```\n\n", prettyJSON(tc.Input))
 		}
 
+		if s := m.Speed(); s != nil {
+			fmt.Fprintf(b, "<sub>speed: %s</sub>\n\n", s.Summary())
+		}
 		if fr := m.FinishReason(); isAbnormal(fr) {
 			fmt.Fprintf(b, "> **Ended: %s**\n\n", fr)
 		}

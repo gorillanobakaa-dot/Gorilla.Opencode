@@ -392,6 +392,9 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 	// internal ID, because two configured endpoints can serve the same model and
 	// it is the server's opinion we are recording.
 	modelID := string(o.providerOptions.model.APIModel)
+	// Every endpoint the user configured (LM Studio, Ollama, NIM...): there
+	// "reasoning off" must be sent, see thinkingRequestOptions.
+	local := o.providerOptions.model.Provider == models.ProviderLocal
 
 	attempts := 0
 	eventChan := make(chan ProviderEvent)
@@ -402,7 +405,7 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			// GORILLA OVERRIDE: ask the server to emit its reasoning. Measured:
 			// without this, GLM-5.2 on NIM streams only [content, role] and the
 			// reasoning reader below never fires. See reasoning.go.
-			reqOpts := append(o.cacheOptions(), thinkingRequestOptions(modelID)...)
+			reqOpts := append(o.cacheOptions(), thinkingRequestOptions(modelID, local)...)
 
 			// GORILLA OVERRIDE: guard against the answer starting and then
 			// stopping — headers arrived, so no header timeout can fire, and the
@@ -555,7 +558,7 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			//
 			// Guarded on currentContent: once tokens have been streamed, retrying
 			// would duplicate the answer, so reasoning is sacrificed instead.
-			if currentContent == "" && thinkingWasRequested(modelID) && isParameterRejection(err) {
+			if currentContent == "" && thinkingWasRequested(modelID, local) && isParameterRejection(err) {
 				noteThinkingRejected(modelID)
 				logging.Warn("server refused the reasoning parameter; retrying without it",
 					"model", modelID, "err", err)
@@ -927,6 +930,7 @@ func (o *openaiClient) usage(completion openai.ChatCompletion) TokenUsage {
 		OutputTokens:        completion.Usage.CompletionTokens,
 		CacheCreationTokens: 0, // OpenAI doesn't provide this directly
 		CacheReadTokens:     cachedTokens,
+		ReasoningTokens:     completion.Usage.CompletionTokensDetails.ReasoningTokens,
 	}
 }
 

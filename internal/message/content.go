@@ -117,6 +117,9 @@ type Finish struct {
 	// conversation, where it can be scrolled, selected and copied like any other
 	// output. omitempty, so existing rows on disk decode unchanged.
 	Details string `json:"details,omitempty"`
+	// Speed is how this answer arrived (see speed.go). nil on rows written
+	// before it existed.
+	Speed *Speed `json:"speed,omitempty"`
 }
 
 func (Finish) isPart() {}
