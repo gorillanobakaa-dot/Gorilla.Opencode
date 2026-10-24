@@ -1,3 +1,19 @@
+## v0.1.152 (2026-10-24): a speed line under every answer, "thinking off" really off, no false "conversation too big"
+
+**Plain-language version:** with an AI on your own computer (LM Studio, Ollama)
+the program now shows, under every answer, when the first word came, how fast
+the rest came and how much of it was thinking. Measured on Gemma 4 12B: 4
+minutes 27 seconds before the first word of a new conversation, 11 seconds once
+LM Studio had kept what it read. With thinking switched off, the program now
+tells the AI so; a greeting that took 30 seconds takes 3. A conversation that
+still fits is no longer stopped as "too big": the program used to count the
+AI's old thinking, which is never sent again. A warning says when the
+instructions take a large part of a small AI's memory. Windows and Linux files
+first; Debian/Ubuntu, Fedora and Mac files follow.
+
+Full notes: `Changelogs/v0.1.152-release-notes.layman.md` and
+`Changelogs/v0.1.152-release-notes.developer.md`.
+
 ## v0.1.151 (2026-10-23): "auto" works on its own, an unanswered question is said plainly, Google server errors are retried
 
 **Plain-language version:** with "auto" on, the program used to keep stopping to
