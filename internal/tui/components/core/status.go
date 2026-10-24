@@ -307,13 +307,17 @@ func (m statusCmp) chrome() statusChrome {
 			tokens += " (" + d + ")"
 		}
 		// GORILLA (2026-10-24): how fast the newest call was. On a local
-		// model this, not dollars, is the cost the person feels.
+		// model this, not dollars, is the cost the person feels. Its own
+		// chip, white on bright red, so it reads on dark and white terminals
+		// alike; kept on narrow screens too, where the cost detail goes.
+		speed := ""
 		if s, ok := agent.LastSpeed(m.session.ID); ok {
-			tokens += " | " + s.Summary()
+			speed = styles.Padded().Background(styles.SpeedColor).
+				Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render(s.Summary())
 		}
-		tokenInfoWidth = lipgloss.Width(tokens) + 2
-		c.tokens = tokensStyle.Render(tokens)
-		shortTokens = tokensStyle.Render(short)
+		tokenInfoWidth = lipgloss.Width(tokens) + 2 + lipgloss.Width(speed)
+		c.tokens = tokensStyle.Render(tokens) + speed
+		shortTokens = tokensStyle.Render(short) + speed
 	}
 
 	c.diagnostics = styles.Padded().

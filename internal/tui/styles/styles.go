@@ -156,6 +156,20 @@ func TextMutedColor() lipgloss.AdaptiveColor {
 	return theme.CurrentTheme().TextMuted()
 }
 
+// SpeedColor is the color of the speed meter (first word, tok/s, tokens).
+//
+// GORILLA (2026-10-24, owner): the meter was the muted grey of the line it
+// sits on and read as washed out; it is the one number a person with a local
+// model acts on. Bright red on a dark terminal, a deeper red on a white one,
+// where pure #FF0000 is still visible but thinner. Not taken from the theme
+// on purpose: it must stand out on every theme.
+var SpeedColor = lipgloss.AdaptiveColor{Dark: "#FF3333", Light: "#D70000"}
+
+// Speed renders text in the speed meter's color, bold.
+func Speed(s string) string {
+	return lipgloss.NewStyle().Foreground(SpeedColor).Bold(true).Render(s)
+}
+
 // TextEmphasizedColor returns the emphasized text color from the current theme
 func TextEmphasizedColor() lipgloss.AdaptiveColor {
 	return theme.CurrentTheme().TextEmphasized()
