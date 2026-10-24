@@ -121,6 +121,21 @@ You can now see where the time goes with an AI on your own computer, "thinking o
 
 Every block below is real output, copied from a run on the maintainer's computer. Nothing here is an illustration.
 
+## Measured on the published files
+
+The Windows program and the Linux program were built on 2026-10-25 on one Windows 11 laptop (Go 1.27.0) from commit 3dcc73b of the release branch, by `fieldkit pipeline run gorilla-opencode`: modules verified against go.sum, vet clean, the full test suite passed (44 packages, no exception), then both programs built and built a second time in another folder, time zone and locale, **byte for byte identical**. The Linux `.tar.gz` holds that Linux program unchanged (one file, mode 0755); it was made with the layout of `scripts/build-tarball.sh`, and because a Windows machine cannot run the Linux program, the check is that the packed file is byte for byte the reproduced program and carries the v0.1.152 stamp. The Arch package is built from the tagged source by the `arch-package` workflow on GitHub and attached with its own checksum. The `.deb`, `.rpm` and Mac zip are not on this page yet.
+
+| File | Bytes | SHA-256 |
+|---|---|---|
+| `gorilla-opencode.exe` | 56,662,528 | `0997a61f3ca1ddaadd81b66aa4ebdaf2f6cb5a0a6d376bccef1eb1bc0303bafa` |
+| `gorilla-opencode-v0.1.152-linux-amd64` | 55,218,336 | `03216f1cd200808bcbba2396d177166811ae9346e7c4f1d608f2e33d839e2038` |
+| `gorilla-opencode-linux-x86_64.tar.gz` | 21,679,464 | `62b705afa7b95e06fc6d31103d9b03190f1ca844440cc2e00ca8183201f85465` |
+
+Before publishing, the exact `gorilla-opencode.exe` above was run headless against Gemma 4 12B QAT in LM Studio with the Fieldkit tools connected (`run_fieldkit_mcp_scenarios.py`); the result is in the developer notes.
+
+
+---
+
 ## The pictures
 
 ### The speed meter on a model running on this laptop
@@ -147,7 +162,7 @@ Measured against the LM Studio 0.4.26 server log with google/gemma-4-12b-qat (20
 - `EstimateRequestTokens` no longer counts `ReasoningContent` (no provider in `internal/llm/provider` sends it back). `MeasuredNextRequest` = previous call's reported prompt + (output - reasoning) + estimated new tool results; used by `overflowAfterTools` when the server reported usage.
 - On a real overflow after a tool round, `elideOldToolResults` replaces tool outputs > 400 chars from messages before the current turn with a sized stub, in the copy that is sent only; the turn continues with a persisted warning.
 - Speed rendering: `styles.SpeedColor` (adaptive #FF3333 / #D70000, not from the theme) bold in the chat footer; a white-on-red chip in the status bar, kept on narrow screens. The speed is noted (`noteLastSpeed`) before `processEvent`, whose `TrackUsage` session save redraws the bar.
-- Icon: the owner's cyan flame gorilla, rendered per size from the 2048 px source by `iconkit from-art` (alpha keyed from black outside an opaque core): winres 13 frames 16-256 (`rsrc_windows_*.syso` rebuilt with go-winres), assets PNG 128-1024, a 21-size .ico, the SVG's embedded master, the macOS .icns.
+- Icon: the owner's cyan flame gorilla, rendered per size from the 2048 px source by `iconkit from-art` (alpha keyed from black outside an opaque core): winres 21 frames 16-256, the 112-240 steps added so the .exe has no gap between 128 and 256 (`rsrc_windows_*.syso` rebuilt with go-winres), assets PNG 128-1024, a 21-size .ico, the SVG's embedded master, the macOS .icns.
 - `crowdedLoadoutNotice`: `config.LoadoutCrowdsTheContext` (share >= 0.33) had no caller; now announced once per session at the first coder message with `LoadoutBiggestCuts(3)`.
 
 ### Known alternatives considered
@@ -162,7 +177,7 @@ One more round-trip write of the assistant message per call (`recordSpeed` updat
 
 ### Toolchain
 
-Go 1.27.0 (Windows). Windows .exe and Linux amd64 binary by `fieldkit pipeline run gorilla-opencode` on Windows (modules, vet, full test suite, build, reproducibility rebuild, checksums); tarball by `scripts/build-tarball.sh`; Arch package by `arch-package.yml`. The .deb, .rpm and macOS 10.13 zip need the Linux build machine (dpkg-deb, rpmbuild, patched Go 1.24) and are added afterwards.
+Go 1.27.0 (Windows). Windows .exe and Linux amd64 binary by `fieldkit pipeline run gorilla-opencode` on Windows (modules, vet, 44 test packages passed, build, byte-identical reproducibility rebuild, checksums); tarball with the layout of `scripts/build-tarball.sh` (one member, 0755, gzip -9), checked by byte equality with the reproduced Linux binary and its version stamp instead of running it; Arch package by `arch-package.yml`. The .deb, .rpm and macOS 10.13 zip need the Linux build machine (dpkg-deb, rpmbuild, patched Go 1.24) and are added afterwards.
 
 ### Resource deltas
 
