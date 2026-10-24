@@ -85,6 +85,9 @@ type memMessages struct {
 	mu   sync.Mutex
 	next int
 	all  []message.Message
+	// writes is every Update in order, parts copied: what a subscriber (the
+	// printer) saw, not only the final state.
+	writes []message.Message
 }
 
 func (m *memMessages) Create(_ context.Context, sessionID string, p message.CreateMessageParams) (message.Message, error) {
@@ -99,6 +102,9 @@ func (m *memMessages) Create(_ context.Context, sessionID string, p message.Crea
 func (m *memMessages) Update(_ context.Context, msg message.Message) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	w := msg
+	w.Parts = append([]message.ContentPart(nil), msg.Parts...)
+	m.writes = append(m.writes, w)
 	for i := range m.all {
 		if m.all[i].ID == msg.ID {
 			m.all[i] = msg

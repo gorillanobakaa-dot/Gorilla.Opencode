@@ -680,20 +680,19 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 	// Process each event in the stream.
 	for event := range eventChan {
 		clock.see(event)
-		// The speed is noted BEFORE processEvent: its TrackUsage publishes the
-		// session update that redraws the status bar, and a speed noted after
-		// it reached the bar only on the next redraw (seen on screen, v0.1.152
-		// release picture).
-		var speed *message.Speed
+		// The speed is measured BEFORE processEvent and travels into it, so it
+		// is on the same write that marks the answer finished: the printer
+		// prints a finished answer once, and its TrackUsage session save
+		// redraws the status bar. A speed stored after either reached neither
+		// (seen on screen, v0.1.152 release pictures).
+		evCtx := ctx
 		if event.Type == provider.EventComplete && event.Response != nil {
 			s := clock.speed(event.Response.Usage)
 			noteLastSpeed(sessionID, s)
-			speed = &s
+			evCtx = withSpeed(ctx, s)
+			logging.Info("model call speed", "session", sessionID, "speed", s.Summary())
 		}
-		processErr := a.processEvent(ctx, sessionID, &assistantMsg, event)
-		if processErr == nil && speed != nil {
-			a.recordSpeed(ctx, sessionID, &assistantMsg, *speed)
-		}
+		processErr := a.processEvent(evCtx, sessionID, &assistantMsg, event)
 		if processErr != nil {
 			// GORILLA FIX: do NOT relabel a provider failure as "canceled".
 			//
@@ -1131,6 +1130,7 @@ func (a *agent) processEvent(ctx context.Context, sessionID string, assistantMsg
 			if name := LeakedToolCallName(assistantMsg.Content().String(), a.toolNames()); name != "" {
 				logging.Warn("model emitted a tool call as text", "tool", name)
 				assistantMsg.AddFinish(event.Response.FinishReason, LeakedToolCallNotice(name))
+				withCallSpeed(ctx, assistantMsg)
 				if err := a.messages.Update(ctx, *assistantMsg); err != nil {
 					return fmt.Errorf("failed to update message: %w", err)
 				}
@@ -1142,6 +1142,7 @@ func (a *agent) processEvent(ctx context.Context, sessionID string, assistantMsg
 			models.NoteAnsweredInUse(a.prov().Model().ID, config.CacheBase())
 		}
 		assistantMsg.AddFinish(event.Response.FinishReason)
+		withCallSpeed(ctx, assistantMsg)
 		if err := a.messages.Update(ctx, *assistantMsg); err != nil {
 			return fmt.Errorf("failed to update message: %w", err)
 		}

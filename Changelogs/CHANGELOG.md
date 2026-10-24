@@ -8,8 +8,10 @@ LM Studio had kept what it read. With thinking switched off, the program now
 tells the AI so; a greeting that took 30 seconds takes 3. A conversation that
 still fits is no longer stopped as "too big": the program used to count the
 AI's old thinking, which is never sent again. A warning says when the
-instructions take a large part of a small AI's memory. Windows and Linux files
-first; Debian/Ubuntu, Fedora and Mac files follow.
+instructions take a large part of a small AI's memory. The speed numbers are
+bright red, and the program has a new icon: the gorilla in a cyan flame ring,
+sharp at every size. Windows and Linux files first; Debian/Ubuntu, Fedora and
+Mac files follow.
 
 Full notes: `Changelogs/v0.1.152-release-notes.layman.md` and
 `Changelogs/v0.1.152-release-notes.developer.md`.

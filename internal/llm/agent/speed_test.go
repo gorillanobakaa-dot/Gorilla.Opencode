@@ -56,6 +56,13 @@ func TestTheStatusBarHasTheSpeedWhenTheSessionIsSaved(t *testing.T) {
 	if !answered {
 		t.Error("the answer was stored without its speed")
 	}
+	// The printer prints a finished answer once: the FIRST write that marks it
+	// finished must already carry the speed (v0.1.152 release picture, 2026-10-25).
+	for _, w := range store.writes {
+		if w.Role == message.Assistant && w.IsFinished() && w.Speed() == nil {
+			t.Fatal("an answer was written finished without its speed; the printer would print it bare")
+		}
+	}
 }
 
 // fakeNow is a clock the test moves by hand.

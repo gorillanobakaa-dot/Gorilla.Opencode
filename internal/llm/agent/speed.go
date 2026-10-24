@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/llm/provider"
-	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/message"
 )
 
@@ -86,11 +85,17 @@ func noteLastSpeed(sessionID string, s message.Speed) {
 	lastSpeedMu.Unlock()
 }
 
-// recordSpeed stores the speed on the finished answer.
-func (a *agent) recordSpeed(ctx context.Context, sessionID string, msg *message.Message, s message.Speed) {
-	msg.SetSpeed(s)
-	if err := a.messages.Update(ctx, *msg); err != nil {
-		logging.Warn("could not store the call's speed", "err", err)
+type speedKey struct{}
+
+// withSpeed carries one call's speed to the place that finishes its message.
+func withSpeed(ctx context.Context, s message.Speed) context.Context {
+	return context.WithValue(ctx, speedKey{}, s)
+}
+
+// withCallSpeed puts the carried speed on msg's finish part. Called after
+// AddFinish (which replaces the part) and before the Update that publishes it.
+func withCallSpeed(ctx context.Context, msg *message.Message) {
+	if s, ok := ctx.Value(speedKey{}).(message.Speed); ok {
+		msg.SetSpeed(s)
 	}
-	logging.Info("model call speed", "session", sessionID, "model", string(msg.Model), "speed", s.Summary())
 }
