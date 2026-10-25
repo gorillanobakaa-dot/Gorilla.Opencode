@@ -375,7 +375,13 @@ func TestFindQueryStartingWithDashIsNotAFlag(t *testing.T) {
 // byte-identical, or fixes land in one and silently miss the other. The test
 // only runs on a machine that HAS the dev copy; everywhere else it skips.
 func TestVendoredPfindMatchesDevCopy(t *testing.T) {
-	dev := filepath.Join(os.Getenv("HOME"), "Documents", "Scripts.For.Work", "pfind", "pfind.py")
+	// GORILLA OVERRIDE (2026-10-25): Scripts.For.Work became Scripts on Linux and pfind
+	// moved into Fieldkit's local kits; with only the old path this skipped silently.
+	home := os.Getenv("HOME")
+	dev := filepath.Join(home, "Documents", "Scripts.For.Work", "pfind", "pfind.py")
+	if alt := filepath.Join(home, "Documents", "Scripts", "Fieldkit", "local", "kits", "pfind", "pfind.py"); fileExists(alt) {
+		dev = alt
+	}
 	devBytes, err := os.ReadFile(dev)
 	if err != nil {
 		t.Skip("no development copy on this machine; nothing to drift against")
@@ -816,4 +822,9 @@ func TestFolderPatternsWorkWithAndWithoutRipgrep(t *testing.T) {
 		assert.Contains(t, byName.Content, "guide.md", "%s: a plain name pattern stopped working", engine)
 		assert.NotContains(t, byName.Content, "main.go", "%s", engine)
 	}
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }

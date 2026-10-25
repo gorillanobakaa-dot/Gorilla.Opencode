@@ -80,6 +80,13 @@ func TestPfindSemanticSendsNothingAndDownloadsNothing(t *testing.T) {
 	if exec.Command(python, "-c", "import chromadb").Run() != nil {
 		t.Skipf("%s has no chromadb (set PFIND_CHROMA_PYTHON to one that does)", python)
 	}
+	// GORILLA OVERRIDE (2026-10-25): HOME is replaced below, which also hides a chromadb
+	// installed with pip --user (~/.local); keep the real user site so the import above
+	// and the driver's import agree.
+	userBase := ""
+	if out, err := exec.Command(python, "-m", "site", "--user-base").Output(); err == nil {
+		userBase = strings.TrimSpace(string(out))
+	}
 	home := t.TempDir()
 	driver := filepath.Join(t.TempDir(), "driver.py")
 	if err := os.WriteFile(driver, []byte(chromaDriver), 0o644); err != nil {
@@ -93,6 +100,9 @@ func TestPfindSemanticSendsNothingAndDownloadsNothing(t *testing.T) {
 		"PFIND_TEST_STORE="+filepath.Join(home, "store"), "ANONYMIZED_TELEMETRY=True",
 		"HTTP_PROXY=http://127.0.0.1:9", "HTTPS_PROXY=http://127.0.0.1:9", "ALL_PROXY=http://127.0.0.1:9",
 		"NO_PROXY=", "no_proxy=")
+	if userBase != "" && os.Getenv("PYTHONUSERBASE") == "" {
+		cmd.Env = append(cmd.Env, "PYTHONUSERBASE="+userBase)
+	}
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
