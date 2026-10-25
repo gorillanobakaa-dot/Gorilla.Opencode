@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -62,6 +63,123 @@ type editorCmp struct {
 	history    []string
 	historyPos int
 	draft      string
+
+	// GORILLA FIX: a paste on the Windows console must not send anything.
+	//
+	// Owner's report, 2026-10-25: ~200 quoted paths from Explorer's "Copy as
+	// path" (15K characters) pasted into this box were sent as separate
+	// messages, a bare path each, while the rest queued up in the box and the
+	// agent-busy warning repeated. Cause: bubbletea v1 reads the Windows console
+	// with ReadConsoleInput, where a paste is not bracketed - it arrives as one
+	// key event per character and every line break is an ordinary Enter
+	// (key_windows.go, readConInputs), indistinguishable from the Send key.
+	//
+	// What does tell them apart is timing. A paste is a burst: its keys are
+	// already queued, microseconds apart. A person cannot press a key and then
+	// Enter (or Enter and then a key) within a few milliseconds. So an Enter is
+	// a line break when a key came just before it, and otherwise it waits
+	// enterSettle: if another key arrives in that time it was a line break too,
+	// and only an Enter followed by silence sends.
+	lastKeyAt    time.Time
+	pendingEnter int // sequence number of the Enter waiting to send; 0 = none
+	enterSeq     int
+	// measurePending: a measureMsg is on its way; the height is measured once
+	// per paste, not once per pasted key.
+	measurePending bool
+	// pasteBuf: pasted characters not yet in the textarea (see bufferPasted).
+	pasteBuf []rune
+	// frame is the last View; frameKnown says nothing has changed since.
+	frame      string
+	frameKnown bool
+	// rows is measureRows' answer for rowsValue at rowsWidth.
+	rows        int
+	rowsKnown   bool
+	rowsValue   string
+	rowsWidth   int
+	now         func() time.Time                     // nil = time.Now; tests set it
+	settleAfter func(time.Duration, tea.Msg) tea.Cmd // nil = tea.Tick; tests set it
+}
+
+const (
+	// pasteBurstGap: a key closer than this to the one before it belongs to a
+	// paste. Console paste events are microseconds apart; key repeat is ~33 ms.
+	pasteBurstGap = 8 * time.Millisecond
+	// enterSettle: how long an Enter waits for more pasted keys before it sends.
+	// Short enough not to be felt.
+	enterSettle = 30 * time.Millisecond
+)
+
+// enterSettledMsg says the Enter with this sequence number was followed by
+// silence, so it was pressed, not pasted.
+type enterSettledMsg struct{ seq int }
+
+// measureMsg asks for the box height to be measured once a paste is over.
+type measureMsg struct{}
+
+// noteKey records a key's arrival and reports whether it belongs to a paste.
+func (m *editorCmp) noteKey() bool {
+	now := m.clock()
+	burst := !m.lastKeyAt.IsZero() && now.Sub(m.lastKeyAt) < pasteBurstGap
+	m.lastKeyAt = now
+	if m.pendingEnter != 0 {
+		// Another key before the waiting Enter settled: the Enter was a line
+		// break inside a paste. Put it where it was, then handle this key.
+		m.pendingEnter = 0
+		m.pasteBuf = append(m.pasteBuf, '\n')
+		burst = true
+	}
+	return burst
+}
+
+// bufferPasted holds a pasted character back instead of handing it to the
+// textarea, and reports whether it did. bubbles' textarea re-hashes every line
+// on each Update (cursorLineNumber), so a 15K-character paste fed to it one key
+// at a time took tens of seconds; flushPaste inserts the lot in one call.
+func (m *editorCmp) bufferPasted(k tea.KeyMsg) bool {
+	if !m.textarea.Focused() || k.Paste || k.Alt {
+		return false
+	}
+	switch k.Type {
+	case tea.KeyRunes:
+		m.pasteBuf = append(m.pasteBuf, k.Runes...)
+	case tea.KeySpace:
+		m.pasteBuf = append(m.pasteBuf, ' ')
+	case tea.KeyEnter:
+		m.pasteBuf = append(m.pasteBuf, '\n')
+	default:
+		return false
+	}
+	return true
+}
+
+func (m *editorCmp) flushPaste() {
+	if len(m.pasteBuf) == 0 {
+		return
+	}
+	m.textarea.InsertString(string(m.pasteBuf))
+	m.pasteBuf = m.pasteBuf[:0]
+}
+
+func (m *editorCmp) scheduleMeasure() tea.Cmd {
+	if m.measurePending {
+		return nil
+	}
+	m.measurePending = true
+	return m.settle(enterSettle, measureMsg{})
+}
+
+func (m *editorCmp) clock() time.Time {
+	if m.now != nil {
+		return m.now()
+	}
+	return time.Now()
+}
+
+func (m *editorCmp) settle(d time.Duration, msg tea.Msg) tea.Cmd {
+	if m.settleAfter != nil {
+		return m.settleAfter(d, msg)
+	}
+	return tea.Tick(d, func(time.Time) tea.Msg { return msg })
 }
 
 // recallHistory replaces the input with an earlier (or later) message.
@@ -206,6 +324,19 @@ func (m *editorCmp) desiredHeight() int {
 // (prompt width, word breaks, and cursor placement differ), leaving the cursor
 // on a visible tail while earlier wrapped rows stayed outside the viewport.
 func (m *editorCmp) measuredRows() int {
+	// The probe renders the whole buffer, and View asks twice per frame
+	// (desiredHeight, overflowNotice). The answer depends only on the text and
+	// the width, so it is worked out once per change.
+	value, width := m.textarea.Value(), m.textarea.Width()
+	if m.rowsKnown && value == m.rowsValue && width == m.rowsWidth {
+		return m.rows
+	}
+	m.rows = m.measureRows()
+	m.rowsKnown, m.rowsValue, m.rowsWidth = true, value, width
+	return m.rows
+}
+
+func (m *editorCmp) measureRows() int {
 	originalHeight := m.textarea.Height()
 	probe := m.textarea
 	probe.SetHeight(editorBufferLines)
@@ -236,6 +367,9 @@ func (m *editorCmp) measuredRows() int {
 func (m *editorCmp) SetHeightCeiling(rows int) {
 	if rows < minEditorHeight {
 		rows = minEditorHeight
+	}
+	if rows != m.heightCeiling {
+		m.frameKnown = false // the page sets this on every frame; only a change counts
 	}
 	m.heightCeiling = rows
 }
@@ -366,6 +500,27 @@ var controlCommands = map[string]bool{
 	"context": true, "loadout": true, "tokens": true,
 }
 
+// pressEnter is what a pressed (not pasted) Enter does: a trailing backslash
+// becomes a line break, anything else is sent.
+func (m *editorCmp) pressEnter() tea.Cmd {
+	value := m.textarea.Value()
+	if len(value) > 0 && value[len(value)-1] == '\\' {
+		// If the last character is a backslash, remove it and add a newline
+		m.textarea.SetValue(value[:len(value)-1] + "\n")
+		return nil
+	}
+	// Otherwise, send the message. send() resets the textarea, so re-measure
+	// afterwards and let the layout shrink the box back down. Recomputing
+	// (rather than assuming the minimum) stays correct when send() bails out
+	// early, e.g. agent busy.
+	sendCmd := m.send()
+	if h := m.desiredHeight(); h != m.lastReportedHeight {
+		m.lastReportedHeight = h
+		return tea.Batch(sendCmd, util.CmdHandler(EditorHeightMsg{Height: h}))
+	}
+	return sendCmd
+}
+
 func (m *editorCmp) send() tea.Cmd {
 	// Read the command word BEFORE the busy check, so a control command is not
 	// refused by it.
@@ -418,6 +573,25 @@ func (m *editorCmp) send() tea.Cmd {
 
 func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+	burst := false // this key is part of a paste (see lastKeyAt)
+	if km, ok := msg.(tea.KeyMsg); ok {
+		burst = m.noteKey()
+		if burst && m.bufferPasted(km) {
+			return m, m.scheduleMeasure() // nothing on screen changed: frameKnown holds
+		}
+	}
+	if _, ok := msg.(measureMsg); ok {
+		m.measurePending = false
+		if m.clock().Sub(m.lastKeyAt) < enterSettle {
+			// Still pasting. No flush and no redraw yet: every redraw is output
+			// the console must parse, and on Windows that held up reading the
+			// rest of the paste (measured: ~200 records/s instead of thousands).
+			return m, m.scheduleMeasure()
+		}
+	}
+	m.frameKnown = false
+	// Whatever is handled next sees the paste so far as text in the box.
+	m.flushPaste()
 	switch msg := msg.(type) {
 	case dialog.ThemeChangedMsg:
 		m.textarea = CreateTextArea(&m.textarea)
@@ -438,6 +612,14 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		m.attachments = append(m.attachments, msg.Attachment)
+	case enterSettledMsg:
+		if msg.seq != m.pendingEnter {
+			return m, nil // a key followed that Enter; it was a pasted line break
+		}
+		m.pendingEnter = 0
+		return m, m.pressEnter()
+	case measureMsg:
+		// The paste is over (see above): fall through to the height check.
 	case tea.KeyMsg:
 		// "?" on an empty prompt opens help instead of typing a lone "?". It is
 		// the one help key every terminal can send: ctrl+? cannot be typed in
@@ -509,27 +691,25 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Hanlde Enter key
 		if m.textarea.Focused() && key.Matches(msg, editorMaps.Send) {
-			value := m.textarea.Value()
-			if len(value) > 0 && value[len(value)-1] == '\\' {
-				// If the last character is a backslash, remove it and add a newline
-				m.textarea.SetValue(value[:len(value)-1] + "\n")
-				return m, nil
-			} else {
-				// Otherwise, send the message. send() resets the textarea, so
-				// re-measure afterwards and let the layout shrink the box back
-				// down. Recomputing (rather than assuming the minimum) stays
-				// correct when send() bails out early, e.g. agent busy.
-				sendCmd := m.send()
-				if h := m.desiredHeight(); h != m.lastReportedHeight {
-					m.lastReportedHeight = h
-					return m, tea.Batch(sendCmd, util.CmdHandler(EditorHeightMsg{Height: h}))
-				}
-				return m, sendCmd
+			if msg.Type != tea.KeyEnter || msg.Paste {
+				return m, m.pressEnter() // ctrl+s cannot come from a paste
 			}
+			// An Enter inside a burst never gets here: bufferPasted took it as a
+			// line break. This one came alone; wait to learn whether keys follow.
+			m.enterSeq++
+			m.pendingEnter = m.enterSeq
+			return m, m.settle(enterSettle, enterSettledMsg{seq: m.enterSeq})
 		}
 
 	}
 	m.textarea, cmd = m.textarea.Update(msg)
+
+	// Measuring renders the whole buffer. Done per key of a console paste that
+	// is quadratic: 15K characters took minutes to land. Measure once the burst
+	// is over instead.
+	if burst {
+		return m, tea.Batch(cmd, m.scheduleMeasure())
+	}
 
 	// GORILLA OVERRIDE: tell the layout when the content's row count changes so
 	// the input box grows/shrinks with what's typed. Only fires on an actual
@@ -573,7 +753,18 @@ func (m *editorCmp) overflowNotice() string {
 		Render(fmt.Sprintf(" %s %d more %s", overflowArrow, n, word))
 }
 
+// View is drawn after every message, each pasted key included. While a paste is
+// only being buffered the field has not changed, so the last frame is reused;
+// rendering it again per key made a 15K-character paste take minutes to land.
 func (m *editorCmp) View() string {
+	if !m.frameKnown {
+		m.frame = m.render()
+		m.frameKnown = true
+	}
+	return m.frame
+}
+
+func (m *editorCmp) render() string {
 	t := theme.CurrentTheme()
 
 	// GORILLA OVERRIDE: size ourselves rather than waiting to be sized.
@@ -619,6 +810,9 @@ func (m *editorCmp) View() string {
 }
 
 func (m *editorCmp) SetSize(width, height int) tea.Cmd {
+	if width != m.width || height != m.height {
+		m.frameKnown = false // the page sets this on every frame; only a change counts
+	}
 	m.width = width
 	m.height = height
 	// GORILLA OVERRIDE: the textarea must leave room for the "> " prompt that
