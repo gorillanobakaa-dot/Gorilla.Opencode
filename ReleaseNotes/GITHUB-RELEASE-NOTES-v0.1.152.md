@@ -148,6 +148,14 @@ Version 0.1.152 on Windows 11, Gemma 4 12B QAT served by LM Studio on the same l
 
 [![Gorilla OpenCode v0.1.152 on Windows with Gemma 4 12B in LM Studio: under the answer and in a red label in the bottom bar the speed reads first word 4m27s, 3.8 tok/s, 357 tokens (345 thinking), with the model's cyan reasoning above](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.152/docs/screenshots/gallery/v0152-speed-meter-gemma.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.152/docs/screenshots/gallery/v0152-speed-meter-gemma.png)
 
+### The same release on a 2011 MacBook Air
+
+Added after publication, on 2026-10-25. The Mac file on this page was built on the Windows laptop, so it had not yet been run on a real old Mac. It was then taken from this page on a MacBook Air from 2011 (macOS 10.13.6, 4 GB of memory), installed with the installer inside the zip, and asked "In one short sentence: what is the capital of Romania?" through Gemini 3.8 Flash (signed in with Google). It answered in 2.4 seconds, then 54.1 tokens per second (7 tokens). The speed shows under the answer and in the red label in the bottom bar.
+
+[![Gorilla OpenCode v0.1.152 on a 2011 MacBook Air with macOS 10.13.6: the answer "The capital of Romania is Bucharest." with first word 2.4s, 54.1 tok/s, 7 tokens in red under it and in a red label in the bottom bar, version v0.1.152 at the right of the status bar](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/5239c5a248ab8a27613732782138cd5aa3865f3f/docs/screenshots/gallery/v0152-macair-speed-meter-gemini.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/5239c5a248ab8a27613732782138cd5aa3865f3f/docs/screenshots/gallery/v0152-macair-speed-meter-gemini.png)
+
+One problem found on the way: `SHA256SUMS-v0.1.152.txt` has Windows line ends on six of its seven lines, and the `shasum` that comes with macOS 10.13 refuses those lines. The checksums themselves are right. On an old Mac, check a file with `shasum -a 256 FILE` and compare the number by eye, or read the list through `tr -d '\r'` first.
+
 ---
 
 # For developers: how it works, and how to check it
