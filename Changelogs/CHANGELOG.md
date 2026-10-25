@@ -3,7 +3,7 @@
 **Plain-language version:** asked to move pictures "to trash", an AI on the
 laptop ran a command that deletes for good, and the program let it in auto
 mode. Now a command that deletes for good says so when you are asked
-("PERMANENT DELETE"). Once you have asked for the trash or the Recycle Bin, a
+("Permanent delete: it deletes for good"). Once you have asked for the trash or the Recycle Bin, a
 permanent delete the AI picks by itself is not run in auto mode, `/yolo` or
 `-p`; the AI is told how to use the Recycle Bin instead. A delete you ask for
 still runs: "delete them permanently", "delete all the pngs" or a command you
