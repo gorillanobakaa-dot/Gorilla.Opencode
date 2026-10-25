@@ -967,9 +967,10 @@ func formatTimestampDiff(start, end int64) string {
 
 // speedSuffix is " | first word 4m17s, 3.9 tok/s, 994 tokens (812 thinking)"
 // for an answer whose speed was measured, "" for one that was not (older rows).
+// The numbers are bright red (styles.Speed), not the muted grey of the line.
 func speedSuffix(msg message.Message) string {
 	if s := msg.Speed(); s != nil {
-		return " | " + s.Summary()
+		return " | " + styles.Speed(s.Summary())
 	}
 	return ""
 }

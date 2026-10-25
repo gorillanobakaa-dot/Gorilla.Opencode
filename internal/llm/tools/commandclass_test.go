@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/llm/tools/shell"
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 )
@@ -37,6 +38,16 @@ func TestReadOnlyCommandsNeverAsk(t *testing.T) {
 	}
 	for _, cmd := range rows {
 		t.Run(cmd, func(t *testing.T) {
+			// GORILLA FIX (2026-10-24): `type` is read-only in bash and
+			// Get-Content in PowerShell, where it asks on purpose
+			// (unixOnlyReadOnly). This row failed on every Windows run; the
+			// rule is right, the row was platform-blind.
+			if strings.HasPrefix(cmd, "type ") && shell.IsWindowsPowerShell() {
+				if v := bashGateVerdict(cmd); v.ReadOnly {
+					t.Errorf("%q skips the gate under PowerShell, where type reads any file", cmd)
+				}
+				return
+			}
 			if v := bashGateVerdict(cmd); !v.ReadOnly {
 				t.Errorf("%q asks; it only reads", cmd)
 			}
