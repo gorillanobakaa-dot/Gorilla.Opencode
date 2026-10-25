@@ -34,6 +34,9 @@ type Engine struct {
 	// Receipt returns the program's own record of what ran in a session
 	// (internal/app/receipt.go). Optional.
 	Receipt func(sessionID string) (string, bool)
+	// ClaimWarning returns the warning line for the session's last turn when
+	// its answer claims an action no tool call backs, else "". Optional.
+	ClaimWarning func(sessionID string) string
 }
 
 // SessionCreator is the one thing the server needs from the session store.
@@ -492,6 +495,15 @@ func (st *turnState) finish(result agent.AgentEvent) map[string]any {
 			stop = "cancelled"
 		case message.FinishReasonPermissionDenied:
 			stop = "refusal"
+		}
+	}
+	// GORILLA OVERRIDE (2026-10-25): a claimed action that nothing ran is
+	// flagged before the receipt (internal/app/claimguard.go). Sent whatever
+	// GORILLA_OPENCODE_NO_RECEIPT says: it is not the receipt, and an editor
+	// shows it to a person. A turn that ended in an error is not checked.
+	if st.s.eng.ClaimWarning != nil && result.Error == nil {
+		if w := st.s.eng.ClaimWarning(st.sessionID); w != "" {
+			st.update(map[string]any{"sessionUpdate": "agent_message_chunk", "content": textBlock("\n\n" + w + "\n")})
 		}
 	}
 	if st.s.eng.Receipt != nil && os.Getenv("GORILLA_OPENCODE_NO_RECEIPT") != "1" {

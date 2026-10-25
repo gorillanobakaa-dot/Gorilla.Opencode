@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"path/filepath"
 	"strings"
@@ -92,6 +93,12 @@ func newRig(t *testing.T, script func(ctx context.Context, sessionID, prompt str
 		Agent:       runner,
 		Receipt: func(string) (string, bool) {
 			return "--- what actually ran ---\n1 tool call:\n  view a.go -> ok\n", true
+		},
+		ClaimWarning: func(id string) string {
+			if rigClaimWarning != nil {
+				return rigClaimWarning(id)
+			}
+			return ""
 		},
 	}
 	clientIn, srvOut := io.Pipe()
@@ -297,6 +304,71 @@ func TestCancelStopsTheTurnAndADeniedQuestionIsADenial(t *testing.T) {
 				t.Errorf("stopReason %v", stop)
 			}
 			return
+		}
+	}
+}
+
+// rigClaimWarning stands in for the program's claim check in one test.
+var rigClaimWarning func(sessionID string) string
+
+// GORILLA OVERRIDE (2026-10-25): the claim warning reaches the editor, after
+// the answer and before the receipt, and only on a turn that ended cleanly.
+func TestAClaimWarningIsSentBeforeTheReceipt(t *testing.T) {
+	asked := ""
+	rigClaimWarning = func(id string) string { asked = id; return "!! CLAIM: nothing was deleted." }
+	t.Cleanup(func() { rigClaimWarning = nil })
+	chunks, sid := claimTurnChunks(t, func(final message.Message) agent.AgentEvent {
+		return agent.AgentEvent{Type: agent.AgentEventTypeResponse, Message: final}
+	})
+	want := []string{"All files were deleted.", "\n\n!! CLAIM: nothing was deleted.\n", "\n\n--- what actually ran ---\n1 tool call:\n  view a.go -> ok\n"}
+	if strings.Join(chunks, "|") != strings.Join(want, "|") {
+		t.Errorf("the editor saw %q, want %q", chunks, want)
+	}
+	if asked != sid {
+		t.Errorf("the check was asked about session %q, want %q", asked, sid)
+	}
+}
+
+func TestATurnThatFailedGetsNoClaimWarning(t *testing.T) {
+	rigClaimWarning = func(string) string { return "!! CLAIM: nothing was deleted." }
+	t.Cleanup(func() { rigClaimWarning = nil })
+	chunks, _ := claimTurnChunks(t, func(message.Message) agent.AgentEvent {
+		return agent.AgentEvent{Type: agent.AgentEventTypeError, Error: errors.New("provider fell over")}
+	})
+	if strings.Contains(strings.Join(chunks, "|"), "!! CLAIM") {
+		t.Errorf("a failed turn was checked: %q", chunks)
+	}
+}
+
+// claimTurnChunks runs one prompt whose answer is "All files were deleted." and
+// returns the text chunks the editor saw, and the session id.
+func claimTurnChunks(t *testing.T, end func(final message.Message) agent.AgentEvent) ([]string, string) {
+	t.Helper()
+	var r *rig
+	r = newRig(t, func(ctx context.Context, sessionID, prompt string, out chan<- agent.AgentEvent) {
+		final := assistant("m1", sessionID, "All files were deleted.", "")
+		final.AddFinish(message.FinishReasonEndTurn)
+		runnerOf(t, r).msgs.Publish(pubsub.UpdatedEvent, final)
+		out <- end(final)
+	})
+	r.send(map[string]any{"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": map[string]any{"protocolVersion": 1}})
+	r.next()
+	r.send(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "session/new", "params": map[string]any{"cwd": t.TempDir(), "mcpServers": []any{}}})
+	sid := r.next()["result"].(map[string]any)["sessionId"].(string)
+	r.send(map[string]any{"jsonrpc": "2.0", "id": 2, "method": "session/prompt", "params": map[string]any{"sessionId": sid, "prompt": []map[string]any{{"type": "text", "text": "delete the pngs"}}}})
+
+	var chunks []string
+	for {
+		m := r.next()
+		if m["method"] == "session/update" {
+			u := m["params"].(map[string]any)["update"].(map[string]any)
+			if c, ok := u["content"].(map[string]any); ok {
+				chunks = append(chunks, c["text"].(string))
+			}
+			continue
+		}
+		if m["id"] != nil && m["id"].(float64) == 2 {
+			return chunks, sid
 		}
 	}
 }
