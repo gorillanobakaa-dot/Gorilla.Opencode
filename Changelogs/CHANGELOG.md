@@ -1,3 +1,22 @@
+## v0.1.153 (2026-10-25): a missing model never sends your conversation anywhere; "local." means this computer; a long paste stays one message
+
+**Plain-language version:** when the AI model named in your settings is gone
+(deleted from LM Studio, renamed, retired), the program no longer picks
+another one by itself. On 25 October it had picked NVIDIA's cloud and sent the
+whole conversation there. Now nothing is sent until a model is chosen: with
+the screen open, the model list opens by itself, says why, and shows only the
+models your own computer can run now. Without the screen (`-p`, editors), it
+uses the first model from your own short list (`preferredLocalModels`) that
+your computer has at that moment, says which, or stops and says nothing was
+sent. Models from a server on the internet are now named `remote.`, not
+`local.`; old names keep working. A run without the screen no longer asks a
+server on the internet for its model list unless a model in your settings is
+on it. On Windows, a long paste stays one message until you press Enter, and
+the installer names the icon sizes it really installed.
+
+Full notes: `Changelogs/v0.1.153-release-notes.layman.md` and
+`Changelogs/v0.1.153-release-notes.developer.md`.
+
 ## v0.1.152 (2026-10-24): a speed line under every answer, "thinking off" really off, no false "conversation too big"
 
 **Plain-language version:** with an AI on your own computer (LM Studio, Ollama)
