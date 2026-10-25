@@ -10,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/opencode-ai/opencode/internal/app"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/diff"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
@@ -378,6 +379,17 @@ func renderAssistantMessage(
 		if isSummary {
 			info = append(info, baseStyle.Width(width-1).Foreground(t.TextMuted()).Render(" (summary)"))
 		}
+		// GORILLA OVERRIDE (2026-10-25): the answer claims an action that no
+		// tool call this turn backs. One bold red line, first under the answer;
+		// the answer itself is left as the model wrote it. See
+		// internal/app/claimguard.go.
+		if line := claimWarningLine(msg, msgIndex, allMessages); line != "" {
+			info = append([]string{baseStyle.
+				Width(width - 1).
+				Foreground(t.Error()).
+				Bold(true).
+				Render(" " + line)}, info...)
+		}
 
 		content = renderMessage(content, false, true, width, info...)
 		messages = append(messages, uiMessage{
@@ -427,6 +439,29 @@ func renderAssistantMessage(
 		position++ // for the space
 	}
 	return messages
+}
+
+// claimWarningLine is the claim warning for the turn that msg ends, or "". Only
+// a message that ended the turn is checked: a message that went on to a tool
+// call is not the turn's last word.
+func claimWarningLine(msg message.Message, msgIndex int, allMessages []message.Message) string {
+	if !msg.IsFinished() || msg.FinishReason() != message.FinishReasonEndTurn {
+		return ""
+	}
+	if msgIndex < 0 || msgIndex >= len(allMessages) || allMessages[msgIndex].ID != msg.ID {
+		msgIndex = -1
+		for i := range allMessages {
+			if allMessages[i].ID == msg.ID {
+				msgIndex = i
+			}
+		}
+		if msgIndex < 0 {
+			return ""
+		}
+	}
+	turn := append([]message.Message{}, app.LastTurn(allMessages, msgIndex)...)
+	turn[len(turn)-1] = msg // the copy being rendered may be newer than the list's
+	return app.ClaimWarningLine(app.ClaimWarning(turn))
 }
 
 func findToolResponse(toolCallID string, futureMessages []message.Message) *message.ToolResult {

@@ -188,6 +188,11 @@ func (s *Session) turn(ctx context.Context, prompt string) error {
 				}
 				return result.Error
 			}
+			// GORILLA OVERRIDE (2026-10-25): a claimed action that no tool
+			// call this turn backs (internal/app/claimguard.go).
+			if w := app.ClaimWarningLine(s.app.ClaimWarningFor(s.sess.ID)); w != "" {
+				fmt.Fprintln(s.out, "\n"+w)
+			}
 			return nil
 		}
 	}

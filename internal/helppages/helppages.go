@@ -138,6 +138,9 @@ func Editor() Page {
 	b.p("  * At the end of each answer, the program's own record of what really ran, beginning " +
 		"\"--- what actually ran\". The program writes it, not the AI, and a helper's actions are " +
 		"listed under that helper.")
+	b.p("  * When an answer says it deleted, moved, ran, installed or saved something and no " +
+		"tool call that turn succeeded, a line beginning \"!! CLAIM NOT BACKED BY ANY TOOL CALL\" " +
+		"says so. It reads English only, and it never changes the answer.")
 	b.blank()
 
 	b.h("Not supported yet")

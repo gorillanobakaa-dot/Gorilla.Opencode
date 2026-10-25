@@ -1,0 +1,77 @@
+# fieldkit mutate --plan tests/mutations-claim-guard.yaml --cwd . -- go test ./internal/app/ ./internal/acp/ ./internal/tui/components/chat/ -count=1 -run "Claim|Honest|Turn|DeepSeek|Shape|Screen|OnlyTheMessage|WarningLine"
+# Every rule of the claim guard (internal/app/claimguard.go, 2026-10-25), broken on purpose; each must be CAUGHT.
+- file: internal/app/claimguard.go
+  swap: ["if strings.HasSuffix(sentence, \"?\") {", "if false && strings.HasSuffix(sentence, \"?\") {"]
+  why: a question counts as a claim again
+- file: internal/app/claimguard.go
+  swap: ["if blocked(words, i) {", "if false && blocked(words, i) {"]
+  why: a negation, modal or condition no longer stops a claim
+- file: internal/app/claimguard.go
+  swap: ["const claimWindow = 4", "const claimWindow = 1"]
+  why: a blocker two or more words before the verb is missed ("if the files were deleted")
+- file: internal/app/claimguard.go
+  swap: ["text = fencedCodeRe.ReplaceAllString(text, \"\\n\")", "_ = fencedCodeRe"]
+  why: words inside a code block count as claims
+- file: internal/app/claimguard.go
+  swap: ["text = inlineCodeRe.ReplaceAllString(text, \" code \")", "_ = inlineCodeRe"]
+  why: '"Executed `del ...`" is no longer seen as a run claim'
+- file: internal/app/claimguard.go
+  swap: ["if auxOnly[before] {", "if true {"]
+  why: the imperative "run" counts as a claim
+- file: internal/app/claimguard.go
+  swap: ["case claimSubjects[before], claimObjects[after], isNumber(after):", "case claimObjects[after], isNumber(after):"]
+  why: '"All files were deleted" / "I deleted" are missed'
+- file: internal/app/claimguard.go
+  swap: ["case claimSubjects[before], claimObjects[after], isNumber(after):", "case claimSubjects[before], isNumber(after):"]
+  why: '"The script erased them" is missed'
+- file: internal/app/claimguard.go
+  swap: ["case claimSubjects[before], claimObjects[after], isNumber(after):", "case claimSubjects[before], claimObjects[after]:"]
+  why: '"renamed 3 files" is missed'
+- file: internal/app/claimguard.go
+  swap: ["case j < 0 && (i > 0 || after == \"code\" || after == \"\"):", "case j < 0:"]
+  why: '"Deleted files go to the Recycle Bin" is flagged'
+- file: internal/app/claimguard.go
+  swap: ["case j < 0 && (i > 0 || after == \"code\" || after == \"\"):", "case false:"]
+  why: a clause that opens with the verb ("Executed ...", "Successfully installed ...") is missed
+- file: internal/app/claimguard.go
+  swap: ["for j >= 0 && claimAdverbs[words[j]] {", "for false && claimAdverbs[words[j]] {"]
+  why: '"have been successfully removed" is missed'
+- file: internal/app/claimguard.go
+  swap: ["if !seen[k] {", "if true {"]
+  why: the same kind is said twice in the warning
+- file: internal/app/claimguard.go
+  swap: ["(c == '.' || c == '!' || c == '?') && (i+1 == len(text)", "(c == '.' || c == '!' || c == '?') && (true || i+1 == len(text)"]
+  why: a dot inside a name splits a question and hides its question mark
+- file: internal/app/claimguard.go
+  swap: ["if turn[i].Role == message.Assistant {", "if i == len(turn)-1 {"]
+  why: only the last message of the turn is read
+- file: internal/app/claimguard.go
+  swap: ["o == \"ok\" || strings.HasPrefix(o, \"ok, \")", "true"]
+  why: a failed call counts as backing the claim
+- file: internal/app/claimguard.go
+  swap: ["if succeeded > 0 {", "if succeeded > 1 {"]
+  why: a turn with one successful call is flagged
+- file: internal/app/claimguard.go
+  swap: ["if calls == 0 {", "if calls >= 0 {"]
+  why: a turn whose calls all failed says "no tool ran"
+- file: internal/app/claimguard.go
+  swap: ["start = i + 1\n\t\t\tbreak", "start = 0\n\t\t\tbreak"]
+  why: an earlier turn's call backs this turn's claim
+- file: internal/app/claimguard.go
+  swap: ["if line == \"\" {\n\t\treturn\n\t}", "if false {\n\t\treturn\n\t}"]
+  why: an empty warning prints a bare prefix line
+- file: internal/tui/components/chat/message.go
+  swap: ["if !msg.IsFinished() || msg.FinishReason() != message.FinishReasonEndTurn {", "if !msg.IsFinished() {"]
+  why: a cancelled or tool-use message is checked as the turn's last word
+- file: internal/tui/components/chat/message.go
+  swap: ["if line := claimWarningLine(msg, msgIndex, allMessages); line != \"\" {", "if line := claimWarningLine(msg, msgIndex, allMessages); false && line != \"\" {"]
+  why: the warning is not drawn on screen
+- file: internal/tui/components/chat/message.go
+  swap: ["\t\t\tif allMessages[i].ID == msg.ID {\n\t\t\t\tmsgIndex = i", "\t\t\tif false {\n\t\t\t\tmsgIndex = i"]
+  why: a stale index loses the warning
+- file: internal/acp/server.go
+  swap: ["if st.s.eng.ClaimWarning != nil && result.Error == nil {", "if st.s.eng.ClaimWarning != nil {"]
+  why: a turn that failed is checked
+- file: internal/acp/server.go
+  swap: ["if w := st.s.eng.ClaimWarning(st.sessionID); w != \"\" {", "if w := st.s.eng.ClaimWarning(st.sessionID); false && w != \"\" {"]
+  why: the editor is not sent the warning

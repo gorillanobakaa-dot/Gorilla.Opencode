@@ -258,21 +258,29 @@ func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat
 	// receipt.go. Set GORILLA_OPENCODE_NO_RECEIPT=1 for the answer alone, for a
 	// script that parses this output and cannot be changed.
 	receipt, haveReceipt := a.receipt(sess.ID)
+	// GORILLA OVERRIDE (2026-10-25): an answer that claims an action nothing
+	// ran gets one warning line before the receipt. See claimguard.go. With the
+	// receipt switched off it goes to stderr, so stdout stays the answer alone.
+	warning := a.ClaimWarningFor(sess.ID)
 	if !haveReceipt || os.Getenv("GORILLA_OPENCODE_NO_RECEIPT") == "1" {
 		fmt.Println(format.FormatOutput(content, outputFormat))
+		printClaimWarning(os.Stderr, warning)
 	} else if f, _ := format.Parse(outputFormat); f == format.JSON {
 		out, err := json.MarshalIndent(struct {
-			Response string  `json:"response"`
-			Receipt  Receipt `json:"receipt"`
-		}{content, receipt}, "", "  ")
+			Response     string  `json:"response"`
+			ClaimWarning string  `json:"claim_warning,omitempty"`
+			Receipt      Receipt `json:"receipt"`
+		}{content, warning, receipt}, "", "  ")
 		if err != nil {
 			fmt.Println(format.FormatOutput(content, outputFormat))
+			printClaimWarning(os.Stderr, warning)
 		} else {
 			fmt.Println(string(out))
 		}
 	} else {
 		fmt.Println(content)
 		fmt.Println()
+		printClaimWarning(os.Stdout, warning)
 		fmt.Print(receipt.Text())
 	}
 

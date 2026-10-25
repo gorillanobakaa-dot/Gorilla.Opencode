@@ -83,6 +83,9 @@ Nothing is printed to stdout but the protocol. Logs go to the usual log file.`,
 			Permissions: a.Permissions,
 			Agent:       a.CoderAgent,
 			Receipt:     a.ReceiptText,
+			ClaimWarning: func(sessionID string) string {
+				return app.ClaimWarningLine(a.ClaimWarningFor(sessionID))
+			},
 		}
 		logging.Info("acp: serving on stdio", "cwd", cwd, "version", version.Version)
 		return acp.New(eng, version.Version, os.Stdin, os.Stdout).Serve(ctx)
