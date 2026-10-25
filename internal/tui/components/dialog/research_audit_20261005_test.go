@@ -223,7 +223,9 @@ func TestResearchScreenPricesTheMeasuredBasis(t *testing.T) {
 		m.SetSize(sz.w, sz.h)
 		v := m.View()
 		allowed := before[sz.h]
-		if m.compact {
+		// Compact is View's decision too (the full form may not fit even at
+		// 40 rows), so ask what View rendered, not what SetSize chose.
+		if m.compact || lipgloss.Height(m.render()) > sz.h {
 			allowed++
 		}
 		if h := lipgloss.Height(v); h > allowed {

@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
+	"github.com/opencode-ai/opencode/internal/llm/models"
 )
 
 // The fit test in research_test.go covers the unpriced shape only. With a
@@ -22,8 +23,14 @@ func TestAPricedSupervisedDialogFitsTheScreenToo(t *testing.T) {
 	pricedConfig(t)
 	// The chat model differs from the helper model here, which adds the
 	// HELPERS RUN ON block: the tallest shape (48 rows before 2026-10-09).
+	// It is pinned: it used to be whatever LM Studio served on the machine.
+	chatModelOtherThanTheHelper(t, models.ProviderLocal)
 	for _, measured := range []bool{false, true} {
 		t.Setenv("XDG_CACHE_HOME", t.TempDir())
+		// The helper timing is cached per process, so a fresh cache directory
+		// alone does not hide samples an earlier test (or this machine) left.
+		config.ResetHelperTimingForTest()
+		t.Cleanup(config.ResetHelperTimingForTest)
 		if measured {
 			for _, in := range []int64{60000, 90000, 120000} {
 				config.RecordResearchRun(4, in, 3000, 20, 90*time.Second)

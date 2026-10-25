@@ -1,0 +1,30 @@
+# fieldkit mutate --plan tests/mutations-dialog-fit.yaml --cwd . -- go test ./internal/tui/components/dialog/ -count=1 -run "ResearchDialogFits|ShortScreens|TallScreens|BelowTheSmallest|PricedSupervised|ReadsNoMachineState|OuterBlankRows"
+# The /research chooser fits every supported screen with measured history (2026-10-25). Each must be CAUGHT.
+- file: internal/tui/components/dialog/research.go
+  swap: ["for m.shed < researchMaxShed {", "for m.shed < 0 {"]
+  why: nothing past compact gives way again (32 rows on 90x30)
+- file: internal/tui/components/dialog/research.go
+  swap: ["\t\tif m.shed >= level {\n\t\t\treturn\n\t\t}", "\t\tif false {\n\t\t\treturn\n\t\t}"]
+  why: shedAt rows are never shed
+- file: internal/tui/components/dialog/research.go
+  swap: ["\t\tif m.shed >= level {\n\t\t\treturn\n\t\t}", "\t\tif level > 0 {\n\t\t\treturn\n\t\t}"]
+  why: rows are shed on a screen the dialog fits
+- file: internal/tui/components/dialog/research.go
+  swap: ["m.clip += lipgloss.Height(out) - m.height", "m.clip += 0"]
+  why: below the smallest screen the key line falls off again
+- file: internal/tui/components/dialog/research.go
+  swap: ["add(kindMoney, \"%s PER MINUTE.    PER HOUR: %s\", pmStr, phStr)", "shedAt(1, kindMoney, \"%s PER MINUTE.    PER HOUR: %s\", pmStr, phStr)"]
+  why: the price is shed to make the dialog fit
+- file: internal/tui/components/dialog/research.go
+  swap: ["\t\t\tif m.shed < 2 {\n", "\t\t\tif false {\n"]
+  why: the selected mode's description is lost on every screen
+- file: internal/tui/components/dialog/research.go
+  swap: ["\t\tvpad = 0\n", "\t\tvpad = 1\n"]
+  why: the last shed step keeps the outer blank rows
+- file: internal/tui/components/dialog/zz_configtest_main_test.go
+  # Port 1 refuses at once: the mutant must not ask the real LM Studio anything.
+  swap: ["\tmodels.DefaultLocalRuntimes = nil\n", "\tmodels.DefaultLocalRuntimes = []struct{ Name, BaseURL string }{{\"dead\", \"http://127.0.0.1:1/v1\"}}\n"]
+  why: the tests probe default local runtimes on loopback again
+- file: internal/tui/components/dialog/zz_configtest_main_test.go
+  swap: ["os.Setenv(v, filepath.Join(tmp, v))", "_ = filepath.Join(tmp, v)"]
+  why: the tests read this machine's helper timing and run history again
