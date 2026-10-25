@@ -24,9 +24,20 @@ import (
 	"testing"
 )
 
+// GORILLA OVERRIDE (2026-10-25): Scripts.For.Work became Scripts on Linux and the
+// toolkit moved into Fieldkit's local kits; with only the old path the guard
+// skipped silently. The first folder that exists is the development copy.
 func devToolkitDir() string {
-	return filepath.Join(os.Getenv("HOME"), "Documents", "Scripts.For.Work",
-		"Code.review", "code_review_toolkit")
+	home := os.Getenv("HOME")
+	for _, d := range []string{
+		filepath.Join(home, "Documents", "Scripts", "Fieldkit", "local", "kits", "Code.review", "code_review_toolkit"),
+		filepath.Join(home, "Documents", "Scripts.For.Work", "Code.review", "code_review_toolkit"),
+	} {
+		if _, err := os.Stat(d); err == nil {
+			return d
+		}
+	}
+	return filepath.Join(home, "Documents", "Scripts.For.Work", "Code.review", "code_review_toolkit")
 }
 
 func TestVendoredToolkitMatchesDevCopy(t *testing.T) {
