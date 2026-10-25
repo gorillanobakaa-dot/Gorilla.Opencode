@@ -131,7 +131,11 @@ type ResearchDialogCmp struct {
 	width, height int
 	// compact drops blank lines and section headers when the terminal is too
 	// short to show the dialog AND its key hints.
-	compact  bool
+	compact bool
+	// shed and clip are the steps past compact, taken in View only when the
+	// compact form still does not fit. See View.
+	shed     int
+	clip     int
 	selected int
 	agents   int
 	question string
@@ -438,6 +442,15 @@ func (m ResearchDialogCmp) costLines() []costLine {
 		}
 		lines = append(lines, costLine{text, k})
 	}
+	// shedAt marks a row that restates or explains another row: it goes at
+	// shed level `level` and above. Money, danger, quota and the row saying
+	// whether the basis is measured or assumed are never shed.
+	shedAt := func(level int, k costKind, f string, a ...any) {
+		if m.shed >= level {
+			return
+		}
+		add(k, f, a...)
+	}
 
 	// GORILLA FIX 2026-08-14: the helper model is now stated FIRST, always, as
 	// the caption for every figure below it — not gated on a provider mismatch
@@ -457,7 +470,7 @@ func (m ResearchDialogCmp) costLines() []costLine {
 			if helper.Provider != chat.Provider {
 				add(kindQuota, "   It is also a DIFFERENT PROVIDER: separate account, separate quota.")
 			}
-			add(kindQuota, "   Every figure below is %s's. Press «m» to use %s.", hName, cName)
+			shedAt(3, kindQuota, "   Every figure below is %s's. Press «m» to use %s.", hName, cName)
 		} else if helper.ID != chat.ID {
 			add(kindDanger, "HELPERS RUN ON: %s", hName)
 			add(kindMuted, "   NOT %s, which you are chatting with.", cName)
@@ -474,7 +487,7 @@ func (m ResearchDialogCmp) costLines() []costLine {
 		}
 	}
 
-	add(kindHeader, "WHAT THIS COSTS")
+	shedAt(1, kindHeader, "WHAT THIS COSTS")
 	switch {
 	case !priced:
 		add(kindDanger, "CANNOT PRICE %s. No rate on record.", modelName)
@@ -486,7 +499,7 @@ func (m ResearchDialogCmp) costLines() []costLine {
 		if !m.compact { // restates the two lines above; dropped on short screens
 			add(kindMuted, "   %s x %s per minute = %s", humanDuration(seconds), pmStr, total)
 		}
-		add(kindMuted, "   %d sessions, %s each, on %s.", n, amount(parseBack(total)/float64(n)), modelName)
+		shedAt(1, kindMuted, "   %d sessions, %s each, on %s.", n, amount(parseBack(total)/float64(n)), modelName)
 		// GORILLA OVERRIDE (2026-08-23): ROADMAP item 6. The figure above is
 		// HELPERS ONLY. The turn that launches the run and the turn that reads
 		// every answer back and writes the synthesis both run on the CODER model,
@@ -536,7 +549,7 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	// screen stating the maximum is 10. One word carrying two different meanings
 	// is most of why the arithmetic looked broken.
 	add(kindMuted, "")
-	add(kindHeader, "QUOTA")
+	shedAt(1, kindHeader, "QUOTA")
 	// Now a real token comparison rather than a rescaled step count: a helper
 	// step carries four tools, an ordinary question carries the coder's thirteen,
 	// so they are not one-for-one. See ResearchQuotaMultiple.
@@ -551,7 +564,7 @@ func (m ResearchDialogCmp) costLines() []costLine {
 			humanCount(in+out), humanCount(config.ResearchOrdinaryQuestionTokens()))
 	}
 	if mode == "supervised" {
-		add(kindMuted, "   %d helpers + %d auditors = %d sessions, %d steps each.",
+		shedAt(1, kindMuted, "   %d helpers + %d auditors = %d sessions, %d steps each.",
 			m.agents, audited, n, config.ResearchStepsPerHelper)
 		// The DOUBLE claim, made checkable. It is double TIME at one rate, not
 		// a faster burn — and above 4 helpers it is not every lane either.
@@ -559,8 +572,8 @@ func (m ResearchDialogCmp) costLines() []costLine {
 		// followed by an explanation of an exclusion that is not happening is
 		// its own small piece of nonsense.
 		if audited < m.agents {
-			add(kindQuota, "   Only %d of %d lanes are audited. The verifier and completeness", audited, m.agents)
-			add(kindMuted, "   lanes read the others' work and are never checked themselves.")
+			shedAt(2, kindQuota, "   Only %d of %d lanes are audited. The verifier and completeness", audited, m.agents)
+			shedAt(2, kindMuted, "   lanes read the others' work and are never checked themselves.")
 		}
 	} else {
 		add(kindMuted, "   %d helpers x %d steps each.", n, config.ResearchStepsPerHelper)
@@ -597,7 +610,7 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	// row below, and the PUBLISHED row restates what the money lines show.
 	_, _, _, tokensMeasured := config.ResearchHelperSessionTokens()
 	if !(m.compact && tokensMeasured) {
-		add(kindMeasured, "MEASURED: %s tokens of context per helper step (this machine).",
+		shedAt(1, kindMeasured, "MEASURED: %s tokens of context per helper step (this machine).",
 			humanCount(config.ResearchHelperBasisTokens()))
 	}
 	if !m.compact {
@@ -616,9 +629,9 @@ func (m ResearchDialogCmp) costLines() []costLine {
 	secs, n, timed := config.MeasuredSecondsPerHelper()
 	switch {
 	case timed && tokensMeasured:
-		add(kindMeasured, "MEASURED: %.0fs per helper, median of your last %d (this machine).", secs, n)
+		shedAt(2, kindMeasured, "MEASURED: %.0fs per helper, median of your last %d (this machine).", secs, n)
 	case timed:
-		add(kindMeasured, "MEASURED: %.0fs per helper, median of your last %d (this machine).", secs, n)
+		shedAt(2, kindMeasured, "MEASURED: %.0fs per helper, median of your last %d (this machine).", secs, n)
 		add(kindAssumed, "ASSUMED («not measured»): %d steps | %d out per step.",
 			config.ResearchStepsPerHelper, config.ResearchOutputPerStep)
 	case tokensMeasured:
@@ -766,7 +779,23 @@ func (m ResearchDialogCmp) renderCost(width int) string {
 		}
 		out = append(out, st.Render(emphasise(text, t)))
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, out...)
+	block := lipgloss.JoinVertical(lipgloss.Left, out...)
+	if m.clip <= 0 {
+		return block
+	}
+	// The last resort (see View): the block keeps its top rows, which carry
+	// the model and the money, and one row says how much is hidden and why.
+	rows := strings.Split(block, "\n")
+	keep := len(rows) - m.clip - 1
+	if keep < 0 {
+		keep = 0
+	}
+	if keep >= len(rows) {
+		return block
+	}
+	note := base.Foreground(t.Warning()).Width(width).Padding(0, 1).
+		Render(fmt.Sprintf("... %d more rows hidden: make the window taller to see them.", len(rows)-keep))
+	return lipgloss.JoinVertical(lipgloss.Left, append(rows[:keep:keep], note)...)
 }
 
 // emphasise paints «marked» words in a hot colour INSIDE a line.
@@ -843,14 +872,48 @@ func (m ResearchDialogCmp) theWarning() string {
 // 40 rows). With a priced helper model that differs from the chat model the
 // full form is 48 rows, so on a 120x40 terminal the key line fell off the
 // bottom. The deciding fact is whether it fits, so that is what is measured.
+//
+// GORILLA FIX (2026-10-25): compact was the only fallback, and it was not
+// enough. On a machine with measured helper timing but no measured run size
+// the compact form was 32 rows on a 90x30 terminal and the key line fell off
+// again; at 80x24 it was further still. The test that should have caught it
+// read a clean cache on CI and passed. So past compact the dialog sheds rows
+// that restate or explain another row, in three steps (shedAt), and if even
+// that is too tall it clips the cost block and says so. The key line and the
+// mode selector are never cut: a dialog that cannot be confirmed or cancelled
+// is the failure this screen has had four times.
 func (m ResearchDialogCmp) View() string {
 	out := m.render()
-	if !m.compact && m.height > 0 && lipgloss.Height(out) > m.height {
+	if m.height <= 0 || lipgloss.Height(out) <= m.height {
+		return out
+	}
+	if !m.compact {
 		m.compact = true
+		if out = m.render(); lipgloss.Height(out) <= m.height {
+			return out
+		}
+	}
+	for m.shed < researchMaxShed {
+		m.shed++
+		if out = m.render(); lipgloss.Height(out) <= m.height {
+			return out
+		}
+	}
+	// Each pass hides the rows still over; wrapping can differ by a row once
+	// the note is added, hence the loop rather than one subtraction.
+	for i := 0; i < 8 && lipgloss.Height(out) > m.height; i++ {
+		m.clip += lipgloss.Height(out) - m.height
 		out = m.render()
 	}
 	return out
 }
+
+// researchMaxShed is the last shedAt level: 1 drops section rules and rows
+// that restate a figure, 2 the mode's description and the per-row detail of
+// the audit and timing, 3 the mode's own price line (the warning restates it),
+// the "every figure below" caption (the key line names «m») and the outer
+// blank rows.
+const researchMaxShed = 3
 
 func (m ResearchDialogCmp) render() string {
 	t := theme.CurrentTheme()
@@ -898,10 +961,13 @@ func (m ResearchDialogCmp) render() string {
 		if i == m.selected {
 			rows = append(rows,
 				base.Width(maxWidth).Padding(0, 1).Render("▸ "+
-					base.Foreground(t.Background()).Background(t.Primary()).Bold(true).Render(" "+opt.name+" ")),
-				base.Foreground(t.TextMuted()).Width(maxWidth).Padding(0, 4).Render(opt.what),
-				base.Foreground(t.Warning()).Width(maxWidth).Padding(0, 4).Render(opt.cost),
-			)
+					base.Foreground(t.Background()).Background(t.Primary()).Bold(true).Render(" "+opt.name+" ")))
+			if m.shed < 2 {
+				rows = append(rows, base.Foreground(t.TextMuted()).Width(maxWidth).Padding(0, 4).Render(opt.what))
+			}
+			if m.shed < 3 {
+				rows = append(rows, base.Foreground(t.Warning()).Width(maxWidth).Padding(0, 4).Render(opt.cost))
+			}
 			continue
 		}
 		rows = append(rows, base.Foreground(t.TextMuted()).Width(maxWidth).Padding(0, 1).
@@ -928,7 +994,11 @@ func (m ResearchDialogCmp) render() string {
 
 	content := lipgloss.JoinVertical(lipgloss.Left, rows...)
 
-	return base.Padding(1, 2).
+	vpad := 1
+	if m.shed >= 3 {
+		vpad = 0
+	}
+	return base.Padding(vpad, 2).
 		Border(lipgloss.RoundedBorder()).
 		BorderBackground(styles.PanelBackground()).
 		BorderForeground(t.TextMuted()).
