@@ -19,7 +19,7 @@
   swap: ["\tcase trash:\n\t\ttrashRecord.asked[sessionID] = true", "\tcase trash:"]
   why: "a trash request is not recorded"
 - file: internal/llm/tools/trash.go
-  swap: ["\tcase permanent:\n\t\tdelete(trashRecord.asked, sessionID)", "\tcase permanent:"]
+  swap: ["case permanent, typedDelete(low):", "case typedDelete(low):"]
   why: "the person asking for a permanent delete no longer clears the record"
 - file: internal/llm/tools/trash.go
   swap: ['if !negatedAt(low, i, 3, false) {', 'if true {']
@@ -72,3 +72,9 @@
 - file: internal/llm/tools/trash.go
   swap: ["|[șş]terg|", "|"]
   why: "Romanian 'șterge' is not read as a delete order"
+- file: internal/llm/tools/trash.go
+  swap: ["case permanent, typedDelete(low):", "case permanent:"]
+  why: "owner case: 'to trash' then 'rm -rf *.png instead of the trash' is still refused"
+- file: internal/llm/tools/trash.go
+  swap: ["if !negatedAt(low, m[0]+1, 2, true) {", "if true {"]
+  why: "'don't rm -rf them' counts as a typed delete order"

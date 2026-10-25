@@ -230,6 +230,12 @@ var permanentWords = []string{
 // later "ok, just delete them", deletes.
 var deleteWords = regexp.MustCompile(`(?i)\b(delete|remove|erase|wipe|get rid of|rm|del|supprime[rz]?|efface[rz]?|borra[r]?|elimina[r]?|lösche[n]?|entferne[n]?|apaga[r]?|cancella(re)?)\b|[șş]terg|\bsterg`)
 
+// deleteCommand is a delete COMMAND the person typed ("use rm -rf *.png",
+// "Remove-Item *.png"). Owner, 2026-10-25: after "to trash" they insisted on
+// `rm -rf *.png`, and that is the latest explicit order even when the same
+// message also says "trash" ("rm -rf *.png instead of the trash").
+var deleteCommand = regexp.MustCompile(`(?i)(^|[\s` + "`" + `"'(;|&])(rm\s+(-[a-z]+\s+)*\S|remove-item\s+\S|rd\s+/s|rmdir\s+/s|del\s+/[qsf]|del\s+\S+\.\w+|erase\s+\S)`)
+
 // negations, among the three words before a permanent phrase, turn it around:
 // "to the trash, do not delete them permanently" still means the trash, while
 // "no wait, delete them permanently" does not.
@@ -264,6 +270,17 @@ func mentionsPermanent(low string) bool {
 func deleteOrdered(low string) bool {
 	for _, m := range deleteWords.FindAllStringIndex(low, -1) {
 		if !negatedAt(low, m[0], 2, true) {
+			return true
+		}
+	}
+	return false
+}
+
+// typedDelete reports a delete command the person typed, not negated just
+// before it ("don't rm them" is no order).
+func typedDelete(low string) bool {
+	for _, m := range deleteCommand.FindAllStringIndex(low, -1) {
+		if !negatedAt(low, m[0]+1, 2, true) {
 			return true
 		}
 	}
@@ -312,7 +329,7 @@ func NoteUserRequest(sessionID, text string) {
 	trashRecord.mu.Lock()
 	defer trashRecord.mu.Unlock()
 	switch {
-	case permanent:
+	case permanent, typedDelete(low):
 		delete(trashRecord.asked, sessionID)
 	case trash:
 		trashRecord.asked[sessionID] = true

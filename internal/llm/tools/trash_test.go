@@ -110,6 +110,57 @@ func TestTrashRequestIsRecordedFromThePersonsWords(t *testing.T) {
 	assert.False(t, TrashAsked("trash-none"), "a plain delete request is not a trash request")
 }
 
+// The owner's three cases (command post, 2026-10-25 18:38: "we do want to be
+// able to delete files ... that's the whole point of this exercise").
+func TestOwnerCaseTrashThenTypedRmRunsTheDelete(t *testing.T) {
+	for i, later := range []string{
+		"use rm -rf *.png",
+		"rm -rf *.png instead of the trash",
+		"no, Remove-Item *.png -Force, forget the recycle bin",
+	} {
+		s := "owner-typed-" + string(rune('a'+i))
+		NoteUserRequest(s, "MOVE ALL THESE FILES to trash")
+		require.True(t, TrashAsked(s))
+		NoteUserRequest(s, later)
+		assert.False(t, TrashAsked(s), "the person's typed delete command must win: %q", later)
+		perms := newTrashPerms(true)
+		r := trashRun(t, s, perms, `rm -rf *.png`)
+		assert.NotContains(t, r.Content, "NOT RUN", later)
+		require.Len(t, perms.asked, 1, "it goes to the permission service like any command (auto approves it)")
+		assert.Contains(t, perms.asked[0].Description, PermanentDeleteWhy, "the prompt may say so")
+		assert.NotContains(t, perms.asked[0].Description, "You asked for the Recycle Bin")
+		assert.Empty(t, perms.asked[0].Irreversible, "no second confirmation: an ordinary delete is not an auto-approve carve-out")
+		assert.Empty(t, perms.asked[0].HardStop)
+	}
+	s := "owner-typed-negated"
+	NoteUserRequest(s, "to the trash please, don't rm -rf them")
+	assert.True(t, TrashAsked(s), "a negated typed command is no order")
+}
+
+func TestOwnerCaseDeleteAllThePngsRunsInAutoMode(t *testing.T) {
+	s := "owner-delete-all"
+	NoteUserRequest(s, "delete all the pngs")
+	perms := newTrashPerms(true)
+	r := trashRun(t, s, perms, `Remove-Item *.png -Force`)
+	assert.NotContains(t, r.Content, "NOT RUN")
+	require.Len(t, perms.asked, 1)
+	assert.Empty(t, perms.asked[0].Irreversible)
+	assert.Empty(t, perms.asked[0].HardStop)
+}
+
+func TestOwnerCaseTrashThenModelChosenRemoveItemIsRefused(t *testing.T) {
+	s := "owner-trash-only"
+	NoteUserRequest(s, "MOVE ALL THESE FILES to trash")
+	perms := newTrashPerms(true)
+	r := trashRun(t, s, perms, `Remove-Item *.png -Force -Recurse`)
+	assert.Contains(t, r.Content, "NOT RUN")
+	assert.Contains(t, r.Content, "Recycle Bin instead")
+	if runtime.GOOS == "windows" {
+		assert.Contains(t, r.Content, "SendToRecycleBin")
+	}
+	assert.Empty(t, perms.asked)
+}
+
 func TestAHelperInheritsTheRecordAndCannotClearIt(t *testing.T) {
 	parent, child := "trash-parent-"+t.Name(), "trash-child-"+t.Name()
 	NoteUserRequest(parent, "move these to the recycle bin")
