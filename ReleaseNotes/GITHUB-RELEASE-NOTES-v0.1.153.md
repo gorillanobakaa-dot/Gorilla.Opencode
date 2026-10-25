@@ -199,6 +199,28 @@ The same program with its screen, in a hidden console (keys written into the con
  │  [lmstudio] Gemma 4                                                                                               │
 ```
 
+## The pictures
+
+Taken on 2026-10-25 from the published `gorilla-opencode.exe` above (Fieldkit `tui_shots.py --tour choice`) in a classic Windows console. The configuration names the deleted model for every agent and has one connection, LM Studio on this laptop, with Qwen3.6-35B-A3B loaded.
+
+### The model list opens by itself
+
+Nothing was typed. The list opened on "ON THIS MACHINE — available now", with the reason in red above it and again in the bottom bar. It offers only the three models LM Studio has, the loaded one marked "(loaded)".
+
+[![Gorilla OpenCode v0.1.153 on Windows: the model list opened by itself on ON THIS MACHINE available now, with the red line coder model local.deepseek/deepseek-r1-0528-qwen3-8b is not in lmstudio any more (4 agents) nothing is sent until you pick, offering only Qwen3 (loaded) and two Gemma 4 models from LM Studio](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.153/docs/screenshots/gallery/v0153-model-choice-picker.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.153/docs/screenshots/gallery/v0153-model-choice-picker.png)
+
+### The pick, for every agent
+
+Enter on Qwen3. Only now may anything be sent; the helper agents follow the pick.
+
+[![Gorilla OpenCode v0.1.153 status bar after the pick reads Model chosen Qwen3 for every agent, with nothing sent before it](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.153/docs/screenshots/gallery/v0153-model-chosen.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.153/docs/screenshots/gallery/v0153-model-chosen.png)
+
+### The first answer, from the laptop's own model
+
+"Say hello in five words." The answer came from Qwen3 in LM Studio: 3 minutes 41 seconds before the first word, while it read 12.5K tokens of instructions and tools, then 10.0 tokens a second. The speed is in red under the answer and in the bottom bar.
+
+[![Gorilla OpenCode v0.1.153 answering Hello there from your local AI assistant from Qwen3 in LM Studio, with the red speed line first word 3m41s, 10.0 tok/s, 8 tokens under the answer and in the bottom bar](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.153/docs/screenshots/gallery/v0153-speed-line-qwen.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.153/docs/screenshots/gallery/v0153-speed-line-qwen.png)
+
 ## Real model, real work, before publishing
 
 The exact `gorilla-opencode.exe` above (SHA-256 `3c58a210…`, `--version` v0.1.153) was first on PATH. The model was Qwen3.6-35B-A3B (Q4_K_M) in LM Studio on the same laptop: Intel Iris Xe graphics, 32,768-token window, about 10 words a second. Three Fieldkit test sets ran on 25 October between 19:39 and 20:00. Each verdict comes from the session record and the disk, not from what the model said.
@@ -225,7 +247,7 @@ The exact `gorilla-opencode.exe` above (SHA-256 `3c58a210…`, `--version` v0.1.
 
 ## After publication (done by the maintainer's sessions, recorded here when done)
 
-1. The tag `v0.1.153` is on the tip of the `release-v0.1.153` branch, NOT on the commit that merges it into main. While this release was being checked, main gained two later changes (#23 trash vs delete, #24 keys typed during start-up), and those are not in these files. The branch tip holds exactly the code of 0babfc5, the commit the files were built from; only this page was added after it. A tag on the merge commit would name code that is not in the files. The pull request is still merged on the owner's word, so these notes and this page land on main.
+1. The tag `v0.1.153` is on the tip of the `release-v0.1.153` branch, NOT on the commit that merges it into main. While this release was being checked, main gained two later changes (#23 trash vs delete, #24 keys typed during start-up), and those are not in these files. The branch tip holds exactly the code of 0babfc5, the commit the files were built from; after it only this page, its three pictures and the PKGBUILD version line were added (`git diff --name-only 0babfc5 v0.1.153` lists nothing else). A tag on the merge commit would name code that is not in the files. The pull request is still merged on the owner's word, so these notes and this page land on main.
 2. The release is created from that tag with the six files above, `SHA256SUMS-v0.1.153.txt`, and this page.
 3. `fieldkit release verify v0.1.153 --repo gorillanobakaa-dot/Gorilla.Opencode`: every file downloaded again into an empty folder and checked against SHA256SUMS, GitHub's own digests and the table above; the `linux-install` workflow installs and starts the `.deb` on Ubuntu and the `.rpm` on Fedora.
 4. The `arch-package` workflow builds, installs and runs the Arch package from the tag and attaches it; SHA256SUMS is updated; `packaging/PKGBUILD` gets the tag's source checksum in a follow-up pull request.
