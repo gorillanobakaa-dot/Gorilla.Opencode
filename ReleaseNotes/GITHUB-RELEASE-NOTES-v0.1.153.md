@@ -158,6 +158,9 @@ The Windows program and the Linux program were built on 2026-10-25 on one Window
 | `gorilla-opencode_0.1.153_amd64.deb` | 17,653,556 | `1108e95d6a054bb23889b4b049cd3a8d09b573619d72c479d1350369c19ae124` |
 | `gorilla-opencode-0.1.153-1.x86_64.rpm` | 25,331,260 | `2b4e741a42dd4f9856e83b855a1abf18df15a80e7b0c4a462cafb1e9fc923f0a` |
 | `gorilla-opencode-0.1.153-mac-10.13-x86_64.zip` | 24,213,540 | `acb6f0b088000e1f53f0778bf89d72e31372c11218e35e5fb55b43e6828eef90` |
+| `gorilla-opencode-0.1.153-1-x86_64.pkg.tar.zst` | 26,549,880 | `76d81a6db12cacef8efdc04a319ed642ebca8f27df9bb6e68887422db0d317f4` |
+
+The Arch package row was added after publication. On Arch or CachyOS, install it with `sudo pacman -U ./gorilla-opencode-0.1.153-1-x86_64.pkg.tar.zst`. The `arch-package` workflow (run 40230282930) built the package on Arch from the tagged source, using the PKGBUILD with the tag's source checksum (`release-v0.1.153-pkgbuild`). It installed the package, ran it, uninstalled it, and attached it with its checksum to `SHA256SUMS-v0.1.153.txt`. All seven files on this page were then downloaded again and checked against that file with `fieldkit release verify`. The `linux-install` workflow (run 40230081740) installed and started the Ubuntu `.deb` and the Fedora `.rpm`, and `linux-conversation` (run 40230081827) passed.
 
 ## The 25 October case, run again on the published Windows program
 
