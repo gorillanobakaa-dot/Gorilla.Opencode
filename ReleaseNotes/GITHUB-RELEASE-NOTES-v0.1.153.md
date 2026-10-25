@@ -225,7 +225,7 @@ The exact `gorilla-opencode.exe` above (SHA-256 `3c58a210…`, `--version` v0.1.
 
 ## After publication (done by the maintainer's sessions, recorded here when done)
 
-1. The pull request of `release-v0.1.153` is merged on the owner's word; the tag `v0.1.153` is put on the merge commit.
+1. The tag `v0.1.153` is on the tip of the `release-v0.1.153` branch, NOT on the commit that merges it into main. While this release was being checked, main gained two later changes (#23 trash vs delete, #24 keys typed during start-up), and those are not in these files. The branch tip holds exactly the code of 0babfc5, the commit the files were built from; only this page was added after it. A tag on the merge commit would name code that is not in the files. The pull request is still merged on the owner's word, so these notes and this page land on main.
 2. The release is created from that tag with the six files above, `SHA256SUMS-v0.1.153.txt`, and this page.
 3. `fieldkit release verify v0.1.153 --repo gorillanobakaa-dot/Gorilla.Opencode`: every file downloaded again into an empty folder and checked against SHA256SUMS, GitHub's own digests and the table above; the `linux-install` workflow installs and starts the `.deb` on Ubuntu and the `.rpm` on Fedora.
 4. The `arch-package` workflow builds, installs and runs the Arch package from the tag and attaches it; SHA256SUMS is updated; `packaging/PKGBUILD` gets the tag's source checksum in a follow-up pull request.
