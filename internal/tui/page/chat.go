@@ -392,6 +392,14 @@ func (p *chatPage) sendMessage(text string, attachments []message.Attachment) te
 	return tea.Batch(cmds...)
 }
 
+// EditorText is what the chat box holds.
+func (p *chatPage) EditorText() string {
+	if v, ok := p.editorCap.(interface{ Value() string }); ok {
+		return v.Value()
+	}
+	return ""
+}
+
 func (p *chatPage) SetSize(width, height int) tea.Cmd {
 	return p.layout.SetSize(width, height)
 }
