@@ -244,13 +244,16 @@ func platformInstall() error {
 		fmt.Println("already running from:", exePath)
 	}
 
-	// The .ico carries all seven sizes (256 down to 16) so Windows has a real
-	// image for every context — the 256 for large tiles and the Alt-Tab view,
-	// the 16 for the title bar — instead of downscaling one big PNG badly.
+	// The .ico carries every size Windows asks for (16 up to 256) so it has a
+	// real image for every context — the 256 for large tiles and the Alt-Tab
+	// view, the 16 for the title bar — instead of downscaling one big PNG badly.
 	if err := installAsset("icons/"+appIcoName, icoPath); err != nil {
 		return err
 	}
-	fmt.Println("installed icon:", icoPath, "(256/128/64/48/32/24/16)")
+	// GORILLA FIX (2026-10-25): the sizes are read from the file just written.
+	// This printed a hand-typed "(256/128/64/48/32/24/16)" that stayed when the
+	// v0.1.152 icon brought 21 sizes.
+	fmt.Println("installed icon:", icoPath, icoSizesLabel(icoPath))
 
 	// The shortcut points at the EXE, not at "exe launch". Double-clicking a
 	// console program is how a terminal app is opened on Windows, and cobra's

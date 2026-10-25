@@ -131,6 +131,9 @@ The Windows program and the Linux program were built on 2026-10-25 on one Window
 | `gorilla-opencode_0.1.152_amd64.deb` | 22,210,514 | `30e6659e1c45f249565afabbf437d1bbe0dec982a052f06b9a5dc2abeb429901` |
 | `gorilla-opencode-0.1.152-1.x86_64.rpm` | 25,299,220 | `36967095b714bf3fedd36cf14fac74118a5817ae8c4af9b84fed12535fbc187c` |
 | `gorilla-opencode-0.1.152-mac-10.13-x86_64.zip` | 24,179,093 | `637df3b259489cb955b59ab2306ae83b35ea8058276ec86e037222dbb1a7a0d4` |
+| `gorilla-opencode-0.1.152-1-x86_64.pkg.tar.zst` | 26,505,516 | `7c8753b97d0cc6af102d456836282d25b5c77cc34bdd256055275513b4a6e1be` |
+
+The Arch package row was added after publication: the `arch-package` workflow built it from the tagged source on Arch, installed it, ran it (it reports v0.1.152), uninstalled it and attached it with its checksum. All the files on this page were then downloaded again and checked against `SHA256SUMS-v0.1.152.txt`; the Ubuntu `.deb` and the Fedora `.rpm` were installed and started by the `linux-install` workflow.
 
 Before publishing, the exact `gorilla-opencode.exe` above was run headless against Gemma 4 12B QAT in LM Studio with the Fieldkit tools connected (`run_fieldkit_mcp_scenarios.py`, scenario "count"). Asked "How many tools do I have access to through Fieldkit? Count them, do not guess.", it called `fieldkit_readiness` and answered "You have 1,445 tools accessible through Fieldkit. Of those, 12 are verified, 44 are tested, 319 are carded, and 1,070 have been gathered only." Both calls were stored with their speed. That run used the processor only: that night the laptop's Intel Iris Xe graphics stopped with "device lost" (Vulkan) on every large request after the first fault at 00:50, so the model was loaded with the graphics switched off. The earlier runs on the same code, on the graphics, are the pictures below.
 
