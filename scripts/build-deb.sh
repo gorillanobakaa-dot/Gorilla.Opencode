@@ -187,5 +187,9 @@ chmod 755 "$PKG/DEBIAN/postinst" "$PKG/DEBIAN/postrm"
 OUTDIR="$ROOT/Compiled.Builds"
 mkdir -p "$OUTDIR"
 DEB="$OUTDIR/gorilla-opencode_${VERSION}_amd64.deb"
-dpkg-deb --build --root-owner-group "$PKG" "$DEB"
+# GORILLA (2026-10-25, owner's decision): xz -9e, not dpkg-deb's default -6. Measured on the
+# v0.1.152 package: 17.6 MB instead of 22.2 MB for the same files. Unpacking needs ~65 MB of
+# memory instead of ~9 MB; every download over a slow or metered link is 4.6 MB lighter.
+# scripts/build-packages-nfpm.py (the Windows path) uses the same level.
+dpkg-deb --build --root-owner-group -Zxz -z9 -Sextreme "$PKG" "$DEB"
 echo "Built: $DEB"

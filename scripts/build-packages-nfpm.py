@@ -135,14 +135,23 @@ def ar_members(raw: bytes) -> list:
     return out
 
 
+# xz -9e for the .deb's data. Owner's decision, 2026-10-25, from the v0.1.152 measurement of the same tar:
+# nfpm's own xz 25.3 MB, -6 (dpkg-deb's default) 22.2 MB, -9e 17.6 MB. The cost is paid by the builder
+# (slower compression) and by the installing machine (~65 MB of memory to unpack instead of ~9 MB);
+# the 4.6 MB is paid by every person downloading over a slow or metered link. build-deb.sh asks
+# dpkg-deb for the same (-Zxz -z9 -Sextreme).
+XZ_PRESET = 9 | __import__("lzma").PRESET_EXTREME
+XZ_NAME = "xz -9e"
+
+
 def recompress_deb(deb: Path) -> None:
-    """data.tar.xz again at xz preset 6, dpkg-deb's default. Measured 2026-10-25: nfpm's own xz
-    left this .deb at 25.3 MB where preset 6 makes 22.2 MB of the same tar."""
+    """data.tar.xz again at XZ_PRESET."""
     import lzma
     parts = []
     for name, head, body in ar_members(deb.read_bytes()):
         if name == "data.tar.xz":
-            body = lzma.compress(lzma.decompress(body), format=lzma.FORMAT_XZ, check=lzma.CHECK_CRC64, preset=6)
+            body = lzma.compress(lzma.decompress(body), format=lzma.FORMAT_XZ, check=lzma.CHECK_CRC64,
+                                 preset=XZ_PRESET)
             head = head[:48] + f"{len(body):<10}".encode() + head[58:]
         parts.append(head + body + (b"\n" if len(body) & 1 else b""))
     deb.write_bytes(b"!<arch>\n" + b"".join(parts))
@@ -207,10 +216,12 @@ def main():
                  f"extra {sorted(set(got) - set(want))}, modes {[(k, oct(got[k])) for k in want if k in got and got[k] != want[k]]}")
     import lzma
     data = next(b for n, _, b in ar_members(targets["deb"].read_bytes()) if n.startswith("data.tar"))
-    p6 = len(lzma.compress(lzma.decompress(data), preset=6))
-    if len(data) > p6 * 1.01:
-        sys.exit(f"the .deb's data is {len(data):,} bytes where xz preset 6 makes {p6:,}: a heavier download")
-    print(f"deb: {targets['deb'].name}  {len(got)} files, modes as planned, data {len(data):,} bytes (xz -6)")
+    # Measured against the smallest xz can make, written out here, not against XZ_PRESET: a check that
+    # reads the setting it checks passes whatever the setting is.
+    best = len(lzma.compress(lzma.decompress(data), preset=9 | lzma.PRESET_EXTREME))
+    if len(data) > best * 1.01:
+        sys.exit(f"the .deb's data is {len(data):,} bytes where {XZ_NAME} makes {best:,}: a heavier download")
+    print(f"deb: {targets['deb'].name}  {len(got)} files, modes as planned, data {len(data):,} bytes ({XZ_NAME})")
     print(f"rpm: {targets['rpm'].name}  ({targets['rpm'].stat().st_size:,} bytes)")
     if a.compare:
         old = deb_members(Path(a.compare))
