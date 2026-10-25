@@ -36,7 +36,9 @@ package tools
 // by writing "permanently" into a task.
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
@@ -164,10 +166,22 @@ func OnlyScratchTargets(cmd string) bool {
 	return found
 }
 
+// machineTempDir is this machine's temp folder as isScratchTarget compares
+// paths: lowercase, forward slashes, no trailing slash. A variable so a test
+// can play another OS.
+var machineTempDir = func() string {
+	return strings.TrimRight(strings.ToLower(filepath.ToSlash(os.TempDir())), "/")
+}
+
 func isScratchTarget(p string) bool {
 	p = strings.ReplaceAll(p, `\`, "/")
-	for _, r := range tempRoots {
-		if p == r || strings.HasPrefix(p, r+"/") {
+	// GORILLA FIX (2026-10-25, PR #23 CI): the temp folder written out in
+	// full counts too, so the rule is the same on every OS. Only /tmp was
+	// listed, so `rm /tmp/x/a.png` was a clean on Linux while the same
+	// folder on Windows (C:\Users\me\AppData\Local\Temp\x\a.png) was not.
+	roots := append([]string{machineTempDir()}, tempRoots...)
+	for _, r := range roots {
+		if r != "" && (p == r || strings.HasPrefix(p, r+"/")) {
 			return true
 		}
 	}

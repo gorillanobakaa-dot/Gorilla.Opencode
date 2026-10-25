@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/permission"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/stretchr/testify/assert"
@@ -67,6 +68,29 @@ func TestScratchTargetsAreTempOrBuildOutputOnly(t *testing.T) {
 	} {
 		assert.False(t, OnlyScratchTargets(cmd), "a person's files were excused as scratch: %s", cmd)
 	}
+}
+
+// PR #23 CI (ubuntu): the temp exemption must be the same on every OS. Each
+// case runs with the machine temp folder of Linux, Windows and macOS.
+func TestTheTempExemptionIsTheSameOnEveryOS(t *testing.T) {
+	saved := machineTempDir
+	defer func() { machineTempDir = saved }()
+	for _, c := range []struct{ name, temp, tempFile, home string }{
+		{"linux", "/tmp", "/tmp/gorilla-x/a.png", "/home/me/Pictures/a.png"},
+		{"windows", "c:/users/me/appdata/local/temp", `C:\Users\me\AppData\Local\Temp\gorilla-x\a.png`, `C:\Users\me\Pictures\a.png`},
+		{"darwin", "/var/folders/xy/t", "/var/folders/xy/T/gorilla-x/a.png", "/Users/me/Pictures/a.png"},
+	} {
+		machineTempDir = func() string { return c.temp }
+		assert.True(t, OnlyScratchTargets(strings.ToLower("rm -f "+c.tempFile)), "%s: a file in the temp folder is a clean", c.name)
+		assert.True(t, OnlyScratchTargets(strings.ToLower("Remove-Item -Recurse "+c.tempFile)), "%s", c.name)
+		assert.False(t, OnlyScratchTargets(strings.ToLower("rm -f "+c.home)), "%s: a file in Pictures is not a clean", c.name)
+		assert.False(t, OnlyScratchTargets(strings.ToLower("Remove-Item "+c.home+" -Force")), "%s", c.name)
+		assert.False(t, OnlyScratchTargets(strings.ToLower("rm -f "+c.temp+"x/a.png")), "%s: a sibling that only starts like temp is not temp", c.name)
+	}
+	// The spelled-out roots hold whatever the machine temp folder is.
+	machineTempDir = func() string { return "" }
+	assert.True(t, OnlyScratchTargets("rm -f /tmp/a.png"))
+	assert.True(t, OnlyScratchTargets(`remove-item $env:temp\a.png`))
 }
 
 func TestTrashRequestIsRecordedFromThePersonsWords(t *testing.T) {
@@ -203,13 +227,20 @@ func newTrashPerms(auto bool) *trashPerms {
 }
 
 func TestUnwatchedPermanentDeleteIsRefusedAfterATrashRequest(t *testing.T) {
-	dir := t.TempDir()
-	png := filepath.Join(dir, "a.png")
+	// A person's file named relative to the shell's own folder, as the
+	// 2026-10-25 case did (`Remove-Item *.png`). Not a path under the temp
+	// folder: that is a clean, which the rule leaves alone on every OS (the
+	// first version of this test used t.TempDir() and passed on Windows only,
+	// PR #23 CI).
+	name := "trash-test-" + strings.ReplaceAll(t.Name(), "/", "-") + ".png"
+	png := filepath.Join(config.WorkingDirectory(), name)
 	require.NoError(t, os.WriteFile(png, []byte("x"), 0o644))
-	cmd := "rm -f " + filepath.ToSlash(png)
+	t.Cleanup(func() { os.Remove(png) })
+	cmd := "rm -f " + name
 	if runtime.GOOS == "windows" {
-		cmd = "Remove-Item '" + png + "' -Force"
+		cmd = "Remove-Item " + name + " -Force"
 	}
+	require.False(t, OnlyScratchTargets(strings.ToLower(cmd)), "the test must aim at a person's file, not a clean")
 	s := "trash-run-" + t.Name()
 	NoteUserRequest(s, "MOVE ALL THESE FILES to trash")
 	perms := newTrashPerms(true)

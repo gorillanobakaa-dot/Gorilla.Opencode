@@ -78,3 +78,9 @@
 - file: internal/llm/tools/trash.go
   swap: ["if !negatedAt(low, m[0]+1, 2, true) {", "if true {"]
   why: "'don't rm -rf them' counts as a typed delete order"
+- file: internal/llm/tools/trash.go
+  swap: ["roots := append([]string{machineTempDir()}, tempRoots...)", "roots := tempRoots"]
+  why: "PR #23 CI: the temp folder written out in full is a clean on Linux (/tmp) but not on Windows or macOS"
+- file: internal/llm/tools/trash.go
+  swap: ["if r != \"\" && (p == r || strings.HasPrefix(p, r+\"/\")) {", "if r != \"\" && strings.HasPrefix(p, r) {"]
+  why: "a folder that only starts like the temp folder (/tmpx) is excused as temp"
