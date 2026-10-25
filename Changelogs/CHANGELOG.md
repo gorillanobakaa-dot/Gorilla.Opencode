@@ -10,8 +10,8 @@ still fits is no longer stopped as "too big": the program used to count the
 AI's old thinking, which is never sent again. A warning says when the
 instructions take a large part of a small AI's memory. The speed numbers are
 bright red, and the program has a new icon: the gorilla in a cyan flame ring,
-sharp at every size. Windows and Linux files first; Debian/Ubuntu, Fedora and
-Mac files follow.
+sharp at every size. Files for Mac, Windows, Debian/Ubuntu, Fedora, Arch and
+any Linux.
 
 Full notes: `Changelogs/v0.1.152-release-notes.layman.md` and
 `Changelogs/v0.1.152-release-notes.developer.md`.

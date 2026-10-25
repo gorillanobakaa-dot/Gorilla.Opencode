@@ -1,4 +1,4 @@
-# Gorilla OpenCode 0.1.152: Windows and Linux
+# Gorilla OpenCode 0.1.152: Mac, Windows and Linux
 
 **With an AI that runs on your own computer, you can now see where the time goes: when the first word came, how fast the rest came, and how much of it was thinking. Switching thinking off now really switches it off, and a conversation that still fits is no longer stopped as "too big".**
 
@@ -24,9 +24,6 @@ three-word greeting took 30 seconds. Now it takes about 3.
 
 **Everyone else:** a safe update, nothing you rely on changes; the program has a
 new icon, the gorilla in a cyan flame ring.
-
-**Debian, Ubuntu, Fedora and Mac:** the files for these are built on another
-machine and will be added to this page; until then 0.1.151 is the one to use.
 
 ## Why this matters to you
 
@@ -83,7 +80,7 @@ LM Studio's own log showed what happened. Before its first word, the AI spent 4 
 
 - Thinking is not switched off or limited for you. The owner keeps it on to see how the AI reasons and where it goes wrong.
 - No tool is turned off on your behalf when the window is crowded. The warning says what you could turn off; the choice is yours.
-- This page has the Windows program, the Linux program and the Arch package. The Debian/Ubuntu, Fedora and Mac files are built on another machine and will be added to this page.
+- The Mac program is still not signed by Apple (that costs a yearly fee); the first open needs right-click, Open.
 
 ### Privacy and security
 
@@ -91,19 +88,20 @@ Nothing new leaves your computer. The speed line comes from the times at which w
 
 ### How to install
 
+**On a Mac (macOS 10.13 or later, Intel):** on this page, under Assets, click `gorilla-opencode-0.1.152-mac-10.13-x86_64.zip`. Open the folder Safari makes in Downloads, right-click `Install Gorilla OpenCode.command`, choose **Open**, then **Open** again. When it says DONE, double-click "Gorilla OpenCode" on the Desktop. It moves the version you had to the Trash; `Undo Gorilla OpenCode.command` brings it back.
+
 **On Windows:** download `gorilla-opencode.exe`, then in a terminal in that folder: `.\gorilla-opencode.exe install`.
 
-**On Arch or CachyOS:** the `.pkg.tar.zst`. **Any other Linux:** `gorilla-opencode-v0.1.152-linux-amd64`, one file you make executable, or the `.tar.gz`.
+**On Debian, Ubuntu or Mint:** `sudo apt install ./gorilla-opencode_0.1.152_amd64.deb`. **Fedora, openSUSE, Rocky:** the `.rpm`. **Arch, CachyOS:** the `.pkg.tar.zst`. **Any other Linux:** `gorilla-opencode-v0.1.152-linux-amd64`, one file you make executable, or the `.tar.gz`.
 
-**Debian, Ubuntu, Mint, Fedora, Mac:** until their files appear on this page, version 0.1.151 is the latest for those systems.
-
-To check a download is the published file, compare it with `SHA256SUMS-v0.1.152.txt` (Linux: `sha256sum -c SHA256SUMS-v0.1.152.txt --ignore-missing`; Windows: `Get-FileHash gorilla-opencode.exe`).
+To check a download is the published file, compare it with `SHA256SUMS-v0.1.152.txt` (Mac: `shasum -a 256 FILE`; Linux: `sha256sum -c SHA256SUMS-v0.1.152.txt --ignore-missing`; Windows: `Get-FileHash gorilla-opencode.exe`).
 
 ### If something goes wrong
 
 - **The first word takes minutes with an AI on your own computer:** the AI is reading the instructions and tools. Open /context and turn off what you do not use, or give the AI a larger memory in LM Studio or Ollama.
 - **"left out ... old tool output(s)":** the conversation was full; the AI can run the tool again if it needs that output. /compact or /new give it room.
 - **No speed line:** answers from before this version have none.
+- **On a Mac, "unidentified developer":** right-click, **Open**.
 
 ### Common questions
 
@@ -123,13 +121,16 @@ Every block below is real output, copied from a run on the maintainer's computer
 
 ## Measured on the published files
 
-The Windows program and the Linux program were built on 2026-10-25 on one Windows 11 laptop (Go 1.27.0) from commit 71d8223 of the release branch, by `fieldkit pipeline run gorilla-opencode`: modules verified against go.sum, vet clean, the full test suite passed (44 packages, no exception), then both programs built and built a second time in another folder, time zone and locale, **byte for byte identical**. One earlier run of the same suite failed one test, `TestOrdinaryFailuresReportTheRealErrorAndExitCode` (PowerShell lost its own error message once under the full suite's load); it passed in 5 of 6 runs and is recorded as unstable to fix. The pipeline also built a macOS 10.13 program on this laptop; it is not on this page, because nobody has started that build on a Mac yet. The Linux `.tar.gz` holds that Linux program unchanged (one file, mode 0755); it was made with the layout of `scripts/build-tarball.sh`, and because a Windows machine cannot run the Linux program, the check is that the packed file is byte for byte the reproduced program and carries the v0.1.152 stamp. The Arch package is built from the tagged source by the `arch-package` workflow on GitHub and attached with its own checksum. The `.deb`, `.rpm` and Mac zip are not on this page yet.
+The Windows program and the Linux program were built on 2026-10-25 on one Windows 11 laptop (Go 1.27.0) from commit 71d8223 of the release branch, by `fieldkit pipeline run gorilla-opencode`: modules verified against go.sum, vet clean, the full test suite passed (44 packages, no exception), then both programs built and built a second time in another folder, time zone and locale, **byte for byte identical**. One earlier run of the same suite failed one test, `TestOrdinaryFailuresReportTheRealErrorAndExitCode` (PowerShell lost its own error message once under the full suite's load); it passed in 5 of 6 runs and is recorded as unstable to fix. The Linux `.tar.gz` holds that Linux program unchanged (one file, mode 0755); it was made with the layout of `scripts/build-tarball.sh`, and because a Windows machine cannot run the Linux program, the check is that the packed file is byte for byte the reproduced program and carries the v0.1.152 stamp. The `.deb` and `.rpm` carry that same Linux program, packed by `scripts/build-packages-nfpm.py` with the file list of `scripts/build-deb.sh`; compared with the v0.1.151 `.deb` built on the Linux machine: the same 146 paths, the same file modes, the same control fields, dependencies and install scripts, the same xz compression. The macOS 10.13 program was built by the pipeline with Go 1.24.13, the same Go as the Mac builds already running on the MacBook Air, and packed into the same zip layout as v0.1.151 (installer, undo, checksums, plus a READ-ME-FIRST note). The Arch package is built from the tagged source by the `arch-package` workflow on GitHub and attached with its own checksum.
 
 | File | Bytes | SHA-256 |
 |---|---|---|
 | `gorilla-opencode.exe` | 57,307,136 | `bc5057d09562d75d8a7aec3dfb2793dcb314722d2c33faec59ce6234adfda583` |
 | `gorilla-opencode-v0.1.152-linux-amd64` | 55,218,336 | `942c2339554c1f7fcbf8e2b6645526d14653142dfec7a7bc9732e2585be71fd4` |
 | `gorilla-opencode-linux-x86_64.tar.gz` | 21,679,463 | `620be165f7799d9da0548f3a753ff6ca28bafe5028ca05afff371d099bbdaaee` |
+| `gorilla-opencode_0.1.152_amd64.deb` | 22,210,514 | `30e6659e1c45f249565afabbf437d1bbe0dec982a052f06b9a5dc2abeb429901` |
+| `gorilla-opencode-0.1.152-1.x86_64.rpm` | 25,299,220 | `36967095b714bf3fedd36cf14fac74118a5817ae8c4af9b84fed12535fbc187c` |
+| `gorilla-opencode-0.1.152-mac-10.13-x86_64.zip` | 24,179,093 | `637df3b259489cb955b59ab2306ae83b35ea8058276ec86e037222dbb1a7a0d4` |
 
 Before publishing, the exact `gorilla-opencode.exe` above was run headless against Gemma 4 12B QAT in LM Studio with the Fieldkit tools connected (`run_fieldkit_mcp_scenarios.py`, scenario "count"). Asked "How many tools do I have access to through Fieldkit? Count them, do not guess.", it called `fieldkit_readiness` and answered "You have 1,445 tools accessible through Fieldkit. Of those, 12 are verified, 44 are tested, 319 are carded, and 1,070 have been gathered only." Both calls were stored with their speed. That run used the processor only: that night the laptop's Intel Iris Xe graphics stopped with "device lost" (Vulkan) on every large request after the first fault at 00:50, so the model was loaded with the graphics switched off. The earlier runs on the same code, on the graphics, are the pictures below.
 
@@ -177,7 +178,7 @@ One more round-trip write of the assistant message per call (`recordSpeed` updat
 
 ### Toolchain
 
-Go 1.27.0 (Windows). Windows .exe and Linux amd64 binary by `fieldkit pipeline run gorilla-opencode` on Windows (modules, vet, 44 test packages passed, build, byte-identical reproducibility rebuild, checksums); tarball with the layout of `scripts/build-tarball.sh` (one member, 0755, gzip -9), checked by byte equality with the reproduced Linux binary and its version stamp instead of running it; Arch package by `arch-package.yml`. The .deb, .rpm and macOS 10.13 zip need the Linux build machine (dpkg-deb, rpmbuild, patched Go 1.24) and are added afterwards.
+Go 1.27.0 (Windows). Windows .exe and Linux amd64 binary by `fieldkit pipeline run gorilla-opencode` on Windows (modules, vet, 44 test packages passed, build, byte-identical reproducibility rebuild, checksums); tarball with the layout of `scripts/build-tarball.sh` (one member, 0755, gzip -9), checked by byte equality with the reproduced Linux binary and its version stamp instead of running it; Arch package by `arch-package.yml`. macOS 10.13 binary and zip by the pipeline's mac stage with Go 1.24.13 (the toolchain of the builds already run on the MacBook Air; the patch in `build-darwin-legacy.sh` is written for 1.24). .deb and .rpm by the new `scripts/build-packages-nfpm.py`: the file list of `build-deb.sh` with every mode written down (Windows keeps no exec bit), packed by nfpm, the .deb's data recompressed at xz -6 as dpkg-deb does; checked against the Linux-built v0.1.151 .deb: same 146 paths, same modes, same control fields and maintainer scripts.
 
 ### Resource deltas
 
@@ -186,6 +187,7 @@ File sizes are in "Measured on the published files". No new dependency. Status b
 ### Code changes
 
 - `internal/message/speed.go` (new), `content.go` (`Finish.Speed`).
+- `scripts/build-packages-nfpm.py` (new): .deb and .rpm without dpkg-deb or rpmbuild; `--compare` checks a Linux-built .deb's paths and modes; this release's notes are required in the package; fieldkit mutate 3/3 caught (a dropped notes glob, a wrong mode, a skipped xz -6).
 - `internal/llm/agent/speed.go`, `overflow.go`, `crowded.go` (new); `agent.go` (clock, overflow fallback, notice); `contextbudget.go` (`MeasuredNextRequest`, reasoning not counted).
 - `internal/llm/provider/reasoning.go`, `openai.go`, `provider.go`.
 - `internal/tui/components/chat/message.go`, `internal/tui/components/core/status.go`, `internal/export/transcript.go`.
@@ -213,7 +215,7 @@ Unchanged. No new network destination; the reasoning field goes to the endpoint 
 ```sh
 # fetch
 gh release download v0.1.152 --repo gorillanobakaa-dot/Gorilla.Opencode
-# Expected: exe, linux-amd64 binary, tar.gz, .pkg.tar.zst, SHA256SUMS-v0.1.152.txt (.deb, .rpm, Mac zip added later)
+# Expected: exe, linux-amd64 binary, tar.gz, .deb, .rpm, .pkg.tar.zst, Mac zip, SHA256SUMS-v0.1.152.txt
 # verify
 sha256sum -c SHA256SUMS-v0.1.152.txt --ignore-missing
 # Expected: each downloaded file: OK
@@ -226,4 +228,5 @@ gorilla-opencode --version
 
 - Not driven end to end on a real model: the overflow fallback (unit tests only) and the crowded notice on screen.
 - `reasoning_effort: "none"` measured on LM Studio only; other servers rely on the reject-and-retry path.
-- .deb, .rpm and the Mac zip are not on the page at publication.
+- The .deb gains a `md5sums` control member (nfpm writes it, dpkg-deb does not); dpkg accepts both.
+- Mac build unsigned; no arm64 Mac build.

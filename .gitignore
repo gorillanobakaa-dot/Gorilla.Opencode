@@ -160,6 +160,12 @@ checksums.sha256
 !/scripts/packaging/
 /scripts/packaging/*
 !/scripts/packaging/build_mac_legacy_package.py
+# GORILLA: exception (2026-10-25) — the .deb/.rpm builder for machines without
+# dpkg-deb or rpmbuild (v0.1.152 was released from Windows) is PUBLISHED, for the
+# same reason as the Mac packager: the release notes name it and a fresh clone must
+# be able to rebuild the packages. Checked: no credentials, no personal paths; it
+# writes only into the out-dir it is given.
+!/scripts/build-packages-nfpm.py
 
 # Third-party leaked prompts kept LOCAL for study, not redistributed
 system-prompts/reference/
