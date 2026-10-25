@@ -50,12 +50,20 @@ Nothing is printed to stdout but the protocol. Logs go to the usual log file.`,
 		if err := os.Chdir(cwd); err != nil {
 			return err
 		}
+		config.SetRunWithoutScreen(true)
 		cfg, err := config.Load(cwd, false)
 		if err != nil {
 			return err
 		}
 		if _, ok := cfg.Agents[config.AgentCoder]; !ok {
 			return fmt.Errorf("no AI provider is configured: start gorilla-opencode once in a terminal and choose one")
+		}
+		// GORILLA OVERRIDE (2026-10-25): an editor has no model picker of ours.
+		// An unusable configured model is settled from preferredLocalModels
+		// (on this machine, listed now) or the session is refused, before
+		// anything is sent. See config/model_choice.go.
+		if err := config.ChooseForRunWithoutScreen(); err != nil {
+			return err
 		}
 		conn, err := db.Connect()
 		if err != nil {

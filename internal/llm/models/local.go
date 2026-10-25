@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
@@ -210,9 +211,10 @@ func LocalRouteFor(id ModelID) (baseURL, apiKey string, ok bool) {
 // RegisterLocalEndpoint fetches an OpenAI-compatible endpoint's model list and
 // registers each model into SupportedModels, routing every one to this
 // endpoint's baseURL + apiKey. Returns how many were discovered and the first
-// registered model id. IDs stay flat ("local.<rawID>") so existing config
+// registered model id. IDs stay flat ("local.<rawID>" on a loopback endpoint,
+// "remote.<rawID>" on any other host: see onmachine.go) so existing config
 // references keep resolving; only a cross-endpoint id collision is namespaced
-// as "local.<name>/<rawID>". Safe to call at runtime (e.g. from /connect).
+// as "<prefix><name>/<rawID>". Safe to call at runtime (e.g. from /connect).
 func RegisterLocalEndpoint(name, baseURL, apiKey string) (int, ModelID) {
 	raw := fetchLocalModels(baseURL, apiKey)
 	if len(raw) == 0 {
@@ -229,8 +231,10 @@ func RegisterLocalEndpoint(name, baseURL, apiKey string) (int, ModelID) {
 	defer commit()
 	registered := make([]ModelID, 0, len(raw))
 	n := 0
+	prefix := EndpointIDPrefix(baseURL)
 	for _, m := range raw {
 		model := convertLocalModel(m)
+		model.ID = ModelID(prefix + m.ID)
 		if existing, dup := SupportedModels[model.ID]; dup {
 			// GORILLA FIX (2026-09-01): compare CANONICAL urls.
 			//
@@ -243,7 +247,7 @@ func RegisterLocalEndpoint(name, baseURL, apiKey string) (int, ModelID) {
 			if r, routed := localRoute[model.ID]; routed &&
 				CanonicalEndpointURL(r.BaseURL) != CanonicalEndpointURL(baseURL) {
 				// same model id from a different endpoint -> namespace newcomer
-				model.ID = ModelID("local." + name + "/" + m.ID)
+				model.ID = ModelID(prefix + name + "/" + m.ID)
 			}
 			_ = existing
 		}
@@ -769,6 +773,28 @@ func RegisterLocalRouteForTest(id ModelID, baseURL, apiKey string) {
 
 func ClearLocalRouteForTest(id ModelID) { delete(localRoute, id) }
 
+// IsolateLocalEndpointsForTest forgets every endpoint model for the length of
+// a test and returns the function that puts them back. Load discovers a model
+// server running on its default port, so a test about "what this machine
+// serves" would otherwise read the developer's own LM Studio.
+func IsolateLocalEndpointsForTest() (restore func()) {
+	savedRoutes := maps.Clone(localRoute)
+	savedModels := map[ModelID]Model{}
+	for id := range localRoute {
+		if m, ok := SupportedModels[id]; ok {
+			savedModels[id] = m
+		}
+	}
+	for id := range savedRoutes {
+		delete(SupportedModels, id)
+	}
+	localRoute = map[ModelID]localRouteInfo{}
+	return func() {
+		localRoute = savedRoutes
+		maps.Copy(SupportedModels, savedModels)
+	}
+}
+
 // RegisterLocalRouteForTestNamed is the same but records the OWNING endpoint,
 // which matters for any test about removal: routes are dropped by endpoint name,
 // not by baseURL, precisely because several endpoints can share a URL.
@@ -851,6 +877,13 @@ func PreferredLocalModel() ModelID {
 	// local.01-ai/yi-large whenever nothing was ranked, because "01" sorts
 	// first. The same rule as an endpoint's default is used instead: a model
 	// seen to answer, then by family and size. Still deterministic.
+	//
+	// GORILLA OVERRIDE (2026-10-25): a model on THIS machine first. "Local"
+	// used to mean any OpenAI-compatible endpoint, NVIDIA's cloud included,
+	// and that is how a deleted LM Studio model became a prompt sent to NVIDIA.
+	if on := OnMachineModels(); len(on) > 0 {
+		return on[0]
+	}
 	var ids []ModelID
 	for id, m := range SupportedModels {
 		if m.Provider == ProviderLocal {

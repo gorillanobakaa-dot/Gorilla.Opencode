@@ -77,7 +77,7 @@ func IsModelHidden(id string) bool {
 	initHiddenModels()
 	hiddenMu.RLock()
 	defer hiddenMu.RUnlock()
-	return hiddenSet[id]
+	return hiddenSet[id] || hiddenSet[legacyEndpointID(id)]
 }
 
 // HiddenModels returns the hidden ids, sorted, so the review screen is stable.

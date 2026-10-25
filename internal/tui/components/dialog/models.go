@@ -307,6 +307,16 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, util.ReportWarn("no local runtime is connected - use /connect to add one")
 			}
 			n := models.RefreshLocalEndpoints()
+			// The columns themselves can change: while a choice is pending,
+			// a server that has just started turns "available now" into the
+			// only column.
+			m.availableProviders = getEnabledProviders(config.Get())
+			m.hScrollPossible = len(m.availableProviders) > 1
+			if idx := findProviderIndex(m.availableProviders, m.provider); idx >= 0 {
+				m.hScrollOffset = idx
+			} else if len(m.availableProviders) > 0 {
+				m.hScrollOffset, m.provider = 0, m.availableProviders[0]
+			}
 			m.setupModelsForProvider(m.provider)
 			loaded := 0
 			for _, mod := range m.models {
@@ -729,6 +739,15 @@ func (m *modelDialogCmp) View() string {
 			infoLines = append(infoLines, baseStyle.Foreground(t.TextMuted()).Width(w).Render(cl))
 		}
 	}
+	// GORILLA OVERRIDE (2026-10-25): why the picker opened by itself, in one
+	// line above everything else. See config/model_choice.go.
+	if why := config.PendingChoiceSummary(); why != "" {
+		line := why + " - nothing is sent until you pick"
+		if r := []rune(line); len(r) > w {
+			line = string(r[:w-3]) + styles.Ellipsis
+		}
+		infoLines = append([]string{baseStyle.Foreground(t.Warning()).Width(w).Render(line)}, infoLines...)
+	}
 	infoLines = append(infoLines, baseStyle.Width(w).Render(""))
 
 	// Render visible models
@@ -923,6 +942,11 @@ func (m *modelDialogCmp) connectionLine() string {
 	switch m.provider {
 	case ProviderBookmarks:
 		return "each row is tagged [connection] — the same model can arrive via two keys, on two quotas"
+	case ProviderAvailableNow:
+		if len(m.models) == 0 {
+			return "no model server on this machine lists a chat model - start LM Studio or Ollama, then press r"
+		}
+		return "served by your own machine; a prompt sent to these does not leave it"
 	case models.ProviderLocal:
 		line := "your endpoints, working models first"
 		var ids []models.ModelID
@@ -1195,9 +1219,50 @@ func (m *modelDialogCmp) setupModels() {
 	m.detail = nil
 
 	m.provider = modelInfo.Provider
+	// While a choice is pending the coder's model is a placeholder, and the
+	// picker opens on what this machine serves now.
+	if config.ModelChoicePending() {
+		m.provider = ProviderAvailableNow
+	}
 	m.hScrollOffset = findProviderIndex(m.availableProviders, m.provider)
 
 	m.setupModelsForProvider(m.provider)
+}
+
+// ProviderAvailableNow is the virtual column of models this machine serves
+// now (models.OnMachineModels: a loopback endpoint listed it at this launch, it
+// is a chat model, and no probe found it gone).
+//
+// GORILLA OVERRIDE (2026-10-25): it exists for the moment the configured model
+// is unusable (config/model_choice.go). The picker opens on it by itself, and
+// when it holds anything it is the ONLY column: the person is asked to choose
+// among models that are there, not handed a catalogue. When this machine serves
+// nothing, the other columns follow it, so a model can still be chosen on
+// purpose; nothing is ever chosen for them.
+const ProviderAvailableNow models.ModelProvider = "* available now"
+
+// resolveSavedID is a saved id (a bookmark, a hidden entry) as the registry
+// knows it now: a remote endpoint's model saved as "local.x" is "remote.x".
+func resolveSavedID(id string) models.ModelID {
+	if renamed, ok := models.RenamedEndpointID(models.ModelID(id)); ok {
+		return renamed
+	}
+	return models.ModelID(id)
+}
+
+// OpenModelChoiceMsg asks the TUI to open the picker on ProviderAvailableNow
+// because a model choice is pending. Sent at start and by a send that the
+// pending choice stopped.
+type OpenModelChoiceMsg struct{}
+
+func availableNowModels() []models.Model {
+	var out []models.Model
+	for _, id := range models.OnMachineModels() {
+		m := models.SupportedModels[id]
+		m.Rank = 0
+		out = append(out, m)
+	}
+	return out
 }
 
 func GetSelectedModel(cfg *config.Config) models.Model {
@@ -1312,6 +1377,12 @@ func getEnabledProviders(cfg *config.Config) []models.ModelProvider {
 		}
 		return rA - rB
 	})
+	if config.ModelChoicePending() {
+		if len(models.OnMachineModels()) > 0 {
+			return []models.ModelProvider{ProviderAvailableNow}
+		}
+		providers = append([]models.ModelProvider{ProviderAvailableNow}, providers...)
+	}
 	return providers
 }
 
@@ -1331,7 +1402,9 @@ func (m *modelDialogCmp) setupModelsForProvider(provider models.ModelProvider) {
 	selectedModelId := agentCfg.Model
 
 	m.provider = provider
-	if provider == ProviderHidden {
+	if provider == ProviderAvailableNow {
+		m.models = availableNowModels()
+	} else if provider == ProviderHidden {
 		m.models = hiddenModelsList()
 	} else if provider == ProviderBookmarks {
 		m.models = bookmarkedModels()
@@ -1376,7 +1449,7 @@ const ProviderBookmarks models.ModelProvider = "* bookmarks"
 func bookmarkedModels() []models.Model {
 	var out []models.Model
 	for _, id := range config.BookmarkedModels() {
-		if m, ok := models.SupportedModels[models.ModelID(id)]; ok {
+		if m, ok := models.SupportedModels[resolveSavedID(id)]; ok {
 			// The rank belongs to the model's home provider and means nothing
 			// here: the shortlist showed "10, 2, 3, 5, 6, 10 ..." with two entries
 			// numbered 10, which reads as a broken sort. Cleared, so the list
@@ -1404,7 +1477,7 @@ func bookmarkedModels() []models.Model {
 func hiddenModelsList() []models.Model {
 	var out []models.Model
 	for _, id := range config.HiddenModels() {
-		if m, ok := models.SupportedModels[models.ModelID(id)]; ok {
+		if m, ok := models.SupportedModels[resolveSavedID(id)]; ok {
 			m.Rank = 0
 			m.Provider = ProviderHidden
 			out = append(out, m)
@@ -1555,6 +1628,13 @@ func providerDisplayName(p models.ModelProvider) string {
 		// Short: this is a HEADING. The instruction lives in the hint line at
 		// the bottom, which is where every other key is explained.
 		return "* HIDDEN — models you removed from the lists"
+	case ProviderAvailableNow:
+		return "* ON THIS MACHINE — available now"
+	case models.ProviderLocal:
+		// GORILLA OVERRIDE (2026-10-25): this column was titled "Local" and
+		// held NVIDIA's cloud next to LM Studio. It holds every endpoint added
+		// by hand; each row names its endpoint, and ids say local. or remote.
+		return "Your endpoints — this machine (local.) and remote (remote.)"
 	}
 	s := string(p)
 	if s == "" {

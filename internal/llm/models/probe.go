@@ -262,6 +262,13 @@ func ProbeVerdictFor(id ModelID) (ProbeVerdict, bool) {
 	probeMu.RLock()
 	defer probeMu.RUnlock()
 	v, ok := probeVerdicts[id]
+	if !ok {
+		// A verdict saved before remote endpoints got their own prefix
+		// (onmachine.go) is filed under the old "local." id.
+		if rest, remote := strings.CutPrefix(string(id), RemoteIDPrefix); remote {
+			v, ok = probeVerdicts[ModelID(LocalIDPrefix+rest)]
+		}
+	}
 	return v, ok
 }
 

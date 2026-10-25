@@ -44,8 +44,9 @@ func IsBookmarked(id string) bool {
 	if cfg == nil {
 		return false
 	}
+	old := legacyEndpointID(id)
 	for _, b := range cfg.BookmarkedModels {
-		if b == id {
+		if b == id || (old != "" && b == old) {
 			return true
 		}
 	}
