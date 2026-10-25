@@ -1,3 +1,21 @@
+## v0.1.154 (2026-10-25): "to the trash" means the Recycle Bin; a delete you ask for still runs; keys typed at start-up reach the chat
+
+**Plain-language version:** asked to move pictures "to trash", an AI on the
+laptop ran a command that deletes for good, and the program let it in auto
+mode. Now a command that deletes for good says so when you are asked
+("Permanent delete: it deletes for good"). Once you have asked for the trash or the Recycle Bin, a
+permanent delete the AI picks by itself is not run in auto mode, `/yolo` or
+`-p`; the AI is told how to use the Recycle Bin instead. A delete you ask for
+still runs: "delete them permanently", "delete all the pngs" or a command you
+type yourself ("use rm -rf *.png") is your latest order, and it wins. Cleaning
+build and temporary folders is unchanged. Keys typed or pasted while the
+program opens no longer go to the "Initialize Project" question, which could
+have been answered Yes by accident and sent a request to the AI; they go to the
+chat box.
+
+Full notes: `Changelogs/v0.1.154-release-notes.layman.md` and
+`Changelogs/v0.1.154-release-notes.developer.md`.
+
 ## v0.1.153 (2026-10-25): a missing model never sends your conversation anywhere; "local." means this computer; a long paste stays one message
 
 **Plain-language version:** when the AI model named in your settings is gone
