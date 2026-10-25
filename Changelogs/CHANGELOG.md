@@ -11,8 +11,11 @@ your computer has at that moment, says which, or stops and says nothing was
 sent. Models from a server on the internet are now named `remote.`, not
 `local.`; old names keep working. A run without the screen no longer asks a
 server on the internet for its model list unless a model in your settings is
-on it. On Windows, a long paste stays one message until you press Enter, and
-the installer names the icon sizes it really installed.
+on it. A red line now warns when an answer says something was deleted, moved,
+run or saved and nothing actually ran (English only, tested with a stand-in AI).
+The /research chooser fits on an 80x24 window. On Windows, a long paste stays
+one message until you press Enter, and the installer names the icon sizes it
+really installed.
 
 Full notes: `Changelogs/v0.1.153-release-notes.layman.md` and
 `Changelogs/v0.1.153-release-notes.developer.md`.
