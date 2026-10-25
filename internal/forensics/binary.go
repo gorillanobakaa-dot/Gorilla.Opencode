@@ -585,6 +585,14 @@ func machoVer(v uint32) string {
 // OpenCode 0.1.149-dev for the Air (patched go1.24) carries minos 11.0 there
 // and runs on the Air. So only LC_VERSION_MIN_MACOSX is a verdict on 10.13;
 // a higher LC_BUILD_VERSION is reported as unproven, never as a refusal.
+//
+// GORILLA (2026-10-25): measured on the Air (10.13.6), the loader does not
+// refuse a command-line program for LC_VERSION_MIN_MACOSX either: copies of one
+// go1.24 program with LC_VERSION_MIN_MACOSX 10.14, and LC_BUILD_VERSION 10.14
+// and 99.0, all ran and did their work. The minimum is the build's promise, not
+// a gate; what fails on 10.13 is a symbol it lacks, at load or first call. An
+// .app is different: LaunchServices refuses it by Info.plist's
+// LSMinimumSystemVersion, which this header check does not read.
 func legacyVerdict(cpu macho.Cpu, min, src string) string {
 	if cpu != macho.CpuAmd64 && cpu != macho.Cpu386 {
 		return "NO: " + machoCPU(cpu) + " slice, the Air is Intel"
@@ -599,7 +607,8 @@ func legacyVerdict(cpu macho.Cpu, min, src string) string {
 		return "UNPROVEN: LC_BUILD_VERSION says " + min + ", but 10.13 predates that load command " +
 			"(Gorilla's own 10.13 build says 11.0 there and runs); only a run on the Air proves it"
 	}
-	return "NO: needs macOS " + min
+	return "UNPROVEN: " + src + " says " + min + ", and 10.13.6 does not refuse a program for it " +
+		"(measured on the Air); a symbol 10.13 lacks would fail at load, so only a run on the Air proves it"
 }
 
 func versionLE(a, b string) bool {

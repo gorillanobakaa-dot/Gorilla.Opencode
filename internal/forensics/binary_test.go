@@ -136,8 +136,10 @@ func TestLegacyVerdict(t *testing.T) {
 		{macho.CpuAmd64, "10.9", minCmd, "OK"},
 		{macho.CpuAmd64, "10.13.4", minCmd, "OK"},
 		{macho.CpuAmd64, "10.13.6", minCmd, "OK"},
-		{macho.CpuAmd64, "10.14", minCmd, "NO: needs macOS 10.14"},
-		{macho.CpuAmd64, "11.0", minCmd, "NO: needs macOS 11.0"},
+		{macho.CpuAmd64, "10.14", minCmd, "UNPROVEN: LC_VERSION_MIN_MACOSX says 10.14"},
+		{macho.CpuAmd64, "11.0", minCmd, "UNPROVEN: LC_VERSION_MIN_MACOSX says 11.0"},
+		// Measured 2026-10-25: 10.13.6 ran copies marked LC_VERSION_MIN_MACOSX 10.14
+		// and LC_BUILD_VERSION 10.14 / 99.0. A header above 10.13 is never a refusal.
 		// 10.13 does not read LC_BUILD_VERSION: Gorilla's own 10.13 build
 		// says 11.0 there and runs on the Air.
 		{macho.CpuAmd64, "11.0", buildCmd, "UNPROVEN: LC_BUILD_VERSION says 11.0"},
