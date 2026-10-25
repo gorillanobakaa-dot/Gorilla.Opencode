@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/assets"
@@ -64,6 +65,38 @@ func installAsset(embedPath, dst string) error {
 		return err
 	}
 	return os.WriteFile(dst, data, 0o644)
+}
+
+// icoSizes reads the frame sizes from an .ico file's directory (a width byte
+// of 0 means 256). An unreadable or malformed file gives nil.
+func icoSizes(path string) []int {
+	b, err := os.ReadFile(path)
+	if err != nil || len(b) < 6 || b[2] != 1 || b[3] != 0 {
+		return nil
+	}
+	n := int(b[4]) | int(b[5])<<8
+	if len(b) < 6+16*n {
+		return nil
+	}
+	sizes := make([]int, 0, n)
+	for i := 0; i < n; i++ {
+		w := int(b[6+16*i])
+		if w == 0 {
+			w = 256
+		}
+		sizes = append(sizes, w)
+	}
+	sort.Ints(sizes)
+	return sizes
+}
+
+// icoSizesLabel is "(21 sizes, 16-256 px)" for the installer's message.
+func icoSizesLabel(path string) string {
+	s := icoSizes(path)
+	if len(s) == 0 {
+		return "(sizes unreadable)"
+	}
+	return fmt.Sprintf("(%d sizes, %d-%d px)", len(s), s[0], s[len(s)-1])
 }
 
 // copySelf writes the running binary to dst. Returns false when the running
