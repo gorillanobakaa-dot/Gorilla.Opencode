@@ -360,6 +360,11 @@ func (m *editorCmp) measureRows() int {
 	return rows
 }
 
+// Value is what the box holds, a paste still being buffered included.
+func (m *editorCmp) Value() string {
+	return m.textarea.Value() + string(m.pasteBuf)
+}
+
 // SetHeightCeiling tells the field the most rows it may occupy. The frame owner
 // knows the window size; the field does not, and must never exceed it — see the
 // heightCeiling comment on editorCmp. Anything hidden by this cap is announced

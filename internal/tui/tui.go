@@ -27,7 +27,6 @@ import (
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/quota"
 	"github.com/opencode-ai/opencode/internal/session"
-	"github.com/opencode-ai/opencode/internal/usage"
 	"github.com/opencode-ai/opencode/internal/tui/components/chat"
 	"github.com/opencode-ai/opencode/internal/tui/components/core"
 	"github.com/opencode-ai/opencode/internal/tui/components/dialog"
@@ -36,6 +35,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 	"github.com/opencode-ai/opencode/internal/tui/util"
+	"github.com/opencode-ai/opencode/internal/usage"
 )
 
 type keyMap struct {
@@ -329,6 +329,10 @@ type appModel struct {
 	settingsDialog     dialog.SettingsDialog
 
 	showInitDialog bool
+	// offerGate keeps the start-up "Initialize Project" offer from taking keys
+	// typed for the chat (init_offer.go).
+	offerGate initOfferGate
+	now       func() time.Time // nil = time.Now; tests set it
 
 	// GORILLA OVERRIDE: /research mode chooser.
 	researchDialog     dialog.ResearchDialogCmp
@@ -495,7 +499,7 @@ type quotaLineMsg struct {
 	line string
 	// typed marks the reading the person asked for with /usage.
 	typed bool
-	kind util.InfoType
+	kind  util.InfoType
 	// summary, when non-nil, renders the full Models & Quota panel into the
 	// scrollback (bars, plain-language "left/used", green->red colour). Set only
 	// on an explicit /usage: the automatic session-start reading stays one line
@@ -728,7 +732,17 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
+	// The start-up offer must not take keys typed for the chat (init_offer.go).
+	if k, ok := msg.(tea.KeyMsg); ok {
+		next, gateCmd, handled := a.gateOfferKey(k)
+		if handled {
+			return next, gateCmd
+		}
+		a = next
+	}
 	switch msg := msg.(type) {
+	case offerKeySettledMsg:
+		return a.answerOffer(msg)
 	case tea.MouseMsg:
 		// GORILLA FIX: only wheel events drive scrolling. Motion/press/
 		// release events are unused by any component (verified: nothing
@@ -1351,8 +1365,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 
 	case dialog.ShowInitDialogMsg:
-		a.showInitDialog = msg.Show
-		return a, nil
+		return a.openStartupOffer(msg.Show), nil
 
 	case dialog.CloseResearchDialogMsg:
 		a.showResearchDialog = false
@@ -1862,6 +1875,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, util.CmdHandler(startCompactSessionMsg{})
 		case "init":
 			a.showInitDialog = true
+			a.offerGate.armed = false // asked for: its keys are answers
 			return a, nil
 		case "task", "tasks", "agents", "kill":
 			// GORILLA OVERRIDE: /tasks — live monitor of running helper

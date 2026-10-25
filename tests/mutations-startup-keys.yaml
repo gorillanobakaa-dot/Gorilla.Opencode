@@ -1,0 +1,35 @@
+# fieldkit mutate --plan tests/mutations-startup-keys.yaml --cwd . -- go test ./internal/tui/ -count=1 -run "Offer|ChatComesUp|Deliberate|OfferAppears"
+# Every rule of the start-up offer gate (internal/tui/init_offer.go, 2026-10-25), broken on purpose; each must be CAUGHT.
+- file: internal/tui/init_offer.go
+  swap: ["\tif a.offerGate.typed {\n\t\tshow = false", "\tif false && a.offerGate.typed {\n\t\tshow = false"]
+  why: the offer opens over a box already being typed in
+- file: internal/tui/init_offer.go
+  swap: ["\tg.typed = true\n", "\n"]
+  why: keys are no longer noted, so the offer opens over typing that has begun
+- file: internal/tui/init_offer.go
+  swap: ["if a.clock().Sub(g.shownAt) < offerGrace || len(g.held) > 0 {", "if len(g.held) > 0 {"]
+  why: keys that came before anyone could read the offer answer it
+- file: internal/tui/init_offer.go
+  swap: ["if a.clock().Sub(g.shownAt) < offerGrace || len(g.held) > 0 {", "if a.clock().Sub(g.shownAt) < offerGrace {"]
+  why: a paste into an offer that has been on screen answers it
+- file: internal/tui/init_offer.go
+  swap: ["keys := append(a.offerGate.held, k)", "keys := []tea.KeyMsg{k}"]
+  why: the held first key of a paste is lost
+- file: internal/tui/init_offer.go
+  swap: ["keys := append(a.offerGate.held, k)", "keys := append([]tea.KeyMsg{k}, a.offerGate.held...)"]
+  why: the held key is replayed after the one that followed it (keys reordered)
+- file: internal/tui/init_offer.go
+  swap: ["\ta.showInitDialog = false\n\ta.offerGate.armed = false", "\ta.offerGate.armed = false"]
+  why: the offer stays open after it was put away and takes the next key
+- file: internal/tui/init_offer.go
+  swap: ["\tg.passing = true\n", "\n"]
+  why: a deliberate answer is held again forever instead of reaching the offer
+- file: internal/tui/init_offer.go
+  swap: ["if msg.seq != g.seq || len(g.held) == 0 || !a.showInitDialog {", "if true {"]
+  why: a deliberate answer never reaches the offer
+- file: internal/tui/tui.go
+  swap: ["\t\tnext, gateCmd, handled := a.gateOfferKey(k)\n\t\tif handled {", "\t\tnext, gateCmd, handled := a.gateOfferKey(k)\n\t\tif false && handled {"]
+  why: the gate is bypassed; the open offer takes keys as before
+- file: internal/tui/tui.go
+  swap: ["\t\treturn a.openStartupOffer(msg.Show), nil", "\t\ta.showInitDialog = msg.Show\n\t\treturn a, nil"]
+  why: Init's offer opens unarmed, as before the fix
