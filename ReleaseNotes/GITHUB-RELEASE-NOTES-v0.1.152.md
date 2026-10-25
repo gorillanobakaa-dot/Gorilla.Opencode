@@ -123,15 +123,15 @@ Every block below is real output, copied from a run on the maintainer's computer
 
 ## Measured on the published files
 
-The Windows program and the Linux program were built on 2026-10-25 on one Windows 11 laptop (Go 1.27.0) from commit 3dcc73b of the release branch, by `fieldkit pipeline run gorilla-opencode`: modules verified against go.sum, vet clean, the full test suite passed (44 packages, no exception), then both programs built and built a second time in another folder, time zone and locale, **byte for byte identical**. The Linux `.tar.gz` holds that Linux program unchanged (one file, mode 0755); it was made with the layout of `scripts/build-tarball.sh`, and because a Windows machine cannot run the Linux program, the check is that the packed file is byte for byte the reproduced program and carries the v0.1.152 stamp. The Arch package is built from the tagged source by the `arch-package` workflow on GitHub and attached with its own checksum. The `.deb`, `.rpm` and Mac zip are not on this page yet.
+The Windows program and the Linux program were built on 2026-10-25 on one Windows 11 laptop (Go 1.27.0) from commit 71d8223 of the release branch, by `fieldkit pipeline run gorilla-opencode`: modules verified against go.sum, vet clean, the full test suite passed (44 packages, no exception), then both programs built and built a second time in another folder, time zone and locale, **byte for byte identical**. One earlier run of the same suite failed one test, `TestOrdinaryFailuresReportTheRealErrorAndExitCode` (PowerShell lost its own error message once under the full suite's load); it passed in 5 of 6 runs and is recorded as unstable to fix. The pipeline also built a macOS 10.13 program on this laptop; it is not on this page, because nobody has started that build on a Mac yet. The Linux `.tar.gz` holds that Linux program unchanged (one file, mode 0755); it was made with the layout of `scripts/build-tarball.sh`, and because a Windows machine cannot run the Linux program, the check is that the packed file is byte for byte the reproduced program and carries the v0.1.152 stamp. The Arch package is built from the tagged source by the `arch-package` workflow on GitHub and attached with its own checksum. The `.deb`, `.rpm` and Mac zip are not on this page yet.
 
 | File | Bytes | SHA-256 |
 |---|---|---|
-| `gorilla-opencode.exe` | 56,662,528 | `0997a61f3ca1ddaadd81b66aa4ebdaf2f6cb5a0a6d376bccef1eb1bc0303bafa` |
-| `gorilla-opencode-v0.1.152-linux-amd64` | 55,218,336 | `03216f1cd200808bcbba2396d177166811ae9346e7c4f1d608f2e33d839e2038` |
-| `gorilla-opencode-linux-x86_64.tar.gz` | 21,679,464 | `62b705afa7b95e06fc6d31103d9b03190f1ca844440cc2e00ca8183201f85465` |
+| `gorilla-opencode.exe` | 57,307,136 | `bc5057d09562d75d8a7aec3dfb2793dcb314722d2c33faec59ce6234adfda583` |
+| `gorilla-opencode-v0.1.152-linux-amd64` | 55,218,336 | `942c2339554c1f7fcbf8e2b6645526d14653142dfec7a7bc9732e2585be71fd4` |
+| `gorilla-opencode-linux-x86_64.tar.gz` | 21,679,463 | `620be165f7799d9da0548f3a753ff6ca28bafe5028ca05afff371d099bbdaaee` |
 
-Before publishing, the exact `gorilla-opencode.exe` above was run headless against Gemma 4 12B QAT in LM Studio with the Fieldkit tools connected (`run_fieldkit_mcp_scenarios.py`); the result is in the developer notes.
+Before publishing, the exact `gorilla-opencode.exe` above was run headless against Gemma 4 12B QAT in LM Studio with the Fieldkit tools connected (`run_fieldkit_mcp_scenarios.py`, scenario "count"). Asked "How many tools do I have access to through Fieldkit? Count them, do not guess.", it called `fieldkit_readiness` and answered "You have 1,445 tools accessible through Fieldkit. Of those, 12 are verified, 44 are tested, 319 are carded, and 1,070 have been gathered only." Both calls were stored with their speed. That run used the processor only: that night the laptop's Intel Iris Xe graphics stopped with "device lost" (Vulkan) on every large request after the first fault at 00:50, so the model was loaded with the graphics switched off. The earlier runs on the same code, on the graphics, are the pictures below.
 
 
 ---
