@@ -553,6 +553,10 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 	if a.agentName == config.AgentCoder {
 		peerBlock, peerMsgs = takePeerMessages()
 	}
+	// GORILLA OVERRIDE (2026-10-25): what the person's own words say about the
+	// trash, before any peer text is attached. A helper's prompt is ignored
+	// (the session is linked to its parent first). See tools/trash.go.
+	tools.NoteUserRequest(sessionID, content)
 	userMsg, err := a.createUserMessage(ctx, sessionID, withPeerBlock(peerBlock, content), attachmentParts)
 	if err != nil {
 		requeuePeerMessages(peerMsgs)

@@ -166,6 +166,7 @@ func (b *agentTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolRes
 	// user.
 	if err == nil {
 		b.permissions.RegisterChildSession(session.ID, sessionID)
+		tools.LinkHelperSession(session.ID, sessionID)
 	}
 	if err != nil {
 		return tools.ToolResponse{}, fmt.Errorf("error creating session: %s", err)
