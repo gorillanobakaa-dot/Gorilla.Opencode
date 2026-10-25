@@ -250,6 +250,11 @@ type Config struct {
 	// configured. Declared here also so updateCfgFile, which round-trips
 	// config.json through this struct, does not delete them. See hooks.go.
 	Hooks []Hook `json:"hooks,omitempty" mapstructure:"hooks"`
+	// GORILLA OVERRIDE (2026-10-25): the models a run without a screen (-p,
+	// ACP) may switch to, in order, when an agent's configured model is
+	// unusable. Only one available on this machine now is taken, unless the
+	// owner lists a remote one here by hand. See model_choice.go.
+	PreferredLocalModels []string `json:"preferredLocalModels,omitempty" mapstructure:"preferredLocalModels"`
 }
 
 // Application constants
@@ -290,6 +295,7 @@ func Load(workingDir string, debug bool) (*Config, error) {
 	if cfg != nil {
 		return cfg, nil
 	}
+	resetPendingChoices()
 
 	cfg = &Config{
 		WorkingDir: workingDir,
@@ -699,17 +705,19 @@ func applyDefaultValues() {
 // configured model could be silently replaced and the user would only see the
 // downstream API error from a model they never chose — with no hint the swap
 // had happened. Substituting someone's model is worth a line of output.
+//
+// GORILLA OVERRIDE (2026-10-25): it no longer substitutes anything. On that
+// date the coder's LM Studio model had been deleted, this function "fell back"
+// to local.nvidia/nemotron-3-ultra-550b-a55b, and a headless run sent the
+// whole prompt to NVIDIA's cloud. A line on stderr does not undo a prompt
+// already sent. The agent is now held for a choice (model_choice.go): it gets a
+// placeholder so the program can start, nothing is sent until the choice is
+// made, and the choice is the person's (the TUI's picker) or the owner's
+// preferredLocalModels list (a run without a screen).
 func revertAgentToDefault(name AgentName, agent Agent, reason string) error {
-	logging.Warn("reverting agent to default model",
+	logging.Warn("agent model unusable, holding it for a choice",
 		"agent", name, "configured_model", agent.Model, "reason", reason)
-
-	if !setDefaultModelForAgent(name) {
-		return fmt.Errorf("no valid provider available for agent %s", name)
-	}
-	fmt.Fprintf(os.Stderr, "note: agent %q model %q is unusable (%s) — falling back to %q\n",
-		name, agent.Model, reason, cfg.Agents[name].Model)
-	logging.Info("set default model for agent", "agent", name, "model", cfg.Agents[name].Model)
-	return nil
+	return holdAgentForChoice(name, agent, reason)
 }
 
 // validateAgent validates an agent's model ID and provider, ensuring they are
@@ -737,6 +745,18 @@ func validateAgent(cfg *Config, name AgentName, agent Agent) error {
 		// Remembered for the model doctor, which says it on screen and writes
 		// it to config.json. A move known only to a log file was repeated on
 		// every launch and never seen.
+		legacyMoves[name] = [2]models.ModelID{agent.Model, current}
+		agent.Model = current
+		updated := cfg.Agents[name]
+		updated.Model = current
+		cfg.Agents[name] = updated
+	}
+	// GORILLA OVERRIDE (2026-10-25): a model of a remote endpoint was
+	// "local.<id>" until remote endpoints got "remote." (models/onmachine.go).
+	// The same move as above: kept, said by the model doctor, written by it.
+	if current, renamed := models.RenamedEndpointID(agent.Model); renamed {
+		logging.Info("remote endpoint model renamed",
+			"agent", name, "from", agent.Model, "to", current)
 		legacyMoves[name] = [2]models.ModelID{agent.Model, current}
 		agent.Model = current
 		updated := cfg.Agents[name]
@@ -1542,8 +1562,17 @@ func registerLocalEndpoints() {
 	models.LoadProbeVerdicts(CacheBase())
 
 	var first models.ModelID
+	// GORILLA OVERRIDE (2026-10-25): a run without a screen does not ask a
+	// remote endpoint for its list unless a configured model is on it. See
+	// SetRunWithoutScreen in model_choice.go.
+	skipRemote := runWithoutScreen && !remoteEndpointsNeeded()
 	for _, url := range order {
 		ep := seenURL[url]
+		if skipRemote && !isLoopbackURL(ep.BaseURL) {
+			logging.Info("not listing a remote endpoint: no configured model is on it",
+				"name", ep.Name, "baseURL", ep.BaseURL)
+			continue
+		}
 		if n, id := models.RegisterLocalEndpoint(ep.Name, ep.BaseURL, ep.APIKey); n > 0 && first == "" {
 			first = id
 		}
@@ -1789,11 +1818,23 @@ func UpdateAgentModel(agentName AgentName, modelID models.ModelID) error {
 	}
 	cfg.Agents[agentName] = newAgentCfg
 
+	prevHold, hadHold := pendingChoiceFor(agentName)
 	if err := validateAgent(cfg, agentName, newAgentCfg); err != nil {
 		// revert config update on failure
 		cfg.Agents[agentName] = existingAgentCfg
+		restorePendingChoice(agentName, prevHold, hadHold)
 		return fmt.Errorf("failed to update agent model: %w", err)
 	}
+	// GORILLA OVERRIDE (2026-10-25): validateAgent no longer swaps an unusable
+	// model for another; it holds the agent for a choice. A choice that is
+	// itself unusable is refused here, and the agent keeps what it had.
+	if held, ok := pendingChoiceFor(agentName); ok && held.Configured == modelID {
+		cfg.Agents[agentName] = existingAgentCfg
+		restorePendingChoice(agentName, prevHold, hadHold)
+		return fmt.Errorf("failed to update agent model: %s is unusable (%s)", modelID, held.Reason)
+	}
+	// A model the person picked ends any hold on this agent.
+	clearPendingChoice(agentName)
 	// Written to config.json below, so it is a choice now, not a derivation.
 	forgetDerivedRoleAgent(agentName)
 

@@ -204,6 +204,9 @@ understanding code directly from the terminal.`,
 			return fmt.Errorf("failed to change directory: %v", err)
 		}
 
+		// A -p run lists remote endpoints only when a configured model is on
+		// one (config.SetRunWithoutScreen).
+		config.SetRunWithoutScreen(prompt != "")
 		cfg, err := config.Load(cwd, debug)
 		if err != nil {
 			return err
@@ -297,6 +300,19 @@ Set one of these and try again:
   (or ANTHROPIC_API_KEY, OPENAI_API_KEY, GROQ_API_KEY, ... — see README)
 
 Desktop launches read keys from ~/.config/%s/env`, appBinName)
+		}
+
+		// GORILLA OVERRIDE (2026-10-25): an unusable configured model holds its
+		// agent, and nothing is sent until a model is chosen (config/
+		// model_choice.go). The TUI asks the person with its picker. A run with
+		// no picker (-p, plain) takes the first of preferredLocalModels that is
+		// on this machine and listed now, or is refused here, non-zero, before
+		// a single request.
+		showsTUI := prompt == "" && !plainMode && config.InterfaceMode() != config.InterfacePlain
+		if !showsTUI {
+			if err := config.ChooseForRunWithoutScreen(); err != nil {
+				return err
+			}
 		}
 
 		// Connect DB, this will also run migrations

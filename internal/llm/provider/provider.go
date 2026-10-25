@@ -271,6 +271,12 @@ func (p *baseProvider[C]) cleanMessages(messages []message.Message) (cleaned []m
 }
 
 func (p *baseProvider[C]) SendMessages(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (*ProviderResponse, error) {
+	// GORILLA OVERRIDE (2026-10-25): nothing is sent while an agent's
+	// configured model is unusable and no model has been chosen in its place.
+	// See config/model_choice.go.
+	if err := config.CheckModelChosen(); err != nil {
+		return nil, err
+	}
 	// GORILLA OVERRIDE: proactive pace-setter (see ratelimit.go). Space
 	// requests under the user's configured RPM cap before sending.
 	if err := paceRequest(ctx); err != nil {
@@ -300,7 +306,14 @@ func (p *baseProvider[C]) StreamResponse(ctx context.Context, messages []message
 	// GORILLA OVERRIDE: proactive pace-setter (see ratelimit.go). If the wait
 	// is cancelled, surface it as an error event so the caller's channel-range
 	// loop terminates cleanly instead of hitting the provider.
-	if err := paceRequest(ctx); err != nil {
+	//
+	// GORILLA OVERRIDE (2026-10-25): the model-choice gate first, the same as
+	// SendMessages.
+	err := config.CheckModelChosen()
+	if err == nil {
+		err = paceRequest(ctx)
+	}
+	if err != nil {
 		ch := make(chan ProviderEvent, 1)
 		ch <- ProviderEvent{Type: EventError, Error: err}
 		close(ch)

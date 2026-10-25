@@ -102,6 +102,17 @@ func doctorAgents(set AgentSetter) []Finding {
 		// setter write it down so it is not silently redone at every launch.
 		if mv, moved := legacyMoves[name]; moved && cur == mv[1] {
 			toName := models.SupportedModels[mv[1]].Name
+			// A rename for where the model runs (models/onmachine.go) is not
+			// a retirement, and is said as what it is.
+			if strings.HasPrefix(string(mv[0]), models.LocalIDPrefix) && strings.HasPrefix(string(mv[1]), models.RemoteIDPrefix) {
+				if set == nil {
+					out = append(out, Finding{Text: fmt.Sprintf("the %s agent is saved as %s, but that model is served by a remote endpoint, not this machine; its id is now %s. Not yet written to config.json.", name, mv[0], mv[1])})
+				} else if err := set(name, mv[1]); err == nil {
+					delete(legacyMoves, name)
+					out = append(out, Finding{Fixed: true, Text: fmt.Sprintf("the %s agent was saved as %s; that model is served by a remote endpoint, not this machine. Now saved as %s.", name, mv[0], mv[1])})
+				}
+				continue
+			}
 			if set == nil {
 				out = append(out, Finding{Text: fmt.Sprintf("the %s agent is saved as %s, which is no longer offered. It is being run on %s instead; this is not yet written to config.json.", name, mv[0], toName)})
 			} else if err := set(name, mv[1]); err == nil {

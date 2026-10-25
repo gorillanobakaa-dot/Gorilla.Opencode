@@ -60,9 +60,9 @@ func loadModelMeta() map[string]ModelMeta {
 }
 
 // lookupModelMeta finds curated metadata for a raw model id, tolerating
-// the "local." prefix that discovered ids carry.
+// the "local." or "remote." prefix that discovered ids carry.
 func lookupModelMeta(id string) (ModelMeta, bool) {
-	id = strings.TrimPrefix(id, "local.")
+	id = stripEndpointPrefix(id)
 	m, ok := modelMetaByID[id]
 	return m, ok
 }

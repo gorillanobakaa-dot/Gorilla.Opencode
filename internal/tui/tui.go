@@ -421,6 +421,12 @@ func (a appModel) Init() tea.Cmd {
 	// that?" into "because this repository told it to". The refusal case is
 	// announced too, and more loudly, because a file that silently did not
 	// load is indistinguishable from a file that is not there.
+	// GORILLA OVERRIDE (2026-10-25): the configured model is unusable. The
+	// picker opens on what this machine serves, with the reason, and nothing
+	// is sent until a model is picked. See config/model_choice.go.
+	if config.ModelChoicePending() {
+		cmds = append(cmds, util.CmdHandler(dialog.OpenModelChoiceMsg{}))
+	}
 	cmds = append(cmds, func() tea.Msg {
 		v := config.AutoLoadProjectInstructions(config.WorkingDirectory())
 		switch {
@@ -1323,16 +1329,36 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.showModelDialog = true
 		return a, util.ReportInfo(fmt.Sprintf("Switched to %s — pick a model", msg.Provider))
 
+	case dialog.OpenModelChoiceMsg:
+		if !config.ModelChoicePending() {
+			return a, nil
+		}
+		a.modelDialog.Init()
+		a.modelDialog.SwitchToProvider(dialog.ProviderAvailableNow)
+		a.showModelDialog = true
+		return a, util.ReportWarn(config.PendingChoiceSummary() + " - pick the model to use; nothing is sent until you do")
+
 	case dialog.ModelSelectedMsg:
 		a.showModelDialog = false
 
 		// Capture the outgoing coder model BEFORE the update, so the helper
 		// agents that were shadowing it can be identified afterwards.
 		prevCoder := config.Get().Agents[config.AgentCoder].Model
+		// GORILLA OVERRIDE (2026-10-25): while a choice is pending the agents
+		// hold a placeholder. The pick is what ends the hold, once every helper
+		// has followed it (config/model_choice.go).
+		choosing := config.ModelChoicePending()
 
 		model, err := a.app.CoderAgent.Update(config.AgentCoder, msg.Model.ID)
 		if err != nil {
 			return a, util.ReportError(err)
+		}
+		if choosing {
+			if _, ferr := config.FollowCoderModel(prevCoder, msg.Model.ID); ferr != nil {
+				return a, util.ReportError(fmt.Errorf("%s chosen, but the background agents could not be moved, so nothing will be sent yet: %w", model.Name, ferr))
+			}
+			config.ClearPendingModelChoices()
+			return a, util.ReportInfo(fmt.Sprintf("Model chosen: %s, for every agent", model.Name))
 		}
 
 		// GORILLA FIX: bring the helper agents along. Changing the coder used to

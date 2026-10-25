@@ -370,6 +370,15 @@ func (p *chatPage) clearSidebar() tea.Cmd {
 }
 
 func (p *chatPage) sendMessage(text string, attachments []message.Attachment) tea.Cmd {
+	// GORILLA OVERRIDE (2026-10-25): an unusable configured model is not
+	// replaced behind the person's back (config/model_choice.go). Until a
+	// model is picked, a send opens the picker and sends nothing.
+	if config.ModelChoicePending() {
+		return tea.Batch(
+			util.CmdHandler(dialog.OpenModelChoiceMsg{}),
+			util.ReportWarn("Nothing was sent: "+config.PendingChoiceSummary()+". Pick a model, then send again."),
+		)
+	}
 	var cmds []tea.Cmd
 	if p.session.ID == "" {
 		session, err := p.app.Sessions.Create(context.Background(), "New Session")
