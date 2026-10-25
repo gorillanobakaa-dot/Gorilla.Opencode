@@ -1968,6 +1968,7 @@ func (r *researchTool) runHelper(ctx context.Context, parentSessionID, callID st
 	// to the user's conversation, so one "allow for session" covers the run
 	// instead of every lane asking the same question again.
 	r.permissions.RegisterChildSession(helperSession.ID, parentSessionID)
+	tools.LinkHelperSession(helperSession.ID, parentSessionID)
 
 	// GORILLA FIX 2026-08-14: registration moved OUT to the caller, which
 	// registers before queueing for a slot. Registering here meant a helper

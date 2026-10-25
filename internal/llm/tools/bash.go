@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/tools/shell"
+	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/permission"
 )
 
@@ -199,6 +201,7 @@ Usage notes:
 - When issuing multiple commands, %s. DO NOT use newlines (newlines are ok in quoted strings).
 - IMPORTANT: All commands share the same shell session. Shell state (environment variables, virtual environments, current directory, etc.) persist between commands. For example, if you set an environment variable as part of a command, the environment variable will persist for subsequent commands.
 - Try to maintain your current working directory throughout the session by using absolute paths and avoiding usage of 'cd'. You may use 'cd' if the User explicitly requests it.
+- %s
 - Permission prompts: a command that is not read-only asks the user once. When the user answers "Allow family", every later command that begins with the same approved prefix runs without asking, so prefer repeating an approved command shape with a different tail over inventing a new spelling of it.
 <good-example>
 pytest /foo/bar/tests
@@ -209,7 +212,26 @@ pytest /foo/bar/tests
 
 # Git and GitHub
 When asked to commit or open a PR, use this bash tool with git and the gh CLI. Before committing, run git status/diff/log so the message matches the repo's style, then write a concise message about the "why". Stage only files relevant to the change. Never update git config, never use interactive flags (e.g. git rebase -i, git add -i), never create empty commits, and do not push to a remote unless the user asks. Return an empty response after git/gh commands — the user sees the output directly.
-%s`, shellName, bannedCommandsStr, MaxOutputLength, chainAdvice, badChain, trailer)
+%s`, shellName, bannedCommandsStr, MaxOutputLength, chainAdvice, trashGuidance(), badChain, trailer)
+}
+
+// trashGuidance teaches the recycle way for this machine. GORILLA OVERRIDE
+// (2026-10-25): see trash.go for the case that needed it.
+// Kept short: every turn pays for it (schema_cost_test.go caps the tool at
+// 1600 tokens). The refusal carries the long version, RecycleAdvice.
+func trashGuidance() string {
+	how := "`gio trash <path>` or `trash-put <path>`"
+	switch {
+	case runtime.GOOS == "windows" || shell.IsWindowsPowerShell():
+		how = "`Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($full, 'OnlyErrorDialogs', 'SendToRecycleBin')` (folder: DeleteDirectory)"
+	case runtime.GOOS == "darwin":
+		how = "`trash <path>` or Finder via osascript"
+	}
+	if _, err := lookPathFieldkit(); err == nil {
+		how += " or `fieldkit size recycle <paths> --json`"
+	}
+	return "Trash: rm/Remove-Item/del/rd delete FOR GOOD. For the trash or Recycle Bin use " + how +
+		"; if that fails, ask. NEVER fall back to a plain delete."
 }
 
 func NewBashTool(permission permission.Service) BaseTool {
@@ -251,6 +273,11 @@ type bashVerdict struct {
 	// HardStop is why auto-approve still asks (sudo, a system-wide install),
 	// or "". See commandclass.go.
 	HardStop string
+	// PermanentDelete is the delete program or call found on the line (a
+	// plain delete skips the Recycle Bin), or "". ScratchOnly is true when
+	// every target is temp or build output. See trash.go.
+	PermanentDelete string
+	ScratchOnly     bool
 }
 
 func bashGateVerdict(command string) bashVerdict {
@@ -269,8 +296,27 @@ func bashGateVerdict(command string) bashVerdict {
 		v.Irreversible = d.Why
 		v.ReadOnly = false
 		v.Description = fmt.Sprintf("DANGEROUS — %s.\nExecute command: %s", d.Why, command)
+		return v
+	}
+	// GORILLA OVERRIDE (2026-10-25): a plain delete says, on the prompt and
+	// over ACP (which shows Description as the title), that nothing goes to
+	// the Recycle Bin. See trash.go.
+	if v.PermanentDelete = PermanentDeleteIn(command); v.PermanentDelete != "" {
+		v.ReadOnly = false
+		v.ScratchOnly = OnlyScratchTargets(command)
+		v.Description = fmt.Sprintf("PERMANENT DELETE — %s.\nExecute command: %s", PermanentDeleteWhy, command)
 	}
 	return v
+}
+
+// refuseUnwatchedPermanentDelete is rule 2 of trash.go: the person asked for
+// the trash, nobody is answering prompts, and the line deletes for good
+// something that is not temp or build output.
+func (b *bashTool) refuseUnwatchedPermanentDelete(sessionID string, v bashVerdict) bool {
+	if v.PermanentDelete == "" || v.ScratchOnly || !TrashAsked(sessionID) {
+		return false
+	}
+	return config.PermissionMode() == config.PermissionAuto || b.permissions.IsAutoApproved(sessionID)
 }
 
 // bashPermissionRequest is the question Run asks for a command the gate did
@@ -345,6 +391,14 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	sessionID, messageID := GetContextValues(ctx)
 	if sessionID == "" || messageID == "" {
 		return ToolResponse{}, fmt.Errorf("session ID and message ID are required for creating a new file")
+	}
+	if b.refuseUnwatchedPermanentDelete(sessionID, verdict) {
+		logging.Warn("refused a permanent delete: the user asked for the Recycle Bin and nobody is answering prompts",
+			"command", params.Command, "found", verdict.PermanentDelete, "session", sessionID)
+		return NewTextErrorResponse(trashRefusal(verdict.PermanentDelete)), nil
+	}
+	if verdict.PermanentDelete != "" && TrashAsked(sessionID) {
+		verdict.Description = "You asked for the Recycle Bin; this command does not use it.\n" + verdict.Description
 	}
 	irreversible := verdict.Irreversible
 	if !verdict.ReadOnly {

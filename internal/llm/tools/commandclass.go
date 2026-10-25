@@ -315,6 +315,10 @@ func CommandPurpose(cmd string) string {
 	if h := HardStopIn(cmd); h != "" {
 		return "Asks because " + h + "."
 	}
+	// GORILLA OVERRIDE (2026-10-25): see trash.go.
+	if PermanentDeleteIn(cmd) != "" {
+		return "Permanent delete: it " + PermanentDeleteWhy + "."
+	}
 	segs := splitShellCommands(cmd)
 	if len(segs) == 0 {
 		return ""

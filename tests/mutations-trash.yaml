@@ -1,0 +1,74 @@
+# fieldkit mutate --plan tests/mutations-trash.yaml --cwd . -- go test ./internal/llm/tools/ -count=1 -run "Trash|Permanent|Recycle|Scratch|HugeDelete|Helper|ToolGuidance"
+# Each rule of internal/llm/tools/trash.go (2026-10-25), broken on purpose: every one must be CAUGHT.
+- file: internal/llm/tools/trash.go
+  swap: ['"rm": true, "remove-item": true, "ri": true,', '"rm": true, "ri": true,']
+  why: "Remove-Item (the 2026-10-25 case) is no longer classed as a permanent delete"
+- file: internal/llm/tools/trash.go
+  swap: ['flat := strings.NewReplacer(`"`, ";", `''`, ";", "{", ";", "}", ";", "(", ";", ")", ";").Replace(cmd)', 'flat := cmd']
+  why: "a delete inside braces, brackets or quotes (ForEach-Object { Remove-Item }, powershell -Command) is missed"
+- file: internal/llm/tools/trash.go
+  swap: ['if m := permanentDeleteCalls.FindString(cmd); m != "" {', 'if m := ""; m != "" {']
+  why: "the .NET and Python delete calls are missed"
+- file: internal/llm/tools/trash.go
+  swap: ['if low == "-delete" {', 'if low == "-never" {']
+  why: "find -delete is missed"
+- file: internal/llm/tools/trash.go
+  swap: ['"xargs": true,', '"xargsx": true,']
+  why: "a delete behind xargs is missed"
+- file: internal/llm/tools/trash.go
+  swap: ["\tcase trash:\n\t\ttrashRecord.asked[sessionID] = true", "\tcase trash:"]
+  why: "a trash request is not recorded"
+- file: internal/llm/tools/trash.go
+  swap: ["\tcase permanent:\n\t\tdelete(trashRecord.asked, sessionID)", "\tcase permanent:"]
+  why: "the person asking for a permanent delete no longer clears the record"
+- file: internal/llm/tools/trash.go
+  swap: ['if !negatedAt(low, i, 3, false) {', 'if true {']
+  why: "'do not delete them permanently' clears the trash record"
+- file: internal/llm/tools/trash.go
+  swap: ["p, ok := trashRecord.parent[sessionID]", "p, ok := \"\", false"]
+  why: "a helper does not inherit its parent's trash request, and its model-written prompt can clear its own record"
+- file: internal/llm/tools/trash.go
+  swap: ['if !isScratchTarget(low) {', 'if false {']
+  why: "a person's files are excused as a temp/build clean"
+- file: internal/llm/tools/trash.go
+  swap: ['return found', 'return found && false']
+  why: "a real build clean is refused in a trash conversation"
+- file: internal/llm/tools/trash.go
+  swap: ['strings.HasPrefix(p, "%") || (len(p) > 1 && p[1] == '':'') {', 'false {']
+  why: "a rooted or home folder named out/temp/build is excused as scratch"
+- file: internal/llm/tools/trash.go
+  swap: ["'OnlyErrorDialogs', 'SendToRecycleBin') }", "'OnlyErrorDialogs') }"]
+  why: "the Windows advice no longer sends files to the Recycle Bin"
+- file: internal/llm/tools/bash.go
+  swap: ['if v.PermanentDelete == "" || v.ScratchOnly || !TrashAsked(sessionID) {', 'if true {']
+  why: "the unattended permanent delete after a trash request runs (the files are lost)"
+- file: internal/llm/tools/bash.go
+  swap: ['return config.PermissionMode() == config.PermissionAuto || b.permissions.IsAutoApproved(sessionID)', 'return true']
+  why: "a watched session (ask mode) is refused instead of asked"
+- file: internal/llm/tools/bash.go
+  swap: ['v.Description = fmt.Sprintf("PERMANENT DELETE — %s.\nExecute command: %s", PermanentDeleteWhy, command)', 'v.Description = fmt.Sprintf("Execute command: %s", command)']
+  why: "the prompt (dialog and ACP title) no longer says the delete is permanent"
+- file: internal/llm/tools/bash.go
+  swap: ['verdict.Description = "You asked for the Recycle Bin; this command does not use it.\n" + verdict.Description', 'verdict.Description = verdict.Description']
+  why: "the prompt no longer reminds the person they asked for the Recycle Bin"
+- file: internal/llm/tools/bash.go
+  swap: ["\t\treturn v\n\t}\n\t// GORILLA OVERRIDE (2026-10-25)", "\t}\n\t// GORILLA OVERRIDE (2026-10-25)"]
+  why: "the huge-delete verdict is overwritten by the permanent-delete one"
+- file: internal/llm/tools/bash.go
+  swap: ["- %s\n- Permission prompts:", "-%.0s Permission prompts:"]
+  why: "the tool description no longer teaches the recycle way"
+- file: internal/llm/tools/commandclass.go
+  swap: ['return "Permanent delete: it " + PermanentDeleteWhy + "."', 'return ""']
+  why: "the dialog's plain line no longer says the delete is permanent"
+- file: internal/llm/tools/trash.go
+  swap: ["\tcase deleteOrdered(low):\n\t\tdelete(trashRecord.asked, sessionID)", "\tcase deleteOrdered(low):"]
+  why: "a later plain 'delete them' no longer wins over an earlier trash request (owner: deletes must still work)"
+- file: internal/llm/tools/trash.go
+  swap: ["if !negatedAt(low, m[0], 2, true) {", "if true {"]
+  why: "'do not delete anything else' counts as a delete order and clears the trash record"
+- file: internal/llm/tools/trash.go
+  swap: ["!(ignoreNo && n == \"no\")", "true"]
+  why: "'no, just delete them' is read as a negated delete"
+- file: internal/llm/tools/trash.go
+  swap: ["|[șş]terg|", "|"]
+  why: "Romanian 'șterge' is not read as a delete order"
