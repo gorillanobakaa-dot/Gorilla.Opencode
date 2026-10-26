@@ -28,8 +28,9 @@ func TestRobocopyExitCodes_robocopy(t *testing.T) {
 		assert.Contains(t, m, "FAILED", "code %d", code)
 	}
 	for _, code := range []int{-1, 32, 255} {
-		_, ok := robocopyExit(code)
+		m, ok := robocopyExit(code)
 		assert.False(t, ok, "robocopy %d is not a robocopy result", code)
+		assert.Empty(t, m, "robocopy never returns %d; it must not be decoded", code)
 	}
 	m, _ := robocopyExit(3)
 	assert.Contains(t, m, "files were copied")
@@ -126,7 +127,10 @@ func TestRobocopyBashToolSaysSuccess_robocopy(t *testing.T) {
 	src, dst := filepath.Join(root, "src"), filepath.Join(root, "dst")
 	require.NoError(t, os.MkdirAll(src, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(src, "a.txt"), []byte("a"), 0o644))
-	r, _ := bashRun(t, `robocopy "`+src+`" "`+dst+`" /E /NJH /NJS /NP`)
+	// Enter a folder that exists first: the shell is shared, and an earlier
+	// test can leave it in a TempDir that is gone, where PowerShell 5.1
+	// starts no native program at all and reports nothing.
+	r, _ := bashRun(t, `Set-Location -LiteralPath '`+root+`'; robocopy "`+src+`" "`+dst+`" /E /NJH /NJS /NP`)
 	assert.Contains(t, r.Content, "Exit code 1")
 	assert.Contains(t, r.Content, "robocopy: success - files were copied")
 }

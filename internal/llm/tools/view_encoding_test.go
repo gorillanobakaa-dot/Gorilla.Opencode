@@ -99,3 +99,18 @@ func TestDetectTextEncodingCutRune_utf(t *testing.T) {
 	_, ok = detectTextEncoding([]byte("x\x81y\x8dz"), false)
 	assert.False(t, ok, "bytes Windows-1252 leaves undefined are not text")
 }
+
+// A file of control characters with no NUL and no undefined byte is still
+// binary: Windows-1252 decoding is for text, not for any non-UTF-8 bytes.
+func TestViewControlBytesStayBinary_utf(t *testing.T) {
+	data := make([]byte, 0, 200)
+	for len(data) < 200 {
+		for c := byte(1); c < 32 && len(data) < 200; c++ {
+			if c != '\t' && c != '\n' && c != '\r' && c != '\f' && c != 0x1b {
+				data = append(data, c, 0xE9)
+			}
+		}
+	}
+	r := viewBytes(t, "ctl.bin", data)
+	assert.True(t, r.IsError, "control bytes were shown as text: %s", r.Content)
+}

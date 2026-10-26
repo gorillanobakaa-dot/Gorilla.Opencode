@@ -4,12 +4,14 @@
 package shell
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"runtime"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestExecutionPolicyBypassArgs: every PowerShell we start bypasses the
@@ -71,10 +73,21 @@ func TestUTF8ChildEnv_utf(t *testing.T) {
 // TestUTF8NativeOutputIsNotMojibake: git and Python print non-ASCII
 // through the PowerShell session intact. Before the fix git's UTF-8 came
 // back decoded as the OEM code page ("cafÃ©") and Python wrote cp1252.
+// The console this test inherits is first set to code page 437 (what a
+// Western Windows console uses), because a console already on UTF-8 would
+// hide the bug: the first mutation run of this test did exactly that.
 func TestUTF8NativeOutputIsNotMojibake_utf(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows console code pages")
+	}
+	forceOEMConsole(t)
 	s := newTestShell(t)
 	if !s.isPowerShell {
 		t.Skip("PowerShell only")
+	}
+	out, _, _ := exec1(t, s, `"" + [Console]::OutputEncoding.CodePage + " " + $OutputEncoding.CodePage`)
+	if strings.TrimSpace(out) != "65001 65001" {
+		t.Errorf("console/pipe code pages in the session = %q, want 65001 65001", strings.TrimSpace(out))
 	}
 	const word = "café 日本 Ωmega"
 	ran := false
@@ -99,9 +112,9 @@ func TestUTF8NativeOutputIsNotMojibake_utf(t *testing.T) {
 }
 
 // TestStdinNativeReaderDoesNotEatCommands (gap #5): a native program that
-// reads stdin gets end-of-file, not the shell's command stream. Before the
-// fix findstr blocked on the pipe until the timeout, and python read the
-// next commands as its own input.
+// reads stdin gets end-of-file at once, not the shell's command stream.
+// Before the fix findstr blocked on the pipe until the command timed out,
+// and python read the next commands as its own input.
 func TestStdinNativeReaderDoesNotEatCommands_stdin(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("the POSIX wrapper has < /dev/null; see TestACommandThatReadsStdinDoesNotEatTheSession")
@@ -110,7 +123,13 @@ func TestStdinNativeReaderDoesNotEatCommands_stdin(t *testing.T) {
 	if !s.isPowerShell {
 		t.Skip("PowerShell only")
 	}
-	_, _, code := exec1(t, s, `findstr /R "x"`)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	start := time.Now()
+	_, _, code, interrupted, err := s.Exec(ctx, `findstr /R "x"`, 15000)
+	if err != nil || interrupted || time.Since(start) > 10*time.Second {
+		t.Fatalf("findstr waited on the shell's stdin: %v, interrupted %v, after %s", err, interrupted, time.Since(start))
+	}
 	if code == 0 {
 		t.Errorf("findstr found a match on what should be an empty stdin")
 	}

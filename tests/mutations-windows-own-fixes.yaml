@@ -1,0 +1,202 @@
+# fieldkit mutate --plan tests/mutations-windows-own-fixes.yaml --cwd . -- go test ./internal/lsp/... ./internal/llm/tools/... ./internal/app/ ./internal/llm/agent/ -count=1 -run "(?i)uri|executionpolicy|utf|stdin|crlf|readonly|dangerous|robocopy|exitcode|EnvAndRegistry|ReadOnlyCommandsNeverAsk"
+# Job 01 of goal windows-capabilities (2026-10-26): every Windows rule added, broken on purpose; each must be CAUGHT.
+# Run on Windows: several rules (PowerShell session, robocopy, UNC) are only exercised there.
+
+# --- 1. LSP file URIs (gap #2)
+- file: internal/lsp/protocol/uri.go
+  swap: ['return "//" + u.Host + u.Path, nil', 'return u.Path, nil']
+  why: a UNC URI loses its server name
+- file: internal/lsp/protocol/uri.go
+  swap: ['filename, err := filename(uri)', 'filename, err := filename(uri); if err != nil { panic(err) }']
+  why: a bad URI panics again instead of returning an error
+- file: internal/lsp/protocol/uri.go
+  swap: ['case hasSlash && host != "" && herr == nil && !isDriveLetter(uhost):', 'case false:']
+  why: a server's file://server/share URI is turned into a local path
+- file: internal/lsp/protocol/uri.go
+  swap: ['if strings.HasPrefix(path, "//") && len(path) > 2 && path[2] != ''/'' {', 'if false {']
+  why: a UNC path becomes file:////server instead of file://server
+- file: internal/lsp/client.go
+  swap: ['URI:  protocol.URI(protocol.URIFromPath(workspaceDir)),', 'URI:  protocol.URI("file://" + workspaceDir),']
+  why: the workspace URI is built by hand again (file://C:\x)
+- file: internal/lsp/util/edit.go
+  swap: ['	path, err := uri.Path()', '	path, err := strings.TrimPrefix(string(uri), "file://"), error(nil)']
+  why: a server's edit is applied to the URI text instead of the file
+- file: internal/llm/tools/diagnostics.go
+  swap: ['return strings.EqualFold(a, b)', 'return a == b']
+  why: diagnostics for c:\x.go are not matched to C:\X.go
+
+# --- 2-4. PowerShell start: execution policy, UTF-8, stdin (gaps #3, #4, #5, #18)
+- file: internal/llm/tools/shell/shell.go
+  swap: ['return append([]string{"-NoProfile", "-ExecutionPolicy", "Bypass"}, rest...)', 'return append([]string{"-NoProfile"}, rest...)']
+  why: PowerShell starts under the machine's execution policy again
+- file: internal/llm/agent/hooks.go
+  swap: ['return shell.HookPowerShell(), shell.PowerShellArgs("-NonInteractive", "-Command", command)', 'return "powershell.exe", []string{"-NoProfile", "-NonInteractive", "-Command", command}']
+  why: hooks lose -ExecutionPolicy Bypass and ignore pwsh
+- file: internal/llm/tools/shell/shell.go
+  swap: ['for _, kv := range []string{"PYTHONUTF8=1", "PYTHONIOENCODING=utf-8"} {', 'for _, kv := range []string{} {']
+  why: Python children write the ANSI code page again
+- file: internal/llm/tools/shell/shell.go
+  swap: ['		if !set {', '		if true {']
+  why: the user's own PYTHONIOENCODING is overridden
+- file: internal/llm/tools/shell/shell.go
+  swap: ['const psSessionSetup = `try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }', 'const psSessionSetup = `try { } catch { }']
+  why: git's UTF-8 output is decoded as the OEM code page (mojibake)
+- file: internal/llm/tools/shell/shell.go
+  swap: ['{ $__in = [GorillaStdin]::Detach() }', '{ }']
+  why: a native program reads the shell's command stream again
+- file: internal/llm/tools/shell/shell.go
+  swap: ['if isPowerShell && runtime.GOOS == "windows" {', 'if false {']
+  why: the session setup (UTF-8, stdin guard) is never sent
+
+# --- 5. view decodes UTF-16 / UTF-8 BOM / Windows-1252 (gap #6)
+- file: internal/llm/tools/textenc.go
+  swap: ['case bytes.HasPrefix(head, []byte{0xFF, 0xFE}):', 'case false:']
+  why: UTF-16LE (PowerShell 5.1 `>`, .reg) is refused as binary again
+- file: internal/llm/tools/textenc.go
+  swap: ['case bytes.HasPrefix(head, []byte{0xFE, 0xFF}):', 'case false:']
+  why: UTF-16BE is refused as binary again
+- file: internal/llm/tools/textenc.go
+  swap: ['case bytes.HasPrefix(head, []byte{0xEF, 0xBB, 0xBF}):', 'case false:']
+  why: a UTF-8 BOM is shown as text and not named
+- file: internal/llm/tools/textenc.go
+  swap: ['if looksLikeWin1252(head) {', 'if false {']
+  why: ANSI text is refused as binary again
+- file: internal/llm/tools/textenc.go
+  swap: ['case 0x81, 0x8D, 0x8F, 0x90, 0x9D:', 'case 0x00:']
+  why: bytes Windows-1252 leaves undefined count as text
+- file: internal/llm/tools/textenc.go
+  swap: ['return controls*100 <= len(b)', 'return true']
+  why: a file of control characters is shown as text
+- file: internal/llm/tools/textenc.go
+  swap: ['if utf8.Valid(head) || (more && validUTF8Prefix(head)) {', 'if utf8.Valid(head) {']
+  why: a UTF-8 file whose first chunk ends mid-character is decoded as Windows-1252
+- file: internal/llm/tools/textenc.go
+  swap: ['''€'', 0xFFFD,', '''?'', 0xFFFD,']
+  why: Windows-1252 0x80 is not the euro sign
+- file: internal/llm/tools/view.go
+  swap: ['output = fmt.Sprintf("(Decoded from %s; shown here as UTF-8. The file on disk is still %s.)\n", encoding, encoding)', 'output = ""']
+  why: view no longer says which encoding it decoded
+- file: internal/llm/tools/view.go
+  swap: ['src = strings.NewReader(decodeText(data, encoding))', 'src = strings.NewReader(string(data))']
+  why: the bytes are shown undecoded
+
+# --- 6. patch keeps CRLF (gap #16)
+- file: internal/diff/patch.go
+  swap: ['return strings.ReplaceAll(s, "\r\n", "\n")', 'return s']
+  why: CRLF files and CRLF patches are split on LF alone again
+- file: internal/diff/patch.go
+  swap: ['newContent = withLineEnding(newContent, lineEnding(orig[pathKey]))', '_ = withLineEnding']
+  why: a CRLF file is written back with LF
+- file: internal/diff/patch.go
+  swap: ['if crlf > 0 && crlf >= strings.Count(s, "\n")-crlf {', 'if false {']
+  why: a CRLF file is not recognized
+
+# --- 7. PowerShell read-only cmdlets, whole pipeline (gap #7)
+- file: internal/llm/tools/commandclass.go
+  swap: ['"Get-ChildItem", "gci", "dir", "ls",', '"gci", "dir", "ls",']
+  why: Get-ChildItem asks permission again
+- file: internal/llm/tools/commandclass.go
+  swap: ['"Get-Content", "gc", "cat", "type",', '"gc", "cat", "type",']
+  why: Get-Content asks permission again
+- file: internal/llm/tools/commandclass.go
+  swap: ['"Get-Acl",', '']
+  why: Get-Acl asks permission again
+- file: internal/llm/tools/commandclass.go
+  swap: ['if !notInPowerShell[c] {', 'if true {']
+  why: Unix-only names (head, wc, which) are trusted in PowerShell
+- file: internal/llm/tools/commandclass.go
+  swap: ['	if shell.IsWindowsPowerShell() {', '	if false {']
+  why: a PowerShell session gets the bash list
+- file: internal/llm/tools/commandclass.go
+  swap: ['if x := expandShellPathWord(w, home); x != w {', 'if x := w; x != w {']
+  why: Get-Content $env:USERPROFILE\.aws\credentials reads a credential with no prompt
+- file: internal/llm/tools/commandgate.go
+  swap: ['cmd = unwrapPropertyReads(cmd)', '_ = unwrapPropertyReads']
+  why: (Get-Item x).Attributes asks again
+- file: internal/llm/tools/commandclass.go
+  swap: ['[A-Za-z0-9_]*)+)$`)', '[A-Za-z0-9_]*)+))`)']
+  why: '(Get-Item x).IsReadOnly = $false counts as a read'
+
+# --- 8. dangerous Windows commands (gap #8)
+- file: internal/llm/tools/dangerous.go
+  swap: ['(?:hklm|hkcu|hkcr|hku|hkcc):', '(?:hkxx):']
+  why: Remove-Item HKLM:\ is not flagged
+- file: internal/llm/tools/dangerous.go
+  swap: ['vssadmin(?:\.exe)?\s+(?:delete\s+shadows|', 'vssadmin(?:\.exe)?\s+(?:deleteXX\s+shadows|']
+  why: vssadmin delete shadows is not flagged
+- file: internal/llm/tools/dangerous.go
+  swap: ['\s/w(?::|\s|$)', '\s/wXX(?::|\s|$)']
+  why: cipher /w is not flagged
+- file: internal/llm/tools/dangerous.go
+  swap: ['(?i)\bset-executionpolicy\b', '(?i)\bset-executionpolicyXX\b']
+  why: Set-ExecutionPolicy is not flagged
+- file: internal/llm/tools/dangerous.go
+  swap: ['(?i)\btakeown(?:\.exe)?\b', '(?i)\btakeownXX\b']
+  why: takeown is not flagged
+- file: internal/llm/tools/dangerous.go
+  swap: ['/(?:reset|grant|setowner|deny|remove|inheritance)\b', '/(?:resetXX)\b']
+  why: icacls /grant on a system folder is not flagged
+- file: internal/llm/tools/dangerous.go
+  swap: ['(?i)(?:\bsc(?:\.exe)?\s+(?:\\\\\S+\s+)?delete\b', '(?i)(?:\bscXX\b']
+  why: sc delete is not flagged
+- file: internal/llm/tools/dangerous.go
+  swap: ['|bfe|eventlog|wuauserv|', '|bfe|']
+  why: stopping the event log or Windows Update is not flagged
+- file: internal/llm/tools/dangerous.go
+  swap: ['(?:\bschtasks(?:\.exe)?\s+/create\b|', '(?:\bschtasksXX\b|']
+  why: schtasks /create is not flagged
+- file: internal/llm/tools/dangerous.go
+  swap: ['currentversion\\run(?:once|services|servicesonce)?', 'currentversion\\runXX']
+  why: a Run-key write is not flagged
+- file: internal/llm/tools/dangerous.go
+  swap: ['\s/(?:mir|purge|move|mov)(?:\s|$)', '\s/(?:purge|move|mov)(?:\s|$)']
+  why: robocopy /MIR is not flagged
+- file: internal/llm/tools/dangerous.go
+  swap: ['|purge|move|mov)(?:\s|$)', '|purge|move)(?:\s|$)']
+  why: robocopy /MOV is not flagged
+
+# --- 9. exit codes that are information (robocopy 1-7, fc 1, diff/cmp 1)
+- file: internal/llm/tools/exitcodes.go
+  swap: ['if code < 8 {', 'if code < 9 {']
+  why: robocopy 8 (copy errors) counts as success
+- file: internal/llm/tools/exitcodes.go
+  swap: ['if code >= 32 {', 'if code >= 64 {']
+  why: a code robocopy never returns is decoded as robocopy's
+- file: internal/llm/tools/exitcodes.go
+  swap: ['return "fc: the files differ (a successful comparison)", true', 'return "fc: the files differ (a successful comparison)", false']
+  why: fc 1 (the files differ) is a failure again
+- file: internal/llm/tools/exitcodes.go
+  swap: ['		if code == 1 {', '		if code == 2 {']
+  why: diff 1 is a failure and diff 2 (trouble) a success
+- file: internal/llm/tools/exitcodes.go
+  swap: ['if cmdletRe.MatchString(base) {', 'if false {']
+  why: robocopy ... | Out-Null is judged by Out-Null
+- file: internal/llm/tools/bash.go
+  swap: ['if meaning, _ := ExitCodeMeaning(params.Command, exitCode); meaning != "" {', 'if meaning := ""; meaning != "" {']
+  why: the shell result no longer says robocopy 1 is success
+- file: internal/app/receipt.go
+  swap: ['if meaning, ok := tools.ExitCodeMeaning(command, n); ok {', 'if meaning, ok := tools.ExitCodeMeaning(command, n); false && ok {']
+  why: the receipt lists a robocopy that worked as a failure
+- file: internal/app/receipt.go
+  swap: ['outcome = outcomeForCall(tc, tr)', 'outcome = outcomeFor(tc.Name, tr)']
+  why: the receipt does not pass the command, so nothing is decoded
+- file: internal/app/claimguard.go
+  swap: ['if o := outcomeForCall(tc, tr); o == "ok"', 'if o := outcomeFor(tc.Name, tr); o == "ok"']
+  why: the claim guard calls a robocopy that worked a failure
+
+# --- 10. permission scoping paths (gap #22)
+- file: internal/llm/tools/shellpaths.go
+  swap: ['case strings.HasPrefix(low, "$env:"):', 'case false:']
+  why: $env:APPDATA is not resolved
+- file: internal/llm/tools/shellpaths.go
+  swap: ['case strings.HasPrefix(low, "${env:"):', 'case false:']
+  why: ${env:APPDATA} is not resolved
+- file: internal/llm/tools/shellpaths.go
+  swap: ['case strings.HasPrefix(w, "%"):', 'case false:']
+  why: '%APPDATA% is not resolved'
+- file: internal/llm/tools/bash_outside.go
+  swap: ['if registryPath(w) {', 'if false {']
+  why: a registry path falls back to the working directory
+- file: internal/llm/tools/shellpaths.go
+  swap: ['"hklm:", "hkcu:",', '"hkcu:",']
+  why: HKLM:\ is not recognized as a registry path
