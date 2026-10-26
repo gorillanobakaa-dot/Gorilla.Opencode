@@ -191,7 +191,7 @@ stated along with how many were left out.
 - `TestMostSevereFindingsComeFirst`
 - `TestCorroboratedFindingsAreNeverTruncated`
 - `TestVendoredToolkitMatchesDevCopy` — per-file SHA-256 against the working copy
-  in `Scripts.For.Work`, and a check that every Python module there is embedded.
+  in `Scripts`, and a check that every Python module there is embedded.
   A new module that is not vendored kills the shipped toolkit at import time.
 - `TestEveryModuleTheToolkitImportsIsEmbedded` — closes the import graph without
   needing the development copy at all.
