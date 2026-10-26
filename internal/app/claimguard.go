@@ -279,7 +279,7 @@ func ClaimWarning(turn []message.Message) string {
 		for _, tc := range turn[i].ToolCalls() {
 			calls++
 			if tr, ok := results[tc.ID]; ok {
-				if o := outcomeFor(tc.Name, tr); o == "ok" || strings.HasPrefix(o, "ok, ") {
+				if o := outcomeForCall(tc, tr); o == "ok" || strings.HasPrefix(o, "ok, ") {
 					succeeded++
 				}
 			}

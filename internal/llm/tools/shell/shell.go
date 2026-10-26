@@ -117,7 +117,7 @@ func newPersistentShell(cwd string) *PersistentShell {
 	// Default shell args
 	if len(shellArgs) == 0 {
 		if isPowerShell {
-			shellArgs = []string{"-NoProfile", "-Command", "-"}
+			shellArgs = PowerShellArgs("-Command", "-")
 		} else {
 			shellArgs = []string{"-l"}
 		}
@@ -150,6 +150,14 @@ func newPersistentShell(cwd string) *PersistentShell {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start shell %s: %v\n", shellPath, err)
 		return nil
+	}
+
+	// The session setup (UTF-8 console, the stdin guard) goes down the pipe
+	// before any command, so it runs first and at global scope.
+	if isPowerShell && runtime.GOOS == "windows" {
+		if _, err := stdinPipe.Write([]byte(psSessionSetup)); err != nil {
+			fmt.Fprintf(os.Stderr, "PowerShell session setup failed: %v\n", err)
+		}
 	}
 
 	shell := &PersistentShell{
@@ -296,8 +304,10 @@ if ($__perr -ne $null -and $__perr.Count -gt 0) {
   $__code = 2
 } else {
   $__code = $null
+  $__in = [IntPtr]::Zero
   try {
     $__sb = [scriptblock]::Create($__src)
+    if ('GorillaStdin' -as [type]) { $__in = [GorillaStdin]::Detach() }
     & $__sb 2>&1 | ForEach-Object {
       if ($_ -is [System.Management.Automation.ErrorRecord]) {
         [void]$__err.Add(($_ | Out-String -Width 4096))
@@ -306,6 +316,8 @@ if ($__perr -ne $null -and $__perr.Count -gt 0) {
   } catch {
     [void]$__err.Add(($_ | Out-String -Width 4096))
     $__code = 1
+  } finally {
+    if ($__in -ne [IntPtr]::Zero) { [GorillaStdin]::Restore($__in) }
   }
   if ($__code -eq $null) {
     $__code = if ($LASTEXITCODE -ne $null) { $LASTEXITCODE } elseif ($__err.Count -gt 0) { 1 } else { 0 }
@@ -677,7 +689,7 @@ func resolveShellPath() string {
 func startShell(shellPath string, shellArgs []string, cwd string) (*exec.Cmd, *os.File, error) {
 	cmd := exec.Command(shellPath, shellArgs...)
 	cmd.Dir = cwd
-	cmd.Env = append(os.Environ(), "GIT_EDITOR=true")
+	cmd.Env = shellChildEnv(append(os.Environ(), "GIT_EDITOR=true"), runtime.GOOS == "windows")
 
 	stdinPipe, err := cmd.StdinPipe()
 	if err != nil {
@@ -700,6 +712,80 @@ func startShell(shellPath string, shellArgs []string, cwd string) (*exec.Cmd, *o
 		return nil, nil, err
 	}
 	return cmd, f, nil
+}
+
+// PowerShellArgs is how every PowerShell we start begins: no profile, and
+// the execution policy bypassed for THIS process only (gap #3). Under the
+// default Restricted policy the .ps1 shims that npm, npx, a venv's
+// Activate.ps1 and build.ps1 scripts are made of refuse to run. The machine
+// and user policy are never changed (no Set-ExecutionPolicy); a policy set
+// by Group Policy still wins, as it should.
+func PowerShellArgs(rest ...string) []string {
+	return append([]string{"-NoProfile", "-ExecutionPolicy", "Bypass"}, rest...)
+}
+
+// shellChildEnv adds what every child of the shell needs on Windows (gap
+// #4): Python writes UTF-8 to pipes instead of the ANSI code page
+// (PYTHONUTF8, PEP 540; PYTHONIOENCODING for Python before 3.7). A value
+// the user set already is kept.
+func shellChildEnv(env []string, windows bool) []string {
+	if !windows {
+		return env
+	}
+	for _, kv := range []string{"PYTHONUTF8=1", "PYTHONIOENCODING=utf-8"} {
+		key := kv[:strings.IndexByte(kv, '=')+1]
+		set := false
+		for _, e := range env {
+			if len(e) >= len(key) && strings.EqualFold(e[:len(key)], key) {
+				set = true
+				break
+			}
+		}
+		if !set {
+			env = append(env, kv)
+		}
+	}
+	return env
+}
+
+// psSessionSetup runs once, before the first command, in every Windows
+// PowerShell session the bash tool drives.
+//
+// UTF-8 (gap #4): PowerShell decodes a native program's output with
+// [Console]::OutputEncoding, which defaults to the OEM code page (437/850),
+// so git's and cargo's UTF-8 came out as mojibake; $OutputEncoding is what
+// it encodes text piped INTO a native program with (ASCII on 5.1).
+//
+// stdin (gap #5): this shell reads its commands from its stdin, and a
+// native program inherits that handle. Measured on 5.1.26100: `python -c
+// "import sys; sys.stdin.read()"` swallowed every command sent after it.
+// `$null |` in front of the block does not help (the native command inside
+// is not the pipeline's first element). GorillaStdin swaps the process's
+// standard input for NUL around each command (the wrapper's try/finally)
+// and puts it back before PowerShell reads its next line; PowerShell
+// fetches the handle on every read, which is also why the swap must sit
+// inside the one statement the wrapper is.
+const psSessionSetup = `try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
+try { [Console]::InputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
+$global:OutputEncoding = New-Object System.Text.UTF8Encoding $false
+if (-not ('GorillaStdin' -as [type])) { try { Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class GorillaStdin { [StructLayout(LayoutKind.Sequential)] struct SA { public int nLength; public IntPtr sd; public int inherit; } [DllImport("kernel32.dll")] static extern IntPtr GetStdHandle(int n); [DllImport("kernel32.dll")] static extern bool SetStdHandle(int n, IntPtr h); [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern IntPtr CreateFileW(string name, uint access, uint share, ref SA sa, uint disposition, uint flags, IntPtr template); static IntPtr nul = IntPtr.Zero; public static IntPtr Detach() { if (nul == IntPtr.Zero) { SA sa = new SA(); sa.nLength = Marshal.SizeOf(sa); sa.inherit = 1; IntPtr h = CreateFileW("NUL", 0x80000000, 3, ref sa, 3, 0, IntPtr.Zero); if (h == new IntPtr(-1)) { return IntPtr.Zero; } nul = h; } IntPtr old = GetStdHandle(-10); if (!SetStdHandle(-10, nul)) { return IntPtr.Zero; } return old; } public static void Restore(IntPtr old) { SetStdHandle(-10, old); } }' } catch { } }
+`
+
+// HookPowerShell is the PowerShell a lifecycle hook runs in (gap #18): the
+// bash tool's own when that is PowerShell 7 (pwsh), so a hook written for the
+// shell the user chose runs in it; otherwise Windows PowerShell 5.1.
+func HookPowerShell() string {
+	p := ""
+	if cfg := config.Get(); cfg != nil {
+		p = cfg.Shell.Path
+	}
+	if p == "" {
+		p = resolveShellPath()
+	}
+	if strings.Contains(strings.ToLower(filepath.Base(p)), "pwsh") {
+		return p
+	}
+	return "powershell.exe"
 }
 
 // IsWindowsPowerShell reports whether the bash tool will drive PowerShell.

@@ -45,9 +45,20 @@ func (g *GlobPattern) AsPattern() (PatternInfo, error) {
 		basePath := ""
 		switch baseURI := v.BaseURI.Value.(type) {
 		case string:
-			basePath = strings.TrimPrefix(baseURI, "file://")
+			basePath = baseURI
+			if strings.HasPrefix(baseURI, "file://") {
+				p, err := DocumentUri(baseURI).Path()
+				if err != nil {
+					return nil, err
+				}
+				basePath = p
+			}
 		case DocumentUri:
-			basePath = strings.TrimPrefix(string(baseURI), "file://")
+			p, err := baseURI.Path()
+			if err != nil {
+				return nil, err
+			}
+			basePath = p
 		default:
 			return nil, fmt.Errorf("unknown BaseURI type: %T", v.BaseURI.Value)
 		}

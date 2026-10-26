@@ -177,7 +177,7 @@ func (c *Client) InitializeLSPClient(ctx context.Context, workspaceDir string) (
 		WorkspaceFoldersInitializeParams: protocol.WorkspaceFoldersInitializeParams{
 			WorkspaceFolders: []protocol.WorkspaceFolder{
 				{
-					URI:  protocol.URI("file://" + workspaceDir),
+					URI:  protocol.URI(protocol.URIFromPath(workspaceDir)),
 					Name: workspaceDir,
 				},
 			},
@@ -190,7 +190,7 @@ func (c *Client) InitializeLSPClient(ctx context.Context, workspaceDir string) (
 				Version: "0.1.0",
 			},
 			RootPath: workspaceDir,
-			RootURI:  protocol.DocumentUri("file://" + workspaceDir),
+			RootURI:  protocol.URIFromPath(workspaceDir),
 			Capabilities: protocol.ClientCapabilities{
 				Workspace: protocol.WorkspaceClientCapabilities{
 					Configuration: true,
@@ -494,7 +494,10 @@ func (c *Client) pingTypeScriptServer(ctx context.Context) error {
 
 	// If we have any open files, try to get document symbols for one
 	for uri := range c.openFiles {
-		filePath := strings.TrimPrefix(uri, "file://")
+		filePath, perr := protocol.PathFromURI(uri)
+		if perr != nil {
+			continue
+		}
 		if strings.HasSuffix(filePath, ".ts") || strings.HasSuffix(filePath, ".js") ||
 			strings.HasSuffix(filePath, ".tsx") || strings.HasSuffix(filePath, ".jsx") {
 			var symbols []protocol.DocumentSymbol
@@ -632,7 +635,7 @@ type OpenFileInfo struct {
 }
 
 func (c *Client) OpenFile(ctx context.Context, filepath string) error {
-	uri := fmt.Sprintf("file://%s", filepath)
+	uri := string(protocol.URIFromPath(filepath))
 
 	c.openFilesMu.Lock()
 	if _, exists := c.openFiles[uri]; exists {
@@ -671,7 +674,7 @@ func (c *Client) OpenFile(ctx context.Context, filepath string) error {
 }
 
 func (c *Client) NotifyChange(ctx context.Context, filepath string) error {
-	uri := fmt.Sprintf("file://%s", filepath)
+	uri := string(protocol.URIFromPath(filepath))
 
 	content, err := os.ReadFile(filepath)
 	if err != nil {
@@ -711,7 +714,7 @@ func (c *Client) NotifyChange(ctx context.Context, filepath string) error {
 
 func (c *Client) CloseFile(ctx context.Context, filepath string) error {
 	cnf := config.Get()
-	uri := fmt.Sprintf("file://%s", filepath)
+	uri := string(protocol.URIFromPath(filepath))
 
 	c.openFilesMu.Lock()
 	if _, exists := c.openFiles[uri]; !exists {
@@ -744,7 +747,7 @@ func (c *Client) CloseFile(ctx context.Context, filepath string) error {
 }
 
 func (c *Client) IsFileOpen(filepath string) bool {
-	uri := fmt.Sprintf("file://%s", filepath)
+	uri := string(protocol.URIFromPath(filepath))
 	c.openFilesMu.RLock()
 	defer c.openFilesMu.RUnlock()
 	_, exists := c.openFiles[uri]
@@ -759,8 +762,11 @@ func (c *Client) CloseAllFiles(ctx context.Context) {
 
 	// First collect all URIs that need to be closed
 	for uri := range c.openFiles {
-		// Convert URI back to file path by trimming "file://" prefix
-		filePath := strings.TrimPrefix(uri, "file://")
+		filePath, err := protocol.PathFromURI(uri)
+		if err != nil {
+			logging.Warn("Skipping an open file with a bad URI", "uri", uri, "error", err)
+			continue
+		}
 		filesToClose = append(filesToClose, filePath)
 	}
 	c.openFilesMu.Unlock()
@@ -805,7 +811,7 @@ func (c *Client) OpenFileOnDemand(ctx context.Context, filepath string) error {
 // GetDiagnosticsForFile ensures a file is open and returns its diagnostics
 // This is useful for on-demand diagnostics when using lazy loading
 func (c *Client) GetDiagnosticsForFile(ctx context.Context, filepath string) ([]protocol.Diagnostic, error) {
-	uri := fmt.Sprintf("file://%s", filepath)
+	uri := string(protocol.URIFromPath(filepath))
 	documentUri := protocol.DocumentUri(uri)
 
 	// Make sure the file is open

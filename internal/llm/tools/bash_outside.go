@@ -12,9 +12,10 @@ import (
 // the first path the command names that lies outside every workspace root, or
 // the working directory when it names none.
 //
-// It reads the command; it does not run or expand it. Home spellings
-// (~, $HOME, $env:USERPROFILE, %USERPROFILE%) are resolved because they are how
-// a command reaches a person's own folders. The command word of each segment is
+// It reads the command; it does not run it. Home and environment spellings
+// (~, $HOME, $env:APPDATA, %LOCALAPPDATA%, ${env:ProgramData} ...) are
+// resolved because they are how a command reaches a person's own folders and
+// the system's; a registry path (HKLM:\...) is returned as written. The command word of each segment is
 // skipped: C:\Program Files\Go\bin\go.exe is a program being run, not a place
 // being touched.
 func bashRequestPath(command string) string {
@@ -38,15 +39,14 @@ func bashRequestPath(command string) string {
 			if j := strings.LastIndexAny(w, "=>"); j >= 0 && j+1 < len(w) {
 				w = w[j+1:]
 			}
-			if home != "" {
-				low := strings.ToLower(w)
-				for _, h := range []string{"~", "$home", "${home}", "$env:userprofile", "${env:userprofile}", "%userprofile%"} {
-					if low == h || strings.HasPrefix(low, h+"/") || strings.HasPrefix(low, h+`\`) {
-						w = home + w[len(h):]
-						break
-					}
-				}
+			w = strings.Trim(w, `"'`)
+			// GORILLA FIX (2026-10-26, gap #22): every $env:NAME / %NAME%,
+			// not only the home folder, and registry drives, which used to
+			// fall through to "the working directory".
+			if registryPath(w) {
+				return w
 			}
+			w = expandShellPathWord(w, home)
 			if w == "/dev/null" || strings.EqualFold(w, "nul") || !filepath.IsAbs(w) {
 				continue
 			}

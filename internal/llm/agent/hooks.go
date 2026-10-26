@@ -9,7 +9,8 @@ package agent
 // # WHAT RUNS, WHERE
 //
 // One command line through the platform shell — Windows: powershell.exe
-// -NoProfile -NonInteractive -Command; elsewhere: sh -c — in the working
+// (pwsh when the bash tool drives pwsh) -NoProfile -ExecutionPolicy Bypass
+// -NonInteractive -Command; elsewhere: sh -c — in the working
 // directory, with the agent's own environment plus GORILLA_HOOK_* variables.
 // The full raw tool input is also written to the hook's stdin, because an
 // environment variable has a size limit (32767 characters per variable on
@@ -44,6 +45,7 @@ import (
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
+	"github.com/opencode-ai/opencode/internal/llm/tools/shell"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/message"
 )
@@ -96,7 +98,7 @@ func hooksFor(event, tool string) []config.Hook {
 // hookShell returns the platform shell and its arguments for one command line.
 func hookShell(command string) (string, []string) {
 	if runtime.GOOS == "windows" {
-		return "powershell.exe", []string{"-NoProfile", "-NonInteractive", "-Command", command}
+		return shell.HookPowerShell(), shell.PowerShellArgs("-NonInteractive", "-Command", command)
 	}
 	return "sh", []string{"-c", command}
 }

@@ -457,8 +457,39 @@ func peekNextSection(lines []string, initialIndex int) ([]string, []Chunk, int, 
 	return old, chunks, index, false
 }
 
+// lineEnding is the line ending a file mostly uses: "\r\n" when more of
+// its lines end in CRLF than in a bare LF, else "\n".
+func lineEnding(s string) string {
+	crlf := strings.Count(s, "\r\n")
+	if crlf > 0 && crlf >= strings.Count(s, "\n")-crlf {
+		return "\r\n"
+	}
+	return "\n"
+}
+
+// toLF turns CRLF into LF. The patch format and its matcher work on LF
+// lines; a CRLF file used to be split on "\n" alone, so every line kept a
+// "\r", the model's context lines (which have none) matched only by fuzz,
+// and the inserted lines went in with bare LF: mixed endings (gap #16).
+func toLF(s string) string {
+	return strings.ReplaceAll(s, "\r\n", "\n")
+}
+
+// withLineEnding writes LF text back with eol.
+func withLineEnding(s, eol string) string {
+	if eol == "\n" {
+		return s
+	}
+	return strings.ReplaceAll(toLF(s), "\n", eol)
+}
+
 func TextToPatch(text string, orig map[string]string) (Patch, int, error) {
-	text = strings.TrimSpace(text)
+	text = strings.TrimSpace(toLF(text))
+	lfOrig := make(map[string]string, len(orig))
+	for p, c := range orig {
+		lfOrig[p] = toLF(c)
+	}
+	orig = lfOrig
 	lines := strings.Split(text, "\n")
 	if len(lines) < 2 || !strings.HasPrefix(lines[0], "*** Begin Patch") || lines[len(lines)-1] != "*** End Patch" {
 		return Patch{}, 0, NewDiffError("Invalid patch text")
@@ -472,7 +503,7 @@ func TextToPatch(text string, orig map[string]string) (Patch, int, error) {
 }
 
 func IdentifyFilesNeeded(text string) []string {
-	text = strings.TrimSpace(text)
+	text = strings.TrimSpace(toLF(text))
 	lines := strings.Split(text, "\n")
 	result := make(map[string]bool)
 
@@ -493,7 +524,7 @@ func IdentifyFilesNeeded(text string) []string {
 }
 
 func IdentifyFilesAdded(text string) []string {
-	text = strings.TrimSpace(text)
+	text = strings.TrimSpace(toLF(text))
 	lines := strings.Split(text, "\n")
 	result := make(map[string]bool)
 
@@ -555,10 +586,12 @@ func PatchToCommit(patch Patch, orig map[string]string) (Commit, error) {
 				NewContent: action.NewFile,
 			}
 		case ActionUpdate:
-			newContent, err := getUpdatedFile(orig[pathKey], action, pathKey)
+			// The file keeps its own line endings: CRLF in, CRLF out.
+			newContent, err := getUpdatedFile(toLF(orig[pathKey]), action, pathKey)
 			if err != nil {
 				return Commit{}, err
 			}
+			newContent = withLineEnding(newContent, lineEnding(orig[pathKey]))
 			oldContent := orig[pathKey]
 			fileChange := FileChange{
 				Type:       ActionUpdate,

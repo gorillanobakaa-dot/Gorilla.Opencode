@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/logging"
@@ -258,7 +257,7 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	}
 
 	// Read the file content
-	content, lineCount, err := readTextFile(filePath, params.Offset.Int(), params.Limit.Int())
+	content, lineCount, encoding, err := readTextFile(filePath, params.Offset.Int(), params.Limit.Int())
 	if err != nil {
 		return ToolResponse{}, fmt.Errorf("error reading file: %w", err)
 	}
@@ -287,7 +286,11 @@ func (v *viewTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	}
 
 	notifyLspOpenFile(ctx, filePath, v.lspClients)
-	output := "<file>\n"
+	output := ""
+	if encoding != "" {
+		output = fmt.Sprintf("(Decoded from %s; shown here as UTF-8. The file on disk is still %s.)\n", encoding, encoding)
+	}
+	output += "<file>\n"
 	// Format the output with line numbers
 	output += addLineNumbers(content, params.Offset.Int()+1)
 
@@ -333,29 +336,39 @@ func addLineNumbers(content string, startLine int) string {
 	return strings.Join(result, "\n")
 }
 
-func readTextFile(filePath string, offset, limit int) (string, int, error) {
+// readTextFile also returns the encoding it decoded from: "" for plain
+// UTF-8, else a name the caller shows to the reader.
+func readTextFile(filePath string, offset, limit int) (string, int, string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 	defer file.Close()
 
+	var src io.Reader = file
+	head := make([]byte, 8192)
+	n, _ := io.ReadFull(file, head)
+	encoding, _ := detectTextEncoding(head[:n], n == len(head))
+	if encoding != "" {
+		// Files here are at most MaxReadSize, so decoding the whole file is fine.
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return "", 0, "", err
+		}
+		src = strings.NewReader(decodeText(data, encoding))
+	} else if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", 0, "", err
+	}
+
 	lineCount := 0
 
-	scanner := NewLineScanner(file)
+	scanner := NewLineScanner(src)
 	if offset > 0 {
 		for lineCount < offset && scanner.Scan() {
 			lineCount++
 		}
 		if err = scanner.Err(); err != nil {
-			return "", 0, err
-		}
-	}
-
-	if offset == 0 {
-		_, err = file.Seek(0, io.SeekStart)
-		if err != nil {
-			return "", 0, err
+			return "", 0, "", err
 		}
 	}
 
@@ -377,10 +390,10 @@ func readTextFile(filePath string, offset, limit int) (string, int, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 
-	return strings.Join(lines, "\n"), lineCount, nil
+	return strings.Join(lines, "\n"), lineCount, encoding, nil
 }
 
 func isImageFile(filePath string) (bool, string) {
@@ -465,14 +478,17 @@ func binaryFileKind(path string) string {
 		}
 	}
 
-	// A NUL byte in the first chunk is the classic test, and the one every
-	// other tool uses. Valid UTF-8 text never contains one.
-	if bytes.IndexByte(head, 0) >= 0 {
-		return "binary data"
-	}
-	// Not valid UTF-8 at all, and not obviously a known format.
-	if !utf8.Valid(head) && n > 16 {
-		return "not valid UTF-8 text"
+	// A byte-order mark says text whatever follows (UTF-16 is full of NUL
+	// bytes). Otherwise a NUL byte in the first chunk is the classic test,
+	// and the one every other tool uses. Text that is not UTF-8 but reads as
+	// Windows-1252 is decoded, not refused (gap #6).
+	if _, ok := detectTextEncoding(head, n == len(buf)); !ok {
+		if bytes.IndexByte(head, 0) >= 0 {
+			return "binary data"
+		}
+		if n > 16 {
+			return "not valid UTF-8 text"
+		}
 	}
 	return ""
 }

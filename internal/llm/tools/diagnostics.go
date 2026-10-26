@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -114,7 +116,7 @@ func waitForLspDiagnostics(ctx context.Context, filePath string, lsps map[string
 				return
 			}
 
-			if diagParams.URI.Path() == filePath || hasDiagnosticsChanged(client.GetDiagnostics(), originalDiags) {
+			if p, perr := diagParams.URI.Path(); (perr == nil && sameFilePath(p, filePath)) || hasDiagnosticsChanged(client.GetDiagnostics(), originalDiags) {
 				select {
 				case diagChan <- struct{}{}:
 				default:
@@ -217,10 +219,14 @@ func getDiagnostics(filePath string, lsps map[string]*lsp.Client) string {
 		diagnostics := client.GetDiagnostics()
 		if len(diagnostics) > 0 {
 			for location, diags := range diagnostics {
-				isCurrentFile := location.Path() == filePath
+				locPath, perr := location.Path()
+				if perr != nil {
+					locPath = string(location)
+				}
+				isCurrentFile := perr == nil && sameFilePath(locPath, filePath)
 
 				for _, diag := range diags {
-					formattedDiag := formatDiagnostic(location.Path(), diag, lspName)
+					formattedDiag := formatDiagnostic(locPath, diag, lspName)
 
 					if isCurrentFile {
 						fileDiagnostics = append(fileDiagnostics, formattedDiag)
@@ -297,4 +303,14 @@ func countSeverity(diagnostics []string, severity string) int {
 		}
 	}
 	return count
+}
+
+// sameFilePath compares two paths the way the file system does: on Windows
+// the case of letters and the slash direction do not matter.
+func sameFilePath(a, b string) bool {
+	a, b = filepath.Clean(a), filepath.Clean(b)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
 }

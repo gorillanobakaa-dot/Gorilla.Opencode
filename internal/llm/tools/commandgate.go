@@ -230,6 +230,7 @@ func IsSafeReadOnly(cmd string, safe []string) bool {
 		return false
 	}
 	cmd = stripBenignRedirects(cmd)
+	cmd = unwrapPropertyReads(cmd)
 	if hasOpaqueConstruct(cmd) {
 		return false
 	}

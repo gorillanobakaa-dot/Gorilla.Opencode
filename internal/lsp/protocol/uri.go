@@ -69,32 +69,39 @@ func (uri *DocumentUri) UnmarshalText(data []byte) (err error) {
 //
 // DocumentUri("").Path() returns the empty string.
 //
-// Path panics if called on a URI that is not a valid filename.
-func (uri DocumentUri) Path() string {
+// Path returns an error, never panics, for a URI that is not a valid
+// filename: a language server can send anything, and a panic here took
+// the whole session down (gopls' original panicked).
+func (uri DocumentUri) Path() (string, error) {
 	filename, err := filename(uri)
 	if err != nil {
-		// e.g. ParseRequestURI failed.
-		//
-		// This can only affect DocumentUris created by
-		// direct string manipulation; all DocumentUris
-		// received from the client pass through
-		// ParseRequestURI, which ensures validity.
-		panic(err)
+		return "", err
 	}
-	return filepath.FromSlash(filename)
+	return filepath.FromSlash(filename), nil
+}
+
+// PathFromURI is DocumentUri(uri).Path() for a plain string key.
+func PathFromURI(uri string) (string, error) {
+	return DocumentUri(uri).Path()
 }
 
 // Dir returns the URI for the directory containing the receiver.
-func (uri DocumentUri) Dir() DocumentUri {
-	// This function could be more efficiently implemented by avoiding any call
-	// to Path(), but at least consolidates URI manipulation.
-	return URIFromPath(uri.DirPath())
+func (uri DocumentUri) Dir() (DocumentUri, error) {
+	dir, err := uri.DirPath()
+	if err != nil {
+		return "", err
+	}
+	return URIFromPath(dir), nil
 }
 
 // DirPath returns the file path to the directory containing this URI, which
 // must be a file URI.
-func (uri DocumentUri) DirPath() string {
-	return filepath.Dir(uri.Path())
+func (uri DocumentUri) DirPath() (string, error) {
+	p, err := uri.Path()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Dir(p), nil
 }
 
 func filename(uri DocumentUri) (string, error) {
@@ -133,6 +140,10 @@ slow:
 	if isWindowsDriveURIPath(u.Path) {
 		u.Path = strings.ToUpper(string(u.Path[1])) + u.Path[2:]
 	}
+	// file://server/share/x is the UNC path \\server\share\x (RFC 8089 E.3).
+	if u.Host != "" && !strings.EqualFold(u.Host, "localhost") {
+		return "//" + u.Host + u.Path, nil
+	}
 
 	return u.Path, nil
 }
@@ -150,8 +161,24 @@ func ParseDocumentUri(s string) (DocumentUri, error) {
 
 	// VS Code sends URLs with only two slashes,
 	// which are invalid. golang/go#39789.
+	// But file://server/share/x is a valid UNC URI: keep its host.
 	if !strings.HasPrefix(s, "file:///") {
-		s = "file:///" + s[len("file://"):]
+		rest := s[len("file://"):]
+		host, after, hasSlash := strings.Cut(rest, "/")
+		uhost, herr := url.PathUnescape(host)
+		switch {
+		case hasSlash && strings.EqualFold(host, "localhost"):
+			s = "file:///" + after
+		case hasSlash && host != "" && herr == nil && !isDriveLetter(uhost):
+			path, err := url.PathUnescape("/" + after)
+			if err != nil {
+				return "", err
+			}
+			u := url.URL{Scheme: fileScheme, Host: host, Path: path}
+			return DocumentUri(u.String()), nil
+		default:
+			s = "file:///" + rest
+		}
 	}
 
 	// Even though the input is a URI, it may not be in canonical form. VS Code
@@ -188,11 +215,22 @@ func URIFromPath(path string) DocumentUri {
 		path = "/" + strings.ToUpper(string(path[0])) + path[1:]
 	}
 	path = filepath.ToSlash(path)
+	// A UNC path (\\server\share\x) becomes file://server/share/x.
+	if strings.HasPrefix(path, "//") && len(path) > 2 && path[2] != '/' {
+		host, rest, _ := strings.Cut(path[2:], "/")
+		u := url.URL{Scheme: fileScheme, Host: host, Path: "/" + rest}
+		return DocumentUri(u.String())
+	}
 	u := url.URL{
 		Scheme: fileScheme,
 		Path:   path,
 	}
 	return DocumentUri(u.String())
+}
+
+// isDriveLetter reports whether s is exactly a drive such as "C:".
+func isDriveLetter(s string) bool {
+	return len(s) == 2 && unicode.IsLetter(rune(s[0])) && s[1] == ':'
 }
 
 const fileScheme = "file"

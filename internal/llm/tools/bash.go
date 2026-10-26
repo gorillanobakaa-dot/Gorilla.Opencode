@@ -448,6 +448,11 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 			errorMessage += "\n"
 		}
 		errorMessage += fmt.Sprintf("Exit code %d", exitCode)
+		// robocopy 1-7, fc 1 ...: the code is information, and the line
+		// after it says so (exitcodes.go). The receipt reads the same table.
+		if meaning, _ := ExitCodeMeaning(params.Command, exitCode); meaning != "" {
+			errorMessage += "\n" + meaning
+		}
 	}
 
 	hasBothOutputs := stdout != "" && stderr != ""
