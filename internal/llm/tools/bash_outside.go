@@ -25,7 +25,8 @@ func bashRequestPath(command string) string {
 		// not an environment assignment. Only i == 0 was skipped, so in
 		// `PYTHONPATH=... /usr/local/bin/python3 -m fieldkit.core.doctor` the
 		// program itself counted as a place outside the roots and the run asked
-		// (MacBook Air, air-2026-10-23-perms-dialog-4.png).
+		// (MacBook Air, 2026-10-23, dialog 4 in docs/PERMISSIONS.md; its picture was withdrawn because it showed
+		// the account name).
 		cmdWord := 0
 		for cmdWord < len(words) && strings.Contains(words[cmdWord], "=") && !strings.HasPrefix(words[cmdWord], "-") {
 			cmdWord++
