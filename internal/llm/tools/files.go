@@ -104,9 +104,9 @@ func (filesTool) Info() ToolInfo {
 			"action": map[string]any{
 				"type":        "string",
 				"enum":        []string{"copy", "mirror", "purge", "move", "move_files", "attributes", "rename", "info", "list", "delete", "howto"},
-				"description": "mirror=/MIR, purge=only delete extras, move=/MOVE, move_files=/MOV, howto=read card path",
+				"description": "mirror=/MIR, purge=delete from dest what path lacks, move=/MOVE (folders go too), move_files=/MOV (folders stay), howto=read card path",
 			},
-			"path":        s("Source, or the item"),
+			"path":        s("Source (left as it is by purge), or the item"),
 			"dest":        s("Destination; rename: new name of one file"),
 			"pattern":     s("Name filter, e.g. *.tmp"),
 			"threads":     map[string]any{"type": "integer", "description": "1-128"},
