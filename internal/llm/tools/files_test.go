@@ -26,6 +26,12 @@ func filesCall(t *testing.T, perms *recordingPermissions, params map[string]any)
 
 func filesCallIn(t *testing.T, session string, perms *recordingPermissions, params map[string]any) (ToolResponse, error) {
 	t.Helper()
+	// A real robocopy run keeps its log in the temp folder for the person;
+	// in a test that folder is the test's own, so nothing is left behind.
+	tmp := t.TempDir()
+	for _, v := range []string{"TMP", "TEMP", "TMPDIR"} {
+		t.Setenv(v, tmp)
+	}
 	ctx := context.WithValue(context.Background(), SessionIDContextKey, session)
 	ctx = context.WithValue(ctx, MessageIDContextKey, "m1")
 	in, _ := json.Marshal(params)
