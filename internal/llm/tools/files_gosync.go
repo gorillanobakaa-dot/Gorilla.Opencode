@@ -104,6 +104,14 @@ func goPlan(op syncOp) (syncPlan, error) {
 				}
 				if d.IsDir() && !isLinkEntry(d) {
 					plan.DeleteDirs = append(plan.DeleteDirs, path+string(filepath.Separator))
+					// As robocopy's *EXTRA File lines: every file inside the
+					// folder is named, so the preview shows what goes for good.
+					_ = filepath.WalkDir(path, func(p string, e fs.DirEntry, err error) error {
+						if err == nil && !e.IsDir() {
+							plan.Deletes = append(plan.Deletes, p)
+						}
+						return nil
+					})
 					return filepath.SkipDir
 				}
 				if nameMatches(op.Pattern, d.Name()) {

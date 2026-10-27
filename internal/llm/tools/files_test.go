@@ -138,7 +138,8 @@ func TestFilesGoEngineMirror(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Copies) != 2 || plan.Overwrites != 1 || len(plan.Deletes) != 1 || len(plan.DeleteDirs) != 1 {
+	// Deletes: extra.txt and old/y.txt (the file inside the extra folder), as robocopy lists them.
+	if len(plan.Copies) != 2 || plan.Overwrites != 1 || len(plan.Deletes) != 2 || len(plan.DeleteDirs) != 1 {
 		t.Fatalf("plan: %+v", plan)
 	}
 	if _, err := goRun(op); err != nil {

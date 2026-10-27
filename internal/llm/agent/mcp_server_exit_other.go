@@ -4,6 +4,7 @@ package agent
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -17,7 +18,7 @@ func processRunning(pid int) bool {
 	if syscall.Kill(pid, 0) != nil {
 		return false
 	}
-	stat, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
+	stat, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
 	if err != nil {
 		return true
 	}
