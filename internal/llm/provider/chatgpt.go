@@ -278,16 +278,19 @@ func (c *chatgptClient) post(ctx context.Context, body cgRequest) (*http.Respons
 	// says nothing about the request body.
 	u := fmt.Sprintf("%s/responses?client_version=%s",
 		auth.ChatGPTBackend, url.QueryEscape(auth.ChatGPTClientVersion))
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(raw))
-	if err != nil {
-		return nil, err
+	newReq := func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(raw))
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range c.creds.AuthHeaders(token) {
+			req.Header.Set(k, v)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "text/event-stream")
+		return req, nil
 	}
-	for k, v := range c.creds.AuthHeaders(token) {
-		req.Header.Set(k, v)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "text/event-stream")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := doWithConnectRetry(ctx, newReq) // chatgpt_connect_retry.go
 	// GORILLA OVERRIDE (2026-08-23): the usage meter for this backend rides the
 	// RESPONSE, not a queryable endpoint — there is none. Recording it here, at
 	// the one point every ChatGPT request passes through, costs zero extra
