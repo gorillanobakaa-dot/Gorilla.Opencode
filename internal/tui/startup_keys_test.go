@@ -227,3 +227,52 @@ func TestADeliberateAnswerStillAnswersTheOffer(t *testing.T) {
 		}
 	}
 }
+
+// Job 07 acceptance run, 2026-10-27: a prompt typed ~30 ms a key into an offer
+// that had been open for seconds reached the model as "t is in the folder
+// Folder?". Each key settled on its own, so the offer took "W", "h" and "a".
+// Here every key is followed by silence, the slowest typing there is: a key the
+// offer has no use for, and a letter it only moves on (h, l), still reach the box.
+func TestKeysTypedOneByOneIntoTheOpenOfferAllLandInTheBox(t *testing.T) {
+	for _, text := range []string{"What is in the folder Folder?", "list the files here", "hello"} {
+		r := newStartupRun(t)
+		r.send(dialog.ShowInitDialogMsg{Show: true})
+		r.now = r.now.Add(10 * time.Second) // on screen for a while
+		for _, c := range text {
+			r.send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{c}}) // then silence
+			r.now = r.now.Add(150 * time.Millisecond)
+		}
+		if got := r.sent(); len(got) != 0 {
+			t.Errorf("%q: typing answered the offer or sent: %v", text, got)
+		}
+		if r.a.showInitDialog {
+			t.Errorf("%q: the offer is still open", text)
+		}
+		if got := r.boxText(); got != text {
+			t.Errorf("the box holds %q, want every key %q", got, text)
+		}
+	}
+}
+
+// Moving in the offer and then answering is still an answer, and the moves do
+// not reach the box.
+func TestMovingInTheOfferThenAnsweringStillAnswers(t *testing.T) {
+	r := newStartupRun(t)
+	r.send(dialog.ShowInitDialogMsg{Show: true})
+	r.now = r.now.Add(2 * time.Second)
+	r.send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	r.now = r.now.Add(time.Second)
+	r.send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	var answered bool
+	for _, m := range r.seen {
+		if c, ok := m.(dialog.CloseInitDialogMsg); ok && !c.Initialize {
+			answered = true
+		}
+	}
+	if !answered || r.a.showInitDialog {
+		t.Fatalf("answered No=%v, open=%v", answered, r.a.showInitDialog)
+	}
+	if got := r.boxText(); got != "" {
+		t.Fatalf("the moves went into the box: %q", got)
+	}
+}
