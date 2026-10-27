@@ -56,7 +56,7 @@ Not tested here: a machine with PowerShell 7 as the shell, with PowerToys instal
 In PowerShell, in the Gorilla.Opencode folder:
 
 ```powershell
-cd $HOME\Documents\Gorilla.Opencode; go build -o gorilla-opencode.exe .; .\gorilla-opencode.exe system-prompt
+cd C:\Users\gorilla1\Documents\Gorilla.Opencode; & 'C:\Program Files\Go\bin\go.exe' build -o C:\Users\gorilla1\Documents\Gorilla.Opencode\gorilla-opencode.exe .; & C:\Users\gorilla1\Documents\Gorilla.Opencode\gorilla-opencode.exe system-prompt
 ```
 
 It prints the full instructions the AI would receive from this folder. Look for the lines under "Platform: windows" and the "YOUR TOOLS" table. Add `--mcp` to include tools from your MCP servers (that starts them). If no model server is running it prints a one-line note first and the instructions anyway.
