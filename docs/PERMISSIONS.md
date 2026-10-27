@@ -168,15 +168,15 @@ the model refused on its own (the task's rules forbid sudo), wrote the question
 to QUESTIONS.txt and never called the tool. `TestAPersonsDenyIsAnAnswerAndTheTurnCarriesOn`
 remains the evidence until a run where the model does call it.
 
-[![Dialog 1 on the Air: the full INSTALL.md URL on raw.githubusercontent.com, the plain line "Downloads this page and gives its text to the model.", the reason (a place not used yet, after untrusted content), what Allow for session covers, and an aligned ASCII border with the rows above and below intact](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-1.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-1.png)
+- (Picture withdrawn on 2026-10-26: it showed the account name inside the dialog; a retake is needed.) What it showed: Dialog 1 on the Air: the full INSTALL.md URL on raw.githubusercontent.com, the plain line "Downloads this page and gives its text to the model.", the reason (a place not used yet, after untrusted content), what Allow for session covers, and an aligned ASCII border with the rows above and below intact
 
-[![Dialog 2 on the Air: a python3 -c command using urllib to download the Fieldkit branch zip, shown in full, asking because inline code names a network library after a web page was read](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-2.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-2.png)
+- (Picture withdrawn on 2026-10-26: it showed the account name inside the dialog; a retake is needed.) What it showed: Dialog 2 on the Air: a python3 -c command using urllib to download the Fieldkit branch zip, shown in full, asking because inline code names a network library after a web page was read
 
-[![Dialog 3 on the Air: a python3 -c download-and-unzip command shown in full, the same reason as dialog 2](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-3.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-3.png)
+- (Picture withdrawn on 2026-10-26: it showed the account name inside the dialog; a retake is needed.) What it showed: Dialog 3 on the Air: a python3 -c download-and-unzip command shown in full, the same reason as dialog 2
 
-[![Dialog 4 on the Air, the remaining fault: PYTHONPATH=... /usr/local/bin/python3 -m fieldkit.core.doctor --lean asked as "outside every workspace root" because the program path was taken for a target; fixed after this run](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-4.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-dialog-4.png)
+- (Picture withdrawn on 2026-10-26: it showed the account name inside the dialog; a retake is needed.) What it showed: Dialog 4 on the Air, the remaining fault: PYTHONPATH=... /usr/local/bin/python3 -m fieldkit.core.doctor --lean asked as "outside every workspace root" because the program path was taken for a target; fixed after this run
 
-[![The hard-stop attempt on the Air: asked for brew install ripgrep, the model checked which brew, refused on its own because the task forbids sudo and system-wide installs, and wrote the question to QUESTIONS.txt; no tool call, so no dialog; version v0.1.149-perms-c671b03 in the status bar](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-hardstop-dialog.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-hardstop-dialog.png)
+[![The hard-stop attempt on the Air (cropped on 2026-10-26 to the question and the log line, to keep the account name off the page): asked for brew install ripgrep, the model checked which brew, refused on its own because the task forbids sudo and system-wide installs, and wrote the question to QUESTIONS.txt; no tool call, so no dialog; version v0.1.149-perms-c671b03 in the status bar](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-hardstop-dialog.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-23-perms-hardstop-dialog.png)
 
 ### Tests
 

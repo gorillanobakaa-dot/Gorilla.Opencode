@@ -52,3 +52,9 @@ PKGBUILD    text eol=lf
 *.md   text eol=lf
 *.json text eol=lf
 *.py   text eol=lf
+
+# GORILLA (2026-10-27): vendored Rust crates are stored exactly as crates.io
+# ships them. cargo verifies each file's sha256 (.cargo-checksum.json), so the
+# eol=lf normalisation above would break `cargo build --offline` for any crate
+# file that ships with CRLF.
+tools/pfind-rs/vendor/** -text

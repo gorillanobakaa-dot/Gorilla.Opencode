@@ -2,11 +2,11 @@
 
 Version: 1.0.0 · updated 26-10-23-02-05
 
-Owner, 2026-10-23, watching Gorilla OpenCode work on the MacBook Air:
-"inca un dialog de securitate ... va trebui sa scrii un proiect care sa elimine tampeniile si halucinarile astea
-produse de un fable pre prudent. asa nu se poate lucra cu un coding agent. long horizon tasks? On gorilla.opencode?
-forget about it." Earlier: "este atat de sigur si cere atatea prompturi ca devine aproape inutilizabil ... mai sigur
-decat claude desktop ori claude code terminal."
+Owner, 2026-10-23, watching Gorilla OpenCode work on the MacBook Air (translated from Romanian):
+"yet another security dialog ... you will have to write a project that removes this nonsense and these
+hallucinations produced by an over-cautious Fable. You cannot work with a coding agent like this. long horizon
+tasks? On gorilla.opencode? forget about it." Earlier: "it is so safe and asks for so many prompts that it becomes
+almost unusable ... safer than Claude Desktop or the Claude Code terminal."
 
 ## Evidence (measured 2026-10-23, v0.1.149-dev, macOS 10.13, Gemini 3.8 Flash High, auto-approve ON)
 
