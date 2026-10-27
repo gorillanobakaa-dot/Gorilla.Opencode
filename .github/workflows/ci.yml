@@ -25,9 +25,9 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
@@ -40,8 +40,10 @@ jobs:
       - name: vet
         run: go vet ./...
 
+      # The script tees the output and turns each failure into an annotation:
+      # annotations are public, the step log needs a login. Keep it.
       - name: test
-        run: go test ./... -count=1
+        run: bash .github/scripts/go-test-annotate.sh ./... -count=1
 
   # Windows is a first-class target (goal windows-capabilities, 2026-10-26).
   # Same commands as above, run natively on windows-latest: the shell, Job
@@ -56,9 +58,9 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
@@ -71,5 +73,7 @@ jobs:
       - name: vet
         run: go vet ./...
 
+      # Git Bash ships on windows-latest; same annotation script as above.
       - name: test
-        run: go test ./... -count=1 -timeout 30m
+        shell: bash
+        run: bash .github/scripts/go-test-annotate.sh ./... -count=1 -timeout 30m

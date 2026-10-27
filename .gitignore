@@ -257,3 +257,6 @@ internal/llm/tools/codereview/dist/
 # above: a fresh clone must be able to build every file on the release page, and the Mac zip is one of them.
 # No credentials, no internal paths; it only calls build-darwin-legacy.sh and packs packaging/macos/.
 !/scripts/build-mac-zip.sh
+# GORILLA: exception (2026-10-27) - the CI test step's annotation script is PUBLISHED: the workflow runs it
+# from a fresh clone. Standard tools only (go, tee, awk), no credentials, no internal paths.
+!/.github/scripts/go-test-annotate.sh
