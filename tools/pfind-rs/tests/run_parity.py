@@ -105,6 +105,13 @@ def build_fixture(root: Path):
     (root / "project" / "debug.log").write_bytes(b"needle log\n")
     (root / "snippet.txt").write_bytes(b"int main(void)\n{\n    return 0;\n}\n")
     (root / "patterns.txt").write_bytes(b"haystack\nhelper\n")
+    # mutation fixtures (tests/mutations-pfind-rs.yaml), outside project/ so the other cases are unchanged
+    extra = root / "extra"
+    extra.mkdir()
+    (extra / "numbered.txt").write_bytes(b"needle one\nneedle two\nneedle three\nneedle four\n")
+    (extra / "blob.txt").write_bytes(b"binary needle\x00\x01\x02\n")  # not .bin: that is in the default skip list
+    with gzip.open(extra / "bomb.txt.gz", "wb") as f:
+        f.write(b"\n" * (3 * 1024 * 1024) + b"bomb needle\n")
     # every file old and fixed, so relative times read the same on both sides
     for p in root.rglob("*"):
         os.utime(p, (OLD, OLD))
@@ -146,6 +153,7 @@ def cases(root: Path):
     L = str(root / "project" / "lib")
     R = str(root / "recent")
     G = str(root / "repo")
+    X = str(root / "extra")
     f = lambda rel: str(root / "project" / rel)  # noqa: E731
     return [
         # --- ported from find_test.go ---
@@ -220,6 +228,16 @@ def cases(root: Path):
              has=["Needle with a capital"]),
         Case("-s wins over -i", ["--no-color", "--content", "-i", "-s", "--", "needle", f("lib/Case.txt")],
              has=["needle lower"], lacks=["NEEDLE upper"]),
+        Case("-i makes a capital pattern ignore case", ["--no-color", "--content", "-i", "--", "NEEDLE", f("lib/Case.txt")],
+             has=["needle lower", "Needle with a capital"]),
+        Case("--max stops at the cap", ["--no-color", "--content", "--max", "2", "-C", "0", "--", "needle", X + "/numbered.txt"],
+             has=["needle two"], lacks=["needle three"]),
+        Case("a binary file is skipped by default", ["--no-color", "--content", "--", "binary needle", X], rc=1,
+             lacks=["binary needle"]),
+        Case("the decompression budget stops a bomb", ["--no-color", "-z", "--content", "--", "bomb needle", X],
+             env={"PFIND_NO_RG": "1", "PFIND_MAX_DECOMPRESSED_MB": "1"}, rc=1, lacks=["bomb needle"],
+             has_err=["decompression budget"], stderr_same=False,
+             why="the budget belongs to pfind.py's built-in engine (ripgrep's -z has none)"),
         Case("word regexp", ["--no-color", "--content", "-w", "-C", "1", "--", "needle", f("lib/words.txt")]),
         Case("invert match", ["--no-color", "--content", "-v", "--", "needle", f("lib/words.txt")], has=["haystack only"]),
         Case("only matching", ["--no-color", "--content", "-o", "-r", "--", "need[a-z]+", f("lib/words.txt")], has=["needles"]),

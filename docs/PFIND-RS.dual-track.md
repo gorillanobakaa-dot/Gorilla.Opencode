@@ -29,7 +29,7 @@ script, so your computer needed Python installed, and for full speed also a seco
 pfind is now also one ordinary program, `pfind.exe`. It is written in Rust, and it contains ripgrep's own search
 parts. Nothing else has to be installed: no Python, no ripgrep.
 
-It gives the same answers as the Python pfind, word for word. That was checked with 80 tests, each run on both.
+It gives the same answers as the Python pfind, word for word. That was checked with 84 tests, each run on both.
 
 ## How much faster
 
@@ -49,7 +49,7 @@ Measured on this project's own folder (1,567 files that a search looks at), each
 
 Done and checked on this computer (Windows 11):
 - pfind.exe builds without the internet, from the copies of its parts stored in this project.
-- All 80 tests pass on both versions, and the two outputs match.
+- All 84 tests pass on both versions, and the two outputs match. To prove the tests can fail, 8 rules in the new code were broken on purpose one at a time (case, the match cap, binary files, the zip-bomb budget, ranking, filters); the tests caught all 8.
 
 Not done yet: the main program does not use pfind.exe yet. Job 04 builds it into `gorilla-opencode.exe` and makes
 the `find` tool use it.
@@ -68,7 +68,7 @@ Linux here.
 
 ## Worst case if something is wrong
 
-A search could miss something that the Python pfind finds. The 80 tests cover every kind of search the AI's `find`
+A search could miss something that the Python pfind finds. The 84 tests cover every kind of search the AI's `find`
 tool makes, and every option the tests touch. Options no test covers could still differ: the full list is in track
 two. pfind.exe never connects to the internet, and it has no update check and no telemetry. A wrong answer stays a
 local wrong answer, and the Python pfind is still there to compare against.
@@ -84,7 +84,9 @@ local wrong answer, and the Python pfind is still there to compare against.
 | Windows build, offline | `cargo build --release --offline --locked` | `target/release/pfind.exe`, 3.3 MB |
 | Linux static build from Windows | `cargo build --release --offline --locked --target x86_64-unknown-linux-musl` | ELF, 3.98 MB, linked with `rust-lld` (`.cargo/config.toml`); **not run** |
 | unit tests | `cargo test --release --offline --locked` | 11 passed (difflib ratio, RRF, re.escape, smart case, float repr, fnmatch, strftime, JSON) |
-| parity oracle | `python -I tools/pfind-rs/tests/run_parity.py --both` (repository root) | 80 cases, 0 assertion failures, 0 output mismatches |
+| parity oracle | `python -I tools/pfind-rs/tests/run_parity.py --both` (repository root) | 84 cases, 0 assertion failures, 0 output mismatches |
+| mutation test | `fieldkit mutate --plan tests/mutations-pfind-rs.yaml --cwd . -- python -I tools/pfind-rs/tests/mutate_check.py` (repository root) | 8 rules broken on purpose, 8 caught (each mutant rebuilt, then cargo test + `run_parity --both`) |
+| fresh clone, offline | `git clone --branch feat/pfind-rs` of the worktree, then the Windows build above | builds: the vendored bytes survive git (cargo checks every crate file's sha256) |
 | speed table | `python -I tools/pfind-rs/tests/bench.py --markdown` | below |
 
 `.cargo/config.toml` points crates.io at `vendor/` and sets `net.offline = true`. A build from a fresh clone never

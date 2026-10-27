@@ -16,6 +16,13 @@ This runs the ported pfind tests (from `internal/llm/tools/find_test.go`, `find_
 changelog) against pfind.py and pfind.exe. It exits 0 only if both pass and their outputs match.
 `--py` / `--exe-only` run one side, `-k TEXT` picks cases, `-v` prints full diffs.
 
+To prove those tests can fail (each rule broken on purpose, rebuilt, tested, put back; rebuild once afterwards,
+because the last mutant's binary stays in `target/`):
+
+```
+fieldkit guard -- fieldkit mutate --plan tests/mutations-pfind-rs.yaml --cwd . -- python -I tools/pfind-rs/tests/mutate_check.py
+```
+
 ## Build (offline, from `vendor/`)
 
 ```
