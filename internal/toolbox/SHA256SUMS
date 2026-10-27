@@ -1,0 +1,17 @@
+# The ONLY helper bytes gorilla-opencode will run from its embedded toolbox.
+# "<sha256 of the uncompressed file>  <goos>-<goarch>/<file>". Compiled into the binary.
+# Provenance of each line: third_party/PINS.md ("Embedded toolbox"). A helper embedded
+# without a line here, or with other bytes, is refused at run time.
+#
+# Built from source on the VAIO (Debian 13, x86_64-pc-windows-gnu, stripped), 2026-10-27;
+# hashes from its SHA256SUMS, re-measured on Windows with `fieldkit size hash`: all match.
+62e5af807440009f12d809e228bfaa8cd037934816ea30f0cb1b1c6c901a3cae  windows-amd64/ast-grep.exe
+270c2e7ce44961049da6efd8dc7a26ef1c76a3fb6f72902895fc9110e9f1cd0a  windows-amd64/coreutils.exe
+bb0e96fe2f1e3d20a3a993ccf6b1fd3e4493e5a2ea1024b9728a2e07c9ac41d4  windows-amd64/difft.exe
+00b56f24eeed92a0b793f36138db6e9023f3aacca87c1c0cab975f76c9074056  windows-amd64/hyperfine.exe
+89646ba4293867e0e23976bc3f5562733e40c62b564c64c785b44408a7773c26  windows-amd64/ninja.exe
+d6f01d309784d928507ac45b11d92f255ca3108c32c2b4321da91b1b0c8ae67a  windows-amd64/sd.exe
+#
+# Built on this laptop from tools/pfind-rs (merge cdc01cc), `cargo build --release --offline --locked`,
+# x86_64-pc-windows-msvc. scripts/build-toolbox.ps1 rebuilds it and stops if the bytes differ.
+6828dfcf5853e78530598c1344b4e4882eed88d37189fc56d9c9ecad666ebfe7  windows-amd64/pfind.exe

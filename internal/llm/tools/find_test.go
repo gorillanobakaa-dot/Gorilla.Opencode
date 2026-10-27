@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/opencode-ai/opencode/internal/toolbox"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -312,6 +313,7 @@ func TestFindRefusesWhenEngineUnavailable(t *testing.T) {
 		assert.Contains(t, err.Error(), "GORILLA_PFIND")
 	})
 	t.Run("no python3 anywhere refuses and says what to install", func(t *testing.T) {
+		skipIfToolboxPfind(t)
 		t.Setenv("GORILLA_PFIND", "")
 		t.Setenv("PATH", t.TempDir()) // neither pfind nor python3 findable
 		_, _, err := findPfindPath()
@@ -323,7 +325,40 @@ func TestFindRefusesWhenEngineUnavailable(t *testing.T) {
 // TestFindEmbeddedEngineWorksOnACleanMachine is the portability claim itself:
 // no pfind on PATH, no override, an empty cache — the tool must extract its
 // embedded engine and complete a real search using nothing but python3.
+// skipIfToolboxPfind: a -tags toolbox build embeds pfind.exe, which comes
+// before pfind on PATH and the python fallback, so a test of those paths does
+// not apply there (TestFindPrefersTheEmbeddedPfindExe covers that build).
+func skipIfToolboxPfind(t *testing.T) {
+	t.Helper()
+	if _, err := toolbox.Path("pfind"); err == nil {
+		t.Skip("this build embeds pfind.exe (-tags toolbox); the python path is not reached")
+	}
+}
+
+func TestFindPrefersTheEmbeddedPfindExe(t *testing.T) {
+	embedded, err := toolbox.Path("pfind")
+	if err != nil {
+		t.Skipf("no embedded pfind in this build: %v", err)
+	}
+	t.Setenv("GORILLA_PFIND", "")
+	bin, prefix, err := findPfindPath()
+	require.NoError(t, err)
+	assert.Equal(t, embedded, bin, "the embedded pfind.exe must come before pfind on PATH and python")
+	assert.Empty(t, prefix)
+	assert.Equal(t, "pfind.exe (embedded)", pfindEngine(bin, prefix))
+}
+
+func TestPfindEngineSaysWhichEngineRan(t *testing.T) {
+	assert.Equal(t, "pfind.py (python)", pfindEngine("python3", []string{"pfind.py"}))
+	assert.Equal(t, "pfind (/usr/bin/pfind)", pfindEngine("/usr/bin/pfind", nil))
+	root, err := toolbox.CacheRoot()
+	require.NoError(t, err)
+	assert.Equal(t, "pfind.exe (embedded)",
+		pfindEngine(filepath.Join(root, "gorilla-opencode", "toolbox", "abc", "pfind.exe"), nil))
+}
+
 func TestFindEmbeddedEngineWorksOnACleanMachine(t *testing.T) {
+	skipIfToolboxPfind(t)
 	if _, _, err := findPythonExe(); err != nil {
 		t.Skip("no working python 3 interpreter installed")
 	}

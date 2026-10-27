@@ -14,6 +14,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/llm/tools/shell"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/permission"
+	"github.com/opencode-ai/opencode/internal/toolbox"
 )
 
 type BashParams struct {
@@ -424,6 +425,11 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 			}
 			return ToolResponse{}, permission.ErrorPermissionDenied
 		}
+	}
+	// Every embedded helper the command calls by name is hash-checked (and
+	// re-extracted if its file was changed) before the command runs.
+	if err := toolbox.VerifyMentioned(params.Command); err != nil {
+		return NewTextErrorResponse("this command was NOT run: an embedded helper it calls failed its sha256 check: " + err.Error()), nil
 	}
 	startTime := time.Now()
 	shellInstance := shell.GetPersistentShell(config.WorkingDirectory())

@@ -269,3 +269,10 @@ internal/llm/tools/codereview/dist/
 !tools/pfind-rs/tests/*.py
 !tools/pfind-rs/vendor/**
 tools/pfind-rs/target/
+
+# GORILLA (2026-10-27, job 04): the embedded toolbox's helper programs are put here by
+# scripts/build-toolbox.ps1 just before a `-tags toolbox` build; only the README is committed.
+/internal/toolbox/bin/*/
+# The release script that fills it is PUBLISHED (a fresh clone must be able to make the toolbox build):
+# no credentials, no internal paths; the helpers' folder is a parameter.
+!/scripts/build-toolbox.ps1

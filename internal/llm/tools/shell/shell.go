@@ -17,6 +17,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/osutil"
 	"github.com/opencode-ai/opencode/internal/procjob"
+	"github.com/opencode-ai/opencode/internal/toolbox"
 )
 
 type PersistentShell struct {
@@ -802,7 +803,7 @@ func resolveShellPath() string {
 func startShell(shellPath string, shellArgs []string, cwd string) (*exec.Cmd, *procjob.Job, *os.File, error) {
 	cmd := exec.Command(shellPath, shellArgs...)
 	cmd.Dir = cwd
-	cmd.Env = shellChildEnv(append(os.Environ(), "GIT_EDITOR=true"), runtime.GOOS == "windows")
+	cmd.Env = agentShellEnv(runtime.GOOS == "windows")
 
 	stdinPipe, err := cmd.StdinPipe()
 	if err != nil {
@@ -836,6 +837,19 @@ func startShell(shellPath string, shellArgs []string, cwd string) (*exec.Cmd, *p
 // by Group Policy still wins, as it should.
 func PowerShellArgs(rest ...string) []string {
 	return append([]string{"-NoProfile", "-ExecutionPolicy", "Bypass"}, rest...)
+}
+
+// agentShellEnv is the environment of the agent's shell: this process's own,
+// GIT_EDITOR=true, shellChildEnv, and the embedded toolbox (internal/toolbox,
+// -tags toolbox builds only) in front of PATH, so `sd`, `ast-grep`, `difft`,
+// `pfind` ... are callable by name. Each helper is extracted and hash-checked
+// first; one that fails is left off PATH. bash.go checks again, before each
+// command, every helper the command names (toolbox.VerifyMentioned). Only the
+// agent's shell gets this PATH, never the user's.
+func agentShellEnv(windows bool) []string {
+	env := shellChildEnv(append(os.Environ(), "GIT_EDITOR=true"), windows)
+	dirs, _ := toolbox.Dirs()
+	return toolbox.PrependPath(env, dirs)
 }
 
 // shellChildEnv adds what every child of the shell needs on Windows (gap

@@ -161,7 +161,7 @@ func RunInConsole(ctx context.Context, shellPath, command, cwd, input string, ti
 			return ConsoleResult{}, err
 		}
 	}
-	env := envBlock(shellChildEnv(append(os.Environ(), "GIT_EDITOR=true"), true))
+	env := envBlock(agentShellEnv(true))
 
 	job, err := procjob.New()
 	if err != nil {
