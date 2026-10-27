@@ -260,3 +260,12 @@ internal/llm/tools/codereview/dist/
 # GORILLA: exception (2026-10-27) - the CI test step's annotation script is PUBLISHED: the workflow runs it
 # from a fresh clone. Standard tools only (go, tee, awk), no credentials, no internal paths.
 !/.github/scripts/go-test-annotate.sh
+
+# GORILLA: exception (2026-10-27) — pfind.exe (tools/pfind-rs) is SOURCE: its
+# parity runner is a .py file, and its vendored crates must be committed byte
+# for byte (cargo checks every vendored file against .cargo-checksum.json, so a
+# crate file swallowed by *.py, *.sh, *.log or *.gz above breaks the offline
+# build on a fresh clone). The cargo build output is not.
+!tools/pfind-rs/tests/*.py
+!tools/pfind-rs/vendor/**
+tools/pfind-rs/target/
