@@ -517,6 +517,7 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	// Without the separator a query like "-v" or "--help" would be parsed as a
 	// pfind flag instead of searched for.
 	args := append([]string{}, prefix...)
+	depthCut := false // a plain listing cut at depth 2 (find_depthnote.go)
 	args = append(args,
 		"--no-color",
 		"--count",
@@ -610,6 +611,7 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 				args = append(args, "--files")
 				if params.Glob == "" {
 					args = append(args, "--max-depth", "2")
+					depthCut = true
 				}
 			}
 		} else if params.FilesOnly {
@@ -668,8 +670,12 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	var exitErr *exec.ExitError
 	if runErr != nil && errors.As(runErr, &exitErr) && exitErr.ExitCode() == 1 &&
 		!strings.Contains(stderr, "Traceback") {
+		empty := "No matches found."
+		if note := depthNoteFor(depthCut, searchPath); note != "" {
+			empty = "No files within depth 2.\n" + note
+		}
 		return WithResponseMetadata(
-			NewTextResponse("No matches found."),
+			NewTextResponse(empty),
 			FindResponseMetadata{Engine: pfindEngine(bin, prefix), DurationS: elapsed.Round(time.Millisecond).String()},
 		), nil
 	}
@@ -686,6 +692,9 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	// a silently capped list reads as the complete answer.
 	if m := countSummary.FindStringSubmatch(stderr); m != nil && m[2] != "" {
 		body += fmt.Sprintf("\n[%s files matched; only %s shown — narrow with type, path or glob]", m[1], m[2])
+	}
+	if note := depthNoteFor(depthCut, searchPath); note != "" {
+		body = strings.TrimRight(body, "\n") + "\n" + note
 	}
 	rawBytes := len(body)
 	truncated := false
