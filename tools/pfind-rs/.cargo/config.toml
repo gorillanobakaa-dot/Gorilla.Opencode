@@ -1,0 +1,16 @@
+# Build only from the crates vendored in ./vendor (pinned in Cargo.lock and
+# third_party/PINS.md): no network, no registry. `cargo build --release
+# --offline --locked` is the documented build.
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"
+
+[net]
+offline = true
+
+# Linux (static musl) build from any host, including Windows:
+#   cargo build --release --offline --locked --target x86_64-unknown-linux-musl
+[target.x86_64-unknown-linux-musl]
+linker = "rust-lld"
