@@ -16,11 +16,11 @@ package config
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"runtime"
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/llm/models"
+	"github.com/opencode-ai/opencode/internal/pathlook"
 )
 
 // SettingKind determines the editor widget and the validation applied.
@@ -774,11 +774,10 @@ func defaultShellPath() string {
 	if runtime.GOOS != "windows" {
 		return "/bin/bash"
 	}
-	if p, err := exec.LookPath("pwsh.exe"); err == nil {
-		return p
-	}
-	if p, err := exec.LookPath("powershell.exe"); err == nil {
-		return p
+	// GORILLA FIX (2026-10-27): asked through pathlook, which resolves it once
+	// per PATH value for the whole process (shell.resolveShellPath shares it).
+	if _, full, ok := pathlook.PowerShell(); ok {
+		return full
 	}
 	return "powershell.exe"
 }
