@@ -14,6 +14,10 @@ Changing them: the files tool's attributes action (set/clear), or the powershell
 Changing an ACL (icacls /grant, /deny, /reset, takeown) is a security change: say exactly what it does and ask first.
 
 ## Registry - read only
+First choice: the `windows` tool, as JSON with no permission prompt:
+{"action":"registry","path":"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion","name":"CurrentBuild"} reads one
+value; without "name" it lists the key's values and subkeys. Its cim action reads Win32_OperatingSystem,
+Win32_LogicalDisk, Win32_Process and the other listed classes. The commands below are for what it cannot do.
     Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' | Select-Object ProductName, DisplayVersion
     Get-ItemPropertyValue 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name HideFileExt
     Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' | ForEach-Object { $_.GetValue('DisplayName') }

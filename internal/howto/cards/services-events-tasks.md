@@ -1,5 +1,10 @@
 # Services, event log and scheduled tasks: reading
 
+First choice: the `windows` tool. It reads services, the event log and scheduled tasks as JSON with no
+permission prompt: {"action":"services","name":"wuauserv"}, {"action":"eventlog","log":"System","level":"error",
+"hours":24}, {"action":"tasks","name":"Microsoft"}; add "full":true when it says it capped. Use the commands
+below for what it cannot do (another event filter, a task's actions in detail, a remote machine).
+
 All of these only read. Starting, stopping or reconfiguring a service, clearing a log, or changing a task changes
 the machine: say what and why, and ask first (most need administrator rights).
 

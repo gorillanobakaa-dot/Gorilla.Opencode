@@ -89,7 +89,11 @@ const (
 	// 2026-10-27 (windows-capabilities job 06): 11,143. +2: files gained action=howto (the on-demand
 	// how-to cards) and bash names its PowerShell edition. The prompt grew instead (the tool table and
 	// the startup probe, ~+518 a turn on prompt.env); see docs/WHAT-A-CURIOUS-USER-COSTS.md.
-	measuredDefaultToolSchemaTokens = 11143
+	// 2026-10-27 (windows-capabilities job 09): 11,454, measured on Windows. +291 is the read-only
+	// windows tool (registry, services, event log, tasks, CIM), default ON and registered ONLY on
+	// Windows (0 elsewhere, so Linux and macOS read ~11,163 here); the other ~20 is job 07's files and
+	// find wording. One call replaces several PowerShell round trips, each with a permission prompt.
+	measuredDefaultToolSchemaTokens = 11454
 	measuredBasePromptTokens        = 2250
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.

@@ -157,6 +157,11 @@ func coderToolSet(
 	// attributes, bulk rename, details, delete to the Recycle Bin. Never
 	// deferred: the owner's complaint was a model that did not know it could.
 	add(config.FilesComponentID, tools.NewFilesTool(permissions))
+	// GORILLA (2026-10-27, job 09): registry, services, event log, scheduled
+	// tasks and CIM, read-only and always allowed. Windows only.
+	if tools.WindowsToolAvailable() {
+		add(config.WindowsComponentID, tools.NewWindowsTool())
+	}
 	// GORILLA OVERRIDE: on the Nuclear Option (helper-leash = 0) omit the
 	// agent tool entirely, so its schema tokens vanish too — not just its
 	// spawns (which subagent_guard.go would refuse anyway).

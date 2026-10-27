@@ -241,13 +241,17 @@ exists.
 TestDefaultToolSchemaCost -v`:
 
 ```
-tool schemas, default ON                            ~11,143 tokens   81%
+tool schemas, default ON                            ~11,454 tokens   81%
 base system prompt (coder-modern)                    ~2,314 tokens   17%
 prompt blocks, default ON                              ~369 tokens    3%
                                                      ------------
 per-turn total, before any CLAUDE.md                ~13,824 tokens
 
-(re-measured 2026-10-27, windows-capabilities job 06: schemas +2 (files gained action=howto; bash names
+(re-measured 2026-10-27, windows-capabilities job 09, on Windows: 11,143 -> 11,454. +291 is the
+read-only windows tool (registry, services, event log, scheduled tasks, CIM as JSON), registered only on
+Windows, so Linux and macOS do not pay it (~11,163 there); ~20 is job 07's wording in files and find.
+It earns its row: reading one service or one registry value was a PowerShell command, a permission
+prompt and a re-sent conversation each; earlier, job 06: schemas +2 (files gained action=howto; bash names
 its PowerShell edition). The PROMPT grew instead, measured on this laptop with `gorilla-opencode
 system-prompt` (bytes/4): ~2,504 -> ~3,022 tokens, +518 a turn: the "YOUR TOOLS" table ~375 (18 tools,
 deferral off; with tool_search on only the loaded tools are listed), the startup probe and the how-to card

@@ -163,6 +163,11 @@ var LoadoutComponents = []LoadoutComponent{
 	// these are the plain file operations a person asks for. The figure is a
 	// guess; calibration measures the schema at startup.
 	{FilesComponentID, "Files: copy, mirror, move, rename, attributes, delete", "agent can only copy, move, rename or delete files by writing shell commands: no dry-run preview, no 128-thread robocopy, no Recycle Bin", 330, true, true},
+	// GORILLA (2026-10-27, windows-capabilities job 09): the read-only windows
+	// tool (registry, services, event log, scheduled tasks, CIM). Registered
+	// only on Windows; calibration sets this row to 0 elsewhere. The figure is
+	// a guess; calibration measures the schema at startup.
+	{WindowsComponentID, "Windows: registry, services, event log, tasks, CIM (read-only)", "agent can read the registry, services, event log, scheduled tasks and WMI only by writing PowerShell, and every such command asks for permission", 260, true, false},
 	// GORILLA (2026-10-21): the binary and forensics toolkit, phase 1. Pure Go,
 	// read-only, no network. ON by default with deliberately short
 	// descriptions: on Windows and macOS 10.13 there is no readelf, nm,
@@ -273,6 +278,9 @@ const (
 	UsageComponentID = "tool.usage"
 	// FilesComponentID gates the files tool (internal/llm/tools/files.go).
 	FilesComponentID = "tool.files"
+	// WindowsComponentID gates the read-only windows tool
+	// (internal/llm/tools/winsys.go).
+	WindowsComponentID = "tool.windows"
 	// BinaryInspectComponentID and ArchiveComponentID gate the forensics
 	// toolkit's two tools (internal/forensics).
 	BinaryInspectComponentID = "tool.binary_inspect"
@@ -490,6 +498,9 @@ var lowBandwidthKeep = map[string]string{
 		"quota that otherwise took a model 30 tool calls, each re-sending the whole " +
 		"conversation (measured 2026-10-21). Its own reading is the provider already " +
 		"in use, cached for a minute.",
+	WindowsComponentID: "it never touches the network: it reads this computer's " +
+		"registry, services, event log, tasks and CIM, and one call replaces several " +
+		"PowerShell round trips, each re-sending the conversation. Windows only.",
 	"prompt.env": "cheap since the shallow project_summary change (~130 measured " +
 		"tokens) and MORE useful on a remote link, not less: knowing the cwd, OS and " +
 		"git state prevents a wasted round trip, which is the expensive thing here.",

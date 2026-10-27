@@ -94,3 +94,21 @@ func TestCardNamesAreForgiving(t *testing.T) {
 		t.Error("case, spaces and .md should not matter")
 	}
 }
+
+// TestWindowsToolIsNamedByTheCards (job 09): the cards for the registry and
+// for services, events and tasks send the model to the read-only windows
+// tool first, with a call it can copy.
+func TestWindowsToolIsNamedByTheCards(t *testing.T) {
+	for card, want := range map[string]string{
+		"attributes-acl-registry": `{"action":"registry"`,
+		"services-events-tasks":   `{"action":"eventlog"`,
+	} {
+		body, ok := getFor(hostprobe.Facts{OS: "windows"}, card)
+		if !ok {
+			t.Fatalf("no card %s on Windows", card)
+		}
+		if !strings.Contains(body, "`windows` tool") || !strings.Contains(body, want) {
+			t.Errorf("card %s does not point to the windows tool with %s", card, want)
+		}
+	}
+}
