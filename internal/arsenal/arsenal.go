@@ -43,6 +43,7 @@ import (
 	"sync"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/pathlook"
 )
 
 //go:embed manifest.json
@@ -162,10 +163,25 @@ type Impostor struct {
 }
 
 // Seams for tests. Production code never reassigns them.
+//
+// GORILLA FIX (2026-10-27): lookPath is nil in production, meaning "a fresh
+// pathlook.Snapshot per detection batch". Each exec.LookPath walked PATH x
+// PATHEXT; one /arsenal open asked ~70 names, about 30,000 stats on the
+// owner's laptop and 900,000 entries in one cacheable `go test` testlog. A
+// snapshot lists each PATH directory once. A test sets lookPath to imagine a
+// machine.
 var (
-	lookPath = exec.LookPath
+	lookPath func(string) (string, error)
 	goos     = runtime.GOOS
 )
+
+// looker is the PATH lookup for one batch of questions.
+func looker() func(string) (string, error) {
+	if lookPath != nil {
+		return lookPath
+	}
+	return pathlook.NewSnapshot().LookPath
+}
 
 func (i Impostor) matches(binary, path string) bool {
 	if i.Binary != binary || i.OS != goos {
@@ -284,8 +300,24 @@ type IgnoredHit struct {
 // actionable, "not installed" is misleading.
 func (s Status) Partial() bool { return len(s.Found) > 0 && len(s.Missing) > 0 }
 
-// Detect probes this machine for one entry.
-func DetectEntry(e Entry) Status {
+// Detect probes this machine for one entry. Probing many: DetectAll.
+func DetectEntry(e Entry) Status { return detectEntry(e, looker()) }
+
+// DetectAll probes this machine for the package manager and every entry of m,
+// with one look at PATH for the lot.
+func DetectAll(m Manifest) (PackageManager, map[string]Status) {
+	look := looker()
+	pm := detectPackageManager(look)
+	st := map[string]Status{}
+	for _, s := range m.Series {
+		for _, e := range s.Entries {
+			st[e.ID] = detectEntry(e, look)
+		}
+	}
+	return pm, st
+}
+
+func detectEntry(e Entry, lookPath func(string) (string, error)) Status {
 	st := Status{Entry: e}
 	for _, b := range e.Detect.Binaries {
 		path, err := lookPath(b)
@@ -394,7 +426,9 @@ const (
 
 // DetectPackageManager looks for the tool rather than reading /etc/os-release,
 // because what matters is what can actually be run here.
-func DetectPackageManager() PackageManager {
+func DetectPackageManager() PackageManager { return detectPackageManager(looker()) }
+
+func detectPackageManager(lookPath func(string) (string, error)) PackageManager {
 	if goos == "windows" {
 		// scoop is a PowerShell function on a shim, so LookPath finds
 		// scoop.cmd / scoop.ps1 rather than an .exe. Checking the shim

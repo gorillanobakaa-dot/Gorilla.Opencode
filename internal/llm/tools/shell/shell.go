@@ -16,6 +16,7 @@ import (
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/osutil"
+	"github.com/opencode-ai/opencode/internal/pathlook"
 )
 
 type PersistentShell struct {
@@ -643,11 +644,11 @@ func resolveShellPath() string {
 		return s
 	}
 	// 2. PowerShell itself: 7+ if present, else the 5.1 that ships with Windows.
-	if _, err := exec.LookPath("pwsh.exe"); err == nil {
-		return "pwsh.exe"
-	}
-	if _, err := exec.LookPath("powershell.exe"); err == nil {
-		return "powershell.exe"
+	//    GORILLA FIX (2026-10-27): resolved once per PATH value (pathlook), not
+	//    on every call - IsWindowsPowerShell asks this while rendering, and two
+	//    full PATH x PATHEXT walks per render made go test's testlog 1.3 M lines.
+	if name, _, ok := pathlook.PowerShell(); ok {
+		return name
 	}
 	// 3. An explicit opt-out, for people who really do want bash on Windows.
 	if s := os.Getenv("SHELL_FALLBACK"); s != "" {

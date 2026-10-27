@@ -117,13 +117,9 @@ func NewArsenalCmp() ArsenalCmp {
 	// GORILLA FIX (2026-10-05), from the /arsenal audit (A10): list and count
 	// only what can exist on this operating system. See arsenal.ForPlatform.
 	m := arsenal.ForPlatform(full)
-	pm := arsenal.DetectPackageManager()
-	st := map[string]arsenal.Status{}
-	for _, s := range m.Series {
-		for _, e := range s.Entries {
-			st[e.ID] = arsenal.DetectEntry(e)
-		}
-	}
+	// GORILLA FIX (2026-10-27): one look at PATH for the whole screen, not a
+	// full PATH walk per name (see arsenal.DetectAll).
+	pm, st := arsenal.DetectAll(m)
 	c := ArsenalCmp{
 		man:       m,
 		full:      full,

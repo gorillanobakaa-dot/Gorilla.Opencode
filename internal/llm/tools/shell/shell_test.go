@@ -13,10 +13,13 @@ package shell
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/opencode-ai/opencode/internal/pathlook"
 )
 
 func newTestShell(t *testing.T) *PersistentShell {
@@ -286,5 +289,31 @@ func TestIsWindowsPowerShellDoesNotSpawnAShell(t *testing.T) {
 	if before == nil && after != nil {
 		t.Error("IsWindowsPowerShell started a shell as a side effect; it is called while " +
 			"building the tool description, before the working directory is settled")
+	}
+}
+
+// GORILLA FIX (2026-10-27): asking which shell would be used walked PATH for
+// pwsh.exe and powershell.exe on every call; it is asked on every render.
+// Resolved once per PATH value now: 200 questions, one probe.
+func TestResolveShellPathProbesPathOnce(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("windows only")
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "pwsh.exe"), []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("SHELL", "")
+	before := pathlook.Counted().LookPaths
+	for i := 0; i < 200; i++ {
+		// resolveShellPath, not IsWindowsPowerShell: a shell another test left
+		// running would answer without asking PATH at all.
+		if p := resolveShellPath(); p != "pwsh.exe" {
+			t.Fatalf("resolveShellPath() = %q with pwsh.exe on PATH", p)
+		}
+	}
+	if n := pathlook.Counted().LookPaths - before; n != 1 {
+		t.Fatalf("200 questions made %d LookPath calls, want 1", n)
 	}
 }
