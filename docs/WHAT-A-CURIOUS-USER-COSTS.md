@@ -241,13 +241,16 @@ exists.
 TestDefaultToolSchemaCost -v`:
 
 ```
-tool schemas, default ON                            ~10,671 tokens   80%
+tool schemas, default ON                            ~11,141 tokens   81%
 base system prompt (coder-modern)                    ~2,314 tokens   17%
 prompt blocks, default ON                              ~369 tokens    3%
                                                      ------------
-per-turn total, before any CLAUDE.md                ~13,354 tokens
+per-turn total, before any CLAUDE.md                ~13,824 tokens
 
-(re-measured 2026-10-27 on Windows, where the bash row carries the PowerShell guidance: 10,713 before
+(re-measured 2026-10-27, windows-capabilities job 05: +470 for the files tool, default ON and never
+deferred: the owner's complaint was a model that did not know it could copy with 128 threads, set
+attributes or rename in bulk; eight actions, one schema instead of eight; trimmed from 516 before recording;
+earlier 2026-10-27 on Windows, where the bash row carries the PowerShell guidance: 10,713 before
 and 10,671 after the console mode; tool.bash 1,594 -> 1,552. The two Windows-only parameters console and
 input were paid for by cutting the generic "3. Command Execution / 4. Output Processing / 5. Return
 Result" steps to one line, so the row shrank on every platform; Read-Host now has an answer instead of

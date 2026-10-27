@@ -61,6 +61,7 @@ func CalibrateLoadout(
 	set("tool.view", tools.NewViewTool(lspClients))
 	set("tool.patch", tools.NewPatchTool(lspClients, permissions, history))
 	set("tool.write", tools.NewWriteTool(lspClients, permissions, history))
+	set(config.FilesComponentID, tools.NewFilesTool(permissions))
 	set("tool.agent", NewAgentTool(sessions, messages, lspClients, permissions, history))
 	// GORILLA FIX (2026-08-17): measure the research tool WITHOUT the dossier
 	// addition, and the dossier row as that addition alone. Measuring Info()

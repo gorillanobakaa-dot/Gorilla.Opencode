@@ -156,6 +156,13 @@ var LoadoutComponents = []LoadoutComponent{
 	// left". Without it a model asked about "bananas" was measured spending 30
 	// tool calls hunting through files and the session database for it.
 	{UsageComponentID, "Usage and cost — what /usage shows", "asked about cost, quota or what is left, the agent cannot read it and goes looking through your files instead (measured: 30 calls for one question)", 120, true, false},
+	// GORILLA (2026-10-27, job 05): copy/mirror/move trees (robocopy, up to 128
+	// threads on Windows), attributes, bulk rename, details, delete to the
+	// Recycle Bin. Owner: the model "was not aware it can use robocopy with up
+	// to 128 threads ... no idea how to view and check attributes". Critical:
+	// these are the plain file operations a person asks for. The figure is a
+	// guess; calibration measures the schema at startup.
+	{FilesComponentID, "Files: copy, mirror, move, rename, attributes, delete", "agent can only copy, move, rename or delete files by writing shell commands: no dry-run preview, no 128-thread robocopy, no Recycle Bin", 330, true, true},
 	// GORILLA (2026-10-21): the binary and forensics toolkit, phase 1. Pure Go,
 	// read-only, no network. ON by default with deliberately short
 	// descriptions: on Windows and macOS 10.13 there is no readelf, nm,
@@ -264,6 +271,8 @@ const (
 	PeersComponentID = "tool.peers"
 	// UsageComponentID gates the usage tool (session cost + allowance left).
 	UsageComponentID = "tool.usage"
+	// FilesComponentID gates the files tool (internal/llm/tools/files.go).
+	FilesComponentID = "tool.files"
 	// BinaryInspectComponentID and ArchiveComponentID gate the forensics
 	// toolkit's two tools (internal/forensics).
 	BinaryInspectComponentID = "tool.binary_inspect"

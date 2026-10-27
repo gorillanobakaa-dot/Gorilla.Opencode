@@ -150,6 +150,10 @@ func coderToolSet(
 	add("tool.view", tools.NewViewTool(lspClients))
 	add("tool.patch", tools.NewPatchTool(lspClients, permissions, history))
 	add("tool.write", tools.NewWriteTool(lspClients, permissions, history))
+	// GORILLA (2026-10-27, job 05): copy/mirror/move (robocopy on Windows),
+	// attributes, bulk rename, details, delete to the Recycle Bin. Never
+	// deferred: the owner's complaint was a model that did not know it could.
+	add(config.FilesComponentID, tools.NewFilesTool(permissions))
 	// GORILLA OVERRIDE: on the Nuclear Option (helper-leash = 0) omit the
 	// agent tool entirely, so its schema tokens vanish too — not just its
 	// spawns (which subagent_guard.go would refuse anyway).
