@@ -77,3 +77,36 @@ jobs:
       - name: test
         shell: bash
         run: bash .github/scripts/go-test-annotate.sh ./... -count=1 -timeout 30m
+
+  # The embedded toolbox (internal/toolbox, job 04): the -tags toolbox build and
+  # its Hash/Extract tests, on Windows where the helpers run. A fresh clone has
+  # no helper binaries (only internal/toolbox/bin/README.md), so this proves the
+  # tagged build compiles and the extract/hash logic holds against fake helpers;
+  # the real seven are checked by scripts/build-toolbox.ps1 at release time.
+  # Measured locally: tagged tests 0.8 s, tagged build ~10 s; the job is mostly
+  # setup-go and go mod download (a few minutes).
+  toolbox-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      - name: build (-tags toolbox)
+        run: go build -tags toolbox ./...
+
+      - name: vet (-tags toolbox)
+        run: go vet -tags toolbox ./internal/toolbox/... ./internal/llm/tools/...
+
+      - name: test (-tags toolbox)
+        shell: bash
+        run: bash .github/scripts/go-test-annotate.sh ./internal/toolbox/... -count=1 -tags toolbox -v

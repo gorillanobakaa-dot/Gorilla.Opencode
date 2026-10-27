@@ -74,3 +74,53 @@ and their reasoning: `tools/pfind-rs/LICENSES.md`.
 proc-macro2, quote, syn, unicode-ident, serde_core and serde_derive are in the lock file for other crates' optional
 features. They are vendored because `--locked` checks the whole lock file, and none of them is compiled into
 pfind.exe (`cargo tree --target all` shows none of them).
+
+## Embedded toolbox (internal/toolbox, `-tags toolbox` builds), fetched once and built from source on 2026-10-27
+
+Every helper below is embedded in gorilla-opencode.exe by `scripts/build-toolbox.ps1` and run only if its bytes
+match `internal/toolbox/SHA256SUMS`. Rule for the tag: the newest release tag dated on or before 2026-10-13 (at least
+14 days old). Each tool's own license file is in `third_party/<tool>/`, fetched from the pinned commit with
+`fieldkit evidence fetch` (sha256 below).
+
+| tool | upstream | tag | tag date | commit | license (file, sha256) | shipped file (windows-amd64) |
+|---|---|---|---|---|---|---|
+| pfind (ours) | tools/pfind-rs | 4.0.0 | 2026-10-27 | merge cdc01cc | AGPL-3.0-or-later (tools/pfind-rs/LICENSES.md) | pfind.exe, 3,272,704 B |
+| difftastic | https://github.com/Wilfred/difftastic | 0.71.0 | 2026-09-18 | b7d119e90ac9f972f03f69508da765dacd302c0c | MIT (difftastic/LICENSE, 76f1045e65caa521762a76bbddcc24b6e6ec2251a097d0b3975ca35de47f11e2) | difft.exe, 116,142,080 B |
+| sd | https://github.com/chmln/sd | v1.1.0 | 2026-02-25 | 4a7b216552d64134c0fa17a59b9d557d89019f0f | MIT (sd/LICENSE, 531a4a325368974524d09db46e9f48c37c6c7f10357176cb2a727540c80f313e) | sd.exe, 2,180,096 B |
+| hyperfine | https://github.com/sharkdp/hyperfine | v2.0.0 | 2026-10-07 | b33755fe1fca8bcc1f182c773ca3ab040bfe517d | MIT OR Apache-2.0 (hyperfine/LICENSE-MIT 1dfee18c2ff07ce551de4d6a1d2db158c0380746b488a7f0d08c8e0d3568b7c3, hyperfine/LICENSE-APACHE c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4) | hyperfine.exe, 1,355,264 B |
+| ast-grep | https://github.com/ast-grep/ast-grep | 0.50.0 | 2026-10-07 | 4118186ecca8f4935ae8d85ee6d43c3211f3b763 | MIT (ast-grep/LICENSE, 81471889c77b2161a3e4dcdb1b2e6ca382e485766132d92d5fe1d7497e7dd2d9) | ast-grep.exe, 50,155,008 B |
+| ninja | https://github.com/ninja-build/ninja | v1.13.2 | 2025-11-20 | 3441b633c2fe2c494e958780ba0f4227b1327634 | Apache-2.0 (ninja/COPYING, eb7e9ab9690124c5c9f42bdc81383d886a3dede26345b6ed15bbad7caf81f7ea) | ninja.exe, 1,341,440 B |
+| uutils coreutils | https://github.com/uutils/coreutils | 0.12.0 | 2026-09-17 | dc1efd89948a9ca4c78c3a4b9a6ac891019a8c69 | MIT (coreutils/LICENSE, 29953405eaa3dcc41c37d1621d55b6a47eee93e05613e439e73295029740b10c) | coreutils.exe (multicall, `--features windows`), 12,182,016 B |
+
+Not shipped: `sg.exe` (upstream's deprecated alias of ast-grep, a second 50 MB copy on Windows). Upstream quirk:
+`sd --version` prints 1.0.0 at tag v1.1.0 (upstream did not bump Cargo.toml). hyperfine is the rule pick v2.0.0.
+
+**Who built what.** The six third-party tools were built from upstream git at the commits above on the owner's
+second machine (the VAIO: Debian 13 trixie, x86_64), offline after one `cargo vendor`, target
+`x86_64-pc-windows-gnu` (mingw-w64 GCC 14-win32, statically linked, stripped, RUSTFLAGS empty):
+rustc 1.95.0 (59807616e 2026-04-14) / cargo 1.95.0 for difftastic, sd, ast-grep and coreutils (difftastic and
+ast-grep pin 1.85.0 in rust-toolchain.toml; built with RUSTUP_TOOLCHAIN=stable, newer than every declared
+rust-version, no upstream code patched); rustc 1.99.1 (58cf8f9c3 2026-10-13) for hyperfine v2.0.0 (rust-version
+1.97.0); ninja with CMake 3.31.6 Release + mingw `-static`. pfind.exe was built on the Windows laptop
+(`cargo build --release --offline --locked`, x86_64-pc-windows-msvc). Each exe ran `--version` or a real invocation
+on real Windows (exit 0) before it was pinned.
+
+**Where the vendored sources live (measured, decided).** The six `cargo vendor` trees, packed as
+`vendor-<tool>.tar.zst`, are 161,981,237 bytes together (ast-grep 34,608,128; coreutils 56,479,601; difftastic
+32,054,520; hyperfine v2.0.0 21,816,387; sd 17,022,601; ninja has none). They are NOT committed: that would put
+162 MB into every clone of a repository whose own source is a few MB, for a rebuild path only a release maker
+uses. They stay beside the from-source build output (on the VAIO and its copy on the Windows laptop), pinned here by
+sha256, and go up as release assets when a release ships the toolbox. Rebuild: check out the tool at its commit,
+`tar -I zstd -xf vendor-<tool>.tar.zst -C <checkout>`, `cargo build --release --offline --locked`.
+
+| vendor tarball | bytes | sha256 |
+|---|---|---|
+| vendor-ast-grep.tar.zst | 34,608,128 | b7dbf2110c8285cd64f051b25a40c02af7f6c1be5f507619d6ca8cd9c8ab4640 |
+| vendor-coreutils.tar.zst | 56,479,601 | 8262681404ad8526491295c58802673d630c90d5a6982476eb213ee0d90a7261 |
+| vendor-difftastic.tar.zst | 32,054,520 | 02e5c7d9dee9be939dd864da56feeeb93aac5563108f792b1605f3a2fdc6659a |
+| vendor-hyperfine.tar.zst (v2.0.0) | 21,816,387 | 23403bd9313747f2d84608aac237703341ae539f8dfe6b33424b16f9622810ea |
+| vendor-sd.tar.zst | 17,022,601 | d44ac85b368c359da0311d432491849475725ed71f96fdbf2221cdb0dfffda4a |
+
+Not done yet: a script that rebuilds the six on Windows (`x86_64-pc-windows-msvc`) from these tarballs (the
+reproducibility path; until it is proven the VAIO binaries are the shipped ones), 7-Zip 7za (MSVC build), the
+per-crate license notices of the helpers' own dependencies, and Linux/macOS embeds.

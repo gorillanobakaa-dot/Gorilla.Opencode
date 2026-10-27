@@ -51,9 +51,10 @@ func TestParsePinsHash(t *testing.T) {
 		t.Fatalf("pins = %v", pins)
 	}
 	for _, bad := range []string{
-		"abc  windows-amd64/sd.exe",                         // not a sha256
-		strings.Repeat("zz", 32) + "  windows-amd64/sd.exe", // not hex
-		sum + "  a  b", // three fields
+		"abc  windows-amd64/sd.exe",
+		"abcd  windows-amd64/sd.exe",                                      // hex, but not 32 bytes                         // not a sha256
+		strings.Repeat("zz", 32) + "  windows-amd64/sd.exe",               // not hex
+		sum + "  a  b",                                                    // three fields
 		sum + "  windows-amd64/sd.exe\n" + sum + "  windows-amd64/sd.exe", // pinned twice
 	} {
 		if _, err := ParsePins(bad); err == nil {
@@ -235,6 +236,9 @@ func TestExtractRefusesSharedCacheDir(t *testing.T) {
 
 func TestMentioned(t *testing.T) {
 	b, _ := fakeBox(t, map[string][]byte{"sd.exe": nil, "ast-grep.exe": nil, "README.md": nil}, nil)
+	if got := fmt.Sprint(b.Names()); got != "[ast-grep sd]" {
+		t.Errorf("Names = %s, want [ast-grep sd] (README.md is not a helper)", got)
+	}
 	cases := map[string][]string{
 		"sd foo bar file.txt":             {"sd"},
 		"Get-Content x | sd.exe a b":      {"sd"},
