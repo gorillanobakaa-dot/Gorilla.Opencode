@@ -309,9 +309,16 @@ func describeZone(s string) string {
 
 // ── list ───────────────────────────────────────────────────────────────────
 
-// filesList is Get-ChildItem: files and folders with their attributes, hidden
-// and system items only with hidden=true. Searching is find's job; this is
-// the view that shows what find skips on purpose.
+// filesList is Get-ChildItem -Force: files and folders with their attributes,
+// hidden and system items included and marked. Searching is find's job; this
+// is the view that shows what find skips on purpose.
+//
+// GORILLA FIX (2026-10-27, job 07): hidden and system items are listed by
+// default. They were left out unless hidden=true, so "show the attributes of
+// every file here" answered without the two hidden files, the very ones whose
+// attributes mattered; the model saw "2 hidden/system not shown" and did not
+// ask again. A hidden FOLDER is still not entered without hidden=true (.git
+// and the like would flood a recursive listing); the header counts them.
 func filesList(p filesParams) (ToolResponse, error) {
 	fi, err := os.Stat(p.Path)
 	if err != nil {
@@ -332,14 +339,11 @@ func filesList(p filesParams) (ToolResponse, error) {
 		if aerr == nil {
 			hidden = a&(attrHidden|attrSystem) != 0
 		}
-		if hidden && !p.Hidden {
-			skipped++
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
 		descend := p.Recurse && d.IsDir() && !isLinkEntry(d)
+		if hidden && d.IsDir() && descend && !p.Hidden {
+			skipped++
+			descend = false
+		}
 		show := nameMatches(p.Pattern, d.Name()) &&
 			!(kind == "file" && d.IsDir()) && !(kind == "dir" && !d.IsDir())
 		if show {
@@ -363,7 +367,7 @@ func filesList(p filesParams) (ToolResponse, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: %d item(s)", p.Path, len(lines))
 	if skipped > 0 {
-		fmt.Fprintf(&b, ", %d hidden/system not shown (hidden=true shows them)", skipped)
+		fmt.Fprintf(&b, ", %d hidden/system folder(s) listed but not entered (hidden=true enters them)", skipped)
 	}
 	b.WriteString("\n")
 	writeListN(&b, "", lines, p.Full, filesListLines)

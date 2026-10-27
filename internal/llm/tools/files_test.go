@@ -644,13 +644,28 @@ func TestFilesList(t *testing.T) {
 		}
 		return r.Content
 	}
+	// Job 07: hidden items are listed (and marked) without asking; "the
+	// attributes of every file here" answered without them.
 	plain := list(nil)
-	if !strings.Contains(plain, "visible.txt") || strings.Contains(plain, ".secret") || strings.Contains(plain, "deep.txt") ||
-		!strings.Contains(plain, "1 hidden/system not shown") {
+	if !strings.Contains(plain, "visible.txt") || !strings.Contains(plain, ".secret") || !strings.Contains(plain, "Hidden") ||
+		strings.Contains(plain, "deep.txt") {
 		t.Errorf("plain:\n%s", plain)
 	}
-	if h := list(map[string]any{"hidden": true}); !strings.Contains(h, ".secret") || !strings.Contains(h, "Hidden") {
-		t.Errorf("hidden:\n%s", h)
+	// A hidden folder is listed but entered only with hidden=true.
+	hidDir := filepath.Join(dir, ".git")
+	mustWrite(t, filepath.Join(hidDir, "inside.txt"), "i")
+	if runtime.GOOS == "windows" {
+		if err := writeAttrs(hidDir, attrHidden|attrDirectory); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rec := list(map[string]any{"recurse": true})
+	if !strings.Contains(rec, ".git") || strings.Contains(rec, "inside.txt") ||
+		!strings.Contains(rec, "1 hidden/system folder(s) listed but not entered") {
+		t.Errorf("recurse without hidden:\n%s", rec)
+	}
+	if h := list(map[string]any{"recurse": true, "hidden": true}); !strings.Contains(h, "inside.txt") {
+		t.Errorf("hidden=true does not enter the hidden folder:\n%s", h)
 	}
 	if rec := list(map[string]any{"recurse": true, "kind": "file"}); !strings.Contains(rec, "deep.txt") || strings.Contains(rec, "<DIR>") {
 		t.Errorf("recurse files:\n%s", rec)

@@ -120,7 +120,7 @@ func (filesTool) Info() ToolInfo {
 			"start":       map[string]any{"type": "integer", "description": "rename: first {n}"},
 			"case":        s("rename: lower, upper or title"),
 			"kind":        s("list: file or dir"),
-			"hidden":      b("list: include hidden/system"),
+			"hidden":      b("list: enter hidden/system folders"),
 			"hash":        b("info: SHA-256"),
 			"permanent":   b("delete: skip the Recycle Bin"),
 			"dry_run":     b("Preview only"),
