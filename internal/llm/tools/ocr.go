@@ -41,34 +41,53 @@ const ocrTimeout = 45 * time.Second
 // later turn.
 const maxOCRChars = 20000
 
-// OCRAvailable reports whether this machine can read text out of an image.
+// OCRAvailable reports whether this machine can read text out of an image:
+// tesseract, or on Windows the OCR engine built into Windows (gap #15).
 //
 // Checked, never assumed — the entire reason this file exists is a capability
 // that was present and unknown. The counterpart is /arsenal, which tells the
 // USER the same thing.
-// GORILLA OVERRIDE: Checks Windows Program Files paths where Tesseract is typically installed
 func OCRAvailable() bool {
-	// First try PATH
-	if _, err := exec.LookPath("tesseract"); err == nil {
+	if tesseractPath() != "" {
 		return true
 	}
+	ok, _ := windowsOCRAvailable()
+	return ok
+}
 
-	// Windows: Check common installation paths
+// tesseractPath is where tesseract is, or "".
+// GORILLA OVERRIDE: Checks Windows Program Files paths where Tesseract is typically installed
+func tesseractPath() string {
+	if p, err := exec.LookPath("tesseract"); err == nil {
+		return p
+	}
 	if runtime.GOOS == "windows" {
-		windowsPaths := []string{
+		for _, p := range []string{
 			filepath.Join(os.Getenv("ProgramFiles"), "Tesseract-OCR", "tesseract.exe"),
 			filepath.Join(os.Getenv("ProgramFiles(x86)"), "Tesseract-OCR", "tesseract.exe"),
 			"C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
 			"C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe",
-		}
-		for _, p := range windowsPaths {
+		} {
 			if _, err := os.Stat(p); err == nil {
-				return true
+				return p
 			}
 		}
 	}
+	return ""
+}
 
-	return false
+// OCRStatus is the doctor's line for OCR: which engine view will use, or
+// what is missing.
+func OCRStatus() []string {
+	if p := tesseractPath(); p != "" {
+		return []string{"[ok] OCR (images in view): tesseract at " + p}
+	}
+	if ok, why := windowsOCRAvailable(); ok {
+		return []string{"[ok] OCR (images in view): " + windowsOCREngine + ", offline (" + why + "); tesseract not installed"}
+	} else if runtime.GOOS == "windows" {
+		return []string{"[!] OCR (images in view): no tesseract, and " + windowsOCREngine + " cannot start: " + why}
+	}
+	return []string{"[!] OCR (images in view): tesseract not installed"}
 }
 
 // OCRResult is what came back, and how much to trust it.
@@ -80,6 +99,18 @@ type OCRResult struct {
 	// answer — a photograph of a landscape has no text — and it must not be
 	// reported as a failure.
 	Empty bool
+	// Engine is what read it: "tesseract" or "Windows OCR".
+	Engine string
+}
+
+// capOCR builds the result from recognized text, cut at maxOCRChars.
+func capOCR(text, engine string) OCRResult {
+	res := OCRResult{Text: text, Empty: text == "", Engine: engine}
+	if len(text) > maxOCRChars {
+		res.Text = cutAtRune(text, maxOCRChars)
+		res.Truncated = true
+	}
+	return res
 }
 
 // OCRImage reads the text out of an image using tesseract.
@@ -90,31 +121,17 @@ type OCRResult struct {
 // preprocessing is image-dependent and belongs in a deliberate step the model
 // asks for, not in the path that runs on every screenshot.
 func OCRImage(ctx context.Context, path string) (OCRResult, error) {
-	if !OCRAvailable() {
+	tess := tesseractPath()
+	if tess == "" {
+		if ok, why := windowsOCRAvailable(); ok {
+			return windowsOCR(ctx, path)
+		} else if runtime.GOOS == "windows" {
+			return OCRResult{}, fmt.Errorf("tesseract is not installed and %s cannot start: %s", windowsOCREngine, why)
+		}
 		return OCRResult{}, fmt.Errorf("tesseract is not installed")
 	}
 	runCtx, cancel := context.WithTimeout(ctx, ocrTimeout)
 	defer cancel()
-
-	// Find tesseract binary (handle Windows paths)
-	tess := "tesseract"
-	if runtime.GOOS == "windows" {
-		found := ""
-		for _, p := range []string{
-			filepath.Join(os.Getenv("ProgramFiles"), "Tesseract-OCR", "tesseract.exe"),
-			filepath.Join(os.Getenv("ProgramFiles(x86)"), "Tesseract-OCR", "tesseract.exe"),
-			"C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
-			"C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe",
-		} {
-			if _, err := os.Stat(p); err == nil {
-				found = p
-				break
-			}
-		}
-		if found != "" {
-			tess = found
-		}
-	}
 
 	// "-" sends the text to stdout instead of writing a file next to the
 	// image. Reading a file must never leave anything behind.
@@ -133,13 +150,7 @@ func OCRImage(ctx context.Context, path string) (OCRResult, error) {
 		return OCRResult{}, fmt.Errorf("tesseract failed: %s", firstLine(msg))
 	}
 
-	text := strings.TrimSpace(out.String())
-	res := OCRResult{Text: text, Empty: text == ""}
-	if len(text) > maxOCRChars {
-		res.Text = text[:maxOCRChars]
-		res.Truncated = true
-	}
-	return res, nil
+	return capOCR(strings.TrimSpace(out.String()), "tesseract"), nil
 }
 
 func firstLine(s string) string {
@@ -159,7 +170,11 @@ func firstLine(s string) string {
 // handed OCR text with no marking will quote it as though it read the picture.
 func ocrHeader(path string, res OCRResult) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "TEXT READ OUT OF THE IMAGE %s using OCR (tesseract).\n", path)
+	engine := res.Engine
+	if engine == "" {
+		engine = "tesseract"
+	}
+	fmt.Fprintf(&b, "TEXT READ OUT OF THE IMAGE %s using OCR (%s).\n", path, engine)
 	b.WriteString("This is a TRANSCRIPTION, not the image. OCR mistakes similar shapes " +
 		"(l/1/I, 0/O, rn/m), loses layout and columns, and degrades badly on small, " +
 		"low-contrast or re-photographed text. Quote it as \"the image appears to say\", " +
@@ -191,7 +206,7 @@ func ocrHeader(path string, res OCRResult) string {
 // how to fix it, and "how" depends on who is reading.
 func noOCRMessage(path, imageType string) string {
 	const (
-		win   = "    Windows:  scoop install tesseract      (or: choco install tesseract)\n              https://github.com/UB-Mannheim/tesseract/wiki\n"
+		win   = "    Windows:  the OCR built into Windows needs no install, only a language with OCR:\n              Settings > Time & language > Language & region > add one (it lists Optical character recognition)\n              or: scoop install tesseract\n"
 		mac   = "    macOS:    brew install tesseract\n"
 		linux = "    Debian:   sudo apt-get install -y tesseract-ocr tesseract-ocr-eng\n              (Arch: sudo pacman -S --needed tesseract tesseract-data-eng)\n"
 	)
