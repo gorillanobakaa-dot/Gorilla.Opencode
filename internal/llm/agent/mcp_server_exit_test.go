@@ -56,9 +56,6 @@ func TestMCPServerWatchStopIsNotReportedAsAnExit(t *testing.T) {
 // the call waiting forever: mcp-go never answers a pending request after the
 // server's output ends.
 func TestAnMCPServerThatExitsMidCallEndsTheCall(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("macOS keeps an exited child as a zombie that answers signal 0; the watch cannot see it there")
-	}
 	prev := mcpServerWatchEvery
 	mcpServerWatchEvery = 20 * time.Millisecond
 	t.Cleanup(func() { mcpServerWatchEvery = prev })
