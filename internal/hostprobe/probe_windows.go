@@ -28,7 +28,7 @@ func probeOS(f *Facts) {
 	f.PowerShells = installedPowerShells()
 	f.LongPaths = onOff(regDword(registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Control\FileSystem`, "LongPathsEnabled"))
 	f.DevMode = onOff(regDword(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock`, "AllowDevelopmentWithoutDevLicense"))
-	f.MSVC = msvc(filepath.Join(os.Getenv("ProgramData"), "Microsoft", "VisualStudio", "Packages", "_Instances"))
+	f.MSVC, f.MSVCDevCmd = msvc(filepath.Join(os.Getenv("ProgramData"), "Microsoft", "VisualStudio", "Packages", "_Instances"))
 	_, err := exec.LookPath("wt.exe")
 	f.Terminal = err == nil
 	f.PowerToys, f.PowerToysCLIs = powerToys(powerToysDirs())
@@ -145,13 +145,14 @@ func installedPowerShells() []string {
 }
 
 // msvc reads Visual Studio's own instance records (the files vswhere.exe
-// reads) and names the newest instance that has the C++ toolset (VC\Tools\MSVC).
-func msvc(instances string) string {
+// reads) and names the newest instance that has the C++ toolset (VC\Tools\MSVC),
+// with its VsDevCmd.bat when that file is there.
+func msvc(instances string) (string, string) {
 	entries, err := os.ReadDir(instances)
 	if err != nil {
-		return ""
+		return "", ""
 	}
-	best, bestVer := "", ""
+	best, bestVer, bestCmd := "", "", ""
 	for _, e := range entries {
 		raw, err := os.ReadFile(filepath.Join(instances, e.Name(), "state.json"))
 		if err != nil {
@@ -183,10 +184,18 @@ func msvc(instances string) string {
 		}
 		name := strings.TrimSpace(title + " " + st.CatalogInfo.ProductDisplayVersion)
 		if st.InstallationVersion > bestVer {
-			best, bestVer = name, st.InstallationVersion
+			best, bestVer, bestCmd = name, st.InstallationVersion, ""
+			if c := filepath.Join(st.InstallationPath, "Common7", "Tools", "VsDevCmd.bat"); fileExists(c) {
+				bestCmd = c
+			}
 		}
 	}
-	return best
+	return best, bestCmd
+}
+
+func fileExists(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && !fi.IsDir()
 }
 
 // powerToysDirs are where the per-user and the machine-wide installers put it.

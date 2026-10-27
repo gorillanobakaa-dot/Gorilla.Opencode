@@ -30,11 +30,29 @@ func TestWindowsLinesNameShellCPUsRobocopyAndToolbox(t *testing.T) {
 			t.Errorf("lines lack %q:\n%s", want, got)
 		}
 	}
-	// PowerToys and Sysinternals are taught only when found.
-	for _, absent := range []string{"PowerToys", "Sysinternals"} {
-		if strings.Contains(got, absent) {
-			t.Errorf("%s named although not found:\n%s", absent, got)
-		}
+	// Sysinternals is taught only when found. PowerToys is named either way on
+	// Windows (job 07: a missing line read as "not checked", not as "no").
+	if strings.Contains(got, "Sysinternals") {
+		t.Errorf("Sysinternals named although not found:\n%s", got)
+	}
+	if !strings.Contains(got, "PowerToys: not installed") {
+		t.Errorf("PowerToys' absence is not said:\n%s", got)
+	}
+	if strings.Contains(got, "MSVC build:") {
+		t.Errorf("an MSVC build line without a VsDevCmd.bat:\n%s", got)
+	}
+}
+
+// Job 07: GPT-6-Luna knew MSVC was installed but failed twice to quote
+// cmd /c "...VsDevCmd.bat..." from PowerShell 5.1. The line names the file and
+// the one way that needs no nested quoting.
+func TestWindowsLinesTeachTheMSVCDevShellThroughACmdFile(t *testing.T) {
+	f := winFacts()
+	f.MSVCDevCmd = `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat`
+	got := strings.Join(f.Lines(), "\n")
+	want := `MSVC build: write a .cmd file (line 1: @call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=amd64 -no_logo; then cl lines) and run cmd /c FILE.cmd`
+	if !strings.Contains(got, want) {
+		t.Errorf("lines lack %q:\n%s", want, got)
 	}
 }
 

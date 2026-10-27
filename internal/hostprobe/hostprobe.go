@@ -42,9 +42,11 @@ type Facts struct {
 	LongPaths string // "on", "off" or ""
 	DevMode   string // "on", "off" or ""
 
-	Git      bool
-	MSVC     string // "Visual Studio Build Tools 2022 17.14.40"
-	Terminal bool   // Windows Terminal (wt.exe)
+	Git  bool
+	MSVC string // "Visual Studio Build Tools 2022 17.14.40"
+	// MSVCDevCmd is that instance's Common7\Tools\VsDevCmd.bat, "" when absent.
+	MSVCDevCmd string
+	Terminal   bool // Windows Terminal (wt.exe)
 
 	PowerToys     string   // install folder, "" when not installed
 	PowerToysCLIs []string // command-line programs found in that folder
@@ -119,7 +121,14 @@ func lookSysinternals() []string {
 }
 
 // Lines is the probe as a few short lines for the <env> block. Facts that are
-// absent are left out; PowerToys and Sysinternals appear only when found.
+// absent are left out; Sysinternals appears only when found.
+//
+// GORILLA FIX (2026-10-27, job 07): on Windows PowerToys is named when it is
+// NOT found too. Asked "is PowerToys installed?", GPT-6-Luna answered that it
+// could not tell: a line that is missing reads as "not checked", not as "no".
+// And MSVC names its VsDevCmd.bat with the one way to use it from PowerShell
+// 5.1: the model knew MSVC was there but failed twice to quote cmd /c "..."
+// around a path with spaces and parentheses, which PowerShell 5.1 mangles.
 func (f Facts) Lines() []string {
 	var l []string
 	name := f.OSName
@@ -173,12 +182,18 @@ func (f Facts) Lines() []string {
 	if len(found) > 0 {
 		l = append(l, "Installed: "+strings.Join(found, ", "))
 	}
+	if f.MSVCDevCmd != "" {
+		l = append(l, `MSVC build: write a .cmd file (line 1: @call "`+f.MSVCDevCmd+
+			`" -arch=amd64 -no_logo; then cl lines) and run cmd /c FILE.cmd; never cmd /c "..." from PowerShell`)
+	}
 	if f.PowerToys != "" {
 		s := "PowerToys: installed at " + f.PowerToys
 		if len(f.PowerToysCLIs) > 0 {
 			s += "; command-line: " + strings.Join(f.PowerToysCLIs, ", ")
 		}
 		l = append(l, s)
+	} else if f.OS == "windows" {
+		l = append(l, "PowerToys: not installed")
 	}
 	if len(f.Sysinternals) > 0 {
 		l = append(l, "Sysinternals on PATH: "+strings.Join(f.Sysinternals, ", "))

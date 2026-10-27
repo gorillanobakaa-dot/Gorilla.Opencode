@@ -38,11 +38,21 @@ func TestMSVCNeedsTheCppToolset(t *testing.T) {
 	}
 	state("a", withVC, "17.14.1", "Visual Studio Build Tools 2022")
 	state("b", noVC, "17.99.0", "Visual Studio Community 2022") // newer, but no C++ toolset
-	if got := msvc(inst); got != "Visual Studio Build Tools 2022 17.14.40" {
-		t.Errorf("got %q", got)
+	if got, cmd := msvc(inst); got != "Visual Studio Build Tools 2022 17.14.40" || cmd != "" {
+		t.Errorf("got %q, dev shell %q (none was made yet)", got, cmd)
 	}
-	if got := msvc(filepath.Join(root, "missing")); got != "" {
-		t.Errorf("no instances folder: got %q", got)
+	devCmd := filepath.Join(withVC, "Common7", "Tools", "VsDevCmd.bat")
+	if err := os.MkdirAll(filepath.Dir(devCmd), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(devCmd, []byte("@echo off\r\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, cmd := msvc(inst); cmd != devCmd {
+		t.Errorf("dev shell %q, want %q", cmd, devCmd)
+	}
+	if got, cmd := msvc(filepath.Join(root, "missing")); got != "" || cmd != "" {
+		t.Errorf("no instances folder: got %q %q", got, cmd)
 	}
 }
 
