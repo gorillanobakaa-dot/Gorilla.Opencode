@@ -3,7 +3,6 @@ package lsp
 import (
 	"encoding/json"
 
-	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/lsp/protocol"
 	"github.com/opencode-ai/opencode/internal/lsp/util"
@@ -82,13 +81,13 @@ func notifyFileWatchRegistration(id string, watchers []protocol.FileSystemWatche
 // Notifications
 
 func HandleServerMessage(params json.RawMessage) {
-	cnf := config.Get()
+	debug := debugLSPEnabled() // config.Get() is nil before config loads (tests, early start)
 	var msg struct {
 		Type    int    `json:"type"`
 		Message string `json:"message"`
 	}
 	if err := json.Unmarshal(params, &msg); err == nil {
-		if cnf.DebugLSP {
+		if debug {
 			logging.Debug("Server message", "type", msg.Type, "message", msg.Message)
 		}
 	}

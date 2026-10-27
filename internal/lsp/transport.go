@@ -8,7 +8,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/logging"
 )
 
@@ -18,9 +17,9 @@ func WriteMessage(w io.Writer, msg *Message) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
-	cnf := config.Get()
+	debug := debugLSPEnabled() // config.Get() is nil before config loads (tests, early start)
 
-	if cnf.DebugLSP {
+	if debug {
 		logging.Debug("Sending message to server", "method", msg.Method, "id", msg.ID)
 	}
 
@@ -39,7 +38,7 @@ func WriteMessage(w io.Writer, msg *Message) error {
 
 // ReadMessage reads a single LSP message from the given reader
 func ReadMessage(r *bufio.Reader) (*Message, error) {
-	cnf := config.Get()
+	debug := debugLSPEnabled() // config.Get() is nil before config loads (tests, early start)
 	// Read headers
 	var contentLength int
 	for {
@@ -49,7 +48,7 @@ func ReadMessage(r *bufio.Reader) (*Message, error) {
 		}
 		line = strings.TrimSpace(line)
 
-		if cnf.DebugLSP {
+		if debug {
 			logging.Debug("Received header", "line", line)
 		}
 
@@ -65,7 +64,7 @@ func ReadMessage(r *bufio.Reader) (*Message, error) {
 		}
 	}
 
-	if cnf.DebugLSP {
+	if debug {
 		logging.Debug("Content-Length", "length", contentLength)
 	}
 
@@ -76,7 +75,7 @@ func ReadMessage(r *bufio.Reader) (*Message, error) {
 		return nil, fmt.Errorf("failed to read content: %w", err)
 	}
 
-	if cnf.DebugLSP {
+	if debug {
 		logging.Debug("Received content", "content", string(content))
 	}
 
@@ -91,11 +90,11 @@ func ReadMessage(r *bufio.Reader) (*Message, error) {
 
 // handleMessages reads and dispatches messages in a loop
 func (c *Client) handleMessages() {
-	cnf := config.Get()
+	debug := debugLSPEnabled() // config.Get() is nil before config loads (tests, early start)
 	for {
 		msg, err := ReadMessage(c.stdout)
 		if err != nil {
-			if cnf.DebugLSP {
+			if debug {
 				logging.Error("Error reading message", "error", err)
 			}
 			return
@@ -103,7 +102,7 @@ func (c *Client) handleMessages() {
 
 		// Handle server->client request (has both Method and ID)
 		if msg.Method != "" && msg.ID != 0 {
-			if cnf.DebugLSP {
+			if debug {
 				logging.Debug("Received request from server", "method", msg.Method, "id", msg.ID)
 			}
 
@@ -157,7 +156,7 @@ func (c *Client) handleMessages() {
 			c.notificationMu.RUnlock()
 
 			if ok {
-				if cnf.DebugLSP {
+				if debug {
 					logging.Debug("Handling notification", "method", msg.Method)
 				}
 				// Limit concurrent notification handlers to avoid goroutine explosion
@@ -168,11 +167,11 @@ func (c *Client) handleMessages() {
 						handler(msg.Params)
 					}()
 				default:
-					if cnf.DebugLSP {
+					if debug {
 						logging.Warn("Notification handler semaphore full, dropping notification", "method", msg.Method)
 					}
 				}
-			} else if cnf.DebugLSP {
+			} else if debug {
 				logging.Debug("No handler for notification", "method", msg.Method)
 			}
 			continue
@@ -185,7 +184,7 @@ func (c *Client) handleMessages() {
 			c.handlersMu.RUnlock()
 
 			if ok {
-				if cnf.DebugLSP {
+				if debug {
 					logging.Debug("Received response for request", "id", msg.ID)
 				}
 				// Non-blocking send: if the Call goroutine has already moved on (context cancelled),
@@ -194,11 +193,11 @@ func (c *Client) handleMessages() {
 				case ch <- msg:
 					close(ch)
 				default:
-					if cnf.DebugLSP {
+					if debug {
 						logging.Debug("Handler channel full or closed, dropping response", "id", msg.ID)
 					}
 				}
-			} else if cnf.DebugLSP {
+			} else if debug {
 				logging.Debug("No handler for response", "id", msg.ID)
 			}
 		}
@@ -207,10 +206,10 @@ func (c *Client) handleMessages() {
 
 // Call makes a request and waits for the response
 func (c *Client) Call(ctx context.Context, method string, params any, result any) error {
-	cnf := config.Get()
+	debug := debugLSPEnabled() // config.Get() is nil before config loads (tests, early start)
 	id := c.nextID.Add(1)
 
-	if cnf.DebugLSP {
+	if debug {
 		logging.Debug("Making call", "method", method, "id", id)
 	}
 
@@ -236,14 +235,14 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 		return fmt.Errorf("failed to send request: %w", err)
 	}
 
-	if cnf.DebugLSP {
+	if debug {
 		logging.Debug("Request sent", "method", method, "id", id)
 	}
 
 	// Wait for response
 	select {
 	case resp := <-ch:
-		if cnf.DebugLSP {
+		if debug {
 			logging.Debug("Received response", "id", id)
 		}
 
@@ -275,8 +274,8 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 
 // Notify sends a notification (a request without an ID that doesn't expect a response)
 func (c *Client) Notify(ctx context.Context, method string, params any) error {
-	cnf := config.Get()
-	if cnf.DebugLSP {
+	debug := debugLSPEnabled() // config.Get() is nil before config loads (tests, early start)
+	if debug {
 		logging.Debug("Sending notification", "method", method)
 	}
 

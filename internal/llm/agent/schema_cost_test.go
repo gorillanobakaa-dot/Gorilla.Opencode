@@ -27,6 +27,7 @@ package agent
 // applied to every row equally, so comparisons between rows are sound.
 
 import (
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -42,12 +43,14 @@ import (
 // BASE PROMPT 1791 -> 2037 on 2026-09-03, deliberately, +246 tokens (+13.7%).
 // Two separate additions, and both cost more than the estimate written before
 // measuring, which is why the estimate is not what gets recorded here:
-//   +161  four memory/conduct lines (read before denying, tag the source,
-//         calibrate to the evidence, pressure does not change facts). The
-//         written proposal estimated ~120. Out by 34%.
-//   + 84  two always-on verification lines: a pipeline's exit status is the
-//         LAST command's, and never stub past a missing file. Both name a bug
-//         this codebase has shipped, so they are not gated.
+//
+//	+161  four memory/conduct lines (read before denying, tag the source,
+//	      calibrate to the evidence, pressure does not change facts). The
+//	      written proposal estimated ~120. Out by 34%.
+//	+ 84  two always-on verification lines: a pipeline's exit status is the
+//	      LAST command's, and never stub past a missing file. Both name a bug
+//	      this codebase has shipped, so they are not gated.
+//
 // A third block, five scope-restraint lines, is gated behind prompt.restraint
 // and ships OFF, so it is NOT in this figure. It measures 212 tokens against a
 // hand-typed 150 -- out by 41%, caught by this test on the first run.
@@ -94,7 +97,9 @@ const (
 	// Windows (0 elsewhere, so Linux and macOS read ~11,163 here); the other ~20 is job 07's files and
 	// find wording. One call replaces several PowerShell round trips, each with a permission prompt.
 	measuredDefaultToolSchemaTokens = 11454
-	measuredBasePromptTokens        = 2250
+	// Linux CI run 40535301006 on 07e7e88: 10,947 without the windows tool (not ~11,163 as guessed above).
+	measuredDefaultToolSchemaTokensElsewhere = 10947
+	measuredBasePromptTokens                 = 2250
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.
 	schemaDriftAllowance = 500
@@ -171,12 +176,16 @@ func TestDefaultToolSchemaCostIsCounted(t *testing.T) {
 	// Documented at loadout.go:938 since 2026-08-14, and walked into anyway.
 	t.Logf("per-turn total (no CLAUDE.md) %5d", config.LoadoutActiveTokens())
 
-	if d := toolsOn - measuredDefaultToolSchemaTokens; d > schemaDriftAllowance || d < -schemaDriftAllowance {
+	recorded := measuredDefaultToolSchemaTokens
+	if runtime.GOOS != "windows" {
+		recorded = measuredDefaultToolSchemaTokensElsewhere
+	}
+	if d := toolsOn - recorded; d > schemaDriftAllowance || d < -schemaDriftAllowance {
 		t.Errorf("default tool schemas are %d tokens, recorded as %d (drift %+d).\n"+
 			"  Every turn pays this, so a jump here is a recurring bill on someone\n"+
 			"  else's metered connection. If the change is intended, update the\n"+
 			"  constant AND docs/WHAT-A-CURIOUS-USER-COSTS.md, which quotes it.",
-			toolsOn, measuredDefaultToolSchemaTokens, d)
+			toolsOn, recorded, d)
 	}
 	if d := base - measuredBasePromptTokens; d > 200 || d < -200 {
 		t.Errorf("base prompt is %d tokens, recorded as %d (drift %+d)", base, measuredBasePromptTokens, d)
