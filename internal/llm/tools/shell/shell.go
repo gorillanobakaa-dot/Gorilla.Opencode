@@ -227,6 +227,10 @@ func (s *PersistentShell) execCommand(command string, timeout time.Duration, ctx
 		}
 	}
 
+	if r, moved := s.recoverMissingCwd(); moved {
+		return r
+	}
+
 	tempDir := os.TempDir()
 	stdoutFile := filepath.Join(tempDir, fmt.Sprintf("gorilla-opencode-stdout-%d", time.Now().UnixNano()))
 	stderrFile := filepath.Join(tempDir, fmt.Sprintf("gorilla-opencode-stderr-%d", time.Now().UnixNano()))
@@ -560,6 +564,68 @@ echo $EXEC_EXIT_CODE > %s
 		exitCode:    exitCode,
 		interrupted: interrupted,
 	}
+}
+
+// recoverMissingCwd moves the session out of a working folder that no longer
+// exists, and says so instead of running the command.
+//
+// GORILLA FIX (2026-10-27, job 09): the folder was deleted by another process
+// while the session sat in it. Windows PowerShell 5.1 then starts no native
+// program, raises no error and sets no $LASTEXITCODE, so `go build` came back
+// as "no output (exit code 0)": a build that never ran looked like one that
+// passed. bash in a deleted folder lists it as empty. The command is not run
+// (in the new folder it could act on the wrong files); the session moves to
+// the nearest folder above that still exists, and the model is told both.
+func (s *PersistentShell) recoverMissingCwd() (commandResult, bool) {
+	if s.cwd == "" {
+		return commandResult{}, false
+	}
+	if st, err := os.Stat(s.cwd); err == nil && st.IsDir() {
+		return commandResult{}, false
+	}
+	gone := s.cwd
+	target := nearestExistingDir(gone)
+	var cd string
+	if s.isPowerShell {
+		cd = "Set-Location -LiteralPath " + shellQuotePS(target) + "\n"
+	} else {
+		cd = "cd " + shellQuote(target) + "\n"
+	}
+	// The shell reads its stdin in order, so the move happens before the
+	// next command's wrapper.
+	if _, err := s.stdin.Write([]byte(cd)); err != nil {
+		return commandResult{
+			stderr:   fmt.Sprintf("The working folder %s no longer exists, and the session could not be moved: %v", gone, err),
+			exitCode: 1,
+			err:      err,
+		}, true
+	}
+	s.cwd = target
+	return commandResult{
+		stderr: fmt.Sprintf("The working folder %s no longer exists (it was deleted or moved while this session was in it). "+
+			"The command was NOT run. The session is now in %s: run the command again if that is the right "+
+			"folder, or cd to the one you meant.\n", gone, target),
+		exitCode: 1,
+	}, true
+}
+
+// nearestExistingDir is the closest folder at or above p that exists, else
+// the home folder, else the temp folder.
+func nearestExistingDir(p string) string {
+	for dir := filepath.Clean(p); ; {
+		if st, err := os.Stat(dir); err == nil && st.IsDir() {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return home
+	}
+	return os.TempDir()
 }
 
 // stopRunning ends whatever the shell is doing, for a cancel or a timeout.
