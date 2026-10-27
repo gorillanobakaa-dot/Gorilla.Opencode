@@ -354,6 +354,15 @@ func (t *webSearchTool) searchLynx(ctx context.Context, q string, n int) ([]sear
 	if bin == "" {
 		return nil, fmt.Errorf("lynx is not installed")
 	}
+	return t.searchTextEngines(ctx, q, n, "lynx", func(ctx context.Context, target string) (string, error) {
+		return runLynx(ctx, bin, target)
+	})
+}
+
+// searchTextEngines runs the engine list through one renderer (lynx, or the
+// built-in reader) whose output is in lynx's dump layout.
+func (t *webSearchTool) searchTextEngines(ctx context.Context, q string, n int, label string,
+	render func(context.Context, string) (string, error)) ([]searchHit, error) {
 	esc := url.QueryEscape(q)
 
 	var tried []string
@@ -367,7 +376,7 @@ func (t *webSearchTool) searchLynx(ctx context.Context, q string, n int) ([]sear
 		if u, perr := url.Parse(target); perr == nil {
 			lynxWait(u.Hostname())
 		}
-		dump, err := runLynx(ctx, bin, target)
+		dump, err := render(ctx, target)
 		if err != nil && strings.TrimSpace(dump) == "" {
 			tried = append(tried, fmt.Sprintf("%s (no response: %v)", e.name, err))
 			continue
@@ -382,7 +391,7 @@ func (t *webSearchTool) searchLynx(ctx context.Context, q string, n int) ([]sear
 			continue
 		}
 		for i := range hits {
-			hits[i].Backend = "lynx/" + e.name
+			hits[i].Backend = label + "/" + e.name
 		}
 		if len(tried) > 0 {
 			addSearchWarning(ctx, "web search fell back to %s; earlier engines gave nothing: %s",

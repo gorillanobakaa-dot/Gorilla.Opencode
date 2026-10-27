@@ -245,14 +245,28 @@ variable or in "searxngURL" in this program's config.json. Ask the user for the
 address; never guess one and never point this at a public instance.
 `
 	}
-	return head + quick + better + `
-If the user declines both, that is the end of it: ask them for a URL and read it
+	return head + `
+MISSING ON THIS MACHINE: a SearXNG address, the lynx program, and the built-in
+reader's switch. Any one of the three turns web search on.
+` + quick + builtinReaderSetup + better + `
+If the user declines all three, that is the end of it: ask them for a URL and read it
 with web_fetch. Do not go looking for another way to search - do not fetch a
 search engine's results page, and do not substitute remembered facts for a search
 you did not perform.
 
 These sources need none of this and still work: ` + strings.Join(KeylessSearchSources(), ", ") + `.`
 }
+
+// builtinReaderSetup is the no-install option, the same on every system.
+const builtinReaderSetup = `
+NO INSTALL - the built-in reader. This program fetches the results pages of
+Brave, Ecosia, Mojeek and Marginalia itself (the engines lynx would use) and
+reads them as text. It is off until the user turns it on, because the search
+terms go to those engines. Tell them that, and if they want it, they add
+"webSearchBuiltin": true to this program's config.json, or set the environment
+variable ` + webReaderEnvVar + `=builtin, and restart this program. Do not edit
+the config file for them.
+`
 
 type WebSearchParams struct {
 	Query      string `json:"query"`
@@ -1048,7 +1062,7 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 	// Only refuse when BOTH routes are gone: a configured SearXNG, or lynx on
 	// PATH. lynx is a Recommends of the package, so in practice this fires only
 	// for someone who removed it.
-	if source == "web" && searxngEndpoint() == "" && lynxPath() == "" {
+	if source == "web" && searxngEndpoint() == "" && lynxPath() == "" && !builtinReaderEnabled() {
 		return NewTextErrorResponse(searxngSetup()), nil
 	}
 
@@ -1099,10 +1113,14 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 		// prompt. SearXNG first when configured: it queries the same upstreams
 		// but with real per-engine parsers and reports which of them failed,
 		// where lynx can only tell that a page yielded nothing.
+		// The built-in reader (gap #12) only when lynx is absent: both read
+		// the same engines, and lynx is the one measured against them.
 		if searxngEndpoint() != "" {
 			chosen = []backend{{"SearXNG", t.searchSearxNG}}
-		} else {
+		} else if lynxPath() != "" {
 			chosen = []backend{{"lynx", t.searchLynx}}
+		} else {
+			chosen = []backend{{"built-in reader", t.searchBuiltin}}
 		}
 	case "scholar":
 		chosen = []backend{{"OpenAlex", t.searchOpenAlex}}

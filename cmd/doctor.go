@@ -8,9 +8,12 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opencode-ai/opencode/internal/bootstrap"
+	"github.com/opencode-ai/opencode/internal/llm/tools"
 )
 
 var doctorCmd = &cobra.Command{
@@ -23,6 +26,12 @@ placeholder files, and the external tools the search, review and OCR tools use.
 Everything it reports is optional. Nothing here is required to run.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		bootstrap.RunDoctor()
+		// What the tools can reach on this machine, on every system: each
+		// line says what is there and what is missing (gaps #12, #15).
+		fmt.Println("[Gorilla OpenCode] Tool capabilities")
+		for _, line := range tools.CapabilityStatus() {
+			fmt.Println("  " + line)
+		}
 		return nil
 	},
 }
