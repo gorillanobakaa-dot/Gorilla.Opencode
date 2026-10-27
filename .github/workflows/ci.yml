@@ -9,7 +9,9 @@ name: ci
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    # feat/ and fix/ branches too: the Windows work is pushed to a feat/ branch
+    # before any pull request exists, and a push nobody's CI reads proves nothing.
+    branches: [ main, 'feat/**', 'fix/**' ]
   pull_request:
 
 concurrency:
@@ -40,3 +42,34 @@ jobs:
 
       - name: test
         run: go test ./... -count=1
+
+  # Windows is a first-class target (goal windows-capabilities, 2026-10-26).
+  # Same commands as above, run natively on windows-latest: the shell, Job
+  # Object, ConPTY, UTF-16 and CRLF code paths only execute here. Built without
+  # the toolbox tag, as a fresh clone is (no helper binaries present).
+  # .gitattributes forces LF in the working tree, so the embedded prompts and
+  # the byte-identity tests see the same bytes as on Linux.
+  build-test-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      - name: build
+        run: go build ./...
+
+      - name: vet
+        run: go vet ./...
+
+      - name: test
+        run: go test ./... -count=1 -timeout 30m

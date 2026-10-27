@@ -8,6 +8,10 @@ builds:
     goos:
       - linux
       - darwin
+      # GORILLA OVERRIDE (2026-10-27): Windows is a release target. Both
+      # windows/amd64 and windows/arm64 build with CGO_ENABLED=0 (checked with
+      # go build on the Windows machine); the archive is a .zip (format_overrides).
+      - windows
     goarch:
       - amd64
       - arm64
