@@ -18,6 +18,20 @@ import (
 func previewSync(op syncOp) (syncPlan, error) { return goPlan(op) }
 func runSync(op syncOp) (syncPlan, error)     { return goRun(op) }
 
+// archiverPath is bsdtar for zip with a password, 7z and tar.xz; for tar.xz a
+// GNU tar does when no bsdtar is installed (gnu=true).
+func archiverPath(format string) (path string, gnu bool, err error) {
+	if p, err := exec.LookPath("bsdtar"); err == nil {
+		return p, false, nil
+	}
+	if p, err := exec.LookPath("tar"); err == nil && format == "tar.xz" {
+		return p, true, nil
+	}
+	return "", false, fmt.Errorf("%s needs bsdtar (Debian/Ubuntu: libarchive-tools); only zip without a password works without it", format)
+}
+
+func hideConsole(*exec.Cmd) {}
+
 // Outside Windows only ReadOnly maps onto the file (its write bits); Hidden is
 // read from a leading dot and cannot be set.
 const settableAttrs = attrReadOnly

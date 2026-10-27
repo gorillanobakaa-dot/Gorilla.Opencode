@@ -9,7 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-
+	"slices"
 	"strings"
 	"time"
 
@@ -307,6 +307,39 @@ func describeZone(s string) string {
 	return strings.Join(parts, " ")
 }
 
+// detailKeys are the info lines list details=true repeats under each entry.
+var detailKeys = []string{"created", "owner", "group", "mode", "acl", "stream", "mark of the web"}
+
+// entryDetails is one entry's owner, creation time, permissions (ACL, or mode
+// and group outside Windows), alternate streams and Mark of the Web on one
+// line: the info lines, without the ones the listing already shows.
+//
+// GORILLA FIX (2026-10-27, v0.1.156): "list all your files and their
+// attributes in the working folder" was answered with the attribute flags
+// only, on GPT-6-Luna; owner, created and permissions needed one info call
+// per file, which the model never made.
+func entryDetails(path string) string {
+	var parts, acl []string
+	for _, l := range platformInfo(path) {
+		k, v, ok := strings.Cut(l, ": ")
+		if !ok || !slices.Contains(detailKeys, k) {
+			continue
+		}
+		if k == "acl" {
+			acl = append(acl, v)
+		} else {
+			parts = append(parts, l)
+		}
+	}
+	if len(acl) > 0 {
+		parts = append(parts, "acl: "+strings.Join(acl, "; "))
+	}
+	if len(parts) == 0 {
+		return "(no details readable)"
+	}
+	return strings.Join(parts, " | ")
+}
+
 // ── list ───────────────────────────────────────────────────────────────────
 
 // filesList is Get-ChildItem -Force: files and folders with their attributes,
@@ -357,7 +390,11 @@ func filesList(p filesParams) (ToolResponse, error) {
 				mod = info.ModTime().Format("2006-01-02 15:04")
 			}
 			rel, _ := filepath.Rel(p.Path, path)
-			lines = append(lines, fmt.Sprintf("%-16s %12s  %-24s %s", mod, size, attrString(a), rel))
+			line := fmt.Sprintf("%-16s %12s  %-24s %s", mod, size, attrString(a), rel)
+			if p.Details && (p.Full || len(lines) < filesListLines) {
+				line += "\n    " + entryDetails(path)
+			}
+			lines = append(lines, line)
 		}
 		if d.IsDir() && !descend {
 			return filepath.SkipDir
@@ -366,10 +403,19 @@ func filesList(p filesParams) (ToolResponse, error) {
 	})
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: %d item(s)", p.Path, len(lines))
+	if !p.Details {
+		b.WriteString(" (details=true adds owner, created, ACL, streams, Mark of the Web per entry)")
+	}
 	if skipped > 0 {
 		fmt.Fprintf(&b, ", %d hidden/system folder(s) listed but not entered (hidden=true enters them)", skipped)
 	}
 	b.WriteString("\n")
 	writeListN(&b, "", lines, p.Full, filesListLines)
+	if p.Details {
+		// Measured on GPT-6-Luna (2026-10-27): given every detail, the answer
+		// named owner and ACL and left out when each file was created.
+		b.WriteString("TELL THE PERSON: each entry's attributes, owner, created and permissions " +
+			"(say once what is the same for all).\n")
+	}
 	return NewTextResponse(b.String()), nil
 }

@@ -162,7 +162,7 @@ var LoadoutComponents = []LoadoutComponent{
 	// to 128 threads ... no idea how to view and check attributes". Critical:
 	// these are the plain file operations a person asks for. The figure is a
 	// guess; calibration measures the schema at startup.
-	{FilesComponentID, "Files: copy, mirror, move, rename, attributes, delete", "agent can only copy, move, rename or delete files by writing shell commands: no dry-run preview, no 128-thread robocopy, no Recycle Bin", 330, true, true},
+	{FilesComponentID, "Files: copy, mirror, move, rename, attributes, archive, delete", "agent can only copy, move, rename or delete files by writing shell commands: no dry-run preview, no 128-thread robocopy, no Recycle Bin", 330, true, true},
 	// GORILLA (2026-10-27, windows-capabilities job 09): the read-only windows
 	// tool (registry, services, event log, scheduled tasks, CIM). Registered
 	// only on Windows; calibration sets this row to 0 elsewhere. The figure is
