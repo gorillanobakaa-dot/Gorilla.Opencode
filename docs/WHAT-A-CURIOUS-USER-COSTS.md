@@ -241,13 +241,20 @@ exists.
 TestDefaultToolSchemaCost -v`:
 
 ```
-tool schemas, default ON                            ~11,141 tokens   81%
+tool schemas, default ON                            ~11,143 tokens   81%
 base system prompt (coder-modern)                    ~2,314 tokens   17%
 prompt blocks, default ON                              ~369 tokens    3%
                                                      ------------
 per-turn total, before any CLAUDE.md                ~13,824 tokens
 
-(re-measured 2026-10-27, windows-capabilities job 05: +470 for the files tool, default ON and never
+(re-measured 2026-10-27, windows-capabilities job 06: schemas +2 (files gained action=howto; bash names
+its PowerShell edition). The PROMPT grew instead, measured on this laptop with `gorilla-opencode
+system-prompt` (bytes/4): ~2,504 -> ~3,022 tokens, +518 a turn: the "YOUR TOOLS" table ~375 (18 tools,
+deferral off; with tool_search on only the loaded tools are listed), the startup probe and the how-to card
+line ~137, the first prompt line +7. Both ride the prompt.env row, so /context switches them off together.
+The long knowledge (robocopy's switches and exit codes, PowerShell file operations, the toolbox) is in
+on-demand cards, read with files action=howto, and costs nothing until read;
+earlier, job 05: +470 for the files tool, default ON and never
 deferred: the owner's complaint was a model that did not know it could copy with 128 threads, set
 attributes or rename in bulk; eight actions, one schema instead of eight; trimmed from 516 before recording;
 earlier 2026-10-27 on Windows, where the bash row carries the PowerShell guidance: 10,713 before

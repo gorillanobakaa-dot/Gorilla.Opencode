@@ -86,7 +86,10 @@ const (
 	// 2026-10-27 (windows-capabilities job 05): 11,141. +470 is the files tool (copy/mirror/move with
 	// robocopy, attributes, bulk rename, info, list, delete to the Recycle Bin), default ON and never
 	// deferred; trimmed from 516. One schema for eight actions.
-	measuredDefaultToolSchemaTokens = 11141
+	// 2026-10-27 (windows-capabilities job 06): 11,143. +2: files gained action=howto (the on-demand
+	// how-to cards) and bash names its PowerShell edition. The prompt grew instead (the tool table and
+	// the startup probe, ~+518 a turn on prompt.env); see docs/WHAT-A-CURIOUS-USER-COSTS.md.
+	measuredDefaultToolSchemaTokens = 11143
 	measuredBasePromptTokens        = 2250
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.

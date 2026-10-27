@@ -907,17 +907,21 @@ if (-not ('GorillaStdin' -as [type])) { try { Add-Type -TypeDefinition 'using Sy
 if (-not ('GorillaStop' -as [type])) { try { Add-Type -TypeDefinition 'using System; using System.Reflection; using System.Threading; using System.Management.Automation.Runspaces; public static class GorillaStop { static volatile bool busy; static Runspace rs; static EventWaitHandle ev; public static void Arm(Runspace r, string name) { if (ev != null) { return; } rs = r; ev = new EventWaitHandle(false, EventResetMode.AutoReset, name); Thread t = new Thread(Loop); t.IsBackground = true; t.Start(); } static volatile bool requested; public static void Begin() { requested = false; busy = true; } public static void End() { busy = false; } public static bool Requested() { return requested; } static void Loop() { MethodInfo m = typeof(Runspace).GetMethod("GetCurrentlyRunningPipeline", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic); while (true) { ev.WaitOne(); if (!busy || m == null) { continue; } try { Pipeline p = m.Invoke(rs, null) as Pipeline; if (p != null) { requested = true; p.StopAsync(); } } catch { } } } }' } catch { } }
 `
 
+// ShellPath is the program the bash tool drives: config shell.path, else
+// resolveShellPath. Starts nothing (see IsWindowsPowerShell for why that
+// matters); the system prompt names it, with its edition (internal/hostprobe).
+func ShellPath() string {
+	if cfg := config.Get(); cfg != nil && cfg.Shell.Path != "" {
+		return cfg.Shell.Path
+	}
+	return resolveShellPath()
+}
+
 // HookPowerShell is the PowerShell a lifecycle hook runs in (gap #18): the
 // bash tool's own when that is PowerShell 7 (pwsh), so a hook written for the
 // shell the user chose runs in it; otherwise Windows PowerShell 5.1.
 func HookPowerShell() string {
-	p := ""
-	if cfg := config.Get(); cfg != nil {
-		p = cfg.Shell.Path
-	}
-	if p == "" {
-		p = resolveShellPath()
-	}
+	p := ShellPath()
 	if strings.Contains(strings.ToLower(filepath.Base(p)), "pwsh") {
 		return p
 	}

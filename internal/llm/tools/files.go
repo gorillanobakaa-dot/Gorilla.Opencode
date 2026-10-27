@@ -37,6 +37,7 @@ import (
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/howto"
 	"github.com/opencode-ai/opencode/internal/pathutil"
 	"github.com/opencode-ai/opencode/internal/permission"
 )
@@ -85,6 +86,14 @@ const filesDescription = "Copy, mirror, move, rename, delete files; attributes; 
 	"Windows: robocopy, up to 128 threads. Changes preview first (copied AND deleted) and ask; " +
 	"mirror/purge/move delete for good; delete uses the Recycle Bin unless permanent."
 
+// Summary is the files tool's line in the system prompt's tool table.
+func (filesTool) Summary() string {
+	if runtime.GOOS == "windows" {
+		return "Copy/mirror/move via robocopy (1-128 threads), rename, attrs; howto"
+	}
+	return "Copy/mirror/move, bulk rename, attributes, details, list, delete to the trash"
+}
+
 func (filesTool) Info() ToolInfo {
 	s := func(d string) map[string]any { return map[string]any{"type": "string", "description": d} }
 	b := func(d string) map[string]any { return map[string]any{"type": "boolean", "description": d} }
@@ -94,8 +103,8 @@ func (filesTool) Info() ToolInfo {
 		Parameters: map[string]any{
 			"action": map[string]any{
 				"type":        "string",
-				"enum":        []string{"copy", "mirror", "purge", "move", "move_files", "attributes", "rename", "info", "list", "delete"},
-				"description": "mirror=/MIR, purge=only delete extras, move=/MOVE, move_files=/MOV",
+				"enum":        []string{"copy", "mirror", "purge", "move", "move_files", "attributes", "rename", "info", "list", "delete", "howto"},
+				"description": "mirror=/MIR, purge=only delete extras, move=/MOVE, move_files=/MOV, howto=read card path",
 			},
 			"path":        s("Source, or the item"),
 			"dest":        s("Destination; rename: new name of one file"),
@@ -126,6 +135,9 @@ func (t filesTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	if err := UnmarshalToolInput(call.Input, &p); err != nil {
 		return NewTextErrorResponse(fmt.Sprintf("error parsing parameters: %s", err)), nil
 	}
+	if strings.EqualFold(strings.TrimSpace(p.Action), "howto") {
+		return filesHowto(p.Path), nil
+	}
 	if strings.TrimSpace(p.Path) == "" {
 		return NewTextErrorResponse("path is required"), nil
 	}
@@ -149,7 +161,24 @@ func (t filesTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		return t.delete(ctx, p)
 	}
 	return NewTextErrorResponse(fmt.Sprintf(
-		"unknown action %q: use copy, mirror, purge, move, move_files, attributes, rename, info, list or delete", p.Action)), nil
+		"unknown action %q: use copy, mirror, purge, move, move_files, attributes, rename, info, list, delete or howto", p.Action)), nil
+}
+
+// filesHowto returns one how-to card (internal/howto), or the list of the
+// cards that apply on this machine when the name is empty or unknown.
+func filesHowto(name string) ToolResponse {
+	if card, ok := howto.Get(name); ok {
+		return NewTextResponse(card)
+	}
+	avail := howto.Available()
+	if len(avail) == 0 {
+		return NewTextErrorResponse("no how-to cards apply on this machine")
+	}
+	msg := "cards here: " + strings.Join(avail, ", ")
+	if strings.TrimSpace(name) != "" {
+		return NewTextErrorResponse(fmt.Sprintf("no card %q here; %s", name, msg))
+	}
+	return NewTextResponse(msg)
 }
 
 // filesAbs makes a path absolute against the working directory.

@@ -68,6 +68,9 @@ func CoderAgentTools(
 		prompt.SetDeferredCatalogue("")
 		config.SetDeferredComponents(nil, 0)
 	}
+	// GORILLA (2026-10-27, job 06): "Your tools", one line each, from this very
+	// set, so the table cannot drift from what the model is sent.
+	prompt.SetToolTable(tools.ToolTableBlock(full, config.LoadoutEnabled(config.ToolSearchComponentID)))
 	return full
 }
 

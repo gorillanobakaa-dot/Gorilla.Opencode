@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/hostprobe"
 	"github.com/opencode-ai/opencode/internal/llm/tools/shell"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/permission"
@@ -136,11 +137,20 @@ var safeReadOnlyCommands = []string{
 // bash, get a parse error back, and have no way to work out why. Telling it what
 // shell it is actually holding is the difference between a tool that works and a
 // tool that argues with itself.
-const powerShellGuidance = `
+func powerShellGuidance(chaining string) string {
+	return strings.Replace(powerShellGuidanceText, "{{chaining}}", chaining, 1)
+}
+
+const (
+	ps51Chaining  = "- Chain commands with ';'. Windows PowerShell 5.1 does NOT support '&&' or '||' — they are parse errors there."
+	pwsh7Chaining = "- Chain commands with ';', or with '&&' / '||' (PowerShell 7 supports them; Windows PowerShell 5.1 would not)."
+)
+
+const powerShellGuidanceText = `
 
 # You are driving PowerShell, not bash
 This session's shell is PowerShell on Windows. Write PowerShell, not POSIX shell:
-- Chain commands with ';'. Windows PowerShell 5.1 does NOT support '&&' or '||' — they are parse errors there. (PowerShell 7+ does support them, but do not rely on it.)
+{{chaining}}
 - Use PowerShell cmdlets rather than coreutils: Get-Content (not cat), Get-ChildItem (not ls), Select-String (not grep), Remove-Item (not rm), Copy-Item (not cp), New-Item (not touch/mkdir).
 - Environment variables are $env:NAME, set with $env:NAME = 'value'. There is no 'export' and no inline 'VAR=x cmd' prefix.
 - Paths use backslashes; quote any path containing spaces. Forward slashes usually work too.
@@ -168,10 +178,18 @@ func bashDescription() string {
 	chainAdvice := "use the ';' or '&&' operator to separate them"
 	badChain := "cd /foo/bar && pytest tests"
 	if shell.IsWindowsPowerShell() {
-		shellName = "PowerShell"
-		trailer = powerShellGuidance
-		chainAdvice = "use ';' to separate them. NEVER '&&' or '||': Windows PowerShell 5.1 rejects them as a syntax error"
+		// GORILLA (2026-10-27, job 06): the edition is named, and the '&&'
+		// warning is only given where it is true: PowerShell 7 (pwsh) accepts
+		// '&&' and '||', Windows PowerShell 5.1 does not.
+		shellName = hostprobe.ShellEdition(shell.ShellPath())
 		badChain = `cd C:\foo\bar; pytest tests`
+		if hostprobe.IsPowerShell7() {
+			trailer = powerShellGuidance(pwsh7Chaining)
+			chainAdvice = "use ';' or '&&' to separate them (PowerShell 7 accepts '&&' and '||')"
+		} else {
+			trailer = powerShellGuidance(ps51Chaining)
+			chainAdvice = "use ';' to separate them. NEVER '&&' or '||': Windows PowerShell 5.1 rejects them as a syntax error"
+		}
 	}
 
 	return fmt.Sprintf(`Executes a given %s command in a persistent shell session with optional timeout, ensuring proper handling and security measures.
@@ -227,6 +245,15 @@ func trashGuidance() string {
 	}
 	return "Trash: rm/Remove-Item/del/rd delete FOR GOOD. For the trash or Recycle Bin use " + how +
 		"; if that fails, ask. NEVER fall back to a plain delete."
+}
+
+// Summary is bash's line in the system prompt's tool table: on Windows it says
+// PowerShell and which edition, since the tool keeps the name bash.
+func (b *bashTool) Summary() string {
+	if shell.IsWindowsPowerShell() {
+		return "Runs " + hostprobe.ShellEdition(shell.ShellPath()) + "; not bash"
+	}
+	return "Runs " + hostprobe.ShellEdition(shell.ShellPath()) + " commands"
 }
 
 func NewBashTool(permission permission.Service) BaseTool {
