@@ -48,6 +48,12 @@ const archiveDefaultLevel = 6
 const archiveOptions = "options: format=zip|7z|tar.xz, level=0 (store) .. 9 (smallest), " +
 	"password=... (zip only, AES-256), dest=a file or folder OUTSIDE the folder being archived"
 
+// archiveTellThem ends the reply. Measured on GPT-6-Luna (2026-10-27): with
+// the options only in the tool result, the answer named the defaults and
+// dropped the options, so the person never learned there was a choice.
+const archiveTellThem = "TELL THE PERSON: the defaults used above, and that they can ask for 7z or tar.xz, " +
+	"another level, a password (zip) or another place."
+
 // archiveExt maps a format to its file extension.
 var archiveExt = map[string]string{"zip": ".zip", "7z": ".7z", "tar.xz": ".tar.xz"}
 
@@ -207,7 +213,8 @@ func (t filesTool) archive(ctx context.Context, p filesParams) (ToolResponse, er
 	if err != nil {
 		return NewTextErrorResponse(fmt.Sprintf("archive reported success but %s is missing: %v", s.Out, err)), nil
 	}
-	return NewTextResponse(s.describe("DONE") + fmt.Sprintf("written: %s (%s)\n", s.Out, filesHumanBytes(fi.Size()))), nil
+	return NewTextResponse(s.describe("DONE") + fmt.Sprintf("written: %s (%s)\n%s\n", s.Out,
+		filesHumanBytes(fi.Size()), archiveTellThem)), nil
 }
 
 // writeArchive writes to <out>.partial and renames it when complete, so a

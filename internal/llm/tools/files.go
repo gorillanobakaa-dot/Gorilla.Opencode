@@ -90,7 +90,7 @@ func NewFilesTool(permissions permission.Service) BaseTool {
 const filesDescription = "Copy, mirror, move, rename, delete, archive files; attributes; list incl. hidden. " +
 	"info/details cover owner, created, permissions (ACL), streams and Mark of the Web; " +
 	"list details=true gives them for every entry in one call. " +
-	"archive: zip, 7z or tar.xz, written OUTSIDE the folder; tell the person the defaults used. " +
+	"archive: zip, 7z or tar.xz, written OUTSIDE the folder; tell the person the defaults used and the other options. " +
 	"Windows: robocopy, up to 128 threads. Changes preview first (copied AND deleted) and ask; " +
 	"mirror/purge/move delete for good; delete uses the Recycle Bin unless permanent."
 

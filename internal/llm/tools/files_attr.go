@@ -411,5 +411,11 @@ func filesList(p filesParams) (ToolResponse, error) {
 	}
 	b.WriteString("\n")
 	writeListN(&b, "", lines, p.Full, filesListLines)
+	if p.Details {
+		// Measured on GPT-6-Luna (2026-10-27): given every detail, the answer
+		// named owner and ACL and left out when each file was created.
+		b.WriteString("TELL THE PERSON: each entry's attributes, owner, created and permissions " +
+			"(say once what is the same for all).\n")
+	}
 	return NewTextResponse(b.String()), nil
 }
