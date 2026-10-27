@@ -26,6 +26,7 @@ package tools
 //  5. Read-only actions (info, list, attributes without set/clear) never ask.
 //  6. delete goes to the Recycle Bin; permanent=true asks as irreversible and
 //     is refused when the person asked for the trash (trash.go, rule 2).
+//  7. archive writes outside the folder it packs (files_archive.go).
 
 import (
 	"context"
@@ -68,6 +69,10 @@ type filesParams struct {
 	Kind        string `json:"kind"`
 	Hidden      bool   `json:"hidden"`
 	Hash        bool   `json:"hash"`
+	Details     bool   `json:"details"`
+	Format      string `json:"format"`
+	Level       *int   `json:"level"`
+	Password    string `json:"password"`
 	Permanent   bool   `json:"permanent"`
 	DryRun      bool   `json:"dry_run"`
 	Full        bool   `json:"full"`
@@ -82,7 +87,10 @@ func NewFilesTool(permissions permission.Service) BaseTool {
 	return filesTool{permissions: permissions}
 }
 
-const filesDescription = "Copy, mirror, move, rename, delete files; attributes; details; list incl. hidden. " +
+const filesDescription = "Copy, mirror, move, rename, delete, archive files; attributes; list incl. hidden. " +
+	"info/details cover owner, created, permissions (ACL), streams and Mark of the Web; " +
+	"list details=true gives them for every entry in one call. " +
+	"archive: zip, 7z or tar.xz, written OUTSIDE the folder; tell the person the defaults used. " +
 	"Windows: robocopy, up to 128 threads. Changes preview first (copied AND deleted) and ask; " +
 	"mirror/purge/move delete for good; delete uses the Recycle Bin unless permanent."
 
@@ -103,8 +111,8 @@ func (filesTool) Info() ToolInfo {
 		Parameters: map[string]any{
 			"action": map[string]any{
 				"type":        "string",
-				"enum":        []string{"copy", "mirror", "purge", "move", "move_files", "attributes", "rename", "info", "list", "delete", "howto"},
-				"description": "mirror=/MIR, purge=delete from dest what path lacks, move=/MOVE (folders go too), move_files=/MOV (folders stay), howto=read card path",
+				"enum":        []string{"copy", "mirror", "purge", "move", "move_files", "attributes", "rename", "info", "list", "delete", "archive", "howto"},
+				"description": "mirror=/MIR, purge=delete from dest what path lacks, move=/MOVE (folders go too), move_files=/MOV (folders stay), archive=pack path into dest, howto=read card path",
 			},
 			"path":        s("Source (left as it is by purge), or the item"),
 			"dest":        s("Destination; rename: new name of one file"),
@@ -122,6 +130,10 @@ func (filesTool) Info() ToolInfo {
 			"kind":        s("list: file or dir"),
 			"hidden":      b("list: enter hidden/system folders"),
 			"hash":        b("info: SHA-256"),
+			"details":     b("list: owner, created, ACL, streams, Mark of the Web per entry"),
+			"format":      s("archive: zip (default), 7z or tar.xz"),
+			"level":       map[string]any{"type": "integer", "description": "archive: 0 store .. 9 smallest; default 6"},
+			"password":    s("archive: encrypt (zip, AES-256)"),
 			"permanent":   b("delete: skip the Recycle Bin"),
 			"dry_run":     b("Preview only"),
 			"full":        b(fullDescription),
@@ -159,9 +171,11 @@ func (t filesTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 		return filesList(p)
 	case "delete":
 		return t.delete(ctx, p)
+	case "archive":
+		return t.archive(ctx, p)
 	}
 	return NewTextErrorResponse(fmt.Sprintf(
-		"unknown action %q: use copy, mirror, purge, move, move_files, attributes, rename, info, list, delete or howto", p.Action)), nil
+		"unknown action %q: use copy, mirror, purge, move, move_files, attributes, rename, info, list, delete, archive or howto", p.Action)), nil
 }
 
 // filesHowto returns one how-to card (internal/howto), or the list of the

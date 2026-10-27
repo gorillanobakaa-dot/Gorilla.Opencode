@@ -96,9 +96,13 @@ const (
 	// windows tool (registry, services, event log, tasks, CIM), default ON and registered ONLY on
 	// Windows (0 elsewhere, so Linux and macOS read ~11,163 here); the other ~20 is job 07's files and
 	// find wording. One call replaces several PowerShell round trips, each with a permission prompt.
-	measuredDefaultToolSchemaTokens = 11454
+	// 2026-10-27 (v0.1.156): 11,609 on Windows. +155 is the files tool (tool.files now reads 652):
+	// action=archive (zip/7z/tar.xz, level, password, dest outside the folder) and list details=true, and
+	// a description that says info/details cover owner, created, ACL, streams and Mark of the Web. GPT-6-Luna
+	// answered "list all your files and their attributes" with flags only and hand-wrote a .NET zip.
+	measuredDefaultToolSchemaTokens = 11609
 	// Linux CI run 40535301006 on 07e7e88: 10,947 without the windows tool (not ~11,163 as guessed above).
-	measuredDefaultToolSchemaTokensElsewhere = 10947
+	measuredDefaultToolSchemaTokensElsewhere = 10947 // +~155 expected from v0.1.156 files; inside the band, re-read from CI
 	measuredBasePromptTokens                 = 2250
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.

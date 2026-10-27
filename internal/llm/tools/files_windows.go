@@ -25,6 +25,22 @@ func robocopyPath() string {
 	return filepath.Join(dir, "robocopy.exe")
 }
 
+// archiverPath is Windows' own tar.exe (bsdtar) in System32, never a tar
+// found on PATH (files_archive.go, rule 3).
+func archiverPath(string) (path string, gnu bool, err error) {
+	dir, err := windows.GetSystemDirectory()
+	if err != nil {
+		dir = `C:\Windows\System32`
+	}
+	p := filepath.Join(dir, "tar.exe")
+	if _, err := os.Stat(p); err != nil {
+		return "", false, fmt.Errorf("%s is missing (Windows 10 1803 and later ship it); only zip without a password works here", p)
+	}
+	return p, false, nil
+}
+
+func hideConsole(cmd *exec.Cmd) { cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true} }
+
 // runRobocopy runs one robocopy pass with its log in a private temp file and
 // returns the parsed log and the exit code.
 func runRobocopy(op syncOp, preview bool) (syncPlan, error) {
