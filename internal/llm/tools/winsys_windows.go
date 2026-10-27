@@ -261,7 +261,6 @@ func serviceConfig(h windows.Handle, name string) (mgr.Config, bool) {
 	return cfg, err == nil
 }
 
-
 // ---- event log, scheduled tasks, CIM: fixed PowerShell scripts ----
 
 // winsysPSPrelude is shared: UTF-8 out, stop on errors, ISO dates.
