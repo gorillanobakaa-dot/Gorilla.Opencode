@@ -83,7 +83,7 @@ def run(cmd, timeout=None, input_text=None, cwd=None):
 
 
 def as_root(cmd):
-    if os.geteuid() == 0:
+    if getattr(os, "geteuid", lambda: -1)() == 0:  # no geteuid on Windows
         return cmd
     if shutil.which("sudo"):
         return ["sudo"] + cmd
@@ -105,11 +105,25 @@ def find_all_in_path(binary_name):
 # package manager detection
 # ---------------------------------------------------------------------------
 
-def detect_pkg_manager():
+def detect_pkg_manager(which=shutil.which, windows=(os.name == "nt")):
+    # Windows (gap #13): Scoop, the package manager Gorilla OpenCode uses there
+    # (internal/arsenal). Per user, no admin. winget is not used: it reports
+    # usage to Microsoft. On Windows the Linux managers are never offered.
+    if windows:
+        return "scoop" if which("scoop") else None
     for mgr in ("apt-get", "dnf", "pacman", "apk", "zypper", "brew"):
-        if shutil.which(mgr):
+        if which(mgr):
             return mgr
     return None
+
+
+def scoop_install(pkg, assume_yes):
+    # scoop is a .cmd/.ps1 shim: CreateProcess finds no scoop.exe, so the
+    # resolved path is run, not the bare name.
+    exe = shutil.which("scoop") or "scoop"
+    status_line("SCOOP", f"installing: {pkg}")
+    rc, out, err = run([exe, "install", pkg], timeout=900)
+    return rc == 0, (out + err)
 
 PKG_MANAGER = detect_pkg_manager()
 _APT_UPDATED = False
@@ -351,6 +365,12 @@ def try_install(tool: Tool, args):
             attempts.append(("apt", ok, msg))
             if ok:
                 return "apt", cand, attempts
+
+    if spec.scoop and PKG_MANAGER == "scoop":
+        ok, msg = scoop_install(spec.scoop, args.yes)
+        attempts.append(("scoop", ok, msg))
+        if ok:
+            return "scoop", None, attempts
 
     if spec.installer_script:
         fn = SCRIPT_INSTALLERS.get(spec.installer_script)
