@@ -19,6 +19,10 @@ import (
 type BashParams struct {
 	Command string  `json:"command"`
 	Timeout FlexInt `json:"timeout"`
+	// Console and Input are the Windows console mode (gap #11): the command
+	// runs in a pseudoconsole and Input is typed into it.
+	Console bool   `json:"console,omitempty"`
+	Input   string `json:"input,omitempty"`
 }
 
 type BashPermissionsParams struct {
@@ -141,7 +145,7 @@ This session's shell is PowerShell on Windows. Write PowerShell, not POSIX shell
 - Paths use backslashes; quote any path containing spaces. Forward slashes usually work too.
 - '2>/dev/null' does not exist; use '2>$null'. There is no /dev/null, /tmp, or ~ — use $env:TEMP and $env:USERPROFILE.
 - Bash control flow ('if [ -f x ]', 'for x in *', backtick substitution) is a parse error. Use 'if (Test-Path x)', 'foreach ($x in ...)', '$(cmd)'.
-- Never use Read-Host, Get-Credential, or any command that waits for console input: this shell has no interactive terminal and the command will hang until it times out.
+- A command that waits for console input (Read-Host, a y/n prompt) hangs here: pass console=true with the answers in input. Never Get-Credential.
 - ConvertFrom-Json returns a PSCustomObject, not a hashtable.
 - There is NO Unix userland here. bc, awk, sed, jq, make, tar, less and friends are
   not installed. Do not reach for one because the task looks Unix-shaped; if you
@@ -182,17 +186,7 @@ Before executing the command, please follow these steps:
  - Verify that the command is not one of the banned commands: %s.
  - WHY those are banned, so you can explain it when asked: they are raw network fetchers and browsers. Run from a shell they bypass the audited, permission-gated web tools, which is exactly what a prompt-injection attack needs. Nothing is lost: use the websearch tool to search (it drives lynx + a private SearxNG under the hood) and the fetch tool to read a URL. Banned in the shell ≠ absent from the product.
 
-3. Command Execution:
- - After ensuring proper quoting, execute the command.
- - Capture the output of the command.
-
-4. Output Processing:
- - If the output exceeds %d characters, output will be truncated before being returned to you.
- - Prepare the output for display to the user.
-
-5. Return Result:
- - Provide the processed output of the command.
- - If any errors occurred during execution, include those in the output.
+3. Output: over %d characters it is truncated; errors are included.
 
 Usage notes:
 - The command argument is required.
@@ -241,20 +235,33 @@ func NewBashTool(permission permission.Service) BaseTool {
 }
 
 func (b *bashTool) Info() ToolInfo {
+	params := map[string]any{
+		"command": map[string]any{
+			"type":        "string",
+			"description": "The command to execute",
+		},
+		"timeout": map[string]any{
+			"type":        "number",
+			"description": "Optional timeout in milliseconds (max 600000)",
+		},
+	}
+	// Windows only (gap #11): the schema elsewhere does not pay for a mode
+	// that does not exist there.
+	if shell.ConsoleSupported() {
+		params["console"] = map[string]any{
+			"type":        "boolean",
+			"description": "Run in a real console (prompts, Read-Host); a separate process, not this session",
+		}
+		params["input"] = map[string]any{
+			"type":        "string",
+			"description": "With console: text typed in, one line per answer",
+		}
+	}
 	return ToolInfo{
 		Name:        BashToolName,
 		Description: bashDescription(),
-		Parameters: map[string]any{
-			"command": map[string]any{
-				"type":        "string",
-				"description": "The command to execute",
-			},
-			"timeout": map[string]any{
-				"type":        "number",
-				"description": "Optional timeout in milliseconds (max 600000)",
-			},
-		},
-		Required: []string{"command"},
+		Parameters:  params,
+		Required:    []string{"command"},
 	}
 }
 
@@ -423,9 +430,24 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	if shellInstance == nil {
 		return ToolResponse{}, fmt.Errorf("Shell could not be started. Please ensure a compatible shell (bash or powershell) is available in PATH")
 	}
-	stdout, stderr, exitCode, interrupted, err := shellInstance.Exec(ctx, params.Command, params.Timeout.Int())
-	if err != nil {
-		return ToolResponse{}, fmt.Errorf("error executing command: %w", err)
+	var stdout, stderr string
+	var exitCode int
+	var interrupted bool
+	if params.Console && shell.ConsoleSupported() {
+		// Console mode (gap #11): same permission gate as above, run in a
+		// pseudoconsole in the session's directory, its own Job Object.
+		timeout := time.Duration(params.Timeout.Int()) * time.Millisecond
+		res, cerr := shell.RunInConsole(ctx, "", params.Command, shellInstance.Cwd(), params.Input, timeout)
+		if cerr != nil {
+			return ToolResponse{}, fmt.Errorf("error executing command in a console: %w", cerr)
+		}
+		stdout, exitCode, interrupted = res.Output, res.ExitCode, res.Interrupted
+	} else {
+		var err error
+		stdout, stderr, exitCode, interrupted, err = shellInstance.Exec(ctx, params.Command, params.Timeout.Int())
+		if err != nil {
+			return ToolResponse{}, fmt.Errorf("error executing command: %w", err)
+		}
 	}
 
 	// GORILLA OVERRIDE: filter noisy build logs to their signal (errors,

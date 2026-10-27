@@ -1,0 +1,96 @@
+# fieldkit mutate --plan tests/mutations-jobobjects-conpty.yaml --cwd . -- go test ./internal/procjob/ ./internal/llm/tools/shell/ ./internal/lsp/ ./internal/llm/agent/ ./internal/llm/tools/ -count=1 -run "(?i)jobobject|(?i)grandchild|(?i)conpty|ExitIsNotReported|BreakOutsideALoop"
+# Job 02 of goal windows-capabilities (2026-10-27): Job Objects (gap #9), interrupt keeps the session (gap #10),
+# ConPTY console mode (gap #11). Every rule added, broken on purpose; each must be CAUGHT. Run on Windows.
+# Not in the plan, on purpose: CREATE_SUSPENDED in procjob.Start closes a race (a child started before the
+# assignment) that no test can trigger on demand; see docs/JOBOBJECTS-CONPTY.dual-track.md.
+
+# --- procjob: the Job Object itself
+- file: internal/procjob/job_windows.go
+  swap: ['LimitFlags: windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,', 'LimitFlags: 0,']
+  why: closing the job (or a crash) no longer kills the tree
+- file: internal/procjob/job_windows.go
+  swap: ['if pid == keep || hosts[pid] {', 'if hosts[pid] {']
+  why: an interrupt kills the shell it should keep
+- file: internal/procjob/job_windows.go
+  swap: ['return windows.TerminateJobObject(j.handle, 1)', 'return nil']
+  why: Terminate reports success and kills nothing
+- file: internal/procjob/job_windows.go
+  swap: ['n := 64', 'n := 0']
+  why: the process list query never gets a buffer big enough
+- file: internal/procjob/job_windows.go
+  swap: ['aerr := job.AssignPid(cmd.Process.Pid)', 'aerr := error(nil)']
+  why: Start hands back a job the process was never put in
+- file: internal/procjob/cancel.go
+  swap: ['if j := holder.Load(); j != nil && j.Terminate() == nil {', 'if false {']
+  why: a cancelled context kills only the top process again
+
+# --- the shell (gaps #9, #10)
+- file: internal/llm/tools/shell/shell.go
+  swap: ['if _, err := s.job.KillAllBut(s.cmd.Process.Pid); err == nil {', 'if false {']
+  why: an interrupt goes back to taskkill /T of the shell's children, which cannot find an orphaned grandchild
+- file: internal/llm/tools/shell/shell.go
+  swap: ['s.stop.fire()', '_ = s.stop']
+  why: an interrupted cmdlet ends the whole session again
+- file: internal/llm/tools/shell/shell.go
+  swap: ["			return true\n", "			return false\n"]
+  why: a kept session is reported as lost
+- file: internal/llm/tools/shell/shell.go
+  swap: ['	if kept {', '	if !kept {']
+  why: the note tells the model the opposite of what happened
+- file: internal/llm/tools/shell/shell.go
+  swap: ['shell.job.Close()', '_ = shell.job']
+  why: what a closed or exited shell started in the background keeps running
+- file: internal/llm/tools/shell/shell.go
+  swap: ['if (!busy || m == null) { continue; }', 'if (true) { continue; }']
+  why: GorillaStop never stops the running pipeline
+- file: internal/llm/tools/shell/shell.go
+  swap: ["if ('GorillaStop' -as [type]) { [GorillaStop]::Begin() }", '']
+  why: the session never says a command is running, so a stop is ignored
+- file: internal/llm/tools/shell/shell.go
+  swap: ['if ($__stopped) {', 'if ($false) {']
+  why: a stopped pipeline writes its files with cmdlets that are themselves stopped
+
+# --- ConPTY (gap #11)
+- file: internal/llm/tools/shell/conpty_windows.go
+  swap: ['si.Flags = windows.STARTF_USESTDHANDLES', 'si.Flags = 0']
+  why: a child of a redirected process writes past the console
+- file: internal/llm/tools/shell/conpty_windows.go
+  swap: ['return strings.ReplaceAll(s, "\n", "\r")', 'return s']
+  why: the typed answer never presses Enter
+- file: internal/llm/tools/shell/conpty_windows.go
+  swap: ['_ = job.Terminate()', '_ = 0']
+  why: a timed-out console command is left to run
+- file: internal/llm/tools/shell/conpty_windows.go
+  swap: ['if err := windows.AssignProcessToJobObject(job.Handle(), pi.Process); err != nil {', 'if false {']
+  why: the console command is not in its job, so a stop reaches nothing
+- file: internal/llm/tools/bash.go
+  swap: ['if params.Console && shell.ConsoleSupported() {', 'if false {']
+  why: console=true is accepted and ignored
+- file: internal/llm/tools/bash.go
+  swap: ['if shell.ConsoleSupported() {', 'if false {']
+  why: the schema does not offer console mode on Windows
+
+# --- LSP, MCP, hooks (gap #9)
+- file: internal/lsp/client.go
+  swap: ["\t\t\t_ = c.job.Close()\n\t\t\treturn fmt.Errorf(\"process tree killed after timeout\")", "\t\t\treturn fmt.Errorf(\"process tree killed after timeout\")"]
+  why: a server that ignores stdin keeps its tree after Close
+- file: internal/lsp/client.go
+  swap: ['job, err := procjob.StartContext(cmd, func() error { return cmd.Process.Kill() })', 'job, err := (*procjob.Job)(nil), cmd.Start()']
+  why: language servers run outside a job again
+- file: internal/llm/agent/mcp-tools.go
+  swap: ['mcpJobs.Store(c, job)', '_ = job']
+  why: an MCP server is not tracked in a job
+- file: internal/llm/agent/mcp-tools.go
+  swap: ['_ = job.(*procjob.Job).Close() // KILL_ON_JOB_CLOSE: the whole tree', '_ = job']
+  why: abandoning a server leaves its children running
+- file: internal/llm/agent/hooks.go
+  swap: ['job, err := procjob.StartContext(cmd, func() error { return killHookTree(cmd) })', 'job, err := (*procjob.Job)(nil), cmd.Start()']
+  why: a hook's background process outlives the hook
+
+# --- exit and break leave the wrapper's try/finally without a stop
+- file: internal/llm/tools/shell/shell.go
+  swap: ['if ($__req) {', 'if ($true) {']
+  why: an `exit` is reported as an interrupt instead of the shell ending
+- file: internal/llm/tools/shell/shell.go
+  swap: ['		if s.isAlive {', '		if false {']
+  why: a top-level break is reported as the shell ending

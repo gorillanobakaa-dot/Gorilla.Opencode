@@ -241,12 +241,17 @@ exists.
 TestDefaultToolSchemaCost -v`:
 
 ```
-tool schemas, default ON                            ~10,621 tokens   80%
+tool schemas, default ON                            ~10,671 tokens   80%
 base system prompt (coder-modern)                    ~2,314 tokens   17%
-prompt blocks, default ON                              ~397 tokens    3%
+prompt blocks, default ON                              ~369 tokens    3%
                                                      ------------
-per-turn total, before any CLAUDE.md                ~13,332 tokens
+per-turn total, before any CLAUDE.md                ~13,354 tokens
 
+(re-measured 2026-10-27 on Windows, where the bash row carries the PowerShell guidance: 10,713 before
+and 10,671 after the console mode; tool.bash 1,594 -> 1,552. The two Windows-only parameters console and
+input were paid for by cutting the generic "3. Command Execution / 4. Output Processing / 5. Return
+Result" steps to one line, so the row shrank on every platform; Read-Host now has an answer instead of
+"never use it". The 1,600 per-tool cap was 6 tokens away before this);
 (re-measured 2026-10-22: +11 for binary_inspect's part=exports and the summary's version info and
 signer names, now 215 + 202; earlier 2026-10-22: +48 for the forensics tools' full=true switch, 204 + 202;
 2026-10-21 again with binary_inspect 180 + archive 178 = 358, the forensics toolkit;

@@ -16,6 +16,7 @@ import (
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/osutil"
+	"github.com/opencode-ai/opencode/internal/procjob"
 )
 
 type PersistentShell struct {
@@ -29,6 +30,12 @@ type PersistentShell struct {
 	// closeQueue closes commandQueue exactly once. Two goroutines closed it
 	// (the panic handler and the process waiter); the second close panics.
 	closeQueue sync.Once
+	// job holds the shell and everything it starts (Windows; nil elsewhere
+	// or when no job could be made). Closing it kills the whole tree.
+	job *procjob.Job
+	// stop interrupts a running PowerShell pipeline without ending the
+	// session (Windows PowerShell only; nil otherwise).
+	stop *stopSignal
 }
 
 type commandExecution struct {
@@ -141,11 +148,11 @@ func newPersistentShell(cwd string) *PersistentShell {
 		}
 	}
 
-	cmd, stdinPipe, err := startShell(shellPath, shellArgs, cwd)
+	cmd, job, stdinPipe, err := startShell(shellPath, shellArgs, cwd)
 	if err != nil && cwd != "" {
 		fmt.Fprintf(os.Stderr, "Failed to start shell %s in %q: %v — retrying without a working directory\n", shellPath, cwd, err)
 		cwd = ""
-		cmd, stdinPipe, err = startShell(shellPath, shellArgs, "")
+		cmd, job, stdinPipe, err = startShell(shellPath, shellArgs, "")
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start shell %s: %v\n", shellPath, err)
@@ -154,8 +161,10 @@ func newPersistentShell(cwd string) *PersistentShell {
 
 	// The session setup (UTF-8 console, the stdin guard) goes down the pipe
 	// before any command, so it runs first and at global scope.
+	var stop *stopSignal
 	if isPowerShell && runtime.GOOS == "windows" {
-		if _, err := stdinPipe.Write([]byte(psSessionSetup)); err != nil {
+		stop = newStopSignal()
+		if _, err := stdinPipe.Write([]byte(psSessionSetup + stop.armScript())); err != nil {
 			fmt.Fprintf(os.Stderr, "PowerShell session setup failed: %v\n", err)
 		}
 	}
@@ -167,6 +176,8 @@ func newPersistentShell(cwd string) *PersistentShell {
 		cwd:          cwd,
 		commandQueue: make(chan *commandExecution, 10),
 		isPowerShell: isPowerShell,
+		job:          job,
+		stop:         stop,
 	}
 
 	go func() {
@@ -186,6 +197,10 @@ func newPersistentShell(cwd string) *PersistentShell {
 			// Log the error if needed
 		}
 		shell.isAlive = false
+		// Whatever the dead shell started dies with it, not later and not
+		// never (gap #9).
+		shell.job.Close()
+		shell.stop.close()
 		shell.closeQueue.Do(func() { close(shell.commandQueue) })
 	}()
 
@@ -287,12 +302,23 @@ func (s *PersistentShell) execCommand(command string, timeout time.Duration, ctx
 		// throw is caught, the output collected before it is kept, and the
 		// shell lives on with its working directory intact. Set-Location inside
 		// a script block still moves the session, exactly as `& { }` did.
+		//
+		// GORILLA FIX (2026-10-27, rev 4, gap #10): the whole wrapper is one
+		// try/finally. An interrupt sets the session's stop event, GorillaStop
+		// stops the running pipeline (what Ctrl+C does at a console), and the
+		// finally block still writes the four files, with exit code 130 and
+		// only .NET calls, because a cmdlet called while the pipeline is
+		// stopping is itself stopped. The session survives with its variables,
+		// venv and directory; $__stopped tells the two ends apart.
 		fullCommand = fmt.Sprintf(`
-$ErrorActionPreference = 'Continue'
-$global:LASTEXITCODE = $null
+$__stopped = $true
 $__enc = New-Object System.Text.UTF8Encoding $false
 $__err = New-Object System.Collections.ArrayList
 $__outl = New-Object System.Collections.ArrayList
+try {
+$ErrorActionPreference = 'Continue'
+$global:LASTEXITCODE = $null
+if ('GorillaStop' -as [type]) { [GorillaStop]::Begin() }
 $__src = $__enc.GetString([System.Convert]::FromBase64String('%s'))
 $__tok = $null
 $__perr = $null
@@ -323,10 +349,23 @@ if ($__perr -ne $null -and $__perr.Count -gt 0) {
     $__code = if ($LASTEXITCODE -ne $null) { $LASTEXITCODE } elseif ($__err.Count -gt 0) { 1 } else { 0 }
   }
 }
-[System.IO.File]::WriteAllText(%s, ($__outl | Out-String -Width 4096), $__enc)
-[System.IO.File]::WriteAllText(%s, ($__err -join ''), $__enc)
-[System.IO.File]::WriteAllText(%s, (Get-Location).Path, $__enc)
+$__o = ($__outl | Out-String -Width 4096)
+$__stopped = $false
+} finally {
+$__req = $false
+if ('GorillaStop' -as [type]) { $__req = [GorillaStop]::Requested(); [GorillaStop]::End() }
+if ($__stopped) {
+  $__o = [string]::Join([string][char]10, [object[]]$__outl.ToArray())
+  if ($__req) {
+    [void]$__err.Add("`+stoppedMarker+`")
+    $__code = 130
+  } else { $__code = '`+unwoundStatus+`' }
+}
+[System.IO.File]::WriteAllText(%s, $__o, $__enc)
+[System.IO.File]::WriteAllText(%s, [string]::Join('', [object[]]$__err.ToArray()), $__enc)
+[System.IO.File]::WriteAllText(%s, $ExecutionContext.SessionState.Path.CurrentLocation.Path, $__enc)
 [System.IO.File]::WriteAllText(%s, [string]$__code, $__enc)
+}
 `,
 			base64.StdEncoding.EncodeToString([]byte(command)),
 			shellQuotePS(stdoutFile),
@@ -389,6 +428,7 @@ echo $EXEC_EXIT_CODE > %s
 	}
 
 	interrupted := false
+	sessionKept := false
 	// GORILLA FIX (2026-08-19), tool audit: a command containing `exit` ends
 	// THIS shell, not a subshell.
 	//
@@ -416,7 +456,7 @@ echo $EXEC_EXIT_CODE > %s
 		for {
 			select {
 			case <-ctx.Done():
-				s.stopRunning(statusFile)
+				sessionKept = s.stopRunning(statusFile)
 				interrupted = true
 				done <- true
 				return
@@ -437,7 +477,7 @@ echo $EXEC_EXIT_CODE > %s
 				if timeout > 0 {
 					elapsed := time.Since(startTime)
 					if elapsed > timeout {
-						s.stopRunning(statusFile)
+						sessionKept = s.stopRunning(statusFile)
 						interrupted = true
 						done <- true
 						return
@@ -454,6 +494,23 @@ echo $EXEC_EXIT_CODE > %s
 	exitCodeStr := readFileOrEmpty(statusFile)
 	newCwd := readFileOrEmpty(cwdFile)
 
+	// The wrapper was left without a stop being asked for: `exit` (which
+	// ends this shell; the finally block still runs on the way out) or a
+	// top-level break/continue (which does not). Which one shows in whether
+	// the shell is still there a moment later.
+	if strings.TrimSpace(exitCodeStr) == unwoundStatus {
+		exitCodeStr = ""
+		for deadline := time.Now().Add(unwoundGrace); s.isAlive && time.Now().Before(deadline); {
+			time.Sleep(25 * time.Millisecond)
+		}
+		if s.isAlive {
+			exitCodeStr = "1"
+			stderr += "\nThe command left early (a break or continue outside a loop); the session is unchanged.\n"
+		} else {
+			shellExited = true
+		}
+	}
+
 	exitCode := 0
 	if exitCodeStr != "" {
 		fmt.Sscanf(exitCodeStr, "%d", &exitCode)
@@ -469,6 +526,11 @@ echo $EXEC_EXIT_CODE > %s
 	} else if interrupted {
 		exitCode = 143
 		stderr += "\nCommand execution timed out or was interrupted"
+	}
+	// Gap #10: say whether the interrupt cost the session, so the model
+	// knows whether to set its variables or venv up again.
+	if interrupted {
+		stderr += "\n" + interruptNote(sessionKept)
 	}
 	// The parser names the token; the model needs to be told what to write
 	// instead, or it tries `&&` again with different spacing.
@@ -513,19 +575,54 @@ echo $EXEC_EXIT_CODE > %s
 // the next command gets a fresh one (GetPersistentShell). The working directory
 // is carried over; shell variables set earlier are lost, which is the price of
 // the stop actually stopping.
-func (s *PersistentShell) stopRunning(statusFile string) {
+//
+// GORILLA FIX (2026-10-27, gap #10): on Windows PowerShell the stop event is
+// set first, which stops a busy cmdlet the way Ctrl+C does and keeps the
+// session. Only a shell that still does not answer is killed, with its whole
+// job. The result says which of the two happened.
+func (s *PersistentShell) stopRunning(statusFile string) (sessionKept bool) {
 	s.killChildren()
-	deadline := time.Now().Add(750 * time.Millisecond)
+	s.stop.fire()
+	deadline := time.Now().Add(stopGrace)
 	for time.Now().Before(deadline) {
-		if (fileExists(statusFile) && fileSize(statusFile) > 0) || !s.isAlive {
-			return
+		if !s.isAlive {
+			return false
+		}
+		if fileExists(statusFile) && fileSize(statusFile) > 0 {
+			return true
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
 	s.isAlive = false
-	if s.cmd != nil && s.cmd.Process != nil {
+	if s.job.Terminate() != nil && s.cmd != nil && s.cmd.Process != nil {
 		_ = s.cmd.Process.Kill()
 	}
+	return false
+}
+
+// stopGrace is how long an interrupted shell has to finish its own wrapper.
+// A stopped PowerShell pipeline needs a few hundred milliseconds to unwind.
+const stopGrace = 2 * time.Second
+
+// stoppedMarker is the line the PowerShell wrapper adds when its pipeline was
+// stopped rather than finished.
+const stoppedMarker = "The command was stopped before it finished."
+
+// unwoundStatus is what the PowerShell wrapper writes as its status when it
+// was left without a stop: an `exit` or a stray break/continue.
+const unwoundStatus = "unwound"
+
+// unwoundGrace is how long an `exit` takes to end PowerShell after the
+// wrapper's finally block has run.
+const unwoundGrace = 2 * time.Second
+
+// interruptNote tells the model whether an interrupt cost the session.
+func interruptNote(kept bool) string {
+	if kept {
+		return "The shell session was kept: variables, an activated venv and the working directory are unchanged."
+	}
+	return "The shell itself was busy and had to be ended: the next command starts a fresh shell in the same " +
+		"directory, but variables and an activated venv set up earlier are gone."
 }
 
 func (s *PersistentShell) killChildren() {
@@ -544,8 +641,16 @@ func (s *PersistentShell) killChildren() {
 		// (pkill -P), so Ctrl+C there costs you a command and here it cost you the
 		// session. One Ctrl+C should not be a factory reset.
 		//
-		// Children are enumerated directly rather than shelled out to, because
-		// this runs on the interrupt path where a 300ms process launch is felt.
+		// GORILLA FIX (2026-10-27, gap #9): with the shell in a Job Object,
+		// everything in the job but the shell (and its console host) is
+		// killed. That reaches a grandchild whose parent already exited,
+		// which a walk down from the shell's children cannot find.
+		if _, err := s.job.KillAllBut(s.cmd.Process.Pid); err == nil {
+			return
+		}
+		// No job (it could not be made): children are enumerated directly
+		// rather than shelled out to, because this runs on the interrupt
+		// path where a 300ms process launch is felt.
 		for _, pid := range childPIDs(s.cmd.Process.Pid) {
 			exec.Command("taskkill", "/T", "/F", "/PID", fmt.Sprintf("%d", pid)).Run()
 		}
@@ -612,6 +717,9 @@ func (s *PersistentShell) Close() {
 
 	s.stdin.Write([]byte("exit\n"))
 
+	// The process waiter in newPersistentShell then closes the shell's job,
+	// which takes the tree with it (gap #9): a server it started in the
+	// background does not outlive the session.
 	s.cmd.Process.Kill()
 	s.isAlive = false
 }
@@ -686,14 +794,19 @@ func resolveShellPath() string {
 
 // startShell launches the shell process and returns its stdin pipe. Split out of
 // newPersistentShell so the caller can retry with a different directory.
-func startShell(shellPath string, shellArgs []string, cwd string) (*exec.Cmd, *os.File, error) {
+//
+// On Windows the shell starts inside its own Job Object (gap #9): everything
+// it starts, and everything those start, is in the job, so an interrupt can
+// kill the whole tree but the shell, and closing the job (or this program
+// crashing) kills all of it. The job is nil where none could be made.
+func startShell(shellPath string, shellArgs []string, cwd string) (*exec.Cmd, *procjob.Job, *os.File, error) {
 	cmd := exec.Command(shellPath, shellArgs...)
 	cmd.Dir = cwd
 	cmd.Env = shellChildEnv(append(os.Environ(), "GIT_EDITOR=true"), runtime.GOOS == "windows")
 
 	stdinPipe, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, nil, fmt.Errorf("stdin pipe: %w", err)
+		return nil, nil, nil, fmt.Errorf("stdin pipe: %w", err)
 	}
 	// StdinPipe returns an *os.File wrapped so Close is idempotent; the shell
 	// wants the raw file to write to. Assert rather than cast so a future Go
@@ -704,14 +817,15 @@ func startShell(shellPath string, shellArgs []string, cwd string) (*exec.Cmd, *o
 		if wrapped, okw := stdinPipe.(filer); okw {
 			f = wrapped.File()
 		} else {
-			cmd.Process.Kill()
-			return nil, nil, fmt.Errorf("shell stdin is %T, not an *os.File", stdinPipe)
+			// Not started yet, so there is no process to kill.
+			return nil, nil, nil, fmt.Errorf("shell stdin is %T, not an *os.File", stdinPipe)
 		}
 	}
-	if err := cmd.Start(); err != nil {
-		return nil, nil, err
+	job, err := procjob.Start(cmd)
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	return cmd, f, nil
+	return cmd, job, f, nil
 }
 
 // PowerShellArgs is how every PowerShell we start begins: no profile, and
@@ -765,10 +879,18 @@ func shellChildEnv(env []string, windows bool) []string {
 // and puts it back before PowerShell reads its next line; PowerShell
 // fetches the handle on every read, which is also why the swap must sit
 // inside the one statement the wrapper is.
+//
+// Interrupt (gap #10): GorillaStop waits on the session's stop event (see
+// stop_windows.go) on a background thread and, while a command runs, stops
+// the running pipeline. Runspace.GetCurrentlyRunningPipeline is internal in
+// PowerShell 5.1, so it is reached by reflection; if a PowerShell version
+// lacks it, nothing is stopped and stopRunning ends the shell as before and
+// says so.
 const psSessionSetup = `try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
 try { [Console]::InputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
 $global:OutputEncoding = New-Object System.Text.UTF8Encoding $false
 if (-not ('GorillaStdin' -as [type])) { try { Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class GorillaStdin { [StructLayout(LayoutKind.Sequential)] struct SA { public int nLength; public IntPtr sd; public int inherit; } [DllImport("kernel32.dll")] static extern IntPtr GetStdHandle(int n); [DllImport("kernel32.dll")] static extern bool SetStdHandle(int n, IntPtr h); [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern IntPtr CreateFileW(string name, uint access, uint share, ref SA sa, uint disposition, uint flags, IntPtr template); static IntPtr nul = IntPtr.Zero; public static IntPtr Detach() { if (nul == IntPtr.Zero) { SA sa = new SA(); sa.nLength = Marshal.SizeOf(sa); sa.inherit = 1; IntPtr h = CreateFileW("NUL", 0x80000000, 3, ref sa, 3, 0, IntPtr.Zero); if (h == new IntPtr(-1)) { return IntPtr.Zero; } nul = h; } IntPtr old = GetStdHandle(-10); if (!SetStdHandle(-10, nul)) { return IntPtr.Zero; } return old; } public static void Restore(IntPtr old) { SetStdHandle(-10, old); } }' } catch { } }
+if (-not ('GorillaStop' -as [type])) { try { Add-Type -TypeDefinition 'using System; using System.Reflection; using System.Threading; using System.Management.Automation.Runspaces; public static class GorillaStop { static volatile bool busy; static Runspace rs; static EventWaitHandle ev; public static void Arm(Runspace r, string name) { if (ev != null) { return; } rs = r; ev = new EventWaitHandle(false, EventResetMode.AutoReset, name); Thread t = new Thread(Loop); t.IsBackground = true; t.Start(); } static volatile bool requested; public static void Begin() { requested = false; busy = true; } public static void End() { busy = false; } public static bool Requested() { return requested; } static void Loop() { MethodInfo m = typeof(Runspace).GetMethod("GetCurrentlyRunningPipeline", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic); while (true) { ev.WaitOne(); if (!busy || m == null) { continue; } try { Pipeline p = m.Invoke(rs, null) as Pipeline; if (p != null) { requested = true; p.StopAsync(); } } catch { } } } }' } catch { } }
 `
 
 // HookPowerShell is the PowerShell a lifecycle hook runs in (gap #18): the
@@ -859,4 +981,12 @@ func fileSize(path string) int64 {
 		return 0
 	}
 	return info.Size()
+}
+
+// Cwd is the session's working directory as last reported by the shell.
+// It waits for a running command to finish, because that command may move it.
+func (s *PersistentShell) Cwd() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.cwd
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/llm/tools"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/permission"
+	"github.com/opencode-ai/opencode/internal/procjob"
 	"github.com/opencode-ai/opencode/internal/version"
 
 	"github.com/mark3labs/mcp-go/client"
@@ -78,7 +79,7 @@ func runTool(ctx context.Context, c MCPClient, serverName, toolName string, inpu
 // callMCP initialises the server, makes one call and collects every content
 // block. It never panics on a malformed answer.
 func callMCP(ctx context.Context, c MCPClient, toolName string, input string) mcpAnswer {
-	defer c.Close()
+	defer closeMCPClient(c)
 	initRequest := mcp.InitializeRequest{}
 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
 	initRequest.Params.ClientInfo = mcp.Implementation{
@@ -204,7 +205,7 @@ func (b *mcpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolRes
 
 	switch b.mcpConfig.Type {
 	case config.MCPStdio:
-		c, err := client.NewStdioMCPClient(
+		c, err := newStdioMCPClient(
 			b.mcpConfig.Command,
 			b.mcpConfig.Env,
 			b.mcpConfig.Args...,
@@ -329,7 +330,7 @@ func getTools(ctx context.Context, name string, m config.MCPServer, permissions 
 	for _, t := range tools.Tools {
 		stdioTools = append(stdioTools, NewMcpTool(name, t, permissions, m))
 	}
-	defer c.Close()
+	defer closeMCPClient(c)
 	return stdioTools
 }
 
@@ -343,13 +344,58 @@ var (
 // stdin (measured: a ping configured as a server) went on running after this
 // program had exited. For a stdio server the process is killed first; the
 // wait then returns at once and runs off the start-up path.
+//
+// GORILLA FIX (2026-10-27, gap #9): the kill takes the server's whole Job
+// Object, so what the server started (a node or python child behind an npx
+// or uvx launcher) dies with it. Process.Kill stays as the fallback where no
+// job could be made.
 func abandonMCPClient(c MCPClient) {
 	if sc, ok := c.(*client.StdioMCPClient); ok {
-		if cmd := stdioCmd(sc); cmd != nil && cmd.Process != nil {
+		if job, ok := mcpJobs.LoadAndDelete(sc); ok {
+			_ = job.(*procjob.Job).Close() // KILL_ON_JOB_CLOSE: the whole tree
+		} else if cmd := stdioCmd(sc); cmd != nil && cmd.Process != nil {
 			_ = cmd.Process.Kill()
 		}
 	}
 	go func() { _ = c.Close() }()
+}
+
+// mcpJobs holds the Job Object of each running stdio server (Windows).
+var mcpJobs sync.Map // *client.StdioMCPClient -> *procjob.Job
+
+// newStdioMCPClient starts a stdio server and puts it in a Job Object
+// (gap #9), so the server and everything it starts end together: when the
+// client is closed, when the server is abandoned, and when this program
+// crashes. mcp-go starts the process itself, so it is assigned right after
+// the start rather than created inside the job; a child started in that
+// first moment would escape, which a launcher does not do before it has
+// read its own arguments.
+func newStdioMCPClient(command string, env []string, args ...string) (*client.StdioMCPClient, error) {
+	c, err := client.NewStdioMCPClient(command, env, args...)
+	if err != nil {
+		return nil, err
+	}
+	if cmd := stdioCmd(c); cmd != nil && cmd.Process != nil {
+		if job, jerr := procjob.New(); jerr == nil {
+			if job.AssignPid(cmd.Process.Pid) == nil {
+				mcpJobs.Store(c, job)
+			} else {
+				_ = job.Close()
+			}
+		}
+	}
+	return c, nil
+}
+
+// closeMCPClient closes the client the usual way (stdin shut, wait), then
+// its job, which kills anything the server left running.
+func closeMCPClient(c MCPClient) {
+	_ = c.Close()
+	if sc, ok := c.(*client.StdioMCPClient); ok {
+		if job, ok := mcpJobs.LoadAndDelete(sc); ok {
+			_ = job.(*procjob.Job).Close()
+		}
+	}
 }
 
 // stdioCmd reads the unexported process handle of a mcp-go stdio client.
@@ -485,7 +531,7 @@ func GetMcpTools(ctx context.Context, permissions permission.Service) []tools.Ba
 	for name, m := range config.Get().MCPServers {
 		switch m.Type {
 		case config.MCPStdio:
-			c, err := client.NewStdioMCPClient(
+			c, err := newStdioMCPClient(
 				m.Command,
 				m.Env,
 				m.Args...,

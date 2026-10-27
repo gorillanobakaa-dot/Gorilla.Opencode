@@ -80,7 +80,10 @@ const (
 	// a large model can lift the caps that keep a small local model's results short.
 	// 2026-10-22 (night run, job 2): 10,621. +11 is binary_inspect naming part=exports and saying the
 	// summary now carries PE version info and signer names, unverified (204 -> 215).
-	measuredDefaultToolSchemaTokens = 10621
+	// 2026-10-27 (windows-capabilities job 02): 10,671, measured on Windows (10,713 there before).
+	// bash 1,594 -> 1,552: console and input (Windows-only parameters, ConPTY) were paid for by
+	// cutting the generic execution/output/return steps of its description to one line.
+	measuredDefaultToolSchemaTokens = 10671
 	measuredBasePromptTokens        = 2250
 	// The band is generous on purpose. It is a tripwire for "somebody added a
 	// tool with a 900-token description and nobody noticed", not a lock.
