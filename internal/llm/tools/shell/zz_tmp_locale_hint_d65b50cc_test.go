@@ -12,6 +12,12 @@ func TestTmpD65b50ccLocaleHint(t *testing.T) {
 	if !s.isPowerShell {
 		t.Skip("PowerShell only")
 	}
+	// The '&&' hint exists for Windows PowerShell 5.1, where '&&' is a parse
+	// error. PowerShell 7 (pwsh, preferred when installed, as on the CI
+	// runner) runs it as a chain: no error, so no hint to look for.
+	if v := psMajor(t, s); v >= 7 {
+		t.Skipf("PowerShell %d parses '&&' as a chain; the hint is for 5.1 only", v)
+	}
 	// Baseline: English UI culture.
 	_, stderrEn, codeEn := exec1(t, s, `cd C:\ && echo hi`)
 	t.Logf("EN code=%d hint=%v stderr=%q", codeEn, strings.Contains(stderrEn, "separate commands with ';'"), stderrEn)

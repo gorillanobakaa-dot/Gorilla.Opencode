@@ -49,8 +49,91 @@ var readOnlyAdditions = []string{
 
 // unixOnlyReadOnly are read-only in bash and something else in PowerShell:
 // `type` is Get-Content there, which read a credentials file unasked
-// (2026-10-05, see bash.go).
+// (2026-10-05, see bash.go). In PowerShell it is listed again below, as the
+// Get-Content alias it is, now that namesSensitivePath expands $env: paths.
 var unixOnlyReadOnly = []string{"type"}
+
+// powerShellReadOnly are the cmdlets (and their built-in aliases) that only
+// read: the inspection the tool guidance itself tells the model to use, and
+// which asked permission every time (gap #7). A pipeline is read-only only if
+// EVERY stage is (commandgate.go splits at |), so a Rename-Item, Remove-Item
+// or Set-* tail still asks. Script blocks { }, sub-expressions and
+// redirection stay opaque.
+var powerShellReadOnly = []string{
+	"Get-ChildItem", "gci", "dir", "ls",
+	"Get-Item", "gi",
+	"Get-ItemProperty", "gp",
+	"Get-Content", "gc", "cat", "type",
+	"Test-Path",
+	"Get-Command", "gcm",
+	"Get-Location", "gl", "pwd",
+	"Resolve-Path", "rvpa",
+	"Get-FileHash",
+	"Get-Acl",
+	"Select-String", "sls",
+	"Measure-Object", "measure",
+	"Select-Object", "select", "Sort-Object", "sort",
+	"Format-Table", "ft", "Format-List", "fl", "Out-String",
+	"Get-Date", "date",
+}
+
+// notInPowerShell are read-only list entries that are neither a PowerShell
+// alias nor a Windows program, dropped when the shell is PowerShell: a name
+// that does not exist there can only resolve to whatever .exe of that name a
+// PATH directory happens to hold. Their PowerShell equivalents are in
+// powerShellReadOnly (head/tail: Select-Object -First/-Last, wc:
+// Measure-Object, grep: Select-String, stat/file: Get-Item, which/command -v:
+// Get-Command, md5sum/sha256sum: Get-FileHash, realpath: Resolve-Path,
+// test/[: Test-Path).
+var notInPowerShell = map[string]bool{
+	"cal": true, "uptime": true, "id": true, "groups": true, "which": true, "whereis": true,
+	"whatis": true, "uname": true, "df": true, "du": true, "free": true,
+	"head": true, "tail": true, "wc": true, "file": true, "stat": true,
+	"grep": true, "egrep": true, "fgrep": true, "realpath": true, "readlink": true,
+	"basename": true, "dirname": true, "test": true, "[": true, "command -v": true,
+	"cmp": true, "md5sum": true, "sha256sum": true, "sha1sum": true, "shasum": true, "md5": true,
+	"cut": true, "nproc": true, "arch": true, "locale": true, "tty": true,
+	"lsb_release": true, "lscpu": true, "sw_vers": true, "sysctl -n": true,
+	"xcode-select -p": true, "xcode-select --print-path": true,
+	"pkgutil --pkg-info": true, "pkgutil --pkgs": true,
+	"brew --prefix": true, "brew list": true, "brew config": true,
+}
+
+// propertyRead is a whole segment of the form (Get-Item x).Attributes: a
+// parenthesised plain command followed only by property names. Nothing that
+// can hide another command may be inside, and nothing (an `=`, a method call)
+// may follow, so (Get-Item x).IsReadOnly = $false and (Get-Item x).Delete()
+// stay opaque.
+var propertyRead = regexp.MustCompile(`^\(\s*([^(){}$` + "`" + `<>;|&\r\n=]+?)\s*\)((?:\.[A-Za-z_][A-Za-z0-9_]*)+)$`)
+
+// unwrapPropertyReads replaces each segment of that form by its inner
+// command, so the inner command is judged like any other.
+func unwrapPropertyReads(cmd string) string {
+	if !strings.Contains(cmd, ").") {
+		return cmd
+	}
+	var out strings.Builder
+	start := 0
+	flush := func(end int) {
+		seg := cmd[start:end]
+		trimmed := strings.TrimSpace(seg)
+		if m := propertyRead.FindStringSubmatch(trimmed); m != nil {
+			out.WriteString(" " + m[1] + " ")
+		} else {
+			out.WriteString(seg)
+		}
+	}
+	for i := 0; i < len(cmd); i++ {
+		switch cmd[i] {
+		case ';', '|', '&', '\n', '\r':
+			flush(i)
+			out.WriteByte(cmd[i])
+			start = i + 1
+		}
+	}
+	flush(len(cmd))
+	return out.String()
+}
 
 // versionFlags may follow a bare program name to make a read-only query.
 var versionFlags = map[string]bool{"--version": true, "-version": true, "--help": true, "version": true}
@@ -83,24 +166,57 @@ func stripBenignRedirects(cmd string) string {
 func namesSensitivePath(cmd string) bool {
 	home, _ := os.UserHomeDir()
 	for _, w := range strings.Fields(cmd) {
-		w = strings.Trim(w, `"'`)
-		if w == "" || strings.HasPrefix(w, "-") {
-			continue
-		}
-		if strings.Contains(w, "environ") && strings.Contains(w, "/proc/") {
-			return true
-		}
-		if home != "" && (w == "~" || strings.HasPrefix(w, "~/") || strings.HasPrefix(w, "$HOME")) {
-			w = filepath.Join(home, strings.TrimPrefix(strings.TrimPrefix(w, "$HOME"), "~"))
-		}
-		if !strings.ContainsAny(w, `/\`) && !strings.HasPrefix(w, ".") {
-			continue
-		}
-		if RefuseSensitiveRead(w) != "" {
+		if sensitivePathWord(strings.Trim(w, `"'`), home) {
 			return true
 		}
 	}
 	return false
+}
+
+// sensitivePathWord is the decision for ONE word of a command, the same on
+// every OS.
+//
+// GORILLA FIX (2026-10-27): the word is split into its components on BOTH
+// separators before it is judged. A PowerShell path written with backslashes
+// expanded on Linux to /home/runner\<folder>\<file>, which Linux reads as one
+// file name directly under /home, so neither the credential folder nor the
+// file name was ever seen and the read was counted as read-only (CI, ubuntu).
+// PowerShell accepts both separators on every OS, pwsh on Linux included; a
+// backslash inside a real Unix file name is rare enough that asking about it
+// costs nothing.
+func sensitivePathWord(w, home string) bool {
+	if w == "" || strings.HasPrefix(w, "-") {
+		return false
+	}
+	if strings.Contains(w, "environ") && strings.Contains(w, "/proc/") {
+		return true
+	}
+	// A path spelled from an environment variable (PowerShell's env: drive,
+	// %NAME%, ~, $HOME) was judged as a RELATIVE path, i.e. inside the
+	// workspace and exempt, so `cat` (Get-Content in PowerShell) read it with
+	// no prompt. Expanded first now.
+	if x := expandShellPathWord(w, home); x != w {
+		w = x
+	}
+	if !strings.ContainsAny(w, `/\`) && !strings.HasPrefix(w, ".") {
+		return false
+	}
+	return RefuseSensitiveRead(nativePathWord(w)) != ""
+}
+
+// nativePathWord rebuilds a path word with this OS's separator, whichever of
+// the two it was written with. A leading separator (an absolute Unix path, or
+// a rooted Windows one) and a UNC prefix are kept.
+func nativePathWord(w string) string {
+	parts := strings.FieldsFunc(w, func(r rune) bool { return r == '/' || r == '\\' })
+	lead := ""
+	for _, r := range w {
+		if r != '/' && r != '\\' {
+			break
+		}
+		lead += string(filepath.Separator)
+	}
+	return filepath.Clean(lead + strings.Join(parts, string(filepath.Separator)))
 }
 
 // hardStop is one row of the "asks even under auto-approve" table.
@@ -337,9 +453,20 @@ func CommandPurpose(cmd string) string {
 // readOnlyList is safeReadOnlyCommands plus the additions above, for the
 // shell this session actually drives.
 func readOnlyList() []string {
-	out := append(append([]string{}, safeReadOnlyCommands...), readOnlyAdditions...)
-	if !shell.IsWindowsPowerShell() {
-		out = append(out, unixOnlyReadOnly...)
+	if shell.IsWindowsPowerShell() {
+		return powerShellReadOnlyList()
 	}
-	return out
+	out := append(append([]string{}, safeReadOnlyCommands...), readOnlyAdditions...)
+	return append(out, unixOnlyReadOnly...)
+}
+
+// powerShellReadOnlyList is the read-only list when the shell is PowerShell.
+func powerShellReadOnlyList() []string {
+	var out []string
+	for _, c := range append(append([]string{}, safeReadOnlyCommands...), readOnlyAdditions...) {
+		if !notInPowerShell[c] {
+			out = append(out, c)
+		}
+	}
+	return append(out, powerShellReadOnly...)
 }

@@ -11,19 +11,46 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
+
+// platformTextImage draws a line of text without ImageMagick where the
+// system can (Windows: System.Drawing, ocr_windows_test.go); nil elsewhere.
+var platformTextImage func(t *testing.T, text string) string
+
+// imageMagick is ImageMagick's program, or "".
+//
+// GORILLA FIX (2026-10-27, job 09): on Windows "convert" on PATH is
+// System32\convert.exe, which converts a FAT volume to NTFS. These tests ran
+// it with ImageMagick's arguments (it refused them, exit 4, and the tests
+// skipped). On Windows only "magick" is ImageMagick.
+func imageMagick() string {
+	if p, err := exec.LookPath("magick"); err == nil {
+		return p
+	}
+	if runtime.GOOS != "windows" {
+		if p, err := exec.LookPath("convert"); err == nil {
+			return p
+		}
+	}
+	return ""
+}
 
 // makeTextImage draws a known string so the test asserts against something it
 // controls rather than against whatever happens to be on disk.
 func makeTextImage(t *testing.T, text string) string {
 	t.Helper()
-	if _, err := exec.LookPath("convert"); err != nil {
+	if platformTextImage != nil {
+		return platformTextImage(t, text)
+	}
+	im := imageMagick()
+	if im == "" {
 		t.Skip("imagemagick not installed")
 	}
 	p := filepath.Join(t.TempDir(), "sample.png")
-	cmd := exec.Command("convert", "-size", "900x220", "xc:white",
+	cmd := exec.Command(im, "-size", "900x220", "xc:white",
 		"-pointsize", "44", "-fill", "black", "-annotate", "+30+110", text, p)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Skipf("could not render a test image: %v\n%s", err, out)
@@ -57,12 +84,18 @@ func TestAnImageWithNoTextIsAnAnswerNotAFailure(t *testing.T) {
 	if !OCRAvailable() {
 		t.Skip("tesseract not installed")
 	}
-	if _, err := exec.LookPath("convert"); err != nil {
-		t.Skip("imagemagick not installed")
-	}
-	p := filepath.Join(t.TempDir(), "blank.png")
-	if out, err := exec.Command("convert", "-size", "400x300", "xc:skyblue", p).CombinedOutput(); err != nil {
-		t.Skipf("could not render: %v\n%s", err, out)
+	var p string
+	if platformTextImage != nil {
+		p = platformTextImage(t, "")
+	} else {
+		im := imageMagick()
+		if im == "" {
+			t.Skip("imagemagick not installed")
+		}
+		p = filepath.Join(t.TempDir(), "blank.png")
+		if out, err := exec.Command(im, "-size", "400x300", "xc:skyblue", p).CombinedOutput(); err != nil {
+			t.Skipf("could not render: %v\n%s", err, out)
+		}
 	}
 	res, err := OCRImage(context.Background(), p)
 	if err != nil {
@@ -109,8 +142,9 @@ func TestTheRefusalNamesTheFixAndTheCost(t *testing.T) {
 // something installed was believed absent.
 func TestOCRAvailabilityIsMeasured(t *testing.T) {
 	_, err := exec.LookPath("tesseract")
-	if got := OCRAvailable(); got != (err == nil) {
-		t.Errorf("OCRAvailable() = %v but LookPath says %v", got, err == nil)
+	windowsReady, _ := windowsOCRAvailable()
+	if got := OCRAvailable(); got != (err == nil || windowsReady) {
+		t.Errorf("OCRAvailable() = %v but LookPath says %v and Windows OCR %v", got, err == nil, windowsReady)
 	}
 }
 

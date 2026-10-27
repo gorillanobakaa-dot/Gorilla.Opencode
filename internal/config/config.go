@@ -219,6 +219,12 @@ type Config struct {
 	// json tags, and a field it cannot match becomes write-only. That is exactly
 	// how WorkingDir's `json:"wd"` silently never loaded back.
 	SearxNGURL string `json:"searxngURL,omitempty" mapstructure:"searxngURL"`
+	// GORILLA OVERRIDE (2026-10-27, gap #12): general web search without lynx
+	// or SearXNG. When true, web_search fetches the results pages of the
+	// engines its lynx route uses (Brave, Ecosia, Mojeek, Marginalia) itself
+	// and reads them as text. Off by default: it sends search terms to those
+	// engines, and turning that on is the user's decision, not ours.
+	WebSearchBuiltin bool `json:"webSearchBuiltin,omitempty" mapstructure:"webSearchBuiltin"`
 	// GORILLA OVERRIDE (2026-10-11): the address the two research sources that
 	// demand one (Unpaywall, SEC EDGAR) are given. GORILLA_OPENCODE_CONTACT_EMAIL
 	// wins when set. Never read from a folder's .gorilla-opencode.json (see

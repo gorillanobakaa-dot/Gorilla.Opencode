@@ -1,0 +1,37 @@
+[package]
+name = "pfind"
+version = "4.0.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Unified hybrid local search, content extraction and filesystem exploration (native port of pfind.py)"
+publish = false
+
+[[bin]]
+name = "pfind"
+path = "src/main.rs"
+
+[dependencies]
+grep-matcher = "0.1"
+grep-regex = "0.1"
+grep-searcher = "0.1"
+ignore = "0.4"
+globset = "0.4"
+regex = "1"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+bzip2 = "0.6"
+lzma-rs = "0.3"
+ruzstd = "0.8"
+tar = { version = "0.4", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_Time", "Win32_Security"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true
+panic = "abort"

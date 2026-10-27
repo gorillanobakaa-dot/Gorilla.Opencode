@@ -370,8 +370,15 @@ func TestPromptOutputsAreByteIdentical(t *testing.T) {
 		// what is written. A default flipped in the loadout registry moves this
 		// number without a single character changing in coder-modern.txt, which is
 		// exactly the drift it exists to make loud.
+		//
+		// 9259 -> 9285 on 2026-10-27 (windows-capabilities job 06, gap #20): the
+		// first line claimed "Windows internals" while the prompt carried only
+		// Linux hints; it now names what the program really gives a model on
+		// Windows, "Windows builds (MSVC, PowerShell, robocopy)" (+26 bytes). The
+		// ext4 and distro-package lines are gated os.linux, but they sit behind
+		// prompt.localtools, default OFF, so they are not in this count.
 		{"base coder (kept as a control — this file was already embedded)",
-			BaseCoderPrompt(models.ProviderLocal), 9259, "simple question gets direct sentence"},
+			BaseCoderPrompt(models.ProviderLocal), 9285, "simple question gets direct sentence"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if len(tc.got) != tc.wantSize {

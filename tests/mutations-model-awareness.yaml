@@ -1,0 +1,92 @@
+# fieldkit mutate --plan tests/mutations-model-awareness.yaml --cwd . -- go test -count=1 ./internal/hostprobe/ ./internal/howto/ ./internal/llm/prompt/ ./internal/llm/agent/ ./internal/llm/tools/ -run "(?i)(carriestheprobe|windowslines|linuxlines|shelledition|getiscached|windows11|msvc|powertoys|card|robocopy|carriesthetooltable|osgated|renderedsystem|howto|chaining|nameStheedition|tooltablelines)"
+# Job 06 of goal windows-capabilities (2026-10-27): the model knows its tools and its machine. Every rule added,
+# broken on purpose; each must be CAUGHT. Run on Windows (the probe's registry reads and the PowerShell rules are
+# Windows facts).
+# Not in the plan, on purpose: the sync.Once cache (a second probe gives the same lines on an unchanged machine, so
+# no test can tell), the "also installed" filter (the test string is a prefix either way), and the Linux /etc/os-release
+# reader (this plan runs on Windows; the Linux CI runs TestLinuxLinesCarryNoWindowsFacts on synthetic facts).
+
+# --- the probe's lines
+- file: internal/hostprobe/hostprobe.go
+  swap: ['cpu += fmt.Sprintf("; robocopy /MT:n takes 1-%d threads (default 8), the files tool drives it", RobocopyMaxThreads)', 'cpu += ""']
+  why: the CPU line stops saying robocopy's thread limit
+- file: internal/hostprobe/hostprobe.go
+  swap: ['const RobocopyMaxThreads = 128', 'const RobocopyMaxThreads = 64']
+  why: the model is told a wrong /MT limit
+- file: internal/hostprobe/hostprobe.go
+  swap: ['	if f.PowerToys != "" {', '	if true {']
+  why: PowerToys is taught although it is not installed
+- file: internal/hostprobe/hostprobe.go
+  swap: ['	if len(f.Sysinternals) > 0 {', '	if true {']
+  why: Sysinternals is named although none is on PATH
+- file: internal/hostprobe/hostprobe.go
+  swap: ['case strings.Contains(base, "pwsh"):', 'case false:']
+  why: PowerShell 7 is not told apart from other shells
+- file: internal/hostprobe/hostprobe.go
+  swap: ['CPUs: runtime.NumCPU()}', 'CPUs: 8}']
+  why: the CPU count is not this machine's
+
+# --- the Windows probe
+- file: internal/hostprobe/probe_windows.go
+  swap: ['if n >= 22000 && strings.HasPrefix(product, "Windows 10") {', 'if false {']
+  why: Windows 11 is reported as Windows 10 (ProductName was never changed by Microsoft)
+- file: internal/hostprobe/probe_windows.go
+  swap: ['if fi, err := os.Stat(filepath.Join(st.InstallationPath, "VC", "Tools", "MSVC")); err != nil || !fi.IsDir() {', 'if false {']
+  why: a Visual Studio without the C++ toolset is reported as MSVC
+- file: internal/hostprobe/probe_windows.go
+  swap: ['if strings.Contains(ln, "cli") || ln == "powertoys.awake.exe" {', 'if strings.Contains(ln, "cli") {']
+  why: Awake's command line is not found in the installed files
+- file: internal/hostprobe/probe_windows.go
+  swap: ['if _, err := os.Stat(filepath.Join(d, "PowerToys.exe")); err != nil {', 'if false {']
+  why: a folder without PowerToys.exe counts as an install
+
+# --- the how-to cards
+- file: internal/howto/howto.go
+  swap: ["if f.OS == \"windows\" {\n\t\tout = append(out, windowsCards...)", "if true {\n\t\tout = append(out, windowsCards...)"]
+  why: the Windows cards are offered on Linux
+- file: internal/howto/howto.go
+  swap: ['		if f.PowerToys != "" {', '		if true {']
+  why: the PowerToys card is offered although PowerToys is not installed
+- file: internal/howto/howto.go
+  swap: ['		if len(f.Sysinternals) > 0 {', '		if true {']
+  why: the Sysinternals card is offered although none is on PATH
+- file: internal/howto/howto.go
+  swap: ['		if a == name {', '		if true {']
+  why: any name serves the first card
+- file: internal/llm/tools/files.go
+  swap: ['if strings.EqualFold(strings.TrimSpace(p.Action), "howto") {', 'if false {']
+  why: the files tool's howto action is unreachable
+
+# --- the system prompt
+- file: internal/llm/prompt/coder.go
+  swap: ['platform, machineLines(), modelLine', 'platform, "", modelLine']
+  why: the environment block says only the platform name again
+- file: internal/llm/prompt/coder.go
+  swap: ['		table = ToolTable()', '		table = ""']
+  why: the tool table is not in the prompt
+- file: internal/llm/agent/tools.go
+  swap: ['prompt.SetToolTable(tools.ToolTableBlock(full, ', 'prompt.SetToolTable(tools.ToolTableBlock(nil, ']
+  why: the table is not built from the real tool set
+- file: internal/llm/tools/tooltable.go
+  swap: ['		if deferral && IsDeferrable(name) {', '		if IsDeferrable(name) {']
+  why: with deferral off, the deferrable tools vanish from the table
+- file: internal/llm/tools/tooltable.go
+  swap: ['			return s[:i+1]', '			return s']
+  why: table lines carry whole paragraphs
+- file: internal/llm/prompt/sections.go
+  swap: ['				if goos != runtime.GOOS {', '				if false {']
+  why: os.linux lines (ext4, distro packages) are sent on Windows
+- file: internal/llm/prompt/coder-modern.txt
+  swap: ['do not promise a recovery you cannot do [[needs prompt.localtools os.linux]]', 'do not promise a recovery you cannot do [[needs prompt.localtools]]']
+  why: the ext4 hint is not gated to Linux
+
+# --- the shell is named with its edition; '&&' advice per edition
+- file: internal/llm/tools/bash.go
+  swap: ['		shellName = hostprobe.ShellEdition(shell.ShellPath())', '		shellName = "PowerShell"']
+  why: the bash tool's description does not name the PowerShell edition
+- file: internal/llm/tools/bash.go
+  swap: ["		if hostprobe.IsPowerShell7() {\n\t\t\ttrailer", "		if !hostprobe.IsPowerShell7() {\n\t\t\ttrailer"]
+  why: PowerShell 7 is told '&&' fails, or 5.1 is told it works
+- file: internal/llm/tools/bash.go
+  swap: ['return "Runs " + hostprobe.ShellEdition(shell.ShellPath()) + "; not bash"', 'return "Runs commands"']
+  why: the tool table's bash line does not say PowerShell

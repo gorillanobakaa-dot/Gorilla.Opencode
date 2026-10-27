@@ -187,3 +187,19 @@ func TestSparseReportsCleanFile(t *testing.T) {
 func writeFile(path, content string) error {
 	return os.WriteFile(path, []byte(content), 0o644)
 }
+
+// TestSparseOnWindowsSaysWhyAndWhatToUse (gap #14): sparse stays Linux-only,
+// and the refusal names the reason and the alternatives.
+func TestSparseOnWindowsSaysWhyAndWhatToUse(t *testing.T) {
+	msg := sparsePlatformRefusal("windows")
+	for _, want := range []string{"not available on Windows", "Linux kernel", "make C=2", "review tool", "WSL"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("the Windows refusal does not say %q: %s", want, msg)
+		}
+	}
+	for _, goos := range []string{"linux", "darwin"} {
+		if got := sparsePlatformRefusal(goos); got != "" {
+			t.Errorf("%s is refused: %s", goos, got)
+		}
+	}
+}

@@ -111,7 +111,7 @@ func CredsPath() string {
 
 // LoadGeminiCreds reads stored credentials, or returns (nil, nil) if none.
 func LoadGeminiCreds() (*GeminiCreds, error) {
-	data, err := os.ReadFile(CredsPath())
+	data, err := readSecretFile(CredsPath())
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -125,21 +125,14 @@ func LoadGeminiCreds() (*GeminiCreds, error) {
 	return &c, nil
 }
 
-// Save writes the credentials atomically with 0600 perms.
+// Save writes the credentials atomically with 0600 perms, sealed with DPAPI on Windows.
 func (c *GeminiCreds) Save() error {
-	path := CredsPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	// Sealed for the current Windows user (secretfile.go, gap #17).
+	return writeSecretFile(CredsPath(), data)
 }
 
 // tokenResponse is the shape of Google's token endpoint reply.

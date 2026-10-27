@@ -9,7 +9,8 @@ package agent
 // # WHAT RUNS, WHERE
 //
 // One command line through the platform shell — Windows: powershell.exe
-// -NoProfile -NonInteractive -Command; elsewhere: sh -c — in the working
+// (pwsh when the bash tool drives pwsh) -NoProfile -ExecutionPolicy Bypass
+// -NonInteractive -Command; elsewhere: sh -c — in the working
 // directory, with the agent's own environment plus GORILLA_HOOK_* variables.
 // The full raw tool input is also written to the hook's stdin, because an
 // environment variable has a size limit (32767 characters per variable on
@@ -44,8 +45,10 @@ import (
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
+	"github.com/opencode-ai/opencode/internal/llm/tools/shell"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/message"
+	"github.com/opencode-ai/opencode/internal/procjob"
 )
 
 const (
@@ -96,7 +99,7 @@ func hooksFor(event, tool string) []config.Hook {
 // hookShell returns the platform shell and its arguments for one command line.
 func hookShell(command string) (string, []string) {
 	if runtime.GOOS == "windows" {
-		return "powershell.exe", []string{"-NoProfile", "-NonInteractive", "-Command", command}
+		return shell.HookPowerShell(), shell.PowerShellArgs("-NonInteractive", "-Command", command)
 	}
 	return "sh", []string{"-c", command}
 }
@@ -142,12 +145,19 @@ func runHook(ctx context.Context, h config.Hook, env []string, stdin string) hoo
 	out := &tailBuffer{max: hookOutputMax}
 	cmd.Stdout, cmd.Stderr = out, out
 	prepareHookProcess(cmd)
-	cmd.Cancel = func() error { return killHookTree(cmd) }
 	// A grandchild that inherited the pipes can hold them open after the shell
 	// is gone; without a bound, Wait would block on them indefinitely.
 	cmd.WaitDelay = 3 * time.Second
 
-	err := cmd.Run()
+	// GORILLA FIX (2026-10-27, gap #9): on Windows the hook runs in a Job
+	// Object. The timeout kills the job, which reaches a grandchild whose
+	// parent already exited (taskkill /T cannot), and closing the job when
+	// the hook is done ends anything it left running in the background.
+	job, err := procjob.StartContext(cmd, func() error { return killHookTree(cmd) })
+	if err == nil {
+		err = cmd.Wait()
+		_ = job.Close()
+	}
 	o := hookOutcome{exitCode: -1, output: out.String()}
 	if ctx.Err() == context.DeadlineExceeded {
 		o.timedOut = true

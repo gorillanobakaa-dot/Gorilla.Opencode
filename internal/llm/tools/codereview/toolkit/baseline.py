@@ -80,7 +80,7 @@ def load(target_dir: str) -> Tuple[List[dict], List[str]]:
     if not os.path.exists(p):
         return [], []
     try:
-        with open(p, errors="replace") as f:
+        with open(p, encoding="utf-8", errors="replace") as f:
             data = json.load(f)
     except (OSError, ValueError) as e:
         return [], [f"{BASELINE_FILENAME} could not be read ({e}); nothing suppressed"]

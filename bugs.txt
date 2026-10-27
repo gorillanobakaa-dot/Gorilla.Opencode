@@ -107,4 +107,7 @@ OUTSTANDING (pre-existing, tracked in DOCUMENTATION.dual-track.md)
   - gemini-pro-latest wired but not exercised end-to-end
   - Google free-tier 429 retries can look like a hang on quota-zero
     models (no progress indication in -p mode)
-  - Linux x86_64 only
+  - [corrected 2026-10-26] this said "Linux x86_64 only", which is no
+    longer true: the program builds and runs on Windows (the Windows port,
+    fixed 2026-09-01; TO.DO.TO.FIX/STATUS.md is the record) and macOS.
+    Still open: .goreleaser.yml lists only linux and darwin, no windows.

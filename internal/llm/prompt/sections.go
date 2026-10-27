@@ -25,6 +25,7 @@ package prompt
 import (
 	"fmt"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -83,6 +84,15 @@ func applyToolGates(body string) string {
 		}
 		enabled := true
 		for _, id := range strings.Fields(m[1]) {
+			// GORILLA (2026-10-27, job 06): os.<goos> keeps a line only on that
+			// OS (gap #20: ext4 and distro-package hints were sent on Windows).
+			if goos, isOS := strings.CutPrefix(id, "os."); isOS {
+				if goos != runtime.GOOS {
+					enabled = false
+					break
+				}
+				continue
+			}
 			if !config.LoadoutEnabled(id) {
 				enabled = false
 				break

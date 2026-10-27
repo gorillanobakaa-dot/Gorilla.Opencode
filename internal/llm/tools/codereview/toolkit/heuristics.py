@@ -192,7 +192,7 @@ CLOSERS = {v: k for k, v in PAIRS.items()}
 
 def check_brace_parity(path: str) -> list:
     try:
-        with open(path, errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             raw = f.read()
     except OSError as e:
         return [_finding("brace-parity", path, None, "info", "unreadable", str(e))]
@@ -255,7 +255,7 @@ def check_template_lookup(path: str) -> list:
             ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".h"):
         return []
     try:
-        with open(path, errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             raw = f.read()
     except OSError:
         return []
@@ -316,7 +316,7 @@ def check_unified_build(path: str) -> list:
     if ext not in (".cpp", ".cc", ".cxx", ".h", ".hpp"):
         return []
     try:
-        with open(path, errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             raw = f.read()
     except OSError:
         return []
@@ -410,7 +410,7 @@ def check_kernel_locks(path: str) -> list:
     if os.path.splitext(path)[1].lower() not in (".c", ".h"):
         return []
     try:
-        with open(path, errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             raw = f.read()
     except OSError:
         return []
@@ -485,7 +485,7 @@ def check_blast_radius(symbol: str, root: str, max_hits: int = 500) -> list:
                 continue
             full = os.path.join(dirpath, fn)
             try:
-                with open(full, errors="replace") as f:
+                with open(full, encoding="utf-8", errors="replace") as f:
                     for lineno, line in enumerate(f, start=1):
                         if rx.search(line):
                             out.append(_finding(

@@ -371,7 +371,7 @@ func (w *WorkspaceWatcher) WatchWorkspace(ctx context.Context, workspacePath str
 				return
 			}
 
-			uri := fmt.Sprintf("file://%s", event.Name)
+			uri := string(protocol.URIFromPath(event.Name))
 
 			// Add new directories to the watcher
 			if event.Op&fsnotify.Create != 0 {
@@ -599,7 +599,14 @@ func (w *WorkspaceWatcher) matchesPattern(path string, pattern protocol.GlobPatt
 	}
 
 	// For relative patterns
-	basePath = strings.TrimPrefix(basePath, "file://")
+	if strings.HasPrefix(basePath, "file://") {
+		p, err := protocol.PathFromURI(basePath)
+		if err != nil {
+			logging.Error("Bad base URI in a watch pattern", "basePath", basePath, "error", err)
+			return false
+		}
+		basePath = p
+	}
 	basePath = filepath.ToSlash(basePath)
 
 	// Make path relative to basePath for matching
@@ -642,7 +649,11 @@ func (w *WorkspaceWatcher) debounceHandleFileEvent(ctx context.Context, uri stri
 // handleFileEvent sends file change notifications
 func (w *WorkspaceWatcher) handleFileEvent(ctx context.Context, uri string, changeType protocol.FileChangeType) {
 	// If the file is open and it's a change event, use didChange notification
-	filePath := uri[7:] // Remove "file://" prefix
+	filePath, err := protocol.PathFromURI(uri)
+	if err != nil {
+		logging.Error("Bad file URI in a watch event", "uri", uri, "error", err)
+		return
+	}
 	if changeType == protocol.FileChangeType(protocol.Deleted) {
 		w.client.ClearDiagnosticsForURI(protocol.DocumentUri(uri))
 	} else if changeType == protocol.FileChangeType(protocol.Changed) && w.client.IsFileOpen(filePath) {

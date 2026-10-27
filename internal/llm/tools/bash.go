@@ -11,14 +11,20 @@ import (
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/hostprobe"
 	"github.com/opencode-ai/opencode/internal/llm/tools/shell"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/permission"
+	"github.com/opencode-ai/opencode/internal/toolbox"
 )
 
 type BashParams struct {
 	Command string  `json:"command"`
 	Timeout FlexInt `json:"timeout"`
+	// Console and Input are the Windows console mode (gap #11): the command
+	// runs in a pseudoconsole and Input is typed into it.
+	Console bool   `json:"console,omitempty"`
+	Input   string `json:"input,omitempty"`
 }
 
 type BashPermissionsParams struct {
@@ -131,17 +137,26 @@ var safeReadOnlyCommands = []string{
 // bash, get a parse error back, and have no way to work out why. Telling it what
 // shell it is actually holding is the difference between a tool that works and a
 // tool that argues with itself.
-const powerShellGuidance = `
+func powerShellGuidance(chaining string) string {
+	return strings.Replace(powerShellGuidanceText, "{{chaining}}", chaining, 1)
+}
+
+const (
+	ps51Chaining  = "- Chain commands with ';'. Windows PowerShell 5.1 does NOT support '&&' or '||' — they are parse errors there."
+	pwsh7Chaining = "- Chain commands with ';', or with '&&' / '||' (PowerShell 7 supports them; Windows PowerShell 5.1 would not)."
+)
+
+const powerShellGuidanceText = `
 
 # You are driving PowerShell, not bash
 This session's shell is PowerShell on Windows. Write PowerShell, not POSIX shell:
-- Chain commands with ';'. Windows PowerShell 5.1 does NOT support '&&' or '||' — they are parse errors there. (PowerShell 7+ does support them, but do not rely on it.)
+{{chaining}}
 - Use PowerShell cmdlets rather than coreutils: Get-Content (not cat), Get-ChildItem (not ls), Select-String (not grep), Remove-Item (not rm), Copy-Item (not cp), New-Item (not touch/mkdir).
 - Environment variables are $env:NAME, set with $env:NAME = 'value'. There is no 'export' and no inline 'VAR=x cmd' prefix.
 - Paths use backslashes; quote any path containing spaces. Forward slashes usually work too.
 - '2>/dev/null' does not exist; use '2>$null'. There is no /dev/null, /tmp, or ~ — use $env:TEMP and $env:USERPROFILE.
 - Bash control flow ('if [ -f x ]', 'for x in *', backtick substitution) is a parse error. Use 'if (Test-Path x)', 'foreach ($x in ...)', '$(cmd)'.
-- Never use Read-Host, Get-Credential, or any command that waits for console input: this shell has no interactive terminal and the command will hang until it times out.
+- A command that waits for console input (Read-Host, a y/n prompt) hangs here: pass console=true with the answers in input. Never Get-Credential.
 - ConvertFrom-Json returns a PSCustomObject, not a hashtable.
 - There is NO Unix userland here. bc, awk, sed, jq, make, tar, less and friends are
   not installed. Do not reach for one because the task looks Unix-shaped; if you
@@ -163,10 +178,18 @@ func bashDescription() string {
 	chainAdvice := "use the ';' or '&&' operator to separate them"
 	badChain := "cd /foo/bar && pytest tests"
 	if shell.IsWindowsPowerShell() {
-		shellName = "PowerShell"
-		trailer = powerShellGuidance
-		chainAdvice = "use ';' to separate them. NEVER '&&' or '||': Windows PowerShell 5.1 rejects them as a syntax error"
+		// GORILLA (2026-10-27, job 06): the edition is named, and the '&&'
+		// warning is only given where it is true: PowerShell 7 (pwsh) accepts
+		// '&&' and '||', Windows PowerShell 5.1 does not.
+		shellName = hostprobe.ShellEdition(shell.ShellPath())
 		badChain = `cd C:\foo\bar; pytest tests`
+		if hostprobe.IsPowerShell7() {
+			trailer = powerShellGuidance(pwsh7Chaining)
+			chainAdvice = "use ';' or '&&' to separate them (PowerShell 7 accepts '&&' and '||')"
+		} else {
+			trailer = powerShellGuidance(ps51Chaining)
+			chainAdvice = "use ';' to separate them. NEVER '&&' or '||': Windows PowerShell 5.1 rejects them as a syntax error"
+		}
 	}
 
 	return fmt.Sprintf(`Executes a given %s command in a persistent shell session with optional timeout, ensuring proper handling and security measures.
@@ -182,17 +205,7 @@ Before executing the command, please follow these steps:
  - Verify that the command is not one of the banned commands: %s.
  - WHY those are banned, so you can explain it when asked: they are raw network fetchers and browsers. Run from a shell they bypass the audited, permission-gated web tools, which is exactly what a prompt-injection attack needs. Nothing is lost: use the websearch tool to search (it drives lynx + a private SearxNG under the hood) and the fetch tool to read a URL. Banned in the shell ≠ absent from the product.
 
-3. Command Execution:
- - After ensuring proper quoting, execute the command.
- - Capture the output of the command.
-
-4. Output Processing:
- - If the output exceeds %d characters, output will be truncated before being returned to you.
- - Prepare the output for display to the user.
-
-5. Return Result:
- - Provide the processed output of the command.
- - If any errors occurred during execution, include those in the output.
+3. Output: over %d characters it is truncated; errors are included.
 
 Usage notes:
 - The command argument is required.
@@ -234,6 +247,15 @@ func trashGuidance() string {
 		"; if that fails, ask. NEVER fall back to a plain delete."
 }
 
+// Summary is bash's line in the system prompt's tool table: on Windows it says
+// PowerShell and which edition, since the tool keeps the name bash.
+func (b *bashTool) Summary() string {
+	if shell.IsWindowsPowerShell() {
+		return "Runs " + hostprobe.ShellEdition(shell.ShellPath()) + "; not bash"
+	}
+	return "Runs " + hostprobe.ShellEdition(shell.ShellPath()) + " commands"
+}
+
 func NewBashTool(permission permission.Service) BaseTool {
 	return &bashTool{
 		permissions: permission,
@@ -241,20 +263,33 @@ func NewBashTool(permission permission.Service) BaseTool {
 }
 
 func (b *bashTool) Info() ToolInfo {
+	params := map[string]any{
+		"command": map[string]any{
+			"type":        "string",
+			"description": "The command to execute",
+		},
+		"timeout": map[string]any{
+			"type":        "number",
+			"description": "Optional timeout in milliseconds (max 600000)",
+		},
+	}
+	// Windows only (gap #11): the schema elsewhere does not pay for a mode
+	// that does not exist there.
+	if shell.ConsoleSupported() {
+		params["console"] = map[string]any{
+			"type":        "boolean",
+			"description": "Run in a real console (prompts, Read-Host); a separate process, not this session",
+		}
+		params["input"] = map[string]any{
+			"type":        "string",
+			"description": "With console: text typed in, one line per answer",
+		}
+	}
 	return ToolInfo{
 		Name:        BashToolName,
 		Description: bashDescription(),
-		Parameters: map[string]any{
-			"command": map[string]any{
-				"type":        "string",
-				"description": "The command to execute",
-			},
-			"timeout": map[string]any{
-				"type":        "number",
-				"description": "Optional timeout in milliseconds (max 600000)",
-			},
-		},
-		Required: []string{"command"},
+		Parameters:  params,
+		Required:    []string{"command"},
 	}
 }
 
@@ -418,14 +453,34 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 			return ToolResponse{}, permission.ErrorPermissionDenied
 		}
 	}
+	// Every embedded helper the command calls by name is hash-checked (and
+	// re-extracted if its file was changed) before the command runs.
+	if err := toolbox.VerifyMentioned(params.Command); err != nil {
+		return NewTextErrorResponse("this command was NOT run: an embedded helper it calls failed its sha256 check: " + err.Error()), nil
+	}
 	startTime := time.Now()
 	shellInstance := shell.GetPersistentShell(config.WorkingDirectory())
 	if shellInstance == nil {
 		return ToolResponse{}, fmt.Errorf("Shell could not be started. Please ensure a compatible shell (bash or powershell) is available in PATH")
 	}
-	stdout, stderr, exitCode, interrupted, err := shellInstance.Exec(ctx, params.Command, params.Timeout.Int())
-	if err != nil {
-		return ToolResponse{}, fmt.Errorf("error executing command: %w", err)
+	var stdout, stderr string
+	var exitCode int
+	var interrupted bool
+	if params.Console && shell.ConsoleSupported() {
+		// Console mode (gap #11): same permission gate as above, run in a
+		// pseudoconsole in the session's directory, its own Job Object.
+		timeout := time.Duration(params.Timeout.Int()) * time.Millisecond
+		res, cerr := shell.RunInConsole(ctx, "", params.Command, shellInstance.Cwd(), params.Input, timeout)
+		if cerr != nil {
+			return ToolResponse{}, fmt.Errorf("error executing command in a console: %w", cerr)
+		}
+		stdout, exitCode, interrupted = res.Output, res.ExitCode, res.Interrupted
+	} else {
+		var err error
+		stdout, stderr, exitCode, interrupted, err = shellInstance.Exec(ctx, params.Command, params.Timeout.Int())
+		if err != nil {
+			return ToolResponse{}, fmt.Errorf("error executing command: %w", err)
+		}
 	}
 
 	// GORILLA OVERRIDE: filter noisy build logs to their signal (errors,
@@ -448,6 +503,11 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 			errorMessage += "\n"
 		}
 		errorMessage += fmt.Sprintf("Exit code %d", exitCode)
+		// robocopy 1-7, fc 1 ...: the code is information, and the line
+		// after it says so (exitcodes.go). The receipt reads the same table.
+		if meaning, _ := ExitCodeMeaning(params.Command, exitCode); meaning != "" {
+			errorMessage += "\n" + meaning
+		}
 	}
 
 	hasBothOutputs := stdout != "" && stderr != ""

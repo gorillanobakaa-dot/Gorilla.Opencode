@@ -38,6 +38,7 @@ import (
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/pathutil"
 )
 
 // sensitiveBasenames are refused wherever they are found — these names do not
@@ -102,7 +103,9 @@ func RefuseSensitiveRead(path string) string {
 		strings.Contains(lowAbs, strings.ToLower(filepath.Join(".config", "opencode"))) {
 		return reason(abs, "it holds this program's own provider API keys and sign-in tokens")
 	}
-	if base := strings.ToLower(filepath.Clean(config.ConfigBase())); len(base) > 3 &&
+	// Canonical like abs: XDG_CONFIG_HOME may be spelled short (8.3) or reach
+	// the folder through a link, and abs never is.
+	if base := strings.ToLower(pathutil.Canonical(config.ConfigBase())); len(base) > 3 &&
 		(lowAbs == base || strings.HasPrefix(lowAbs, base+string(filepath.Separator))) {
 		return reason(abs, "it holds this program's own provider API keys and sign-in tokens")
 	}
@@ -197,15 +200,10 @@ func isHomeOrAbove(root string) bool {
 	if err != nil || home == "" {
 		return false
 	}
-	h := strings.ToLower(filepath.Clean(home))
-	r := strings.ToLower(filepath.Clean(root))
-	if h == r {
-		return true
-	}
-	if !strings.HasSuffix(r, string(filepath.Separator)) {
-		r += string(filepath.Separator)
-	}
-	return strings.HasPrefix(h, r)
+	// GORILLA FIX (2026-10-27): respelled first. A home folder opened as
+	// C:\Users\LONGNA~1 did not count as the home folder, so its credentials
+	// became "project files" again.
+	return pathutil.WithinLexical(root, home)
 }
 
 func reason(path, why string) string {
@@ -231,13 +229,10 @@ func realForGuard(abs string) string {
 		}
 		abs = strings.Join(parts, `\`)
 	}
-	if real, err := filepath.EvalSymlinks(abs); err == nil {
-		return real
-	}
-	if dir, err := filepath.EvalSymlinks(filepath.Dir(abs)); err == nil {
-		return filepath.Join(dir, filepath.Base(abs))
-	}
-	return abs
+	// GORILLA FIX (2026-10-27): pathutil.Canonical, not filepath.EvalSymlinks,
+	// which since Go 1.23 no longer follows junctions on Windows: a junction
+	// in the project pointing at ~/.ssh was read as a project folder.
+	return pathutil.Canonical(abs)
 }
 
 // refuseSensitiveGlob refuses a search whose PATTERN reaches into a credential

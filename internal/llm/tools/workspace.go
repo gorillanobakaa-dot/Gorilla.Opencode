@@ -29,10 +29,12 @@ package tools
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/pathutil"
 )
 
 // ResolveWriteTarget returns the path bytes will ACTUALLY be written to, after
@@ -71,10 +73,7 @@ func ResolveWriteTarget(dest string) (resolved string, insideRoot bool, err erro
 		return resolved, true, nil
 	}
 	// Fall back to the primary working directory for the common single-root case.
-	if wd, e := filepath.EvalSymlinks(config.WorkingDirectory()); e == nil {
-		return resolved, withinDir(wd, resolved), nil
-	}
-	return resolved, withinDir(filepath.Clean(config.WorkingDirectory()), resolved), nil
+	return resolved, withinDir(pathutil.Canonical(config.WorkingDirectory()), resolved), nil
 }
 
 // DescribeWriteTarget renders the destination for a permission prompt, naming
@@ -95,7 +94,9 @@ func DescribeWriteTarget(dest string) string {
 	if !filepath.IsAbs(asked) {
 		asked = filepath.Join(config.WorkingDirectory(), asked)
 	}
-	redirected := filepath.Clean(resolved) != filepath.Clean(asked)
+	// Respelled with Long first, so a short (8.3) spelling of the same file
+	// is not called a redirection.
+	redirected := !pathutil.Equal(resolved, pathutil.Long(asked))
 
 	switch {
 	case redirected && !inside:
@@ -112,38 +113,30 @@ func DescribeWriteTarget(dest string) string {
 // resolveExistingAncestor resolves symlinks for a path that may not exist yet,
 // by walking up to the nearest ancestor that does and re-attaching the tail.
 // That is what decides where the bytes actually land.
+//
+// GORILLA FIX (2026-10-27): resolved with pathutil.Canonical. Since Go 1.23
+// filepath.EvalSymlinks no longer follows Windows junctions, which any user
+// can make without privilege, so a junction in the project was named, not
+// where it wrote.
 func resolveExistingAncestor(abs string) (string, error) {
-	tail := ""
-	cur := abs
-	for {
-		if resolved, err := filepath.EvalSymlinks(cur); err == nil {
-			if tail == "" {
-				return resolved, nil
-			}
-			return filepath.Join(resolved, tail), nil
+	for cur := abs; ; {
+		if _, err := os.Lstat(cur); err == nil {
+			return pathutil.Canonical(abs), nil
 		}
 		parent := filepath.Dir(cur)
 		if parent == cur {
 			// Reached the root without finding anything that exists.
 			return "", fmt.Errorf("no existing ancestor for %s", abs)
 		}
-		tail = filepath.Join(filepath.Base(cur), tail)
 		cur = parent
 	}
 }
 
-// withinDir reports whether target is dir itself or lies beneath it. Compared on
-// cleaned paths with a separator guard, so /home/user/project-evil is not
-// treated as inside /home/user/project.
+// withinDir reports whether target is dir itself or lies beneath it, with a
+// separator guard, so /home/user/project-evil is not treated as inside
+// /home/user/project. Both are already resolved; pathutil also expands 8.3
+// short names (a working directory given as C:\Users\RUNNER~1\... and a
+// target resolved to C:\Users\runneradmin\... are the same folder).
 func withinDir(dir, target string) bool {
-	dir = filepath.Clean(dir)
-	target = filepath.Clean(target)
-	if target == dir {
-		return true
-	}
-	rel, err := filepath.Rel(dir, target)
-	if err != nil {
-		return false
-	}
-	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	return pathutil.WithinLexical(dir, target)
 }

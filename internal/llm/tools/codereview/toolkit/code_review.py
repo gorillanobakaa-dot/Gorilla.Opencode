@@ -153,7 +153,7 @@ def run(cmd, timeout=30, cwd=None):
         # with no findings = the tool broke). Raising here would collapse
         # those distinctions, which are the ones this toolkit cares most about.
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
-                           cwd=cwd, check=False)
+                           cwd=cwd, check=False, encoding="utf-8", errors="replace")
         return p.returncode, p.stdout, p.stderr
     except FileNotFoundError:
         return 127, "", "not found"
@@ -383,7 +383,7 @@ def run_job(job: Job, timeout: int) -> JobResult:
     t0 = time.time()
     header = f"$ cd {job.cwd} && {' '.join(job.argv)}\n\n"
     try:
-        with open(job.log_path, "w") as f:
+        with open(job.log_path, "w", encoding="utf-8") as f:
             f.write(header)
             f.flush()
             # Resolved here, not when the job was built, so the log header still
@@ -394,22 +394,29 @@ def run_job(job: Job, timeout: int) -> JobResult:
             # check=False: an analyser exiting non-zero usually means it FOUND
             # something, which is success from our side. execute_jobs()
             # interprets the code.
+            # GORILLA FIX (2026-10-27): UTF-8 with replacement, here and for
+            # every file this toolkit writes. Python's default on Windows is
+            # the ANSI code page (cp1252), and REPORT.md carries a warning
+            # sign: on the windows-latest CI runner, where clang-format is
+            # installed and reports, the write raised UnicodeEncodeError and
+            # the whole review exited 1 with no report.
             proc = subprocess.run(argv, cwd=job.cwd, stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT, text=True,
+                                   encoding="utf-8", errors="replace",
                                    timeout=timeout, check=False)
             f.write(proc.stdout or "")
         rc = proc.returncode
     except subprocess.TimeoutExpired:
         rc = 124
-        with open(job.log_path, "a") as f:
+        with open(job.log_path, "a", encoding="utf-8") as f:
             f.write(f"\n[TIMED OUT after {timeout}s]\n")
     except FileNotFoundError:
         rc = 127
-        with open(job.log_path, "a") as f:
+        with open(job.log_path, "a", encoding="utf-8") as f:
             f.write("\n[TOOL BINARY NOT FOUND -- run install_tools.py first]\n")
     except Exception as e:
         rc = 1
-        with open(job.log_path, "a") as f:
+        with open(job.log_path, "a", encoding="utf-8") as f:
             f.write(f"\n[UNEXPECTED ERROR: {e}]\n")
     return JobResult(job=job, returncode=rc, duration=time.time() - t0)
 
@@ -417,7 +424,7 @@ def run_job(job: Job, timeout: int) -> JobResult:
 def read_log_body(log_path: str) -> str:
     """A tool's output with our own command-line header stripped off."""
     try:
-        with open(log_path, errors="replace") as f:
+        with open(log_path, encoding="utf-8", errors="replace") as f:
             return "\n".join(f.read().splitlines()[LOG_HEADER_LINES:])
     except OSError:
         return ""
@@ -669,7 +676,7 @@ def write_reports(results_dir: str, target: str, profile: str, files: List[str],
         "checklist_tools": [t.id for t in checklist_tools],
     }
     json_path = os.path.join(results_dir, "report.json")
-    with open(json_path, "w") as f:
+    with open(json_path, "w", encoding="utf-8") as f:
         json.dump(json_report, f, indent=2)
 
     md = ["# Code Review Report", "", f"- Target: `{target}`", f"- Detected profile: **{profile}**",
@@ -718,7 +725,7 @@ def write_reports(results_dir: str, target: str, profile: str, files: List[str],
         md.append("")
 
     md_path = os.path.join(results_dir, "REPORT.md")
-    with open(md_path, "w") as f:
+    with open(md_path, "w", encoding="utf-8") as f:
         f.write("\n".join(md))
 
     return md_path

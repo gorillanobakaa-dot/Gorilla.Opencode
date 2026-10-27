@@ -1,0 +1,26 @@
+# fieldkit guard -- fieldkit mutate --plan tests/mutations-pfind-rs.yaml --cwd . -- python -I tools/pfind-rs/tests/mutate_check.py
+# Rules of tools/pfind-rs (pfind.exe 4.0.0, 2026-10-27), broken on purpose: every one must be CAUGHT by the parity cases.
+- file: tools/pfind-rs/src/rank.rs
+  swap: ['"name" => 2.0,', '"name" => 0.1,']
+  why: "the name signal no longer outweighs content in the fused ranking"
+- file: tools/pfind-rs/src/rank.rs
+  swap: ["    if ignore_case {\n        return true;\n    }", "    if ignore_case {\n        return false;\n    }"]
+  why: "-i no longer makes a name match case-insensitive (held by the cargo unit test)"
+- file: tools/pfind-rs/src/search.rs
+  swap: ["        b.case_insensitive(true);", "        b.case_smart(true);"]
+  why: "-i no longer makes a content search case-insensitive"
+- file: tools/pfind-rs/src/rank.rs
+  swap: ["            score = 5.0;", "            score = 0.0;"]
+  why: "an exact file-name hit is dropped from --name results"
+- file: tools/pfind-rs/src/walk.rs
+  swap: ["    if user_inc.is_empty() || (type_inc.is_empty() && exts.is_empty()) {", "    if true {"]
+  why: "-g with -t/-e intersects (ripgrep overrides) instead of keeping the type filter"
+- file: tools/pfind-rs/src/render.rs
+  swap: ["            if seen > cap {", "            if seen > cap + 1 {"]
+  why: "--max shows one match too many"
+- file: tools/pfind-rs/src/search.rs
+  swap: ["        BinaryDetection::quit(b'\\0')", "        BinaryDetection::none()"]
+  why: "binary files are searched and printed by default"
+- file: tools/pfind-rs/src/archive.rs
+  swap: ["                return (mb * 1024.0 * 1024.0) as u64;", "                return u64::MAX;"]
+  why: "PFIND_MAX_DECOMPRESSED_MB is ignored: a zip bomb is decompressed without a budget"

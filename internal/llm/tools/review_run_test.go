@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -408,7 +409,7 @@ func TestARealQuickRunSchedulesNoSecurityToolAndLeavesTheTargetAlone(t *testing.
 		focusArgs("quick")...)
 	stdout, stderr, err := tk.run(context.Background(), args...)
 	if err != nil {
-		t.Fatalf("quick run failed: %v\n%s", err, stderr)
+		t.Fatalf("quick run failed: %v: %s\n%s", err, lastLine(stderr), stderr)
 	}
 	var rep agentReport
 	if err := json.Unmarshal(stdout, &rep); err != nil {
@@ -498,7 +499,7 @@ func TestARealSecurityRunSchedulesNoLinterAndReachesTheDeepStage(t *testing.T) {
 			focusArgs(focus)...)
 		stdout, stderr, err := tk.run(context.Background(), args...)
 		if err != nil {
-			t.Fatalf("%s run failed: %v\n%s", focus, err, stderr)
+			t.Fatalf("%s run failed: %v: %s\n%s", focus, err, lastLine(stderr), stderr)
 		}
 		var rep agentReport
 		if err := json.Unmarshal(stdout, &rep); err != nil {
@@ -740,7 +741,7 @@ func TestACTreeReportDecodesAndSaysWhereTheFullReportIs(t *testing.T) {
 	stdout, stderr, err := tk.run(context.Background(), target, "--audience", "agent",
 		"--results-dir", results, "--skip-preflight")
 	if err != nil {
-		t.Fatalf("run failed: %v\n%s", err, stderr)
+		t.Fatalf("run failed: %v: %s\n%s", err, lastLine(stderr), stderr)
 	}
 	var rep agentReport
 	if err := json.Unmarshal(stdout, &rep); err != nil {
@@ -762,6 +763,56 @@ func TestACTreeReportDecodesAndSaysWhereTheFullReportIs(t *testing.T) {
 	if !strings.Contains(summary, rep.ManualSteps[0].Label) {
 		t.Errorf("the manual steps are not offered:\n%s", summary)
 	}
+}
+
+// Found on the windows-latest CI runner (2026-10-27): there clang-format is
+// installed, so a C tree gets a real finding, and REPORT.md (which marks it
+// with a warning sign) was written in Python's default ANSI code page. cp1252
+// has no warning sign: UnicodeEncodeError, exit 1, no report. Laptops without
+// clang-format never reached that line. A stand-in clang-format that reports
+// one violation, with a non-ASCII byte in its output, puts every machine on
+// that path.
+func TestAReportingAnalyserDoesNotCrashTheReportOnAnANSICodePage(t *testing.T) {
+	tk := toolkitForTest(t)
+	bin := t.TempDir()
+	if runtime.GOOS == "windows" {
+		writeReviewFixture(t, filepath.Join(bin, "clang-format.cmd"), "@echo off\r\n"+
+			"if \"%1\"==\"--version\" (echo clang-format version 18.1.8& exit /b 0)\r\n"+
+			"echo %3:1:17: error: code should be clang-formatted [-Wclang-format-violations] \xe2\x80\x9cx\xe2\x80\x9d\r\n"+
+			"exit /b 1\r\n")
+	} else {
+		writeReviewFixture(t, filepath.Join(bin, "clang-format"), "#!/bin/sh\n"+
+			"if [ \"$1\" = --version ]; then echo 'clang-format version 18.1.8'; exit 0; fi\n"+
+			"echo \"$3:1:17: error: code should be clang-formatted [-Wclang-format-violations] \xe2\x80\x9cx\xe2\x80\x9d\"\n"+
+			"exit 1\n")
+		if err := os.Chmod(filepath.Join(bin, "clang-format"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	target := t.TempDir()
+	writeReviewFixture(t, filepath.Join(target, "a.c"), "int main(void) { return 0; }\n")
+	results := t.TempDir()
+
+	stdout, stderr, err := tk.run(context.Background(), target, "--audience", "agent",
+		"--results-dir", results, "--skip-preflight")
+	if err != nil {
+		t.Fatalf("run failed: %v: %s", err, lastLine(stderr))
+	}
+	var rep agentReport
+	if err := json.Unmarshal(stdout, &rep); err != nil {
+		t.Fatalf("the report does not decode: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(results, "REPORT.md")); err != nil {
+		t.Errorf("no REPORT.md: %v", err)
+	}
+}
+
+// lastLine is the line a Python traceback ends on, which names the error. CI
+// annotations show only a message's first line, so failures put it there.
+func lastLine(b []byte) string {
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
 }
 
 // In agent mode stdout is the JSON report or it is empty. The preflight used to

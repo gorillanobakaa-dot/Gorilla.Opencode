@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/hostprobe"
+	"github.com/opencode-ai/opencode/internal/howto"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 )
 
@@ -56,8 +58,12 @@ func BaseCoderPrompt(provider models.ModelProvider) string {
 
 // EnvironmentInfoBlock / LSPInfoBlock expose the switchable prompt blocks
 // so the loadout can price them. GORILLA OVERRIDE.
-func EnvironmentInfoBlock() string { return getEnvironmentInfo(configuredModel(config.AgentCoder)) }
-func LSPInfoBlock() string         { return lspInformation() }
+// The tool table rides the same prompt.env row, so it is priced with it (once
+// the agent has built its tool set and set the table).
+func EnvironmentInfoBlock() string {
+	return getEnvironmentInfo(configuredModel(config.AgentCoder)) + ToolTable()
+}
+func LSPInfoBlock() string { return lspInformation() }
 
 // CoderPrompt renders the coder prompt for the CONFIGURED coder model. Kept
 // for callers that only hold a provider; the agent itself uses CoderPromptFor
@@ -106,7 +112,15 @@ func CoderPromptFor(model models.Model) string {
 		deferred = DeferredCatalogue()
 	}
 
-	return fmt.Sprintf("%s\n\n%s\n%s\n%s", BaseCoderPrompt(model.Provider), envInfo, lspInfo, deferred)
+	// The "Your tools" table rides with the env block (prompt.env): it is the
+	// machine-and-tools half of the same orientation. Set by the agent from the
+	// tool set it built (SetToolTable), like the deferred catalogue.
+	table := ""
+	if config.LoadoutEnabled("prompt.env") {
+		table = ToolTable()
+	}
+
+	return fmt.Sprintf("%s\n\n%s\n%s%s\n%s", BaseCoderPrompt(model.Provider), envInfo, table, lspInfo, deferred)
 }
 
 // GORILLA OVERRIDE: two 2023-era prompt constants (baseOpenAICoderPrompt at
@@ -167,11 +181,31 @@ func getEnvironmentInfo(model models.Model) string {
 Working directory: %s
 Is directory a git repo: %s
 Platform: %s
-%s%s</env>
+%s%s%s</env>
 <project_summary>
 %s
 </project_summary>
-%s`, cwd, boolToYesNo(isGit), platform, modelLine, userDirs(), summary, extra)
+%s`, cwd, boolToYesNo(isGit), platform, machineLines(), modelLine, userDirs(), summary, extra)
+}
+
+// machineLines is the startup probe (internal/hostprobe) and the how-to card
+// line, a few short lines under "Platform:".
+//
+// GORILLA (2026-10-27, job 06): "Platform: windows" was all a model was told,
+// and the owner's local models then did not know which PowerShell they drove,
+// that robocopy takes 128 threads, or what was installed. Probed once per
+// process and cached, so the block stays byte-identical between renders.
+func machineLines() string {
+	var b strings.Builder
+	for _, l := range hostprobe.Get().Lines() {
+		b.WriteString(l)
+		b.WriteString("\n")
+	}
+	if l := howto.PromptLine(); l != "" {
+		b.WriteString(l)
+		b.WriteString("\n")
+	}
+	return b.String()
 }
 
 // modelEnvLine is the one line that tells the model which model it is: the
@@ -554,6 +588,7 @@ func boolToYesNo(b bool) string {
 var (
 	deferredCatalogueMu sync.RWMutex
 	deferredCatalogue   string
+	toolTable           string
 )
 
 // SetDeferredCatalogue records the one-line index of withheld tools.
@@ -561,6 +596,20 @@ func SetDeferredCatalogue(block string) {
 	deferredCatalogueMu.Lock()
 	deferredCatalogue = block
 	deferredCatalogueMu.Unlock()
+}
+
+// SetToolTable records the "Your tools" block (tools.ToolTableBlock).
+func SetToolTable(block string) {
+	deferredCatalogueMu.Lock()
+	toolTable = block
+	deferredCatalogueMu.Unlock()
+}
+
+// ToolTable returns the "Your tools" block, or "" before the agent set one.
+func ToolTable() string {
+	deferredCatalogueMu.RLock()
+	defer deferredCatalogueMu.RUnlock()
+	return toolTable
 }
 
 // DeferredCatalogue returns the current index, or "" when nothing is deferred.

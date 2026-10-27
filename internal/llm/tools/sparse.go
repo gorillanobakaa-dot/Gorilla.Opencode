@@ -125,11 +125,8 @@ func (s *sparseTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 	// told the wrong thing about its own mistake fixes the wrong thing, and the
 	// contract that bad input is reported as bad input should not depend on
 	// which machine the tool happens to be running on.
-	if runtime.GOOS == "windows" {
-		return NewTextErrorResponse(
-			"sparse is a Linux kernel semantic checker and does not exist on Windows. " +
-				"It is only useful for Linux kernel development; on this machine, use the " +
-				"review tool instead."), nil
+	if msg := sparsePlatformRefusal(runtime.GOOS); msg != "" {
+		return NewTextErrorResponse(msg), nil
 	}
 
 	// sparse is a binary the user may not have installed. Say so plainly with
@@ -232,4 +229,22 @@ func (s *sparseTool) Run(ctx context.Context, call ToolCall) (ToolResponse, erro
 		NewTextResponse(header+text),
 		SparseResponseMetadata{Warnings: warnings, Errors: errors, Binary: binary},
 	), nil
+}
+
+// sparsePlatformRefusal is the answer on a system sparse does not run on, or
+// "" where it does.
+//
+// GORILLA FIX (2026-10-27, job 09, gap #14): sparse stays Linux-only, and the
+// refusal now says why and what to use instead, so the model does not go
+// looking for a Windows build that does not exist.
+func sparsePlatformRefusal(goos string) string {
+	if goos != "windows" {
+		return ""
+	}
+	return "sparse is not available on Windows, and this will not change: it checks C written for the " +
+		"Linux kernel (its __user, __iomem and __bitwise annotations and lock context) and runs inside " +
+		"the kernel's own build (make C=1 or C=2) with Linux headers and a GNU toolchain. There is no " +
+		"Windows build of it. Instead: for C or C++ on this machine use the review tool (cppcheck, " +
+		"clang-tidy and the clang static analyzer); for Linux kernel patches run `make C=2` on a Linux " +
+		"machine or in WSL."
 }

@@ -17,10 +17,15 @@ import (
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/lsp/protocol"
+	"github.com/opencode-ai/opencode/internal/procjob"
 )
 
 type Client struct {
-	Cmd    *exec.Cmd
+	Cmd *exec.Cmd
+	// job holds the server and everything it starts (Windows, gap #9), so
+	// a server that spawns helpers (tsserver, rust-analyzer's proc-macro
+	// server) does not leave them behind. Nil elsewhere.
+	job    *procjob.Job
 	stdin  io.WriteCloser
 	stdout *bufio.Reader
 	stderr io.ReadCloser
@@ -100,10 +105,13 @@ func NewClient(ctx context.Context, command string, args ...string) (*Client, er
 	// Initialize server state
 	client.serverState.Store(StateStarting)
 
-	// Start the LSP server process
-	if err := cmd.Start(); err != nil {
+	// Start the LSP server process, in its own Job Object on Windows.
+	// A cancelled context ends the whole tree, not only the server.
+	job, err := procjob.StartContext(cmd, func() error { return cmd.Process.Kill() })
+	if err != nil {
 		return nil, fmt.Errorf("failed to start LSP server: %w", err)
 	}
+	client.job = job
 
 	// Handle stderr in a separate goroutine.
 	//
@@ -177,7 +185,7 @@ func (c *Client) InitializeLSPClient(ctx context.Context, workspaceDir string) (
 		WorkspaceFoldersInitializeParams: protocol.WorkspaceFoldersInitializeParams{
 			WorkspaceFolders: []protocol.WorkspaceFolder{
 				{
-					URI:  protocol.URI("file://" + workspaceDir),
+					URI:  protocol.URI(protocol.URIFromPath(workspaceDir)),
 					Name: workspaceDir,
 				},
 			},
@@ -190,7 +198,7 @@ func (c *Client) InitializeLSPClient(ctx context.Context, workspaceDir string) (
 				Version: "0.1.0",
 			},
 			RootPath: workspaceDir,
-			RootURI:  protocol.DocumentUri("file://" + workspaceDir),
+			RootURI:  protocol.URIFromPath(workspaceDir),
 			Capabilities: protocol.ClientCapabilities{
 				Workspace: protocol.WorkspaceClientCapabilities{
 					Configuration: true,
@@ -296,11 +304,19 @@ func (c *Client) Close() error {
 	}()
 
 	// Wait for process to exit with timeout
+	// GORILLA FIX (2026-10-27, gap #9): the timeout kills the server's whole
+	// job (KILL_ON_JOB_CLOSE), not only the server: a bare Process.Kill left
+	// its children running. After a clean exit the job is closed too, which
+	// ends any helper the server left behind.
 	select {
 	case err := <-done:
+		_ = c.job.Close()
 		return err
 	case <-time.After(2 * time.Second):
-		// If we timeout, try to kill the process
+		if c.job != nil {
+			_ = c.job.Close()
+			return fmt.Errorf("process tree killed after timeout")
+		}
 		if err := c.Cmd.Process.Kill(); err != nil {
 			return fmt.Errorf("failed to kill process: %w", err)
 		}
@@ -332,7 +348,7 @@ func (c *Client) SetServerState(state ServerState) {
 // WaitForServerReady waits for the server to be ready by polling the server
 // with a simple request until it responds successfully or times out
 func (c *Client) WaitForServerReady(ctx context.Context) error {
-	cnf := config.Get()
+	debug := debugLSPEnabled() // config.Get() is nil before config loads (tests, early start)
 
 	// Set initial state
 	c.SetServerState(StateStarting)
@@ -345,7 +361,7 @@ func (c *Client) WaitForServerReady(ctx context.Context) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
-	if cnf.DebugLSP {
+	if debug {
 		logging.Debug("Waiting for LSP server to be ready...")
 	}
 
@@ -354,7 +370,7 @@ func (c *Client) WaitForServerReady(ctx context.Context) error {
 
 	// For TypeScript-like servers, we need to open some key files first
 	if serverType == ServerTypeTypeScript {
-		if cnf.DebugLSP {
+		if debug {
 			logging.Debug("TypeScript-like server detected, opening key configuration files")
 		}
 		c.openKeyConfigFiles(ctx)
@@ -371,7 +387,7 @@ func (c *Client) WaitForServerReady(ctx context.Context) error {
 			if err == nil {
 				// Server responded successfully
 				c.SetServerState(StateReady)
-				if cnf.DebugLSP {
+				if debug {
 					logging.Debug("LSP server is ready")
 				}
 				return nil
@@ -379,7 +395,7 @@ func (c *Client) WaitForServerReady(ctx context.Context) error {
 				logging.Debug("LSP server not ready yet", "error", err, "serverType", serverType)
 			}
 
-			if cnf.DebugLSP {
+			if debug {
 				logging.Debug("LSP server not ready yet", "error", err, "serverType", serverType)
 			}
 		}
@@ -494,7 +510,10 @@ func (c *Client) pingTypeScriptServer(ctx context.Context) error {
 
 	// If we have any open files, try to get document symbols for one
 	for uri := range c.openFiles {
-		filePath := strings.TrimPrefix(uri, "file://")
+		filePath, perr := protocol.PathFromURI(uri)
+		if perr != nil {
+			continue
+		}
 		if strings.HasSuffix(filePath, ".ts") || strings.HasSuffix(filePath, ".js") ||
 			strings.HasSuffix(filePath, ".tsx") || strings.HasSuffix(filePath, ".jsx") {
 			var symbols []protocol.DocumentSymbol
@@ -542,7 +561,7 @@ func (c *Client) pingTypeScriptServer(ctx context.Context) error {
 
 // openTypeScriptFiles finds and opens TypeScript files to help initialize the server
 func (c *Client) openTypeScriptFiles(ctx context.Context, workDir string) {
-	cnf := config.Get()
+	debug := debugLSPEnabled() // config.Get() is nil before config loads (tests, early start)
 	filesOpened := 0
 	maxFilesToOpen := 5 // Limit to a reasonable number of files
 
@@ -572,7 +591,7 @@ func (c *Client) openTypeScriptFiles(ctx context.Context, workDir string) {
 			// Try to open the file
 			if err := c.OpenFile(ctx, path); err == nil {
 				filesOpened++
-				if cnf.DebugLSP {
+				if debug {
 					logging.Debug("Opened TypeScript file for initialization", "file", path)
 				}
 			}
@@ -581,11 +600,11 @@ func (c *Client) openTypeScriptFiles(ctx context.Context, workDir string) {
 		return nil
 	})
 
-	if err != nil && cnf.DebugLSP {
+	if err != nil && debug {
 		logging.Debug("Error walking directory for TypeScript files", "error", err)
 	}
 
-	if cnf.DebugLSP {
+	if debug {
 		logging.Debug("Opened TypeScript files for initialization", "count", filesOpened)
 	}
 }
@@ -632,7 +651,7 @@ type OpenFileInfo struct {
 }
 
 func (c *Client) OpenFile(ctx context.Context, filepath string) error {
-	uri := fmt.Sprintf("file://%s", filepath)
+	uri := string(protocol.URIFromPath(filepath))
 
 	c.openFilesMu.Lock()
 	if _, exists := c.openFiles[uri]; exists {
@@ -671,7 +690,7 @@ func (c *Client) OpenFile(ctx context.Context, filepath string) error {
 }
 
 func (c *Client) NotifyChange(ctx context.Context, filepath string) error {
-	uri := fmt.Sprintf("file://%s", filepath)
+	uri := string(protocol.URIFromPath(filepath))
 
 	content, err := os.ReadFile(filepath)
 	if err != nil {
@@ -710,8 +729,8 @@ func (c *Client) NotifyChange(ctx context.Context, filepath string) error {
 }
 
 func (c *Client) CloseFile(ctx context.Context, filepath string) error {
-	cnf := config.Get()
-	uri := fmt.Sprintf("file://%s", filepath)
+	debug := debugLSPEnabled() // config.Get() is nil before config loads (tests, early start)
+	uri := string(protocol.URIFromPath(filepath))
 
 	c.openFilesMu.Lock()
 	if _, exists := c.openFiles[uri]; !exists {
@@ -726,7 +745,7 @@ func (c *Client) CloseFile(ctx context.Context, filepath string) error {
 		},
 	}
 
-	if cnf.DebugLSP {
+	if debug {
 		logging.Debug("Closing file", "file", filepath)
 	}
 	if err := c.Notify(ctx, "textDocument/didClose", params); err != nil {
@@ -744,7 +763,7 @@ func (c *Client) CloseFile(ctx context.Context, filepath string) error {
 }
 
 func (c *Client) IsFileOpen(filepath string) bool {
-	uri := fmt.Sprintf("file://%s", filepath)
+	uri := string(protocol.URIFromPath(filepath))
 	c.openFilesMu.RLock()
 	defer c.openFilesMu.RUnlock()
 	_, exists := c.openFiles[uri]
@@ -753,14 +772,17 @@ func (c *Client) IsFileOpen(filepath string) bool {
 
 // CloseAllFiles closes all currently open files
 func (c *Client) CloseAllFiles(ctx context.Context) {
-	cnf := config.Get()
+	debug := debugLSPEnabled() // config.Get() is nil before config loads
 	c.openFilesMu.Lock()
 	filesToClose := make([]string, 0, len(c.openFiles))
 
 	// First collect all URIs that need to be closed
 	for uri := range c.openFiles {
-		// Convert URI back to file path by trimming "file://" prefix
-		filePath := strings.TrimPrefix(uri, "file://")
+		filePath, err := protocol.PathFromURI(uri)
+		if err != nil {
+			logging.Warn("Skipping an open file with a bad URI", "uri", uri, "error", err)
+			continue
+		}
 		filesToClose = append(filesToClose, filePath)
 	}
 	c.openFilesMu.Unlock()
@@ -768,12 +790,12 @@ func (c *Client) CloseAllFiles(ctx context.Context) {
 	// Then close them all
 	for _, filePath := range filesToClose {
 		err := c.CloseFile(ctx, filePath)
-		if err != nil && cnf.DebugLSP {
+		if err != nil && debug {
 			logging.Warn("Error closing file", "file", filePath, "error", err)
 		}
 	}
 
-	if cnf.DebugLSP {
+	if debug {
 		logging.Debug("Closed all files", "files", filesToClose)
 	}
 }
@@ -805,7 +827,7 @@ func (c *Client) OpenFileOnDemand(ctx context.Context, filepath string) error {
 // GetDiagnosticsForFile ensures a file is open and returns its diagnostics
 // This is useful for on-demand diagnostics when using lazy loading
 func (c *Client) GetDiagnosticsForFile(ctx context.Context, filepath string) ([]protocol.Diagnostic, error) {
-	uri := fmt.Sprintf("file://%s", filepath)
+	uri := string(protocol.URIFromPath(filepath))
 	documentUri := protocol.DocumentUri(uri)
 
 	// Make sure the file is open

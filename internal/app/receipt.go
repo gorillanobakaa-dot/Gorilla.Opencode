@@ -33,6 +33,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/opencode-ai/opencode/internal/llm/agent"
@@ -110,7 +111,7 @@ func (r *Receipt) add(msgs []message.Message, helperMsgs func(string) []message.
 
 			outcome := "no result recorded"
 			if tr, ok := results[tc.ID]; ok {
-				outcome = outcomeFor(tc.Name, tr)
+				outcome = outcomeForCall(tc, tr)
 			}
 			if outcome != "ok" && !strings.HasPrefix(outcome, "ok, ") {
 				r.Problems++
@@ -145,6 +146,25 @@ func outcomeOf(tr message.ToolResult) string { return outcomeFor("bash", tr) }
 // listed as a failed call. And a command that was stopped by a timeout or a
 // cancel returns an ordinary result, so it was listed as "ok".
 func outcomeFor(tool string, tr message.ToolResult) string {
+	return outcomeForCommand(tool, "", tr)
+}
+
+// outcomeForCall is outcomeFor with the call's own command, so an exit code
+// that is information (robocopy 1-7, fc 1) is read as the program defines it.
+func outcomeForCall(tc message.ToolCall, tr message.ToolResult) string {
+	command := ""
+	if tc.Name == "bash" {
+		var args struct {
+			Command string `json:"command"`
+		}
+		if json.Unmarshal([]byte(tc.Input), &args) == nil {
+			command = args.Command
+		}
+	}
+	return outcomeForCommand(tc.Name, command, tr)
+}
+
+func outcomeForCommand(tool, command string, tr message.ToolResult) string {
 	c := tr.Content
 	low := strings.ToLower(c)
 	shell := tool == "bash"
@@ -195,6 +215,14 @@ func outcomeFor(tool string, tr message.ToolResult) string {
 	// or every failing build would be listed here as ok.
 	if m := exitCodeRe.FindAllStringSubmatch(c, -1); shell && len(m) > 0 {
 		if code := m[len(m)-1][1]; code != "0" {
+			// GORILLA FIX (2026-10-26): robocopy exit 1 is "files were
+			// copied". Listed as a failure, a mirror that worked was
+			// reported as one that did not.
+			if n, err := strconv.Atoi(code); err == nil {
+				if meaning, ok := tools.ExitCodeMeaning(command, n); ok {
+					return "ok, exit code " + code + ": " + meaning
+				}
+			}
 			return "exit code " + code
 		}
 	}

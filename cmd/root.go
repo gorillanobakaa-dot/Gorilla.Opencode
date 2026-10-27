@@ -16,6 +16,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/format"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/logging"
+	"github.com/opencode-ai/opencode/internal/pathutil"
 	"github.com/opencode-ai/opencode/internal/plain"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/tui"
@@ -59,6 +60,10 @@ func resolveWorkspace(flagCwd string, nonInteractive bool) (dir, alreadySaved st
 	if err != nil {
 		return "", "", false, fmt.Errorf("failed to get current working directory: %v", err)
 	}
+	// GORILLA FIX (2026-10-27): one spelling for a folder. A shell started in
+	// C:\Users\RUNNER~1\... hands over the 8.3 short form; the workspace, the
+	// saved history and every containment check use the long one.
+	realCwd = pathutil.Long(realCwd)
 
 	if nonInteractive || !saved.Ask || !interactiveTerminal() {
 		if saved.WorkingDir != "" {

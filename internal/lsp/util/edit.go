@@ -11,7 +11,10 @@ import (
 )
 
 func applyTextEdits(uri protocol.DocumentUri, edits []protocol.TextEdit) error {
-	path := strings.TrimPrefix(string(uri), "file://")
+	path, err := uri.Path()
+	if err != nil {
+		return fmt.Errorf("bad file URI %q: %w", uri, err)
+	}
 
 	// Read the file content
 	content, err := os.ReadFile(path)
@@ -148,7 +151,10 @@ func applyTextEdit(lines []string, edit protocol.TextEdit) ([]string, error) {
 // applyDocumentChange applies a DocumentChange (create/rename/delete operations)
 func applyDocumentChange(change protocol.DocumentChange) error {
 	if change.CreateFile != nil {
-		path := strings.TrimPrefix(string(change.CreateFile.URI), "file://")
+		path, err := change.CreateFile.URI.Path()
+		if err != nil {
+			return fmt.Errorf("bad file URI %q: %w", change.CreateFile.URI, err)
+		}
 		if change.CreateFile.Options != nil {
 			if change.CreateFile.Options.Overwrite {
 				// Proceed with overwrite
@@ -164,7 +170,10 @@ func applyDocumentChange(change protocol.DocumentChange) error {
 	}
 
 	if change.DeleteFile != nil {
-		path := strings.TrimPrefix(string(change.DeleteFile.URI), "file://")
+		path, err := change.DeleteFile.URI.Path()
+		if err != nil {
+			return fmt.Errorf("bad file URI %q: %w", change.DeleteFile.URI, err)
+		}
 		if change.DeleteFile.Options != nil && change.DeleteFile.Options.Recursive {
 			if err := os.RemoveAll(path); err != nil {
 				return fmt.Errorf("failed to delete directory recursively: %w", err)
@@ -177,8 +186,14 @@ func applyDocumentChange(change protocol.DocumentChange) error {
 	}
 
 	if change.RenameFile != nil {
-		oldPath := strings.TrimPrefix(string(change.RenameFile.OldURI), "file://")
-		newPath := strings.TrimPrefix(string(change.RenameFile.NewURI), "file://")
+		oldPath, err := change.RenameFile.OldURI.Path()
+		if err != nil {
+			return fmt.Errorf("bad file URI %q: %w", change.RenameFile.OldURI, err)
+		}
+		newPath, err := change.RenameFile.NewURI.Path()
+		if err != nil {
+			return fmt.Errorf("bad file URI %q: %w", change.RenameFile.NewURI, err)
+		}
 		if change.RenameFile.Options != nil {
 			if !change.RenameFile.Options.Overwrite {
 				if _, err := os.Stat(newPath); err == nil {

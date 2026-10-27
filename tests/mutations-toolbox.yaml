@@ -1,0 +1,65 @@
+# fieldkit mutate --plan tests/mutations-toolbox.yaml --cwd . -- go test -tags toolbox -count=1 ./internal/toolbox/ ./internal/llm/tools/shell/ ./internal/llm/tools/ -run "(?i)(hash|extract|mentioned|prependpath|pins|toolbox|agentshell|pfindengine|prefersthe)"
+# Job 04 of goal windows-capabilities (2026-10-27): the embedded toolbox. Every rule added, broken on purpose; each
+# must be CAUGHT. Run on Windows AFTER scripts/build-toolbox.ps1 (the find/shell rules need the real helpers embedded).
+# Not in the plan, on purpose: the re-hash right after writing an extract (no test can make a just-written file differ
+# without a fault injector), the Unix 0700/perm branches (this plan runs on Windows; the Linux CI runs their tests), and
+# the call site of toolbox.VerifyMentioned in bash.go (the bash tool's Run needs the permission service; the function
+# itself is covered below). See docs/TOOLBOX.dual-track.md.
+
+# --- pins
+- file: internal/toolbox/toolbox.go
+  swap: ['if b, err := hex.DecodeString(sum); err != nil || len(b) != sha256.Size {', 'if _, err := hex.DecodeString(sum); err != nil {']
+  why: a short hex string is accepted as a sha256
+- file: internal/toolbox/toolbox.go
+  swap: ['if _, dup := pins[name]; dup {', 'if false {']
+  why: a helper pinned twice keeps whichever line came last
+
+# --- embedded bytes against their pin
+- file: internal/toolbox/toolbox.go
+  swap: ['if got := hashBytes(data); got != pin {', 'if false {']
+  why: an embedded helper with other bytes than its pin is run
+- file: internal/toolbox/toolbox.go
+  swap: ['	if !pinned {', '	if false {']
+  why: an unpinned helper is not refused for the right reason
+- file: internal/toolbox/toolbox.go
+  swap: ['data, err = io.ReadAll(zr)', 'data, err = gz, nil']
+  why: a gzip-embedded helper is extracted compressed
+- file: internal/toolbox/toolbox.go
+  swap: ['if n == "README.md" {', 'if false {']
+  why: bin/README.md is listed as a helper
+
+# --- extract and the check before every exec
+- file: internal/toolbox/toolbox.go
+  swap: ['if hashFile(target) == pin {', 'if hashFile(target) != "" {']
+  why: a changed extract is handed out without its hash being checked
+- file: internal/toolbox/toolbox.go
+  swap: ["if runtime.GOOS == \"windows\" {\n\t\tif err := CacheDirIsPrivate(dir); err != nil {", "if runtime.GOOS == \"windows\" {\n\t\tif err := error(nil); err != nil {"]
+  why: helpers are extracted into a folder other users can write to
+- file: internal/toolbox/private.go
+  swap: ['if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {', 'if err != nil {']
+  why: a cache folder outside the profile counts as private on Windows
+
+# --- the shell
+- file: internal/toolbox/toolbox.go
+  swap: ["(\\.exe)?($|[\\s;&|)'\"}])`)", "(\\.exe)?`)"]
+  why: a helper's name inside a longer word (sdx, mysd) counts as a call
+- file: internal/toolbox/toolbox.go
+  swap: ['for _, n := range b.Mentioned(command) {', 'for _, n := range []string(nil) {']
+  why: a command runs a helper without its hash being checked first
+- file: internal/toolbox/toolbox.go
+  swap: ['if k == "PATH" || (runtime.GOOS == "windows" && strings.EqualFold(k, "PATH")) {', 'if k == "PATH" {']
+  why: on Windows ("Path") a second PATH is appended instead of the real one extended
+- file: internal/llm/tools/shell/shell.go
+  swap: ['return toolbox.PrependPath(env, dirs)', 'return env']
+  why: the agent shell cannot call the helpers by name
+
+# --- find
+- file: internal/llm/tools/find.go
+  swap: ["if p, err := toolbox.Path(\"pfind\"); err == nil {\n\t\treturn p, nil, nil", "if p, err := toolbox.Path(\"pfind\"); err == nil && false {\n\t\treturn p, nil, nil"]
+  why: the embedded pfind.exe is not preferred over pfind on PATH and python
+- file: internal/llm/tools/find.go
+  swap: ['case toolbox.IsToolboxFile(bin):', 'case false:']
+  why: the result does not say the embedded engine ran
+- file: internal/toolbox/toolbox.go
+  swap: ['return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)', 'return err == nil']
+  why: any file counts as a toolbox file

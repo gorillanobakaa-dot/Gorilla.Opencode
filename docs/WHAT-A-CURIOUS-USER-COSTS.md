@@ -241,12 +241,31 @@ exists.
 TestDefaultToolSchemaCost -v`:
 
 ```
-tool schemas, default ON                            ~10,621 tokens   80%
+tool schemas, default ON                            ~11,454 tokens   81%
 base system prompt (coder-modern)                    ~2,314 tokens   17%
-prompt blocks, default ON                              ~397 tokens    3%
+prompt blocks, default ON                              ~369 tokens    3%
                                                      ------------
-per-turn total, before any CLAUDE.md                ~13,332 tokens
+per-turn total, before any CLAUDE.md                ~13,824 tokens
 
+(re-measured 2026-10-27, windows-capabilities job 09, on Windows: 11,143 -> 11,454. +291 is the
+read-only windows tool (registry, services, event log, scheduled tasks, CIM as JSON), registered only on
+Windows, so Linux and macOS do not pay it (~11,163 there); ~20 is job 07's wording in files and find.
+It earns its row: reading one service or one registry value was a PowerShell command, a permission
+prompt and a re-sent conversation each; earlier, job 06: schemas +2 (files gained action=howto; bash names
+its PowerShell edition). The PROMPT grew instead, measured on this laptop with `gorilla-opencode
+system-prompt` (bytes/4): ~2,504 -> ~3,022 tokens, +518 a turn: the "YOUR TOOLS" table ~375 (18 tools,
+deferral off; with tool_search on only the loaded tools are listed), the startup probe and the how-to card
+line ~137, the first prompt line +7. Both ride the prompt.env row, so /context switches them off together.
+The long knowledge (robocopy's switches and exit codes, PowerShell file operations, the toolbox) is in
+on-demand cards, read with files action=howto, and costs nothing until read;
+earlier, job 05: +470 for the files tool, default ON and never
+deferred: the owner's complaint was a model that did not know it could copy with 128 threads, set
+attributes or rename in bulk; eight actions, one schema instead of eight; trimmed from 516 before recording;
+earlier 2026-10-27 on Windows, where the bash row carries the PowerShell guidance: 10,713 before
+and 10,671 after the console mode; tool.bash 1,594 -> 1,552. The two Windows-only parameters console and
+input were paid for by cutting the generic "3. Command Execution / 4. Output Processing / 5. Return
+Result" steps to one line, so the row shrank on every platform; Read-Host now has an answer instead of
+"never use it". The 1,600 per-tool cap was 6 tokens away before this);
 (re-measured 2026-10-22: +11 for binary_inspect's part=exports and the summary's version info and
 signer names, now 215 + 202; earlier 2026-10-22: +48 for the forensics tools' full=true switch, 204 + 202;
 2026-10-21 again with binary_inspect 180 + archive 178 = 358, the forensics toolkit;

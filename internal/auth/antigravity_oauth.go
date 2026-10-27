@@ -158,7 +158,7 @@ func AntigravityCredsPath() string {
 
 // LoadAntigravityCreds reads stored credentials, or returns (nil, nil) if none.
 func LoadAntigravityCreds() (*AntigravityCreds, error) {
-	data, err := os.ReadFile(AntigravityCredsPath())
+	data, err := readSecretFile(AntigravityCredsPath())
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -172,21 +172,14 @@ func LoadAntigravityCreds() (*AntigravityCreds, error) {
 	return &c, nil
 }
 
-// Save writes the credentials atomically with 0600 perms.
+// Save writes the credentials atomically with 0600 perms, sealed with DPAPI on Windows.
 func (c *AntigravityCreds) Save() error {
-	path := AntigravityCredsPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	// Sealed for the current Windows user (secretfile.go, gap #17).
+	return writeSecretFile(AntigravityCredsPath(), data)
 }
 
 // LogoutAntigravity removes the stored Antigravity credentials.

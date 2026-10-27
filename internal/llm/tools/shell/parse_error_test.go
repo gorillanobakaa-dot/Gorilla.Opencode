@@ -11,9 +11,13 @@ package shell
 // command started in a fresh one with the session's state gone.
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/opencode-ai/opencode/internal/pathutil"
+	"github.com/opencode-ai/opencode/internal/pathutil/pathutiltest"
 )
 
 func psOnly(t *testing.T) *PersistentShell {
@@ -35,8 +39,41 @@ func psOnly(t *testing.T) *PersistentShell {
 // that, and is not tripped by a loaded machine.
 const parseBound = 12 * time.Second
 
+// psMajor is the major version of the PowerShell the session runs.
+// resolveShellPath prefers pwsh.exe (7+) when it is installed, as on the
+// windows-latest CI runner, and Windows PowerShell 5.1 otherwise.
+func psMajor(t *testing.T, s *PersistentShell) int {
+	t.Helper()
+	out, _, _ := exec1(t, s, "$PSVersionTable.PSVersion.Major")
+	n, err := strconv.Atoi(strings.TrimSpace(out))
+	if err != nil {
+		t.Fatalf("PowerShell version unreadable: %q", out)
+	}
+	return n
+}
+
+// GORILLA FIX (2026-10-27): `&&` is a parse error only in Windows PowerShell
+// 5.1. In PowerShell 7 it is the pipeline-chain operator, so on the CI
+// runner (pwsh 7 installed) `cd C:\ && echo hi` ran and printed hi, exit 0:
+// correct for that shell, and this test asserted 5.1 regardless. It now
+// checks what each version must do; under 7 that includes the chain
+// stopping at a failure, which is what && means.
 func TestAnAmpersandChainFailsAtOnceWithTheRealReason(t *testing.T) {
 	s := psOnly(t)
+	if v := psMajor(t, s); v >= 7 {
+		stdout, stderr, code := exec1(t, s, `cd C:\ && echo hi`)
+		if code != 0 || !strings.Contains(stdout, "hi") {
+			t.Errorf("PowerShell %d: the chain did not run: code=%d stdout=%q stderr=%q", v, code, stdout, stderr)
+		}
+		stdout, _, code = exec1(t, s, `Get-Item C:\no-such-dir-xyz && echo after`)
+		if code == 0 || strings.Contains(stdout, "after") {
+			t.Errorf("PowerShell %d: && ran past a failure: code=%d stdout=%q", v, code, stdout)
+		}
+		if !s.isAlive {
+			t.Fatal("the shell died on a chain")
+		}
+		return
+	}
 	start := time.Now()
 	stdout, stderr, code := exec1(t, s, `cd C:\ && echo hi`)
 	if d := time.Since(start); d > parseBound {
@@ -94,11 +131,14 @@ func TestChangingDirectoryStillPersists(t *testing.T) {
 	s := psOnly(t)
 	dir := t.TempDir()
 	exec1(t, s, "Set-Location '"+dir+"'")
+	// PowerShell reports the folder by its long name: t.TempDir() is
+	// C:\Users\RUNNER~1\... on the CI runner, and the session says
+	// C:\Users\runneradmin\.... The same folder, so compared with pathutil.
 	out, _, _ := exec1(t, s, "(Get-Location).Path")
-	if !strings.EqualFold(strings.TrimSpace(out), dir) {
+	if !pathutil.Same(strings.TrimSpace(out), dir) {
 		t.Errorf("cwd after Set-Location = %q, want %q", strings.TrimSpace(out), dir)
 	}
-	if !strings.EqualFold(s.cwd, dir) {
+	if !pathutil.Same(s.cwd, dir) {
 		t.Errorf("tracked cwd = %q, want %q", s.cwd, dir)
 	}
 }
@@ -126,5 +166,20 @@ func TestANativeExitCodeIsStillTheCommandsOwn(t *testing.T) {
 	}
 	if _, _, code := exec1(t, s, `Write-Output ok`); code != 0 {
 		t.Errorf("a later success inherited an exit code: %d", code)
+	}
+}
+
+// The CI case on every machine: the session moved to a folder by its 8.3
+// short name still tracks that folder (PowerShell reports the long name).
+func TestChangingDirectoryShortPathStillPersists(t *testing.T) {
+	s := psOnly(t)
+	long := pathutiltest.LongDir(t)
+	alias, kind := pathutiltest.ShortAlias(t, long)
+	exec1(t, s, "Set-Location '"+alias+"'")
+	if !pathutil.Same(s.cwd, long) {
+		t.Errorf("moved to %s (%s of %s); tracked cwd = %q", alias, kind, long, s.cwd)
+	}
+	if out, _, _ := exec1(t, s, "(Get-Location).Path"); !pathutil.Same(strings.TrimSpace(out), long) {
+		t.Errorf("the session is in %q", strings.TrimSpace(out))
 	}
 }

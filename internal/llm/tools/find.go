@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/pathutil"
+	"github.com/opencode-ai/opencode/internal/toolbox"
 )
 
 // GORILLA OVERRIDE: this tool did not exist upstream. It replaces the separate
@@ -236,8 +238,13 @@ var embeddedPfind []byte
 //  1. GORILLA_PFIND — an explicit override. If it is set but unusable that is
 //     an error, not a fall-through: silently ignoring a typo'd override would
 //     run a different engine than the one the user pointed at.
-//  2. `pfind` on PATH — a system install (the .deb ships /usr/bin/pfind).
-//  3. The embedded copy, extracted once into the user cache.
+//  2. The native pfind.exe embedded in a `-tags toolbox` build (internal/toolbox:
+//     extracted to the private cache, its sha256 checked before every run).
+//     A plain build embeds none and this step is skipped.
+//  3. `pfind` on PATH — a system install (the .deb ships /usr/bin/pfind).
+//  4. The embedded pfind.py, extracted once into the user cache, run by python3.
+//
+// pfindEngine names which of these ran; the find result carries it.
 //
 // GORILLA OVERRIDE: when python3 is missing this REFUSES rather than falling
 // back to a degraded search. An agent told "no matches" cannot tell that apart
@@ -318,6 +325,9 @@ func findPfindPath() (string, []string, error) {
 		}
 		return python, append(preArgs, env), nil
 	}
+	if p, err := toolbox.Path("pfind"); err == nil {
+		return p, nil, nil
+	}
 	if p, err := exec.LookPath("pfind"); err == nil {
 		return p, nil, nil
 	}
@@ -342,52 +352,23 @@ func findPfindPath() (string, []string, error) {
 // engine version. The filename carries a content hash, so a new binary with a
 // new engine never runs a stale extract, and re-running never rewrites.
 // cacheDirIsPrivate refuses a cache directory that other local users can write
-// to. The file that lands there is about to be EXECUTED, so a directory anyone
-// can drop a file into is a local privilege-escalation path.
-//
-// GORILLA OVERRIDE (2026-09-01): the Unix permission-bit test cannot be run on
-// Windows and must not simply be skipped there.
-//
-// Go's os.Stat reports a synthesised 0777 for every directory on Windows — it
-// does not read the ACL — so the original `perm & 0o022 != 0` test was true for
-// EVERY directory and the find tool refused to run at all. The local session
-// database has two recorded failures reading "cache dir
-// C:\Users\...\AppData\Local\gorilla-opencode is writable by other users;
-// refusing to execute from it", which is that false positive.
-//
-// Rev 1 responded by skipping the check on Windows entirely, which removed the
-// protection instead of translating it. What the check is really asking is "can
-// somebody else put a file here", and on Windows the answer is carried by
-// location rather than by mode bits: %LOCALAPPDATA% lives under the user's own
-// profile, which is ACL'd to that user. So the Windows form of the same question
-// is "is this inside my profile" — a real check, not a waived one.
+// to (the file that lands there is about to be EXECUTED). The check, and why
+// on Windows it is by location, now lives in internal/toolbox, which the
+// embedded helpers share.
 func cacheDirIsPrivate(dir string) error {
-	if runtime.GOOS != "windows" {
-		st, err := os.Stat(dir)
-		if err != nil {
-			return err
-		}
-		if st.Mode().Perm()&0o022 != 0 {
-			return fmt.Errorf("cache dir %s is writable by other users; refusing to execute from it", dir)
-		}
-		return nil
-	}
+	return toolbox.CacheDirIsPrivate(dir)
+}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("cannot determine the user profile directory to validate %s: %w", dir, err)
+// pfindEngine says which engine findPfindPath chose, for the result's metadata.
+func pfindEngine(bin string, prefix []string) string {
+	switch {
+	case len(prefix) > 0:
+		return "pfind.py (python)"
+	case toolbox.IsToolboxFile(bin):
+		return "pfind.exe (embedded)"
+	default:
+		return "pfind (" + bin + ")"
 	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return err
-	}
-	rel, err := filepath.Rel(home, abs)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return fmt.Errorf(
-			"cache dir %s is outside your user profile (%s), so other users may be able to write to it; "+
-				"refusing to execute the search engine from there", dir, home)
-	}
-	return nil
 }
 
 func extractEmbeddedPfind() (string, error) {
@@ -536,6 +517,7 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	// Without the separator a query like "-v" or "--help" would be parsed as a
 	// pfind flag instead of searched for.
 	args := append([]string{}, prefix...)
+	depthCut := false // a plain listing cut at depth 2 (find_depthnote.go)
 	args = append(args,
 		"--no-color",
 		"--count",
@@ -629,6 +611,7 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 				args = append(args, "--files")
 				if params.Glob == "" {
 					args = append(args, "--max-depth", "2")
+					depthCut = true
 				}
 			}
 		} else if params.FilesOnly {
@@ -687,9 +670,13 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	var exitErr *exec.ExitError
 	if runErr != nil && errors.As(runErr, &exitErr) && exitErr.ExitCode() == 1 &&
 		!strings.Contains(stderr, "Traceback") {
+		empty := "No matches found."
+		if note := depthNoteFor(depthCut, searchPath); note != "" {
+			empty = "No files within depth 2.\n" + note
+		}
 		return WithResponseMetadata(
-			NewTextResponse("No matches found."),
-			FindResponseMetadata{Engine: "pfind", DurationS: elapsed.Round(time.Millisecond).String()},
+			NewTextResponse(empty),
+			FindResponseMetadata{Engine: pfindEngine(bin, prefix), DurationS: elapsed.Round(time.Millisecond).String()},
 		), nil
 	}
 	if runErr != nil {
@@ -705,6 +692,9 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	// a silently capped list reads as the complete answer.
 	if m := countSummary.FindStringSubmatch(stderr); m != nil && m[2] != "" {
 		body += fmt.Sprintf("\n[%s files matched; only %s shown — narrow with type, path or glob]", m[1], m[2])
+	}
+	if note := depthNoteFor(depthCut, searchPath); note != "" {
+		body = strings.TrimRight(body, "\n") + "\n" + note
 	}
 	rawBytes := len(body)
 	truncated := false
@@ -724,7 +714,7 @@ func (f *findTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 	return WithResponseMetadata(
 		NewTextResponse(body),
 		FindResponseMetadata{
-			Engine:    "pfind",
+			Engine:    pfindEngine(bin, prefix),
 			Truncated: truncated,
 			Bytes:     rawBytes,
 			DurationS: elapsed.Round(time.Millisecond).String(),
@@ -742,7 +732,8 @@ func withinHome(path, home string) bool {
 	if !filepath.IsAbs(p) {
 		p = filepath.Join(config.WorkingDirectory(), p)
 	}
-	return filepath.Clean(p) == filepath.Clean(home)
+	// Respelled first: a home folder given in its 8.3 short form is still home.
+	return pathutil.Equal(pathutil.Long(p), pathutil.Long(home))
 }
 
 // doomedContentSearch catches the one shape that cannot succeed: reading the

@@ -38,13 +38,15 @@ func TestReadOnlyCommandsNeverAsk(t *testing.T) {
 	}
 	for _, cmd := range rows {
 		t.Run(cmd, func(t *testing.T) {
-			// GORILLA FIX (2026-10-24): `type` is read-only in bash and
-			// Get-Content in PowerShell, where it asks on purpose
-			// (unixOnlyReadOnly). This row failed on every Windows run; the
-			// rule is right, the row was platform-blind.
-			if strings.HasPrefix(cmd, "type ") && shell.IsWindowsPowerShell() {
+			// GORILLA FIX (2026-10-26, gap #7): under PowerShell the rows
+			// whose program does not exist there (uname, df, sw_vers ...) ask:
+			// the name could only resolve to whatever .exe a PATH folder
+			// holds. Their PowerShell equivalents are read-only instead
+			// (readonly_powershell_test.go). `type` is Get-Content there and
+			// reads like it; credential paths still ask (namesSensitivePath).
+			if shell.IsWindowsPowerShell() && unixOnlyRow(cmd) {
 				if v := bashGateVerdict(cmd); v.ReadOnly {
-					t.Errorf("%q skips the gate under PowerShell, where type reads any file", cmd)
+					t.Errorf("%q skips the gate under PowerShell, where that program does not exist", cmd)
 				}
 				return
 			}
@@ -53,6 +55,21 @@ func TestReadOnlyCommandsNeverAsk(t *testing.T) {
 			}
 		})
 	}
+}
+
+// unixOnlyRow: every segment's program is a Unix-only read-only entry, or
+// the row needs one (test ... && echo).
+func unixOnlyRow(cmd string) bool {
+	for _, seg := range splitShellCommands(stripBenignRedirects(cmd)) {
+		f := strings.Fields(seg)
+		if len(f) == 0 {
+			continue
+		}
+		if notInPowerShell[f[0]] || (len(f) > 1 && notInPowerShell[f[0]+" "+f[1]]) {
+			return true
+		}
+	}
+	return false
 }
 
 // TestTheseStillAsk: each row is the reason a read-only-looking command must

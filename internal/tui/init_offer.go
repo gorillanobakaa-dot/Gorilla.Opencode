@@ -25,6 +25,16 @@ import (
 // without an answer (the project is not marked, so it is offered again next
 // launch) and every key goes to the chat box, in order, where the editor's
 // paste rule makes an Enter inside the burst a line break.
+//
+// GORILLA FIX (2026-10-27, job 07): a held key is an answer only if the offer
+// has a use for it. Typing at ~30 ms a key (the acceptance runner, and a fast
+// typist) let every key settle on its own, so "What is in the folder Folder?"
+// reached the model as "t is in the folder Folder?": the offer took "W" and "a"
+// (no use for either, dropped) and "h" (its move-left key) before two keys came
+// close enough to count as typing. A key the offer cannot use now puts it away
+// and goes to the chat; a letter the offer only moves on (h, l) goes to the
+// offer but is kept, and handed to the chat ahead of the next key if typing
+// follows. Only y, n, q, Enter and Esc answer it, as before.
 const (
 	// offerGrace: a person needs ~250 ms to react to something that has just
 	// appeared; a key sooner than this was on its way before the offer was seen.
@@ -41,6 +51,31 @@ type initOfferGate struct {
 	held    []tea.KeyMsg // a possible answer, waiting to see whether more keys follow
 	seq     int
 	passing bool // the held answer is being handed to the offer
+	// moved: letters the offer took as moves (h, l), handed to the chat if a
+	// key the offer has no use for follows.
+	moved []tea.KeyMsg
+}
+
+// offerKeyUse is what the open offer does with a key (dialog/init.go).
+type offerKeyUse int
+
+const (
+	offerNoUse      offerKeyUse = iota // typing for the chat
+	offerMoveLetter                    // h, l: moves the selection, also a letter
+	offerMove                          // tab, left, right
+	offerAnswer                        // y, n, q, enter, esc
+)
+
+func offerUseOf(k tea.KeyMsg) offerKeyUse {
+	switch k.String() {
+	case "y", "n", "q", "enter", "esc":
+		return offerAnswer
+	case "h", "l":
+		return offerMoveLetter
+	case "tab", "left", "right":
+		return offerMove
+	}
+	return offerNoUse
 }
 
 // offerKeySettledMsg says the held key with this sequence number was followed
@@ -80,13 +115,14 @@ func (a appModel) gateOfferKey(k tea.KeyMsg) (next appModel, cmd tea.Cmd, handle
 	return a, tea.Tick(offerAnswerSettle, func(time.Time) tea.Msg { return offerKeySettledMsg{seq} }), true
 }
 
-// withdrawOffer puts the offer away unanswered and hands the held keys, then k,
-// to the chat as if the offer had never been open.
+// withdrawOffer puts the offer away unanswered and hands the letters it took as
+// moves, the held keys, then k, to the chat as if the offer had never been open.
 func (a appModel) withdrawOffer(k tea.KeyMsg) (appModel, tea.Cmd, bool) {
-	keys := append(a.offerGate.held, k)
+	keys := append(append(append([]tea.KeyMsg{}, a.offerGate.moved...), a.offerGate.held...), k)
 	a.showInitDialog = false
 	a.offerGate.armed = false
 	a.offerGate.held = nil
+	a.offerGate.moved = nil
 	a.offerGate.seq++ // a timer still on its way finds nothing to answer
 	cmds := []tea.Cmd{util.ReportInfo("Initialize-project offer put away while you type; /init brings it back.")}
 	for _, key := range keys {
@@ -107,6 +143,15 @@ func (a appModel) answerOffer(msg offerKeySettledMsg) (tea.Model, tea.Cmd) {
 	}
 	k := g.held[0]
 	g.held = nil
+	switch offerUseOf(k) {
+	case offerNoUse:
+		next, cmd, _ := a.withdrawOffer(k)
+		return next, cmd
+	case offerMoveLetter:
+		g.moved = append(g.moved, k)
+	default:
+		g.moved = nil
+	}
 	g.passing = true
 	m, cmd := a.update(k)
 	if next, ok := m.(appModel); ok {

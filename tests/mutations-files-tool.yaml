@@ -1,0 +1,112 @@
+# fieldkit mutate --plan tests/mutations-files-tool.yaml --cwd . -- go test -count=1 ./internal/llm/tools/ -run "(?i)files"
+# Job 05 of goal windows-capabilities (2026-10-27): the files tool. Every rule added, broken on purpose; each must
+# be CAUGHT. Runs on Windows (robocopy, junctions, SetFileAttributes); the Go engine's own rules are reached
+# directly by TestFilesGoEngine*. Not in the plan, on purpose: the real-run robocopy exit >= 8 branch (no test can
+# make robocopy fail after a clean dry run without a fault injector), the Recycle Bin call itself (stubbed in tests;
+# checked once by hand with GORILLA_TEST_REAL_RECYCLE=1), and the Unix-only files_other.go (the Linux CI runs it).
+# See docs/FILES-TOOL.dual-track.md.
+
+# --- rule 1: preview first, then ask, then run
+- file: internal/llm/tools/files_robocopy.go
+  swap: ['args = append(args, "/L")', 'args = append(args, "/V")']
+  why: the dry run is a real run
+- file: internal/llm/tools/files.go
+  swap: ["\tif p.DryRun {\n\t\treturn NewTextResponse(preview), nil\n\t}\n\tif len(plan.Copies)", "\tif false {\n\t\treturn NewTextResponse(preview), nil\n\t}\n\tif len(plan.Copies)"]
+  why: dry_run=true changes files
+- file: internal/llm/tools/files.go
+  swap: ['if !t.ask(ctx, action, dst, action+":"+src+"->"+dst, preview, syncIrreversible(op, plan), plan) {', 'if false {']
+  why: a mirror runs without asking
+- file: internal/llm/tools/files.go
+  swap: ["\tif len(plan.Errors) > 0 {\n\t\treturn NewTextErrorResponse(\"the dry run reported errors", "\tif false {\n\t\treturn NewTextErrorResponse(\"the dry run reported errors"]
+  why: a dry run that logged ERROR (exit 1) is asked and run
+
+# --- rule 2: the deletes are shown and the prompt is irreversible
+- file: internal/llm/tools/files.go
+  swap: ['if n := plan.deletes(); n > 0 {', 'if false {']
+  why: a mirror that deletes is not marked irreversible
+- file: internal/llm/tools/files_robocopy.go
+  swap: ['case strings.EqualFold(class, "*EXTRA File"):', 'case false:']
+  why: the files a mirror deletes are missing from the preview
+- file: internal/llm/tools/files_robocopy.go
+  swap: ["\tif action == \"move\" || action == \"move_files\" {\n\t\tplan.Deletes = append(plan.Deletes, plan.Copies...)\n\t}\n\treturn plan\n}", "\treturn plan\n}"]
+  why: a move does not say it deletes the source files
+- file: internal/llm/tools/files_robocopy.go
+  swap: ['args = append(args, "/E", "/PURGE", "/XC", "/XN", "/XO", "/XL")', 'args = append(args, "/E", "/PURGE")']
+  why: purge also copies
+
+# --- rule 3: roots and nesting refused before asking
+- file: internal/llm/tools/files.go
+  swap: ['if pathutil.Within(src, dst) || pathutil.Within(dst, src) {', 'if pathutil.Within(src, dst) {']
+  why: a mirror into a folder inside its own source
+- file: internal/llm/tools/files.go
+  swap: ['		return refuseRoot("destination", dst)', '		return ""']
+  why: a mirror onto the profile root or a drive root
+- file: internal/llm/tools/files.go
+  swap: ['		return refuseRoot("source", src)', '		return ""']
+  why: a move out of the profile root
+- file: internal/llm/tools/files.go
+  swap: ['	case isProfileRoot(p):', '	case false:']
+  why: the profile folder is not recognized
+
+# --- rule 4: links never followed
+- file: internal/llm/tools/files_robocopy.go
+  swap: ['args = append(args, "/XJ", "/R:2"', 'args = append(args, "/R:2"']
+  why: robocopy follows a junction loop
+- file: internal/llm/tools/files_gosync.go
+  swap: ["\t\tif isLinkEntry(d) {\n\t\t\treturn nil\n\t\t}\n\t\tif rel == \".\" {", "\t\tif rel == \".\" {"]
+  why: the Go engine copies through a link
+
+# --- threads
+- file: internal/llm/tools/files.go
+  swap: ['if n > maxFilesThreads {', 'if n > 100000 {']
+  why: more than robocopy's 128 threads are passed
+- file: internal/llm/tools/files.go
+  swap: ['		n = runtime.NumCPU()', '		n = 8']
+  why: the default is not the logical CPU count
+
+# --- rename
+- file: internal/llm/tools/files_rename.go
+  swap: ['if other, dup := taken[key]; dup {', 'if false {']
+  why: two files renamed to one name
+- file: internal/llm/tools/files_rename.go
+  swap: ['		if !moving[key] {', '		if false {']
+  why: a rename onto a file that stays
+- file: internal/llm/tools/files_rename.go
+  swap: ['case strings.HasSuffix(name, ".") || strings.HasSuffix(name, " "):', 'case false:']
+  why: a name Windows truncates
+- file: internal/llm/tools/files_rename.go
+  swap: ['return fmt.Sprintf("%0*d", width, n)', 'return fmt.Sprintf("%d", n)']
+  why: "{n:D2} is not zero padded"
+
+# --- attributes
+- file: internal/llm/tools/files_attr.go
+  swap: ["\tif setNormal {\n\t\tclear |= settableAttrs", "\tif false {\n\t\tclear |= settableAttrs"]
+  why: Normal keeps ReadOnly
+- file: internal/llm/tools/files_attr.go
+  swap: ['if bad := (set | clear) &^ settableAttrs; bad != 0 {', 'if bad := uint32(0); bad != 0 {']
+  why: Encrypted is accepted and silently ignored
+- file: internal/llm/tools/files_attr.go
+  swap: ["\tvar out []string\n\t_ = filepath.WalkDir(root", "\tout := []string{root}\n\t_ = filepath.WalkDir(root"]
+  why: a recursive set also changes the folder the pattern excludes
+
+# --- delete
+- file: internal/llm/tools/files_delete.go
+  swap: ['if p.Permanent && TrashAsked(sessionID) {', 'if false {']
+  why: permanent=true after the person asked for the trash
+- file: internal/llm/tools/files_delete.go
+  swap: ['irreversible = fmt.Sprintf("%s: %d file(s), %d folder(s)", PermanentDeleteWhy, files, dirs)', 'irreversible = ""']
+  why: a permanent delete is waved through by auto-approve
+- file: internal/llm/tools/files_delete.go
+  swap: ['} else if err := recycleFunc(targets); err != nil {', '} else if err := forceRemoveAll(targets[0]); err != nil {']
+  why: the default delete is permanent
+- file: internal/llm/tools/files_delete.go
+  swap: ['		if fi.IsDir() && !p.Recurse {', '		if false {']
+  why: a folder with content goes without recurse
+- file: internal/llm/tools/files_delete.go
+  swap: ['if wd := config.WorkingDirectory(); wd != "" && pathutil.Within(p, wd) {', 'if false {']
+  why: the working directory is deleted
+
+# --- list
+- file: internal/llm/tools/files_attr.go
+  swap: ['		if hidden && !p.Hidden {', '		if false {']
+  why: hidden items listed without hidden=true
