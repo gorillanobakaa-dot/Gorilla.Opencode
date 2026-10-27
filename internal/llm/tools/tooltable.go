@@ -71,7 +71,10 @@ func ToolTableBlock(all []BaseTool, deferral bool) string {
 			continue
 		}
 		if n == 0 {
-			b.WriteString("YOUR TOOLS (loaded now; call them by these names)\n")
+			// GORILLA FIX (2026-10-27, job 07): "what tools do you have?" was
+			// answered by calling an MCP server's tool that counts ITS tools
+			// (Fieldkit readiness: "1,499 tools"). The answer is this table.
+			b.WriteString("YOUR TOOLS (loaded now; call them by these names; asked what tools you have, answer from this list)\n")
 		}
 		n++
 		fmt.Fprintf(&b, "  %-14s %s\n", name, ToolSummary(t))

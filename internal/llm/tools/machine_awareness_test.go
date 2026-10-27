@@ -77,7 +77,8 @@ func TestToolTableLines(t *testing.T) {
 		t.Errorf("firstSentence: %q", got)
 	}
 	table := ToolTableBlock([]BaseTool{NewFilesTool(nil), NewFindTool()}, false)
-	if !strings.HasPrefix(table, "YOUR TOOLS") || strings.Count(table, "\n") != 3 {
+	if !strings.HasPrefix(table, "YOUR TOOLS") || strings.Count(table, "\n") != 3 ||
+		!strings.Contains(table, "asked what tools you have, answer from this list") {
 		t.Errorf("table:\n%s", table)
 	}
 	if ToolTableBlock(nil, false) != "" {
