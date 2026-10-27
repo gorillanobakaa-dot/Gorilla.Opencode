@@ -360,3 +360,11 @@ Columns: wall seconds for the whole scenario; model calls; seconds per call (fro
 |---|---|---|---|---|---|---|---|---|
 | copy64 | VALID | 28 | 3 | 3, 2, 1 | 23,359 | 77 | files, files | backup == src: True; 64 threads asked for in a call: True |
 | msvc | VALID | 38 | 6 | 1, 6, 3, 2, 4, 3 | 22,186 | 126 | view, bash, view, bash, bash | hello.exe runs and prints the line: True; MSVC Rich header in the PE: True |
+
+---
+
+Cleanup (2026-10-27 15:00):
+- `fieldkit size recycle %USERPROFILE%\Documents\Scripts\job07-acceptance --whole-folder` moved 181 MiB (594 files) to the Recycle Bin, and the tool found them in the bin's own records. That folder held two 81 MiB toolbox exe builds, five run folders, the logs and PIDS.txt.
+- This job's 19 small temp files were recycled the same way: test logs, and two .keep copies of source files used to prove the tests fail without the fixes.
+- No local model is loaded (`lms ps`), and no process of this job is running.
+- The branch push through the Fieldkit ship command was tried once and refused with HARD LINE 1, the same text as inbox #83. The commits stay local on feat/windows-capabilities.
