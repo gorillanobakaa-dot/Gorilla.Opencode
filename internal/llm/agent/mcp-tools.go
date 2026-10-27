@@ -80,6 +80,8 @@ func runTool(ctx context.Context, c MCPClient, serverName, toolName string, inpu
 // block. It never panics on a malformed answer.
 func callMCP(ctx context.Context, c MCPClient, toolName string, input string) mcpAnswer {
 	defer closeMCPClient(c)
+	ctx, stopWatch := watchMCPServer(ctx, c)
+	defer stopWatch()
 	initRequest := mcp.InitializeRequest{}
 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
 	initRequest.Params.ClientInfo = mcp.Implementation{
@@ -89,7 +91,7 @@ func callMCP(ctx context.Context, c MCPClient, toolName string, input string) mc
 
 	_, err := c.Initialize(ctx, initRequest)
 	if err != nil {
-		return mcpAnswer{text: err.Error(), failed: true}
+		return mcpAnswer{text: mcpCallError(ctx, err), failed: true}
 	}
 
 	toolRequest := mcp.CallToolRequest{}
@@ -101,7 +103,7 @@ func callMCP(ctx context.Context, c MCPClient, toolName string, input string) mc
 	toolRequest.Params.Arguments = args
 	result, err := c.CallTool(ctx, toolRequest)
 	if err != nil {
-		return mcpAnswer{text: err.Error(), failed: true}
+		return mcpAnswer{text: mcpCallError(ctx, err), failed: true}
 	}
 	if result == nil {
 		return mcpAnswer{text: "the MCP server returned no result", failed: true}
