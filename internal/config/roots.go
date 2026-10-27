@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/opencode-ai/opencode/internal/pathutil"
 )
 
 // AbsFor resolves a requested path to the absolute path the workspace rules
@@ -73,18 +75,14 @@ func AbsFor(path string) string {
 // prefix ignores the component boundary. That bug is live in the tree today at
 // edit.go and write.go, which is why permission scoping there can attribute a
 // file to a sibling directory's root.
+//
+// GORILLA FIX (2026-10-27): both sides are respelled first (8.3 short names
+// expanded, case-insensitive on Windows). A root given as C:\Users\RUNNER~1\...
+// did not contain the same folder spelled C:\Users\runneradmin\..., which is
+// how the credential guard resolves what it reads, so a project's own
+// environment file was refused as "not part of a project".
 func containsPath(root, path string) bool {
-	if root == "" || path == "" {
-		return false
-	}
-	rel, err := filepath.Rel(root, path)
-	if err != nil {
-		return false
-	}
-	if rel == "." {
-		return true
-	}
-	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	return pathutil.WithinLexical(root, path)
 }
 
 // normaliseDir expands "~", makes the path absolute, resolves symlinks, and

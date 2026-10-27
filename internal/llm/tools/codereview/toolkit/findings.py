@@ -758,7 +758,7 @@ def verify_positions(items: List[Finding], root: str, drift_window: int = 3) -> 
         if rel not in cache:
             path = rel if os.path.isabs(rel) else os.path.join(root, rel)
             try:
-                with open(path, errors="replace") as fh:
+                with open(path, encoding="utf-8", errors="replace") as fh:
                     cache[rel] = fh.read().splitlines()
             except (OSError, IsADirectoryError):
                 cache[rel] = None

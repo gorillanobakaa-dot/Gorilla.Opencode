@@ -480,7 +480,7 @@ def main():
     out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".setup")
     os.makedirs(out_dir, exist_ok=True)
     report_path = os.path.join(out_dir, "install_report.json")
-    with open(report_path, "w") as f:
+    with open(report_path, "w", encoding="utf-8") as f:
         json.dump({"generated": datetime.now().isoformat(), "results": report}, f, indent=2)
 
     ok_count = sum(1 for r in report if r["status"] in ("already_installed", "installed"))

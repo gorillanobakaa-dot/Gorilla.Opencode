@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/pathutil"
 )
 
 // A symlink inside the workspace pointing elsewhere must be reported by its
@@ -45,7 +46,9 @@ func TestASymlinkIsDescribedByWhereItActuallyGoes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveWriteTarget: %v", err)
 	}
-	if !strings.HasPrefix(resolved, outside) {
+	// pathutil.Within, not HasPrefix: t.TempDir() is C:\Users\RUNNER~1\... on
+	// the CI runner and the resolved target is spelled long.
+	if !pathutil.Within(outside, resolved) {
 		t.Errorf("the symlink was not followed: %q resolved to %q, expected under %q", dest, resolved, outside)
 	}
 	if inside {
@@ -53,7 +56,7 @@ func TestASymlinkIsDescribedByWhereItActuallyGoes(t *testing.T) {
 	}
 
 	desc := DescribeWriteTarget(dest)
-	if !strings.Contains(desc, outside) {
+	if !strings.Contains(desc, resolved) {
 		t.Errorf("the prompt would not show the real destination: %q", desc)
 	}
 	if !strings.Contains(desc, "OUTSIDE") {

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/pathutil"
+	"github.com/opencode-ai/opencode/internal/pathutil/pathutiltest"
 )
 
 // isolate points config at a scratch XDG_CONFIG_HOME and writes the given
@@ -144,8 +146,10 @@ func TestVanishedSavedWorkspaceFallsBackToCwd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolveWorkspace: %v", err)
 	}
-	if got != here {
-		t.Errorf("resolved to %q, want the real cwd %q", got, here)
+	// pathutil.Same: t.TempDir() is C:/Users/RUNNER~1/... on the CI runner,
+	// and the workspace is spelled long.
+	if !pathutil.Same(got, here) || got != pathutil.Long(got) {
+		t.Errorf("resolved to %q, want the real cwd %q spelled long", got, here)
 	}
 }
 
@@ -161,8 +165,36 @@ func TestFreshInstallUsesCwd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolveWorkspace: %v", err)
 	}
-	if got != here {
-		t.Errorf("resolved to %q, want %q", got, here)
+	if !pathutil.Same(got, here) || got != pathutil.Long(got) {
+		t.Errorf("resolved to %q, want %q spelled long", got, here)
+	}
+}
+
+// The CI case: the program started in a folder spelled by its 8.3 short name
+// (C:/Users/RUNNER~1/...). The workspace is that folder, spelled long, so the
+// roots, the saved history and every containment check see one spelling.
+func TestFreshInstallShortPathCwdIsSpelledLong(t *testing.T) {
+	isolate(t, map[string]any{"skipWorkspacePrompt": true})
+	long := pathutiltest.LongDir(t)
+	alias, kind := pathutiltest.ShortAlias(t, long)
+	prev, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(alias); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(prev) }()
+
+	got, _, _, err := resolveWorkspace("", false)
+	if err != nil {
+		t.Fatalf("resolveWorkspace: %v", err)
+	}
+	if !pathutil.Same(got, long) {
+		t.Errorf("started in %s (%s of %s), resolved to %q", alias, kind, long, got)
+	}
+	if kind == pathutiltest.ShortName && !pathutil.Equal(got, long) {
+		t.Errorf("started in %s, the workspace is spelled %q, want %q", alias, got, long)
 	}
 }
 

@@ -6,6 +6,10 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/opencode-ai/opencode/internal/pathutil"
+	"github.com/opencode-ai/opencode/internal/pathutil/pathutiltest"
+	"github.com/spf13/viper"
 )
 
 func TestConfigBaseHonoursXDGConfigHome(t *testing.T) {
@@ -89,14 +93,71 @@ func assertSecretFile(t *testing.T, path string, info os.FileInfo) {
 	if err != nil {
 		t.Skip("cannot determine the user profile directory")
 	}
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		t.Fatalf("Abs(%s): %v", path, err)
+	// pathutil.Within: the CI runner's TEMP is C:\Users\RUNNER~1 and its
+	// profile C:\Users\runneradmin, the same folder spelled two ways.
+	if !pathutil.Within(home, path) {
+		t.Errorf("config.json is at %s (%s), outside the user profile %s — on Windows that "+
+			"location IS the access control, and it holds API keys", path, pathutil.Canonical(path), home)
 	}
-	rel, err := filepath.Rel(home, abs)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		t.Errorf("config.json is at %s, outside the user profile %s — on Windows that "+
-			"location IS the access control, and it holds API keys", abs, home)
+}
+
+// The CI failure, reproduced on every machine: the config folder is reached
+// through a second spelling (8.3 short name, or a junction) of a folder inside
+// the profile. It is still inside the profile.
+func TestConfigFileShortPathIsInsideTheProfile(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("the profile-location check is the Windows form of the 0600 check; elsewhere the mode is checked")
+	}
+	home := pathutiltest.LongDir(t)
+	cfgLong := filepath.Join(home, "AppData Roaming")
+	if err := os.MkdirAll(cfgLong, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	alias, kind := pathutiltest.ShortAlias(t, cfgLong)
+	t.Logf("config folder through a %s: %s", kind, alias)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", alias)
+	if _, err := Load(t.TempDir(), false); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	// Load runs once per binary and viper keeps the file it found then; point
+	// it at the aliased folder for this test, and back after.
+	prev := viper.ConfigFileUsed()
+	viper.SetConfigFile(GorillaConfigFile())
+	t.Cleanup(func() { viper.SetConfigFile(prev) })
+	if err := updateCfgFile(func(c *Config) { c.Debug = false }); err != nil {
+		t.Fatalf("updateCfgFile: %v", err)
+	}
+	path := GorillaConfigFile()
+	if !strings.HasPrefix(path, alias) {
+		t.Fatalf("the config path %s does not use the alias %s; the test proves nothing", path, alias)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("config file not written: %v", err)
+	}
+	assertSecretFile(t, path, info)
+}
+
+// The workspace side of the same failure: a root and a file inside it,
+// spelled two ways, both ways round.
+func TestRootForShortPathFindsTheRoot(t *testing.T) {
+	long := pathutiltest.LongDir(t)
+	alias, kind := pathutiltest.ShortAlias(t, long)
+	for _, c := range []struct{ root, file string }{
+		{long, filepath.Join(alias, "x.go")},
+		{alias, filepath.Join(long, "x.go")},
+	} {
+		useWorkspaceForTest(t, c.root)
+		_, ok := RootFor(c.file)
+		if kind == pathutiltest.ShortName && !ok {
+			t.Errorf("root %s does not contain %s (the same folder, 8.3 spelling)", c.root, c.file)
+		}
+		// A link is a different path as written: RootFor answers about the
+		// path as written, and the guards resolve links before asking.
+		if kind != pathutiltest.ShortName && ok {
+			t.Errorf("root %s contains %s through a %s; RootFor must not follow links", c.root, c.file, kind)
+		}
 	}
 }
 
@@ -201,4 +262,16 @@ func TestWriteSecretFileCreatesParentDirectory(t *testing.T) {
 		t.Errorf("file not created: %v", err)
 	}
 	t.Cleanup(func() { os.RemoveAll(filepath.Join(ConfigBase(), "deeply")) })
+}
+
+// useWorkspaceForTest makes dir the only root for one test. Load runs once
+// per binary, so the loaded config is changed in place and put back after.
+func useWorkspaceForTest(t *testing.T, dir string) {
+	t.Helper()
+	if _, err := Load(dir, false); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	prevWD, prevAdd := cfg.WorkingDir, cfg.AdditionalDirs
+	cfg.WorkingDir, cfg.AdditionalDirs = dir, nil
+	t.Cleanup(func() { cfg.WorkingDir, cfg.AdditionalDirs = prevWD, prevAdd })
 }

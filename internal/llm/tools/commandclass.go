@@ -166,27 +166,57 @@ func stripBenignRedirects(cmd string) string {
 func namesSensitivePath(cmd string) bool {
 	home, _ := os.UserHomeDir()
 	for _, w := range strings.Fields(cmd) {
-		w = strings.Trim(w, `"'`)
-		if w == "" || strings.HasPrefix(w, "-") {
-			continue
-		}
-		if strings.Contains(w, "environ") && strings.Contains(w, "/proc/") {
-			return true
-		}
-		// $env:USERPROFILE\.aws\credentials was judged as a RELATIVE path,
-		// i.e. inside the workspace and exempt, so `cat` (Get-Content in
-		// PowerShell) read it with no prompt. Expanded first now.
-		if x := expandShellPathWord(w, home); x != w {
-			w = filepath.Clean(x)
-		}
-		if !strings.ContainsAny(w, `/\`) && !strings.HasPrefix(w, ".") {
-			continue
-		}
-		if RefuseSensitiveRead(w) != "" {
+		if sensitivePathWord(strings.Trim(w, `"'`), home) {
 			return true
 		}
 	}
 	return false
+}
+
+// sensitivePathWord is the decision for ONE word of a command, the same on
+// every OS.
+//
+// GORILLA FIX (2026-10-27): the word is split into its components on BOTH
+// separators before it is judged. A PowerShell path written with backslashes
+// expanded on Linux to /home/runner\<folder>\<file>, which Linux reads as one
+// file name directly under /home, so neither the credential folder nor the
+// file name was ever seen and the read was counted as read-only (CI, ubuntu).
+// PowerShell accepts both separators on every OS, pwsh on Linux included; a
+// backslash inside a real Unix file name is rare enough that asking about it
+// costs nothing.
+func sensitivePathWord(w, home string) bool {
+	if w == "" || strings.HasPrefix(w, "-") {
+		return false
+	}
+	if strings.Contains(w, "environ") && strings.Contains(w, "/proc/") {
+		return true
+	}
+	// A path spelled from an environment variable (PowerShell's env: drive,
+	// %NAME%, ~, $HOME) was judged as a RELATIVE path, i.e. inside the
+	// workspace and exempt, so `cat` (Get-Content in PowerShell) read it with
+	// no prompt. Expanded first now.
+	if x := expandShellPathWord(w, home); x != w {
+		w = x
+	}
+	if !strings.ContainsAny(w, `/\`) && !strings.HasPrefix(w, ".") {
+		return false
+	}
+	return RefuseSensitiveRead(nativePathWord(w)) != ""
+}
+
+// nativePathWord rebuilds a path word with this OS's separator, whichever of
+// the two it was written with. A leading separator (an absolute Unix path, or
+// a rooted Windows one) and a UNC prefix are kept.
+func nativePathWord(w string) string {
+	parts := strings.FieldsFunc(w, func(r rune) bool { return r == '/' || r == '\\' })
+	lead := ""
+	for _, r := range w {
+		if r != '/' && r != '\\' {
+			break
+		}
+		lead += string(filepath.Separator)
+	}
+	return filepath.Clean(lead + strings.Join(parts, string(filepath.Separator)))
 }
 
 // hardStop is one row of the "asks even under auto-approve" table.

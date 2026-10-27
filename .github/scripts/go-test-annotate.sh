@@ -69,10 +69,13 @@ END {
 		split(tests[i], t, SUBSEP)
 		short = tpkg[i]; sub(/.*\//, "", short)
 		printf "::error title=%s::%s\n", esct(short "." t[1]), esc(t[2])
+		names[tpkg[i]] = names[tpkg[i]] (names[tpkg[i]] == "" ? "" : " ") t[1]
 	}
+	# The package warning names every failing test: past the 10th ::error the
+	# names were lost (run 40488750905: shell had 3 failures, 1 was shown).
 	for (i = 1; i <= npkgs; i++) {
 		split(pkgs[i], p, SUBSEP)
-		printf "::warning title=FAIL %s::%s failing test(s) %s\n", esct(p[1]), p[2], esc(p[3])
+		printf "::warning title=FAIL %s::%s failing test(s) %s: %s\n", esct(p[1]), p[2], esc(p[3]), esc(names[p[1]])
 	}
 	for (i = 1; i <= npanics; i++) printf "::notice title=panic::%s\n", esc(panics[i])
 	if (ntests + npkgs + npanics == 0) print "::error title=go test::exit status non-zero, no FAIL line parsed"

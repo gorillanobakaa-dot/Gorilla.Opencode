@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/message"
+	"github.com/opencode-ai/opencode/internal/pathutil"
+	"github.com/opencode-ai/opencode/internal/pathutil/pathutiltest"
 	"github.com/opencode-ai/opencode/internal/session"
 )
 
@@ -397,13 +399,40 @@ func assertNotWorldReadable(t *testing.T, path string, info os.FileInfo) {
 	if err != nil {
 		t.Skip("cannot determine the user profile directory")
 	}
-	abs, err := filepath.Abs(path)
+	// pathutil.Within: the CI runner's TEMP is C:/Users/RUNNER~1 and its
+	// profile C:/Users/runneradmin, the same folder spelled two ways.
+	if !pathutil.Within(home, path) {
+		t.Errorf("transcript written to %s (%s), outside the user profile %s - on Windows that "+
+			"location IS the access control, and a transcript holds whatever was discussed",
+			path, pathutil.Canonical(path), home)
+	}
+}
+
+// The CI failure on every machine: the export folder reached through a second
+// spelling (8.3 short name, or a junction) of a folder inside the profile.
+func TestExportShortPathIsInsideTheProfile(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("the profile-location check is the Windows form of the 0600 check; elsewhere the mode is checked")
+	}
+	home := pathutiltest.LongDir(t)
+	outLong := filepath.Join(home, "Exported Transcripts")
+	if err := os.MkdirAll(outLong, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	alias, kind := pathutiltest.ShortAlias(t, outLong)
+	t.Logf("export folder through a %s: %s", kind, alias)
+	t.Setenv("USERPROFILE", home)
+	sess, msgs := fixture()
+	path, _, err := WriteSessionTree(alias, sess, msgs, nil, time.Unix(realStoredTimestamp, 0))
 	if err != nil {
-		t.Fatalf("Abs(%s): %v", path, err)
+		t.Fatal(err)
 	}
-	rel, err := filepath.Rel(home, abs)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		t.Errorf("transcript written to %s, outside the user profile %s - on Windows that "+
-			"location IS the access control, and a transcript holds whatever was discussed", abs, home)
+	if !strings.HasPrefix(path, alias) {
+		t.Fatalf("the transcript path %s does not use the alias %s; the test proves nothing", path, alias)
 	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNotWorldReadable(t, path, info)
 }

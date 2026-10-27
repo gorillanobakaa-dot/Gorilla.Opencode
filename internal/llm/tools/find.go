@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/pathutil"
 	"github.com/opencode-ai/opencode/internal/toolbox"
 )
 
@@ -722,7 +723,8 @@ func withinHome(path, home string) bool {
 	if !filepath.IsAbs(p) {
 		p = filepath.Join(config.WorkingDirectory(), p)
 	}
-	return filepath.Clean(p) == filepath.Clean(home)
+	// Respelled first: a home folder given in its 8.3 short form is still home.
+	return pathutil.Equal(pathutil.Long(p), pathutil.Long(home))
 }
 
 // doomedContentSearch catches the one shape that cannot succeed: reading the

@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/pathutil"
+	"github.com/opencode-ai/opencode/internal/pathutil/pathutiltest"
 )
 
 // isolatePrompts points the override directory at a temp dir so these tests
@@ -72,12 +74,8 @@ func TestSaveAndResetOverrideRoundTrip(t *testing.T) {
 		if perm := info.Mode().Perm(); perm != 0o600 {
 			t.Errorf("override mode = %04o, want 0600", perm)
 		}
-	} else if home, err := os.UserHomeDir(); err == nil {
-		abs, _ := filepath.Abs(OverridePath(PromptCoder))
-		if rel, err := filepath.Rel(home, abs); err != nil || rel == ".." ||
-			strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			t.Errorf("override written to %s, outside the user profile %s - it lives beside API keys", abs, home)
-		}
+	} else {
+		assertInsideProfile(t, OverridePath(PromptCoder))
 	}
 
 	if err := ResetPrompt(PromptCoder); err != nil {
@@ -173,4 +171,47 @@ func TestFactoryIsNeverEmpty(t *testing.T) {
 			t.Errorf("factory prompt for %q is empty — reset would produce a blank prompt", id)
 		}
 	}
+}
+
+// assertInsideProfile is the Windows form of the 0600 check: the override
+// inherits the profile's ACL only if it lives inside the profile. Compared
+// with pathutil.Within: the CI runner's TEMP is C:\Users\RUNNER~1 and its
+// profile C:\Users\runneradmin, the same folder spelled two ways.
+func assertInsideProfile(t *testing.T, path string) {
+	t.Helper()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("cannot determine the user profile directory")
+	}
+	if !pathutil.Within(home, path) {
+		t.Errorf("override written to %s (%s), outside the user profile %s - it lives beside API keys",
+			path, pathutil.Canonical(path), home)
+	}
+}
+
+// The CI failure on every machine: the config folder reached through a second
+// spelling (8.3 short name, or a junction) of a folder inside the profile.
+func TestSaveOverrideShortPathIsInsideTheProfile(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("the profile-location check is the Windows form of the 0600 check; elsewhere the mode is checked")
+	}
+	isolatePrompts(t)
+	home := pathutiltest.LongDir(t)
+	cfgLong := filepath.Join(home, "AppData Roaming")
+	if err := os.MkdirAll(cfgLong, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	alias, kind := pathutiltest.ShortAlias(t, cfgLong)
+	t.Logf("config folder through a %s: %s", kind, alias)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", alias)
+	invalidateOverride(PromptCoder)
+	if err := SaveOverride(PromptCoder, "terse\n"); err != nil {
+		t.Fatalf("SaveOverride: %v", err)
+	}
+	path := OverridePath(PromptCoder)
+	if !strings.HasPrefix(path, alias) {
+		t.Fatalf("the override path %s does not use the alias %s; the test proves nothing", path, alias)
+	}
+	assertInsideProfile(t, path)
 }

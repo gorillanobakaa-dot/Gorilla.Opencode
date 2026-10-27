@@ -136,3 +136,56 @@ func TestBashRequestPathResolvesEnvAndRegistrySecurity(t *testing.T) {
 		t.Errorf("a workspace path should give the workspace, got %q", got)
 	}
 }
+
+// CI, ubuntu (2026-10-27): a PowerShell read of a credential under the
+// profile, written with backslashes, was counted as read-only on Linux. The
+// word expanded to /home/runner\<folder>\<file>, one file name under /home.
+// This runs on EVERY OS, over every credential folder and file name the guard
+// knows, in each spelling a PowerShell command can use; before the fix it
+// failed on Linux and macOS.
+func TestPowerShellCredentialPathsAskOnEveryOS_ReadOnly(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	list := powerShellReadOnlyList()
+	var targets []string
+	for _, d := range sensitiveDirSegments {
+		targets = append(targets, d+`\config`)
+	}
+	targets = append(targets, sensitiveBasenames...)
+	for _, target := range targets {
+		for _, prefix := range []string{`$env:USERPROFILE\`, `${env:USERPROFILE}\`, `%USERPROFILE%\`, `~\`, `$HOME\`} {
+			word := prefix + target
+			if !sensitivePathWord(word, home) {
+				t.Errorf("not judged a credential path: %s", word)
+			}
+			for _, cmd := range []string{"Get-Content " + word, "gc " + word, "type " + word} {
+				if IsSafeReadOnly(cmd, list) {
+					t.Errorf("must ask in PowerShell, but counted as read-only: %s", cmd)
+				}
+			}
+		}
+	}
+	// CAPABILITY GUARD: an ordinary file in the profile, either separator,
+	// stays read-only.
+	for _, cmd := range []string{`Get-Content $env:USERPROFILE\notes\todo.txt`, `Get-Content ~/notes/todo.txt`} {
+		if !IsSafeReadOnly(cmd, list) {
+			t.Errorf("an ordinary file asks: %s", cmd)
+		}
+	}
+}
+
+// nativePathWord keeps what makes a path absolute or UNC, on every OS.
+func TestNativePathWordKeepsTheRoot_ReadOnly(t *testing.T) {
+	sep := string(filepath.Separator)
+	for in, want := range map[string]string{
+		`a\b/c`:    filepath.Join("a", "b", "c"),
+		`\a\b`:     sep + filepath.Join("a", "b"),
+		`/a/b`:     sep + filepath.Join("a", "b"),
+		`./a\..\b`: "b",
+	} {
+		if got := nativePathWord(in); got != want {
+			t.Errorf("nativePathWord(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

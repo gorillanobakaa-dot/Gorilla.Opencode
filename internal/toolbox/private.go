@@ -3,9 +3,9 @@ package toolbox
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
-	"strings"
+
+	"github.com/opencode-ai/opencode/internal/pathutil"
 )
 
 // CacheDirIsPrivate refuses a cache directory that other local users can write
@@ -46,12 +46,9 @@ func CacheDirIsPrivate(dir string) error {
 	if err != nil {
 		return fmt.Errorf("cannot determine the user profile directory to validate %s: %w", dir, err)
 	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return err
-	}
-	rel, err := filepath.Rel(home, abs)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+	// pathutil.Within, not a string comparison: the same folder has a short
+	// (8.3) and a long spelling, and a junction to elsewhere is not inside.
+	if !pathutil.Within(home, dir) {
 		return fmt.Errorf(
 			"cache dir %s is outside your user profile (%s), so other users may be able to write to it; "+
 				"refusing to execute a helper from there", dir, home)
