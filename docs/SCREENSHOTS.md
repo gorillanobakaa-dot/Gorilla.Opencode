@@ -32,6 +32,23 @@ speed chip, in bold white.
 
 [![The fix build at rest on the MacBook Air: the status bar is red from the help chip to the blue model name, and "AUTO - approving without asking" and "No diagnostics" are readable in bold white on the red](screenshots/gallery/macos-air-2026-10/air-2026-10-28-after-red-bar-auto-readable.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-28-after-red-bar-auto-readable.png)
 
+### After: an API key warns before the first message
+
+Choosing a paid provider shows this once, and nothing goes on until
+"I understand" is typed. The figures come from the dated price table and
+include the 25% Anthropic charges to build the cache, so "up to" is not below
+a real bill.
+
+[![The paid API key warning on the MacBook Air: a red title saying your card pays for every message, an explanation that every message pays again for the whole conversation, a table of the most each Claude model can cost per message in a new chat and a long chat and per hour of the AI working alone, from Haiku 5.5 at 0.3 cents a message to Fable 5.1 at 606 dollars an hour, the free options with no card, and a prompt to type I understand](${G}/air-2026-10-28-after-api-key-cost-warning.png)](${G}/air-2026-10-28-after-api-key-cost-warning.png)
+
+### After: the session says what the next message can cost
+
+A paid-key session opens with one red line, and the status bar says "next up
+to $0.055". The real bill for this "comms check" was $0.0493, under the
+forecast.
+
+[![A Gorilla OpenCode session on an Anthropic API key: a red line at the top saying the card pays for every message and Claude Sonnet 5 costs up to 5.5 cents for the first message, the comms check answered, the session cost of 4.93 cents for the call, and the status bar showing next up to 0.055 dollars](${G}/air-2026-10-28-after-api-key-start-line-and-next-cost.png)](${G}/air-2026-10-28-after-api-key-start-line-and-next-cost.png)
+
 ### What the testing cost, from Anthropic's own page
 
 An API key cannot read its own balance, so `/usage` now says where it is. This
