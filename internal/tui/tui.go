@@ -19,6 +19,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/export"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
+	"github.com/opencode-ai/opencode/internal/llm/cost"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/llm/prompt"
 	"github.com/opencode-ai/opencode/internal/llm/tools/shell"
@@ -564,6 +565,36 @@ func antigravityIsActive() bool {
 	return p == "" || p == models.ProviderAntigravity
 }
 
+// paidKeyProviders bill a card for every message.
+var paidKeyProviders = map[models.ModelProvider]bool{
+	models.ProviderAnthropic: true, models.ProviderOpenAI: true, models.ProviderXAI: true,
+	models.ProviderDeepSeek: true, models.ProviderOpenRouter: true,
+}
+
+// paidKeyStartLine is the session-start reminder on a paid key, with what the
+// first message can cost when the model has a list price. Empty otherwise.
+func paidKeyStartLine() string {
+	c := config.Get()
+	if c == nil {
+		return ""
+	}
+	m, ok := models.SupportedModels[c.Agents[config.AgentCoder].Model]
+	if !ok || !paidKeyProviders[m.Provider] {
+		return ""
+	}
+	line := "API key: your card pays for every message."
+	if in, out, ok := cost.ListRates(string(m.Provider), m.APIModel, time.Now()); ok && in > 0 {
+		line += fmt.Sprintf(" %s: up to $%.3f for the first message, more as the conversation grows.",
+			m.Name, cost.MessageCost(in, out, cost.ShortConversationTokens))
+	}
+	return line
+}
+
+// anthropicUsageLine is the /usage headline for an Anthropic session. The
+// API gives an ordinary key no balance endpoint (spend reports need an Admin
+// key), so this says where the balance is instead of fetching anything.
+const anthropicUsageLine = "Anthropic (API key): your credit balance is on console.anthropic.com, Billing. An API key cannot read it. What this session has cost is below."
+
 // activeChatGPTMeter returns the ChatGPT meter when ChatGPT is the provider the
 // session actually spends against, else nil.
 func activeChatGPTMeters() []quota.Meter {
@@ -658,11 +689,25 @@ func antigravityUsageCmd(quiet bool) tea.Cmd {
 		// holds. quiet=true is the session-start line; stay silent there.
 		if !antigravityIsActive() {
 			if quiet {
+				// GORILLA (2026-10-28, owner): a session on a paid key opens
+				// with one red line saying so, every time. The full warning
+				// was answered once in the provider picker; this is the reminder.
+				if line := paidKeyStartLine(); line != "" {
+					return quotaLineMsg{line: line, kind: util.InfoTypeError}
+				}
 				return nil
 			}
 			line := "Antigravity is not the active provider, so its weekly quota is not shown."
 			if creds, _ := auth.LoadAntigravityCreds(); creds != nil && creds.Email != "" {
 				line = fmt.Sprintf("Antigravity is not the active provider: signed in as %s, weekly quota not fetched.", creds.Email)
+			}
+			// GORILLA OVERRIDE (2026-10-28): an Anthropic session led with the
+			// Antigravity line above and said nothing about Anthropic (owner, on
+			// the MacBook Air). Name the provider being spent and where its
+			// balance is: an Anthropic API key cannot read its own credit
+			// balance, so the honest answer is the Console, not a number.
+			if coderProvider() == models.ProviderAnthropic {
+				line = anthropicUsageLine
 			}
 			msg := quotaLineMsg{line: line, kind: util.InfoTypeInfo}
 			// Show the ACTIVE provider's own meter instead of a blank. Removing
@@ -914,6 +959,10 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if s, err := a.app.Sessions.Get(context.Background(), a.selectedSession.ID); err == nil {
 					out += "\nThis session:\n  " + strings.Join(usage.SessionLines(s), "\n  ") + "\n"
 				}
+			} else if msg.typed && a.selectedSession.ID == "" {
+				// Before the first message there is no session row, and /usage
+				// used to print nothing here, which read as "not working".
+				out += "\nThis session: nothing sent yet, $0.00 spent.\n"
 			}
 			cmds = append(cmds, printAbove(out))
 		}

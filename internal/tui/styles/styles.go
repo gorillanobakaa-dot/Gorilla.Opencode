@@ -165,6 +165,18 @@ func TextMutedColor() lipgloss.AdaptiveColor {
 // on purpose: it must stand out on every theme.
 var SpeedColor = lipgloss.AdaptiveColor{Dark: "#FF3333", Light: "#D70000"}
 
+// Status bar message colors (owner, 2026-10-28). The bar's empty middle is
+// now SpeedColor red, so a message must stand out against red AND against the
+// terminal: each pair is a fixed high-contrast one, not taken from the theme
+// (the theme's info/warning/error were drawn as background-colored text on a
+// mid-tone, which read poorly on the MacBook Air). An error is white on black
+// so it never looks like the red bar at rest.
+var (
+	StatusInfoBg  = lipgloss.Color("#1E3A8A") // white on dark blue, ~10:1
+	StatusWarnBg  = lipgloss.Color("#FFD400") // black on yellow, ~14:1
+	StatusErrorBg = lipgloss.Color("#000000") // white on black, 21:1
+)
+
 // Speed renders text in the speed meter's color, bold.
 func Speed(s string) string {
 	return lipgloss.NewStyle().Foreground(SpeedColor).Bold(true).Render(s)

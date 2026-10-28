@@ -450,6 +450,15 @@ func providerPortalRows() ([]startup.ProviderRow, bool) {
 		},
 	}
 
+	// GORILLA (2026-10-28, owner): every row that bills a card shows the cost
+	// warning once, before it can be used.
+	for i := range rows {
+		if prov, ok := paidKeyProviders[rows[i].ID]; ok {
+			rows[i].CostWarning = costWarning(prov)
+			rows[i].CostAccepted = cfg.Providers[prov].CostWarningAccepted
+		}
+	}
+
 	_, canKeep := cfg.Agents[config.AgentCoder]
 	return rows, canKeep
 }
@@ -516,6 +525,11 @@ func reopenProviderPortal() error {
 
 // applyPortalChoice turns a selection into saved credentials and agent models.
 func applyPortalChoice(ctx context.Context, c startup.ProviderChoice) error {
+	if prov, ok := paidKeyProviders[c.ID]; ok && c.CostAccepted {
+		if err := config.AcceptCostWarning(prov); err != nil {
+			return err
+		}
+	}
 	switch c.ID {
 	case "antigravity":
 		if err := runAntigravityLogin(ctx); err != nil {

@@ -58,6 +58,15 @@ type ProviderRow struct {
 	// identical, and the people this is built for cannot afford to find out by
 	// being billed.
 	Free bool
+	// CostWarning, when set, is shown on a screen of its own before a paid
+	// provider can be used, and the person must type "I understand" to go on.
+	// CostAccepted means they already did, once, for this provider.
+	//
+	// GORILLA (2026-10-28, owner): an API key bills a bank card for every
+	// message, and the people this is built for are young and on no budget.
+	// The row's one line ("Paid API") did not say what a message costs.
+	CostWarning  string
+	CostAccepted bool
 	// Configured means a usable credential is already saved, so Enter selects
 	// without asking for anything. `r` replaces the stored credential.
 	Configured bool
@@ -72,7 +81,10 @@ type ProviderChoice struct {
 	Input  string // typed credential, empty when none was asked for
 	Input2 string // second value, when the row asked for one
 	Keep   bool   // esc: continue with the current setup, change nothing
-	Quit   bool   // ctrl+c (or esc with nothing configured): abort the launch
+	// CostAccepted: the person typed "I understand" on this row's CostWarning
+	// during this visit, so the caller records it and never asks again.
+	CostAccepted bool
+	Quit         bool // ctrl+c (or esc with nothing configured): abort the launch
 }
 
 type providerModel struct {
@@ -90,7 +102,16 @@ type providerModel struct {
 	hint   string
 	choice ProviderChoice
 	done   bool
+	// cost-warning state: acking shows the warning screen, ack is what has been
+	// typed, acceptedID the row whose warning was accepted on this visit.
+	acking     bool
+	ack        []rune
+	acceptedID string
+	ackThen    string // "enter" or "r": what the key did before the warning
 }
+
+// costAckPhrase is what must be typed to accept a CostWarning.
+const costAckPhrase = "I understand"
 
 func (m *providerModel) Init() tea.Cmd { return nil }
 
@@ -101,6 +122,9 @@ func (m *providerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.acking {
+			return m.updateAcking(msg)
+		}
 		if m.entering {
 			return m.updateEntering(msg)
 		}
@@ -130,21 +154,84 @@ func (m *providerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			// Deliberate re-entry of a credential that is already saved.
 			if r := m.rows[m.sel]; r.Configured && r.NeedsInput {
+				if m.needsAck(r) {
+					m.startAck("r")
+					return m, nil
+				}
 				m.entering = true
 				m.input, m.input2, m.stage = nil, nil, 0
 				m.hint = ""
 			}
 		case "enter":
 			r := m.rows[m.sel]
-			if r.NeedsInput && !r.Configured {
-				m.entering = true
-				m.input, m.input2, m.stage = nil, nil, 0
-				m.hint = ""
+			if m.needsAck(r) {
+				m.startAck("enter")
 				return m, nil
 			}
-			m.choice = ProviderChoice{ID: r.ID}
-			m.done = true
-			return m, tea.Quit
+			return m.afterEnter()
+		}
+	}
+	return m, nil
+}
+
+// needsAck reports whether row r must show its cost warning before anything
+// else happens.
+func (m *providerModel) needsAck(r ProviderRow) bool {
+	return r.CostWarning != "" && !r.CostAccepted && m.acceptedID != r.ID
+}
+
+func (m *providerModel) startAck(then string) {
+	m.acking, m.ack, m.ackThen, m.hint = true, nil, then, ""
+}
+
+// afterEnter is what Enter on the selected row does once any cost warning is
+// out of the way: ask for the key, or choose the row.
+func (m *providerModel) afterEnter() (tea.Model, tea.Cmd) {
+	r := m.rows[m.sel]
+	if r.NeedsInput && !r.Configured {
+		m.entering = true
+		m.input, m.input2, m.stage = nil, nil, 0
+		m.hint = ""
+		return m, nil
+	}
+	m.choice = ProviderChoice{ID: r.ID, CostAccepted: m.acceptedID == r.ID}
+	m.done = true
+	return m, tea.Quit
+}
+
+func (m *providerModel) updateAcking(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c":
+		m.choice = ProviderChoice{Quit: true}
+		m.done = true
+		return m, tea.Quit
+	case "esc":
+		m.acking, m.ack, m.hint = false, nil, ""
+		return m, nil
+	case "enter":
+		if !strings.EqualFold(strings.TrimSpace(string(m.ack)), costAckPhrase) {
+			m.hint = "Type I understand (those two words) and press Enter, or Esc to go back."
+			m.ack = nil
+			return m, nil
+		}
+		m.acking, m.ack, m.hint = false, nil, ""
+		m.acceptedID = m.rows[m.sel].ID
+		if m.ackThen == "r" {
+			m.entering = true
+			m.input, m.input2, m.stage = nil, nil, 0
+			return m, nil
+		}
+		return m.afterEnter()
+	case "backspace":
+		if len(m.ack) > 0 {
+			m.ack = m.ack[:len(m.ack)-1]
+		}
+		return m, nil
+	}
+	if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
+		m.ack = append(m.ack, msg.Runes...)
+		if msg.Type == tea.KeySpace && len(msg.Runes) == 0 {
+			m.ack = append(m.ack, ' ')
 		}
 	}
 	return m, nil
@@ -194,9 +281,10 @@ func (m *providerModel) updateEntering(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.choice = ProviderChoice{
-			ID:     row.ID,
-			Input:  strings.TrimSpace(string(m.input)),
-			Input2: strings.TrimSpace(string(m.input2)),
+			ID:           row.ID,
+			Input:        strings.TrimSpace(string(m.input)),
+			Input2:       strings.TrimSpace(string(m.input2)),
+			CostAccepted: m.acceptedID == row.ID,
 		}
 		m.done = true
 		return m, tea.Quit
@@ -308,6 +396,10 @@ func (m *providerModel) View() string {
 	dim := lipgloss.NewStyle().Faint(true)
 	warn := lipgloss.NewStyle().Bold(true)
 
+	if m.acking {
+		return m.ackView(w)
+	}
+
 	// EVERY line goes through wrapTo or clip — the frame-width invariant.
 	writeWrapped := func(st lipgloss.Style, text string) {
 		for _, l := range wrapTo(text, w) {
@@ -415,6 +507,48 @@ func (m *providerModel) View() string {
 
 	b.WriteString("\n")
 	writeWrapped(dim, dimKeys(m))
+	return b.String()
+}
+
+// ackView is the cost warning on a screen of its own: nothing else competes
+// with it, and on the Air's 39 rows it fits without the list around it.
+func (m *providerModel) ackView(w int) string {
+	var b strings.Builder
+	red := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Background(lipgloss.Color("#D70000"))
+	bold := lipgloss.NewStyle().Bold(true)
+	dim := lipgloss.NewStyle().Faint(true)
+	for i, para := range strings.Split(m.rows[m.sel].CostWarning, "\n") {
+		if para == "" {
+			b.WriteString("\n")
+			continue
+		}
+		st := lipgloss.NewStyle()
+		if i == 0 {
+			st = red
+		}
+		// Table rows keep their columns; prose wraps.
+		if strings.HasPrefix(para, "  ") {
+			b.WriteString(st.Render(clip(para, w)) + "\n")
+			continue
+		}
+		for _, l := range wrapTo(para, w) {
+			b.WriteString(st.Render(l) + "\n")
+		}
+	}
+	b.WriteString("\n")
+	for _, l := range wrapTo("Type "+costAckPhrase+" and press Enter to continue:", w) {
+		b.WriteString(bold.Render(l) + "\n")
+	}
+	b.WriteString("> " + clip(string(m.ack), w-2) + "\n")
+	if m.hint != "" {
+		for _, l := range wrapTo(m.hint, w) {
+			b.WriteString(bold.Render(l) + "\n")
+		}
+	}
+	b.WriteString("\n")
+	for _, l := range wrapTo("esc go back to the list | ctrl+c quit", w) {
+		b.WriteString(dim.Render(l) + "\n")
+	}
 	return b.String()
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/bedrock"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/packages/param"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	toolsPkg "github.com/opencode-ai/opencode/internal/llm/tools"
@@ -199,7 +200,6 @@ func (a *anthropicClient) preparedMessages(messages []anthropic.MessageParam, to
 	lastMessage := messages[len(messages)-1]
 	isUser := lastMessage.Role == anthropic.MessageParamRoleUser
 	messageContent := ""
-	temperature := anthropic.Float(0)
 	if isUser {
 		for _, m := range lastMessage.Content {
 			if m.OfText != nil && m.OfText.Text != "" {
@@ -207,18 +207,21 @@ func (a *anthropicClient) preparedMessages(messages []anthropic.MessageParam, to
 			}
 		}
 		if messageContent != "" && a.options.shouldThink != nil && a.options.shouldThink(messageContent) {
-			thinkingParam = anthropic.ThinkingConfigParamOfEnabled(int64(float64(a.providerOptions.maxTokens) * 0.8))
-			temperature = anthropic.Float(1)
+			thinkingParam = anthropicThinking(a.providerOptions.model.APIModel, a.providerOptions.maxTokens)
 		}
 	}
 
+	// GORILLA OVERRIDE (2026-10-28): no Temperature field. Anthropic removed
+	// temperature on Opus 4.7 and later, Sonnet 5, Opus 5/5.5 and Fable, and
+	// since 2026-10-21 a request carrying it gets a 400 on every model ("`temperature`
+	// is deprecated for this model"). Upstream sent 0 on every turn, so every
+	// Anthropic message failed, "comms check" included (MacBook Air, v0.1.156).
 	return anthropic.MessageNewParams{
-		Model:       anthropic.Model(a.providerOptions.model.APIModel),
-		MaxTokens:   a.providerOptions.maxTokens,
-		Temperature: temperature,
-		Messages:    messages,
-		Tools:       tools,
-		Thinking:    thinkingParam,
+		Model:     anthropic.Model(a.providerOptions.model.APIModel),
+		MaxTokens: a.providerOptions.maxTokens,
+		Messages:  messages,
+		Tools:     tools,
+		Thinking:  thinkingParam,
 		System: []anthropic.TextBlockParam{
 			{
 				Text: a.providerOptions.systemMessage,
@@ -230,8 +233,26 @@ func (a *anthropicClient) preparedMessages(messages []anthropic.MessageParam, to
 	}
 }
 
+// nonStreamingMaxTokens is the largest max_tokens sent on a non-streaming
+// request. The SDK refuses a non-streaming call it expects to run past ten
+// minutes ("streaming is strongly recommended..."), which it estimates from
+// max_tokens alone: anything above ~21,000 is refused before it is sent.
+const nonStreamingMaxTokens = 16000
+
+func capNonStreaming(p *anthropic.MessageNewParams) {
+	if p.MaxTokens > nonStreamingMaxTokens {
+		p.MaxTokens = nonStreamingMaxTokens
+	}
+}
+
 func (a *anthropicClient) send(ctx context.Context, messages []message.Message, tools []toolsPkg.BaseTool) (resposne *ProviderResponse, err error) {
 	preparedMessages := a.preparedMessages(a.convertMessages(messages), a.convertTools(tools))
+	// GORILLA OVERRIDE (2026-10-28): only the title and the summarizer call
+	// send(), and a helper that follows the coder onto a current model
+	// inherits its 64K-128K output limit. Every title then failed on the
+	// MacBook Air ("failed to generate title: streaming is strongly
+	// recommended"), and a summary would have too. Neither needs more than this.
+	capNonStreaming(&preparedMessages)
 	cfg := config.Get()
 	if cfg.Debug {
 		jsonData, _ := json.Marshal(preparedMessages)
@@ -500,6 +521,23 @@ func WithAnthropicDisableCache() AnthropicOption {
 	return func(options *anthropicOptions) {
 		options.disableCache = true
 	}
+}
+
+// legacyBudgetThinking lists the models that still take thinking as a token
+// budget. Everything newer rejects budget_tokens with a 400 and takes
+// {"type":"adaptive"} instead.
+var legacyBudgetThinking = []string{"claude-3", "claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-5", "claude-opus-4-1", "claude-opus-4-0", "claude-sonnet-4-0", "claude-opus-4-2025", "claude-sonnet-4-2025"}
+
+// anthropicThinking returns the thinking setting a model accepts. The pinned
+// SDK (v1.4.0) has no adaptive type, so the adaptive form is sent as raw JSON.
+func anthropicThinking(apiModel string, maxTokens int64) anthropic.ThinkingConfigParamUnion {
+	for _, prefix := range legacyBudgetThinking {
+		if strings.HasPrefix(apiModel, prefix) {
+			return anthropic.ThinkingConfigParamOfEnabled(int64(float64(maxTokens) * 0.8))
+		}
+	}
+	adaptive := param.Override[anthropic.ThinkingConfigEnabledParam](map[string]any{"type": "adaptive"})
+	return anthropic.ThinkingConfigParamUnion{OfEnabled: &adaptive}
 }
 
 func DefaultShouldThinkFn(s string) bool {

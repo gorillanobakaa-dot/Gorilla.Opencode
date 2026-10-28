@@ -121,6 +121,9 @@ type Agent struct {
 type Provider struct {
 	APIKey   string `json:"apiKey"`
 	Disabled bool   `json:"disabled"`
+	// CostWarningAccepted records that the person typed "I understand" on the
+	// paid-key cost warning for this provider (2026-10-28), so it is shown once.
+	CostWarningAccepted bool `json:"costWarningAccepted,omitempty"`
 }
 
 // LocalEndpoint defines one OpenAI-compatible endpoint (NVIDIA NIM, Ollama,
@@ -1662,6 +1665,24 @@ func UpsertProviderKey(provider models.ModelProvider, apiKey string) error {
 	return updateCfgFile(set)
 }
 
+// AcceptCostWarning records that the paid-key cost warning was accepted for
+// this provider, and persists it.
+func AcceptCostWarning(provider models.ModelProvider) error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	set := func(c *Config) {
+		if c.Providers == nil {
+			c.Providers = make(map[models.ModelProvider]Provider)
+		}
+		p := c.Providers[provider]
+		p.CostWarningAccepted = true
+		c.Providers[provider] = p
+	}
+	set(cfg)
+	return updateCfgFile(set)
+}
+
 // SetProviderDisabled toggles a keyed provider on/off and persists it.
 func SetProviderDisabled(provider models.ModelProvider, disabled bool) error {
 	if cfg == nil {
@@ -1815,6 +1836,12 @@ func UpdateAgentModel(agentName AgentName, modelID models.ModelID) error {
 	maxTokens := existingAgentCfg.MaxTokens
 	if model.DefaultMaxTokens > 0 {
 		maxTokens = model.DefaultMaxTokens
+	}
+	// GORILLA OVERRIDE (2026-10-28): a title is a few words. Load() pins it to
+	// 80, but following the coder onto a new model replaced that with the
+	// model's whole output limit (64K+ on current Claude models).
+	if agentName == AgentTitle {
+		maxTokens = 80
 	}
 
 	newAgentCfg := Agent{
