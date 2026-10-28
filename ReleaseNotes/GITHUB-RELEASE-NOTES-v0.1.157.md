@@ -91,5 +91,127 @@ for errors).
 
 Check a download: `sha256sum -c SHA256SUMS-v0.1.157.txt --ignore-missing`. The Arch package was built by the arch-package workflow from `packaging/PKGBUILD`.
 
-Plain-language notes: `v0.1.157-release-notes.layman.md`. Developer notes:
-`v0.1.157-release-notes.developer.md`. Both are attached.
+---
+# In plain language: everything in this release
+
+This is the complete explanation, not a summary of one. Nothing below is behind a link.
+
+<!-- plain-language track: in full, on this page -->
+
+### Why this release exists
+
+On the morning of 28 October the owner upgraded Gorilla OpenCode on an 11-inch
+MacBook Air, signed in with an Anthropic API key, and typed *comms check*. The
+answer was an error. Every Claude model gave the same one, for every message.
+
+### What was wrong
+
+1. **Claude refused every message.** The program sent a setting called
+   `temperature` with each request. Anthropic stopped accepting it on its newer
+   models, and since 21 October 2026 refuses it on all of them. The program
+   now leaves it out.
+2. **A message with the word "think" in it** asked the newer models to think in
+   an older way they refuse. It now asks the way they accept.
+3. **Conversation titles failed** ("failed to generate title"). When you change
+   model, the small helper that writes the title took on the new model's full
+   output limit, and the library that talks to Anthropic refuses a request
+   that large unless it is streamed. The title now keeps its small limit, and
+   such requests are kept under the size the library accepts. Summaries of long
+   conversations had the same problem and are fixed with it.
+4. **`/usage` talked about the wrong company.** In an Anthropic session it
+   only said that Google Antigravity was not in use. It now names Anthropic.
+   It cannot show your balance: Anthropic does not let an API key read it. It
+   says where to find it: console.anthropic.com, under Billing.
+
+### New: what an API key really costs
+
+An API key is tied to a bank card. Every message is paid for, and every
+message pays again for everything already in the conversation. A short reply
+adds little. A file the AI reads adds its whole size to every message after
+it. A pause of more than five minutes makes the next message cost full price
+again.
+
+- **The first time you choose a paid provider** (Anthropic, OpenAI, xAI,
+  DeepSeek, OpenRouter) a screen explains this. For Claude it shows the most
+  each model can cost: per message at the start of a conversation, per message
+  in a long one, and per hour of the AI working on its own. For example Claude
+  Sonnet 5: 5.5 cents, 51 cents, 121 dollars. You type *I understand* to go on.
+  It is asked once per provider.
+- **Every session on a paid key** opens with one red line naming the model and
+  what the first message can cost.
+- **The status bar** shows what the next message can cost ("next up to
+  $0.055"), and after a minute how fast the session is spending ("$0.10/h").
+
+These are estimates at list price, and they are the most a message can cost:
+the program saves the repeated part of the conversation for five minutes, so a
+quick reply usually costs less. Two real bills on the Air (4.85 and 4.93
+cents) were both under the 5.5 cents shown. For providers whose prices the
+program does not have, the screen says so instead of guessing.
+
+### The status bar
+
+The empty part of the bar was black. On the Mac the chip that says *AUTO -
+approving without asking* was drawn black on black, so you could not see that
+the AI was acting without asking. The bar is now red from end to end, with that
+chip in bold white, and messages appear in colours chosen to be read: white on
+dark blue, black on yellow, and white on black for errors (so an error never
+looks like the bar at rest).
+
+### What was checked
+
+On the MacBook Air: the old version refused *comms check*, this one answered
+it. The warning screen, the red start line, the "next up to" figure and the
+bar were photographed. Testing used about 20 cents of the owner's key ($99.80 before, $99.65 at 09:51, then one more 4.93-cent message).
+
+Not checked: OpenAI, xAI, DeepSeek and OpenRouter keys with this version (their
+warning has no prices); a real long conversation with the spending pace; the
+bar on Windows and Linux screens (same code, not photographed).
+
+---
+
+# For developers: how it works, and how to check it
+
+Written for someone who will audit, fork or change the code. It covers the same release as the plain-language part above; neither is a summary of the other.
+
+<!-- developer track: in full, on this page -->
+
+### Summary
+
+- `internal/llm/provider/anthropic.go`: `preparedMessages` no longer sets `Temperature` (was 0, 1 with thinking). Evidence: `400 invalid_request_error "temperature is deprecated for this model"` on every turn, v0.1.152 and v0.1.156, Opus 5.5, Fable 5.1, Sonnet 5 (owner's screenshots, 2026-10-28); Anthropic rejects temperature/top_p/top_k on every model since 2026-10-21.
+- Thinking: `anthropicThinking(apiModel, maxTokens)` sends `{"type":"adaptive"}` via `param.Override` (SDK v1.4.0 has no adaptive type); `budget_tokens` kept only for `legacyBudgetThinking` prefixes (claude-3, 4.0, 4.1, 4.5).
+- Non-streaming cap: `capNonStreaming` sets `max_tokens` to 16,000 when larger (`send()` is used by title and summarizer only). The SDK's `CalculateNonStreamingTimeout` refuses above ~21,333 ("streaming is strongly recommended"). `config.UpdateAgentModel` keeps the title agent at 80 tokens when it follows the coder (it took `DefaultMaxTokens`, 64K+).
+- `/usage`: `anthropicUsageLine` when the coder is Anthropic; "nothing sent yet, $0.00 spent" when no session row exists.
+- Status bar (`components/core/status.go`): idle fill, mode chips (AUTO/EDITS/PLAN, long and short) and diagnostics chip on `styles.SpeedColor` with bold white; info/warn/error messages on fixed `StatusInfoBg` #1E3A8A (white), `StatusWarnBg` #FFD400 (black), `StatusErrorBg` #000000 (white). The theme's `Error()`/`Background()` pair rendered black on black on Terminal.app 10.13.
+- Paid-key warning: `ProviderRow.CostWarning/CostAccepted`, `ProviderChoice.CostAccepted`, acking state in `startup/provider.go` (exact phrase "I understand", case-insensitive; Esc back). Persisted as `providers.<id>.costWarningAccepted`. Text and table in `cmd/cost_warning.go`; rows for anthropic, openai, xai, deepseek, openrouter.
+- Forecast (`internal/llm/cost/forecast.go`): `MessageCost = ctx*in*1.25/1e6 + 500*out/1e6` (1.25 = 5-minute cache write, so the figure is an upper bound: measured 0.0485 and 0.0493 against 0.055 for 19.4K/19.6K on Sonnet 5); `WorkingHourCost` = long (200K) message x 4 calls/min x 60. Rates from `prices.json` via `ListRates` (anthropic and gemini tables only).
+- Status chip: `paidForecast` appends "next up to $X" (context floored at 20K) and "$Y/h" (session cost / age, after 1 minute). Session start: `paidKeyStartLine` as an error-kind quota line.
+
+### Test coverage and CI
+
+Locally only the touched packages: `internal/llm/provider`, `internal/config`, `internal/tui`, `internal/tui/components/core`, `internal/tui/styles`, `internal/tui/startup`, `internal/llm/cost`, `cmd`, `internal/version`, `internal/tui/inline`. Every new test was run against the old code and failed (temperature: 8/8 cases; status bar: 3 + 1; title limit; non-streaming cap; /usage). CI on PR #39 head 32dd918: build-test, build-test-windows, toolbox-windows, all pass.
+
+### Security posture
+
+No new network code, dependency or downloaded program. The cost warning reads only the embedded price table. No key is displayed or logged.
+
+### Deployment
+
+```
+sha256sum -c SHA256SUMS-v0.1.157.txt --ignore-missing
+gorilla-opencode --version
+# Expected: v0.1.157
+go version -m gorilla-opencode.exe | grep tags
+# Expected: build	-tags=toolbox
+```
+
+### Not verified
+
+- OpenAI, xAI, DeepSeek, OpenRouter with this version; their warning has no table (no prices in `prices.json`).
+- `$/h` pace in a real long session; adaptive thinking on a real "think" message beyond one headless run on the Air.
+- The summarizer path on a real long Anthropic conversation (only the cap is unit-tested).
+- Status bar colours on Windows Terminal and Linux terminals (photographed on Terminal.app 10.13 only).
+
+### Known issues
+
+- `costWarningModels` in `cmd/cost_warning.go` is a hand list beside `prices.json`; a new Claude model needs a line there.
+- Carried: the Windows exe is unsigned.
