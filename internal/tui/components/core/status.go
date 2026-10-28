@@ -320,8 +320,15 @@ func (m statusCmp) chrome() statusChrome {
 		shortTokens = tokensStyle.Render(short) + speed
 	}
 
+	// GORILLA OVERRIDE (2026-10-28, owner): the mode chip (AUTO, EDITS, PLAN)
+	// and this chip sit on the same red as the empty bar, in bold white, so the
+	// bar is one red piece up to the model name. On the MacBook Air the theme's
+	// colours drew "AUTO - approving without asking" black on black: the one
+	// warning that must stay readable was invisible.
 	c.diagnostics = styles.Padded().
-		Background(t.BackgroundDarker()).
+		Background(styles.SpeedColor).
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Bold(true).
 		Render(m.projectDiagnostics())
 
 	// GORILLA OVERRIDE: live helper-agent count. Transparency — the user
@@ -346,22 +353,22 @@ func (m statusCmp) chrome() statusChrome {
 	switch permission.EffectiveMode(m.session.ID) {
 	case config.PermissionAuto:
 		c.yolo = styles.Padded().
-			Background(t.Error()).
-			Foreground(t.Background()).
+			Background(styles.SpeedColor).
+			Foreground(lipgloss.Color("#FFFFFF")).
 			Bold(true).
 			// ASCII on purpose: the radiation sign is double-width in a
 			// Windows console and pushed this chip off the end of the line.
 			Render("AUTO - approving without asking")
 	case config.PermissionAcceptEdits:
 		c.yolo = styles.Padded().
-			Background(t.Warning()).
-			Foreground(t.Background()).
+			Background(styles.SpeedColor).
+			Foreground(lipgloss.Color("#FFFFFF")).
 			Bold(true).
 			Render("EDITS auto-approved")
 	case config.PermissionPlan:
 		c.yolo = styles.Padded().
-			Background(t.Primary()).
-			Foreground(t.Background()).
+			Background(styles.SpeedColor).
+			Foreground(lipgloss.Color("#FFFFFF")).
 			Bold(true).
 			Render("PLAN — read-only")
 	default:
@@ -385,11 +392,11 @@ func (m statusCmp) chrome() statusChrome {
 		}
 		switch permission.EffectiveMode(m.session.ID) {
 		case config.PermissionAuto:
-			c.yolo = styles.Padded().Background(t.Error()).Foreground(t.Background()).Bold(true).Render("AUTO")
+			c.yolo = styles.Padded().Background(styles.SpeedColor).Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render("AUTO")
 		case config.PermissionAcceptEdits:
-			c.yolo = styles.Padded().Background(t.Warning()).Foreground(t.Background()).Bold(true).Render("EDITS")
+			c.yolo = styles.Padded().Background(styles.SpeedColor).Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render("EDITS")
 		case config.PermissionPlan:
-			c.yolo = styles.Padded().Background(t.Primary()).Foreground(t.Background()).Bold(true).Render("PLAN")
+			c.yolo = styles.Padded().Background(styles.SpeedColor).Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render("PLAN")
 		}
 		if m.projectDiagnostics() == "No diagnostics" {
 			c.diagnostics = ""

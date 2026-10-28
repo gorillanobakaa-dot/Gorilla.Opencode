@@ -43,3 +43,12 @@ func TestStatusMessagesStandOutFromTheRed(t *testing.T) {
 		t.Errorf("error message not on black: %q", got)
 	}
 }
+
+// The Air screenshot at 09:46 still had black after the red: the mode chip and
+// "No diagnostics" drew on the theme's near-black. Nothing in the bar at rest
+// may sit on it now.
+func TestStatusBarHasNoBlackStretchAtRest(t *testing.T) {
+	if got := renderBar(t, util.InfoMsg{}); strings.Contains(got, "48;2;24;24;24") {
+		t.Errorf("bar at rest still has a near-black stretch: %q", got)
+	}
+}
