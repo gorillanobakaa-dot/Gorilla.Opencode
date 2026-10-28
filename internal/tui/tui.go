@@ -564,6 +564,11 @@ func antigravityIsActive() bool {
 	return p == "" || p == models.ProviderAntigravity
 }
 
+// anthropicUsageLine is the /usage headline for an Anthropic session. The
+// API gives an ordinary key no balance endpoint (spend reports need an Admin
+// key), so this says where the balance is instead of fetching anything.
+const anthropicUsageLine = "Anthropic (API key): your credit balance is on console.anthropic.com, Billing. An API key cannot read it. What this session has cost is below."
+
 // activeChatGPTMeter returns the ChatGPT meter when ChatGPT is the provider the
 // session actually spends against, else nil.
 func activeChatGPTMeters() []quota.Meter {
@@ -663,6 +668,14 @@ func antigravityUsageCmd(quiet bool) tea.Cmd {
 			line := "Antigravity is not the active provider, so its weekly quota is not shown."
 			if creds, _ := auth.LoadAntigravityCreds(); creds != nil && creds.Email != "" {
 				line = fmt.Sprintf("Antigravity is not the active provider: signed in as %s, weekly quota not fetched.", creds.Email)
+			}
+			// GORILLA OVERRIDE (2026-10-28): an Anthropic session led with the
+			// Antigravity line above and said nothing about Anthropic (owner, on
+			// the MacBook Air). Name the provider being spent and where its
+			// balance is: an Anthropic API key cannot read its own credit
+			// balance, so the honest answer is the Console, not a number.
+			if coderProvider() == models.ProviderAnthropic {
+				line = anthropicUsageLine
 			}
 			msg := quotaLineMsg{line: line, kind: util.InfoTypeInfo}
 			// Show the ACTIVE provider's own meter instead of a blank. Removing
@@ -914,6 +927,10 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if s, err := a.app.Sessions.Get(context.Background(), a.selectedSession.ID); err == nil {
 					out += "\nThis session:\n  " + strings.Join(usage.SessionLines(s), "\n  ") + "\n"
 				}
+			} else if msg.typed && a.selectedSession.ID == "" {
+				// Before the first message there is no session row, and /usage
+				// used to print nothing here, which read as "not working".
+				out += "\nThis session: nothing sent yet, $0.00 spent.\n"
 			}
 			cmds = append(cmds, printAbove(out))
 		}
