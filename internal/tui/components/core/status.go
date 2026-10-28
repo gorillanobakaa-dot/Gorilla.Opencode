@@ -418,33 +418,35 @@ func (m statusCmp) InfoBudget() int {
 const infoPadding = 10
 
 func (m statusCmp) View() string {
-	t := theme.CurrentTheme()
 	c := m.chrome()
 
 	// Initialize the help widget
 	status := getHelpWidget()
 	status += c.tokens
 
+	// GORILLA OVERRIDE (2026-10-28, owner): the empty middle of the bar was the
+	// theme's near-black, a black gap between the red speed chip and the blue
+	// model name. At rest it is now the same red, so the bar reads as one
+	// piece; a message takes the space in a fixed high-contrast pair.
 	if m.info.Msg != "" {
 		infoStyle := styles.Padded().
-			Foreground(t.Background()).
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(styles.StatusInfoBg).
+			Bold(true).
 			Width(c.avail)
 
 		switch m.info.Type {
-		case util.InfoTypeInfo:
-			infoStyle = infoStyle.Background(t.Info())
 		case util.InfoTypeWarn:
-			infoStyle = infoStyle.Background(t.Warning())
+			infoStyle = infoStyle.Foreground(lipgloss.Color("#000000")).Background(styles.StatusWarnBg)
 		case util.InfoTypeError:
-			infoStyle = infoStyle.Background(t.Error())
+			infoStyle = infoStyle.Background(styles.StatusErrorBg)
 		}
 
 		msg := truncateStatusMsg(m.info.Msg, c.avail-infoPadding)
 		status += infoStyle.Render(msg)
 	} else {
 		status += styles.Padded().
-			Foreground(t.Text()).
-			Background(t.BackgroundSecondary()).
+			Background(styles.SpeedColor).
 			Width(c.avail).
 			Render("")
 	}
