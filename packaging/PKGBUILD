@@ -22,7 +22,7 @@ pkgname=gorilla-opencode
 # PKGBUILD: makepkg succeeds, the package installs, and only the version string
 # betrays it. BUMP THIS WITH EVERY RELEASE; TestPKGBUILDTracksTheCurrentRelease
 # now fails the build if it drifts.
-pkgver=0.1.154
+pkgver=0.1.157
 pkgrel=1
 pkgdesc="Terminal AI coding agent (revived original OpenCode), bring your own API keys"
 arch=('x86_64')
@@ -109,7 +109,7 @@ source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gorillanobakaa-dot/Gori
 # archive/refs/tags/v${pkgver}.tar.gz, sha256sum it, paste it here, commit to
 # main, then re-download and verify. Do not guess it and do not carry the
 # previous release's value forward.
-sha256sums=('4e549506147c6ca94c3c3b5d25d36e6306b23e4ff13c1b22e57d3db93c8d127c'
+sha256sums=('a53349be3eeb3e0ddf211e4d387220490dca6cda40462f8f2d0f77c8c991c67a'
             '6aa609225bc1ebfdfaea046da530e43fbeded4daa83d75580230f9bd39448429')
 
 build() {
