@@ -4,9 +4,44 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
+	"github.com/opencode-ai/opencode/internal/llm/cost"
+	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/session"
 )
+
+// paidForecast is what the NEXT message can cost and this session's spending
+// pace, for a model with a price in the dated table: "next up to $0.055,
+// $0.60/h". Empty for a model with no list price (free providers included).
+//
+// GORILLA (2026-10-28, owner): "each message costs more than the last" means
+// nothing until "more" is a number. This is that number, from the size of the
+// conversation now. The pace is the session's spend over its age, shown once a
+// minute has passed so one call does not read as a rate.
+func paidForecast(s session.Session, model models.Model, contextTokens int64, now time.Time) string {
+	in, out, ok := cost.ListRates(string(model.Provider), model.APIModel, now)
+	if !ok || in <= 0 {
+		return ""
+	}
+	ctx := max(contextTokens, int64(cost.ShortConversationTokens))
+	parts := []string{"next up to " + dollars(cost.MessageCost(in, out, ctx))}
+	if age := now.Sub(time.Unix(s.CreatedAt, 0)); s.Cost > 0 && s.CreatedAt > 0 && age >= time.Minute {
+		parts = append(parts, dollars(s.Cost/age.Hours())+"/h")
+	}
+	return strings.Join(parts, ", ")
+}
+
+// dollars prints a figure with the precision its size needs.
+func dollars(v float64) string {
+	switch {
+	case v < 0.1:
+		return fmt.Sprintf("$%.3f", v)
+	case v < 10:
+		return fmt.Sprintf("$%.2f", v)
+	}
+	return fmt.Sprintf("$%.0f", v)
+}
 
 // costDetail is the "why" beside the session's cost: how much of it was paid
 // for re-sending old context, what the newest call cost, and how many calls no

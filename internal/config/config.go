@@ -121,6 +121,9 @@ type Agent struct {
 type Provider struct {
 	APIKey   string `json:"apiKey"`
 	Disabled bool   `json:"disabled"`
+	// CostWarningAccepted records that the person typed "I understand" on the
+	// paid-key cost warning for this provider (2026-10-28), so it is shown once.
+	CostWarningAccepted bool `json:"costWarningAccepted,omitempty"`
 }
 
 // LocalEndpoint defines one OpenAI-compatible endpoint (NVIDIA NIM, Ollama,
@@ -1656,6 +1659,24 @@ func UpsertProviderKey(provider models.ModelProvider, apiKey string) error {
 		p := c.Providers[provider]
 		p.APIKey = apiKey
 		p.Disabled = false
+		c.Providers[provider] = p
+	}
+	set(cfg)
+	return updateCfgFile(set)
+}
+
+// AcceptCostWarning records that the paid-key cost warning was accepted for
+// this provider, and persists it.
+func AcceptCostWarning(provider models.ModelProvider) error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	set := func(c *Config) {
+		if c.Providers == nil {
+			c.Providers = make(map[models.ModelProvider]Provider)
+		}
+		p := c.Providers[provider]
+		p.CostWarningAccepted = true
 		c.Providers[provider] = p
 	}
 	set(cfg)

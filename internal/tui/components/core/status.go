@@ -302,6 +302,9 @@ func (m statusCmp) chrome() statusChrome {
 		}
 		// The "why" (re-reading share, last call, unpriced calls) goes first
 		// when the line is short: see the narrow-terminal block below.
+		if f := paidForecast(m.session, model, contextTokens, time.Now()); f != "" {
+			tokens += " | " + f
+		}
 		short := tokens
 		if d := costDetail(m.session); d != "" {
 			tokens += " (" + d + ")"
