@@ -150,3 +150,19 @@ func TestNoOpCases(t *testing.T) {
 		t.Errorf("a no-op case still modified the summarizer: %q", got)
 	}
 }
+
+// Following the coder gave the title agent the new model's whole output limit
+// (MacBook Air, 2026-10-28: Sonnet 5, every title refused by the Anthropic SDK).
+// A title stays at 80 tokens whatever model it moves to.
+func TestTitleKeepsItsSmallLimitWhenItFollows(t *testing.T) {
+	const old = models.ModelID("local.title-old")
+	const new_ = models.ModelID("local.title-new")
+	setAgents(t, old, old, old, old)
+	registerModel(t, new_)
+	if _, err := FollowCoderModel(old, new_); err != nil {
+		t.Fatalf("FollowCoderModel: %v", err)
+	}
+	if got := cfg.Agents[AgentTitle].MaxTokens; got != 80 {
+		t.Errorf("title max tokens = %d after following, want 80", got)
+	}
+}

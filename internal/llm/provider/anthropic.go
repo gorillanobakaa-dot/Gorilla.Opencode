@@ -233,8 +233,26 @@ func (a *anthropicClient) preparedMessages(messages []anthropic.MessageParam, to
 	}
 }
 
+// nonStreamingMaxTokens is the largest max_tokens sent on a non-streaming
+// request. The SDK refuses a non-streaming call it expects to run past ten
+// minutes ("streaming is strongly recommended..."), which it estimates from
+// max_tokens alone: anything above ~21,000 is refused before it is sent.
+const nonStreamingMaxTokens = 16000
+
+func capNonStreaming(p *anthropic.MessageNewParams) {
+	if p.MaxTokens > nonStreamingMaxTokens {
+		p.MaxTokens = nonStreamingMaxTokens
+	}
+}
+
 func (a *anthropicClient) send(ctx context.Context, messages []message.Message, tools []toolsPkg.BaseTool) (resposne *ProviderResponse, err error) {
 	preparedMessages := a.preparedMessages(a.convertMessages(messages), a.convertTools(tools))
+	// GORILLA OVERRIDE (2026-10-28): only the title and the summarizer call
+	// send(), and a helper that follows the coder onto a current model
+	// inherits its 64K-128K output limit. Every title then failed on the
+	// MacBook Air ("failed to generate title: streaming is strongly
+	// recommended"), and a summary would have too. Neither needs more than this.
+	capNonStreaming(&preparedMessages)
 	cfg := config.Get()
 	if cfg.Debug {
 		jsonData, _ := json.Marshal(preparedMessages)

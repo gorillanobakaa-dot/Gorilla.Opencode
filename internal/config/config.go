@@ -1816,6 +1816,12 @@ func UpdateAgentModel(agentName AgentName, modelID models.ModelID) error {
 	if model.DefaultMaxTokens > 0 {
 		maxTokens = model.DefaultMaxTokens
 	}
+	// GORILLA OVERRIDE (2026-10-28): a title is a few words. Load() pins it to
+	// 80, but following the coder onto a new model replaced that with the
+	// model's whole output limit (64K+ on current Claude models).
+	if agentName == AgentTitle {
+		maxTokens = 80
+	}
 
 	newAgentCfg := Agent{
 		Model:           modelID,

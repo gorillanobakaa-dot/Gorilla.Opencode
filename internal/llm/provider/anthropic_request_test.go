@@ -48,3 +48,19 @@ func TestAnthropicThinkingShapePerModel(t *testing.T) {
 		t.Errorf("no thinking asked, none must be sent, got %s", j)
 	}
 }
+
+// A title or summary on a model with a 64K output limit was refused by the SDK
+// before it was sent (MacBook Air, 2026-10-28). The cap must bring max_tokens
+// under the SDK's non-streaming ceiling and leave small values alone.
+func TestNonStreamingMaxTokensFitsTheSDK(t *testing.T) {
+	for _, in := range []int64{80, 16000, 64000, 128000} {
+		p := anthropic.MessageNewParams{Model: "claude-sonnet-5", MaxTokens: in}
+		capNonStreaming(&p)
+		if _, err := anthropic.CalculateNonStreamingTimeout(int(p.MaxTokens), p.Model, nil); err != nil {
+			t.Errorf("max_tokens %d -> %d still refused: %v", in, p.MaxTokens, err)
+		}
+		if in <= nonStreamingMaxTokens && p.MaxTokens != in {
+			t.Errorf("max_tokens %d changed to %d", in, p.MaxTokens)
+		}
+	}
+}
