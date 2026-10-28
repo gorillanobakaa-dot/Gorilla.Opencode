@@ -1,3 +1,45 @@
+## 2026-10-28: Anthropic models answer again, and the status bar is one colour (MacBook Air, macOS 10.13)
+
+Taken by the owner on the 11-inch MacBook Air (1366x768), unscaled. The
+"before" shots are the released v0.1.152 and v0.1.156; the "after" shots are
+the fix build `v0.1.156-dev.anthropicfix4` from branch
+`fix/anthropic-no-temperature` (PR 39).
+
+### Before: every Anthropic message refused
+
+Gorilla OpenCode sent `temperature` on every request. Anthropic stopped
+accepting it on its current models, and since 2026-10-21 on all of them, so
+every message came back `400 Bad Request`: `"temperature" is deprecated for
+this model`. It did not matter which model or what was typed.
+
+[![Gorilla OpenCode v0.1.152 on the MacBook Air with Claude Fable 5.1 selected: the message "check" fails with 400 Bad Request, the error saying temperature is deprecated for this model, and nothing was spent](screenshots/gallery/macos-air-2026-10/air-2026-10-28-before-fable-temperature-400.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-28-before-fable-temperature-400.png)
+
+[![Gorilla OpenCode v0.1.156 on the MacBook Air with Claude Sonnet 5 selected: "comms check" fails with the same 400 temperature error; the status bar below has a black gap between the help chip and the blue model name](screenshots/gallery/macos-air-2026-10/air-2026-10-28-before-comms-check-400-black-gap.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-28-before-comms-check-400-black-gap.png)
+
+### After: the same "comms check" is answered
+
+No `temperature` on the request. Answer in under a second, five cents for the
+whole conversation (19.4K tokens of context).
+
+[![The fix build on the MacBook Air: "comms check" answered by Claude Sonnet 5 with "Comms check received, I'm online and ready", first word in 821 ms, spent 5 cents, and the status bar red from end to end up to the blue model name](screenshots/gallery/macos-air-2026-10/air-2026-10-28-after-comms-check-answered.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-28-after-comms-check-answered.png)
+
+### After: the status bar at rest, red all the way
+
+The empty middle of the bar was near-black, and the "AUTO - approving without
+asking" chip was drawn black on black on this Mac, so the one warning that says
+the AI acts without asking could not be read. Both now sit on the red of the
+speed chip, in bold white.
+
+[![The fix build at rest on the MacBook Air: the status bar is red from the help chip to the blue model name, and "AUTO - approving without asking" and "No diagnostics" are readable in bold white on the red](screenshots/gallery/macos-air-2026-10/air-2026-10-28-after-red-bar-auto-readable.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-28-after-red-bar-auto-readable.png)
+
+### What the testing cost, from Anthropic's own page
+
+An API key cannot read its own balance, so `/usage` now says where it is. This
+is that page after the whole fix was tested on the Air: 36 cents spent this
+month, credits at $99.65.
+
+[![The Claude Console dashboard after the fix was tested: organisation credits 99.65 dollars and spend this month 36 cents of a 500 dollar tier limit](screenshots/gallery/macos-air-2026-10/air-2026-10-28-after-console-spend.png)](screenshots/gallery/macos-air-2026-10/air-2026-10-28-after-console-spend.png)
+
 ## v0.1.133 (2026-09-03) — the brakes on the research tool, photographed
 
 All three taken on **Gemma 4 E**, a small free model, against the shipped
