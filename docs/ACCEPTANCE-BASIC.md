@@ -144,3 +144,18 @@ Reading: no Linux-shaped defect in the suite (PATH, fixtures, helpers, hidden fi
 ## Files
 
 - `tests/acceptance/basic/`: `jobs.yaml`, `fixtures/`, `spec.go`, `setup.go`, `check.go`, `runner.go`, `report.go`, `spec_test.go`, `acceptance_test.go`, `README.md`, `results/`.
+
+## P5b re-run: the "tool missing" jobs after the toolbox grew (2026-10-31, Windows, ChatGPT Luna)
+
+Toolbox build with 7za, ffmpeg and ffprobe embedded (docs/TOOLBOX.dual-track.md), clean PATH, same model as P5a. Records: `tests/acceptance/basic/results/p5b/`. The six jobs that used the missing programs, **6 of 6 passed**, each with the helper called by plain name from the toolbox:
+
+| job | P5a Luna (run 1 / run 2) | P5b |
+|---|---|---|
+| sevenzip_make | PASS / PASS (158 to 218 s class, 10 to 15 calls, disk hunt) | PASS, 15 s, 4 calls |
+| sevenzip_extract | PASS / PASS | PASS, 20 s, 3 calls |
+| png_to_webp | PASS (34 s, 8 calls) / PASS (98 s, 13 calls) | PASS, 18 s, 2 calls (`ffmpeg -y -i ...`) |
+| image_resize | PASS (27 s, 7 calls) / PASS (30 s, 6 calls) | PASS, 211 s, 8 calls (slower: asked fieldkit_discover first, see P5c) |
+| video_length | PASS (61 s, 6 calls) / PASS (44 s, 7 calls) | PASS, 14 s, 1 call |
+| extract_audio | PASS (43 s, 6 calls) / FAIL (57 s, 10 calls) | PASS, 25 s, 3 calls |
+
+One run per cell, so this is a sample. The earlier numbers for 7z are from the report text above. Not verified: a Linux re-run (Zero sends this to the VAIO: build with `bash scripts/fetch-toolbox-extras.sh OUT` then `bash scripts/build-toolbox.sh OUT`, run `ACC_JOBS=sevenzip_make,sevenzip_extract,png_to_webp,image_resize,video_length,extract_audio` with `ACC_EXE` set to that build and `ACC_EMBEDDED=1`; note `BuildExe` embeds only on Windows today); a bare machine; whether `image_resize` is slow because of the tool or the model.

@@ -15,3 +15,14 @@ d6f01d309784d928507ac45b11d92f255ca3108c32c2b4321da91b1b0c8ae67a  windows-amd64/
 # Built on this laptop from tools/pfind-rs (merge cdc01cc), `cargo build --release --offline --locked`,
 # x86_64-pc-windows-msvc. scripts/build-toolbox.ps1 rebuilds it and stops if the bytes differ.
 6828dfcf5853e78530598c1344b4e4882eed88d37189fc56d9c9ecad666ebfe7  windows-amd64/pfind.exe
+#
+# P5b (2026-10-31): the helpers the acceptance suite found missing, on BOTH systems, same names. Official release
+# files, not built here; scripts/fetch-toolbox-extras.sh downloads them and refuses any other bytes.
+# 7za = 7-Zip 26.04 (7za.exe from 7z2604-extra.7z; on Linux the 7zz of 7z2604-linux-x64.tar.xz, shipped as "7za").
+# ffmpeg, ffprobe = FFmpeg n9.0.2-28-g669f5ab083 (BtbN autobuild-2026-10-18-13-01, gpl, static).
+abd632a86f2a3be878311a50dde3d560bc719664550d8b6a411888fbe89c3629  windows-amd64/7za.exe
+f9c4d64e3012fa2740efaabe260b64149f3e4c25a63c4fa39e8091e4a19f686f  windows-amd64/ffmpeg.exe
+04bde2c18043338085b73d2aaaefc86b865820ccd90144d8578231e6bf229c35  windows-amd64/ffprobe.exe
+d1bc79f00e9815b24048ab167690bdd1dbc387de7dbc47e8d75d68689e49cf4f  linux-amd64/7za
+03e218b978410716319c1b712c7973384de6be63b80f5ad4a8a60c9e8d95f4a0  linux-amd64/ffmpeg
+c2357e52b4d68261674078e1f7fbeef63c03cc2cd5ac085061c030ba74c9e4e4  linux-amd64/ffprobe
