@@ -96,7 +96,7 @@ func TestBrowserFallbackUsedOnEmptyPage(t *testing.T) {
 		t.Fatalf("unexpected error: %s", resp.Content)
 	}
 	for _, want := range []string{"Rendered by script",
-		"rendered by a local browser (firefox) via fieldkit web fetch: the HTTP page had no readable text"} {
+		"rendered by a local browser (firefox) via fieldkit web fetch: the HTTP page had only 0 characters of readable text"} {
 		if !strings.Contains(resp.Content, want) {
 			t.Errorf("missing %q in %s", want, resp.Content)
 		}
@@ -186,11 +186,46 @@ func TestBrowserFallbackLookPathOnce(t *testing.T) {
 }
 
 func TestBrowserFallbackNotUsedWhenPageHasText(t *testing.T) {
-	serveHTML(t, `<html><body><p>Plain readable words here.</p></body></html>`)
+	serveHTML(t, `<html><body><p>`+strings.Repeat("Plain readable words here. ", 10)+`</p></body></html>`)
 	c := withFieldkit(t, fkFound,
 		func(context.Context, string, string) ([]byte, error) { return okJSON("x"), nil })
 	resp := fetchJS(t)
 	if resp.IsError || c.runs != 0 || c.looks != 0 {
 		t.Fatalf("err=%v looks=%d runs=%d: %s", resp.IsError, c.looks, c.runs, resp.Content)
+	}
+}
+
+// Measured 2026-10-31: discord.com/app over HTTP is its <title> and nothing
+// else. A shell with a scrap of text must reach the browser too.
+const titleShell = `<html><head><title>Discord</title><script>x()</script></head><body><div id="app"></div></body></html>`
+
+func TestBrowserFallbackUsedOnTitleOnlyShell(t *testing.T) {
+	serveHTML(t, titleShell)
+	c := withFieldkit(t, fkFound, func(context.Context, string, string) ([]byte, error) {
+		return okJSON("Rendered by script, a much longer page than the title alone"), nil
+	})
+	resp := fetchJS(t)
+	if resp.IsError || c.runs != 1 {
+		t.Fatalf("err=%v runs=%d: %s", resp.IsError, c.runs, resp.Content)
+	}
+	if !strings.Contains(resp.Content, "Rendered by script") ||
+		!strings.Contains(resp.Content, "the HTTP page had only 7 characters of readable text") {
+		t.Errorf("browser text or note missing: %s", resp.Content)
+	}
+}
+
+func TestBrowserFallbackFailureKeepsShortHTTPText(t *testing.T) {
+	serveHTML(t, titleShell)
+	withFieldkit(t, fkFound, func(context.Context, string, string) ([]byte, error) {
+		return nil, errors.New("exit code 3")
+	})
+	resp := fetchJS(t)
+	if resp.IsError {
+		t.Fatalf("a short page must not become an error: %s", resp.Content)
+	}
+	for _, want := range []string{"Discord", "only 7 characters of text; the browser fallback", "exit code 3"} {
+		if !strings.Contains(resp.Content, want) {
+			t.Errorf("missing %q in %s", want, resp.Content)
+		}
 	}
 }
