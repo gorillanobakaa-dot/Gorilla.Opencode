@@ -16,11 +16,19 @@ A Windows build made with the "toolbox" option now carries all seven inside its 
 
 The new native pfind.exe (job 03) is the first of them: when it is there, the find tool uses it instead of Python.
 
+## P5b update (2026-10-31): three more helpers, on Windows AND Linux
+
+The acceptance suite (docs/ACCEPTANCE-BASIC.md) found three programs the AI kept hunting the disk for: 7-Zip, ffmpeg and ffprobe. They are now in the toolbox under the same names on both systems: `7za` (make and unpack .7z, .zip, .tar and more), `ffmpeg` (convert, resize and cut pictures, audio and video, including PNG to WebP and extracting the sound of a video) and `ffprobe` (read a video's length and details). The "image converter" row of the suite is covered by ffmpeg, so no fourth program was added. Rule kept: Windows never gets more than Linux; the seven older helpers are still Windows-only (the frozen list in `parity_test.go` did not grow and did not shrink: 7 before, 7 after).
+
+Cost: each Windows build with these is about 60 MB bigger (ffmpeg and ffprobe are 165 MB each unpacked, about 35 MB each compressed).
+
+Who can act through them: nobody on their own. The files come once, at build time, from the 7-Zip and FFmpeg (BtbN) release pages, are checked against fixed fingerprints, and sit inside the program. They make no update checks and send nothing. FFmpeg can open web addresses if the AI types one; that is the AI's command, not the helper's doing.
+
 ## Honest state of play
 
 Done and tested on this laptop (Windows 11): a toolbox build with all seven helpers; every one unpacked and checked; pfind.exe answering the find tool; the AI's shell running `sd --version` by its plain name. The ordinary build (without the toolbox option) is unchanged and carries nothing extra.
 
-Not done yet: Linux and macOS builds carry no helpers. 7-Zip (7za), the jq/yq "data" action and finding Visual Studio's build tools are separate pieces still to come. The six third-party helpers were built from source on the owner's second machine, not yet rebuilt on Windows.
+Not done yet: Linux and macOS builds carry no helpers except the three of the P5b update (below). The jq/yq "data" action and finding Visual Studio's build tools are separate pieces still to come. The six third-party helpers were built from source on the owner's second machine, not yet rebuilt on Windows.
 
 ## Worst case if something is wrong
 
@@ -85,6 +93,24 @@ Owner decision 2026-10-26: every helper binary is embedded in gorilla-opencode.e
 - shell: `agentShellEnv` (persistent shell and ConPTY) prepends `toolbox.Dirs()` (extract + check all) to PATH of the agent's shell only. bash.go calls `toolbox.VerifyMentioned(command)` before each command: each helper named as a word in the command is re-checked (and re-extracted) first; a failure refuses the command.
 - `cacheDirIsPrivate` moved to `toolbox.CacheDirIsPrivate`; find.go delegates.
 - `scripts/build-toolbox.ps1`: cargo-builds pfind.exe (offline, vendored), copies the six from `-HelpersDir`, stops on any pin mismatch, gzips (default; `-NoCompress` for raw), `go build -tags toolbox -trimpath -ldflags "-s -w"`.
+
+## P5b update (2026-10-31): 7za, ffmpeg, ffprobe on both tracks
+
+Pins (`internal/toolbox/SHA256SUMS`, one line per system; the Linux `7za` is the official `7zz`, renamed so the name matches Windows):
+
+| helper | version | windows-amd64 sha256 | linux-amd64 sha256 |
+|---|---|---|---|
+| 7za | 7-Zip 26.04 (released 2026-10-05) | abd632a86f2a3be878311a50dde3d560bc719664550d8b6a411888fbe89c3629 (7za.exe, 860,160 B) | d1bc79f00e9815b24048ab167690bdd1dbc387de7dbc47e8d75d68689e49cf4f (7zz, 2,886,216 B) |
+| ffmpeg | n9.0.2-28-g669f5ab083, GPL static | f9c4d64e3012fa2740efaabe260b64149f3e4c25a63c4fa39e8091e4a19f686f (165,159,424 B) | 03e218b978410716319c1b712c7973384de6be63b80f5ad4a8a60c9e8d95f4a0 (172,864,808 B) |
+| ffprobe | same build | 04bde2c18043338085b73d2aaaefc86b865820ccd90144d8578231e6bf229c35 (164,957,696 B) | c2357e52b4d68261674078e1f7fbeef63c03cc2cd5ac085061c030ba74c9e4e4 (172,631,272 B) |
+
+Sources (official release files, no mirror): `https://www.7-zip.org/a/7z2604-extra.7z` (Windows 7za.exe) and `7z2604-linux-x64.tar.xz` (7zz); FFmpeg's own download page points to BtbN/FFmpeg-Builds, asset `ffmpeg-n9.0.2-28-g669f5ab083-{win64,linux64}-gpl-9.0` of release `autobuild-2026-10-18-13-01`. Archive hashes are in `scripts/fetch-toolbox-extras.sh`, which downloads, refuses any other bytes, and checks every extracted file against the pin list. FFmpeg's archive hashes equal GitHub's own digest of the asset; 7-Zip publishes no hash or signature on its page, so its hashes are the ones measured on 2026-10-31 over HTTPS (trust on first use, then pinned).
+
+Threat model. Download: once, by the release maker, over HTTPS from 7-zip.org and github.com; never by the running program. Signature: none checked for 7-Zip (none offered); the FFmpeg builds are unsigned GitHub assets whose digest matches. Who can act: Igor Pavlov (7-Zip) and the BtbN build bot/maintainer could have shipped other bytes at fetch time; after the pin, the only bytes ever run are these. Telemetry: neither 7-Zip nor FFmpeg has any; ffmpeg only opens network addresses the caller gives it. Rule for the tag (third_party/PINS.md): 7-Zip 26.04 is the newest release at least 14 days old (26.05 is from 2026-10-21). FFmpeg autobuilds are rolling and the repository keeps only recent ones, so the 14-day rule cannot be applied; the newest stable release branch (9.0.2) at the oldest build still published was used.
+
+Build: `bash scripts/fetch-toolbox-extras.sh OUT`, then `scripts/build-toolbox.ps1 -HelpersDir` (Windows, flat folder) or `bash scripts/build-toolbox.sh OUT` (Linux, new: embeds the linux-amd64 pins, gzip, `-tags toolbox`). Licenses: `third_party/7zip/License.txt` (LGPL + unRAR restriction), `third_party/ffmpeg/LICENSE.txt` (GPL).
+
+Parity: `TestToolboxSameHelpersOnWindowsAndLinux` passes with the three on both systems; `parityBacklog` is unchanged at 7 (ast-grep, coreutils, difft, hyperfine, ninja, pfind, sd). Linux: the system tool is still found on PATH when the toolbox is not built in.
 
 ## Before
 
