@@ -53,6 +53,7 @@ type Facts struct {
 
 	Sysinternals []string // Sysinternals programs found on PATH
 	Toolbox      []string // helpers embedded in this binary (internal/toolbox)
+	PathTools    []string // everyday helpers found on PATH (helpers.go)
 }
 
 var (
@@ -71,6 +72,7 @@ func probe() Facts {
 	_, err := exec.LookPath("git")
 	f.Git = err == nil
 	f.Toolbox = toolbox.Names()
+	f.PathTools = lookPathTools()
 	probeOS(&f)
 	return f
 }
