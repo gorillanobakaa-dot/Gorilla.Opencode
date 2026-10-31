@@ -228,6 +228,12 @@ type Config struct {
 	// and reads them as text. Off by default: it sends search terms to those
 	// engines, and turning that on is the user's decision, not ours.
 	WebSearchBuiltin bool `json:"webSearchBuiltin,omitempty" mapstructure:"webSearchBuiltin"`
+	// GORILLA OVERRIDE (2026-10-30, plan P3c): web_fetch's browser fallback is ON
+	// when fieldkit is installed; true switches it off. Stored as the negative
+	// because omitempty drops a false, so a default-ON switch could not be
+	// persisted as off. GORILLA_OPENCODE_WEB_FETCH_BROWSER=0 does the same. Never
+	// read from a folder's .gorilla-opencode.json (see filterFolderSettings).
+	WebFetchBrowserOff bool `json:"webFetchBrowserOff,omitempty" mapstructure:"webFetchBrowserOff"`
 	// GORILLA OVERRIDE (2026-10-11): the address the two research sources that
 	// demand one (Unpaywall, SEC EDGAR) are given. GORILLA_OPENCODE_CONTACT_EMAIL
 	// wins when set. Never read from a folder's .gorilla-opencode.json (see

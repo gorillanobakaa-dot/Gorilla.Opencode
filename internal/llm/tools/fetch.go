@@ -515,7 +515,7 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	}
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	client := newSafeClient(timeout)
+	client := newFetchClient(timeout)
 
 	target, note := rewriteToSource(params.URL)
 	var notes []string
@@ -637,6 +637,25 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		}
 	}
 
+	// GORILLA OVERRIDE (2026-10-30, plan P3c): no text from the HTTP page ->
+	// render it in a local browser through fieldkit, before the token budget so
+	// the browser text is treated like any other page.
+	browserNote := ""
+	if strings.TrimSpace(out) == "" && format != "html" && format != "json" {
+		text, browser, reason := browserFetch(ctx, target)
+		switch {
+		case text != "":
+			out = text
+			if browser == "" {
+				browser = "browser"
+			}
+			notes = append(notes, fmt.Sprintf("rendered by a local browser (%s) via fieldkit web fetch: "+
+				"the HTTP page had no readable text", browser))
+		case reason != "":
+			browserNote = "\n\nThe browser fallback (fieldkit web fetch) was tried and failed: " + reason + "."
+		}
+	}
+
 	if res.fromCache {
 		notes = append(notes, "unchanged since the last fetch (304); served from this session's cache")
 	}
@@ -699,8 +718,8 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 				"This is NOT the same as the page being empty. The usual cause is a page whose "+
 				"content is assembled by JavaScript in the browser, which nothing here executes. "+
 				"Try format=\"html\" to see the raw markup, look for an API or .md/.txt version of "+
-				"the same document, or ask the user to paste what they can see.",
-			target, status, len(res.body))), nil
+				"the same document, or ask the user to paste what they can see.%s",
+			target, status, len(res.body), browserNote)), nil
 	}
 
 	header := fmt.Sprintf("Fetched: %s", target)

@@ -92,3 +92,11 @@ fieldkit pipeline run gorilla-opencode --var src=PATH/TO/Gorilla.Opencode --var 
 ```
 
 The version flag is optional. A second run redoes only the stages whose inputs changed.
+
+## web_fetch renders script-only pages in a local browser
+
+When a page's HTTP body holds no readable text (its content is built by JavaScript), `web_fetch` runs `fieldkit web fetch URL --json` once, if `fieldkit` is on PATH. It drives a browser already installed on this machine (throwaway profile, no downloads). Only the URL goes to that process: no cookies, headers or session data. The text it returns is fenced as untrusted page text, like any fetched page, and the result says "rendered by a local browser". If it fails, the usual "no readable text" message says why.
+
+- **Setting:** `"webFetchBrowserOff": true` in config.json turns it off (default: on when fieldkit is found; not read from a project folder's `.gorilla-opencode.json`)
+- **Environment:** `GORILLA_OPENCODE_WEB_FETCH_BROWSER=0` does the same
+- **Lookup:** `fieldkit` is looked up on PATH once per process
