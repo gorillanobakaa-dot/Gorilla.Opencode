@@ -27,9 +27,11 @@ type Call struct {
 
 // JobResult is the record of one job on one model.
 type JobResult struct {
-	Job     string  `json:"job"`
-	Title   string  `json:"title"`
-	Model   string  `json:"model"`
+	Job   string `json:"job"`
+	Title string `json:"title"`
+	Model string `json:"model"`
+	// Variant is "" (this machine's profile) or "fresh-profile" (see Config).
+	Variant string  `json:"variant,omitempty"`
 	OS      string  `json:"os"`
 	Pass    bool    `json:"pass"`
 	Seconds float64 `json:"seconds"`
@@ -65,7 +67,14 @@ type Config struct {
 	// PathMode: "clean" (default) runs with only the system folders on PATH,
 	// what a person who installed nothing else has; "host" keeps this machine's.
 	PathMode string
-	Timeout  time.Duration
+	// Variant "fresh-profile" moves USERPROFILE, HOME, APPDATA and LOCALAPPDATA
+	// to an empty folder, so what the owner installed under their profile
+	// (scoop, winget, pip) is not where a model would look first - closer to a
+	// person who installed nothing. The config folder (login, MCP servers) is
+	// kept by pointing XDG_CONFIG_HOME at the real one. Programs under
+	// Program Files stay findable by full path; that is stated in the report.
+	Variant string
+	Timeout time.Duration
 	// Embedded says the exe was built with the toolbox (so "toolbox:X" needs
 	// count as present).
 	Embedded bool
@@ -73,7 +82,7 @@ type Config struct {
 
 // RunJob runs one job on cfg.Model and checks the result.
 func RunJob(cfg Config, j Job) (JobResult, error) {
-	res := JobResult{Job: j.ID, Title: j.Title, Model: cfg.Model, OS: runtime.GOOS, ExitCode: -1}
+	res := JobResult{Job: j.ID, Title: j.Title, Model: cfg.Model, Variant: cfg.Variant, OS: runtime.GOOS, ExitCode: -1}
 	p, err := Prepare(j, cfg.Root, cfg.Fixtures)
 	if err != nil {
 		return res, err
@@ -86,7 +95,7 @@ func RunJob(cfg Config, j Job) (JobResult, error) {
 		return res, err
 	}
 
-	env := runEnv(cfg.PathMode)
+	env := runEnv(cfg.PathMode, cfg.Variant, cfg.Root)
 	res.NeedsPresent = map[string]bool{}
 	for _, n := range j.Needs {
 		if strings.HasPrefix(n, "toolbox:") {
@@ -189,18 +198,40 @@ func guessCause(r JobResult) string {
 }
 
 // runEnv is the environment of the run. PATH is replaced in "clean" mode.
-func runEnv(mode string) []string {
-	if mode == "host" {
-		return os.Environ()
+func runEnv(mode, variant, root string) []string {
+	drop := map[string]bool{}
+	var add []string
+	if mode != "host" {
+		drop["PATH"] = true
+		add = append(add, "PATH="+cleanPath())
+	}
+	if variant == "fresh-profile" {
+		realConfig := os.Getenv("XDG_CONFIG_HOME")
+		if realConfig == "" {
+			home, _ := os.UserHomeDir()
+			realConfig = filepath.Join(home, ".config")
+		}
+		fresh := filepath.Join(root, "_fresh-home")
+		os.MkdirAll(filepath.Join(fresh, "AppData", "Roaming"), 0o755)
+		os.MkdirAll(filepath.Join(fresh, "AppData", "Local"), 0o755)
+		for _, k := range []string{"USERPROFILE", "HOME", "APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME"} {
+			drop[k] = true
+		}
+		add = append(add,
+			"USERPROFILE="+fresh, "HOME="+fresh,
+			"APPDATA="+filepath.Join(fresh, "AppData", "Roaming"),
+			"LOCALAPPDATA="+filepath.Join(fresh, "AppData", "Local"),
+			"XDG_CONFIG_HOME="+realConfig)
 	}
 	var keep []string
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(strings.ToUpper(kv), "PATH=") {
+		name, _, _ := strings.Cut(kv, "=")
+		if drop[strings.ToUpper(name)] {
 			continue
 		}
 		keep = append(keep, kv)
 	}
-	return append(keep, "PATH="+cleanPath())
+	return append(keep, add...)
 }
 
 func cleanPath() string {

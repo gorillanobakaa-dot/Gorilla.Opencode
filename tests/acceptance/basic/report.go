@@ -59,7 +59,7 @@ func Render(jobs []Job, results []JobResult, causes map[string]Cause) string {
 	var models []string
 	byKey := map[string]JobResult{}
 	for _, r := range results {
-		k := r.Model + "|" + r.OS
+		k := r.Model + variantSuffix(r.Variant) + "|" + r.OS
 		found := false
 		for _, m := range models {
 			if m == k {
@@ -129,6 +129,13 @@ func Render(jobs []Job, results []JobResult, causes map[string]Cause) string {
 		fmt.Fprintf(&b, "| %s | %d |\n", c, count[c])
 	}
 	return b.String()
+}
+
+func variantSuffix(v string) string {
+	if v == "" {
+		return ""
+	}
+	return " [" + v + "]"
 }
 
 // failedWhy is the first failed check's reason, or the exit reason.

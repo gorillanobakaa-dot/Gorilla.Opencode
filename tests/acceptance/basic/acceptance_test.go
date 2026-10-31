@@ -15,6 +15,7 @@ package basic
 //	ACC_EXE      use this binary instead of building one
 //	ACC_HELPERS  folder of the pinned toolbox helpers (default: the installed copy's cache)
 //	ACC_PATH     "clean" (default) or "host"; see Config.PathMode
+//	ACC_VARIANT  "" (this machine) or "fresh-profile" (see Config.Variant)
 //	ACC_TIMEOUT  per-job limit (default 8m)
 //
 // Results: results/<model>-<os>.json, one file per model, rewritten after every
@@ -61,7 +62,7 @@ func TestAcceptance(t *testing.T) {
 	resultsDir, _ := filepath.Abs("results")
 	os.MkdirAll(resultsDir, 0o755)
 
-	cfg := Config{Root: root, Fixtures: fixtures, PathMode: envOr("ACC_PATH", "clean"), Timeout: 8 * time.Minute}
+	cfg := Config{Root: root, Fixtures: fixtures, PathMode: envOr("ACC_PATH", "clean"), Variant: os.Getenv("ACC_VARIANT"), Timeout: 8 * time.Minute}
 	if d, err := time.ParseDuration(os.Getenv("ACC_TIMEOUT")); err == nil {
 		cfg.Timeout = d
 	}
@@ -94,7 +95,7 @@ func TestAcceptance(t *testing.T) {
 			}
 			t.Logf("%-18s %-34s %5.0fs %2d calls  %s", j.ID, cfg.Model, r.Seconds, r.ToolCalls, verdict)
 			data, _ := json.MarshalIndent(results, "", "  ")
-			name := strings.NewReplacer("/", "_", ":", "_").Replace(cfg.Model) + "-" + runtime.GOOS + ".json"
+			name := strings.NewReplacer("/", "_", ":", "_").Replace(cfg.Model) + "-" + runtime.GOOS + variantFile(cfg.Variant) + ".json"
 			os.WriteFile(filepath.Join(resultsDir, name), data, 0o644)
 		}
 	}
@@ -125,4 +126,11 @@ func envOr(k, def string) string {
 		return v
 	}
 	return def
+}
+
+func variantFile(v string) string {
+	if v == "" {
+		return ""
+	}
+	return "-" + v
 }
