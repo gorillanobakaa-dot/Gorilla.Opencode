@@ -15,3 +15,13 @@ d6f01d309784d928507ac45b11d92f255ca3108c32c2b4321da91b1b0c8ae67a  windows-amd64/
 # Built on this laptop from tools/pfind-rs (merge cdc01cc), `cargo build --release --offline --locked`,
 # x86_64-pc-windows-msvc. scripts/build-toolbox.ps1 rebuilds it and stops if the bytes differ.
 6828dfcf5853e78530598c1344b4e4882eed88d37189fc56d9c9ecad666ebfe7  windows-amd64/pfind.exe
+#
+# Image codecs (job P4b, 2026-10-31): the official prebuilt release binary of each, both systems, the same three names.
+# Sources and the release-archive sha256 are in third_party/PINS.md ("Image codecs"). Not pinned, because no official
+# binary exists for one system: mozjpeg cjpeg (source-only releases), Tesseract, ImageMagick (see PINS.md).
+6a2f5cb5dce71366353ab1d9caf9c636e039f25703acfce1c148eed346f2f72a  windows-amd64/cwebp.exe
+5ac7ece6bdda1587f3c169ce74ab2734994f9d14e07fc5358208443c1b29edec  linux-amd64/cwebp
+42312321ed9f715987cb3623292eaedc778970b45efb9b1de62ce795f61991a0  windows-amd64/avifenc.exe
+bfa76fdb43b4903972ed2baedbff889d4f1e0b19efe7fe934044cf83e4b709a5  linux-amd64/avifenc
+35ae3980ab831af64f4aecc98f69b81bfa146fa750a61d17ebbb12520128cbc8  windows-amd64/oxipng.exe
+df8f3e79e6ef06d8515d4949d19d872ae4e82fe16bc1fe6ad1efe181e3a21780  linux-amd64/oxipng

@@ -121,6 +121,24 @@ sha256, and go up as release assets when a release ships the toolbox. Rebuild: c
 | vendor-hyperfine.tar.zst (v2.0.0) | 21,816,387 | 23403bd9313747f2d84608aac237703341ae539f8dfe6b33424b16f9622810ea |
 | vendor-sd.tar.zst | 17,022,601 | d44ac85b368c359da0311d432491849475725ed71f96fdbf2221cdb0dfffda4a |
 
+## Image codecs (internal/toolbox, job P4b, 2026-10-31)
+
+The official prebuilt release of each, downloaded once, archive hashed, the one program taken out and hashed (that
+hash is the line in `internal/toolbox/SHA256SUMS`). Newest release at least 14 days old on 2026-10-31. Both systems
+get the same three names (parity_test.go). Windows `--version` runs exit 0; the Linux files were NOT run here.
+
+| tool | release | date | archive (sha256) | program |
+|---|---|---|---|---|
+| cwebp (libwebp, BSD-3-Clause) | 1.6.0, storage.googleapis.com/downloads.webmproject.org/releases/webp/ | 2025-07 | libwebp-1.6.0-windows-x64.zip 48886f506b21f62e4661f0f4cbfca19800897c385128e8902542d29a950c93f1; libwebp-1.6.0-linux-x86-64.tar.gz 1c5ffab71efecefa0e3c23516c3a3a1dccb45cc310ae1095c6f14ae268e38067 | bin/cwebp(.exe) |
+| avifenc (libavif, BSD-2-Clause; aom and dav1d inside) | v1.4.2, github.com/AOMediaCodec/libavif | 2026-05-26 | windows-artifacts.zip cb2d9fea43dcbab1d0707e3b37eb7b08070ad2fb60a2c188c39ec12382c0484a; linux-artifacts.zip faf58a670ffbfdc0e3559e6d37592cff277c447dd39453f1cd1d7d7f5a20b8ef | avifenc(.exe) |
+| oxipng (MIT) | v10.2.1, github.com/oxipng/oxipng | 2026-09-02 | oxipng-10.2.1-x86_64-pc-windows-msvc.zip 7e940f83ee46874b73f53031f96a15834cb70b220af27391fb06fe7b4dd798e1; oxipng-10.2.1-x86_64-unknown-linux-musl.tar.gz 1813750ef592c5350ca79c88f98b2c0876d05c826dc7156245256d4255c1ad17 | oxipng(.exe) |
+
+**Not in the toolbox, on purpose (parity: neither system gets a copy).** mozjpeg `cjpeg`: its releases are source
+only (v4.1.1 has no asset; the v4.0.3 zip is Windows-only and from 2021). Tesseract: upstream ships no binary at all
+(the Windows setup program is a third party's). ImageMagick: Windows is a multi-file portable folder and Linux an
+AppImage, not one program each. The `image` how-to card says how to get these (`scoop install` / `apt install`);
+`fieldkit image` uses them when present and falls back to `magick`.
+
 Not done yet: a script that rebuilds the six on Windows (`x86_64-pc-windows-msvc`) from these tarballs (the
 reproducibility path; until it is proven the VAIO binaries are the shipped ones), 7-Zip 7za (MSVC build), the
 per-crate license notices of the helpers' own dependencies, and Linux/macOS embeds.
