@@ -21,7 +21,7 @@ Then the program was run for real on each job with `chatgpt.gpt-5.6-luna` (ChatG
 - **The tools Gorilla already carries were not the gap.** On the jobs about files and text, Luna used the built-in find, view, files, write and archive tools, almost never a shell command, and never the embedded coreutils by name. They passed in 1 to 5 calls and mostly under 20 seconds.
 - **A model that can see needs no OCR program.** Luna read the text in the picture with its own eyes (1 call), and read the photo's camera and date through PowerShell and Windows' own image library. A model without vision would have no way; that was not tested.
 - **Local Qwen was too slow to measure fully.** Every Qwen job that finished took 292 to 355 s, even with a single tool call. It passed all 4 it finished (list, read, delete, delete to the Recycle Bin: the two things the owner said it could not do worked here). The fifth job (a hidden file) hit the 6-minute limit before the model made any call. The other 30 jobs were not run: the run was stopped after 5 jobs because 35 jobs at 5 minutes each did not fit the time budget. Qwen is **not** compared with Luna in this report.
-- **Linux was not run.** The Sony VAIO was off. The same files run there (see the README).
+- **Linux was run on 2026-10-31** (Sony VAIO, same commit `ee19710`): ChatGPT Luna passed **33 of 35**. Both failures wrote their result one folder above the job folder (a copy and a 7z archive); the model said it was done, the disk says the file is in the wrong place. The same habit failed `sort_uniq` once on Windows. The suite needed no change to run on Linux.
 
 ## Worst case if something is wrong
 
@@ -124,7 +124,22 @@ The cause column uses the four labels of the brief. `model error` for Qwen/hidde
 - Qwen: 5 of 35 jobs.
 - The receipt records one argument per call.
 - The OCR, EXIF and video checks accept the model's own vision or PowerShell route; they do not require the named program.
-- Linux and macOS: not run.
+- Linux: one run, one model (ChatGPT Luna, 33 of 35), the default clean PATH `/usr/local/bin:/usr/bin:/bin`. This VAIO has 7z, ffmpeg and ImageMagick installed, so Linux passes say "installed", not "carried by Gorilla". Qwen was not run on Linux. macOS: not run.
+
+## Linux result (2026-10-31, Sony VAIO, exe built from `ee19710`, no toolbox on Linux)
+
+`chatgpt.gpt-5.6-luna`, default model, `ACC_ROOT` inside a scratch job, 521 s for 35 jobs. Unit tests: `ok github.com/opencode-ai/opencode/tests/acceptance/basic`. Per-job table: `tests/acceptance/basic/results/tables.md` (column `linux`) and `results/chatgpt.gpt-5.6-luna-linux.json`.
+
+| model / OS | passed | failures |
+|---|---|---|
+| chatgpt.gpt-5.6-luna / linux | 33 of 35 | copy_folder, sevenzip_make |
+
+| job | cause | why |
+|---|---|---|
+| copy_folder | model error | `photos-backup` was created one folder above the job folder; the answer claimed success. Whether the model passed a wrong path or the `files` tool resolved a relative path elsewhere was not determined (the receipt clips arguments). |
+| sevenzip_make | model error | `docs.7z` was written one folder above the job folder. 7z was on PATH; the runner's automatic guess ("model did not know the tool exists") was wrong and is overridden in `causes.yaml`. |
+
+Reading: no Linux-shaped defect in the suite (PATH, fixtures, helpers, hidden files and the trash check all worked), so no code fix was made. The two failures and the Windows `sort_uniq` failure are one pattern, a write outside the working folder, which is a program behavior for the owner to decide (point 5 above). Not re-run: one run per cell is a sample.
 
 ## Files
 
