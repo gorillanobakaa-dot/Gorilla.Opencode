@@ -139,6 +139,7 @@ func RunJob(cfg Config, j Job) (JobResult, error) {
 	p.Stop()
 	res.Checks = RunChecks(j, p.Dir, p.Vars, res.Answer)
 	res.Pass = AllPassed(res.Checks)
+	redactHome(&res)
 	if !res.Pass {
 		res.CauseAuto = guessCause(res)
 	}
@@ -349,4 +350,23 @@ func embedToolbox(repo, helpersDir string) (string, error) {
 		}
 	}
 	return dest, nil
+}
+
+// redactHome replaces the user's name in paths of the record, because the
+// results are committed to a public repository. It runs after the checks, so
+// the checks see the real answer.
+func redactHome(r *JobResult) {
+	home, err := os.UserHomeDir()
+	user := filepath.Base(home)
+	if err != nil || len(user) < 3 {
+		return
+	}
+	clean := func(s string) string { return strings.ReplaceAll(s, user, "USER") }
+	r.Answer, r.Stderr = clean(r.Answer), clean(r.Stderr)
+	for i := range r.Calls {
+		r.Calls[i].Detail = clean(r.Calls[i].Detail)
+	}
+	for i := range r.Checks {
+		r.Checks[i].Why = clean(r.Checks[i].Why)
+	}
 }

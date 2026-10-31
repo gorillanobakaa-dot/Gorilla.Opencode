@@ -1,0 +1,11 @@
+# Causes confirmed by reading the receipt of each failed job (MODEL[ [VARIANT]]/JOB).
+# They override the runner's automatic guess in the report.
+"chatgpt.gpt-5.6-luna/extract_audio":
+  cause: tool missing
+  note: "ffmpeg is not on the system PATH and not in the embedded toolbox (it is only in scoop here). The model looked, asked the fieldkit videokit tool, which needs a download that needs approval, and stopped to ask."
+"chatgpt.gpt-5.6-luna [fresh-profile]/sort_uniq":
+  cause: model error
+  note: "Model wrote unique.txt one folder ABOVE the working folder (write path C:\\fk-scratch\\p5a-acc\\unique.txt). The write tool let it; the same job passed in the other run."
+"local.qwen3.6-35b-a3b/hidden_file":
+  cause: model error
+  note: "Killed at the 6-minute job limit with no tool call made: every Qwen job that finished took 292 to 355 s here, even with one tool call, so the limit ended the run while the model was still working (why a turn is that slow was not measured). Not a tool gap. Not re-run (time budget)."
