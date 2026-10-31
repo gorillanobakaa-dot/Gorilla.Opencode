@@ -29,6 +29,9 @@ const (
 	browserFallbackGrace   = 10 * time.Second
 	browserFallbackEnvVar  = "GORILLA_OPENCODE_WEB_FETCH_BROWSER"
 	browserFallbackMaxOut  = 8 << 20
+	// Under this many characters of HTTP text the page is treated as a
+	// script-only shell (fieldkit/web/rule.py MIN_TEXT_CHARS, the same number).
+	browserFallbackMinChars = 200
 )
 
 type browserFetchResult struct {

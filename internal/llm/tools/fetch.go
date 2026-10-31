@@ -11,6 +11,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	md "github.com/JohannesKaufmann/html-to-markdown"
 	"github.com/PuerkitoBio/goquery"
@@ -637,22 +638,35 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		}
 	}
 
-	// GORILLA OVERRIDE (2026-10-30, plan P3c): no text from the HTTP page ->
-	// render it in a local browser through fieldkit, before the token budget so
-	// the browser text is treated like any other page.
+	// GORILLA OVERRIDE (2026-10-30, plan P3c): no usable text from the HTTP
+	// page -> render it in a local browser through fieldkit, before the token
+	// budget so the browser text is treated like any other page.
+	//
+	// GORILLA FIX (2026-10-31, measured): "no usable text" is fieldkit's rule,
+	// under browserFallbackMinChars characters, not "exactly empty". Run live
+	// with gpt-5.6-luna, discord.com/app gave the one word "Discord" (its
+	// <title>), so an empty-only trigger never fired on a real script-only page.
+	// A selector narrows on purpose, so a short result there is left alone.
 	browserNote := ""
-	if strings.TrimSpace(out) == "" && format != "html" && format != "json" {
+	httpChars := utf8.RuneCountInString(strings.TrimSpace(out))
+	if isHTML && httpChars < browserFallbackMinChars && format != "html" && format != "json" &&
+		strings.TrimSpace(params.Selector) == "" {
 		text, browser, reason := browserFetch(ctx, target)
 		switch {
-		case text != "":
+		case text != "" && utf8.RuneCountInString(strings.TrimSpace(text)) > httpChars:
 			out = text
 			if browser == "" {
 				browser = "browser"
 			}
 			notes = append(notes, fmt.Sprintf("rendered by a local browser (%s) via fieldkit web fetch: "+
-				"the HTTP page had no readable text", browser))
-		case reason != "":
+				"the HTTP page had only %d characters of readable text", browser, httpChars))
+		case text != "":
+			notes = append(notes, "the browser fallback (fieldkit web fetch) found no more text than the HTTP page")
+		case reason != "" && httpChars == 0:
 			browserNote = "\n\nThe browser fallback (fieldkit web fetch) was tried and failed: " + reason + "."
+		case reason != "":
+			notes = append(notes, fmt.Sprintf("only %d characters of text; the browser fallback "+
+				"(fieldkit web fetch) was tried and failed: %s", httpChars, reason))
 		}
 	}
 
