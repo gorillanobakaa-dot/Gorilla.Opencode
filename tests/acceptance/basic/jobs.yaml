@@ -1,0 +1,362 @@
+# Everyday jobs for the Gorilla OpenCode acceptance suite (plan row P5a).
+#
+# Each job: the files made in a fresh folder (setup), the prompt a person would
+# type, and deterministic checks on the disk or on the answer text. Contents
+# carry odd tokens (MANGO-7731) so a model cannot pass by guessing.
+# Placeholders: {{SCRATCH}} the job's folder, {{URL}} {{PORT}} {{PID}} from the
+# job's service. "needs" names the programs a person would use; the runner
+# records which are on the machine, to tell "tool missing" from "not used".
+# Reference: tests/acceptance/basic/README.md
+
+jobs:
+  # ---- look at files -------------------------------------------------------
+  - id: list_folder
+    title: List a folder
+    prompt: What files are in this folder? List them all.
+    files:
+      alpha.txt: "a\n"
+      beta.md: "b\n"
+      gamma.csv: "1,2\n"
+      sub/delta.log: "d\n"
+    checks:
+      - {kind: answer, all: [alpha.txt, beta.md, gamma.csv, sub]}
+
+  - id: read_file
+    title: Read a file
+    prompt: What does notes.txt say?
+    files:
+      notes.txt: "The vault code is MANGO-7731.\n"
+    checks:
+      - {kind: answer, contains: MANGO-7731}
+
+  - id: hidden_file
+    title: See a hidden file
+    prompt: Are there any hidden files in this folder? If so, what is inside them?
+    files:
+      visible.txt: "nothing here\n"
+      .hidden-token.txt: "secret word: PAPAYA-5528\n"
+    hidden: [".hidden-token.txt"]
+    checks:
+      - {kind: answer, all: [.hidden-token.txt, PAPAYA-5528]}
+
+  - id: file_type
+    title: What type of file is this
+    prompt: There is a file called mystery here with no extension. What kind of file is it really?
+    fixtures:
+      mystery: photo.png
+    checks:
+      - {kind: answer, any: [png, "portable network graphics"]}
+
+  - id: file_hash
+    title: Hash a file
+    prompt: Give me the SHA-256 hash of blob.txt.
+    files:
+      blob.txt: "hash me please\n"
+    needs: ["toolbox:coreutils"]
+    checks:
+      - {kind: answer, contains: 1cc0bc3f0c48143efc66a65368bd745ce8bf4e30fcddcaf1b0d0d56417eb899c}
+
+  # ---- change files --------------------------------------------------------
+  - id: create_file
+    title: Create a file with given text
+    prompt: Create a file called greeting.txt that contains exactly the text hello banana
+    checks:
+      - {kind: content, path: greeting.txt, equals: hello banana}
+
+  - id: make_folders
+    title: Make nested folders
+    prompt: Create the folders projects/2024/q1 here.
+    checks:
+      - {kind: exists, path: projects/2024/q1}
+
+  - id: delete_file
+    title: Delete a file
+    prompt: Delete junk.tmp
+    files:
+      junk.tmp: "x\n"
+      keep.txt: "keep me\n"
+    checks:
+      - {kind: absent, path: junk.tmp}
+      - {kind: exists, path: keep.txt}
+
+  - id: delete_to_bin
+    title: Delete to the Recycle Bin / trash
+    prompt: Delete acc-recycle-8841.txt, but send it to the Recycle Bin (trash) so I can get it back.
+    files:
+      acc-recycle-8841.txt: "bin test\n"
+    checks:
+      - {kind: recycled, path: acc-recycle-8841.txt}
+
+  - id: rename_file
+    title: Rename a file
+    prompt: Rename report-old.txt to report-2024.txt
+    files:
+      report-old.txt: "quarterly numbers 4471\n"
+    checks:
+      - {kind: absent, path: report-old.txt}
+      - {kind: content, path: report-2024.txt, contains: quarterly numbers 4471}
+
+  - id: move_file
+    title: Move a file into a folder
+    prompt: Move invoice.txt into the folder archive.
+    files:
+      invoice.txt: "invoice 90210\n"
+    dirs: [archive]
+    checks:
+      - {kind: absent, path: invoice.txt}
+      - {kind: content, path: archive/invoice.txt, contains: invoice 90210}
+
+  - id: copy_folder
+    title: Copy a folder
+    prompt: Make a copy of the folder photos called photos-backup, with everything in it.
+    files:
+      photos/a.txt: "one\n"
+      photos/b.txt: "two\n"
+      photos/trip/c.txt: "three\n"
+    checks:
+      - {kind: same_tree, path: photos, other: photos-backup}
+
+  - id: replace_many
+    title: Replace text in many files
+    prompt: In every .conf file in this folder, replace http://old.example with https://new.example
+    files:
+      a.conf: "url=http://old.example/a\n"
+      b.conf: "url=http://old.example/b\nmode=1\n"
+      c.conf: "# c\nurl=http://old.example/c\n"
+      d.conf: "url=http://old.example/d\n"
+      e.conf: "url=http://old.example/e\n"
+    checks:
+      - {kind: content, path: a.conf, equals: "url=https://new.example/a"}
+      - {kind: content, path: b.conf, equals: "url=https://new.example/b\nmode=1"}
+      - {kind: content, path: c.conf, equals: "# c\nurl=https://new.example/c"}
+      - {kind: content, path: d.conf, equals: "url=https://new.example/d"}
+      - {kind: content, path: e.conf, equals: "url=https://new.example/e"}
+
+  - id: sort_uniq
+    title: Sort and remove duplicate lines
+    prompt: Make unique.txt from names.txt - sorted alphabetically with duplicate lines removed.
+    files:
+      names.txt: "pear\napple\npear\nfig\napple\nbanana\n"
+    needs: ["toolbox:coreutils"]
+    checks:
+      - {kind: content, path: unique.txt, equals: "apple\nbanana\nfig\npear"}
+
+  # ---- archives ------------------------------------------------------------
+  - id: zip_make
+    title: Make a zip
+    prompt: Make a zip file called docs.zip containing the folder docs.
+    files:
+      docs/a.txt: "alpha\n"
+      docs/b.txt: "beta\n"
+    checks:
+      - {kind: zip_has, path: docs.zip, names: [a.txt, b.txt]}
+
+  - id: zip_extract
+    title: Unzip
+    prompt: Unzip bundle.zip into a folder called out.
+    zips:
+      bundle.zip:
+        one.txt: "first ZEBRA-6613\n"
+        inner/two.txt: "second\n"
+    checks:
+      - {kind: content, path: out/one.txt, contains: ZEBRA-6613}
+      - {kind: exists, path: out/inner/two.txt}
+
+  - id: sevenzip_make
+    title: Make a 7z archive
+    prompt: Make a 7z archive called docs.7z of the folder docs.
+    files:
+      docs/a.txt: "alpha\n"
+      docs/b.txt: "beta\n"
+    needs: [7z]
+    checks:
+      - {kind: magic, path: docs.7z, hex: 377abcaf271c}
+
+  - id: sevenzip_extract
+    title: Extract a 7z archive
+    prompt: Extract sample.7z into a folder called out7.
+    fixtures:
+      sample.7z: sample.7z
+    needs: [7z]
+    checks:
+      - {kind: content, path: out7/inner/x.txt, contains: extracted-ok-KIWI-2290}
+
+  # ---- text tools ----------------------------------------------------------
+  - id: tail_30
+    title: Last 30 lines
+    prompt: Show me the last 30 lines of server.log
+    lines:
+      server.log: "100:line-%03d entry"
+    needs: ["toolbox:coreutils"]
+    checks:
+      - {kind: answer, all: [line-071, line-100]}
+      - {kind: answer, none: [line-070]}
+
+  - id: follow_log
+    title: Follow a growing log for 5 seconds
+    prompt: app.log is being written to right now. Watch it for 5 seconds and tell me which new lines appear (the ones tick-005 and later).
+    service: growing_log
+    needs: ["toolbox:coreutils"]
+    timeout: 6m
+    checks:
+      - {kind: answer, regex: 'tick-0(0[5-9]|[1-9][0-9])', min: 3}
+
+  - id: count_lines
+    title: Count lines
+    prompt: How many lines does data.txt have?
+    lines:
+      data.txt: "237:row-%03d"
+    needs: ["toolbox:coreutils"]
+    checks:
+      - {kind: answer, regex: '\b237\b'}
+
+  - id: find_by_name
+    title: Find a file by name
+    prompt: Somewhere under this folder there is a file called report-final.docx. Where is it?
+    files:
+      deep/a/b/report-final.docx: "x\n"
+      deep/a/report-draft.docx: "x\n"
+      deep/c/notes.txt: "x\n"
+      other/todo.txt: "x\n"
+    needs: ["toolbox:pfind"]
+    checks:
+      - {kind: answer, regex: 'deep[\\/]+a[\\/]+b'}
+
+  - id: grep_text
+    title: Search text in files
+    prompt: Which files in this folder (including subfolders) contain the text TODO(kiwi)?
+    files:
+      src/main.go: "package main\n// TODO(kiwi): fix\n"
+      src/util/helper.go: "package util\n// TODO(kiwi) later\n"
+      src/clean.go: "package src\n"
+      README.md: "nothing\n"
+    needs: ["toolbox:pfind"]
+    checks:
+      - {kind: answer, all: [main.go, helper.go]}
+      - {kind: answer, none: [clean.go, README.md]}
+
+  - id: json_query
+    title: Query a JSON file
+    prompt: In people.json, which city does the user named Zoltan live in?
+    files:
+      people.json: '{"users":[{"name":"Ana","city":"Lima"},{"name":"Zoltan","city":"Quito"},{"name":"Mei","city":"Oslo"}]}'
+    checks:
+      - {kind: answer, all: [Quito]}
+      - {kind: answer, none: [Lima, Oslo]}
+
+  - id: diff_files
+    title: Compare two files
+    prompt: a.txt and b.txt are almost the same. What is the one line that differs?
+    files:
+      a.txt: "one\ntwo\nthree kumquat\nfour\n"
+      b.txt: "one\ntwo\nthree lychee\nfour\n"
+    checks:
+      - {kind: answer, all: [kumquat, lychee]}
+
+  - id: count_by_ext
+    title: Count files by extension
+    prompt: How many .log files are in this folder and all its subfolders?
+    files:
+      l01.log: "x"
+      l02.log: "x"
+      l03.log: "x"
+      l04.log: "x"
+      l05.log: "x"
+      l06.log: "x"
+      s/l07.log: "x"
+      s/l08.log: "x"
+      s/l09.log: "x"
+      s/t/l10.log: "x"
+      s/t/l11.log: "x"
+      s/t/l12.log: "x"
+      s/t/u/l13.log: "x"
+      other.txt: "x"
+      s/other.txt: "x"
+    checks:
+      - {kind: answer, regex: '\b13\b'}
+
+  # ---- disk, network, processes -------------------------------------------
+  - id: disk_usage
+    title: Disk usage of a folder
+    prompt: How many bytes do all the files in the folder data add up to? Give the number of bytes.
+    lines:
+      data/one.txt: "1000:%07d"
+      data/two.txt: "2000:%07d"
+      data/three.txt: "3000:%07d"
+    needs: ["toolbox:coreutils"]
+    checks:
+      - {kind: answer, any: ["48000", "48,000", "48 000"]}
+
+  - id: download_file
+    title: Download a file
+    prompt: Download {{URL}}/payload.txt and save it here as got.txt
+    service: http
+    files:
+      "@www/payload.txt": "download-ok-TOKEN-9912\n"
+    needs: [curl]
+    checks:
+      - {kind: content, path: got.txt, contains: download-ok-TOKEN-9912}
+
+  - id: port_process
+    title: Who uses a port
+    prompt: Which process is listening on TCP port {{PORT}}? Give me its process ID.
+    service: port
+    checks:
+      - {kind: answer, contains: "{{PID}}"}
+
+  # ---- pictures and video --------------------------------------------------
+  - id: png_to_webp
+    title: Convert PNG to WebP
+    prompt: Convert photo.png to WebP, saved as photo.webp
+    fixtures:
+      photo.png: photo.png
+    needs: [magick]
+    checks:
+      - {kind: magic, path: photo.webp, hex: 52494646}
+      - {kind: magic, path: photo.webp, hex: 57454250, offset: 8}
+
+  - id: image_resize
+    title: Resize an image
+    prompt: Make a copy of photo.png called small.png that is 160 pixels wide, keeping the proportions.
+    fixtures:
+      photo.png: photo.png
+    needs: [magick]
+    checks:
+      - {kind: dims, path: small.png, w: 160, h: 120}
+
+  - id: ocr_picture
+    title: Read the text in a picture
+    prompt: What text is written in the picture ocr.png?
+    fixtures:
+      ocr.png: ocr.png
+    needs: [tesseract]
+    checks:
+      - {kind: answer, all: ["4417", banana]}
+
+  - id: exif_read
+    title: Read a photo's EXIF data
+    prompt: What camera make and model took exif.jpg, and when?
+    fixtures:
+      exif.jpg: exif.jpg
+    needs: [exiftool]
+    checks:
+      - {kind: answer, all: [GorillaCam, Model-K9]}
+      - {kind: answer, any: ["2024:03:09", "2024-03-09", "March 9, 2024", "9 March 2024", "09/03/2024", "03/09/2024"]}
+
+  - id: video_length
+    title: How long is a video
+    prompt: How long is clip.mp4?
+    fixtures:
+      clip.mp4: clip.mp4
+    needs: [ffprobe]
+    checks:
+      - {kind: answer, regex: '(?i)(\b7(\.0+)?\s*(s\b|sec)|\b0?0?:?0?0:07\b)'}
+
+  - id: extract_audio
+    title: Extract the audio of a video
+    prompt: Extract the sound from clip.mp4 into an mp3 file called audio.mp3
+    fixtures:
+      clip.mp4: clip.mp4
+    needs: [ffmpeg]
+    checks:
+      - {kind: size_min, path: audio.mp3, min: 2000}

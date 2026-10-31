@@ -1,0 +1,136 @@
+[
+  {
+    "job": "list_folder",
+    "title": "List a folder",
+    "model": "local.qwen3.6-35b-a3b",
+    "os": "windows",
+    "pass": true,
+    "seconds": 305.8587703,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\list_folder",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Here are the contents of `C:\\fk-scratch\\p5a-acc\\list_folder`:\n\n**Top-level files:**\n| File | Size |\n|------|------|\n| `alpha.txt` | 2 B |\n| `beta.md` | 2 B |\n| `gamma.csv` | 4 B |\n\n**Subdirectories:**\n- `sub/` — contains `delta.log` (2 B)\n\nNo hidden files or other items found.",
+    "stderr": "2026/10/31 02:38:23 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "read_file",
+    "title": "Read a file",
+    "model": "local.qwen3.6-35b-a3b",
+    "os": "windows",
+    "pass": true,
+    "seconds": 292.3854698,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\read_file\\notes.txt",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "It contains a single line:\n\n```\nThe vault code is MANGO-7731.\n```",
+    "stderr": "2026/10/31 02:43:29 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "hidden_file",
+    "title": "See a hidden file",
+    "model": "local.qwen3.6-35b-a3b",
+    "os": "windows",
+    "pass": false,
+    "seconds": 360.0155118,
+    "exit_code": -1,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": false,
+        "why": "answer lacks \".hidden-token.txt\""
+      }
+    ],
+    "tool_calls": 0,
+    "calls": null,
+    "answer": "",
+    "stderr": "killed by the job time limit 6m0s\n2026/10/31 02:48:22 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "cause_auto": "model error"
+  },
+  {
+    "job": "delete_file",
+    "title": "Delete a file",
+    "model": "local.qwen3.6-35b-a3b",
+    "os": "windows",
+    "pass": true,
+    "seconds": 304.3374807,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "absent",
+        "ok": true,
+        "why": "junk.tmp is gone"
+      },
+      {
+        "kind": "exists",
+        "ok": true,
+        "why": "keep.txt exists"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5a-acc\\delete_file\\junk.tmp",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Deleted `junk.tmp` to the Recycle Bin.",
+    "stderr": "2026/10/31 02:54:22 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "delete_to_bin",
+    "title": "Delete to the Recycle Bin / trash",
+    "model": "local.qwen3.6-35b-a3b",
+    "os": "windows",
+    "pass": true,
+    "seconds": 354.6676745,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "recycled",
+        "ok": true,
+        "why": "acc-recycle-8841.txt is in the Recycle Bin"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5a-acc\\delete_to_bin\\acc-recycle-8841.txt",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Done — `acc-recycle-8841.txt` has been moved to the Recycle Bin. You can restore it from there whenever you need it back.",
+    "stderr": "2026/10/31 02:59:26 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  }
+]

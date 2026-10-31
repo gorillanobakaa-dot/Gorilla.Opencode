@@ -1,0 +1,1591 @@
+[
+  {
+    "job": "list_folder",
+    "title": "List a folder",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 3.9103176,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\list_folder",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Files in `C:\\fk-scratch\\p5a-acc\\list_folder`:\n\n- `alpha.txt`\n- `beta.md`\n- `gamma.csv`\n- `sub\\delta.log`",
+    "stderr": "2026/10/31 02:26:07 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "read_file",
+    "title": "Read a file",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 3.6565649000000002,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\read_file\\notes.txt",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "notes.txt says:\n\n\u003e The vault code is MANGO-7731.",
+    "stderr": "2026/10/31 02:26:11 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "hidden_file",
+    "title": "See a hidden file",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 7.5157505,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 3,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5a-acc\\hidden_file",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\hidden_file\\.gorilla-opencode.json",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\hidden_file\\.hidden-token.txt",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Yes. There are two hidden files:\n\n- `.gorilla-opencode.json` — contains agent model configuration, including `chatgpt.gpt-5.6-luna`.\n- `.hidden-token.txt` — contains: `secret word: PAPAYA-5528`.",
+    "stderr": "2026/10/31 02:26:15 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "file_type",
+    "title": "What type of file is this",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 4.9148837,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 2,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "mystery in C:\\fk-scratch\\p5a-acc\\file_type",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "binary_inspect",
+        "detail": "C:\\fk-scratch\\p5a-acc\\file_type\\mystery",
+        "outcome": "failed",
+        "times": 1
+      }
+    ],
+    "answer": "The `mystery` file is really a **PNG image**. Its signature begins with the standard PNG magic bytes:\n\n`89 50 4E 47 0D 0A 1A 0A`",
+    "stderr": "2026/10/31 02:26:22 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "file_hash",
+    "title": "Hash a file",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 3.7471289,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5a-acc\\file_hash\\blob.txt",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "The SHA-256 hash of `blob.txt` is:\n\n`1cc0bc3f0c48143efc66a65368bd745ce8bf4e30fcddcaf1b0d0d56417eb899c`",
+    "stderr": "2026/10/31 02:26:27 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "toolbox:coreutils": true
+    }
+  },
+  {
+    "job": "create_file",
+    "title": "Create a file with given text",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 8.858022,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "greeting.txt: content equals"
+      }
+    ],
+    "tool_calls": 3,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\create_file",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "write",
+        "detail": "C:\\fk-scratch\\p5a-acc\\create_file\\greeting.txt",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\create_file\\greeting.txt",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created `greeting.txt` containing exactly:\n\n```text\nhello banana\n```",
+    "stderr": "2026/10/31 02:26:31 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "make_folders",
+    "title": "Make nested folders",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 10.0241194,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "exists",
+        "ok": true,
+        "why": "projects/2024/q1 exists"
+      }
+    ],
+    "tool_calls": 2,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\make_folders",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "New-Item -ItemType Directory -Path 'C:\\fk-scratch\\p5a-acc\\make_folders\\projects\\2024\\q1' -...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created `projects/2024/q1` here:\n\n`C:\\fk-scratch\\p5a-acc\\make_folders\\projects\\2024\\q1`",
+    "stderr": "2026/10/31 02:26:40 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "delete_file",
+    "title": "Delete a file",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 9.1438714,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "absent",
+        "ok": true,
+        "why": "junk.tmp is gone"
+      },
+      {
+        "kind": "exists",
+        "ok": true,
+        "why": "keep.txt exists"
+      }
+    ],
+    "tool_calls": 3,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\delete_file",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5a-acc\\delete_file\\junk.tmp",
+        "outcome": "ok",
+        "times": 2
+      }
+    ],
+    "answer": "Deleted `junk.tmp` and moved it to the Recycle Bin.",
+    "stderr": "2026/10/31 02:26:50 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "delete_to_bin",
+    "title": "Delete to the Recycle Bin / trash",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 8.702736699999999,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "recycled",
+        "ok": true,
+        "why": "acc-recycle-8841.txt is in the Recycle Bin"
+      }
+    ],
+    "tool_calls": 3,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\delete_to_bin",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5a-acc\\delete_to_bin\\acc-recycle-8841.txt",
+        "outcome": "ok",
+        "times": 2
+      }
+    ],
+    "answer": "Moved `acc-recycle-8841.txt` to the Windows Recycle Bin. It can be restored from there.",
+    "stderr": "2026/10/31 02:26:59 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "rename_file",
+    "title": "Rename a file",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 6.9407083,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "absent",
+        "ok": true,
+        "why": "report-old.txt is gone"
+      },
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "report-2024.txt: contains quarterly numbers 4471"
+      }
+    ],
+    "tool_calls": 2,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\rename_file",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5a-acc\\rename_file\\report-old.txt",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Renamed `report-old.txt` to `report-2024.txt`.",
+    "stderr": "2026/10/31 02:27:08 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "move_file",
+    "title": "Move a file into a folder",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 9.0867492,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "absent",
+        "ok": true,
+        "why": "invoice.txt is gone"
+      },
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "archive/invoice.txt: contains invoice 90210"
+      }
+    ],
+    "tool_calls": 5,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\move_file",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\move_file\\archive",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5a-acc\\move_file\\invoice.txt",
+        "outcome": "ok",
+        "times": 2
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\move_file",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Moved `invoice.txt` into `archive` successfully.",
+    "stderr": "2026/10/31 02:27:15 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "copy_folder",
+    "title": "Copy a folder",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 8.3420338,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "same_tree",
+        "ok": true,
+        "why": "3 files, identical"
+      }
+    ],
+    "tool_calls": 3,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\copy_folder",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5a-acc\\copy_folder\\photos",
+        "outcome": "ok",
+        "times": 2
+      }
+    ],
+    "answer": "Created `photos-backup` as a complete copy of `photos`.\n\n- 3 files copied\n- 2 directories copied\n- Source: `C:\\fk-scratch\\p5a-acc\\copy_folder\\photos`\n- Backup: `C:\\fk-scratch\\p5a-acc\\copy_folder\\photos-backup`",
+    "stderr": "2026/10/31 02:27:24 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "replace_many",
+    "title": "Replace text in many files",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 24.7673278,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "a.conf: content equals"
+      },
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "b.conf: content equals"
+      },
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "c.conf: content equals"
+      },
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "d.conf: content equals"
+      },
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "e.conf: content equals"
+      }
+    ],
+    "tool_calls": 9,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "http://old.example in C:\\fk-scratch\\p5a-acc\\replace_many",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\replace_many\\a.conf",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\replace_many\\b.conf",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\replace_many\\c.conf",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\replace_many\\d.conf",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\replace_many\\e.conf",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "patch",
+        "detail": "{\"patch_text\":\"*** Begin Patch\\n*** Update File: C:\\\\fk-scratch\\\\p5a-acc\\\\replace_many\\\\a....",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "http://old.example in C:\\fk-scratch\\p5a-acc\\replace_many",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "https://new.example in C:\\fk-scratch\\p5a-acc\\replace_many",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Replaced `http://old.example` with `https://new.example` in all five `.conf` files:\n\n- `a.conf`\n- `b.conf`\n- `c.conf`\n- `d.conf`\n- `e.conf`\n\nVerified that no old URLs remain and all five new URLs are present.",
+    "stderr": "2026/10/31 02:27:33 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "sort_uniq",
+    "title": "Sort and remove duplicate lines",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": false,
+    "seconds": 8.1451461,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "content",
+        "ok": false,
+        "why": "open C:\\fk-scratch\\p5a-acc\\sort_uniq\\unique.txt: The system cannot find the file specified."
+      }
+    ],
+    "tool_calls": 4,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\sort_uniq",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\sort_uniq\\names.txt",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "write",
+        "detail": "C:\\fk-scratch\\p5a-acc\\unique.txt",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\unique.txt",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created `unique.txt` with duplicate lines removed and entries sorted alphabetically:\n\n```text\napple\nbanana\nfig\npear\n```",
+    "stderr": "2026/10/31 02:27:57 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "toolbox:coreutils": true
+    },
+    "cause_auto": "model did not know the tool exists"
+  },
+  {
+    "job": "zip_make",
+    "title": "Make a zip",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 10.4372837,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "zip_has",
+        "ok": true,
+        "why": "docs.zip: every named file is inside"
+      }
+    ],
+    "tool_calls": 4,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\zip_make",
+        "outcome": "ok",
+        "times": 2
+      },
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5a-acc\\zip_make\\docs",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "archive",
+        "detail": "C:\\fk-scratch\\p5a-acc\\zip_make\\docs.zip",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created and verified `C:\\fk-scratch\\p5a-acc\\zip_make\\docs.zip`.\n\nIt contains the `docs` folder with `a.txt` and `b.txt`.",
+    "stderr": "2026/10/31 02:28:06 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "zip_extract",
+    "title": "Unzip",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 17.4013983,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "out/one.txt: contains ZEBRA-6613"
+      },
+      {
+        "kind": "exists",
+        "ok": true,
+        "why": "out/inner/two.txt exists"
+      }
+    ],
+    "tool_calls": 6,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\zip_extract",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "archive",
+        "detail": "C:\\fk-scratch\\p5a-acc\\zip_extract\\bundle.zip",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "archive",
+        "detail": "C:\\fk-scratch\\p5a-acc\\zip_extract\\bundle.zip",
+        "outcome": "failed",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\zip_extract\\out",
+        "outcome": "failed",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Expand-Archive -LiteralPath 'C:\\fk-scratch\\p5a-acc\\zip_extract\\bundle.zip' -DestinationPat...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\zip_extract\\out",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Unzipped `bundle.zip` into:\n\n`C:\\fk-scratch\\p5a-acc\\zip_extract\\out`\n\nContents:\n- `one.txt`\n- `inner\\two.txt`",
+    "stderr": "2026/10/31 02:28:16 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "sevenzip_make",
+    "title": "Make a 7z archive",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 11.0801128,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "docs.7z: bytes at 0 are 377abcaf271c"
+      }
+    ],
+    "tool_calls": 5,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\sevenzip_make",
+        "outcome": "ok",
+        "times": 2
+      },
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5a-acc\\sevenzip_make\\docs",
+        "outcome": "ok",
+        "times": 2
+      },
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5a-acc\\sevenzip_make\\docs.7z",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created and verified:\n\n`C:\\fk-scratch\\p5a-acc\\sevenzip_make\\docs.7z`\n\n- Format: 7z\n- Contents: `docs` folder with 2 files\n- Size: 224 bytes\n- No password\n- Compression level: 6",
+    "stderr": "2026/10/31 02:28:33 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "7z": false
+    }
+  },
+  {
+    "job": "sevenzip_extract",
+    "title": "Extract a 7z archive",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 157.6128421,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "out7/inner/x.txt: contains extracted-ok-KIWI-2290"
+      }
+    ],
+    "tool_calls": 15,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\sevenzip_extract",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "archive",
+        "detail": "C:\\fk-scratch\\p5a-acc\\sevenzip_extract\\sample.7z",
+        "outcome": "failed",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"Extract the entire sample.7z archive into a new folder named out7 in the current ...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Get-Command 7z,7za,7zz -ErrorAction SilentlyContinue | Select-Object Name,Source",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Get-Command tar,7zip,7zr,bsdtar -ErrorAction SilentlyContinue | Select-Object Name,Source",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "archive",
+        "detail": "C:\\fk-scratch\\p5a-acc\\sevenzip_extract\\sample.7z",
+        "outcome": "failed",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "@('C:\\Program Files\\7-Zip\\7z.exe','C:\\Program Files\\7-Zip\\7zz.exe','C:\\Program Files (x86)...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Get-Command python,py -ErrorAction SilentlyContinue | Select-Object Name,Source; python -c...",
+        "outcome": "exit code 1",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Get-ChildItem -Path 'C:\\fk-scratch\\p5a-acc\\sevenzip_extract' -Force | Select-Object Name,L...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\",
+        "outcome": "failed",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Format-Hex -Path 'C:\\fk-scratch\\p5a-acc\\sevenzip_extract\\sample.7z'",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\Users",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "\u0026 'C:\\Users\\USER\\Documents\\Build.Work\\firefox\\158.0\\other-licenses\\7zstub\\src\\bin\\x64\\...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Get-ChildItem -Path 'C:\\fk-scratch\\p5a-acc\\sevenzip_extract\\out7' -Recurse -Force | Select...",
+        "outcome": "exit code 1",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Get-Content -Raw 'C:\\fk-scratch\\p5a-acc\\sevenzip_extract\\out7\\inner\\x.txt'",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Extracted `sample.7z` successfully into:\n\n`C:\\fk-scratch\\p5a-acc\\sevenzip_extract\\out7`\n\nThe archive contains `out7\\inner\\x.txt`.",
+    "stderr": "2026/10/31 02:28:44 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "7z": false
+    }
+  },
+  {
+    "job": "tail_30",
+    "title": "Last 30 lines",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 4.5781347,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      },
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\tail_30\\server.log",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "```text\nline-071 entry\nline-072 entry\nline-073 entry\nline-074 entry\nline-075 entry\nline-076 entry\nline-077 entry\nline-078 entry\nline-079 entry\nline-080 entry\nline-081 entry\nline-082 entry\nline-083 entry\nline-084 entry\nline-085 entry\nline-086 entry\nline-087 entry\nline-088 entry\nline-089 entry\nline-090 entry\nline-091 entry\nline-092 entry\nline-093 entry\nline-094 entry\nline-095 entry\nline-096 entry\nline-097 entry\nline-098 entry\nline-099 entry\nline-100 entry\n```",
+    "stderr": "2026/10/31 02:31:22 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "toolbox:coreutils": true
+    }
+  },
+  {
+    "job": "follow_log",
+    "title": "Follow a growing log for 5 seconds",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 14.3288485,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 3,
+    "calls": [
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\follow_log\\app.log",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Start-Sleep -Seconds 5",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\follow_log\\app.log",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "New lines that appeared during the 5-second watch:\n\n```text\ntick-009 heartbeat\ntick-010 heartbeat\ntick-011 heartbeat\ntick-012 heartbeat\ntick-013 heartbeat\ntick-014 heartbeat\ntick-015 heartbeat\ntick-016 heartbeat\ntick-017 heartbeat\ntick-018 heartbeat\ntick-019 heartbeat\ntick-020 heartbeat\ntick-021 heartbeat\ntick-022 heartbeat\n```",
+    "stderr": "2026/10/31 02:31:27 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "toolbox:coreutils": true
+    }
+  },
+  {
+    "job": "count_lines",
+    "title": "Count lines",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 4.3723119,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\count_lines\\data.txt",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "`data.txt` has **237 lines**.",
+    "stderr": "2026/10/31 02:31:41 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "toolbox:coreutils": true
+    }
+  },
+  {
+    "job": "find_by_name",
+    "title": "Find a file by name",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 3.6175881,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\find_by_name",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "`C:\\fk-scratch\\p5a-acc\\find_by_name\\deep\\a\\b\\report-final.docx`",
+    "stderr": "2026/10/31 02:31:45 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "toolbox:pfind": true
+    }
+  },
+  {
+    "job": "grep_text",
+    "title": "Search text in files",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 4.2423335,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      },
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "TODO(kiwi) in C:\\fk-scratch\\p5a-acc\\grep_text",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "The text `TODO(kiwi)` appears in:\n\n- `src\\main.go`\n- `src\\util\\helper.go`",
+    "stderr": "2026/10/31 02:31:49 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "toolbox:pfind": true
+    }
+  },
+  {
+    "job": "json_query",
+    "title": "Query a JSON file",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 4.2737715,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      },
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "Zoltan in C:\\fk-scratch\\p5a-acc\\json_query",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Zoltan lives in **Quito**.",
+    "stderr": "2026/10/31 02:31:53 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "diff_files",
+    "title": "Compare two files",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 4.5619119999999995,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 2,
+    "calls": [
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\diff_files\\a.txt",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\diff_files\\b.txt",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "The differing line is line 3:\n\n- `a.txt`: `three kumquat`\n- `b.txt`: `three lychee`",
+    "stderr": "2026/10/31 02:31:58 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "count_by_ext",
+    "title": "Count files by extension",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 3.4169524,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\count_by_ext",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "There are **13 `.log` files** in this folder and all its subfolders.",
+    "stderr": "2026/10/31 02:32:02 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "disk_usage",
+    "title": "Disk usage of a folder",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 10.7523672,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 2,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\disk_usage\\data",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "$total = (Get-ChildItem -LiteralPath 'C:\\fk-scratch\\p5a-acc\\disk_usage\\data' -File -Recurs...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "48000 bytes",
+    "stderr": "2026/10/31 02:32:06 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "toolbox:coreutils": true
+    }
+  },
+  {
+    "job": "download_file",
+    "title": "Download a file",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 77.895714,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "got.txt: contains download-ok-TOKEN-9912"
+      }
+    ],
+    "tool_calls": 10,
+    "calls": [
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"Download the text file at http://127.0.0.1:57970/payload.txt and save it as C:\\\\f...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_describe",
+        "detail": "{\"tool\":\"web-fetch\"}",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_run",
+        "detail": "{\"tool\":\"web-fetch\",\"inputs\":{\"url\":\"http://127.0.0.1:57970/payload.txt\",\"timeout\":\"30\"},\"...",
+        "outcome": "ok",
+        "times": 2
+      },
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"Fetch a file from a local HTTP loopback URL and save the response bytes to C:\\\\fk...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"Diagnose whether the approved local web fetch tool can access loopback HTTP URLs\"...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\download_file",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "if (Test-Path -LiteralPath 'C:\\fk-scratch\\p5a-acc\\download_file' -PathType Container) { Wr...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "$url = 'http://127.0.0.1:57970/payload.txt'; $out = 'C:\\fk-scratch\\p5a-acc\\download_file\\g...",
+        "outcome": "exit code 1",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "$url = 'http://127.0.0.1:57970/payload.txt'; $out = 'C:\\fk-scratch\\p5a-acc\\download_file\\g...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Downloaded and saved the payload to:\n\n`C:\\fk-scratch\\p5a-acc\\download_file\\got.txt`\n\nVerified file size: **23 bytes**.",
+    "stderr": "2026/10/31 02:32:16 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "curl": true
+    }
+  },
+  {
+    "job": "port_process",
+    "title": "Who uses a port",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 7.0674867,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "bash",
+        "detail": "Get-NetTCPConnection -LocalPort 57995 -State Listen | Select-Object LocalAddress,LocalPort...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "TCP port **57995** is being listened to by process ID **5988**.",
+    "stderr": "2026/10/31 02:33:34 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n"
+  },
+  {
+    "job": "png_to_webp",
+    "title": "Convert PNG to WebP",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 34.309085,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "photo.webp: bytes at 0 are 52494646"
+      },
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "photo.webp: bytes at 8 are 57454250"
+      }
+    ],
+    "tool_calls": 8,
+    "calls": [
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"Convert the existing photo.png in the current folder to a WebP file named photo.w...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Get-Command magick,convert,ffmpeg,python,py -ErrorAction SilentlyContinue | Select-Object ...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "py -c \"import PIL; print(PIL.__version__)\"",
+        "outcome": "exit code 1",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"Image conversion from PNG to WebP using an installed local tool, preserving photo...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Get-Command cwebp,dwebp,magick,ffmpeg,ffprobe,7z -ErrorAction SilentlyContinue | Select-Ob...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\png_to_webp",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Test-Path 'C:\\Program Files\\ImageMagick-7.1.2-Q16-HDRI\\magick.exe'; Test-Path 'C:\\fk-scrat...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "\u0026 'C:\\Program Files\\ImageMagick-7.1.2-Q16-HDRI\\magick.exe' 'C:\\fk-scratch\\p5a-acc\\png_to_w...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Converted successfully:\n\n`C:\\fk-scratch\\p5a-acc\\png_to_webp\\photo.webp`",
+    "stderr": "2026/10/31 02:33:41 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "magick": false
+    }
+  },
+  {
+    "job": "image_resize",
+    "title": "Resize an image",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 26.5248438,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "dims",
+        "ok": true,
+        "why": "small.png is 160x120"
+      }
+    ],
+    "tool_calls": 7,
+    "calls": [
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"make a copy of photo.png named small.png resized to 160 pixels wide while preserv...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"resize an existing PNG image to a specified width while preserving its aspect rat...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\image_resize",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_describe",
+        "detail": "{\"tool\":\"gorilla-size-copy\"}",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Add-Type -AssemblyName System.Drawing; $p='C:\\fk-scratch\\p5a-acc\\image_resize\\photo.png'; ...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5a-acc\\image_resize",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Add-Type -AssemblyName System.Drawing; $src='C:\\fk-scratch\\p5a-acc\\image_resize\\photo.png'...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created `small.png` from `photo.png`.\n\n- Dimensions: **160 × 120 pixels**\n- Aspect ratio preserved\n- Location: `C:\\fk-scratch\\p5a-acc\\image_resize\\small.png`",
+    "stderr": "2026/10/31 02:34:16 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "magick": false
+    }
+  },
+  {
+    "job": "ocr_picture",
+    "title": "Read the text in a picture",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 4.5163081,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "view",
+        "detail": "C:\\fk-scratch\\p5a-acc\\ocr_picture\\ocr.png",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "The image appears to say:\n\n**“GORILLA 4417 BANANA”**",
+    "stderr": "2026/10/31 02:34:42 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "tesseract": false
+    }
+  },
+  {
+    "job": "exif_read",
+    "title": "Read a photo's EXIF data",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 17.4852999,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      },
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 2,
+    "calls": [
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"Read the EXIF metadata from the local image exif.jpg, specifically camera make, m...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Add-Type -AssemblyName System.Drawing; $p = [System.IO.Path]::GetFullPath('exif.jpg'); $i ...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "`exif.jpg` was taken with a **GorillaCam Model-K9** on **March 9, 2024 at 14:05:06**.",
+    "stderr": "2026/10/31 02:34:47 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "exiftool": false
+    }
+  },
+  {
+    "job": "video_length",
+    "title": "How long is a video",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 61.0105798,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 6,
+    "calls": [
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"Determine the duration/length of the local video file clip.mp4\"}",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_describe",
+        "detail": "{\"tool\":\"videokit\"}",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_run",
+        "detail": "{\"tool\":\"videokit\",\"inputs\":{\"command\":\"probe C:\\\\fk-scratch\\\\p5a-acc\\\\video_length\\\\clip....",
+        "outcome": "ok",
+        "times": 2
+      },
+      {
+        "tool": "bash",
+        "detail": "$cmd = Get-Command ffprobe -ErrorAction SilentlyContinue; if ($cmd) { \u0026 $cmd.Source -v err...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "$p = 'C:\\fk-scratch\\p5a-acc\\video_length\\clip.mp4'; $sh = New-Object -ComObject Shell.Appl...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "`clip.mp4` is **7 seconds long**.",
+    "stderr": "2026/10/31 02:35:04 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "ffprobe": false
+    }
+  },
+  {
+    "job": "extract_audio",
+    "title": "Extract the audio of a video",
+    "model": "chatgpt.gpt-5.6-luna",
+    "variant": "fresh-profile",
+    "os": "windows",
+    "pass": true,
+    "seconds": 43.2780491,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "size_min",
+        "ok": true,
+        "why": "audio.mp3 is 34603 bytes"
+      }
+    ],
+    "tool_calls": 6,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "clip.mp4 in C:\\fk-scratch\\p5a-acc\\extract_audio",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"Extract the audio track from clip.mp4 and save it as audio.mp3 in the same folder...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Get-Command ffmpeg -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source; G...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "ffmpeg.exe in C:\\",
+        "outcome": "failed",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "\u0026 'C:\\Users\\USER\\scoop\\apps\\ffmpeg\\9.0.1\\bin\\ffmpeg.exe' -y -i 'C:\\fk-scratch\\p5a-acc\\...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Extracted the audio successfully:\n\n`C:\\fk-scratch\\p5a-acc\\extract_audio\\audio.mp3`",
+    "stderr": "2026/10/31 02:36:05 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "ffmpeg": false
+    }
+  }
+]
