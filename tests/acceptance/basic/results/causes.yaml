@@ -9,3 +9,9 @@
 "local.qwen3.6-35b-a3b/hidden_file":
   cause: model error
   note: "Killed at the 6-minute job limit with no tool call made: every Qwen job that finished took 292 to 355 s here, even with one tool call, so the limit ended the run while the model was still working (why a turn is that slow was not measured). Not a tool gap. Not re-run (time budget)."
+"chatgpt.gpt-5.6-luna/copy_folder":
+  cause: model error
+  note: "Linux run. The copy was made one folder ABOVE the job folder (acc/photos-backup, not copy_folder/photos-backup); the model's answer said it was done. The receipt clips arguments, so whether the model passed a wrong path or the files tool resolved a relative one against another folder was not determined. Same pattern as the Windows sort_uniq failure."
+"chatgpt.gpt-5.6-luna/sevenzip_make":
+  cause: model error
+  note: "Linux run. docs.7z is a valid-looking output but was written one folder ABOVE the job folder (acc/docs.7z); the model's answer printed that path. 7z was on PATH (needs_present true), so the automatic guess 'model did not know the tool exists' is wrong. Same write-outside-folder pattern as copy_folder."
