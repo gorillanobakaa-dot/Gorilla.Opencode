@@ -36,3 +36,17 @@ c2357e52b4d68261674078e1f7fbeef63c03cc2cd5ac085061c030ba74c9e4e4  linux-amd64/ff
 bfa76fdb43b4903972ed2baedbff889d4f1e0b19efe7fe934044cf83e4b709a5  linux-amd64/avifenc
 35ae3980ab831af64f4aecc98f69b81bfa146fa750a61d17ebbb12520128cbc8  windows-amd64/oxipng.exe
 df8f3e79e6ef06d8515d4949d19d872ae4e82fe16bc1fe6ad1efe181e3a21780  linux-amd64/oxipng
+#
+# Linux twins of the helpers above (goal parity-everywhere, 2026-11-01), so Linux has the same names as Windows.
+# ast-grep, coreutils, difft, hyperfine, ninja, sd: built from the same pinned sources on the VAIO (Debian 13,
+# x86_64-unknown-linux-musl, stripped; task T-20261027-012841-ee4400, re-sent by T-20261101-150300-db8f41, hashes
+# re-measured on Windows with `fieldkit size hash`: match the VAIO's list). ninja is a static glibc build, not musl.
+# pfind: tools/pfind-rs, `cargo build --release --offline --locked --target x86_64-unknown-linux-musl` (rust-lld) on
+# the Windows laptop. See third_party/PINS.md. Not run on a Linux machine by this job (ELF header checked only).
+b964b7c8b3bc1cb619a5643e6a38b3c4343e7c4b21ee7e9bb05e847cc3376832  linux-amd64/ast-grep
+a9e21a87fada7914630bc041f12e8381a5d9c2f1dd459022236255d513f82f8d  linux-amd64/coreutils
+8b00a80af3005fcd4700e0bb4a9e2f6aaae8fb1d41f4b6533c04b5ee9e9a70d7  linux-amd64/difft
+d1f1ddc82b2a53a8ad735f863d9f7ac055dab5b6ee3a5087ea87d0eed01d95c0  linux-amd64/hyperfine
+5eccb0fc2deeb2223e0554f1933bd451d79a9db27aef27b04da25f755010de4e  linux-amd64/ninja
+b7b7510af94e534cd6e3c4ac6d34a4884ee0230a84b01d4db7a864e866b9d37c  linux-amd64/sd
+169b3e9b99d39b4d8f78189acdaea99409b2cfdd30c3516625c986bbc42032d3  linux-amd64/pfind

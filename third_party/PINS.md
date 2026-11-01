@@ -92,6 +92,8 @@ match `internal/toolbox/SHA256SUMS`. Rule for the tag: the newest release tag da
 | ninja | https://github.com/ninja-build/ninja | v1.13.2 | 2025-11-20 | 3441b633c2fe2c494e958780ba0f4227b1327634 | Apache-2.0 (ninja/COPYING, eb7e9ab9690124c5c9f42bdc81383d886a3dede26345b6ed15bbad7caf81f7ea) | ninja.exe, 1,341,440 B |
 | uutils coreutils | https://github.com/uutils/coreutils | 0.12.0 | 2026-09-17 | dc1efd89948a9ca4c78c3a4b9a6ac891019a8c69 | MIT (coreutils/LICENSE, 29953405eaa3dcc41c37d1621d55b6a47eee93e05613e439e73295029740b10c) | coreutils.exe (multicall, `--features windows`), 12,182,016 B |
 
+**Linux twins (2026-11-01).** The same six tools are pinned for linux-amd64 (`linux-amd64/<name>` in `internal/toolbox/SHA256SUMS`), built on the VAIO from the same sources, target `x86_64-unknown-linux-musl` (task T-20261027-012841-ee4400); ninja came out as a static glibc build. pfind for Linux is `cargo build --release --offline --locked --target x86_64-unknown-linux-musl` (rust-lld) of tools/pfind-rs on the Windows laptop. Run on Linux: not by this job.
+
 Not shipped: `sg.exe` (upstream's deprecated alias of ast-grep, a second 50 MB copy on Windows). Upstream quirk:
 `sd --version` prints 1.0.0 at tag v1.1.0 (upstream did not bump Cargo.toml). hyperfine is the rule pick v2.0.0.
 
