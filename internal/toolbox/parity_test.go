@@ -12,10 +12,10 @@ import (
 // other, by the same name. Runs in every build, tagged or not: it reads only
 // SHA256SUMS, which is always compiled in.
 
-var paritySystems = []string{"windows-amd64", "linux-amd64"}
+var paritySystems = []string{"windows-amd64", "linux-amd64", "darwin-amd64"}
 
 // parityBacklog is the gap that existed when the rule was made: helpers pinned
-// for Windows only (job 04, 2026-10-27); emptied 2026-11-01 (goal parity-everywhere). It may only SHRINK: a helper ported to
+// for Windows only (job 04, 2026-10-27); emptied 2026-11-01 (goal parity-everywhere; Intel Mac added the same day). It may only SHRINK: a helper ported to
 // Linux must leave this list (the test says so), and nothing may be added here
 // to let a new one-system helper in. Port it to the other system instead.
 var parityBacklog = map[string]bool{}
@@ -82,7 +82,7 @@ func TestToolboxSameHelpersOnWindowsAndLinux(t *testing.T) {
 func TestParityCheckCatchesAOneSystemHelper(t *testing.T) {
 	h := strings.Repeat("a", 64)
 	pins := map[string]string{"windows-amd64/rg.exe": h, "linux-amd64/fd": h, "windows-amd64/sd.exe": h,
-		"linux-amd64/sd": h}
+		"linux-amd64/sd": h, "darwin-amd64/sd": h}
 	got := strings.Join(parityProblems(pins, map[string]bool{"jq": true}), "\n")
 	for _, want := range []string{"rg: pinned for windows-amd64 but not for linux-amd64",
 		"fd: pinned for linux-amd64 but not for windows-amd64", "jq: on both systems now"} {
