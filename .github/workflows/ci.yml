@@ -41,7 +41,7 @@ jobs:
           cache: true
 
       - run: go mod download
-      - name: select the packages to test
+      - name: select the touched packages and their dependents (changed files vs the base, go list)
         id: select
         shell: bash
         run: |
@@ -90,7 +90,7 @@ jobs:
           cache: true
 
       - run: go mod download
-      - name: select the packages to test
+      - name: select the touched packages and their dependents (changed files vs the base, go list)
         id: select
         shell: bash
         run: |
