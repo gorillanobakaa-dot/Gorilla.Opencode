@@ -1,5 +1,10 @@
 name: ci
 
+# Tests once (R7, as Fieldkit's tests.yml): a pull request and a feat/ or fix/ push run `go test` only for the
+# packages the diff touches and the packages that import them (.github/scripts/go_test_select.py, tested by
+# test_go_test_select.py); go.mod, go.sum, workflows and the CI scripts select everything. A push to main, a tag
+# and a manual run test ./... in full. Build and vet always cover ./....
+#
 # Build + vet + test on every push and PR. No secrets required, so this runs
 # anywhere Actions is enabled — unlike release.yml/build.yml (goreleaser, needs
 # tokens). This is the gate that would have caught the inherited stream-leak and
@@ -12,6 +17,7 @@ on:
     # feat/ and fix/ branches too: the Windows work is pushed to a feat/ branch
     # before any pull request exists, and a push nobody's CI reads proves nothing.
     branches: [ main, 'feat/**', 'fix/**' ]
+    tags: [ 'v*' ]
   pull_request:
 
 concurrency:
@@ -26,6 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v6
         with:
@@ -33,6 +41,16 @@ jobs:
           cache: true
 
       - run: go mod download
+      - name: select the packages to test
+        id: select
+        shell: bash
+        run: |
+          case "${{ github.event_name }}" in
+            pull_request) base="origin/${{ github.base_ref }}" ;;
+            push) case "${{ github.ref }}" in refs/heads/main|refs/tags/*) base=full ;; *) base=origin/main ;; esac ;;
+            *) base=full ;;
+          esac
+          python .github/scripts/go_test_select.py "$base" --github-output
 
       - name: build
         run: go build ./...
@@ -43,7 +61,11 @@ jobs:
       # The script tees the output and turns each failure into an annotation:
       # annotations are public, the step log needs a login. Keep it.
       - name: test
-        run: bash .github/scripts/go-test-annotate.sh ./... -count=1
+        if: steps.select.outputs.mode != 'none'
+        run: |
+          pkgs='./...'
+          if [ "${{ steps.select.outputs.mode }}" = some ]; then pkgs="${{ steps.select.outputs.packages }}"; fi
+          bash .github/scripts/go-test-annotate.sh $pkgs -count=1
 
   # Windows is a first-class target (goal windows-capabilities, 2026-10-26).
   # Same commands as above, run natively on windows-latest: the shell, Job
@@ -59,6 +81,8 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v6
         with:
@@ -66,6 +90,16 @@ jobs:
           cache: true
 
       - run: go mod download
+      - name: select the packages to test
+        id: select
+        shell: bash
+        run: |
+          case "${{ github.event_name }}" in
+            pull_request) base="origin/${{ github.base_ref }}" ;;
+            push) case "${{ github.ref }}" in refs/heads/main|refs/tags/*) base=full ;; *) base=origin/main ;; esac ;;
+            *) base=full ;;
+          esac
+          python .github/scripts/go_test_select.py "$base" --github-output
 
       - name: build
         run: go build ./...
@@ -76,7 +110,11 @@ jobs:
       # Git Bash ships on windows-latest; same annotation script as above.
       - name: test
         shell: bash
-        run: bash .github/scripts/go-test-annotate.sh ./... -count=1 -timeout 30m
+        if: steps.select.outputs.mode != 'none'
+        run: |
+          pkgs='./...'
+          if [ "${{ steps.select.outputs.mode }}" = some ]; then pkgs="${{ steps.select.outputs.packages }}"; fi
+          bash .github/scripts/go-test-annotate.sh $pkgs -count=1 -timeout 30m
 
   # The embedded toolbox (internal/toolbox, job 04): the -tags toolbox build and
   # its Hash/Extract tests, on Windows where the helpers run. A fresh clone has
