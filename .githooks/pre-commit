@@ -1,0 +1,27 @@
+#!/bin/sh
+# Gorilla OpenCode pre-commit: a change that adds or edits a helper, a command or a release table is refused while it
+# is not built in (carried, known to the AI, visible, on the release page, on every system, tested).
+# The definition: docs/INTEGRATION.md in the Gorilla.Fieldkit repository. Installed with:
+#   git config core.hooksPath .githooks
+# Only what the commit changes is looked at (--changed HEAD), so it is fast and an old gap never blocks an unrelated commit.
+# The pull request CI runs the same command against the PR base (.github/workflows/ci.yml) and is the hard gate.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+git rev-parse -q --verify HEAD >/dev/null 2>&1 || exit 0          # the very first commit has nothing to compare with
+if command -v fieldkit >/dev/null 2>&1; then
+  FK="fieldkit"
+elif command -v python3 >/dev/null 2>&1 && python3 -c "import fieldkit" >/dev/null 2>&1; then
+  FK="python3 -m fieldkit"
+elif command -v python >/dev/null 2>&1 && python -c "import fieldkit" >/dev/null 2>&1; then
+  FK="python -m fieldkit"
+else
+  echo "pre-commit: fieldkit is not installed here, so the integration check did not run (the pull request CI runs it)"
+  exit 0
+fi
+OUT="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/oc-integration-$$")"
+trap 'rm -f "$OUT"' EXIT
+if ! $FK integration check --repo . --changed HEAD >"$OUT" 2>&1; then
+  cat "$OUT"
+  echo "pre-commit: a capability is not built in (docs/INTEGRATION.md in Gorilla.Fieldkit) - commit refused"
+  exit 1
+fi
+exit 0
