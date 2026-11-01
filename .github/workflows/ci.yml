@@ -1,5 +1,10 @@
 name: ci
 
+# Tests once (R7, as Fieldkit's tests.yml): a pull request and a feat/ or fix/ push run `go test` only for the
+# packages the diff touches and the packages that import them (.github/scripts/go_test_select.py, tested by
+# test_go_test_select.py); go.mod, go.sum, workflows and the CI scripts select everything. A push to main, a tag
+# and a manual run test ./... in full. Build and vet always cover ./....
+#
 # Build + vet + test on every push and PR. No secrets required, so this runs
 # anywhere Actions is enabled — unlike release.yml/build.yml (goreleaser, needs
 # tokens). This is the gate that would have caught the inherited stream-leak and
@@ -12,6 +17,7 @@ on:
     # feat/ and fix/ branches too: the Windows work is pushed to a feat/ branch
     # before any pull request exists, and a push nobody's CI reads proves nothing.
     branches: [ main, 'feat/**', 'fix/**' ]
+    tags: [ 'v*' ]
   pull_request:
 
 concurrency:
@@ -22,10 +28,42 @@ permissions:
   contents: read
 
 jobs:
+  # Built in means integrated (docs/INTEGRATION.md in Gorilla.Fieldkit): a pull request that adds a helper, a command or
+  # a release table is red until it is carried, known to the AI, visible, on the release page, on every system and
+  # tested. Fieldkit comes from the public Gorilla.Fieldkit repository at ONE commit (the git object id is the hash of
+  # the content, checked after the fetch); its one dependency is a hash-pinned wheel. Nothing else is fetched unpinned.
+  integration:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      FIELDKIT_COMMIT: b57904f9513f0d1e381c9b3ae72cae0ce69ba976
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install Fieldkit pinned by commit, verify the hash
+        shell: bash
+        run: |
+          set -e
+          git init -q "$RUNNER_TEMP/fieldkit"
+          git -C "$RUNNER_TEMP/fieldkit" fetch -q --depth 1 https://github.com/gorillanobakaa-dot/Gorilla.Fieldkit.git "$FIELDKIT_COMMIT"
+          git -C "$RUNNER_TEMP/fieldkit" checkout -q FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/fieldkit" rev-parse HEAD)" = "$FIELDKIT_COMMIT"
+          printf 'pyyaml==6.0.2 --hash=sha256:80bab7bfc629882493af4aa31a4cfa43a4c57c83813253626916b8c7ada83476\n' > "$RUNNER_TEMP/req.txt"
+          python -m pip install --require-hashes --only-binary :all: -r "$RUNNER_TEMP/req.txt"
+      - name: integration check on what the pull request changes
+        shell: bash
+        run: PYTHONPATH="$RUNNER_TEMP/fieldkit" python -m fieldkit integration check --repo . --changed "origin/${{ github.base_ref }}"
+
   build-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v6
         with:
@@ -33,6 +71,16 @@ jobs:
           cache: true
 
       - run: go mod download
+      - name: select the touched packages and their dependents (changed files vs the base, go list)
+        id: select
+        shell: bash
+        run: |
+          case "${{ github.event_name }}" in
+            pull_request) base="origin/${{ github.base_ref }}" ;;
+            push) case "${{ github.ref }}" in refs/heads/main|refs/tags/*) base=full ;; *) base=origin/main ;; esac ;;
+            *) base=full ;;
+          esac
+          python .github/scripts/go_test_select.py "$base" --github-output
 
       - name: build
         run: go build ./...
@@ -43,7 +91,11 @@ jobs:
       # The script tees the output and turns each failure into an annotation:
       # annotations are public, the step log needs a login. Keep it.
       - name: test
-        run: bash .github/scripts/go-test-annotate.sh ./... -count=1
+        if: steps.select.outputs.mode != 'none'
+        run: |
+          pkgs='./...'
+          if [ "${{ steps.select.outputs.mode }}" = some ]; then pkgs="${{ steps.select.outputs.packages }}"; fi
+          bash .github/scripts/go-test-annotate.sh $pkgs -count=1
 
   # Windows is a first-class target (goal windows-capabilities, 2026-10-26).
   # Same commands as above, run natively on windows-latest: the shell, Job
@@ -59,6 +111,8 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v6
         with:
@@ -66,6 +120,16 @@ jobs:
           cache: true
 
       - run: go mod download
+      - name: select the touched packages and their dependents (changed files vs the base, go list)
+        id: select
+        shell: bash
+        run: |
+          case "${{ github.event_name }}" in
+            pull_request) base="origin/${{ github.base_ref }}" ;;
+            push) case "${{ github.ref }}" in refs/heads/main|refs/tags/*) base=full ;; *) base=origin/main ;; esac ;;
+            *) base=full ;;
+          esac
+          python .github/scripts/go_test_select.py "$base" --github-output
 
       - name: build
         run: go build ./...
@@ -76,7 +140,11 @@ jobs:
       # Git Bash ships on windows-latest; same annotation script as above.
       - name: test
         shell: bash
-        run: bash .github/scripts/go-test-annotate.sh ./... -count=1 -timeout 30m
+        if: steps.select.outputs.mode != 'none'
+        run: |
+          pkgs='./...'
+          if [ "${{ steps.select.outputs.mode }}" = some ]; then pkgs="${{ steps.select.outputs.packages }}"; fi
+          bash .github/scripts/go-test-annotate.sh $pkgs -count=1 -timeout 30m
 
   # The embedded toolbox (internal/toolbox, job 04): the -tags toolbox build and
   # its Hash/Extract tests, on Windows where the helpers run. A fresh clone has
