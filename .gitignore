@@ -281,3 +281,7 @@ tools/pfind-rs/target/
 # build-toolbox.sh embeds the linux-amd64 pins. No credentials, no internal paths.
 !/scripts/build-toolbox.sh
 !/scripts/fetch-toolbox-extras.sh
+
+# The CI test selector and its test are scripts the workflow runs; *.py above swallowed them
+# (PR #55 went red: "go_test_select.py: No such file").
+!/.github/scripts/*.py
