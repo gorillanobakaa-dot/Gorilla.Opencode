@@ -11,6 +11,7 @@ go test ./... -count=1
 ## CI / CD
 
 - **CI runs on every push/PR** (`.github/workflows/ci.yml`) — build, vet, test.
+- **The integration check runs on every PR** (job `integration` in `ci.yml`, and `.githooks/pre-commit` locally: `git config core.hooksPath .githooks`) — `fieldkit integration check --repo . --changed BASE`. A helper, command or table that is not carried, known to the AI, visible, on the release page, on every system and tested keeps the PR red. The definition is `docs/INTEGRATION.md` in Gorilla.Fieldkit. Review checklist: the `integration` check is green; a new helper or command is in all six surfaces, not only in code; no rule was loosened to get the pass.
 - **Build runs on every push to main** (`.github/workflows/build.yml`) — snapshot binaries via goreleaser.
 - **Release runs on tag push** (`.github/workflows/release.yml`) — creates GitHub Release, .deb/.rpm, Homebrew tap, AUR package.
 
