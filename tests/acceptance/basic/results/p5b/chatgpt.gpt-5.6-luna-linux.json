@@ -1,0 +1,307 @@
+[
+  {
+    "job": "sevenzip_make",
+    "title": "Make a 7z archive",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 32.826786245,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "docs.7z: bytes at 0 are 377abcaf271c"
+      }
+    ],
+    "tool_calls": 5,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "7za",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/sevenzip_make",
+        "outcome": "ok",
+        "times": 2
+      },
+      {
+        "tool": "bash",
+        "detail": "7za a /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/sevenzip_make/docs.7z /home/USER/...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "7za l /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/sevenzip_make/docs.7z",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created and verified `docs.7z` in the working directory:\n\n`/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/sevenzip_make/docs.7z`\n\nIt contains the `docs` folder and its two files.",
+    "needs_present": {
+      "7z": true
+    }
+  },
+  {
+    "job": "sevenzip_extract",
+    "title": "Extract a 7z archive",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 28.677291726,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "out7/inner/x.txt: contains extracted-ok-KIWI-2290"
+      }
+    ],
+    "tool_calls": 4,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "7za",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/sevenzip_extract",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "7za x /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/sevenzip_extract/sample.7z -o...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/sevenzip_extract/out7",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Extracted `sample.7z` successfully into `out7`.\n\nExtracted file:\n`out7/inner/x.txt`",
+    "needs_present": {
+      "7z": true
+    }
+  },
+  {
+    "job": "png_to_webp",
+    "title": "Convert PNG to WebP",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 52.396220788,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "photo.webp: bytes at 0 are 52494646"
+      },
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "photo.webp: bytes at 8 are 57454250"
+      }
+    ],
+    "tool_calls": 9,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "cwebp",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "files",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/png_to_webp/photo.png",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "cwebp /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/png_to_webp/photo.png -o /hom...",
+        "outcome": "exit code 127",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "cwebp in /usr/bin",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "webp in /home/USER",
+        "outcome": "failed",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "command -v ffmpeg || true; command -v magick || true; command -v convert || true; command ...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "files",
+        "detail": "image",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "magick /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/png_to_webp/photo.png /home/...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "files",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/png_to_webp/photo.webp",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Converted successfully: `photo.webp` was created from `photo.png`.\n\n- Output size: 3.0 KiB\n- SHA-256: `d6087ff384d0420e6459fd7f6973f76b465f817ee67f7a537f8281da8bbb18e5`\n- The original PNG remains unchanged.",
+    "needs_present": {
+      "magick": true
+    }
+  },
+  {
+    "job": "image_resize",
+    "title": "Resize an image",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 25.763154614,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "dims",
+        "ok": true,
+        "why": "small.png is 160x120"
+      }
+    ],
+    "tool_calls": 4,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "image",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/image_resize",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "if command -v magick \u003e/dev/null 2\u003e\u00261; then magick /home/USER/.cache/fieldkit-scratch/li...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "magick identify -format '%f %wx%h\\n' /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created `small.png` at **160×120 pixels**, preserving the original proportions.",
+    "needs_present": {
+      "magick": true
+    }
+  },
+  {
+    "job": "video_length",
+    "title": "How long is a video",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 18.218909985,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 2,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "ffprobe",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 /home/USER/.cache/...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "`clip.mp4` is **7 seconds** long.",
+    "needs_present": {
+      "ffprobe": true
+    }
+  },
+  {
+    "job": "extract_audio",
+    "title": "Extract the audio of a video",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 27.909258961,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "size_min",
+        "ok": true,
+        "why": "audio.mp3 is 56753 bytes"
+      }
+    ],
+    "tool_calls": 4,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "ffmpeg",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/extract_audio",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "ffmpeg -y -hide_banner -i /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/extract_a...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "audio.mp3 in /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/extract_audio",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Extracted the audio successfully. The file is:\n\n`/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5b/extract_audio/audio.mp3`",
+    "needs_present": {
+      "ffmpeg": true
+    }
+  }
+]

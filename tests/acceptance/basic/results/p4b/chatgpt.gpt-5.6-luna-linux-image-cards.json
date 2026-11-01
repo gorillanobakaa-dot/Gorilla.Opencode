@@ -1,0 +1,164 @@
+[
+  {
+    "job": "png_to_webp",
+    "title": "Convert PNG to WebP",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 26.721519767,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "photo.webp: bytes at 0 are 52494646"
+      },
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "photo.webp: bytes at 8 are 57454250"
+      }
+    ],
+    "tool_calls": 4,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "cwebp",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "photo.png in /home/USER/.cache/fieldkit-scratch/linux-rerun2/p4b/png_to_webp",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "cwebp -lossless /home/USER/.cache/fieldkit-scratch/linux-rerun2/p4b/png_to_webp/photo.p...",
+        "outcome": "exit code 127",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "ffmpeg -y -i /home/USER/.cache/fieldkit-scratch/linux-rerun2/p4b/png_to_webp/photo.png ...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Converted `photo.png` to lossless WebP:\n\n`/home/USER/.cache/fieldkit-scratch/linux-rerun2/p4b/png_to_webp/photo.webp`",
+    "needs_present": {
+      "magick": true
+    }
+  },
+  {
+    "job": "image_resize",
+    "title": "Resize an image",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 21.808878262,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "dims",
+        "ok": true,
+        "why": "small.png is 160x120"
+      }
+    ],
+    "tool_calls": 3,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "image",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p4b/image_resize",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "command -v magick \u0026\u0026 magick photo.png -resize 160x small.png \u0026\u0026 magick identify -format '%...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created `small.png` from `photo.png`, resized proportionally to **160×120 pixels**.",
+    "needs_present": {
+      "magick": true
+    }
+  },
+  {
+    "job": "ocr_picture",
+    "title": "Read the text in a picture",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 11.011606677,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 2,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "image",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "view",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p4b/ocr_picture/ocr.png",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "The image appears to say:\n\n**GORILLA 4417 BANANA**",
+    "needs_present": {
+      "tesseract": true
+    }
+  },
+  {
+    "job": "exif_read",
+    "title": "Read a photo's EXIF data",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 15.32921395,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      },
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "bash",
+        "detail": "python3 - \u003c\u003c'PY' from PIL import Image, ExifTags p='exif.jpg' with Image.open(p) as im: ex...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "`exif.jpg` was taken with a **GorillaCam Model-K9** on **March 9, 2024 at 14:05:06**.",
+    "needs_present": {
+      "exiftool": true
+    }
+  }
+]

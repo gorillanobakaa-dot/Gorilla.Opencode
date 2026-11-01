@@ -1,0 +1,283 @@
+[
+  {
+    "job": "sevenzip_make",
+    "title": "Make a 7z archive",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 49.875877346,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "docs.7z: bytes at 0 are 377abcaf271c"
+      }
+    ],
+    "tool_calls": 5,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/sevenzip_make",
+        "outcome": "ok",
+        "times": 2
+      },
+      {
+        "tool": "files",
+        "detail": "7za",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "7za a /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/sevenzip_make/docs.7z /home/USER/...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "files",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/sevenzip_make/docs.7z",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created and verified `/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/sevenzip_make/docs.7z`.\n\n- Size: 192 bytes\n- Contents: `docs/a.txt`, `docs/b.txt`\n- SHA-256: `df815cb4edcd1865aaf00a3ab3dcc5d295e89f3dc25634623f8581b4dfa1a754`",
+    "needs_present": {
+      "7z": true
+    }
+  },
+  {
+    "job": "sevenzip_extract",
+    "title": "Extract a 7z archive",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 51.201653609,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "out7/inner/x.txt: contains extracted-ok-KIWI-2290"
+      }
+    ],
+    "tool_calls": 4,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/sevenzip_extract",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "files",
+        "detail": "7za",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "7za x /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/sevenzip_extract/sample.7z -o...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/sevenzip_extract/out7",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Extracted `sample.7z` successfully into `out7/`.\n\nExtracted file: `out7/inner/x.txt`",
+    "needs_present": {
+      "7z": true
+    }
+  },
+  {
+    "job": "png_to_webp",
+    "title": "Convert PNG to WebP",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 40.498959895,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "photo.webp: bytes at 0 are 52494646"
+      },
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "photo.webp: bytes at 8 are 57454250"
+      }
+    ],
+    "tool_calls": 6,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "cwebp",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/png_to_webp",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "cd /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/png_to_webp \u0026\u0026 cwebp -lossless p...",
+        "outcome": "exit code 127",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "command -v cwebp || true; printf '%s\\n' \"$PATH\"; printf '%s\\n' /usr/bin/cwebp /usr/local/b...",
+        "outcome": "exit code 1",
+        "times": 1
+      },
+      {
+        "tool": "files",
+        "detail": "image",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "cd /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/png_to_webp \u0026\u0026 command -v ffmpeg...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Converted `photo.png` to lossless WebP:\n\n`/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/png_to_webp/photo.webp`\n\nVerified as a lossless WebP image with alpha channel.",
+    "needs_present": {
+      "magick": true
+    }
+  },
+  {
+    "job": "image_resize",
+    "title": "Resize an image",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 22.686884355,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "dims",
+        "ok": true,
+        "why": "small.png is 160x120"
+      }
+    ],
+    "tool_calls": 3,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "photo.png in /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/image_resize",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "files",
+        "detail": "image",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "identify -format '%wx%h\\n' /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/image_re...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created `small.png` from `photo.png`, resized proportionally from **640×480** to **160×120** pixels.",
+    "needs_present": {
+      "magick": true
+    }
+  },
+  {
+    "job": "video_length",
+    "title": "How long is a video",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 19.28548604,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 2,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "ffprobe",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 /home/USER/.cache/...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "`clip.mp4` is **7 seconds long**.",
+    "needs_present": {
+      "ffprobe": true
+    }
+  },
+  {
+    "job": "extract_audio",
+    "title": "Extract the audio of a video",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "linux",
+    "pass": true,
+    "seconds": 31.07120122,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "size_min",
+        "ok": true,
+        "why": "audio.mp3 is 56753 bytes"
+      }
+    ],
+    "tool_calls": 4,
+    "calls": [
+      {
+        "tool": "files",
+        "detail": "ffmpeg",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "clip.mp4 in /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/extract_audio",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "audio.mp3 in /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/extract_audio",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "ffmpeg -y -hide_banner -i /home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/extract_a...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Extracted the audio successfully:\n\n`/home/USER/.cache/fieldkit-scratch/linux-rerun2/p5c/extract_audio/audio.mp3`",
+    "needs_present": {
+      "ffmpeg": true
+    }
+  }
+]
