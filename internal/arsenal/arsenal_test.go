@@ -232,7 +232,7 @@ func TestEveryEntryIsAvailableOnAtLeastOnePackageManager(t *testing.T) {
 	m, _ := Load()
 	for _, s := range m.Series {
 		for _, e := range s.Entries {
-			if !Available(e, APT) && !Available(e, Pacman) {
+			if !Available(e, APT) && !Available(e, Pacman) && !Available(e, Winget) {
 				t.Errorf("%s cannot be installed by either package manager — it is a tease", e.ID)
 			}
 		}
@@ -393,6 +393,8 @@ func TestAnyModeIsOnlyUsedWhereTheNamesAreAlternatives(t *testing.T) {
 	allowed := map[string]bool{
 		"astgrep": true, "imagemagick": true, "p7zip": true,
 		"apkinspect": true, "libreoffice": true,
+		// PowerToys: one program, found at its fixed install folder (Paths needs any-mode).
+		"powertoys": true,
 	}
 	for _, s := range m.Series {
 		for _, e := range s.Entries {
@@ -682,9 +684,17 @@ func TestEntriesThatCannotExistHereAreNotListedOrCounted(t *testing.T) {
 	for _, s := range lin.Series {
 		linTotal += len(s.Entries)
 	}
-	if len(lin.Series) != len(full.Series) || linTotal != total {
-		t.Errorf("Linux lists %d entries in %d series, the manifest has %d in %d — nothing in it is Windows-only",
-			linTotal, len(lin.Series), total, len(full.Series))
+	// Only entries that name Windows alone (PowerToys, W6) may be missing on Linux.
+	winOnly := 0
+	for _, s := range full.Series {
+		for _, e := range s.Entries {
+			if len(e.Platforms) == 1 && e.Platforms[0] == "windows" {
+				winOnly++
+			}
+		}
+	}
+	if linTotal != total-winOnly {
+		t.Errorf("Linux lists %d entries, the manifest has %d of which %d are Windows-only", linTotal, total, winOnly)
 	}
 
 	// The embedded manifest itself is not altered by filtering.

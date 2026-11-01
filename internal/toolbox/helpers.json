@@ -1,0 +1,15 @@
+[
+  {"name": "coreutils", "version": "0.12.0", "purpose": "The everyday file commands (ls, cp, mv, cat, head, tail, sort, wc, sha256sum and about 100 more), the same on every system."},
+  {"name": "pfind", "version": "4.0.0", "purpose": "Finds files and text on the whole disk fast, on every core, and never loops through junctions."},
+  {"name": "ast-grep", "version": "0.50.0", "purpose": "Searches and rewrites source code by its structure, not by plain text."},
+  {"name": "difft", "version": "0.71.0", "purpose": "Shows what changed between two files by the code's structure, so moved lines are not noise."},
+  {"name": "sd", "version": "1.1.0", "purpose": "Find and replace text in files, with simple regular expressions."},
+  {"name": "hyperfine", "version": "2.0.0", "purpose": "Times a command many times and reports the average, to compare two ways of doing a job."},
+  {"name": "ninja", "version": "1.13.2", "purpose": "Runs the compile steps of a build as fast as the machine allows."},
+  {"name": "7za", "version": "26.04", "purpose": "Packs and unpacks 7z, zip, tar and other archives."},
+  {"name": "ffmpeg", "version": "7.0.2", "version_darwin": "8.0", "purpose": "Converts, cuts and extracts audio and video.", "mac_min": "11.0"},
+  {"name": "ffprobe", "version": "7.0.2", "version_darwin": "8.0", "purpose": "Reads what is inside a video or audio file: length, codecs, size.", "mac_min": "11.0"},
+  {"name": "cwebp", "version": "1.6.0", "purpose": "Turns PNG and JPEG pictures into smaller WebP pictures."},
+  {"name": "avifenc", "version": "1.4.2", "purpose": "Turns PNG and JPEG pictures into much smaller AVIF pictures."},
+  {"name": "oxipng", "version": "10.2.1", "purpose": "Makes PNG pictures smaller without changing a single pixel."}
+]

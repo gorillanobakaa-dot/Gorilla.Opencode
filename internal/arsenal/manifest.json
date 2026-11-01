@@ -67,6 +67,16 @@
             ],
             "scoop": [
               "tesseract"
+            ],
+            "dnf": [
+              "tesseract",
+              "tesseract-langpack-eng"
+            ],
+            "brew": [
+              "tesseract"
+            ],
+            "winget": [
+              "UB-Mannheim.TesseractOCR"
             ]
           },
           "needs": {
@@ -75,7 +85,7 @@
             "network_at_runtime": false
           },
           "tier": "MINIMUM",
-          "caveats": "Accuracy depends far more on the picture than on the engine. A deskew and a threshold with imagemagick usually beats switching OCR engine. Other languages are separate packages, roughly 2-10 MB each."
+          "caveats": "Accuracy depends far more on the picture than on the engine. A deskew and a threshold with imagemagick usually beats switching OCR engine. Other languages are separate packages, roughly 2-10 MB each. Without Tesseract the agent cannot read the text in a picture itself: it falls back to a model that can see images, if you have one connected, and otherwise tells you it cannot read the picture."
         },
         {
           "id": "ripgrep",
@@ -208,6 +218,15 @@
             ],
             "scoop": [
               "imagemagick"
+            ],
+            "dnf": [
+              "ImageMagick"
+            ],
+            "brew": [
+              "imagemagick"
+            ],
+            "winget": [
+              "ImageMagick.ImageMagick"
             ]
           },
           "needs": {
@@ -1215,6 +1234,50 @@
           },
           "tier": "MINIMUM",
           "caveats": "A valid signature proves the file matches a key. It does not prove the key belongs to who you think — that is a separate question."
+        }
+      ]
+    },
+    {
+      "id": "windows-desktop",
+      "title": "Windows desktop - helpers from Microsoft",
+      "why": "Free Microsoft tools that make a Windows desktop easier to work with next to the agent.",
+      "entries": [
+        {
+          "id": "powertoys",
+          "title": "PowerToys: screen text grabber, window layouts, file search",
+          "teaches": "Microsoft's free power-user kit for Windows. Text Extractor copies the text out of anything on the screen, even a picture or a video frame; FancyZones snaps windows into layouts; PowerToys Run is a quick launcher. It runs beside this program and needs no setup from it.",
+          "unlocks": [
+            "copy text out of a screenshot or a locked PDF with one keystroke, then paste it to the agent",
+            "keep the agent and the work side by side in fixed window layouts",
+            "launch and find files from the keyboard"
+          ],
+          "detect": {
+            "binaries": [
+              "PowerToys"
+            ],
+            "mode": "any",
+            "paths": {
+              "windows": [
+                "${ProgramFiles}/PowerToys/PowerToys.exe",
+                "${LOCALAPPDATA}/PowerToys/PowerToys.exe"
+              ]
+            }
+          },
+          "platforms": [
+            "windows"
+          ],
+          "packages": {
+            "winget": [
+              "Microsoft.PowerToys"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Windows 10 or 11 only. It is a separate program with its own settings and its own background process; the agent does not drive it, you do."
         }
       ]
     }

@@ -38,7 +38,7 @@ cost before they start. Everything else is local.
 | `/login` | Sign in with your Google account. |
 | `/logout` | Sign out of your Google account. |
 | `/usage` | Show your quota and balances — how many bananas are left. |
-| `/arsenal` · `/tools` | What this agent can do here, what it could do, and the cost. |
+| `/arsenal` · `/tools` | Built-in tools, what else you can add, and the cost. |
 | `/context` · `/loadout` `/tokens` | Turn features off to spend less. |
 | `/settings` · `/config` `/prefs` | Every option, what it accepts, and its default. |
 | `/prompts` · `/prompt` | Read or change the AI's standing instructions. |
@@ -261,7 +261,9 @@ Shows what you have left to spend, in plain words. If you signed in with Antigra
 
 *Also: `/tools`*
 
-**What this agent can do here, what it could do, and the cost.**
+**Built-in tools, what else you can add, and the cost.**
+
+Opens on what is BUILT IN and ready now (file tools, search, archives, video and picture converters), each with its version and what it is for, then the tools you can add, with the exact command for your system.
 
 A map of capabilities, not a chat answer. It checks THIS machine for the tools behind each one — reading PDFs and scanned pages, taking audio and video apart, opening firmware and disk images, inspecting Android apps, looking up who owns a domain — and shows what is already here, what is not, and the exact command to get the rest. The screen counts them itself. Tools that cannot exist on your operating system are left off the list rather than shown as missing.
 
