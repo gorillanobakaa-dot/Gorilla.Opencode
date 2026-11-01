@@ -15,13 +15,10 @@ import (
 var paritySystems = []string{"windows-amd64", "linux-amd64"}
 
 // parityBacklog is the gap that existed when the rule was made: helpers pinned
-// for Windows only (job 04, 2026-10-27). It may only SHRINK: a helper ported to
+// for Windows only (job 04, 2026-10-27); emptied 2026-11-01 (goal parity-everywhere). It may only SHRINK: a helper ported to
 // Linux must leave this list (the test says so), and nothing may be added here
 // to let a new one-system helper in. Port it to the other system instead.
-var parityBacklog = map[string]bool{
-	"ast-grep": true, "coreutils": true, "difft": true, "hyperfine": true,
-	"ninja": true, "pfind": true, "sd": true,
-}
+var parityBacklog = map[string]bool{}
 
 func pinnedHelpers(pins map[string]string) map[string]map[string]bool {
 	out := map[string]map[string]bool{}
