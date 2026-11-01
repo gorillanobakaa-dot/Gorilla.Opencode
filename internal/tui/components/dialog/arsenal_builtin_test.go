@@ -1,6 +1,8 @@
 package dialog
 
 import (
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -130,4 +132,44 @@ func TestHelpNamesArsenal(t *testing.T) {
 	if !strings.Contains(h.View(), "/arsenal: tools") {
 		t.Fatal("/help must name /arsenal as the place to see tools")
 	}
+}
+
+// The one test of the definition: every helper pinned in SHA256SUMS, on every system, is on the arsenal page,
+// counted by /context, described for the release page (helpers.json) and named by the everyday card; /help names
+// /arsenal. Remove any of them and this fails.
+func TestEveryPinnedHelperIsVisible(t *testing.T) {
+	card, err := os.ReadFile("../../../howto/cards/everyday.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat, err := toolbox.Catalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	described := map[string]bool{}
+	for _, h := range cat {
+		described[h.Name] = h.Purpose != "" && h.Version != ""
+	}
+	for _, plat := range toolbox.Platforms() {
+		pinned := toolbox.Pinned(plat)
+		if len(pinned) == 0 {
+			t.Fatalf("%s: nothing pinned", plat)
+		}
+		page := texts(builtModel(plat).builtInLines())
+		if !strings.Contains(ArsenalCountsLine(len(pinned), 0), fmt.Sprintf("%d built-in helpers", len(pinned))) {
+			t.Errorf("%s: /context count line", plat)
+		}
+		for _, h := range pinned {
+			if !strings.Contains(page, h.Name+" ") {
+				t.Errorf("%s: %s missing from /arsenal", plat, h.Name)
+			}
+			if !described[h.Name] {
+				t.Errorf("%s: %s not described in helpers.json (release page)", plat, h.Name)
+			}
+			if !strings.Contains(string(card), h.Name) {
+				t.Errorf("%s: %s not named by the everyday card (/help)", plat, h.Name)
+			}
+		}
+	}
+	TestHelpNamesArsenal(t)
 }
