@@ -1,0 +1,265 @@
+[
+  {
+    "job": "sevenzip_make",
+    "title": "Make a 7z archive",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "windows",
+    "pass": true,
+    "seconds": 15.3577649,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "docs.7z: bytes at 0 are 377abcaf271c"
+      }
+    ],
+    "tool_calls": 4,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5b-acc\\sevenzip_make",
+        "outcome": "ok",
+        "times": 2
+      },
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5b-acc\\sevenzip_make\\docs",
+        "outcome": "ok",
+        "times": 2
+      }
+    ],
+    "answer": "Created `C:\\fk-scratch\\p5b-acc\\sevenzip_make\\docs.7z` from the `docs` folder.\n\nUsed 7z format, compression level 6, and no password.",
+    "stderr": "2026/10/31 20:39:32 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "7z": false
+    }
+  },
+  {
+    "job": "sevenzip_extract",
+    "title": "Extract a 7z archive",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "windows",
+    "pass": true,
+    "seconds": 20.1377264,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "out7/inner/x.txt: contains extracted-ok-KIWI-2290"
+      }
+    ],
+    "tool_calls": 3,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5b-acc\\sevenzip_extract",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "New-Item -ItemType Directory -Path 'C:\\fk-scratch\\p5b-acc\\sevenzip_extract\\out7' -Force; 7...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5b-acc\\sevenzip_extract\\out7",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Extracted `sample.7z` successfully into:\n\n`C:\\fk-scratch\\p5b-acc\\sevenzip_extract\\out7`\n\nThe archive contains `out7\\inner\\x.txt`.",
+    "stderr": "2026/10/31 20:39:47 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "7z": false
+    }
+  },
+  {
+    "job": "png_to_webp",
+    "title": "Convert PNG to WebP",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "windows",
+    "pass": true,
+    "seconds": 17.8599505,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "photo.webp: bytes at 0 are 52494646"
+      },
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "photo.webp: bytes at 8 are 57454250"
+      }
+    ],
+    "tool_calls": 2,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5b-acc\\png_to_webp",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "ffmpeg -y -i \"C:\\fk-scratch\\p5b-acc\\png_to_webp\\photo.png\" \"C:\\fk-scratch\\p5b-acc\\png_to_w...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Converted successfully. The WebP file is saved as:\n\n`C:\\fk-scratch\\p5b-acc\\png_to_webp\\photo.webp`\n\nSize: 3,018 bytes.",
+    "stderr": "2026/10/31 20:40:07 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "magick": false
+    }
+  },
+  {
+    "job": "image_resize",
+    "title": "Resize an image",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "windows",
+    "pass": true,
+    "seconds": 210.7102004,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "dims",
+        "ok": true,
+        "why": "small.png is 160x120"
+      }
+    ],
+    "tool_calls": 8,
+    "calls": [
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"Make a copy of photo.png named small.png, resized to 160 pixels wide while preser...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_describe",
+        "detail": "{\"tool\":\"image-squash\"}",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"Resize photo.png to exactly 160 pixels wide with preserved aspect ratio and save ...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5b-acc\\image_resize",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_run",
+        "detail": "{\"tool\":\"image-squash\",\"mode\":\"preview\",\"inputs\":{\"paths\":[\"C:\\\\fk-scratch\\\\p5b-acc\\\\image...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 \"C:\\fk-...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5b-acc\\image_resize",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "ffmpeg -y -i \"C:\\fk-scratch\\p5b-acc\\image_resize\\photo.png\" -vf \"scale=160:-1\" -frames:v 1...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created `small.png` from `photo.png`.\n\n- Dimensions: **160 × 120 pixels**\n- Proportions preserved: **4:3**\n- Output: `C:\\fk-scratch\\p5b-acc\\image_resize\\small.png`",
+    "stderr": "2026/10/31 20:40:25 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "magick": false
+    }
+  },
+  {
+    "job": "video_length",
+    "title": "How long is a video",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "windows",
+    "pass": true,
+    "seconds": 13.8941816,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "bash",
+        "detail": "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"C:\\...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "`clip.mp4` is **7 seconds** long.",
+    "stderr": "2026/10/31 20:43:56 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "ffprobe": false
+    }
+  },
+  {
+    "job": "extract_audio",
+    "title": "Extract the audio of a video",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "windows",
+    "pass": true,
+    "seconds": 24.5822374,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "size_min",
+        "ok": true,
+        "why": "audio.mp3 is 56544 bytes"
+      }
+    ],
+    "tool_calls": 3,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5b-acc\\extract_audio",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "audio.mp3 in C:\\fk-scratch\\p5b-acc",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "ffmpeg -y -i \"C:\\fk-scratch\\p5b-acc\\extract_audio\\clip.mp4\" -vn -codec:a libmp3lame \"C:\\fk...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Extracted the sound successfully:\n\n`C:\\fk-scratch\\p5b-acc\\extract_audio\\audio.mp3`\n\nThe file is approximately 55 KB and 7 seconds long.",
+    "stderr": "2026/10/31 20:44:10 WARN Ripgrep (rg) not found in $PATH. Some features might be limited or slower.\n",
+    "needs_present": {
+      "ffmpeg": false
+    }
+  }
+]
