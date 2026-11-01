@@ -176,3 +176,40 @@ Toolbox build with 7za, ffmpeg and ffprobe embedded (docs/TOOLBOX.dual-track.md)
 | extract_audio | PASS (43 s, 6 calls) / FAIL (57 s, 10 calls) | PASS, 25 s, 3 calls |
 
 One run per cell, so this is a sample. The earlier numbers for 7z are from the report text above. Not verified: a Linux re-run (Zero sends this to the VAIO: build with `bash scripts/fetch-toolbox-extras.sh OUT` then `bash scripts/build-toolbox.sh OUT`, run `ACC_JOBS=sevenzip_make,sevenzip_extract,png_to_webp,image_resize,video_length,extract_audio` with `ACC_EXE` set to that build and `ACC_EMBEDDED=1`; note `BuildExe` embeds only on Windows today); a bare machine; whether `image_resize` is slow because of the tool or the model.
+
+## Linux re-run (2026-11-01, Sony VAIO)
+
+Same model (chatgpt.gpt-5.6-luna), same jobs as the Windows re-runs, one run per cell. Build: the pinned helpers fetched with `scripts/fetch-toolbox-extras.sh` (12 `ok` lines, every file matched `internal/toolbox/SHA256SUMS`), then `scripts/build-toolbox.sh` (`go build -tags toolbox`, 199 MB, `linux-amd64` helpers embedded). The two scripts are git-ignored (`*.sh`), so they were written from the brief and copied in untracked. The suite ran with `ACC_EXE` set to that build and `ACC_EMBEDDED=1`: `BuildExe` still embeds only on Windows, so it was not used. Records: `results/p5b/*-linux.json`, `results/p5c/*-linux-host-path.json`, `results/p4b/*-linux-image-cards.json`. No code changed.
+
+**P5b, clean PATH (system folders only): 6 of 6 passed.**
+
+| job | result | seconds | calls | how |
+|---|---|---|---|---|
+| sevenzip_make | PASS | 33 | 5 | `7za a`, `7za l` |
+| sevenzip_extract | PASS | 29 | 4 | `7za x` |
+| png_to_webp | PASS | 52 | 9 | `cwebp`, after probing for ffmpeg and magick |
+| image_resize | PASS | 26 | 4 | probed `magick` first |
+| video_length | PASS | 18 | 2 | `ffprobe` |
+| extract_audio | PASS | 28 | 4 | `ffmpeg -y -i` |
+
+**P5c, `ACC_PATH=host` (the host's own PATH): 6 of 6 passed.**
+
+| job | result | seconds | calls |
+|---|---|---|---|
+| sevenzip_make | PASS | 50 | 5 |
+| sevenzip_extract | PASS | 51 | 4 |
+| png_to_webp | PASS | 40 | 6 |
+| image_resize | PASS | 23 | 3 |
+| video_length | PASS | 19 | 2 |
+| extract_audio | PASS | 31 | 4 |
+
+**P4b, the four image jobs, clean PATH: 4 of 4 passed.**
+
+| job | result | seconds | calls | how |
+|---|---|---|---|---|
+| png_to_webp | PASS | 27 | 4 | `cwebp -lossless`, then ffmpeg |
+| image_resize | PASS | 22 | 3 | `magick photo.png -resize` |
+| ocr_picture | PASS | 11 | 2 | no shell call |
+| exif_read | PASS | 15 | 1 | python3 with PIL |
+
+Not verified: one run per cell is a sample, not a rate. This VAIO has `7za`, `ffmpeg`, `ffprobe`, `magick` and `tesseract` in `/usr/bin`, and the "clean" PATH keeps `/usr/bin`. So a pass does not prove the embedded toolbox copy was the one used (only `cwebp` is absent from the host), and `image_resize` used the host's `magick`, `exif_read` the host's python3 with PIL. Whether the toolbox suffices on a bare Linux machine is still open. No Linux-only defect was seen. The P5a Linux results file was left as it was.
