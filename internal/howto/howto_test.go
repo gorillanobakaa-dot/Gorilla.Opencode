@@ -112,3 +112,23 @@ func TestWindowsToolIsNamedByTheCards(t *testing.T) {
 		}
 	}
 }
+
+// P4b: the image workflow card rides with the image codecs, on either system,
+// and names every tool the workflow needs.
+func TestImageCardOfferedWithImageCodecsAndNamesTheTools(t *testing.T) {
+	for _, osName := range []string{"windows", "linux"} {
+		f := hostprobe.Facts{OS: osName, Toolbox: []string{"oxipng", "sd"}}
+		if _, ok := getFor(f, "image"); !ok {
+			t.Errorf("%s: image card not offered with oxipng embedded", osName)
+		}
+		if _, ok := getFor(hostprobe.Facts{OS: osName, Toolbox: []string{"sd"}}, "image"); ok {
+			t.Errorf("%s: image card offered without an image codec", osName)
+		}
+	}
+	card, _ := getFor(hostprobe.Facts{OS: "linux", Toolbox: []string{"cwebp"}}, "image")
+	for _, want := range []string{"cwebp", "avifenc", "oxipng", "magick", "tesseract", "-resize", "SSIM", "EXIF", "-strip"} {
+		if !strings.Contains(card, want) {
+			t.Errorf("image card lacks %q", want)
+		}
+	}
+}

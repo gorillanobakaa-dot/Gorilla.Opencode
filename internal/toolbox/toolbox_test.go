@@ -300,3 +300,26 @@ func TestIsToolboxFile(t *testing.T) {
 		t.Error("a file outside the toolbox folder is recognized")
 	}
 }
+
+// P4b: the image codecs are pinned for both systems under one name, each with
+// a full sha256, and the two systems' files are different programs.
+func TestImageCodecsPinnedOnBothSystems(t *testing.T) {
+	pins, err := ParsePins(pinsText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"cwebp", "avifenc", "oxipng"} {
+		w, l := pins["windows-amd64/"+name+".exe"], pins["linux-amd64/"+name]
+		if len(w) != 64 || len(l) != 64 {
+			t.Errorf("%s: want a pin on both systems, got windows %q linux %q", name, w, l)
+		}
+		if w == l {
+			t.Errorf("%s: windows and linux pins are the same hash", name)
+		}
+	}
+	for _, name := range []string{"cjpeg", "tesseract", "magick"} {
+		if pins["windows-amd64/"+name+".exe"] != "" || pins["linux-amd64/"+name] != "" {
+			t.Errorf("%s has no official binary for both systems and must not be pinned for one", name)
+		}
+	}
+}

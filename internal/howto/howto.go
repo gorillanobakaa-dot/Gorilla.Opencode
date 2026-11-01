@@ -47,8 +47,18 @@ func availableFor(f hostprobe.Facts) []string {
 			out = append(out, name)
 		}
 	}
+	for _, name := range tb {
+		if imageCodecs[name] {
+			out = append(out, "image")
+			break
+		}
+	}
 	return out
 }
+
+// imageCodecs are the toolbox helpers the "image" card is about: the card is
+// offered wherever one of them is embedded (same names on both systems).
+var imageCodecs = map[string]bool{"cwebp": true, "avifenc": true, "oxipng": true}
 
 // Exists reports whether a card of that name is embedded at all.
 func Exists(name string) bool {
