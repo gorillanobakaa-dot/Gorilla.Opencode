@@ -30,7 +30,7 @@ var windowsCards = []string{"robocopy", "powershell-files", "attributes-acl-regi
 func Available() []string { return availableFor(hostprobe.Get()) }
 
 func availableFor(f hostprobe.Facts) []string {
-	var out []string
+	out := []string{"everyday"}
 	if f.OS == "windows" {
 		out = append(out, windowsCards...)
 		if f.PowerToys != "" {

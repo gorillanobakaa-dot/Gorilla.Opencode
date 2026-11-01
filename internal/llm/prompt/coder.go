@@ -201,6 +201,10 @@ func machineLines() string {
 		b.WriteString(l)
 		b.WriteString("\n")
 	}
+	if l := hostprobe.Get().HelperBlock(); l != "" {
+		b.WriteString(l)
+		b.WriteString("\n")
+	}
 	if l := howto.PromptLine(); l != "" {
 		b.WriteString(l)
 		b.WriteString("\n")

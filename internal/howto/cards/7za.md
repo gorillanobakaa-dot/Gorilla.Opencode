@@ -1,11 +1,8 @@
-# 7za (embedded toolbox)
+# 7za (embedded toolbox: 7-Zip)
 
-7-Zip 26.04, the same name on Windows and Linux. Packs and unpacks .7z, .zip, .tar, .gz, .xz and more. `x` keeps
-the folders inside the archive, `e` flattens them; `-o` takes the target folder with NO space after it. `-y` answers
-yes to every overwrite: use it only on a new, empty target.
+Makes and unpacks .7z, and also reads .zip, .tar, .gz, .rar. The `archive` tool does zip only: for a .7z use this.
+Call it by name in the shell; extract with `x` (keeps folders), list with `l`.
 
-    7za l backup.7z                                  # list what is inside, changes nothing
-    7za t backup.7z                                  # test the archive (checksums), changes nothing
-    7za x backup.7z -oout                            # unpack into ./out with its folders
-    7za a -t7z -mx=9 backup.7z src docs              # pack two folders, best compression
-    7za a -tzip site.zip public/*                     # a .zip for someone without 7-Zip
+    7za a docs.7z .\docs                 # make docs.7z from the folder docs
+    7za x docs.7z -oout                  # extract into the folder out (no space after -o)
+    7za l docs.7z                        # list what is inside

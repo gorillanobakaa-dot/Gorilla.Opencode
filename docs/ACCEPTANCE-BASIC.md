@@ -141,6 +141,23 @@ The cause column uses the four labels of the brief. `model error` for Qwen/hidde
 
 Reading: no Linux-shaped defect in the suite (PATH, fixtures, helpers, hidden files and the trash check all worked), so no code fix was made. The two failures and the Windows `sort_uniq` failure are one pattern, a write outside the working folder, which is a program behavior for the owner to decide (point 5 above). Not re-run: one run per cell is a sample.
 
+## P5c re-run: the prompt names the helpers (2026-10-31, Windows, ChatGPT Luna)
+
+Change: the system prompt now carries a "Helpers here" block (under 1.5 KB, built from the toolbox and PATH, same shape on Windows and Linux, absent helpers not named) and a how-to card `everyday`, which the block tells the model to read before any web search. Cards `7za`, `ffmpeg`, `ffprobe` were added for the P5b helpers.
+
+Re-run: the six jobs whose first-run notes said the model hunted for or asked about a tool, one run each, `ACC_PATH=host` (this laptop's PATH has 7z, ffmpeg and ImageMagick; P5b is not in this branch, so the embedded toolbox was not used). Record: `results/p5c/chatgpt.gpt-5.6-luna-windows-host-path.json`.
+
+| job | before (run 1 / run 2) | after |
+|---|---|---|
+| sevenzip_make | PASS 11 s, 5 calls / PASS 9 s, 3 calls | PASS 15 s, 5 calls |
+| sevenzip_extract | PASS 158 s, 15 calls / PASS 218 s, 10 calls | PASS 16 s, 3 calls |
+| png_to_webp | PASS 34 s, 8 calls / PASS 98 s, 13 calls | PASS 9 s, 2 calls |
+| image_resize | PASS 27 s, 7 calls / PASS 30 s, 6 calls | PASS 26 s, 5 calls |
+| video_length | PASS 61 s, 6 calls / PASS 44 s, 7 calls | PASS 9 s, 1 call |
+| extract_audio | PASS 43 s, 6 calls / FAIL 57 s, 10 calls | PASS 16 s, 4 calls |
+
+6 of 6 passed. Not verified: one run per job (a sample, not a rate); the "before" runs used the clean PATH, the "after" run the host PATH, so part of the gain may be the helpers being on PATH rather than the block (not separated); Qwen and Linux not re-run; the prompt's effect on a machine with none of these helpers was only unit-tested.
+
 ## Files
 
 - `tests/acceptance/basic/`: `jobs.yaml`, `fixtures/`, `spec.go`, `setup.go`, `check.go`, `runner.go`, `report.go`, `spec_test.go`, `acceptance_test.go`, `README.md`, `results/`.
