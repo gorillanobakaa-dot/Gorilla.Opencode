@@ -153,3 +153,40 @@ per-crate license notices of the helpers' own dependencies, and Linux/macOS embe
 | FFmpeg | https://github.com/BtbN/FFmpeg-Builds (linked from ffmpeg.org/download.html) | n9.0.2-28-g669f5ab083, release autobuild-2026-10-18-13-01, gpl static | 2026-10-18 (rolling builds; older ones are deleted upstream, so the 14-day rule cannot be applied) | GPL (third_party/ffmpeg/LICENSE.txt, sha256 8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903) | ffmpeg, ffprobe for both systems from ffmpeg-n9.0.2-28-g669f5ab083-win64-gpl-9.0.zip (a38198cc130ed3fa02097d0baebcea9c1b8a9d9d3d1d8161d691d1f03709158b) and ...-linux64-gpl-9.0.tar.xz (d2cc2d5446f14ff32b411e4fee488005b472023fb6554bed0ea80b7110f0b3a6), both equal to GitHub's digest of the asset |
 
 Not built from source (unlike the table above): the upstream binaries are pinned by sha256 in `internal/toolbox/SHA256SUMS` and re-checked by `scripts/fetch-toolbox-extras.sh`. 7-Zip publishes no checksum or signature; its hashes are trust-on-first-use over HTTPS, measured 2026-10-31. The Linux executables ran only on the build machine's Windows side as files (not executed: no Linux run was made here).
+
+## macOS twins (internal/toolbox, darwin-amd64 = Intel, goal parity-everywhere, 2026-11-01)
+
+The same 13 names as Windows and Linux, pinned as `darwin-amd64/<name>` in `internal/toolbox/SHA256SUMS`; macOS 10.13
+(High Sierra) is the floor. Made on the Windows laptop. Every Mach-O was parsed (load commands read by script): one x86_64
+slice, minimum OS and libraries listed below. **None was run on a Mac** (the MacBook Air did not answer: `fieldkit mac find
+macair` "NOT FOUND" at 16:4x on 2026-11-01); only the headers were checked. Inbox item carries the smoke command.
+
+| helper | where it came from | min macOS (Mach-O) | libraries |
+|---|---|---|---|
+| ast-grep 0.50.0, difft 0.71.0, sd v1.1.0, hyperfine v2.0.0, oxipng v10.2.1 | official `x86_64-apple-darwin` release archives | 10.12 | libSystem, libiconv |
+| coreutils 0.12.0 | official `coreutils-0.12.0-x86_64-apple-darwin.tar.gz` | 10.12 | libSystem, libiconv, libobjc, Foundation |
+| ninja v1.13.2 | built (official `ninja-mac.zip` is 10.15+) | 10.13 | libSystem only (libc++ static) |
+| 7za = 7-Zip 26.04 `7zz` | built from `7z2604-src.tar.xz` (official mac build says macOS 26) | 10.13 | libSystem only |
+| cwebp = libwebp 1.6.0 | built (official mac build says macOS 15); PNG and JPEG input compiled in | 10.13 | libSystem only |
+| avifenc = libavif v1.4.2 + libaom 3.14.1 | built (official macOS artifact is arm64 only); PNG and JPEG input, AV1 encode and decode | 10.13 | libSystem only |
+| pfind (ours) | `tools/pfind-rs`, `cargo build --release --offline --locked --target x86_64-apple-darwin` | 10.13 | libSystem, libiconv |
+| ffmpeg, ffprobe | osxexperts.net static FFmpeg **8.0** Intel (9.0.2 is on Windows and Linux) | **11.0** | system frameworks, libc++, libz, libbz2 |
+
+**Build recipe (built ones).** zig 0.16.0 as the C/C++ compiler and linker: `zig cc -target x86_64-macos.10.13`, cmake 4.4 +
+ninja with a toolchain file (`CMAKE_SYSTEM_NAME Darwin`, `CMAKE_AR` = `zig ar`, `-I<prefix>/include` first so zig's bundled
+SDK `zlib.h` does not beat our zlib). Order: zlib 1.3.1, libpng 1.6.50, libjpeg-turbo 3.1.2 (`WITH_SIMD=0`, no nasm), then
+libwebp (`WEBP_BUILD_CWEBP=ON` only), libaom (`AOM_TARGET_CPU=generic`, `ENABLE_NASM=OFF`, no tools or tests), libavif
+(`AVIF_CODEC_AOM=SYSTEM`, `AVIF_LIBYUV=OFF`, `AVIF_BUILD_APPS=ON`). libavif's cmake downloaded libargparse at configure time
+(its own FetchContent; not pinned here). ninja: `browse` mode switched off (its script step does not run on Windows). 7-Zip:
+`make -f ../../cmpl_mac_x64.mak CC="zig cc -target x86_64-macos.10.13" CXX="zig c++ ..." MY_ARCH=` in
+`CPP/7zip/Bundles/Alone2`, one patch: `CPP/Windows/TimeUtils.cpp` line 263 also excludes `__APPLE__` so it uses
+`clock_gettime` (`timespec_get` is 10.15+ and stops the build at target 10.13). pfind: `CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER`
+= a `zig cc -target x86_64-macos.10.13` wrapper, `MACOSX_DEPLOYMENT_TARGET=10.13`, `-L` to a stub `libiconv.tbd`.
+Source archives were fetched with `fieldkit evidence fetch`; its store keeps the decompressed tar, so those sha256 are of
+that tar, not of upstream's .tar.gz: ninja 146d5abb2cb693fb..., 7z2604-src 9691944c0fe0d01b..., libwebp 7f158e50f55ff7bf...,
+libavif 6330f741b93bc3914..., zlib 044f6f2ec86d0436..., libpng d17b16c34544187d..., libjpeg-turbo 722f2f6e4c68ae021..., libaom
+32a95a492c7a2db4d.... The zig builds were not compared for byte-for-byte repeatability.
+
+**ffmpeg and ffprobe caveat.** evermeet.cx and ffmpeg.martin-riedl.de (the 9.0.2 mac builds) disallow crawlers in robots.txt,
+so they were not fetched. osxexperts.net has Intel 8.0 only, and its Mach-O says macOS 11. macOS 10.13's loader ignores that
+load command, but a missing system symbol would stop it: only a run on the Mac settles it.

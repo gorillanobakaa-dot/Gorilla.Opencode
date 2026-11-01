@@ -50,3 +50,26 @@ d1f1ddc82b2a53a8ad735f863d9f7ac055dab5b6ee3a5087ea87d0eed01d95c0  linux-amd64/hy
 5eccb0fc2deeb2223e0554f1933bd451d79a9db27aef27b04da25f755010de4e  linux-amd64/ninja
 b7b7510af94e534cd6e3c4ac6d34a4884ee0230a84b01d4db7a864e866b9d37c  linux-amd64/sd
 169b3e9b99d39b4d8f78189acdaea99409b2cfdd30c3516625c986bbc42032d3  linux-amd64/pfind
+#
+# macOS twins (goal parity-everywhere, 2026-11-01), darwin-amd64 = Intel, deployment target 10.13 (High Sierra).
+# Taken or built on the Windows laptop; every Mach-O load command was read: x86_64 only, no @rpath/third-party dylib.
+# Official release binaries (macOS 10.12 minimum): ast-grep, coreutils, difft, hyperfine, sd, oxipng.
+# Built here with zig 0.16.0 cc/c++ -target x86_64-macos.10.13 (and rustc for pfind, MACOSX_DEPLOYMENT_TARGET=10.13),
+# because the official macOS files need 10.15 or newer (ninja, cwebp), 11+ (avifenc is arm64 only), or 26 (7zz):
+# ninja v1.13.2, 7za = 7-Zip 26.04 7zz (one source patch), cwebp = libwebp 1.6.0 (zlib 1.3.1, libpng 1.6.50,
+# libjpeg-turbo 3.1.2 static), avifenc = libavif v1.4.2 + libaom 3.14.1 (generic C, no SIMD), pfind = tools/pfind-rs.
+# ffmpeg, ffprobe: osxexperts.net static FFmpeg 8.0 Intel (Linux and Windows have 9.0.2; no robots-allowed mac source
+# has 9.0.2 and the Mach-O says macOS 11 minimum). See third_party/PINS.md ("macOS twins").
+fc3107d4c8d3a44ab030b1945ed44165396e858c1ac1d75973c8ea6e9ad53d5f  darwin-amd64/ast-grep
+c4b7f3039a584676db06932c536382c7104ba207d69ddf75c170bf524960e8fe  darwin-amd64/coreutils
+0d4d42d950b0533d6c04132c991e4be6b6289828fd59b0164996e8defbdbb916  darwin-amd64/difft
+e5a65bc7e1e8047d94c23701036fd4f5f76d42e38549526ee47a7cb21a10c552  darwin-amd64/hyperfine
+31b7d7171a152475f9396f6a664427e54c5d98d89752723f6064e29965e6d841  darwin-amd64/ninja
+96bd2e018ff8a58ac7bf26f1453dd1f93f228dff299fb5b5f12e498ba0661162  darwin-amd64/sd
+447b3315a1ab1da203548a68c34bc448193d556e92670f1533c9d01cb6e9703e  darwin-amd64/pfind
+798d13ce4437d8f3236469eac64820861e0fa860b432016615e5edb5f6a65636  darwin-amd64/7za
+df3f1e3facdc1ae0ad0bd898cdfb072fbc9641bf47b11f172844525a05db8d11  darwin-amd64/ffmpeg
+5228e651e2bd67bb55819b27f6138351587b16d2b87446007bf35b7cf930d891  darwin-amd64/ffprobe
+73f4582c1c7b287e21cbf42762c830df2751240ec78ce931483853ab6688f232  darwin-amd64/cwebp
+9cc4ecc3260d0d053a14c38da54d9047e4bae647614c18f74a6aa7126501d474  darwin-amd64/avifenc
+b9f6bace13541441cd6dc9f3f80695f9dbf94db89c4f51209214d14936ae71c6  darwin-amd64/oxipng
