@@ -276,3 +276,8 @@ tools/pfind-rs/target/
 # The release script that fills it is PUBLISHED (a fresh clone must be able to make the toolbox build):
 # no credentials, no internal paths; the helpers' folder is a parameter.
 !/scripts/build-toolbox.ps1
+# GORILLA (2026-11-01, owner approved inbox #309): the Linux twins are PUBLISHED too (parity: Windows never gets
+# more than Linux). fetch-toolbox-extras.sh downloads the pinned official releases and refuses any other bytes;
+# build-toolbox.sh embeds the linux-amd64 pins. No credentials, no internal paths.
+!/scripts/build-toolbox.sh
+!/scripts/fetch-toolbox-extras.sh
