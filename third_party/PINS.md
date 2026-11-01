@@ -142,3 +142,12 @@ AppImage, not one program each. The `image` how-to card says how to get these (`
 Not done yet: a script that rebuilds the six on Windows (`x86_64-pc-windows-msvc`) from these tarballs (the
 reproducibility path; until it is proven the VAIO binaries are the shipped ones), 7-Zip 7za (MSVC build), the
 per-crate license notices of the helpers' own dependencies, and Linux/macOS embeds.
+
+### P5b additions (2026-10-31): 7-Zip and FFmpeg, official binaries on both systems
+
+| tool | upstream | version | date | license | shipped files |
+|---|---|---|---|---|---|
+| 7-Zip | https://www.7-zip.org/a/ | 26.04 | 2026-10-05 (newest at least 14 days old; 26.05 is 2026-10-21) | LGPL + unRAR restriction (third_party/7zip/License.txt, sha256 39d2187b942cc88818dd959e53c6b7dddd152097a42061467c4d56050168d646) | windows-amd64/7za.exe from 7z2604-extra.7z (sha256 dc4b11d3399db18b063630137145f5585d8f7ac847bf3639bd1185d7d1f7cee0); linux-amd64/7za = 7zz from 7z2604-linux-x64.tar.xz (sha256 fc0327ba27e89bd086cf426dff17d77de582953cdbbc10a6576540a06853ffcd) |
+| FFmpeg | https://github.com/BtbN/FFmpeg-Builds (linked from ffmpeg.org/download.html) | n9.0.2-28-g669f5ab083, release autobuild-2026-10-18-13-01, gpl static | 2026-10-18 (rolling builds; older ones are deleted upstream, so the 14-day rule cannot be applied) | GPL (third_party/ffmpeg/LICENSE.txt, sha256 8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903) | ffmpeg, ffprobe for both systems from ffmpeg-n9.0.2-28-g669f5ab083-win64-gpl-9.0.zip (a38198cc130ed3fa02097d0baebcea9c1b8a9d9d3d1d8161d691d1f03709158b) and ...-linux64-gpl-9.0.tar.xz (d2cc2d5446f14ff32b411e4fee488005b472023fb6554bed0ea80b7110f0b3a6), both equal to GitHub's digest of the asset |
+
+Not built from source (unlike the table above): the upstream binaries are pinned by sha256 in `internal/toolbox/SHA256SUMS` and re-checked by `scripts/fetch-toolbox-extras.sh`. 7-Zip publishes no checksum or signature; its hashes are trust-on-first-use over HTTPS, measured 2026-10-31. The Linux executables ran only on the build machine's Windows side as files (not executed: no Linux run was made here).

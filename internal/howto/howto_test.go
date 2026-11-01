@@ -58,7 +58,7 @@ func TestRobocopyCardCarriesTheSwitchesAndExitCodes(t *testing.T) {
 func TestCardsAreOfferedOnlyWhereTheyAreTrue(t *testing.T) {
 	win := hostprobe.Facts{OS: "windows"}
 	got := strings.Join(availableFor(win), ",")
-	if got != "robocopy,powershell-files,attributes-acl-registry,services-events-tasks" {
+	if got != "everyday,robocopy,powershell-files,attributes-acl-registry,services-events-tasks" {
 		t.Errorf("plain Windows: %s", got)
 	}
 	if _, ok := getFor(win, "powertoys"); ok {
@@ -78,11 +78,11 @@ func TestCardsAreOfferedOnlyWhereTheyAreTrue(t *testing.T) {
 	}
 
 	linux := hostprobe.Facts{OS: "linux", Toolbox: []string{"sd"}}
-	if got := strings.Join(availableFor(linux), ","); got != "sd" {
+	if got := strings.Join(availableFor(linux), ","); got != "everyday,sd" {
 		t.Errorf("Linux offers %q; the Windows cards must not appear there", got)
 	}
-	if promptLineFor(hostprobe.Facts{OS: "linux"}) != "" {
-		t.Error("a prompt line with no cards")
+	if !strings.Contains(promptLineFor(hostprobe.Facts{OS: "linux"}), "everyday") {
+		t.Error("the everyday card is always offered")
 	}
 	if l := promptLineFor(hostprobe.Facts{OS: "windows"}); !strings.Contains(l, "action=howto") || !strings.Contains(l, "robocopy") {
 		t.Errorf("prompt line: %q", l)

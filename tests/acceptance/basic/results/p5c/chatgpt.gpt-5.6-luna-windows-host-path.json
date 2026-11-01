@@ -1,0 +1,259 @@
+[
+  {
+    "job": "sevenzip_make",
+    "title": "Make a 7z archive",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "windows",
+    "pass": true,
+    "seconds": 15.0506872,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "docs.7z: bytes at 0 are 377abcaf271c"
+      }
+    ],
+    "tool_calls": 5,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5c-acc\\sevenzip_make",
+        "outcome": "ok",
+        "times": 2
+      },
+      {
+        "tool": "files",
+        "detail": "C:\\fk-scratch\\p5c-acc\\sevenzip_make\\docs",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "archive",
+        "detail": "C:\\fk-scratch\\p5c-acc\\sevenzip_make\\docs.7z",
+        "outcome": "failed",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5c-acc\\sevenzip_make",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created and verified `C:\\fk-scratch\\p5c-acc\\sevenzip_make\\docs.7z`.\n\n- Format: 7z\n- Contents: 2 files from `docs`\n- Compression level: 6\n- Password: none",
+    "needs_present": {
+      "7z": true
+    }
+  },
+  {
+    "job": "sevenzip_extract",
+    "title": "Extract a 7z archive",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "windows",
+    "pass": true,
+    "seconds": 15.6667653,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "content",
+        "ok": true,
+        "why": "out7/inner/x.txt: contains extracted-ok-KIWI-2290"
+      }
+    ],
+    "tool_calls": 3,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5c-acc\\sevenzip_extract",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "7z x \"C:\\fk-scratch\\p5c-acc\\sevenzip_extract\\sample.7z\" -o\"C:\\fk-scratch\\p5c-acc\\sevenzip_...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5c-acc\\sevenzip_extract\\out7",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Extracted `sample.7z` successfully into:\n\n`C:\\fk-scratch\\p5c-acc\\sevenzip_extract\\out7`\n\nThe archive contains `inner\\x.txt`.",
+    "needs_present": {
+      "7z": true
+    }
+  },
+  {
+    "job": "png_to_webp",
+    "title": "Convert PNG to WebP",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "windows",
+    "pass": true,
+    "seconds": 9.4931962,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "photo.webp: bytes at 0 are 52494646"
+      },
+      {
+        "kind": "magic",
+        "ok": true,
+        "why": "photo.webp: bytes at 8 are 57454250"
+      }
+    ],
+    "tool_calls": 2,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5c-acc\\png_to_webp",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "magick \"C:\\fk-scratch\\p5c-acc\\png_to_webp\\photo.png\" \"C:\\fk-scratch\\p5c-acc\\png_to_webp\\ph...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Converted `photo.png` to WebP and saved it as:\n\n`C:\\fk-scratch\\p5c-acc\\png_to_webp\\photo.webp`",
+    "needs_present": {
+      "magick": true
+    }
+  },
+  {
+    "job": "image_resize",
+    "title": "Resize an image",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "windows",
+    "pass": true,
+    "seconds": 25.6592777,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "dims",
+        "ok": true,
+        "why": "small.png is 160x120"
+      }
+    ],
+    "tool_calls": 5,
+    "calls": [
+      {
+        "tool": "fieldkit_discover",
+        "detail": "{\"goal\":\"Create a resized copy of photo.png named small.png at exactly 160 pixels wide whi...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "fieldkit_describe",
+        "detail": "{\"tool\":\"image-squash\"}",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "Get-Item -LiteralPath 'C:\\fk-scratch\\p5c-acc\\image_resize\\photo.png' | Select-Object FullN...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "$target = 'C:\\fk-scratch\\p5c-acc\\image_resize\\small.png'; if (Test-Path -LiteralPath $targ...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "magick 'C:\\fk-scratch\\p5c-acc\\image_resize\\photo.png' -resize '160x' 'C:\\fk-scratch\\p5c-ac...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Created `small.png` at:\n\n`C:\\fk-scratch\\p5c-acc\\image_resize\\small.png`\n\nDimensions: **160 × 120 pixels**, preserving the original proportions.",
+    "needs_present": {
+      "magick": true
+    }
+  },
+  {
+    "job": "video_length",
+    "title": "How long is a video",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "windows",
+    "pass": true,
+    "seconds": 8.5490624,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "answer",
+        "ok": true,
+        "why": "answer has what was asked"
+      }
+    ],
+    "tool_calls": 1,
+    "calls": [
+      {
+        "tool": "bash",
+        "detail": "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"C:\\...",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "`clip.mp4` is **7 seconds** long.",
+    "needs_present": {
+      "ffprobe": true
+    }
+  },
+  {
+    "job": "extract_audio",
+    "title": "Extract the audio of a video",
+    "model": "chatgpt.gpt-5.6-luna",
+    "os": "windows",
+    "pass": true,
+    "seconds": 16.4534484,
+    "exit_code": 0,
+    "checks": [
+      {
+        "kind": "size_min",
+        "ok": true,
+        "why": "audio.mp3 is 56544 bytes"
+      }
+    ],
+    "tool_calls": 4,
+    "calls": [
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5c-acc\\extract_audio",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5c-acc",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "bash",
+        "detail": "ffmpeg -i \"C:\\fk-scratch\\p5c-acc\\extract_audio\\clip.mp4\" -vn \"C:\\fk-scratch\\p5c-acc\\extrac...",
+        "outcome": "ok",
+        "times": 1
+      },
+      {
+        "tool": "find",
+        "detail": "C:\\fk-scratch\\p5c-acc\\extract_audio",
+        "outcome": "ok",
+        "times": 1
+      }
+    ],
+    "answer": "Done. Extracted the sound from `clip.mp4` into:\n\n`C:\\fk-scratch\\p5c-acc\\extract_audio\\audio.mp3`",
+    "needs_present": {
+      "ffmpeg": true
+    }
+  }
+]
