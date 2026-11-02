@@ -71,3 +71,17 @@ func TestHelperBlockOnBareLinuxNamesOnlyOwnTools(t *testing.T) {
 		t.Errorf("bare Linux block names absent helpers:\n%s", b)
 	}
 }
+
+// Every carried helper that has an example row in the block: pfind, ast-grep, difft, sd, ninja, hyperfine,
+// coreutils, cwebp, avifenc, oxipng. A helper that is not present is not named.
+func TestHelperBlockNamesEachCarriedHelperWhenPresent(t *testing.T) {
+	for _, n := range []string{"pfind", "ast-grep", "difft", "sd", "ninja", "hyperfine", "coreutils", "cwebp", "avifenc", "oxipng"} {
+		with := Facts{OS: "linux", PathTools: []string{n}}.HelperBlock()
+		if !strings.Contains(with, n) {
+			t.Errorf("%s is present but the Helpers block does not name it:\n%s", n, with)
+		}
+		if without := (Facts{OS: "linux"}).HelperBlock(); strings.Contains(without, n+" ") {
+			t.Errorf("%s is absent but the block names it:\n%s", n, without)
+		}
+	}
+}

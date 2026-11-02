@@ -1280,6 +1280,306 @@
           "caveats": "Windows 10 or 11 only. It is a separate program with its own settings and its own background process; the agent does not drive it, you do."
         }
       ]
+    },
+    {
+      "id": "built-in",
+      "title": "Built in, nothing to install",
+      "why": "These programs are carried inside Gorilla OpenCode and checked by hash before every run, so they work on a machine with nothing installed. Each line below also says how to get the same program for the whole system, per package manager.",
+      "entries": [
+        {
+          "id": "coreutils",
+          "title": "The same ls, cp, sort and cat on every system",
+          "teaches": "A Rust rewrite of the standard command-line file tools (ls, cp, mv, sort, head, wc, sha256sum and about a hundred more) that behaves the same on Windows, Linux and macOS, so a recipe the agent learned on one system works on the others.",
+          "unlocks": [
+            "use ls, sort, wc, head or sha256sum on Windows exactly as on Linux",
+            "one command line for every system"
+          ],
+          "detect": {
+            "binaries": [
+              "coreutils"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "rust-coreutils"
+            ],
+            "pacman": [
+              "uutils-coreutils"
+            ],
+            "scoop": [
+              "uutils-coreutils"
+            ],
+            "brew": [
+              "uutils-coreutils"
+            ],
+            "winget": [
+              "uutils.coreutils"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Run as `coreutils ls`, not bare `ls`, unless you link the names yourself. Option details differ a little from GNU in rare corners. It is also carried inside Gorilla OpenCode on Windows, Linux and macOS, so nothing needs installing; the package line only gets you the system-wide copy."
+        },
+        {
+          "id": "difft",
+          "title": "See what really changed between two files",
+          "teaches": "Difftastic compares files by their syntax tree instead of line by line, so moving a block or re-wrapping a line does not show as a change. Far shorter than a plain diff when the agent reviews its own edits.",
+          "unlocks": [
+            "review an edit as the real change only",
+            "compare two versions of a source file"
+          ],
+          "detect": {
+            "binaries": [
+              "difft"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "difftastic"
+            ],
+            "pacman": [
+              "difftastic"
+            ],
+            "scoop": [
+              "difftastic"
+            ],
+            "brew": [
+              "difftastic"
+            ],
+            "winget": [
+              "Wilfred.difftastic"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Needs a language it knows; for plain prose it falls back to a line diff. Very large files can be slow. It is also carried inside Gorilla OpenCode on Windows, Linux and macOS, so nothing needs installing; the package line only gets you the system-wide copy."
+        },
+        {
+          "id": "ninja",
+          "title": "Run a build only as far as it has to",
+          "teaches": "Ninja is the small build runner behind CMake and Meson projects. It reads a finished build file and runs only the steps whose inputs changed, in parallel, so rebuilding after a one-line edit takes seconds.",
+          "unlocks": [
+            "build a CMake or Meson project",
+            "rebuild only what changed"
+          ],
+          "detect": {
+            "binaries": [
+              "ninja"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "ninja-build"
+            ],
+            "pacman": [
+              "ninja"
+            ],
+            "scoop": [
+              "ninja"
+            ],
+            "brew": [
+              "ninja"
+            ],
+            "winget": [
+              "Ninja-build.Ninja"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "It runs a build; it does not write one. You still need CMake or Meson and a compiler. It is also carried inside Gorilla OpenCode on Windows, Linux and macOS, so nothing needs installing; the package line only gets you the system-wide copy."
+        },
+        {
+          "id": "sd",
+          "title": "Find and replace across files without regex pain",
+          "teaches": "sd is a find-and-replace for the command line with plain syntax: sd 'old' 'new' file. It uses ordinary regular expressions, treats the text literally when asked, and is much easier than sed to get right the first time.",
+          "unlocks": [
+            "rename a word across a file or a pipeline",
+            "do a bulk replace with a preview"
+          ],
+          "detect": {
+            "binaries": [
+              "sd"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "sd"
+            ],
+            "pacman": [
+              "sd"
+            ],
+            "scoop": [
+              "sd"
+            ],
+            "brew": [
+              "sd"
+            ],
+            "winget": [
+              "chmln.sd"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "It rewrites the file in place with no undo: commit or copy first. Use -p to preview. It is also carried inside Gorilla OpenCode on Windows, Linux and macOS, so nothing needs installing; the package line only gets you the system-wide copy."
+        },
+        {
+          "id": "cwebp",
+          "title": "Make pictures smaller as WebP",
+          "teaches": "cwebp turns a PNG or JPEG into a WebP picture, usually a third to a half of the size at the same look. Useful before sending images over a slow link or into a document.",
+          "unlocks": [
+            "shrink a screenshot for sharing",
+            "convert PNG or JPEG to WebP"
+          ],
+          "detect": {
+            "binaries": [
+              "cwebp"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "webp"
+            ],
+            "pacman": [
+              "libwebp"
+            ],
+            "scoop": [
+              "libwebp"
+            ],
+            "brew": [
+              "webp"
+            ],
+            "winget": [
+              "Google.libwebp"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Lossy by default: add -lossless for screenshots with text. Old programs may not open WebP. It is also carried inside Gorilla OpenCode on Windows, Linux and macOS, so nothing needs installing; the package line only gets you the system-wide copy."
+        },
+        {
+          "id": "avifenc",
+          "title": "Make pictures even smaller as AVIF",
+          "teaches": "avifenc turns a PNG or JPEG into an AVIF picture, smaller than WebP at the same look. Slower to make, so use it for pictures that will be sent many times.",
+          "unlocks": [
+            "shrink photos hard for slow links",
+            "convert PNG or JPEG to AVIF"
+          ],
+          "detect": {
+            "binaries": [
+              "avifenc"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "libavif-bin"
+            ],
+            "pacman": [
+              "libavif"
+            ],
+            "scoop": [
+              "libavif"
+            ],
+            "brew": [
+              "libavif"
+            ],
+            "winget": [
+              "AOMedia.libavif"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Encoding is slow on an old laptop, and some viewers and old browsers cannot open AVIF. It is also carried inside Gorilla OpenCode on Windows, Linux and macOS, so nothing needs installing; the package line only gets you the system-wide copy."
+        },
+        {
+          "id": "oxipng",
+          "title": "Shrink PNG files without changing a pixel",
+          "teaches": "oxipng re-compresses a PNG losslessly: the picture is identical, the file is smaller. A safe last step for screenshots and icons that go into documents or releases.",
+          "unlocks": [
+            "make PNG files smaller with no quality loss",
+            "tidy screenshots before sharing"
+          ],
+          "detect": {
+            "binaries": [
+              "oxipng"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "oxipng"
+            ],
+            "pacman": [
+              "oxipng"
+            ],
+            "scoop": [
+              "oxipng"
+            ],
+            "brew": [
+              "oxipng"
+            ],
+            "winget": [
+              "shssoichiro.oxipng"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "It overwrites the file unless you give --out: keep a copy of anything you cannot recreate. It is also carried inside Gorilla OpenCode on Windows, Linux and macOS, so nothing needs installing; the package line only gets you the system-wide copy."
+        },
+        {
+          "id": "pfind",
+          "title": "Find files by name, fast, the same on every system",
+          "teaches": "pfind is Gorilla's own parallel file finder. It walks a folder tree using all cores, skips what .gitignore skips, and prints the same result on Windows, Linux and macOS. It is what the find tool uses for names.",
+          "unlocks": [
+            "find a file by name in a big tree",
+            "list files by pattern with the same options everywhere"
+          ],
+          "detect": {
+            "binaries": [
+              "pfind"
+            ]
+          },
+          "packages": {
+            "source": [
+              "tools/pfind-rs (cargo build --release)"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "Carried by Gorilla OpenCode only: there is no system package, so the only way to get it is the program itself. Source is in tools/pfind-rs.",
+          "carried": true
+        }
+      ]
     }
   ]
 }

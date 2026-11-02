@@ -97,6 +97,10 @@ type Entry struct {
 	Packages map[string][]string `json:"packages"`
 	Needs    Needs               `json:"needs"`
 	Tier     string              `json:"tier"`
+	// Carried marks an entry whose program ships inside Gorilla OpenCode and has no system package
+	// (pfind). TestEveryEntryIsAvailableOnAtLeastOnePackageManager accepts it only when every
+	// detect binary is really in internal/toolbox/SHA256SUMS, so the claim is checked, not trusted.
+	Carried bool `json:"carried,omitempty"`
 	// Caveats is the field most tools' own documentation omits and the one a
 	// user most needs: what will disappoint you about this. It is the
 	// difference between a catalogue and honest advice.

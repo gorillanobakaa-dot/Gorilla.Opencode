@@ -232,6 +232,18 @@ func TestEveryEntryIsAvailableOnAtLeastOnePackageManager(t *testing.T) {
 	m, _ := Load()
 	for _, s := range m.Series {
 		for _, e := range s.Entries {
+			if e.Carried {
+				sums, err := os.ReadFile("../toolbox/SHA256SUMS")
+				if err != nil {
+					t.Fatalf("cannot read the toolbox sums to check %s: %v", e.ID, err)
+				}
+				for _, b := range e.Detect.Binaries {
+					if !strings.Contains(string(sums), "/"+b+".exe") && !strings.Contains(string(sums), "/"+b+"\n") {
+						t.Errorf("%s says it is carried, but %s is not in internal/toolbox/SHA256SUMS", e.ID, b)
+					}
+				}
+				continue
+			}
 			if !Available(e, APT) && !Available(e, Pacman) && !Available(e, Winget) {
 				t.Errorf("%s cannot be installed by either package manager — it is a tease", e.ID)
 			}
