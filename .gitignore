@@ -285,3 +285,8 @@ tools/pfind-rs/target/
 # The CI test selector and its test are scripts the workflow runs; *.py above swallowed them
 # (PR #55 went red: "go_test_select.py: No such file").
 !/.github/scripts/*.py
+
+# GORILLA: exception - the release-page helpers-table generator is SOURCE the release procedure runs
+# (fieldkit integration check looks for it here), not a local script.
+!/scripts/release/
+!/scripts/release/build_release_page.py

@@ -1646,7 +1646,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "message":
 			return a, a.messageCommand(msg.Args)
 		case "arsenal", "tools":
-			a.arsenalPage = dialog.NewArsenalCmp()
+			a.arsenalPage = dialog.NewArsenalCmp().OpenOnBuiltIn()
 			a.arsenalPage.SetSize(a.width, a.height)
 			a.showArsenal = true
 			return a, nil

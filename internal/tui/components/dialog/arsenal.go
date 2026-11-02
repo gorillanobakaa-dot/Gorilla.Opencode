@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -38,6 +39,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/opencode-ai/opencode/internal/arsenal"
 	"github.com/opencode-ai/opencode/internal/config"
+	"github.com/opencode-ai/opencode/internal/toolbox"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 	"github.com/opencode-ai/opencode/internal/tui/util"
@@ -61,6 +63,7 @@ const (
 	viewEntries                    // one series, item by item
 	viewDetail                     // one entry, everything known about it
 	viewPlan                       // the install plan: the exact command, in full
+	viewBuiltIn                    // what is built in (ready now); the page /arsenal opens on
 )
 
 type ArsenalCmp struct {
@@ -80,6 +83,11 @@ type ArsenalCmp struct {
 	man  arsenal.Manifest
 	full arsenal.Manifest
 	pm   arsenal.PackageManager
+
+	// built is what this program carries inside itself for this system, and
+	// platform names that system ("windows-amd64"). See arsenal_builtin.go.
+	built    []toolbox.Helper
+	platform string
 
 	// status is detection, done once on open: measured, never claimed.
 	status map[string]arsenal.Status
@@ -125,6 +133,8 @@ func NewArsenalCmp() ArsenalCmp {
 		full:      full,
 		pm:        pm,
 		status:    st,
+		built:     toolbox.BuiltIn(),
+		platform:  runtime.GOOS + "-" + runtime.GOARCH,
 		selected:  map[string]bool{},
 		pricing:   map[string]arsenal.Cost{},
 		linkSpeed: assumedLinkKBps,
@@ -348,7 +358,7 @@ func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.notice = ""
 		switch msg.String() {
 		case "esc", "q":
-			if m.view == viewSeries {
+			if m.view == viewSeries || m.view == viewBuiltIn {
 				return m, util.CmdHandler(CloseArsenalMsg{})
 			}
 			m.back()
@@ -359,8 +369,15 @@ func (m ArsenalCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "down", "j":
 			m.move(1)
 			return m, nil
-		case "enter", "right", "l":
+		case "b":
+			if m.view == viewSeries || m.view == viewEntries {
+				m.view, m.scrollTop = viewBuiltIn, 0
+			}
+			return m, nil
+		case "enter", "right", "l", "tab":
 			switch m.view {
+			case viewBuiltIn:
+				m.view, m.scrollTop = viewSeries, 0
 			case viewSeries:
 				m.view, m.entryIdx, m.scrollTop = viewEntries, 0, 0
 			case viewEntries:
@@ -493,7 +510,7 @@ func (m *ArsenalCmp) move(d int) {
 		if s, ok := m.currentSeries(); ok {
 			m.entryIdx = clampInt(m.entryIdx+d, 0, len(s.Entries)-1)
 		}
-	case viewDetail, viewPlan:
+	case viewDetail, viewPlan, viewBuiltIn:
 		// GORILLA FIX (2026-10-05): the plan was missing here. A plan longer
 		// than the screen showed "... more line(s) — down to continue" and
 		// down did nothing, so the install command at the bottom — the one
@@ -834,6 +851,7 @@ func (m ArsenalCmp) seriesLines() []arsLine {
 		arsLine{"mute", "up/down move | enter open | space take this series | a everything | n none"},
 		arsLine{"mute", m.actionHint("esc close")},
 		arsLine{"mute", askHint},
+		arsLine{"mute", fmt.Sprintf("b the %d built-in helpers, ready now (nothing to install)", m.builtInCount())},
 		arsLine{"", ""})
 
 	for i, s := range m.man.Series {
@@ -1139,6 +1157,8 @@ func (m ArsenalCmp) lines() []arsLine {
 		return m.fit(m.detailLines())
 	case viewPlan:
 		return m.fit(m.planLines())
+	case viewBuiltIn:
+		return m.fit(m.builtInLines())
 	}
 	return m.fit(m.seriesLines())
 }

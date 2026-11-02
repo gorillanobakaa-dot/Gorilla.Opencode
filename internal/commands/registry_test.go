@@ -214,3 +214,28 @@ func TestEveryPaletteCommandIsAlsoTypeable(t *testing.T) {
 		}
 	}
 }
+
+// The commands below are named here on purpose: each must be in the registry, typeable (a dispatch case in the
+// TUI) and explain itself. Adding a command means adding its name to this list; `fieldkit integration check`
+// fails until it is there.
+func TestListedCommandsAreRegisteredDispatchedAndExplained(t *testing.T) {
+	listed := []string{
+		"arsenal", "clear", "plain", "review", "port", "resume", "sessions", "copy", "export", "add-dir",
+		"connect", "purge", "update", "connection", "providers", "login", "logout", "usage", "context",
+		"settings", "prompts", "reset", "compact", "init", "mode", "yolo", "tasks",
+	}
+	dispatched := dispatchedNames(t)
+	for _, n := range listed {
+		c := ByName(n)
+		if c == nil {
+			t.Errorf("/%s is not in the registry", n)
+			continue
+		}
+		if c.Summary == "" {
+			t.Errorf("/%s has no summary, so /help cannot say what it does", n)
+		}
+		if !slices.Contains(dispatched, c.Name) {
+			t.Errorf("/%s is registered but the TUI has no case for it", n)
+		}
+	}
+}

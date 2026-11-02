@@ -51,6 +51,10 @@ type loadoutDialogCmp struct {
 	usageCacheCreate int64
 	usageReported    bool
 
+	// arsenalText is the "N built-in helpers, M installable" line, measured on
+	// first draw and kept while the dialog is open.
+	arsenalText string
+
 	selectedIdx int
 	termWidth   int
 	// GORILLA OVERRIDE: the terminal HEIGHT, which this dialog previously never
@@ -209,6 +213,15 @@ func (m *loadoutDialogCmp) SetLastUsage(input, cacheRead, cacheCreate int64, rep
 }
 
 func NewLoadoutDialogCmp() LoadoutDialog { return &loadoutDialogCmp{} }
+
+// arsenalLine is the built-in / installable count (W6), looked up once per open.
+func (m *loadoutDialogCmp) arsenalLine() string {
+	if m.arsenalText == "" {
+		b, i := ArsenalCounts()
+		m.arsenalText = ArsenalCountsLine(b, i)
+	}
+	return m.arsenalText
+}
 
 func (m *loadoutDialogCmp) Init() tea.Cmd { return nil }
 
@@ -708,7 +721,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	if !compact {
 		// The subtitle and the context-size line explain; they are not state you
 		// act on, so they are the first to go on a short terminal.
-		parts = append(parts, sub, fixed, accuracy, cache)
+		parts = append(parts, sub, fixed, accuracy, cache, base.Foreground(t.TextMuted()).Width(w).Render(fitLine(m.arsenalLine())))
 		// GORILLA OVERRIDE (2026-09-01): the advice goes AFTER the estimate
 		// caveat and before the blank line, so it reads as the conclusion of the
 		// header rather than as another statistic. It is already conditional on

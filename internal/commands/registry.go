@@ -124,7 +124,7 @@ var All = []Command{
 		Name:    "arsenal",
 		Aliases: []string{"tools"},
 		Group:   GroupTuning,
-		Summary: "What this agent can do here, what it could do, and the cost.",
+		Summary: "Built-in tools, what else you can add, and the cost.",
 		// GORILLA FIX (2026-10-05), from the /arsenal audit (A3, A7, A8). Four
 		// sentences here were not true. "About thirty tools" was a typed count
 		// (the screen counts them itself, so the help no longer does).
@@ -134,7 +134,8 @@ var All = []Command{
 		// Windows, where Scoop reports no size. And "it prints the exact command
 		// into the conversation" described the ? key only, which was printed
 		// nowhere; the command is shown on the page's own install plan.
-		Detail: "A map of capabilities, not a chat answer. It checks THIS machine for the tools " +
+		Detail: "Opens on what is BUILT IN and ready now (file tools, search, archives, video and picture converters), each with its version and what it is for, then the tools you can add, with the exact command for your system.\n\n" +
+			"A map of capabilities, not a chat answer. It checks THIS machine for the tools " +
 			"behind each one — reading PDFs and scanned pages, taking audio and video apart, " +
 			"opening firmware and disk images, inspecting Android apps, looking up who owns a " +
 			"domain — and shows what is already here, what is not, and the exact command to " +

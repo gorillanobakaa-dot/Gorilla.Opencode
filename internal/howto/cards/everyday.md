@@ -11,4 +11,6 @@ The common jobs, with the tool that is already here. The "Helpers here" block of
     magick in.png out.webp                         # convert a picture (ffmpeg -i in.png out.webp if no magick)
     tesseract scan.png out                         # OCR: text goes to out.txt, only when tesseract is listed
 
+Built in (carried inside this program, nothing to install; `/arsenal` lists them with versions): coreutils, 7za, ffmpeg, ffprobe, cwebp, avifenc, oxipng, ast-grep, difft, hyperfine, ninja, sd, pfind. `/arsenal` marks the ones missing on your system; on macOS ffmpeg and ffprobe need macOS 11.
+
 When a name is not in the "Helpers here" block it is not installed: do not search the web for it, use the nearest one.

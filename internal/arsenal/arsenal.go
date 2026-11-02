@@ -97,6 +97,10 @@ type Entry struct {
 	Packages map[string][]string `json:"packages"`
 	Needs    Needs               `json:"needs"`
 	Tier     string              `json:"tier"`
+	// Carried marks an entry whose program ships inside Gorilla OpenCode and has no system package
+	// (pfind). TestEveryEntryIsAvailableOnAtLeastOnePackageManager accepts it only when every
+	// detect binary is really in internal/toolbox/SHA256SUMS, so the claim is checked, not trusted.
+	Carried bool `json:"carried,omitempty"`
 	// Caveats is the field most tools' own documentation omits and the one a
 	// user most needs: what will disappoint you about this. It is the
 	// difference between a catalogue and honest advice.
@@ -420,7 +424,13 @@ const (
 	// has it, as bind) and `whois` (scoop does not) - 24 of the 34 entries have
 	// one, and the ten that do not are left absent so UnavailableNote can say
 	// so honestly rather than offering a name that does not resolve.
-	Scoop   PackageManager = "scoop"
+	Scoop PackageManager = "scoop"
+	// GORILLA (2026-11-01, W6): the managers the owner named for each system, so
+	// the line shown is the one that works there: winget on Windows, dnf on
+	// Fedora-family Linux, brew on macOS.
+	Winget  PackageManager = "winget"
+	DNF     PackageManager = "dnf"
+	Brew    PackageManager = "brew"
 	Unknown PackageManager = ""
 )
 
@@ -442,10 +452,22 @@ func detectPackageManager(lookPath func(string) (string, error)) PackageManager 
 				return Scoop
 			}
 		}
+		if _, err := lookPath("winget"); err == nil {
+			return Winget
+		}
+		return Unknown
+	}
+	if goos == "darwin" {
+		if _, err := lookPath("brew"); err == nil {
+			return Brew
+		}
 		return Unknown
 	}
 	if _, err := lookPath("apt-get"); err == nil {
 		return APT
+	}
+	if _, err := lookPath("dnf"); err == nil {
+		return DNF
 	}
 	if _, err := lookPath("pacman"); err == nil {
 		return Pacman
@@ -552,6 +574,17 @@ func InstallCommands(pkgs []string, pm PackageManager) []string {
 		return []string{"sudo apt-get install -y " + strings.Join(pkgs, " ")}
 	case Pacman:
 		return []string{"sudo pacman -S --needed " + strings.Join(pkgs, " ")}
+	case DNF:
+		return []string{"sudo dnf install -y " + strings.Join(pkgs, " ")}
+	case Brew:
+		return []string{"brew install " + strings.Join(pkgs, " ")}
+	case Winget:
+		// winget takes one id per command.
+		var out []string
+		for _, p := range pkgs {
+			out = append(out, "winget install --id "+p+" -e")
+		}
+		return out
 	case Scoop:
 		// No sudo: Scoop installs into the user's own profile, which is the
 		// reason it was chosen over winget and choco. A package written
@@ -875,4 +908,43 @@ func LoadTagfile(path string, m Manifest) (ids []string, unknown []string, err e
 		}
 	}
 	return ids, unknown, nil
+}
+
+// OSManager is the package manager a person on the running operating system
+// would use, whether or not it is here: winget, apt, brew.
+func OSManager(pm PackageManager) PackageManager {
+	if pm != Unknown {
+		return pm
+	}
+	switch goos {
+	case "windows":
+		return Winget
+	case "darwin":
+		return Brew
+	}
+	return APT
+}
+
+// ShowCommands is the command line(s) that fetch an entry on this system, for
+// display only: winget (else scoop) on Windows, brew on macOS, the detected
+// manager (else apt, dnf, pacman) on Linux. nil when the entry has no package
+// for any of them.
+func ShowCommands(e Entry, pm PackageManager) []string {
+	// Windows and macOS have one usual manager each (winget, brew); Linux has the
+	// one this machine runs.
+	var cands []PackageManager
+	switch goos {
+	case "windows":
+		cands = []PackageManager{Winget, Scoop}
+	case "darwin":
+		cands = []PackageManager{Brew}
+	default:
+		cands = []PackageManager{pm, APT, DNF, Pacman}
+	}
+	for _, c := range cands {
+		if pkgs := PackagesFor(e, c); c != Unknown && len(pkgs) > 0 {
+			return InstallCommands(pkgs, c)
+		}
+	}
+	return nil
 }

@@ -97,6 +97,30 @@ func (f Facts) HelperBlock() string {
 	if f.has("ffmpeg") {
 		add("extract audio", "ffmpeg -i clip.mp4 -vn out.mp3")
 	}
+	if f.has("pfind") {
+		add("find files by name", "pfind PATTERN DIR")
+	}
+	if f.has("ast-grep") {
+		add("search code by syntax", "ast-grep -p 'foo($A)' DIR")
+	}
+	if f.has("difft") {
+		add("compare two files", "difft a.go b.go")
+	}
+	if f.has("sd") {
+		add("replace text", "sd 'old' 'new' f.txt")
+	}
+	if f.has("ninja") {
+		add("build", "ninja -C build")
+	}
+	if f.has("hyperfine") {
+		add("time a command", "hyperfine 'cmd'")
+	}
+	if f.has("coreutils") {
+		add("ls / sort / wc anywhere", "coreutils ls -l")
+	}
+	if px := f.first("cwebp", "avifenc", "oxipng"); px != "" {
+		add("shrink pictures", "cwebp in.png -o out.webp ; avifenc in.png out.avif ; oxipng f.png")
+	}
 	if len(rows) == 0 {
 		return ""
 	}

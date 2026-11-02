@@ -583,7 +583,7 @@ func (m *commandHelpCmp) renderAt(listRows int, withDetail, withSubtitle bool) s
 		// know a reference is scrollable reads the bottom row as the end of the
 		// program's abilities. The count is the honest fix: "of 43" tells you
 		// there is more without needing a scrollbar to be noticed.
-		sub := "type / to search | up/down to read | esc to close"
+		sub := "/arsenal shows the tools | type / to search | up/down to read | esc to close"
 		if n := m.commandCount(); n > 0 {
 			shown := min(m.visibleRows(), len(m.rows)-m.scrollTop)
 			pos := "showing " + itoa(shown) + " of " + itoa(len(m.rows)) + " lines, " + itoa(n) + " commands"
@@ -591,7 +591,7 @@ func (m *commandHelpCmp) renderAt(listRows int, withDetail, withSubtitle bool) s
 			if m.columns() > 1 {
 				nav = "up/down to read | tab for the other column"
 			}
-			sub = pos + " | " + nav + " | / to search | esc to close"
+			sub = pos + " | " + nav + " | / to search | /arsenal: tools | esc to close"
 		}
 		if searching {
 			sub = "search: " + m.filter + "_"

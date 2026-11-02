@@ -215,3 +215,35 @@ go version -m gorilla-opencode.exe | grep tags
 
 - `costWarningModels` in `cmd/cost_warning.go` is a hand list beside `prices.json`; a new Claude model needs a line there.
 - Carried: the Windows exe is unsigned.
+
+<!-- helpers:begin -->
+
+### What is built in
+
+Carried inside the program and checked by hash before every run. Nothing to install. A dash means that system does not carry it. On macOS, ffmpeg and ffprobe are 8.0 and need macOS 11 (third_party/PINS.md).
+
+| Helper | Version | Windows | Linux | macOS |
+|---|---|---|---|---|
+| 7za | 26.04 | yes | yes | yes |
+| ast-grep | 0.50.0 | yes | yes | yes |
+| avifenc | v1.4.2 | yes | yes | yes |
+| coreutils | 0.12.0 | yes | yes | yes |
+| cwebp | 1.6.0 | yes | yes | yes |
+| difft | 0.71.0 | yes | yes | yes |
+| ffmpeg | 7.0.2 | yes | yes | yes |
+| ffprobe | 7.0.2 | yes | yes | yes |
+| hyperfine | v2.0.0 | yes | yes | yes |
+| ninja | v1.13.2 | yes | yes | yes |
+| oxipng | v10.2.1 | yes | yes | yes |
+| pfind | 4.0.0 | yes | yes | yes |
+| sd | v1.1.0 | yes | yes | yes |
+
+Not carried, but known: `/arsenal` finds them on your machine and prints the line to install them.
+
+| Program | Windows | Linux | macOS |
+|---|---|---|---|
+| Read text out of images and screenshots (OCR) (tesseract) | `winget install UB-Mannheim.TesseractOCR` | `sudo apt install tesseract-ocr tesseract-ocr-eng` | `brew install tesseract` |
+| Prepare an image so OCR can actually read it (imagemagick) | `winget install ImageMagick.ImageMagick` | `sudo apt install imagemagick` | `brew install imagemagick` |
+| PowerToys: screen text grabber, window layouts, file search (powertoys) | `winget install Microsoft.PowerToys` | not available on Linux | not available on macOS |
+
+<!-- helpers:end -->
