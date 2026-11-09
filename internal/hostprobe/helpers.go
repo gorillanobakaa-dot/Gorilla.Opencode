@@ -63,6 +63,9 @@ func (f Facts) HelperBlock() string {
 	if f.has("rg") {
 		add("grep", "rg -n WORD DIR")
 	}
+	if f.has("fd") {
+		add("find by name", "fd PATTERN DIR ; fd -e go")
+	}
 	add("zip", "files tool, action=archive")
 	if x := f.first("7za", "7z", "7zz"); x != "" {
 		add("7z", x+" a out.7z DIR ; "+x+" x in.7z -oDIR")

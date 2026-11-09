@@ -73,3 +73,20 @@ df3f1e3facdc1ae0ad0bd898cdfb072fbc9641bf47b11f172844525a05db8d11  darwin-amd64/f
 73f4582c1c7b287e21cbf42762c830df2751240ec78ce931483853ab6688f232  darwin-amd64/cwebp
 9cc4ecc3260d0d053a14c38da54d9047e4bae647614c18f74a6aa7126501d474  darwin-amd64/avifenc
 b9f6bace13541441cd6dc9f3f80695f9dbf94db89c4f51209214d14936ae71c6  darwin-amd64/oxipng
+#
+# P5 stage 3a (2026-11-09): ripgrep, fd, jq on all three systems, same names. Official release files from each project's
+# GitHub release, a fixed version, not built here; scripts/fetch-toolbox-extras.sh downloads them and refuses any other
+# bytes. rg = ripgrep 15.2.0 (MIT / Unlicense), fd = fd 10.5.0 (MIT / Apache-2.0; 10.5.1 and 10.5.2 are under 14 days
+# old), jq = jq 1.8.2 (MIT). Windows: x86_64-pc-windows-msvc (jq: jq-windows-amd64.exe); Linux: x86_64-unknown-linux-musl
+# (jq: jq-linux-amd64); macOS: x86_64-apple-darwin (jq: jq-macos-amd64, which needs macOS 14: mac_min in helpers.json).
+# Archive hashes in the fetch script; sources and licences in third_party/PINS.md. Windows files run (--version); the
+# Linux and macOS files were NOT run here (headers only).
+14231169855ec5205cf5a1b6f1db358ff4aed4247c86b69ce8aae647c77f6680  windows-amd64/rg.exe
+d67d27a8e375ed7e9bca2b506a9dd5082bc24547aeba908b863f6f8b8ab0c3b9  windows-amd64/fd.exe
+a6fc67fedaf9128a3309a1e2ebb8b986aeccf70122ee46d2cb4849e423f0c627  windows-amd64/jq.exe
+e62198eb19b136b88c330af83647b5a962cb99b6b1f066758568f12de1974849  linux-amd64/rg
+e79642a479d2816c887047476bbe6ad229465f30de031033574dee2a095e0037  linux-amd64/fd
+b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f  linux-amd64/jq
+0c9a0066db0d26b640777db88045b0ccdd58509a746700e43e1c4ff8707a5ed0  darwin-amd64/rg
+7ca13c0959482c381a4de9b85fe8bef4233ab7e5232761e958ed0df3583baa89  darwin-amd64/fd
+e94b266e3c26690550006abe63152b782280f4e14374accdf04cbde844f00bc0  darwin-amd64/jq
