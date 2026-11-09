@@ -590,6 +590,10 @@ func initLoadout() {
 	})
 }
 
+// localTrimOffKey records, in the same saved file, that the owner switched the
+// automatic local-model trim off (GORILLA, P22). Not a component: it has no row.
+const localTrimOffKey = "local_trim_off"
+
 // LoadoutEnabled reports whether a component is currently on. Unknown ids
 // default to enabled so a new component is never silently dropped.
 func LoadoutEnabled(id string) bool {
@@ -598,6 +602,11 @@ func LoadoutEnabled(id string) bool {
 	defer loadoutMu.RUnlock()
 	v, ok := loadoutState[id]
 	if !ok {
+		return true
+	}
+	// GORILLA (P22): a local model gets deferred tool loading while the row is
+	// still at its default. See localtrim.go.
+	if id == ToolSearchComponentID && !v && !loadoutState[localTrimOffKey] && LocalTrimActive() {
 		return true
 	}
 	return v
@@ -620,6 +629,15 @@ func ToggleLoadout(id string) {
 	cur, ok := loadoutState[id]
 	if !ok {
 		cur = true
+	}
+	if id == ToolSearchComponentID && !cur && LocalTrimActive() {
+		// What the owner SEES is the local trim (row shown on). Pressing the key
+		// means "off": remembered as the opt-out, and pressed again it hands the
+		// row back to the automatic rule.
+		loadoutState[localTrimOffKey] = !loadoutState[localTrimOffKey]
+		loadoutMu.Unlock()
+		saveLoadout()
+		return
 	}
 	loadoutState[id] = !cur
 	loadoutMu.Unlock()
@@ -686,6 +704,7 @@ func LSPLoadoutCounts() (on, off int) {
 func ResetLoadout() {
 	initLoadout()
 	loadoutMu.Lock()
+	delete(loadoutState, localTrimOffKey)
 	for _, c := range LoadoutComponents {
 		loadoutState[c.ID] = c.Default
 	}
