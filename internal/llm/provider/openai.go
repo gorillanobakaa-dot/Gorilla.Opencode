@@ -400,12 +400,16 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 	eventChan := make(chan ProviderEvent)
 
 	go func() {
+		// GORILLA (P22): once per model, before the first request.
+		ensureTuned(ctx, o.providerOptions.model.ID, modelID)
 		for {
 			attempts++
 			// GORILLA OVERRIDE: ask the server to emit its reasoning. Measured:
 			// without this, GLM-5.2 on NIM streams only [content, role] and the
 			// reasoning reader below never fires. See reasoning.go.
 			reqOpts := append(o.cacheOptions(), thinkingRequestOptions(modelID, local)...)
+			// GORILLA (P22): a model on this machine keeps its prompt prefix cached.
+			reqOpts = append(reqOpts, localPromptCache(o.providerOptions.model.ID)...)
 
 			// GORILLA OVERRIDE: guard against the answer starting and then
 			// stopping — headers arrived, so no header timeout can fire, and the
