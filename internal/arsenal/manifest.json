@@ -117,7 +117,45 @@
             "network_at_runtime": false
           },
           "tier": "MINIMUM",
-          "caveats": "It respects .gitignore by default, which is usually what you want and occasionally hides the file you are looking for."
+          "caveats": "It respects .gitignore by default, which is usually what you want and occasionally hides the file you are looking for. It is also carried inside Gorilla OpenCode on Windows, Linux and macOS, so nothing needs installing; the package line only gets you the system-wide copy."
+        },
+        {
+          "id": "fd",
+          "title": "Find files by name, fast",
+          "teaches": "fd finds files and folders by name across a tree, skipping what .gitignore excludes. It is the quick way to answer where a file lives; ripgrep is for the text inside files.",
+          "unlocks": [
+            "fast find-by-name on big trees",
+            "list every file of one kind"
+          ],
+          "detect": {
+            "binaries": [
+              "fd"
+            ]
+          },
+          "packages": {
+            "apt": [
+              "fd-find"
+            ],
+            "pacman": [
+              "fd"
+            ],
+            "scoop": [
+              "fd"
+            ],
+            "brew": [
+              "fd"
+            ],
+            "winget": [
+              "sharkdp.fd"
+            ]
+          },
+          "needs": {
+            "account": false,
+            "card": false,
+            "network_at_runtime": false
+          },
+          "tier": "NICE",
+          "caveats": "It hides ignored and hidden files by default. On Debian and Ubuntu the system package installs the program as fdfind. It is also carried inside Gorilla OpenCode on Windows, Linux and macOS, so nothing needs installing; the package line only gets you the system-wide copy."
         },
         {
           "id": "sqlite3",

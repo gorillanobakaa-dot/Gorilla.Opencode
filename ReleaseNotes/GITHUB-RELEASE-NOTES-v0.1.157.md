@@ -230,12 +230,15 @@ Carried inside the program and checked by hash before every run. Nothing to inst
 | coreutils | 0.12.0 | yes | yes | yes |
 | cwebp | 1.6.0 | yes | yes | yes |
 | difft | 0.71.0 | yes | yes | yes |
+| fd | v10.5.0 | yes | yes | yes |
 | ffmpeg | 7.0.2 | yes | yes | yes |
 | ffprobe | 7.0.2 | yes | yes | yes |
 | hyperfine | v2.0.0 | yes | yes | yes |
+| jq | jq-1.8.2 | yes | yes | yes |
 | ninja | v1.13.2 | yes | yes | yes |
 | oxipng | v10.2.1 | yes | yes | yes |
 | pfind | 4.0.0 | yes | yes | yes |
+| rg | 15.2.0 | yes | yes | yes |
 | sd | v1.1.0 | yes | yes | yes |
 
 Not carried, but known: `/arsenal` finds them on your machine and prints the line to install them.
