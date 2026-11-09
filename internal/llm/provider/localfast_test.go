@@ -2,6 +2,7 @@ package provider
 
 import (
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/opencode-ai/opencode/internal/llm/models"
@@ -24,6 +25,9 @@ func TestPromptCacheIsAskedOnlyOfAModelOnThisMachine(t *testing.T) {
 }
 
 func TestTuneRunsOncePerModelAndNeverForRemote(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fieldkit stub is a shell script; Windows lookup of it is covered by exec.LookPath, not by this stub")
+	}
 	restore := models.IsolateLocalEndpointsForTest()
 	defer restore()
 	models.RegisterLocalRouteForTest("local.p22-z", "http://127.0.0.1:1234/v1", "")
