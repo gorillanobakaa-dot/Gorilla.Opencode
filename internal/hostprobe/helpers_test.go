@@ -34,7 +34,7 @@ func TestHelperBlockNamesOnlyWhatIsPresent(t *testing.T) {
 			t.Errorf("block lacks %q:\n%s", want, b)
 		}
 	}
-	for _, not := range []string{"ffmpeg", "tesseract", "magick", "jq ", "7z a"} {
+	for _, not := range []string{"ffmpeg", "tesseract scan", "magick in", "jq '", "7z a"} {
 		if strings.Contains(b, not) {
 			t.Errorf("block names absent helper %q:\n%s", not, b)
 		}
@@ -52,7 +52,7 @@ func TestHelperBlockStaysUnderBudgetWithEverything(t *testing.T) {
 }
 
 func TestHelperBlockHasTheSameShapeOnWindowsAndLinux(t *testing.T) {
-	all := []string{"7za", "ffmpeg", "ffprobe", "magick", "tesseract", "jq", "tail", "sha256sum"}
+	all := []string{"7za", "ffmpeg", "ffprobe", "magick", "tesseract", "jq", "tail", "sha256sum", "curl"}
 	w := shape(Facts{OS: "windows", PathTools: all}.HelperBlock())
 	l := shape(Facts{OS: "linux", PathTools: all}.HelperBlock())
 	if w != l {
@@ -82,6 +82,71 @@ func TestHelperBlockNamesEachCarriedHelperWhenPresent(t *testing.T) {
 		}
 		if without := (Facts{OS: "linux"}).HelperBlock(); strings.Contains(without, n+" ") {
 			t.Errorf("%s is absent but the block names it:\n%s", n, without)
+		}
+	}
+}
+
+// P5 stage 2 (2026-11-09): the 13 everyday jobs of `fieldkit accept`. Each job names the row label that must
+// teach it on a machine that has everything, on both systems.
+var acceptJobRows = map[string]string{
+	"see-file": "read a file", "delete-file": "delete (to trash)", "move-file": "list / info / delete (to trash) / move",
+	"tail-file": "tail / follow", "find-file": "search text or names", "grep-text": "search text or names",
+	"unzip": "unzip all", "json-read": "JSON", "json-edit": "JSON", "download": "download",
+	"image-convert": "image convert", "ocr": "OCR", "probe-video": "probe a video",
+}
+
+func TestEveryAcceptJobHasARowOnBothSystems(t *testing.T) {
+	all := []string{"7za", "ffmpeg", "ffprobe", "magick", "tesseract", "jq", "tail", "sha256sum", "curl", "rg"}
+	for _, os := range []string{"windows", "linux"} {
+		b := Facts{OS: os, Toolbox: all}.HelperBlock()
+		for job, label := range acceptJobRows {
+			if !strings.Contains(b, label) && !strings.Contains(b, strings.ReplaceAll(label, "delete (to trash) / move", "list / info / delete (to trash) / move")) {
+				t.Errorf("%s: job %s has no row %q:\n%s", os, job, label, b)
+			}
+		}
+	}
+}
+
+// A helper added to helpers.json without an example row in the block fails here; a name in the block that is not
+// in the catalog is not a bundled helper.
+func TestEveryCatalogHelperIsNamedAndNothingElseIsClaimedBundled(t *testing.T) {
+	cat, err := toolbox.Catalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, h := range cat {
+		names = append(names, h.Name)
+	}
+	for _, os := range []string{"windows", "linux"} {
+		b := Facts{OS: os, Toolbox: names}.HelperBlock()
+		for _, n := range names {
+			if !strings.Contains(b, n) {
+				t.Errorf("%s: catalog helper %s is bundled but the block does not name it", os, n)
+			}
+		}
+	}
+	// ImageMagick, Tesseract, jq, rg, curl, exiftool are not bundled: with an empty toolbox and PATH they are
+	// said to be absent, never offered as a row.
+	b := Facts{OS: "linux"}.HelperBlock()
+	for _, n := range []string{"magick ", "tesseract scan", "jq '", "rg -n", "curl -L", "exiftool -a"} {
+		if strings.Contains(b, n) {
+			t.Errorf("absent program offered: %q\n%s", n, b)
+		}
+	}
+	for _, n := range []string{"jq", "rg", "tesseract", "ImageMagick", "curl/wget", "exiftool"} {
+		if !strings.Contains(b, n) || !strings.Contains(b, "not installed") {
+			t.Errorf("bare Linux block does not say %s is absent:\n%s", n, b)
+		}
+	}
+}
+
+func TestPresentProgramsLeaveTheAbsentLine(t *testing.T) {
+	b := Facts{OS: "linux", PathTools: []string{"jq", "magick", "curl"}}.HelperBlock()
+	line := b[strings.Index(b, "not installed"):]
+	for _, n := range []string{"jq", "ImageMagick", "curl"} {
+		if strings.Contains(line, n) {
+			t.Errorf("%s is present but listed as not installed: %s", n, line)
 		}
 	}
 }

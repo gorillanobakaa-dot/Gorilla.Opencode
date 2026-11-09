@@ -13,11 +13,11 @@ import (
 // here is not named, and the shape is the same on Windows and Linux.
 
 // HelperBudget is the most bytes HelperBlock may take.
-const HelperBudget = 1500
+const HelperBudget = 2300
 
 // pathCandidates are the helper programs the probe looks for on PATH.
 var pathCandidates = []string{"7za", "7z", "7zz", "ffmpeg", "ffprobe", "magick", "convert", "tesseract", "jq", "rg",
-	"tail", "sha256sum", "pfind"}
+	"tail", "sha256sum", "pfind", "curl", "wget", "unzip", "exiftool"}
 
 func lookPathTools() []string {
 	var out []string
@@ -60,20 +60,38 @@ func (f Facts) HelperBlock() string {
 	add("list / info / delete (to trash) / move", "files tool, action=list|info|delete|move")
 	add("read a file", "view tool")
 	add("search text or names", "find tool (query=..., regex ok)")
+	if f.has("rg") {
+		add("grep", "rg -n WORD DIR")
+	}
 	add("zip", "files tool, action=archive")
 	if x := f.first("7za", "7z", "7zz"); x != "" {
 		add("7z", x+" a out.7z DIR ; "+x+" x in.7z -oDIR")
+		add("unzip all", x+" x in.zip -oout")
+	} else if win {
+		add("unzip all", "Expand-Archive in.zip -DestinationPath out")
+	} else if f.has("unzip") {
+		add("unzip all", "unzip in.zip -d out")
 	}
 	switch {
 	case win:
 		add("tail / follow", "Get-Content app.log -Tail 30 -Wait")
 	case f.has("tail"):
 		add("tail / follow", "tail -n 30 -f app.log")
+	case f.has("coreutils"):
+		add("tail / follow", "coreutils tail -n 30 -f app.log")
 	}
 	if j := f.first("jq"); j != "" {
-		add("JSON", "jq '.key' f.json")
+		add("JSON", "jq '.key' f.json ; jq '.n=7' f.json > t && mv t f.json")
 	} else if win {
-		add("JSON", "Get-Content f.json -Raw | ConvertFrom-Json")
+		add("JSON", "$j=Get-Content f.json -Raw|ConvertFrom-Json; $j.n=7; $j|ConvertTo-Json -Depth 9|Set-Content f.json")
+	}
+	switch {
+	case win:
+		add("download", "Invoke-WebRequest URL -OutFile f.txt")
+	case f.has("curl"):
+		add("download", "curl -L -o f.txt URL")
+	case f.has("wget"):
+		add("download", "wget -O f.txt URL")
 	}
 	switch {
 	case win:
@@ -121,8 +139,33 @@ func (f Facts) HelperBlock() string {
 	if px := f.first("cwebp", "avifenc", "oxipng"); px != "" {
 		add("shrink pictures", "cwebp in.png -o out.webp ; avifenc in.png out.avif ; oxipng f.png")
 	}
+	if f.has("exiftool") {
+		add("photo metadata", "exiftool -a f.jpg")
+	}
 	if len(rows) == 0 {
 		return ""
 	}
+	if gone := f.missing(); len(gone) > 0 {
+		rows = append(rows, "- not installed (never search the web for them, use the nearest row above): "+strings.Join(gone, ", "))
+	}
 	return "Helpers here (before any web search, read the how-to card everyday):\n" + strings.Join(rows, "\n")
+}
+
+// missing names the everyday programs a job could reach for that are neither
+// embedded nor on PATH. The names are fixed, so the line is as stable as the
+// probe.
+func (f Facts) missing() []string {
+	var gone []string
+	for _, n := range []string{"jq", "rg", "exiftool", "tesseract"} {
+		if !f.has(n) {
+			gone = append(gone, n)
+		}
+	}
+	if !f.has("magick") && !f.has("convert") {
+		gone = append(gone, "ImageMagick")
+	}
+	if f.OS != "windows" && !f.has("curl") && !f.has("wget") {
+		gone = append(gone, "curl/wget")
+	}
+	return gone
 }
