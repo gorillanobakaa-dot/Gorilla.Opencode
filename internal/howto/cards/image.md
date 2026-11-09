@@ -1,9 +1,10 @@
 # Pictures: convert, resize, compress, OCR, metadata (how-to)
 
 Never overwrite the original: always write a new file name, then look at the result (size, and the picture itself).
-Toolbox programs (cwebp, avifenc, oxipng) are called by name. `magick` (ImageMagick 7) and `tesseract` are NOT in the
-toolbox: check with `magick -version` / `tesseract --version`; if missing, a person installs them (Windows:
-`scoop install imagemagick tesseract`; Debian/Ubuntu: `sudo apt install imagemagick tesseract-ocr`).
+Toolbox programs (cwebp, avifenc, oxipng) are called by name. `magick` (ImageMagick 7), `tesseract` and `exiftool` are
+NOT in the toolbox (no official one-file build for both systems: third_party/PINS.md): check with `magick -version` /
+`tesseract --version` / `exiftool -ver`; if missing, a person installs them (Windows: `scoop install imagemagick
+tesseract exiftool`; Debian/Ubuntu: `sudo apt install imagemagick tesseract-ocr libimage-exiftool-perl`).
 JPEG has no toolbox encoder (mozjpeg ships no official binary for both systems): use `magick ... -quality 82`.
 
     # convert
@@ -32,5 +33,7 @@ JPEG has no toolbox encoder (mozjpeg ships no official binary for both systems):
     magick identify -verbose photo.jpg                   # everything, long
     magick photo.jpg -strip clean.jpg                    # copy without EXIF/GPS/ICC (GPS = where it was taken)
     oxipng --strip all in.png --out clean.png            # the same for a PNG, lossless
+    exiftool -a -G1 photo.jpg                            # (if present) every tag with its group, the fullest reader
+    exiftool -all= -o clean.jpg photo.jpg                # (if present) copy with all metadata removed
 
 A phone photo's EXIF often holds the GPS position: strip it before a picture leaves the machine.

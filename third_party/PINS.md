@@ -176,6 +176,36 @@ offers a signature we check), so the pin is trust on first use of GitHub's diges
 telemetry (none of the three has any; they open no network connection). Licence texts: third_party/ripgrep,
 third_party/fd, third_party/jq.
 
+### P5 stage 3b (2026-11-09): ExifTool, Tesseract, ImageMagick, whisper.cpp - decided, NONE shipped
+
+Rule applied: a tool ships only if the project's own page offers a fixed-version build for windows-amd64 AND
+linux-amd64 (parity_test.go: Windows never gets a helper Linux lacks), as ONE file, because the embedded toolbox
+extracts each helper alone under `<hash>/<name>` (internal/toolbox/toolbox.go): no sibling DLL, `.so` or data folder
+is carried. No third-party rebuilds, no installer that needs admin. All four fail that test, so no pin, no
+`SHA256SUMS` line, no `helpers.json` entry. hostprobe already lists them under "not installed" (helpers.go) and the
+howto cards say how each system gets them (`image`: scoop / apt; `ffmpeg`: whisper line).
+
+| tool | official source | Windows | Linux | why not shipped | size (official download) |
+|---|---|---|---|---|---|
+| ExifTool 13.61 (Perl Artistic / GPL) | exiftool.org | `exiftool-13.61_64.zip`: `exiftool(-k).exe` plus the `exiftool_files` folder it needs beside it | `Image-ExifTool-13.61.tar.gz`: Perl source, needs a Perl interpreter | Windows is multi-file; Linux has no program at all, only Perl source. Shipping the Windows zip would give Windows what Linux lacks | not downloaded (not shipped) |
+| Tesseract 5.5.4 (Apache-2.0) | github.com/tesseract-ocr/tesseract (release 2026-10-28) | none from upstream; the setup program is UB Mannheim's, a third party | none from upstream (distro packages, snap) | upstream publishes no binary on either system (the release has 0 assets); the eng traineddata would be useless without the program | n/a |
+| ImageMagick 7 (ImageMagick licence) | imagemagick.org/script/download.php | portable folder (many DLLs) or setup program | AppImage (needs FUSE) | not one file per system; the P4b finding is kept. NOT re-checked today: the download page returned no readable file list to a script | not downloaded |
+| whisper.cpp (MIT) | github.com/ggml-org/whisper.cpp releases (CI tags `bNNNN`, e.g. b5454, 2026-10-06; the `v1.9.5` release has no assets) | `whisper-bin-x64.zip` 8.9 MB, sha256 6ba69e3482d7826214f90a6a9c84ca07782aec1e1d0c6a7c30c994fd5d816ccb: `whisper-cli.exe` + `whisper.dll`, `ggml*.dll` (9 CPU variants) | `whisper-bin-ubuntu-x64.tar.gz` 10.4 MB, sha256 a72becf15d7917f990f6313867a52638b82b7f9ef237fb0c980dac56a135781c: `whisper-cli` + `libwhisper.so`, `libggml*.so` (11 CPU variants) | both are shared-library layouts (list read with `unzip -l` / `tar -t`): the program does not run without its libraries, and the toolbox carries one file. Tags are CI builds, not a version | 8.9 MB / 10.4 MB, under 100 MB |
+
+whisper.cpp model: the smallest English model (`ggml-tiny.en.bin`, MIT, about 75 MB, from the project's own model page)
+would be allowed by licence and size, but without the program there is nothing to feed it; the `ffmpeg` card says a
+person fetches it. Nothing downloaded for ExifTool, Tesseract or ImageMagick; the two whisper archives were hashed and
+listed only (never run) and recycled afterwards.
+
+Threat model for these four (nothing is pulled, so the surface is none): no download at toolbox build, none at run time,
+no auto-update, no telemetry added. If one is added later: say who can act through the download, pin the archive
+hash, and turn off any phone-home at the source (whisper.cpp and ExifTool have none; ImageMagick can read remote
+URLs and delegates, which `policy.xml` would have to close).
+
+To ship one later it needs a toolbox that carries a helper folder (not only a file), or a statically linked official
+single-file build on both systems; then the usual pattern of stage 3a applies (fetch script, SHA256SUMS, helpers.json,
+licence folder, howto card, arsenal entry, parity_test.go).
+
 ## macOS twins (internal/toolbox, darwin-amd64 = Intel, goal parity-everywhere, 2026-11-01)
 
 The same 13 names as Windows and Linux, pinned as `darwin-amd64/<name>` in `internal/toolbox/SHA256SUMS`; macOS 10.13
