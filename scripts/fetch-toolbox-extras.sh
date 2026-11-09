@@ -100,7 +100,9 @@ cp "$d/jq-linux-amd64" "$out/linux-amd64/jq"
 cp "$d/jq-macos-amd64" "$out/darwin-amd64/jq"
 chmod +x "$out"/linux-amd64/* "$out"/darwin-amd64/*
 for p in windows-amd64/7za.exe windows-amd64/ffmpeg.exe windows-amd64/ffprobe.exe linux-amd64/7za linux-amd64/ffmpeg linux-amd64/ffprobe \
-         windows-amd64/cwebp.exe windows-amd64/avifenc.exe windows-amd64/oxipng.exe linux-amd64/cwebp linux-amd64/avifenc linux-amd64/oxipng \n         windows-amd64/rg.exe windows-amd64/fd.exe windows-amd64/jq.exe linux-amd64/rg linux-amd64/fd linux-amd64/jq \n         darwin-amd64/rg darwin-amd64/fd darwin-amd64/jq; do
+         windows-amd64/cwebp.exe windows-amd64/avifenc.exe windows-amd64/oxipng.exe linux-amd64/cwebp linux-amd64/avifenc linux-amd64/oxipng \
+         windows-amd64/rg.exe windows-amd64/fd.exe windows-amd64/jq.exe linux-amd64/rg linux-amd64/fd linux-amd64/jq \
+         darwin-amd64/rg darwin-amd64/fd darwin-amd64/jq; do
   pin=$(awk -v k="$p" '$2==k{print $1}' "$pins")
   got=$(sha256sum "$out/$p" | cut -d' ' -f1)
   [ "$pin" = "$got" ] || { echo "REFUSED $p: sha256 $got, pinned $pin" >&2; exit 1; }

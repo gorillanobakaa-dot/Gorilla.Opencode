@@ -126,7 +126,7 @@ func TestImageCardOfferedWithImageCodecsAndNamesTheTools(t *testing.T) {
 		}
 	}
 	card, _ := getFor(hostprobe.Facts{OS: "linux", Toolbox: []string{"cwebp"}}, "image")
-	for _, want := range []string{"cwebp", "avifenc", "oxipng", "magick", "tesseract", "-resize", "SSIM", "EXIF", "-strip"} {
+	for _, want := range []string{"cwebp", "avifenc", "oxipng", "magick", "tesseract", "-resize", "SSIM", "EXIF", "-strip", "exiftool"} {
 		if !strings.Contains(card, want) {
 			t.Errorf("image card lacks %q", want)
 		}
