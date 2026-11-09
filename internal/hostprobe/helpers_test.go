@@ -73,9 +73,9 @@ func TestHelperBlockOnBareLinuxNamesOnlyOwnTools(t *testing.T) {
 }
 
 // Every carried helper that has an example row in the block: pfind, ast-grep, difft, sd, ninja, hyperfine,
-// coreutils, cwebp, avifenc, oxipng. A helper that is not present is not named.
+// coreutils, cwebp, avifenc, oxipng, fd. A helper that is not present is not named.
 func TestHelperBlockNamesEachCarriedHelperWhenPresent(t *testing.T) {
-	for _, n := range []string{"pfind", "ast-grep", "difft", "sd", "ninja", "hyperfine", "coreutils", "cwebp", "avifenc", "oxipng"} {
+	for _, n := range []string{"pfind", "ast-grep", "difft", "sd", "ninja", "hyperfine", "coreutils", "cwebp", "avifenc", "oxipng", "fd"} {
 		with := Facts{OS: "linux", PathTools: []string{n}}.HelperBlock()
 		if !strings.Contains(with, n) {
 			t.Errorf("%s is present but the Helpers block does not name it:\n%s", n, with)
@@ -126,8 +126,8 @@ func TestEveryCatalogHelperIsNamedAndNothingElseIsClaimedBundled(t *testing.T) {
 			}
 		}
 	}
-	// ImageMagick, Tesseract, jq, rg, curl, exiftool are not bundled: with an empty toolbox and PATH they are
-	// said to be absent, never offered as a row.
+	// With an empty toolbox and PATH nothing is offered: jq and rg (bundled since P5 stage 3a) and the programs that
+	// are not bundled (ImageMagick, Tesseract, curl, exiftool) are said to be absent, never offered as a row.
 	b := Facts{OS: "linux"}.HelperBlock()
 	for _, n := range []string{"magick ", "tesseract scan", "jq '", "rg -n", "curl -L", "exiftool -a"} {
 		if strings.Contains(b, n) {
@@ -147,6 +147,26 @@ func TestPresentProgramsLeaveTheAbsentLine(t *testing.T) {
 	for _, n := range []string{"jq", "ImageMagick", "curl"} {
 		if strings.Contains(line, n) {
 			t.Errorf("%s is present but listed as not installed: %s", n, line)
+		}
+	}
+}
+
+// P5 stage 3a (2026-11-09): rg, fd and jq ship in the toolbox, so a machine with them embedded is offered all
+// three and does not hear them called "not installed".
+func TestBundledRgFdJqAreOfferedAndNotListedAbsent(t *testing.T) {
+	for _, os := range []string{"windows", "linux"} {
+		b := Facts{OS: os, Toolbox: []string{"rg", "fd", "jq"}}.HelperBlock()
+		for _, want := range []string{"rg -n WORD DIR", "fd PATTERN DIR", "jq '.key' f.json"} {
+			if !strings.Contains(b, want) {
+				t.Errorf("%s: bundled helper not offered, want %q:\n%s", os, want, b)
+			}
+		}
+		if i := strings.Index(b, "not installed"); i >= 0 {
+			for _, n := range []string{"jq", "rg"} {
+				if strings.Contains(b[i:], n) {
+					t.Errorf("%s: %s is bundled but listed as not installed: %s", os, n, b[i:])
+				}
+			}
 		}
 	}
 }

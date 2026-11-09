@@ -154,6 +154,28 @@ per-crate license notices of the helpers' own dependencies, and Linux/macOS embe
 
 Not built from source (unlike the table above): the upstream binaries are pinned by sha256 in `internal/toolbox/SHA256SUMS` and re-checked by `scripts/fetch-toolbox-extras.sh`. 7-Zip publishes no checksum or signature; its hashes are trust-on-first-use over HTTPS, measured 2026-10-31. The Linux executables ran only on the build machine's Windows side as files (not executed: no Linux run was made here).
 
+### P5 stage 3a additions (2026-11-09): ripgrep, fd, jq on Windows, Linux and macOS
+
+Official release files of each project's GitHub release, one fixed version, same names on all three systems
+(parity_test.go). Archive hashes: the digest GitHub shows for each asset, re-measured with `fieldkit size hash`
+(all matched); they are in `scripts/fetch-toolbox-extras.sh`, which refuses any other bytes and checks every
+extracted file against `internal/toolbox/SHA256SUMS`. Newest release at least 14 days old on 2026-11-09 (fd 10.5.1
+and 10.5.2 are from 2026-11-04 and 2026-11-07, so fd is 10.5.0). Windows `--version` runs exit 0; the Linux and
+macOS files were NOT run here (Mach-O headers read: x86_64, ripgrep and fd minimum macOS 10.12, jq 14.0).
+
+| tool | release | date | archive (sha256) | program |
+|---|---|---|---|---|
+| rg (ripgrep, MIT / Unlicense: third_party/ripgrep) | 15.2.0, github.com/BurntSushi/ripgrep | 2026-07-15 | ripgrep-15.2.0-x86_64-pc-windows-msvc.zip 71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5; ...-x86_64-unknown-linux-musl.tar.gz 33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c; ...-x86_64-apple-darwin.tar.gz af7825fcc69a2afc7a7aea55fc9af90e26421d8f20fe59df32e233c0b8a231c1 | rg(.exe) |
+| fd (MIT / Apache-2.0: third_party/fd) | v10.5.0, github.com/sharkdp/fd | 2026-08-26 | fd-v10.5.0-x86_64-pc-windows-msvc.zip a227701b8551c35a9931d9f6da75503cf86d88e182d71fb849a70864c5d57cd7; ...-x86_64-unknown-linux-musl.tar.gz 761c72dc8e120d85b22292063be8a796e2eeb20eb3e4f38b8fa2343ccf3514a7; ...-x86_64-apple-darwin.tar.gz 7e31028c62c6955877735d0406807aa484c2a5e6f86235a59e26c29c301da590 | fd(.exe) |
+| jq (MIT: third_party/jq) | jq-1.8.2, github.com/jqlang/jq | 2026-06-20 | the release file is the program: jq-windows-amd64.exe a6fc67fedaf9128a3309a1e2ebb8b986aeccf70122ee46d2cb4849e423f0c627; jq-linux-amd64 b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f; jq-macos-amd64 e94b266e3c26690550006abe63152b782280f4e14374accdf04cbde844f00bc0 | jq(.exe) |
+
+Threat model. Who can act: the upstream release maintainers (BurntSushi, sharkdp, the jq maintainers) and GitHub, which
+serves the files. When: the files are pulled only when the toolbox is rebuilt (`fetch-toolbox-extras.sh`), over HTTPS,
+never at run time; after the pin the only bytes ever run are the pinned ones. Nothing is signed (none of the three
+offers a signature we check), so the pin is trust on first use of GitHub's digest, then fixed. No auto-update, no
+telemetry (none of the three has any; they open no network connection). Licence texts: third_party/ripgrep,
+third_party/fd, third_party/jq.
+
 ## macOS twins (internal/toolbox, darwin-amd64 = Intel, goal parity-everywhere, 2026-11-01)
 
 The same 13 names as Windows and Linux, pinned as `darwin-amd64/<name>` in `internal/toolbox/SHA256SUMS`; macOS 10.13

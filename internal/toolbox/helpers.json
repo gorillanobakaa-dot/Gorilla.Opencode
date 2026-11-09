@@ -11,5 +11,8 @@
   {"name": "ffprobe", "version": "7.0.2", "version_darwin": "8.0", "purpose": "Reads what is inside a video or audio file: length, codecs, size.", "mac_min": "11.0"},
   {"name": "cwebp", "version": "1.6.0", "purpose": "Turns PNG and JPEG pictures into smaller WebP pictures."},
   {"name": "avifenc", "version": "1.4.2", "purpose": "Turns PNG and JPEG pictures into much smaller AVIF pictures."},
-  {"name": "oxipng", "version": "10.2.1", "purpose": "Makes PNG pictures smaller without changing a single pixel."}
+  {"name": "oxipng", "version": "10.2.1", "purpose": "Makes PNG pictures smaller without changing a single pixel."},
+  {"name": "rg", "version": "15.2.0", "purpose": "Searches the text inside many files very fast and skips what .gitignore skips (ripgrep)."},
+  {"name": "fd", "version": "10.5.0", "purpose": "Finds files and folders by name, fast, with simple patterns (a friendlier find)."},
+  {"name": "jq", "version": "1.8.2", "purpose": "Reads, filters and edits JSON files from the command line.", "mac_min": "14.0"}
 ]

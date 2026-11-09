@@ -323,3 +323,50 @@ func TestImageCodecsPinnedOnBothSystems(t *testing.T) {
 		}
 	}
 }
+
+// P5 stage 3a: ripgrep, fd and jq are pinned on all three systems under one name, each with a full sha256, and
+// each system's file is a different program. The pins are the fixed values measured on 2026-11-09; a wrong or
+// swapped hash fails here (and the fetch script refuses any other bytes).
+func TestRgFdJqPinnedOnAllSystemsWithTheMeasuredHashes(t *testing.T) {
+	pins, err := ParsePins(pinsText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"windows-amd64/rg.exe": "14231169855ec5205cf5a1b6f1db358ff4aed4247c86b69ce8aae647c77f6680",
+		"windows-amd64/fd.exe": "d67d27a8e375ed7e9bca2b506a9dd5082bc24547aeba908b863f6f8b8ab0c3b9",
+		"windows-amd64/jq.exe": "a6fc67fedaf9128a3309a1e2ebb8b986aeccf70122ee46d2cb4849e423f0c627",
+		"linux-amd64/rg":       "e62198eb19b136b88c330af83647b5a962cb99b6b1f066758568f12de1974849",
+		"linux-amd64/fd":       "e79642a479d2816c887047476bbe6ad229465f30de031033574dee2a095e0037",
+		"linux-amd64/jq":       "b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f",
+		"darwin-amd64/rg":      "0c9a0066db0d26b640777db88045b0ccdd58509a746700e43e1c4ff8707a5ed0",
+		"darwin-amd64/fd":      "7ca13c0959482c381a4de9b85fe8bef4233ab7e5232761e958ed0df3583baa89",
+		"darwin-amd64/jq":      "e94b266e3c26690550006abe63152b782280f4e14374accdf04cbde844f00bc0",
+	}
+	seen := map[string]string{}
+	for key, h := range want {
+		if pins[key] != h {
+			t.Errorf("%s: pinned %q, expected %q", key, pins[key], h)
+		}
+		if prev, dup := seen[h]; dup {
+			t.Errorf("%s and %s share one hash", key, prev)
+		}
+		seen[h] = key
+	}
+	cat, err := Catalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	have := map[string]Helper{}
+	for _, h := range cat {
+		have[h.Name] = h
+	}
+	for _, n := range []string{"rg", "fd", "jq"} {
+		if have[n].Version == "" {
+			t.Errorf("%s is not in helpers.json with a version", n)
+		}
+	}
+	if have["jq"].MacNeeds() != "14.0" {
+		t.Errorf("jq needs macOS 14 (jq-macos-amd64 Mach-O minos), catalog says %q", have["jq"].MacNeeds())
+	}
+}
