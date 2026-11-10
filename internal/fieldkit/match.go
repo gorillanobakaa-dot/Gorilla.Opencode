@@ -64,6 +64,8 @@ type Catalogue struct {
 	FieldkitCommit string   `json:"fieldkit_commit"`
 	Tools          []Tool   `json:"tools"`
 	Recipes        []Recipe `json:"recipes"`
+
+	ix *index // built once by Load; a Catalogue made by hand builds its own per call
 }
 
 var (
@@ -74,7 +76,11 @@ var (
 
 // Load parses the embedded catalogue once.
 func Load() (Catalogue, error) {
-	loadOnce.Do(func() { loadErr = json.Unmarshal(catalogueJSON, &loaded) })
+	loadOnce.Do(func() {
+		if loadErr = json.Unmarshal(catalogueJSON, &loaded); loadErr == nil {
+			loaded.ix = buildIndex(loaded)
+		}
+	})
 	return loaded, loadErr
 }
 
@@ -126,6 +132,58 @@ func words(s string) map[string]bool {
 	return out
 }
 
+// entry is one searchable item with its words already split.
+type entry struct {
+	t         Tool
+	title, id map[string]bool
+	extra     map[string]bool
+}
+
+type index struct {
+	pool   []entry
+	df     map[string]int
+	n      float64
+	rareDF int
+}
+
+// indexFor returns the word index built once at Load (it was rebuilt on every
+// message: 7-9ms alone, 25ms on a busy machine, against the 20ms limit of
+// TestMatchingIsFast). A hand-made Catalogue has none and builds one per call.
+func indexFor(c Catalogue) *index {
+	if c.ix != nil {
+		return c.ix
+	}
+	return buildIndex(c)
+}
+
+func buildIndex(c Catalogue) *index {
+	pool := make([]entry, 0, len(c.Tools)+len(c.Recipes))
+	for _, t := range c.Tools {
+		in := map[string]bool{}
+		for _, i := range t.Inputs {
+			in[i.Name] = true
+		}
+		pool = append(pool, entry{t, words(t.Title), words(t.ID), in})
+	}
+	for _, r := range c.Recipes {
+		pool = append(pool, entry{Tool{ID: r.ID, Title: r.Title, Trust: "recipe", Recipe: true},
+			words(r.Title), words(r.ID), words(r.Problem + " " + strings.Join(r.Tags, " "))})
+	}
+	// A rare word says more than a common one (2026-10-19: "cooling profile"
+	// put the Firefox profile tools first). Weight: log(N / entries with it).
+	df := map[string]int{}
+	for _, e := range pool {
+		for w := range words(e.t.Title + " " + e.t.ID) {
+			df[w]++
+		}
+	}
+	rareDF := len(pool) / rareShare
+	if rareDF < 3 {
+		rareDF = 3
+	}
+	return &index{pool, df, float64(len(pool)), rareDF}
+}
+
 var trustRank = map[string]int{"verified": 3, "tested": 2, "carded": 1}
 
 // Match returns up to limit tools for a request, best first: the same scoring
@@ -150,42 +208,12 @@ func Match(c Catalogue, request string, limit int) []Tool {
 	// Tools and recipes are searched together (the same as Fieldkit's
 	// discover): what was done before is as findable as what can be run. A
 	// recipe's problem and tags count as a tool's inputs do.
-	type entry struct {
-		t     Tool
-		extra map[string]bool
-	}
-	pool := make([]entry, 0, len(c.Tools)+len(c.Recipes))
-	for _, t := range c.Tools {
-		in := map[string]bool{}
-		for _, i := range t.Inputs {
-			in[i.Name] = true
-		}
-		pool = append(pool, entry{t, in})
-	}
-	for _, r := range c.Recipes {
-		pool = append(pool, entry{Tool{ID: r.ID, Title: r.Title, Trust: "recipe", Recipe: true},
-			words(r.Problem + " " + strings.Join(r.Tags, " "))})
-	}
-	// A rare word says more than a common one (measured 2026-10-19: "cooling
-	// profile" put the Firefox profile tools first, because "profile" is in a
-	// dozen titles and "cooling" in one). Each word is weighted by how few
-	// entries mention it: log(N / entries mentioning it).
-	df := map[string]int{}
-	for _, e := range pool {
-		d := words(e.t.Title + " " + e.t.ID)
-		for w := range d {
-			df[w]++
-		}
-	}
-	n := float64(len(pool))
-	rareDF := len(pool) / rareShare
-	if rareDF < 3 {
-		rareDF = 3
-	}
+	ix := indexFor(c)
+	pool, df, n, rareDF := ix.pool, ix.df, ix.n, ix.rareDF
 	var hits []scored
 	for _, e := range pool {
 		t := e.t
-		title, id := words(t.Title), words(t.ID)
+		title, id := e.title, e.id
 		in := e.extra
 		s := 0.0
 		rare := false
