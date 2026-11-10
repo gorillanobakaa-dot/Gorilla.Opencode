@@ -102,10 +102,12 @@ func scanFileNames(deadline time.Time, enough func(seen int, kept []string) bool
 	if cmd := fileutil.GetRgCmd(""); cmd != nil {
 		out, err := cmd.StdoutPipe()
 		if err == nil && cmd.Start() == nil {
-			// Whatever happens below, the lister does not outlive this call.
-			stopped := make(chan struct{})
+			// Whatever happens below, the lister does not outlive this call. Wait is
+			// called only after the last read: Wait closes the pipe, and calling it
+			// while the reader still works lost ripgrep's whole answer whenever it
+			// exited first (GORILLA FIX 2026-11-10: 12 of 30 runs of
+			// TestATypedQueryStillFindsAFileDeepInTheFolder got 0 results).
 			timer := time.AfterFunc(time.Until(deadline), func() { _ = cmd.Process.Kill() })
-			go func() { _ = cmd.Wait(); close(stopped) }()
 
 			r := bufio.NewReaderSize(out, 64<<10)
 			for {
@@ -121,7 +123,7 @@ func scanFileNames(deadline time.Time, enough func(seen int, kept []string) bool
 			}
 			timer.Stop()
 			_ = cmd.Process.Kill()
-			<-stopped
+			_ = cmd.Wait()
 			return kept
 		}
 		logging.Debug("ripgrep could not be started for file completions; walking instead")
