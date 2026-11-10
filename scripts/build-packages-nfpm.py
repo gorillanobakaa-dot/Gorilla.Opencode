@@ -144,14 +144,24 @@ XZ_PRESET = 9 | __import__("lzma").PRESET_EXTREME
 XZ_NAME = "xz -9e"
 
 
+def _xz_fit(raw: bytes) -> bytes:
+    """xz -9e with the smallest power-of-two dictionary that holds the content (what xz itself does for a small
+    input; Python's preset 9 always asks for 64 MiB, which fieldkit xzcheck rejects for control.tar.xz)."""
+    import lzma
+    dict_size = 1 << 12
+    while dict_size < min(len(raw), 64 << 20):
+        dict_size <<= 1
+    return lzma.compress(raw, format=lzma.FORMAT_XZ, check=lzma.CHECK_CRC64,
+                         filters=[{"id": lzma.FILTER_LZMA2, "preset": XZ_PRESET, "dict_size": dict_size}])
+
+
 def recompress_deb(deb: Path) -> None:
-    """data.tar.xz again at XZ_PRESET."""
+    """data.tar.xz and control.tar.xz again at XZ_PRESET, each with a dictionary that fits its content."""
     import lzma
     parts = []
     for name, head, body in ar_members(deb.read_bytes()):
-        if name == "data.tar.xz":
-            body = lzma.compress(lzma.decompress(body), format=lzma.FORMAT_XZ, check=lzma.CHECK_CRC64,
-                                 preset=XZ_PRESET)
+        if name in ("data.tar.xz", "control.tar.xz"):
+            body = _xz_fit(lzma.decompress(body))
             head = head[:48] + f"{len(body):<10}".encode() + head[58:]
         parts.append(head + body + (b"\n" if len(body) & 1 else b""))
     deb.write_bytes(b"!<arch>\n" + b"".join(parts))
