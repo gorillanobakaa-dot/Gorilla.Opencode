@@ -192,4 +192,15 @@ DEB="$OUTDIR/gorilla-opencode_${VERSION}_amd64.deb"
 # memory instead of ~9 MB; every download over a slow or metered link is 4.6 MB lighter.
 # scripts/build-packages-nfpm.py (the Windows path) uses the same level.
 dpkg-deb --build --root-owner-group -Zxz -z9 -Sextreme "$PKG" "$DEB"
+# The control archive (about 1 KiB) gets a dictionary that fits it, not dpkg-deb's 64 MiB: the same function as the
+# Windows path (fieldkit xzcheck refuses a dictionary bigger than the content, 2026-11-10).
+python3 - "$ROOT/scripts/build-packages-nfpm.py" "$DEB" <<'PY'
+import importlib.util, sys
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("nfpm_build", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+mod.fit_control(Path(sys.argv[2]))
+PY
+dpkg-deb --info "$DEB" >/dev/null
 echo "Built: $DEB"

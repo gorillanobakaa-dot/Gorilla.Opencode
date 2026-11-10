@@ -155,6 +155,20 @@ def _xz_fit(raw: bytes) -> bytes:
                          filters=[{"id": lzma.FILTER_LZMA2, "preset": XZ_PRESET, "dict_size": dict_size}])
 
 
+def fit_control(deb: Path) -> None:
+    """control.tar.xz again with a dictionary that fits its content; data.tar.xz is left as it is. For a .deb made
+    by dpkg-deb (scripts/build-deb.sh): -z9 -Sextreme gives every member a 64 MiB dictionary, the 1 KiB control
+    archive too, and dpkg-deb has no option for one member (fieldkit xzcheck refused it, 2026-11-10)."""
+    import lzma
+    parts = []
+    for name, head, body in ar_members(deb.read_bytes()):
+        if name == "control.tar.xz":
+            body = _xz_fit(lzma.decompress(body))
+            head = head[:48] + f"{len(body):<10}".encode() + head[58:]
+        parts.append(head + body + (b"\n" if len(body) & 1 else b""))
+    deb.write_bytes(b"!<arch>\n" + b"".join(parts))
+
+
 def recompress_deb(deb: Path) -> None:
     """data.tar.xz and control.tar.xz again at XZ_PRESET, each with a dictionary that fits its content."""
     import lzma
