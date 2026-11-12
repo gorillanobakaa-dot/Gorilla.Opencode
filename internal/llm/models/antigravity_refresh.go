@@ -126,6 +126,8 @@ func BuildAntigravityModels(rows []AntigravityRow) map[ModelID]Model {
 			CostPer1MOut: 0,
 		}
 	}
+	// Inject user-configured extra models (e.g. newly announced models in ~/.config/gorilla-opencode/env).
+	injectExtraAntigravityModels(out)
 	// Order and unique names: see antigravity_order.go.
 	finishAntigravity(out)
 	return out
@@ -213,8 +215,52 @@ func LoadRefreshedAntigravity(configDir string) (int, error) {
 	// A cache written before 2026-10-05 has no ranks and repeats names. Repair
 	// it here so the picker is right at once, not after the next refresh.
 	finishAntigravity(cached.Models)
+	injectExtraAntigravityModels(cached.Models)
 	applyAntigravity(cached.Models)
 	return len(cached.Models), nil
+}
+
+// injectExtraAntigravityModels injects models configured via the ANTIGRAVITY_EXTRA_MODELS
+// environment variable (e.g. from ~/.config/gorilla-opencode/env).
+// This allows newly released models (like Gemini 4 Hydrogen) to appear and be selectable
+// immediately, without waiting for Google's staged rollout flag to reach this account/region.
+func injectExtraAntigravityModels(models map[ModelID]Model) {
+	extra := strings.TrimSpace(os.Getenv("ANTIGRAVITY_EXTRA_MODELS"))
+	if extra == "" {
+		return
+	}
+	for _, raw := range strings.Split(extra, ",") {
+		mID := strings.TrimSpace(raw)
+		if mID == "" {
+			continue
+		}
+		mID = strings.TrimPrefix(mID, "antigravity.")
+		id := ModelID("antigravity." + mID)
+		if _, exists := models[id]; exists {
+			continue
+		}
+		label := strings.ReplaceAll(mID, "-", " ")
+		parts := strings.Fields(label)
+		for i, p := range parts {
+			if len(p) > 0 {
+				parts[i] = strings.ToUpper(p[:1]) + p[1:]
+			}
+		}
+		cleanName := strings.Join(parts, " ")
+		models[id] = Model{
+			ID:                  id,
+			Name:                cleanName + antigravityNameSuffix,
+			Provider:            ProviderAntigravity,
+			APIModel:            mID,
+			Description:         fmt.Sprintf("%s via your Google Antigravity sign-in (configured via ANTIGRAVITY_EXTRA_MODELS).", cleanName),
+			ContextWindow:       1_000_000,
+			DefaultMaxTokens:    64_000,
+			CanReason:           true,
+			SupportsAttachments: true,
+			CostPer1MIn:         0,
+			CostPer1MOut:        0,
+		}
+	}
 }
 
 // applyAntigravity REPLACES this provider's registered models with the fetched

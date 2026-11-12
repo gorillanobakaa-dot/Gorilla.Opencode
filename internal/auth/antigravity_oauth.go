@@ -41,22 +41,53 @@ const (
 	AntigravityEndpoint = "https://daily-cloudcode-pa.googleapis.com"
 	AntigravityVersion  = "v1internal"
 
-	// AntigravityUserAgent identifies every Antigravity request (onboarding AND
-	// generation use the same one — unlike the Gemini path).
-	//
-	// 2026-10-19, measured with the same login: Google's model list depends on
-	// the client version in this header. As agy 1.1.10 (the value measured on
-	// 2026-08-03) it listed 23 models; as the Antigravity app 2.24.0 it listed 26,
-	// adding Gemini 3.8 Flash High/Medium/Low, and generateContent on
-	// gemini-3.8-flash-low answered (200, "OK"). The installed app on that day
-	// was 2.24.0. Gemini 4 Argon is NOT served to this sign-in under either
-	// version (404); it is reachable with an AI Studio key (Gemini provider).
-	AntigravityUserAgent = "antigravity/2.24.0 (aidev_client; os_type=windows; arch=amd64; auth_method=consumer)"
+	// DefaultAntigravityVersion is the fallback Antigravity client version.
+	DefaultAntigravityVersion = "2.31.2"
 
 	// AntigravityRequestUA is the top-level "userAgent" field the envelope
 	// carries (distinct from the HTTP header above). Measured value: "antigravity".
 	AntigravityRequestUA = "antigravity"
 )
+
+// FormatAntigravityUserAgent builds the standard aidev_client User-Agent for a given version.
+func FormatAntigravityUserAgent(version string) string {
+	version = strings.TrimSpace(version)
+	if version == "" {
+		version = DefaultAntigravityVersion
+	}
+	return fmt.Sprintf("antigravity/%s (aidev_client; os_type=windows; arch=amd64; auth_method=consumer)", version)
+}
+
+// DefaultAntigravityUserAgent is the default User-Agent identifying Antigravity requests.
+var DefaultAntigravityUserAgent = FormatAntigravityUserAgent(DefaultAntigravityVersion)
+
+// AntigravityUserAgent is kept as a package-level variable for compatibility.
+// Callsites should prefer EffectiveAntigravityUserAgent() to allow runtime overrides.
+var AntigravityUserAgent = DefaultAntigravityUserAgent
+
+// EffectiveAntigravityUserAgent returns the effective HTTP User-Agent header for Antigravity requests.
+// Resolution order (allows zero-recompile version bumps via environment or ~/.config/gorilla-opencode/env):
+//  1. ANTIGRAVITY_USER_AGENT env var (full exact header string override)
+//  2. ANTIGRAVITY_VERSION env var (e.g. "2.31.2", formatted via FormatAntigravityUserAgent)
+//  3. DefaultAntigravityUserAgent ("antigravity/2.31.2 (...)")
+func EffectiveAntigravityUserAgent() string {
+	if ua := strings.TrimSpace(os.Getenv("ANTIGRAVITY_USER_AGENT")); ua != "" {
+		return ua
+	}
+	if ver := strings.TrimSpace(os.Getenv("ANTIGRAVITY_VERSION")); ver != "" {
+		return FormatAntigravityUserAgent(ver)
+	}
+	return DefaultAntigravityUserAgent
+}
+
+// EffectiveAntigravityRequestUA returns the "userAgent" string inside the JSON envelope.
+// Resolves from ANTIGRAVITY_REQUEST_UA if set, falling back to AntigravityRequestUA ("antigravity").
+func EffectiveAntigravityRequestUA() string {
+	if reqUA := strings.TrimSpace(os.Getenv("ANTIGRAVITY_REQUEST_UA")); reqUA != "" {
+		return reqUA
+	}
+	return AntigravityRequestUA
+}
 
 // antigravityScopes are the scopes agy's token actually carries (measured from
 // the refresh response). openid is included; drive.* scopes the IDE uses are not.
@@ -448,7 +479,7 @@ func (c *AntigravityCreds) callAntigravity(ctx context.Context, token, method st
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", AntigravityUserAgent)
+	req.Header.Set("User-Agent", EffectiveAntigravityUserAgent())
 	resp, err := authHTTP().Do(req)
 	if err != nil {
 		return err
