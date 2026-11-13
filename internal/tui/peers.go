@@ -27,13 +27,13 @@ func peerNotice(m peers.Message) util.InfoMsg {
 // receives the whole message at the next tool boundary or turn.
 func peerShortNotice(m peers.Message) string {
 	if m.Kind == peers.KindIdle {
-		return "· " + m.From.Name + " is idle"
+		return "- " + m.From.Name + " is idle"
 	}
 	first := strings.TrimSpace(strings.SplitN(m.Text, "\n", 2)[0])
 	if r := []rune(first); len(r) > 80 {
-		first = string(r[:80]) + "…"
+		first = string(r[:80]) + "..."
 	}
-	return "· from " + m.From.Name + ": " + first
+	return "- from " + m.From.Name + ": " + first
 }
 
 // AttachPeers routes arrivals into the running program. Send is safe from the
