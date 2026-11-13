@@ -18,7 +18,8 @@ Requests now resolve their client identity dynamically at runtime on every reque
 2. **`ANTIGRAVITY_VERSION`**: Version number override (e.g. `2.31.2`, `2.32.0`). Formatted automatically into the standard `aidev_client` header.
 3. **Default Version**: Bumped to `2.31.2` (`DefaultAntigravityVersion = "2.31.2"`).
 4. **`ANTIGRAVITY_REQUEST_UA`**: Overrides the internal `userAgent` field inside the request envelope (defaults to `"antigravity"`).
-5. **`ANTIGRAVITY_EXTRA_MODELS`**: Comma-separated list of model IDs to immediately register into the runtime catalogue (e.g. `gemini-4-hydrogen-high,gemini-4-hydrogen-medium`), bypassing delayed backend rollout flags.
+5. **Built-in Gemini 4 Models**: Gemini 4 Hydrogen Medium, Gemini 4 Hydrogen High, Gemini 4 Argon Medium, and Orchestrator Argon are registered directly in the client catalogue, so they are guaranteed to appear without needing manual configuration.
+6. **`ANTIGRAVITY_EXTRA_MODELS`**: Comma-separated list of additional model IDs to immediately register into the runtime catalogue, bypassing delayed backend rollout flags.
 
 ## How to Configure
 
