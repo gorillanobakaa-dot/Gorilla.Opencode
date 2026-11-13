@@ -12,7 +12,7 @@ func TestEffectiveAntigravityUserAgent_Default(t *testing.T) {
 
 	ua := EffectiveAntigravityUserAgent()
 	expectedVersion := "2.31.2"
-	if !strings.Contains(ua, "antigravity/"+expectedVersion) {
+	if !strings.Contains(ua, "antigravity/hub/"+expectedVersion) {
 		t.Errorf("EffectiveAntigravityUserAgent() = %q, expected containing antigravity/%s", ua, expectedVersion)
 	}
 	if !strings.Contains(ua, "aidev_client") {
@@ -25,8 +25,8 @@ func TestEffectiveAntigravityUserAgent_VersionOverride(t *testing.T) {
 	t.Setenv("ANTIGRAVITY_VERSION", "2.99.0")
 
 	ua := EffectiveAntigravityUserAgent()
-	if !strings.Contains(ua, "antigravity/2.99.0") {
-		t.Errorf("EffectiveAntigravityUserAgent() with ANTIGRAVITY_VERSION = %q, expected containing antigravity/2.99.0", ua)
+	if !strings.Contains(ua, "antigravity/hub/2.99.0") {
+		t.Errorf("EffectiveAntigravityUserAgent() with ANTIGRAVITY_VERSION = %q, expected containing antigravity/hub/2.99.0", ua)
 	}
 }
 

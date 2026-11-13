@@ -3,6 +3,7 @@ package models
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -69,7 +70,7 @@ func TestBuildDropsNonChatRows(t *testing.T) {
 func TestDisplayNameFilterWouldBeWrong(t *testing.T) {
 	var kept int
 	for _, r := range liveRows() {
-		if r.usable() && r.DisplayName != "" {
+		if r.Usable() && r.DisplayName != "" {
 			kept++
 		}
 	}
@@ -126,5 +127,23 @@ func TestMissingCacheIsNotAnError(t *testing.T) {
 	n, err := LoadRefreshedAntigravity(t.TempDir())
 	if err != nil || n != 0 {
 		t.Errorf("absent cache should be silent: n=%d err=%v", n, err)
+	}
+}
+
+func TestNoInventedGemini4InBuiltins(t *testing.T) {
+	for id, m := range AntigravityModels {
+		if strings.Contains(string(id), "gemini-4") || strings.Contains(m.APIModel, "orchestrator-argon") {
+			t.Fatalf("built-in %s must not exist: Gemini 4 ids come only from the backend list", id)
+		}
+	}
+}
+
+func TestDisabledModelIsNotUsable(t *testing.T) {
+	r := AntigravityRow{ID: "gemini-4-carbon-disabled", MaxOutputTokens: 65536}
+	if r.Usable() {
+		t.Fatal("a -disabled id must be hidden")
+	}
+	if !(AntigravityRow{ID: "gemini-4-hydrogen-medium", MaxOutputTokens: 262144}).Usable() {
+		t.Fatal("hydrogen medium must be usable when listed")
 	}
 }

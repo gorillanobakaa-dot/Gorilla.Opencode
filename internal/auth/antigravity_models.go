@@ -28,13 +28,17 @@ package auth
 //
 // ENDPOINT
 //   POST https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels
-//   with an EMPTY JSON body. It rejects "metadata" and "cloudaicompanionProject"
-//   with 400 Unknown name — unlike loadCodeAssist, which requires metadata.
+//   with {"project":"aicode-consumers"}, exactly what the app sends. It rejects
+//   "metadata" and "cloudaicompanionProject" with 400 Unknown name.
 
 import (
 	"context"
 	"fmt"
 )
+
+// AntigravityListProject is the project value the real app puts in the
+// fetchAvailableModels body (not the account's own project).
+const AntigravityListProject = "aicode-consumers"
 
 // AntigravityModelInfo is one entry of the fetchAvailableModels response.
 // Field names are the measured wire shape, not a guess.
@@ -66,47 +70,16 @@ func (c *AntigravityCreds) FetchAvailableModels(ctx context.Context) (map[string
 		return nil, err
 	}
 	var resp fetchAvailableModelsResp
-	// Empty body, deliberately: see the endpoint note above.
-	if err := c.callAntigravity(ctx, token, "fetchAvailableModels", map[string]any{}, &resp); err != nil {
+	// The body the real Antigravity app sends (captured 2026-11-13 with mitmdump
+	// in front of app 2.31.2): {"project":"aicode-consumers"}. An empty body
+	// returns a shorter list WITHOUT the Gemini 4 family; the app's own project
+	// is not the account's project. Nothing is invented here: only ids the
+	// backend lists are ever shown.
+	if err := c.callAntigravity(ctx, token, "fetchAvailableModels", map[string]any{"project": AntigravityListProject}, &resp); err != nil {
 		return nil, fmt.Errorf("fetchAvailableModels: %w", err)
 	}
 	if len(resp.Models) == 0 {
 		return nil, fmt.Errorf("backend returned no models")
-	}
-
-	// Antigravity v2.31+ introduces Gemini 4 (Hydrogen, Argon) and Orchestrator.
-	// When Google's raw fetchAvailableModels endpoint omits them, ensure they are
-	// present so they appear automatically in the picker without manual intervention.
-	gemini4Defaults := map[string]AntigravityModelInfo{
-		"gemini-4-hydrogen-medium": {
-			DisplayName:      "Gemini 4 Hydrogen (Medium)",
-			MaxTokens:        1048576,
-			MaxOutputTokens:  65536,
-			SupportsThinking: true,
-		},
-		"gemini-4-hydrogen-high": {
-			DisplayName:      "Gemini 4 Hydrogen (High)",
-			MaxTokens:        1048576,
-			MaxOutputTokens:  65536,
-			SupportsThinking: true,
-		},
-		"gemini-4-argon-medium": {
-			DisplayName:      "Gemini 4 Argon (Medium)",
-			MaxTokens:        1048576,
-			MaxOutputTokens:  65536,
-			SupportsThinking: true,
-		},
-		"orchestrator-argon": {
-			DisplayName:      "Orchestrator (Argon)",
-			MaxTokens:        1048576,
-			MaxOutputTokens:  65536,
-			SupportsThinking: true,
-		},
-	}
-	for id, info := range gemini4Defaults {
-		if _, exists := resp.Models[id]; !exists {
-			resp.Models[id] = info
-		}
 	}
 
 	return resp.Models, nil

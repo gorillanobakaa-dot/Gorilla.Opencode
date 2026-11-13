@@ -61,11 +61,14 @@ func antigravityCachePath(configDir string) string {
 // on that day — gemini-3.7-flash-tiered, the only id that actually serves Gemini
 // 3.7 — has no displayName at all. Filtering on it is the obvious rule and it
 // silently drops exactly the model the user came for.
-func (r AntigravityRow) usable() bool {
+func (r AntigravityRow) Usable() bool {
 	switch {
 	case r.IsInternal:
 		return false
 	case r.APIProvider == "API_PROVIDER_INTERNAL":
+		return false
+	case strings.HasSuffix(r.ID, "-disabled"):
+		// e.g. gemini-4-carbon-disabled: the app lists it but the plan lacks it.
 		return false
 	case strings.HasPrefix(r.ID, "tab_"), strings.HasPrefix(r.ID, "chat_"):
 		return false
@@ -105,7 +108,7 @@ func displayNameFor(r AntigravityRow) string {
 func BuildAntigravityModels(rows []AntigravityRow) map[ModelID]Model {
 	out := make(map[ModelID]Model, len(rows))
 	for _, r := range rows {
-		if !r.usable() {
+		if !r.Usable() {
 			continue
 		}
 		id := ModelID("antigravity." + r.ID)

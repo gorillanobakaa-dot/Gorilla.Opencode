@@ -14,15 +14,11 @@ package models
 const ProviderAntigravity ModelProvider = "antigravity"
 
 const (
-	AGClaudeSonnet46        ModelID = "antigravity.claude-sonnet-4-6"
-	AGClaudeOpus46          ModelID = "antigravity.claude-opus-4-6-thinking"
-	AGGPTOSS120B            ModelID = "antigravity.gpt-oss-120b-medium"
-	AGGemini36Flash         ModelID = "antigravity.gemini-3.6-flash-medium"
-	AGGemini31Pro           ModelID = "antigravity.gemini-3.1-pro-high"
-	AGGemini4HydrogenMedium ModelID = "antigravity.gemini-4-hydrogen-medium"
-	AGGemini4HydrogenHigh   ModelID = "antigravity.gemini-4-hydrogen-high"
-	AGGemini4ArgonMedium    ModelID = "antigravity.gemini-4-argon-medium"
-	AGOrchestratorArgon     ModelID = "antigravity.orchestrator-argon"
+	AGClaudeSonnet46 ModelID = "antigravity.claude-sonnet-4-6"
+	AGClaudeOpus46   ModelID = "antigravity.claude-opus-4-6-thinking"
+	AGGPTOSS120B     ModelID = "antigravity.gpt-oss-120b-medium"
+	AGGemini36Flash  ModelID = "antigravity.gemini-3.6-flash-medium"
+	AGGemini31Pro    ModelID = "antigravity.gemini-3.1-pro-high"
 )
 
 // AntigravityModels is the built-in, offline first-run list. It is REPLACED by
@@ -92,54 +88,6 @@ var AntigravityModels = map[ModelID]Model{
 		CanReason:           true,
 		SupportsAttachments: true,
 		Rank:                3,
-	},
-	AGGemini4HydrogenMedium: {
-		ID:                  AGGemini4HydrogenMedium,
-		Name:                "Gemini 4 Hydrogen Medium (Antigravity)",
-		Description:         "Google Gemini 4 Hydrogen Medium via your Google Antigravity sign-in. Fast agentic execution and daily coding.",
-		Provider:            ProviderAntigravity,
-		APIModel:            "gemini-4-hydrogen-medium",
-		ContextWindow:       1_000_000,
-		DefaultMaxTokens:    64_000,
-		CanReason:           true,
-		SupportsAttachments: true,
-		Rank:                1,
-	},
-	AGGemini4HydrogenHigh: {
-		ID:                  AGGemini4HydrogenHigh,
-		Name:                "Gemini 4 Hydrogen High (Antigravity)",
-		Description:         "Google Gemini 4 Hydrogen High via your Google Antigravity sign-in. Deep reasoning with high effort.",
-		Provider:            ProviderAntigravity,
-		APIModel:            "gemini-4-hydrogen-high",
-		ContextWindow:       1_000_000,
-		DefaultMaxTokens:    64_000,
-		CanReason:           true,
-		SupportsAttachments: true,
-		Rank:                1,
-	},
-	AGGemini4ArgonMedium: {
-		ID:                  AGGemini4ArgonMedium,
-		Name:                "Gemini 4 Argon Medium (Antigravity)",
-		Description:         "Google Gemini 4 Argon Medium via your Google Antigravity sign-in. Frontier model with deep reasoning.",
-		Provider:            ProviderAntigravity,
-		APIModel:            "gemini-4-argon-medium",
-		ContextWindow:       1_000_000,
-		DefaultMaxTokens:    64_000,
-		CanReason:           true,
-		SupportsAttachments: true,
-		Rank:                1,
-	},
-	AGOrchestratorArgon: {
-		ID:                  AGOrchestratorArgon,
-		Name:                "Orchestrator (Argon) (Antigravity)",
-		Description:         "Google Antigravity Orchestrator pairing Gemini 4 planning with fast execution.",
-		Provider:            ProviderAntigravity,
-		APIModel:            "orchestrator-argon",
-		ContextWindow:       1_000_000,
-		DefaultMaxTokens:    64_000,
-		CanReason:           true,
-		SupportsAttachments: true,
-		Rank:                1,
 	},
 }
 

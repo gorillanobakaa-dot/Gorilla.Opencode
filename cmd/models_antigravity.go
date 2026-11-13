@@ -60,8 +60,23 @@ the ids it actually honours.`,
 			return err
 		}
 
+		if creds.PlanName != "" || creds.PlanID != "" {
+			fmt.Printf("  Your plan: %s\n\n", creds.PlanLabel())
+		}
+		probe, _ := cmd.Flags().GetBool("probe")
 		rows := make([]models.AntigravityRow, 0, len(fetched))
 		for id, m := range fetched {
+			if probe {
+				row := models.AntigravityRow{ID: id, DisplayName: m.DisplayName, APIProvider: m.APIProvider, MaxOutputTokens: m.MaxOutputTokens, IsInternal: m.IsInternal}
+				if !row.Usable() {
+					continue
+				}
+				r := creds.ProbeAntigravityModel(context.Background(), id)
+				fmt.Printf("  probe %-36s %s\n", id, r.Note)
+				if r.NotFound {
+					continue
+				}
+			}
 			rows = append(rows, models.AntigravityRow{
 				ID:               id,
 				DisplayName:      m.DisplayName,
@@ -114,6 +129,7 @@ the ids it actually honours.`,
 }
 
 func init() {
+	modelsRefreshAntigravityCmd.Flags().Bool("probe", false, "send one tiny real prompt to each model and hide the ones the backend does not serve (uses a little quota)")
 	modelsCmd.AddCommand(modelsRefreshAntigravityCmd, modelsDoctorCmd, modelsProbeCmd)
 }
 

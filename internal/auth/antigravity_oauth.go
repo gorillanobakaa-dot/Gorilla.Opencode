@@ -28,6 +28,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -55,7 +56,8 @@ func FormatAntigravityUserAgent(version string) string {
 	if version == "" {
 		version = DefaultAntigravityVersion
 	}
-	return fmt.Sprintf("antigravity/%s (aidev_client; os_type=windows; arch=amd64; auth_method=consumer)", version)
+	// Exactly the real app's header (captured 2026-11-13, app 2.31.2).
+	return fmt.Sprintf("antigravity/hub/%s (aidev_client; os_type=%s; arch=%s; cl=1019359392)", version, runtime.GOOS, runtime.GOARCH)
 }
 
 // DefaultAntigravityUserAgent is the default User-Agent identifying Antigravity requests.
@@ -357,7 +359,7 @@ func (c *AntigravityCreds) SetupProject(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	loadBody := map[string]any{"metadata": caMetadata()}
+	loadBody := map[string]any{"metadata": map[string]string{"ideType": "ANTIGRAVITY"}}
 	var load loadCodeAssistResp
 	if err := c.callAntigravity(ctx, token, "loadCodeAssist", loadBody, &load); err != nil {
 		return fmt.Errorf("loadCodeAssist: %w", err)
