@@ -19,7 +19,21 @@ const peerNoticeTTL = 30 * time.Second
 
 // peerNotice is the message an arrival becomes in this interface.
 func peerNotice(m peers.Message) util.InfoMsg {
-	return util.InfoMsg{Type: util.InfoTypeWarn, Msg: peers.HumanNotice(m), TTL: peerNoticeTTL, Echo: true}
+	return util.InfoMsg{Type: util.InfoTypeInfo, Msg: peerShortNotice(m), TTL: peerNoticeTTL}
+}
+
+// peerShortNotice is one dim line: sender and the first line of the text.
+// Peer text is data from another program, never shown as a prompt; the AI
+// receives the whole message at the next tool boundary or turn.
+func peerShortNotice(m peers.Message) string {
+	if m.Kind == peers.KindIdle {
+		return "· " + m.From.Name + " is idle"
+	}
+	first := strings.TrimSpace(strings.SplitN(m.Text, "\n", 2)[0])
+	if r := []rune(first); len(r) > 80 {
+		first = string(r[:80]) + "…"
+	}
+	return "· from " + m.From.Name + ": " + first
 }
 
 // AttachPeers routes arrivals into the running program. Send is safe from the

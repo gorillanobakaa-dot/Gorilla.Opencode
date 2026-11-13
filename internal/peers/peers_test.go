@@ -506,3 +506,16 @@ func TestActiveIsNilUntilSet(t *testing.T) {
 		t.Error("Active() is not the session set")
 	}
 }
+
+func TestSameMessageFromSameSenderIsDeliveredOnce(t *testing.T) {
+	s := startT(t, t.TempDir(), "f", "a")
+	req := Request{Type: TypeMessage, Text: "NET OPEN", From: Identity{Name: "zero", PID: 7}}
+	for i := 0; i < 5; i++ {
+		if r := s.handle(req, 7); !r.OK {
+			t.Fatalf("round %d refused: %+v", i, r)
+		}
+	}
+	if got := len(s.TakeForAI()); got != 1 {
+		t.Fatalf("delivered %d copies, want 1", got)
+	}
+}

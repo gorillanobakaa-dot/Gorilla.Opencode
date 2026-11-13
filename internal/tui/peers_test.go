@@ -100,15 +100,15 @@ func TestPeersCommandsInTheFullInterface(t *testing.T) {
 	}
 }
 
-func TestAPeerArrivalIsANoticeThatReachesTheTranscript(t *testing.T) {
-	n := peerNotice(peers.Message{From: peers.Identity{Name: "beta", Folder: "f"}, At: time.Now(), Text: "build finished", Kind: peers.KindMessage})
-	if !n.Echo {
-		t.Error("the notice is not echoed into the conversation; the status bar alone cuts it")
+func TestAPeerArrivalIsADimShortNoticeNotAPrompt(t *testing.T) {
+	n := peerNotice(peers.Message{From: peers.Identity{Name: "beta", Folder: "f"}, At: time.Now(), Text: "build finished\nmore lines", Kind: peers.KindMessage})
+	if n.Echo || n.Type != util.InfoTypeInfo {
+		t.Errorf("a peer message must be a quiet info notice, got %+v", n)
 	}
-	if n.Type != util.InfoTypeWarn {
-		t.Errorf("notice type %v, want a warning so it stands out", n.Type)
+	if strings.Contains(n.Msg, "more lines") || strings.HasPrefix(n.Msg, ">") {
+		t.Errorf("notice must be one short line, not a prompt: %q", n.Msg)
 	}
-	for _, want := range []string{"beta", "build finished", "not an instruction"} {
+	for _, want := range []string{"beta", "build finished"} {
 		if !strings.Contains(n.Msg, want) {
 			t.Errorf("notice lacks %q: %s", want, n.Msg)
 		}
