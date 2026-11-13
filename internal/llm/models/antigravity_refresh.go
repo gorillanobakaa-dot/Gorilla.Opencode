@@ -61,11 +61,14 @@ func antigravityCachePath(configDir string) string {
 // on that day — gemini-3.7-flash-tiered, the only id that actually serves Gemini
 // 3.7 — has no displayName at all. Filtering on it is the obvious rule and it
 // silently drops exactly the model the user came for.
-func (r AntigravityRow) usable() bool {
+func (r AntigravityRow) Usable() bool {
 	switch {
 	case r.IsInternal:
 		return false
 	case r.APIProvider == "API_PROVIDER_INTERNAL":
+		return false
+	case strings.HasSuffix(r.ID, "-disabled"):
+		// e.g. gemini-4-carbon-disabled: the app lists it but the plan lacks it.
 		return false
 	case strings.HasPrefix(r.ID, "tab_"), strings.HasPrefix(r.ID, "chat_"):
 		return false
@@ -105,7 +108,7 @@ func displayNameFor(r AntigravityRow) string {
 func BuildAntigravityModels(rows []AntigravityRow) map[ModelID]Model {
 	out := make(map[ModelID]Model, len(rows))
 	for _, r := range rows {
-		if !r.usable() {
+		if !r.Usable() {
 			continue
 		}
 		id := ModelID("antigravity." + r.ID)
@@ -126,6 +129,8 @@ func BuildAntigravityModels(rows []AntigravityRow) map[ModelID]Model {
 			CostPer1MOut: 0,
 		}
 	}
+	// Inject user-configured extra models (e.g. newly announced models in ~/.config/gorilla-opencode/env).
+	injectExtraAntigravityModels(out)
 	// Order and unique names: see antigravity_order.go.
 	finishAntigravity(out)
 	return out
@@ -213,8 +218,52 @@ func LoadRefreshedAntigravity(configDir string) (int, error) {
 	// A cache written before 2026-10-05 has no ranks and repeats names. Repair
 	// it here so the picker is right at once, not after the next refresh.
 	finishAntigravity(cached.Models)
+	injectExtraAntigravityModels(cached.Models)
 	applyAntigravity(cached.Models)
 	return len(cached.Models), nil
+}
+
+// injectExtraAntigravityModels injects models configured via the ANTIGRAVITY_EXTRA_MODELS
+// environment variable (e.g. from ~/.config/gorilla-opencode/env).
+// This allows newly released models (like Gemini 4 Hydrogen) to appear and be selectable
+// immediately, without waiting for Google's staged rollout flag to reach this account/region.
+func injectExtraAntigravityModels(models map[ModelID]Model) {
+	extra := strings.TrimSpace(os.Getenv("ANTIGRAVITY_EXTRA_MODELS"))
+	if extra == "" {
+		return
+	}
+	for _, raw := range strings.Split(extra, ",") {
+		mID := strings.TrimSpace(raw)
+		if mID == "" {
+			continue
+		}
+		mID = strings.TrimPrefix(mID, "antigravity.")
+		id := ModelID("antigravity." + mID)
+		if _, exists := models[id]; exists {
+			continue
+		}
+		label := strings.ReplaceAll(mID, "-", " ")
+		parts := strings.Fields(label)
+		for i, p := range parts {
+			if len(p) > 0 {
+				parts[i] = strings.ToUpper(p[:1]) + p[1:]
+			}
+		}
+		cleanName := strings.Join(parts, " ")
+		models[id] = Model{
+			ID:                  id,
+			Name:                cleanName + antigravityNameSuffix,
+			Provider:            ProviderAntigravity,
+			APIModel:            mID,
+			Description:         fmt.Sprintf("%s via your Google Antigravity sign-in (configured via ANTIGRAVITY_EXTRA_MODELS).", cleanName),
+			ContextWindow:       1_000_000,
+			DefaultMaxTokens:    64_000,
+			CanReason:           true,
+			SupportsAttachments: true,
+			CostPer1MIn:         0,
+			CostPer1MOut:        0,
+		}
+	}
 }
 
 // applyAntigravity REPLACES this provider's registered models with the fetched

@@ -58,6 +58,8 @@ var agVersionRe = regexp.MustCompile(`\d+(?:\.\d+)?`)
 const (
 	agFamilyOpus = iota
 	agFamilySonnet
+	agFamilyGemini4
+	agFamilyOrchestrator
 	agFamilyOtherClaude
 	agFamilyGeminiPro
 	agFamilyGeminiFlash
@@ -81,6 +83,10 @@ func antigravityKey(label string) agKey {
 		k.family = agFamilyOpus
 	case strings.Contains(s, "sonnet"):
 		k.family = agFamilySonnet
+	case strings.Contains(s, "orchestrator"):
+		k.family = agFamilyOrchestrator
+	case strings.Contains(s, "hydrogen"), strings.Contains(s, "argon"), strings.Contains(s, "carbon"):
+		k.family = agFamilyGemini4
 	case strings.Contains(s, "claude"):
 		k.family = agFamilyOtherClaude
 	case strings.Contains(s, "gemini") && strings.Contains(s, "pro"):

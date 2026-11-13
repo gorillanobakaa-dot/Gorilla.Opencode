@@ -200,7 +200,7 @@ func TestLiveGroundingProbeAntigravity(t *testing.T) {
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", auth.AntigravityUserAgent)
+	req.Header.Set("User-Agent", auth.EffectiveAntigravityUserAgent())
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

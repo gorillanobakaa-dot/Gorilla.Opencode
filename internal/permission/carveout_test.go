@@ -10,6 +10,10 @@ package permission
 // it wants to do is send a request somewhere.
 
 import (
+	"context"
+	"fmt"
+	"github.com/opencode-ai/opencode/internal/pubsub"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -204,5 +208,43 @@ func TestUnattendedIsOffForAnInteractiveSession(t *testing.T) {
 		HardStop:  "it runs as the administrator (sudo)",
 	}) {
 		t.Fatal("an interactive session skipped the sudo hard stop without SetUnattended")
+	}
+}
+
+// Owner 2026-11-13: dialogs kept coming after approval. Under auto, a place
+// outside the roots is asked about ONCE; one yes extends the roots to it for
+// the session, so later paths there raise no dialog.
+func TestAutoAsksOncePerOutsideRootPlace(t *testing.T) {
+	s := autoApproved(t)
+	n := countPrompts(t, s)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := s.Subscribe(ctx)
+	go func() {
+		for ev := range ch {
+			if ev.Type == pubsub.CreatedEvent {
+				s.Grant(ev.Payload)
+			}
+		}
+	}()
+	outside := t.TempDir()
+	for i := 0; i < 4; i++ {
+		if !s.Request(CreatePermissionRequest{SessionID: "conversation", ToolName: "write", Action: "write",
+			Path: filepath.Join(outside, fmt.Sprintf("f%d.txt", i)), GrantKey: fmt.Sprintf("k%d", i)}) {
+			t.Fatalf("request %d refused", i)
+		}
+	}
+	time.Sleep(50 * time.Millisecond)
+	if *n != 1 {
+		t.Fatalf("auto raised %d dialogs for one outside-root place, want exactly 1", *n)
+	}
+}
+
+func TestAutoStillAsksForAnotherOutsideRootPlace(t *testing.T) {
+	s := autoApproved(t)
+	denyPrompts(t, s)
+	s.addExtraRoot("conversation", t.TempDir()+"/a/x.txt")
+	if s.Request(CreatePermissionRequest{SessionID: "conversation", ToolName: "write", Action: "write", Path: "/etc/hosts"}) {
+		t.Fatal("an approved place must not widen to /etc")
 	}
 }

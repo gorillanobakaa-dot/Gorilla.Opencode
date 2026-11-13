@@ -456,6 +456,15 @@ func (s *Session) handle(req Request, peerPID int) Reply {
 			return refuse("this session's inbox is full: its AI has not started a turn since the earlier messages arrived")
 		}
 		m := Message{From: from, At: now, Text: sanitizeText(req.Text), Kind: KindMessage}
+		// Deliver once: the same sender repeating the same text before the AI
+		// took the first copy (a broadcast resent on every check-in, "NET OPEN"
+		// x5) adds nothing. Accept it, show and queue nothing.
+		for _, e := range s.inbox {
+			if e.Kind == KindMessage && e.Text == m.Text && senderKey(e.From.Name, e.From.PID) == senderKey(from.Name, from.PID) {
+				s.mu.Unlock()
+				return Reply{OK: true}
+			}
+		}
 		s.inbox = append(s.inbox, m)
 		s.pushRecentLocked(m)
 		fn := s.notify

@@ -2,6 +2,7 @@ package permission
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -261,7 +262,12 @@ const maxAskedKeys = 64
 type permissionService struct {
 	*pubsub.Broker[PermissionRequest]
 
-	mu                  sync.RWMutex
+	mu sync.RWMutex
+	// extraRoots: directories outside the workspace roots that a person
+	// approved once under auto mode, per root session. They count as inside
+	// the roots for the rest of the session, so auto asks ONCE per place, not
+	// once per path (owner 2026-11-13: dialogs kept coming after approval).
+	extraRoots          map[string][]string
 	sessionPermissions  []PermissionRequest
 	pendingRequests     sync.Map
 	autoApproveSessions []string
@@ -817,7 +823,10 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	defer timer.Stop()
 	select {
 	case resp := <-respCh:
-		if resp {
+		if resp && override != "" && opts.Irreversible == "" && opts.HardStop == "" {
+			// The only carve-out left is the outside-root path: one yes
+			// extends the roots for this session to that place.
+			s.addExtraRoot(root, opts.Path)
 		}
 		return resp
 	case <-timer.C:
@@ -1076,9 +1085,52 @@ func (s *permissionService) mustAskAnyway(opts CreatePermissionRequest, root str
 	// relative path still resolves inside the primary root and is still
 	// auto-approved, which is the behaviour ordinary work depends on.
 	if p := opts.Path; p != "" && p != "." {
-		if _, inRoot := config.RootFor(p); !inRoot {
+		if _, inRoot := config.RootFor(p); !inRoot && !s.inExtraRoot(root, p) {
 			return "this targets " + p + ", which is outside every workspace root"
 		}
 	}
 	return ""
+}
+
+// extraRootFor picks the directory one approval extends the roots to: the
+// path's own directory, or the path itself when it is one. Never "/" or the
+// home directory: those would make "outside the roots" mean nothing.
+func extraRootFor(path string) string {
+	abs := config.AbsFor(path)
+	dir := abs
+	if fi, err := os.Stat(abs); err != nil || !fi.IsDir() {
+		dir = filepath.Dir(abs)
+	}
+	home, _ := os.UserHomeDir()
+	if dir == "/" || dir == "." || dir == filepath.VolumeName(dir)+string(filepath.Separator) || (home != "" && filepath.Clean(dir) == filepath.Clean(home)) {
+		return abs
+	}
+	return dir
+}
+
+func (s *permissionService) addExtraRoot(root, path string) {
+	if path == "" || path == "." {
+		return
+	}
+	dir := extraRootFor(path)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.extraRoots == nil {
+		s.extraRoots = make(map[string][]string)
+	}
+	if !slices.Contains(s.extraRoots[root], dir) {
+		s.extraRoots[root] = append(s.extraRoots[root], dir)
+	}
+}
+
+func (s *permissionService) inExtraRoot(root, path string) bool {
+	abs := config.AbsFor(path)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, d := range s.extraRoots[root] {
+		if abs == d || strings.HasPrefix(abs, strings.TrimRight(d, string(filepath.Separator))+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }

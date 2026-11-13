@@ -63,7 +63,7 @@ func (c *antigravityClient) buildEnvelope(messages []message.Message, ts []tools
 		Project:     project,
 		Request:     req,
 		RequestID:   "agent/" + randHex(16),
-		UserAgent:   auth.AntigravityRequestUA,
+		UserAgent:   auth.EffectiveAntigravityRequestUA(),
 		RequestType: "agent",
 	}
 }
@@ -104,7 +104,7 @@ func (c *antigravityClient) post(ctx context.Context, method string, env caEnvel
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	// Unlike the Gemini path, generation DOES carry the Antigravity UA.
-	req.Header.Set("User-Agent", auth.AntigravityUserAgent)
+	req.Header.Set("User-Agent", auth.EffectiveAntigravityUserAgent())
 	return http.DefaultClient.Do(req)
 }
 

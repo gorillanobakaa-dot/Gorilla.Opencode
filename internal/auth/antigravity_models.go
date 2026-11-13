@@ -28,13 +28,17 @@ package auth
 //
 // ENDPOINT
 //   POST https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels
-//   with an EMPTY JSON body. It rejects "metadata" and "cloudaicompanionProject"
-//   with 400 Unknown name — unlike loadCodeAssist, which requires metadata.
+//   with {"project":"aicode-consumers"}, exactly what the app sends. It rejects
+//   "metadata" and "cloudaicompanionProject" with 400 Unknown name.
 
 import (
 	"context"
 	"fmt"
 )
+
+// AntigravityListProject is the project value the real app puts in the
+// fetchAvailableModels body (not the account's own project).
+const AntigravityListProject = "aicode-consumers"
 
 // AntigravityModelInfo is one entry of the fetchAvailableModels response.
 // Field names are the measured wire shape, not a guess.
@@ -66,12 +70,17 @@ func (c *AntigravityCreds) FetchAvailableModels(ctx context.Context) (map[string
 		return nil, err
 	}
 	var resp fetchAvailableModelsResp
-	// Empty body, deliberately: see the endpoint note above.
-	if err := c.callAntigravity(ctx, token, "fetchAvailableModels", map[string]any{}, &resp); err != nil {
+	// The body the real Antigravity app sends (captured 2026-11-13 with mitmdump
+	// in front of app 2.31.2): {"project":"aicode-consumers"}. An empty body
+	// returns a shorter list WITHOUT the Gemini 4 family; the app's own project
+	// is not the account's project. Nothing is invented here: only ids the
+	// backend lists are ever shown.
+	if err := c.callAntigravity(ctx, token, "fetchAvailableModels", map[string]any{"project": AntigravityListProject}, &resp); err != nil {
 		return nil, fmt.Errorf("fetchAvailableModels: %w", err)
 	}
 	if len(resp.Models) == 0 {
 		return nil, fmt.Errorf("backend returned no models")
 	}
+
 	return resp.Models, nil
 }
