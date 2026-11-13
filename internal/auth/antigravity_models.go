@@ -73,5 +73,41 @@ func (c *AntigravityCreds) FetchAvailableModels(ctx context.Context) (map[string
 	if len(resp.Models) == 0 {
 		return nil, fmt.Errorf("backend returned no models")
 	}
+
+	// Antigravity v2.31+ introduces Gemini 4 (Hydrogen, Argon) and Orchestrator.
+	// When Google's raw fetchAvailableModels endpoint omits them, ensure they are
+	// present so they appear automatically in the picker without manual intervention.
+	gemini4Defaults := map[string]AntigravityModelInfo{
+		"gemini-4-hydrogen-medium": {
+			DisplayName:      "Gemini 4 Hydrogen (Medium)",
+			MaxTokens:        1048576,
+			MaxOutputTokens:  65536,
+			SupportsThinking: true,
+		},
+		"gemini-4-hydrogen-high": {
+			DisplayName:      "Gemini 4 Hydrogen (High)",
+			MaxTokens:        1048576,
+			MaxOutputTokens:  65536,
+			SupportsThinking: true,
+		},
+		"gemini-4-argon-medium": {
+			DisplayName:      "Gemini 4 Argon (Medium)",
+			MaxTokens:        1048576,
+			MaxOutputTokens:  65536,
+			SupportsThinking: true,
+		},
+		"orchestrator-argon": {
+			DisplayName:      "Orchestrator (Argon)",
+			MaxTokens:        1048576,
+			MaxOutputTokens:  65536,
+			SupportsThinking: true,
+		},
+	}
+	for id, info := range gemini4Defaults {
+		if _, exists := resp.Models[id]; !exists {
+			resp.Models[id] = info
+		}
+	}
+
 	return resp.Models, nil
 }
