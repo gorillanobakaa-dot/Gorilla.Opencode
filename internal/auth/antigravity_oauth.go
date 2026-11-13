@@ -45,6 +45,10 @@ const (
 	// DefaultAntigravityVersion is the fallback Antigravity client version.
 	DefaultAntigravityVersion = "2.31.2"
 
+	// DefaultAntigravityCL is the app's build number (cl=) as captured from 2.31.2;
+	// override with ANTIGRAVITY_CL without a rebuild.
+	DefaultAntigravityCL = "1019359392"
+
 	// AntigravityRequestUA is the top-level "userAgent" field the envelope
 	// carries (distinct from the HTTP header above). Measured value: "antigravity".
 	AntigravityRequestUA = "antigravity"
@@ -57,7 +61,11 @@ func FormatAntigravityUserAgent(version string) string {
 		version = DefaultAntigravityVersion
 	}
 	// Exactly the real app's header (captured 2026-11-13, app 2.31.2).
-	return fmt.Sprintf("antigravity/hub/%s (aidev_client; os_type=%s; arch=%s; cl=1019359392)", version, runtime.GOOS, runtime.GOARCH)
+	cl := strings.TrimSpace(os.Getenv("ANTIGRAVITY_CL"))
+	if cl == "" {
+		cl = DefaultAntigravityCL
+	}
+	return fmt.Sprintf("antigravity/hub/%s (aidev_client; os_type=%s; arch=%s; cl=%s)", version, runtime.GOOS, runtime.GOARCH, cl)
 }
 
 // DefaultAntigravityUserAgent is the default User-Agent identifying Antigravity requests.

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -50,5 +51,18 @@ func TestEffectiveAntigravityRequestUA(t *testing.T) {
 	t.Setenv("ANTIGRAVITY_REQUEST_UA", "antigravity-custom")
 	if reqUA := EffectiveAntigravityRequestUA(); reqUA != "antigravity-custom" {
 		t.Errorf("EffectiveAntigravityRequestUA() override = %q, want 'antigravity-custom'", reqUA)
+	}
+}
+
+func TestUserAgentIsBuiltFromRuntimeNotHardcoded(t *testing.T) {
+	os.Unsetenv("ANTIGRAVITY_CL")
+	ua := FormatAntigravityUserAgent("2.31.2")
+	want := "os_type=" + runtime.GOOS + "; arch=" + runtime.GOARCH + "; cl=1019359392)"
+	if !strings.Contains(ua, want) {
+		t.Fatalf("%q lacks %q", ua, want)
+	}
+	t.Setenv("ANTIGRAVITY_CL", "42")
+	if !strings.Contains(FormatAntigravityUserAgent("2.31.2"), "cl=42)") {
+		t.Fatal("cl override ignored")
 	}
 }
