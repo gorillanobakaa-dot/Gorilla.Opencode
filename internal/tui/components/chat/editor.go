@@ -2,6 +2,7 @@ package chat
 
 import (
 	"fmt"
+	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"os"
 	"os/exec"
 	"slices"
@@ -541,6 +542,14 @@ func (m *editorCmp) send() tea.Cmd {
 	}
 
 	if m.app.CoderAgent.IsSessionBusy(m.session.ID) {
+		// GORILLA OVERRIDE (2026-11-13): plain text typed while the agent works
+		// is queued and reaches the model at its next tool boundary.
+		text := strings.TrimSpace(m.textarea.Value())
+		if text != "" && !strings.HasPrefix(text, "/") && agent.QueueUserMessage(m.app.CoderAgent, m.session.ID, text) {
+			m.textarea.Reset()
+			m.rememberSent(text)
+			return util.ReportInfo(fmt.Sprintf("Queued (%d): the agent gets it at its next step. esc cancels the turn.", agent.QueuedCount(m.session.ID)))
+		}
 		return util.ReportWarn("Agent is working. esc cancels it. /model, /context and /tasks still work.")
 	}
 

@@ -422,6 +422,12 @@ func (a *agent) Run(ctx context.Context, sessionID string, content string, attac
 		if result.Error != nil && !errors.Is(result.Error, ErrRequestCancelled) && !errors.Is(result.Error, context.Canceled) {
 			logging.ErrorPersist(result.Error.Error())
 		}
+		if result.Error != nil && a.agentName == config.AgentCoder {
+			// Cancelled or failed with words still queued: never lose them.
+			for _, t := range TakeQueued(sessionID) {
+				logging.InfoPersist("Not sent (the turn ended): " + t)
+			}
+		}
 		logging.Debug("Request completed", "sessionID", sessionID)
 		// Only this run's own entry. See Cancel.
 		a.activeRequests.CompareAndDelete(sessionID, run)
@@ -606,6 +612,9 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 		if (agentMessage.FinishReason() == message.FinishReasonToolUse) && toolResults != nil {
 			// We are not done, we need to respond with the tool response
 			msgHistory = append(msgHistory, agentMessage, *toolResults)
+			// GORILLA OVERRIDE (2026-11-13): words the person typed while this
+			// step ran reach the model now, at the tool boundary.
+			msgHistory = a.appendQueued(ctx, sessionID, msgHistory)
 
 			// GORILLA OVERRIDE (2026-09-01): check the request FITS before
 			// spending a round trip discovering that it does not.
@@ -640,12 +649,34 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 			}
 			continue
 		}
+		// A message typed during the last step: answer it in the same run.
+		if a.agentName == config.AgentCoder && QueuedCount(sessionID) > 0 {
+			msgHistory = append(msgHistory, agentMessage)
+			msgHistory = a.appendQueued(ctx, sessionID, msgHistory)
+			continue
+		}
 		return AgentEvent{
 			Type:    AgentEventTypeResponse,
 			Message: agentMessage,
 			Done:    true,
 		}
 	}
+}
+
+// appendQueued adds the queued user messages (coder only) to the history.
+func (a *agent) appendQueued(ctx context.Context, sessionID string, hist []message.Message) []message.Message {
+	if a.agentName != config.AgentCoder {
+		return hist
+	}
+	for _, text := range TakeQueued(sessionID) {
+		um, err := a.createUserMessage(ctx, sessionID, text, nil)
+		if err != nil {
+			logging.ErrorPersist("could not deliver a queued message: " + err.Error() + " — it was: " + text)
+			continue
+		}
+		hist = append(hist, um)
+	}
+	return hist
 }
 
 func (a *agent) createUserMessage(ctx context.Context, sessionID, content string, attachmentParts []message.ContentPart) (message.Message, error) {
