@@ -27,6 +27,8 @@ func TestLongTaskReadsNeverAsk(t *testing.T) {
 		"grep -rn remove docs",
 		"ss -tlnp 2>/dev/null",
 		"iw dev wlan0 link",
+		"git -C /home/gorilla/Documents/Gorilla.Opencode log -n 5 --oneline --decorate",
+		"git --no-pager -C ../other status",
 	} {
 		if !IsSafeReadOnly(cmd, readOnlyList()) {
 			t.Errorf("%q asks; it only reads", cmd)
@@ -48,6 +50,9 @@ func TestLongTaskWritesStillAsk(t *testing.T) {
 		"for f in a; do cat $f > /etc/x; done",
 		"sort -o out in",
 		"git branch -d x",
+		"git -C /repo branch -D x",
+		"git -c core.pager=/tmp/x -C /repo log",
+		"git -C /repo push",
 		"ethtool -s eth0 speed 10",
 		"cat ~/.ssh/id_rsa",
 		"ip netns exec foo sh",

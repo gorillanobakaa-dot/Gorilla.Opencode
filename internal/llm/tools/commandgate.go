@@ -153,6 +153,41 @@ func hasUnsafeFlag(segment string) bool {
 	return false
 }
 
+// stripGitGlobals drops git's leading `-C DIR` and `--no-pager` so that
+// `git -C /repo log` is judged as `git log`. GORILLA OVERRIDE (2026-11-14): the
+// owner's test showed every agent read of another folder asking a person.
+// Only these two are dropped: `-c key=val` and `--exec-path` can make git run
+// another program, so they stay and the command still asks.
+func stripGitGlobals(seg string) string {
+	w := strings.Fields(seg)
+	if len(w) < 2 {
+		return seg
+	}
+	prog := strings.Trim(w[0], `"'`)
+	if i := strings.LastIndex(prog, "/"); i >= 0 {
+		prog = prog[i+1:]
+	}
+	if prog != "git" {
+		return seg
+	}
+	i := 1
+	for i < len(w) {
+		switch {
+		case w[i] == "--no-pager":
+			i++
+		case w[i] == "-C" && i+1 < len(w):
+			i += 2
+		default:
+			goto done
+		}
+	}
+done:
+	if i == 1 {
+		return seg
+	}
+	return strings.Join(append([]string{w[0]}, w[i:]...), " ")
+}
+
 // safeAssignment: VAR=value before a command is read-only when the variable
 // cannot make the program load or run something else.
 var unsafeAssignPrefixes = []string{"LD_", "DYLD_", "BASH_ENV", "ENV=", "GIT_", "PAGER", "EDITOR", "VISUAL", "PYTHON", "PERL", "RUBY", "NODE_", "SHELL", "IFS", "PROMPT_COMMAND", "LESSOPEN"}
@@ -333,7 +368,7 @@ func IsSafeReadOnly(cmd string, safe []string) bool {
 		if inert {
 			continue
 		}
-		seg = stripLeadingAssignments(rest)
+		seg = stripGitGlobals(stripLeadingAssignments(rest))
 		if isVersionQuery(seg) {
 			continue
 		}
