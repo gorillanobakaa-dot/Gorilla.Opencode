@@ -124,8 +124,8 @@ func TestNonInteractiveNeverPrompts(t *testing.T) {
 
 	select {
 	case got := <-done:
-		if got != project {
-			t.Errorf("resolved to %q, want %q", got, project)
+		if got == project {
+			t.Errorf("-p used the remembered workspace %q instead of the current directory", got)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("resolveWorkspace blocked with -p — it tried to prompt a script")
@@ -214,4 +214,23 @@ func chdir(t *testing.T, dir string) func() {
 		t.Fatal(err)
 	}
 	return func() { _ = os.Chdir(prev) }
+}
+
+// I-27: -p without -c must use the folder the command was typed in, never the
+// remembered workspace.
+func TestPromptWithoutCwdUsesCurrentDirectory(t *testing.T) {
+	saved, here := t.TempDir(), t.TempDir()
+	isolate(t, map[string]any{"wd": saved, "skipWorkspacePrompt": true})
+	restore := chdir(t, here)
+	defer restore()
+
+	got, _, _, err := resolveWorkspace("", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotR, _ := filepath.EvalSymlinks(got)
+	hereR, _ := filepath.EvalSymlinks(here)
+	if gotR != hereR {
+		t.Errorf("resolved to %q, want the current directory %q", got, here)
+	}
 }

@@ -112,6 +112,7 @@ func BuildAntigravityModels(rows []AntigravityRow) map[ModelID]Model {
 			continue
 		}
 		id := ModelID("antigravity." + r.ID)
+		maxOut := ClampMaxOutput(Model{APIModel: r.ID}, r.MaxOutputTokens)
 		out[id] = Model{
 			ID:       id,
 			Name:     displayNameFor(r) + antigravityNameSuffix,
@@ -120,7 +121,7 @@ func BuildAntigravityModels(rows []AntigravityRow) map[ModelID]Model {
 			Description: fmt.Sprintf("%s via your Google Antigravity sign-in (free tier or your Google AI plan). Reported by the backend on %s.",
 				displayNameFor(r), time.Now().Format("2006-01-02")),
 			ContextWindow:       r.MaxTokens,
-			DefaultMaxTokens:    r.MaxOutputTokens,
+			DefaultMaxTokens:    maxOut,
 			CanReason:           r.SupportsThinking,
 			SupportsAttachments: r.SupportsImages,
 			// The entitlement is the user's own (free tier or a Google AI plan):

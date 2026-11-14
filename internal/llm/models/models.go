@@ -2,6 +2,7 @@ package models
 
 import (
 	"maps"
+	"strings"
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/llm/cost"
@@ -104,4 +105,30 @@ func (m Model) Rates() (in, out float64) {
 		return in, out
 	}
 	return m.CostPer1MIn, m.CostPer1MOut
+}
+
+// providerMaxOutput is the hard per-request output limit a provider enforces
+// for a family of models, where the catalogue's own figure can be higher (the
+// Antigravity backend reports 262144 for GPT-OSS; the provider answers HTTP 400
+// above 131072). Keyed by a lower-case fragment of the API model id.
+var providerMaxOutput = map[string]int64{
+	"gpt-oss": 131072,
+}
+
+// ClampMaxOutput limits n to what the model really accepts: the model's own
+// DefaultMaxTokens when set and lower, and the provider's known cap.
+func ClampMaxOutput(m Model, n int64) int64 {
+	if n <= 0 {
+		return n
+	}
+	id := strings.ToLower(m.APIModel + " " + string(m.ID))
+	for frag, limit := range providerMaxOutput {
+		if strings.Contains(id, frag) && n > limit {
+			n = limit
+		}
+	}
+	if m.DefaultMaxTokens > 0 && n > m.DefaultMaxTokens {
+		n = m.DefaultMaxTokens
+	}
+	return n
 }

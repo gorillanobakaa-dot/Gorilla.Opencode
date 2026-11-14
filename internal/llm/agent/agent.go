@@ -1559,6 +1559,8 @@ func createAgentProviderFor(agentName config.AgentName, modelID models.ModelID) 
 	if agentConfig.MaxTokens > 0 {
 		maxTokens = agentConfig.MaxTokens
 	}
+	// A saved or catalogue figure above what the model accepts is a 400.
+	maxTokens = models.ClampMaxOutput(model, maxTokens)
 	opts := []provider.ProviderClientOption{
 		provider.WithAPIKey(apiKey),
 		provider.WithModel(model),
