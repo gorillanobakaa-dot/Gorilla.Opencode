@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -130,5 +131,26 @@ func TestNilSummaryAdaptsToNothing(t *testing.T) {
 	var q *QuotaSummary
 	if m := q.ToMeter("a@b.c"); m != nil {
 		t.Errorf("a nil summary produced %d meters", len(m))
+	}
+}
+
+func TestGroupMetersNameTheModelIDsTheyCover(t *testing.T) {
+	q := &QuotaSummary{Groups: []QuotaGroup{
+		{DisplayName: "Claude and GPT models", Description: "Models within this group: Claude Opus, GPT-OSS",
+			Buckets: []QuotaBucket{{DisplayName: "Weekly Limit", RemainingFraction: 1}}},
+	}}
+	live := map[string]AntigravityModelInfo{
+		"claude-opus-4-6-thinking": {DisplayName: "Claude Opus 4.6 (Thinking)"},
+		"gpt-oss-120b-medium":      {DisplayName: "GPT-OSS 120B (Medium)"},
+		"gemini-3-pro":             {DisplayName: "Gemini 3 Pro"},
+	}
+	n := q.ToMeterWithModels("a", live)[0].Note
+	for _, want := range []string{"claude-opus-4-6-thinking", "gpt-oss-120b-medium"} {
+		if !strings.Contains(n, want) {
+			t.Errorf("note %q lacks %s", n, want)
+		}
+	}
+	if strings.Contains(n, "gemini-3-pro") {
+		t.Errorf("note names a model outside the group: %q", n)
 	}
 }

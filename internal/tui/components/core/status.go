@@ -456,9 +456,10 @@ func (m statusCmp) View() string {
 		status += infoStyle.Render(msg)
 	} else {
 		status += styles.Padded().
+			Foreground(lipgloss.Color("#FFFFFF")).
 			Background(styles.SpeedColor).
 			Width(c.avail).
-			Render("")
+			Render(truncateStatusMsg(workingFolderLabel(), c.avail-infoPadding))
 	}
 
 	status += c.yolo
@@ -616,4 +617,13 @@ func costWarnUSD() float64 {
 		return cfg.CostWarnUSD
 	}
 	return 0
+}
+
+// workingFolderLabel is the folder the agent works in, shown in the idle middle
+// of the bar so a -p or -c run never leaves the user guessing where it is.
+func workingFolderLabel() string {
+	if cfg := config.Get(); cfg == nil {
+		return ""
+	}
+	return config.WorkingDirectory()
 }

@@ -17,6 +17,8 @@ package auth
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/opencode-ai/opencode/internal/quota"
@@ -35,6 +37,15 @@ const (
 // KindWindowQuota: these are genuine allowances inside a rolling window, which
 // is the one kind that honestly earns a bar.
 func (q *QuotaSummary) ToMeter(account string) []quota.Meter {
+	return q.ToMeterWithModels(account, nil)
+}
+
+// ToMeterWithModels is ToMeter that also names, under each group, the model ids
+// it covers. The provider says the family names ("Models within this group:
+// Gemini Flash, Gemini Pro") in the group description; the live model list
+// (id -> display name, from fetchAvailableModels) turns them into ids. Nothing
+// is hardcoded: a model the backend does not list is not named.
+func (q *QuotaSummary) ToMeterWithModels(account string, live map[string]AntigravityModelInfo) []quota.Meter {
 	if q == nil {
 		return nil
 	}
@@ -54,6 +65,9 @@ func (q *QuotaSummary) ToMeter(account string) []quota.Meter {
 			Account:  account,
 			Kind:     quota.KindWindowQuota,
 			Note:     g.Description,
+		}
+		if ids := groupModelIDs(g.Description, live); len(ids) > 0 {
+			m.Note = strings.TrimSpace(m.Note + "\nModel ids: " + strings.Join(ids, ", "))
 		}
 		for _, b := range g.Buckets {
 			label := b.DisplayName
@@ -147,4 +161,31 @@ func chatGPTResetPhrase(resetAt int64) string {
 	default:
 		return fmt.Sprintf("resets in %dd", ceilDiv(d, 24*time.Hour))
 	}
+}
+
+// groupModelIDs returns the live model ids whose display name contains one of
+// the family names listed in a group description after the first colon.
+func groupModelIDs(desc string, live map[string]AntigravityModelInfo) []string {
+	i := strings.Index(desc, ":")
+	if i < 0 || len(live) == 0 {
+		return nil
+	}
+	var fams []string
+	for _, f := range strings.Split(desc[i+1:], ",") {
+		if f = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(f), "."))); f != "" {
+			fams = append(fams, f)
+		}
+	}
+	var ids []string
+	for id, info := range live {
+		name := strings.ToLower(info.DisplayName)
+		for _, f := range fams {
+			if strings.Contains(name, f) {
+				ids = append(ids, id)
+				break
+			}
+		}
+	}
+	sort.Strings(ids)
+	return ids
 }

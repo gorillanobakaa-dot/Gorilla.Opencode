@@ -87,7 +87,10 @@ var (
 		if err != nil {
 			return nil, "", err
 		}
-		return q.ToMeter(""), creds.PlanLabel(), nil
+		// Best effort: the ids each bucket covers come from the live model
+		// list; without it the bucket keeps the provider's family names.
+		live, _ := creds.FetchAvailableModels(ctx)
+		return q.ToMeterWithModels("", live), creds.PlanLabel(), nil
 	}
 	chatGPTMeters = func() []quota.Meter {
 		q, _ := auth.LoadChatGPTQuota()

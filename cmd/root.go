@@ -41,8 +41,9 @@ import (
 // The precedence is deliberate:
 //  1. An explicit -c/--cwd always wins. The user was specific; do not
 //     second-guess them, and never interrupt a scripted invocation.
-//  2. Non-interactive runs (-p) never prompt — there is no one to answer. They
-//     fall back to the saved workspace, then to the real cwd.
+//  2. Non-interactive runs (-p) never prompt — there is no one to answer — and
+//     never use the saved workspace either: the folder the command was typed
+//     in IS the answer (I-27: -p silently worked in a remembered folder).
 //  3. Otherwise ask, unless the user has turned the question off, in which case
 //     the saved workspace is used silently.
 func resolveWorkspace(flagCwd string, nonInteractive bool) (dir, alreadySaved string, remember bool, err error) {
@@ -65,7 +66,10 @@ func resolveWorkspace(flagCwd string, nonInteractive bool) (dir, alreadySaved st
 	// saved history and every containment check use the long one.
 	realCwd = pathutil.Long(realCwd)
 
-	if nonInteractive || !saved.Ask || !interactiveTerminal() {
+	if nonInteractive {
+		return realCwd, saved.WorkingDir, false, nil
+	}
+	if !saved.Ask || !interactiveTerminal() {
 		if saved.WorkingDir != "" {
 			return saved.WorkingDir, saved.WorkingDir, false, nil
 		}
