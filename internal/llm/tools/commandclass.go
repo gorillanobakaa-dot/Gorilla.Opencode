@@ -40,7 +40,16 @@ var readOnlyAdditions = []string{
 	"cat", "head", "tail", "wc", "file", "stat", "find", "grep", "egrep", "fgrep", "rg",
 	"tree", "realpath", "readlink", "basename", "dirname", "test", "[",
 	"command -v", "diff", "cmp", "md5sum", "sha256sum", "sha1sum", "shasum", "md5",
-	"sort", "cut", "nproc", "arch", "locale", "tty", "lsb_release", "lscpu",
+	"sort", "cut", "tr", "column", "od", "hexdump", "xxd", "strings", "tac", "nl", "zcat",
+	"jq", "readelf", "objdump", "nm",
+	// Linux hardware and kernel diagnosis (owner 2026-11-14): all read; the
+	// words that make one write (iw set, ip link set, rfkill block ...) are in
+	// unsafeFlagsFor.
+	"iw", "rfkill list", "ip", "ss", "lspci", "lsusb", "lsmod", "lsblk", "ethtool", "lsof", "lscpu", "lshw", "lsipc", "lsns",
+	"dmesg", "journalctl", "modinfo", "findmnt", "sensors", "hostnamectl", "timedatectl status",
+	"nmcli -t", "nmcli device", "nmcli dev", "nmcli general", "nmcli connection show", "nmcli radio",
+	"bluetoothctl show", "bluetoothctl devices", "udevadm info", "udevadm settle", "getconf", "stat", "mountpoint",
+	"nproc", "arch", "locale", "tty", "lsb_release", "lscpu",
 	// macOS: how an agent learns which toolchain is there.
 	"sw_vers", "sysctl -n", "xcode-select -p", "xcode-select --print-path",
 	"pkgutil --pkg-info", "pkgutil --pkgs", "brew --prefix", "brew list", "brew config",

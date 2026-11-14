@@ -669,7 +669,7 @@ func (a *agent) appendQueued(ctx context.Context, sessionID string, hist []messa
 		return hist
 	}
 	for _, text := range TakeQueued(sessionID) {
-		um, err := a.createUserMessage(ctx, sessionID, text, nil)
+		um, err := a.createUserMessage(ctx, sessionID, SteerPrefix+text, nil)
 		if err != nil {
 			logging.ErrorPersist("could not deliver a queued message: " + err.Error() + " — it was: " + text)
 			continue
@@ -896,11 +896,31 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 				}
 				continue
 			}
-			toolResult, toolErr := tool.Run(ctx, tools.ToolCall{
+			toolCtx, toolCancel := context.WithCancel(ctx)
+			setRunningTool(sessionID, toolCancel)
+			toolResult, toolErr := tool.Run(toolCtx, tools.ToolCall{
 				ID:    toolCall.ID,
 				Name:  toolCall.Name,
 				Input: toolCall.Input,
 			})
+			toolCancel()
+			if finishRunningTool(sessionID) && ctx.Err() == nil {
+				// GORILLA OVERRIDE (2026-11-14): Esc stops this tool, not the run.
+				ran[i] = false
+				toolResults[i] = message.ToolResult{
+					ToolCallID: toolCall.ID,
+					Content:    InterruptedToolResult,
+					IsError:    true,
+				}
+				for j := i + 1; j < len(toolCalls); j++ {
+					toolResults[j] = message.ToolResult{
+						ToolCallID: toolCalls[j].ID,
+						Content:    "Not run: the owner pressed Esc on an earlier call in the same message.",
+						IsError:    true,
+					}
+				}
+				goto out
+			}
 			if toolErr != nil {
 				if errors.Is(toolErr, permission.ErrorPermissionDenied) && permission.TakePersonDenial(sessionID) {
 					// GORILLA FIX (2026-10-23): a person pressing Deny is an
