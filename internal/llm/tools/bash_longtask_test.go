@@ -1,10 +1,16 @@
 package tools
 
-import "testing"
+import (
+	"runtime"
+	"testing"
+)
 
 // Owner 2026-11-14: these exact commands raised dialogs on a long kernel
 // diagnosis. Reads never ask; the writes next to them still do.
 func TestLongTaskReadsNeverAsk(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("these are Linux/bash commands; PowerShell has its own read-only list")
+	}
 	for _, cmd := range []string{
 		"which iw rfkill; iw reg get; rfkill list",
 		"diff -rq /a /b | grep -v foo",
