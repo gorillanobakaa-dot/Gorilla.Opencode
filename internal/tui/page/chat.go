@@ -2,6 +2,7 @@ package page
 
 import (
 	"context"
+	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -313,7 +314,12 @@ func (p *chatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if p.session.ID != "" {
 				// Cancel the current session's generation process
 				// This allows users to interrupt long-running operations
-				p.app.CoderAgent.Cancel(p.session.ID)
+				// GORILLA OVERRIDE (2026-11-14): while a tool runs, Esc stops that
+				// tool only and the model asks continue / change; with no tool
+				// running (the model is writing) it cancels the run as before.
+				if !agent.InterruptTool(p.session.ID) {
+					p.app.CoderAgent.Cancel(p.session.ID)
+				}
 				return p, nil
 			}
 		}

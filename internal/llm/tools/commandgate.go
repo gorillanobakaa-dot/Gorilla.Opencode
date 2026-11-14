@@ -97,28 +97,115 @@ var opaqueConstructs = []string{"$(", "`", "${", ">", "<(", "(", "{"}
 //
 // A segment carrying any of these is not refused. It is asked about.
 var unsafeFlags = []string{
-	"-exec", "-toolexec", "-vettool", "-o", "-w", "--output", "--no-index", "--ext-diff",
-	"-d", "-D", "--delete", "-m", "-M", "--move", "-f", "--force", "-c", "-C",
-	"--upload-pack", "--exec", "add", "remove", "rename", "set-url", "prune",
-	// GORILLA OVERRIDE (2026-10-23): find and rg joined the read-only list
-	// (commandclass.go). These are the flags by which they delete, write a
-	// file or run another program.
+	// Flags that run another program or write a file, whatever the program.
+	"-exec", "-toolexec", "-vettool", "--output", "--no-index", "--ext-diff",
+	"--upload-pack", "--exec",
 	"-delete", "-execdir", "-ok", "-okdir", "-fprint", "-fprint0", "-fprintf", "-fls",
 	"--pre", "--install", "--switch", "--reset",
+	// Rotating or clearing logs, writing sysctl, changing a link: never a read.
+	"--vacuum-size", "--vacuum-time", "--vacuum-files", "--rotate", "--flush", "--sync",
+}
+
+// unsafeFlagsFor are short flags that are writes for ONE family of programs
+// and ordinary reads for the rest: `git branch -d` deletes, `grep -c`, `grep -w`,
+// `ls -d`, `lsblk -o`, `du -d` and `grep -C 3` only look. GORILLA OVERRIDE
+// (2026-11-14): they were global, so `grep -c`, `lsblk -o NAME` and every
+// `grep ... remove` asked a person on a long task. Now each applies to the
+// programs it is dangerous for.
+var unsafeFlagsFor = map[string][]string{
+	"git": {"-d", "-D", "--delete", "-m", "-M", "--move", "-f", "--force", "-c", "-C",
+		"add", "remove", "rename", "set-url", "prune", "-o"},
+	"go":         {"-o", "-f", "-w"},
+	"sort":       {"-o"},
+	"sysctl":     {"-w"},
+	"dmesg":      {"-c", "-C", "--clear", "--read-clear"},
+	"iw":         {"set", "add", "del", "connect", "disconnect", "ibss", "mesh", "offchannel", "cac", "start", "stop", "flush", "authenticate", "associate", "deauth", "wowlan"},
+	"ip":         {"set", "add", "del", "delete", "flush", "change", "replace", "append", "exec", "netns", "up", "down"},
+	"ethtool":    {"-s", "-K", "-G", "-A", "-C", "-L", "-E", "-f", "--flash"},
+	"rfkill":     {"block", "unblock", "toggle"},
+	"journalctl": {"--vacuum-size", "--vacuum-time", "--rotate", "--flush"},
+	"sed":        {"-i", "--in-place", "w", "e"},
 }
 
 // hasUnsafeFlag reports whether any word of a segment is, or starts with, one
-// of unsafeFlags followed by end, '=' or nothing. Case-SENSITIVE on purpose:
-// -d and -D, -m and -M are different flags and both are listed.
+// of the unsafe flags followed by end, '=' or nothing. Case-SENSITIVE on
+// purpose: -d and -D, -m and -M are different flags and both are listed.
 func hasUnsafeFlag(segment string) bool {
-	for _, w := range strings.Fields(segment)[1:] {
-		for _, f := range unsafeFlags {
-			if w == f || strings.HasPrefix(w, f+"=") {
-				return true
+	segment = stripLeadingAssignments(segment)
+	words := strings.Fields(segment)
+	if len(words) < 2 {
+		return false
+	}
+	prog := strings.Trim(words[0], `"'`)
+	if i := strings.LastIndex(prog, "/"); i >= 0 {
+		prog = prog[i+1:]
+	}
+	lists := [][]string{unsafeFlags, unsafeFlagsFor[prog]}
+	for _, w := range words[1:] {
+		for _, l := range lists {
+			for _, f := range l {
+				if w == f || strings.HasPrefix(w, f+"=") {
+					return true
+				}
 			}
 		}
 	}
 	return false
+}
+
+// safeAssignment: VAR=value before a command is read-only when the variable
+// cannot make the program load or run something else.
+var unsafeAssignPrefixes = []string{"LD_", "DYLD_", "BASH_ENV", "ENV=", "GIT_", "PAGER", "EDITOR", "VISUAL", "PYTHON", "PERL", "RUBY", "NODE_", "SHELL", "IFS", "PROMPT_COMMAND", "LESSOPEN"}
+
+func isSafeAssignment(w string) bool {
+	i := strings.Index(w, "=")
+	if i <= 0 || strings.HasPrefix(w, "-") {
+		return false
+	}
+	for _, c := range w[:i] {
+		if !(c == '_' || c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9') {
+			return false
+		}
+	}
+	for _, p := range unsafeAssignPrefixes {
+		if strings.HasPrefix(w, p) {
+			return false
+		}
+	}
+	return true
+}
+
+// stripLeadingAssignments removes safe `VAR=value` words in front of a command
+// (`PATH=/usr/sbin:$PATH iw reg get`). An unsafe one is left, so the segment
+// then matches nothing and asks.
+func stripLeadingAssignments(seg string) string {
+	seg = strings.TrimSpace(seg)
+	for {
+		f := strings.Fields(seg)
+		if len(f) < 2 || !isSafeAssignment(f[0]) {
+			return seg
+		}
+		seg = strings.TrimSpace(strings.TrimPrefix(seg, f[0]))
+	}
+}
+
+// loopHead reduces the pieces a read-only for-loop splits into at `;`:
+// `for f in a b` and `done` are inert, `do CMD` is judged as CMD.
+func loopPiece(seg string) (inert bool, rest string) {
+	seg = strings.TrimSpace(seg)
+	w := strings.Fields(seg)
+	if len(w) == 0 {
+		return false, seg
+	}
+	switch {
+	case w[0] == "done" && len(w) == 1:
+		return true, ""
+	case w[0] == "for" && len(w) >= 4 && w[2] == "in":
+		return true, ""
+	case w[0] == "do" && len(w) >= 2:
+		return false, strings.TrimSpace(strings.TrimPrefix(seg, "do"))
+	}
+	return false, seg
 }
 
 // splitShellCommands breaks a command line into the individual commands a shell
@@ -126,6 +213,9 @@ func hasUnsafeFlag(segment string) bool {
 // because a spurious extra segment costs at most one permission prompt while a
 // missed segment costs the whole gate.
 func splitShellCommands(cmd string) []string {
+	if out, ok := splitOutsideQuotes(cmd); ok {
+		return out
+	}
 	parts := []string{cmd}
 	for _, op := range shellChainOperators {
 		var next []string
@@ -239,6 +329,11 @@ func IsSafeReadOnly(cmd string, safe []string) bool {
 		return false
 	}
 	for _, seg := range segments {
+		inert, rest := loopPiece(seg)
+		if inert {
+			continue
+		}
+		seg = stripLeadingAssignments(rest)
 		if isVersionQuery(seg) {
 			continue
 		}
@@ -275,4 +370,50 @@ func segmentIsReadOnly(segment string, safe []string) bool {
 		}
 	}
 	return false
+}
+
+// splitOutsideQuotes splits at the chain operators that sit OUTSIDE quotes, so
+// `grep -E 'a|b' file` is one command, not two. GORILLA OVERRIDE (2026-11-14):
+// the crude split made every alternation in a quoted pattern ask a person.
+// Quotes that do not balance return ok=false and the crude split decides, so
+// the gate still fails closed.
+func splitOutsideQuotes(cmd string) ([]string, bool) {
+	var out []string
+	var cur strings.Builder
+	var q byte
+	flush := func() {
+		if s := strings.TrimSpace(cur.String()); s != "" {
+			out = append(out, s)
+		}
+		cur.Reset()
+	}
+	for i := 0; i < len(cmd); i++ {
+		c := cmd[i]
+		switch {
+		case q != 0:
+			cur.WriteByte(c)
+			if c == '\\' && q == '"' && i+1 < len(cmd) {
+				i++
+				cur.WriteByte(cmd[i])
+			} else if c == q {
+				q = 0
+			}
+		case c == '\\' && i+1 < len(cmd):
+			cur.WriteByte(c)
+			i++
+			cur.WriteByte(cmd[i])
+		case c == '\'' || c == '"':
+			q = c
+			cur.WriteByte(c)
+		case c == '&' || c == '|' || c == ';' || c == '\n' || c == '\r':
+			flush()
+		default:
+			cur.WriteByte(c)
+		}
+	}
+	if q != 0 {
+		return nil, false
+	}
+	flush()
+	return out, true
 }
