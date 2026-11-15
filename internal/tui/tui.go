@@ -3704,7 +3704,7 @@ func (a *appModel) refreshModelCatalogues() tea.Cmd {
 					ID: id, DisplayName: m.DisplayName, APIProvider: m.APIProvider,
 					MaxTokens: m.MaxTokens, MaxOutputTokens: m.MaxOutputTokens,
 					SupportsImages: m.SupportsImages, SupportsThinking: m.SupportsThinking,
-					IsInternal: m.IsInternal,
+					IsInternal: m.IsInternal, Notice: m.Notice(),
 				})
 			}
 			if res, rerr := models.RefreshAntigravity(dir, rows); rerr != nil {

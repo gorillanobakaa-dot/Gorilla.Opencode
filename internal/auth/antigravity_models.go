@@ -55,6 +55,22 @@ type AntigravityModelInfo struct {
 	MinThinkingBudget int64  `json:"minThinkingBudget"`
 	IsInternal        bool   `json:"isInternal"`
 	Recommended       bool   `json:"recommended"`
+	// tagTitle / tagDescription are the backend's own per-model notice. Measured
+	// 2026-11-15 (fetchAvailableModels, 33 models): tagTitle "New" on 14,
+	// "Notice" on gpt-oss-120b-medium with tagDescription "GPT-OSS will be
+	// removed from Antigravity on November 18, 2026.", "Unavailable" on
+	// gemini-4-carbon-disabled. There is no separate deprecation/sunset field.
+	TagTitle       string `json:"tagTitle"`
+	TagDescription string `json:"tagDescription"`
+}
+
+// Notice is the text the picker shows for a model: the backend's own
+// description when it sent one. A bare "New" tag is a promotion, not a notice.
+func (m AntigravityModelInfo) Notice() string {
+	if m.TagDescription == "" {
+		return ""
+	}
+	return m.TagDescription
 }
 
 type fetchAvailableModelsResp struct {

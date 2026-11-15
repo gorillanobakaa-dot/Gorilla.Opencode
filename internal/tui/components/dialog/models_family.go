@@ -89,3 +89,20 @@ func familyRow(g models.FamilyGroup, effort string) models.Model {
 	}
 	return v
 }
+
+// noticeFor is the backend's own notice for row i (a removal date, a plan
+// limit). A family shows the notice of any of its variants: the backend tags
+// one effort id, and the owner must see it whichever effort is highlighted.
+func (m *modelDialogCmp) noticeFor(i int) string {
+	if i >= len(m.models) {
+		return ""
+	}
+	if i < len(m.families) {
+		for _, v := range m.families[i].Variants {
+			if v.Notice != "" {
+				return v.Notice
+			}
+		}
+	}
+	return m.models[i].Notice
+}

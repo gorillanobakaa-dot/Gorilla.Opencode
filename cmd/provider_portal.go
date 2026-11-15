@@ -1087,7 +1087,7 @@ func refreshAntigravityCatalogue(ctx context.Context) {
 			ID: id, DisplayName: m.DisplayName, APIProvider: m.APIProvider,
 			MaxTokens: m.MaxTokens, MaxOutputTokens: m.MaxOutputTokens,
 			SupportsImages: m.SupportsImages, SupportsThinking: m.SupportsThinking,
-			IsInternal: m.IsInternal,
+			IsInternal: m.IsInternal, Notice: m.Notice(),
 		})
 	}
 	res, err := models.RefreshAntigravity(config.CacheBase(), rows)

@@ -887,7 +887,7 @@ func validateAgentMaxTokens(cfg *Config, name AgentName, agent Agent, model mode
 	// GORILLA OVERRIDE: operator-precedence bug — the original condition
 	// parsed as (CanReason && OpenAI) || Local, forcing reasoning effort
 	// onto every local-provider model whether it can reason or not.
-	if model.CanReason && (model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal) {
+	if model.CanReason && (model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal || model.Provider == models.ProviderChatGPT) {
 		if agent.ReasoningEffort == "" {
 			// Set default reasoning effort for models that support it
 			logging.Info("setting default reasoning effort for model that supports reasoning",
