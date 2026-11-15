@@ -71,12 +71,21 @@ How long the AI may think before answering. Only some models support this; on th
 
 ### Permission mode
 
-How much the AI may do before asking you. ask: every change asks. accept-edits: file edits in your project are approved, commands and the web still ask. plan: read-only, the AI describes instead of doing. auto: approved without asking, except an irreversible command, a request that leaves the machine after untrusted content was read, or a path outside your workspace. Shift+Tab cycles through them; /mode sets one by name. Shown in the status bar whenever it is not "ask".
+How much the AI may do before asking you. ask: every change asks. accept-edits: file edits in your project are approved, commands and the web still ask. plan: read-only, the AI describes instead of doing. auto: approved without asking, except an irreversible command, sudo or an install for the whole computer, or a path outside your workspace. Shift+Tab cycles through them; /mode sets one by name. Shown in the status bar whenever it is not "ask".
 
 - **Setting:** `permissions.mode`
 - **Type:** choice
 - **Accepts:** ask / accept-edits / plan / auto
 - **Default:** `ask`
+
+### Web access without asking
+
+allow (default): searching the web and reading a public web page never asks. ask: every search and every new site asks. Either way it still asks for a non-web address, a page on your own network or this computer, a very long query string, or anything that uploads. Plan mode always asks for web reads.
+
+- **Setting:** `permissions.web`
+- **Type:** choice
+- **Accepts:** allow / ask
+- **Default:** `allow`
 
 ## Show me the working
 

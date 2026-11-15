@@ -47,6 +47,39 @@ var PermissionModes = []string{PermissionAsk, PermissionAcceptEdits, PermissionP
 // PermissionsConfig is the persisted block.
 type PermissionsConfig struct {
 	Mode string `json:"mode,omitempty"`
+	// Web is "allow" (default) or "ask": whether web_search and public GET
+	// web_fetch run without a dialog. See WebPermission.
+	Web string `json:"web,omitempty"`
+}
+
+const (
+	WebAllow = "allow"
+	WebAsk   = "ask"
+)
+
+// WebPermission is the one decision for the web tools: "allow" (the default)
+// lets web_search and a public GET web_fetch run without asking, in every
+// mode except plan. "ask" restores a dialog per search and per site.
+// Dangerous shapes (non-http(s), private addresses, long query data) ask
+// regardless; see tools.webNeedsAsk.
+func WebPermission() string {
+	if cfg == nil || cfg.Permissions.Web != WebAsk {
+		return WebAllow
+	}
+	return WebAsk
+}
+
+// SetWebPermission records and persists the web decision.
+func SetWebPermission(v string) error {
+	if cfg == nil {
+		return fmt.Errorf("config not loaded")
+	}
+	v = strings.ToLower(strings.TrimSpace(v))
+	if v != WebAllow && v != WebAsk {
+		return fmt.Errorf("permissions.web must be allow or ask, not %q", v)
+	}
+	cfg.Permissions.Web = v
+	return updateCfgFile(func(c *Config) { c.Permissions.Web = v })
 }
 
 // PermissionMode reports the standing mode; "ask" until something is set.
@@ -132,6 +165,28 @@ func init() {
 				return err
 			}
 			return SetPermissionMode(s)
+		},
+	})
+}
+
+func init() {
+	Settings = append(Settings, Setting{
+		ID:    "permissions.web",
+		Group: GroupConversation,
+		Name:  "Web access without asking",
+		Layman: "allow (default): searching the web and reading a public web page never asks. ask: every search and every new site asks. " +
+			"Either way it still asks for a non-web address, a page on your own network or this computer, a very long query string, or anything that uploads. " +
+			"Plan mode always asks for web reads.",
+		Kind:    KindEnum,
+		Default: WebAllow,
+		Options: []string{WebAllow, WebAsk},
+		Get:     func() any { return WebPermission() },
+		Set: func(v any) error {
+			s, err := asString(v)
+			if err != nil {
+				return err
+			}
+			return SetWebPermission(s)
 		},
 	})
 }
