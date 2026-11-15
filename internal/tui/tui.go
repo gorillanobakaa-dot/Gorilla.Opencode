@@ -746,7 +746,11 @@ func antigravityUsageCmd(quiet bool) tea.Cmd {
 			return quotaLineMsg{line: "Antigravity usage: " + err.Error(), kind: util.InfoTypeError}
 		}
 		msg := quotaLineMsg{line: auth.FormatQuotaLineFor(q, time.Now(), creds.PlanLabel()), kind: util.InfoTypeInfo}
-		meters := q.ToMeter(creds.Email)
+		// The live model list names which models each quota group covers, and
+		// lists the ones no group names under "other / bucket unknown". Best
+		// effort: without it the groups keep the provider's own wording.
+		live, _ := creds.FetchAvailableModels(context.Background())
+		meters := q.ToMeterWithModels(creds.Email, live)
 		_, msg.fractions = bananaAlerts(nil, meters) // seed/update the alert baseline
 		if !quiet {
 			msg.meters = meters

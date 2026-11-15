@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -152,5 +153,60 @@ func TestGroupMetersNameTheModelIDsTheyCover(t *testing.T) {
 	}
 	if strings.Contains(n, "gemini-3-pro") {
 		t.Errorf("note names a model outside the group: %q", n)
+	}
+}
+
+// The real wire: fetchAvailableModels JSON through the same struct the client
+// decodes, and the quota groups as Google describes them (owner screenshot
+// 2026-11-14). Every live model is under a group or under "other"; none is
+// dropped, and nothing in the code names a model.
+func TestEveryLiveModelIsUnderAGroupOrOther(t *testing.T) {
+	var resp fetchAvailableModelsResp
+	wire := `{"models":{
+	 "gemini-4-hydrogen-high":{"displayName":"Gemini 4 Hydrogen (High)"},
+	 "gemini-4-hydrogen-low":{"displayName":"Gemini 4 Hydrogen (Low)"},
+	 "gemini-3.8-flash":{"displayName":"Gemini 3.8 Flash"},
+	 "gemini-4-argon":{"displayName":"Gemini 4 Argon"},
+	 "claude-opus-5-5":{"displayName":"Claude Opus 5.5"},
+	 "gpt-oss-120b-medium":{"displayName":"GPT-OSS 120B (Medium)"},
+	 "orchestrator-1":{"displayName":"Orchestrator","isInternal":true}}}`
+	if err := json.Unmarshal([]byte(wire), &resp); err != nil {
+		t.Fatal(err)
+	}
+	q := &QuotaSummary{Groups: []QuotaGroup{
+		{DisplayName: "Gemini Models", Description: "Models within this group: Gemini 4 Hydrogen, Gemini 3.8 Flash",
+			Buckets: []QuotaBucket{{DisplayName: "Weekly", RemainingFraction: 0.5}}},
+		{DisplayName: "Claude and GPT Models", Description: "Models within this group: Claude Opus, GPT-OSS",
+			Buckets: []QuotaBucket{{DisplayName: "Weekly", RemainingFraction: 1}}},
+		{DisplayName: "Gemini 4 Argon", Buckets: []QuotaBucket{{DisplayName: "Weekly", RemainingFraction: 0.2}}},
+	}}
+	meters := q.ToMeterWithModels("a@b.c", resp.Models)
+	where := map[string]string{}
+	for _, m := range meters {
+		i := strings.Index(m.Note, "Model ids: ")
+		if i < 0 {
+			continue
+		}
+		for _, id := range strings.Split(m.Note[i+len("Model ids: "):], ", ") {
+			where[strings.TrimSpace(id)] = m.Provider
+		}
+	}
+	for id := range resp.Models {
+		if where[id] == "" {
+			t.Errorf("%s appears under no group", id)
+		}
+	}
+	if where["gemini-4-argon"] != "Gemini 4 Argon" {
+		t.Errorf("argon under %q", where["gemini-4-argon"])
+	}
+	if where["orchestrator-1"] != "other / bucket unknown" {
+		t.Errorf("orchestrator under %q", where["orchestrator-1"])
+	}
+	if where["gemini-4-hydrogen-high"] != "Gemini Models" || where["gemini-4-hydrogen-low"] != "Gemini Models" {
+		t.Errorf("hydrogen variants under %q / %q", where["gemini-4-hydrogen-high"], where["gemini-4-hydrogen-low"])
+	}
+	// No live list: no "other" meter, the groups stay as the provider wrote them.
+	if got := len(q.ToMeterWithModels("a", nil)); got != 3 {
+		t.Errorf("without a live list want 3 meters, got %d", got)
 	}
 }
