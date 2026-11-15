@@ -58,6 +58,11 @@ func (q *QuotaSummary) ToMeterWithModels(account string, live map[string]Antigra
 		// number, so collapsing them under one provider heading would print two
 		// identical titles over two different meters.
 		heading := g.DisplayName
+		if heading == "" && len(g.Buckets) > 0 {
+			// A group the backend left unnamed (a plan-only bucket) still
+			// gets its own meter, titled by the backend's bucket id.
+			heading = g.Buckets[0].BucketID
+		}
 		if heading == "" {
 			heading = AntigravityProviderName
 		}
@@ -78,9 +83,16 @@ func (q *QuotaSummary) ToMeterWithModels(account string, live map[string]Antigra
 			if label == "" {
 				label = b.Window
 			}
+			if label == "" {
+				label = b.BucketID
+			}
+			rem := b.RemainingFraction
+			if b.NoReading {
+				rem = quota.FractionUnknown
+			}
 			m.Bars = append(m.Bars, quota.Bar{
 				Label:     label,
-				Remaining: b.RemainingFraction,
+				Remaining: rem,
 				// ResetTime is carried as the provider's raw string; the panel
 				// owns the phrasing, because "resets in 6d" is presentation.
 				Reset: b.ResetTime,
@@ -104,7 +116,7 @@ func (q *QuotaSummary) ToMeterWithModels(account string, live map[string]Antigra
 				Provider: "other / bucket unknown",
 				Account:  account,
 				Kind:     quota.KindWindowQuota,
-				Note:     "Models the backend lists that no quota group names:\nModel ids: " + strings.Join(other, ", "),
+				Note:     "No quota reading from the backend for this plan.\nModel ids: " + strings.Join(other, ", "),
 			})
 		}
 	}

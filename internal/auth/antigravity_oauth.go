@@ -386,11 +386,32 @@ func (c *AntigravityCreds) SetupProject(ctx context.Context) error {
 
 // QuotaBucket is one rolling limit within a model group (measured shape).
 type QuotaBucket struct {
+	BucketID          string  `json:"bucketId"`
 	DisplayName       string  `json:"displayName"`
 	Window            string  `json:"window"`
 	ResetTime         string  `json:"resetTime"`
 	Description       string  `json:"description"`
 	RemainingFraction float64 `json:"remainingFraction"`
+	// NoReading is true when the backend sent the bucket without a
+	// remainingFraction: absent is unknown, never 0% left.
+	NoReading bool `json:"-"`
+}
+
+// UnmarshalJSON records whether remainingFraction was present at all.
+func (b *QuotaBucket) UnmarshalJSON(data []byte) error {
+	type plain QuotaBucket
+	aux := struct {
+		*plain
+		Rem *float64 `json:"remainingFraction"`
+	}{plain: (*plain)(b)}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	b.NoReading = aux.Rem == nil
+	if aux.Rem != nil {
+		b.RemainingFraction = *aux.Rem
+	}
+	return nil
 }
 
 // QuotaGroup is a family of models sharing a weekly limit (Gemini; Claude+GPT).
