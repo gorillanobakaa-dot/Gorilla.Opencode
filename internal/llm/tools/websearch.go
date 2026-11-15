@@ -1070,7 +1070,7 @@ func (t *webSearchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, e
 	if sessionID == "" || messageID == "" {
 		return ToolResponse{}, fmt.Errorf("session ID and message ID are required for web_search")
 	}
-	if !t.permissions.Request(permission.CreatePermissionRequest{
+	if webSearchNeedsAsk(params.Query) && !t.permissions.Request(permission.CreatePermissionRequest{
 		SessionID:   sessionID,
 		Path:        config.WorkingDirectory(),
 		ToolName:    WebSearchToolName,

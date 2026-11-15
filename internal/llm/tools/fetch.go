@@ -503,7 +503,7 @@ func (t *fetchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 	if sessionID == "" || messageID == "" {
 		return ToolResponse{}, fmt.Errorf("session ID and message ID are required for web_fetch")
 	}
-	if !t.permissions.Request(fetchPermissionRequest(sessionID, params)) {
+	if webNeedsAsk(params.URL) && !t.permissions.Request(fetchPermissionRequest(sessionID, params)) {
 		return ToolResponse{}, permission.ErrorPermissionDenied
 	}
 
