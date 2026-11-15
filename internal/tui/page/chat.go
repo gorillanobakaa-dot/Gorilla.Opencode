@@ -317,8 +317,17 @@ func (p *chatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// GORILLA OVERRIDE (2026-11-14): while a tool runs, Esc stops that
 				// tool only and the model asks continue / change; with no tool
 				// running (the model is writing) it cancels the run as before.
-				if !agent.InterruptTool(p.session.ID) {
+				busy := p.app.CoderAgent.IsSessionBusy(p.session.ID)
+				toolStopped := agent.InterruptTool(p.session.ID)
+				if !toolStopped {
 					p.app.CoderAgent.Cancel(p.session.ID)
+				}
+				// GORILLA OVERRIDE (2026-11-15): owner test v0.1.162-13: Esc
+				// stopped the run but nothing asked "continue or change?".
+				// Say it on screen whichever way the run was stopped, so the
+				// question never depends on the model remembering to ask.
+				if busy {
+					return p, util.ReportInfoEcho(escStoppedNotice(toolStopped))
 				}
 				return p, nil
 			}
@@ -487,4 +496,12 @@ func NewChatPage(app *app.App) tea.Model {
 			layout.WithBottomPanel(editorContainer),
 		),
 	}
+}
+
+// escStoppedNotice is the question the owner sees after Esc stopped a run.
+func escStoppedNotice(toolOnly bool) string {
+	if toolOnly {
+		return "Stopped the running step. Continue or change? Type \"continue\" to carry on with the plan, or type what to do instead."
+	}
+	return "Stopped. Continue or change? Type \"continue\" to carry on where it left off, or type what to do instead."
 }
