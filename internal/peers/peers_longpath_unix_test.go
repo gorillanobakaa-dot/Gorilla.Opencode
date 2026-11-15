@@ -13,7 +13,11 @@ import (
 )
 
 func TestSessionStartsWhenTheRegisterFolderPathIsTooLongForASocket(t *testing.T) {
-	run := t.TempDir()
+	run, err := os.MkdirTemp("/tmp", "gx") // short: XDG_RUNTIME_DIR is only used when it is short itself
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(run) })
 	t.Setenv("XDG_RUNTIME_DIR", run)
 	dir := filepath.Join(t.TempDir(), strings.Repeat("long-state-folder-", 8), "peers")
 	if len(filepath.Join(dir, "12345.sock")) <= maxSocketPath {
