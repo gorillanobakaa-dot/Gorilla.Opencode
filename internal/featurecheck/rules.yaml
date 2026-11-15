@@ -1,0 +1,17 @@
+# The "new model / new feature" checklist. Data, not code: a model (or the
+# owner) edits this file, never the checker.
+#
+# model_refs: files that may name a catalogue model. A name found by
+#   `id_pattern` that the live catalogue no longer has is a STALE finding.
+# tool_surfaces: files that must mention every tool named with --new-tool.
+id_pattern: '\b(?:antigravity|chatgpt|claude|gemini|gpt)[.-][a-z0-9][a-z0-9.\-]*[a-z0-9]'
+model_refs:
+  - {surface: "/help pages",   glob: "internal/helppages/*.go"}
+  - {surface: "/arsenal",      glob: "internal/arsenal/manifest.json"}
+  - {surface: "docs",          glob: "docs/*.md"}
+  - {surface: "usage screen",  glob: "internal/usage/*.go"}
+tool_surfaces:
+  - {surface: "/help pages",   glob: "internal/helppages/*.go"}
+  - {surface: "/arsenal",      glob: "internal/arsenal/manifest.json"}
+  - {surface: "docs",          glob: "docs/COMMANDS.md"}
+  - {surface: "release notes", glob: "release_docs_*/*.md"}
