@@ -238,6 +238,7 @@ func (o *openaiClient) preparedParams(messages []openai.ChatCompletionMessagePar
 
 	if o.providerOptions.model.CanReason == true {
 		params.MaxCompletionTokens = openai.Int(o.providerOptions.maxTokens)
+		logEffort(string(o.providerOptions.model.Provider), o.providerOptions.model.APIModel, o.options.reasoningEffort, "reasoning_effort")
 		switch o.options.reasoningEffort {
 		case "low":
 			params.ReasoningEffort = shared.ReasoningEffortLow
