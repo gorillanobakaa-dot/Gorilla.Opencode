@@ -58,6 +58,8 @@ func (c *antigravityClient) buildEnvelope(messages []message.Message, ts []tools
 	if c.creds != nil {
 		project = c.creds.ProjectID
 	}
+	logEffort(string(c.providerOptions.model.Provider), c.providerOptions.model.APIModel,
+		effortInModelID(c.providerOptions.model.APIModel), "model id suffix")
 	return caEnvelope{
 		Model:       c.providerOptions.model.APIModel,
 		Project:     project,

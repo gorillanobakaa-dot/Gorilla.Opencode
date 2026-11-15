@@ -259,6 +259,7 @@ func (c *chatgptClient) buildRequest(messages []message.Message, ts []tools.Base
 			o(&oo)
 		}
 		req.Reasoning = &cgReason{Effort: oo.reasoningEffort}
+		logEffort(string(c.providerOptions.model.Provider), c.providerOptions.model.APIModel, oo.reasoningEffort, "reasoning.effort")
 	}
 	return req
 }
