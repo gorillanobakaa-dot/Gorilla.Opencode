@@ -113,3 +113,8 @@ func GroupFamilies(list []Model) []FamilyGroup {
 	}
 	return out
 }
+
+// FamilyName drops an effort word in parentheses from a display name.
+func FamilyName(display string) string {
+	return strings.TrimSpace(effortNameRe.ReplaceAllString(display, ""))
+}
