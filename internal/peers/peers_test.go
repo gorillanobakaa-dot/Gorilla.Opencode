@@ -519,3 +519,25 @@ func TestSameMessageFromSameSenderIsDeliveredOnce(t *testing.T) {
 		t.Fatalf("delivered %d copies, want 1", got)
 	}
 }
+
+// Owner, 2026-11-15: Zero's traffic is shown to the person; the AI never gets it.
+func TestACopyIsShownAndNeverQueuedForTheAI(t *testing.T) {
+	s := startT(t, t.TempDir(), t.TempDir(), "cc")
+	got := make(chan Message, 1)
+	s.SetNotify(func(m Message) { got <- m })
+	r := s.handle(Request{Type: TypeCC, From: Identity{Name: "fieldkit-zero", PID: 5}, Text: "claude:a -> claude:b: hi"}, 5)
+	if !r.OK {
+		t.Fatalf("a copy was refused: %s", r.Error)
+	}
+	select {
+	case m := <-got:
+		if m.Kind != KindCC || !strings.Contains(HumanNotice(m), "does not get it") {
+			t.Errorf("not marked as a copy: %+v", m)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the copy was not shown")
+	}
+	if n := s.Pending(); n != 0 || len(s.TakeForAI()) != 0 {
+		t.Errorf("a copy reached the AI's inbox (pending %d)", n)
+	}
+}

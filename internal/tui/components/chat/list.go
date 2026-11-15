@@ -26,7 +26,30 @@ type cacheItem struct {
 	width   int
 	content []uiMessage
 }
+
+// PeerCopyMsg is a display-only copy of Zero's traffic, from the peers session.
+// It is drawn, never stored as a message and never sent to the AI.
+type PeerCopyMsg struct {
+	At   time.Time
+	Text string
+}
+
+// ccBlock is one copy, and where in the conversation it arrived (the number of
+// stored messages at that moment).
+type ccBlock struct {
+	after int
+	at    time.Time
+	text  string
+}
+
+func renderCopyBlock(c ccBlock, width, pos int) uiMessage {
+	content := RenderPeerCopy(c.at, c.text, width)
+	return uiMessage{ID: "cc-" + c.at.Format(time.RFC3339Nano), messageType: userMessageType, position: pos,
+		height: lipgloss.Height(content), content: content}
+}
+
 type messagesCmp struct {
+	copies        []ccBlock
 	app           *app.App
 	width, height int
 	viewport      viewport.Model
@@ -128,6 +151,16 @@ func (m *messagesCmp) Init() tea.Cmd {
 func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case PeerCopyMsg:
+		if m.scrollback {
+			if m.width <= 0 {
+				return m, nil
+			}
+			return m, printLine(RenderPeerCopy(msg.At, msg.Text, m.width))
+		}
+		m.copies = append(m.copies, ccBlock{after: len(m.messages), at: msg.At, text: msg.Text})
+		m.rerender()
+		return m, nil
 	case dialog.ThemeChangedMsg:
 		m.rerender()
 		return m, nil
@@ -140,6 +173,7 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SessionClearedMsg:
 		m.session = session.Session{}
 		m.messages = make([]message.Message, 0)
+		m.copies = nil
 		m.currentMsgID = ""
 		m.rendering = false
 		// GORILLA OVERRIDE: forget what was printed, without trying to unprint it.
@@ -367,7 +401,17 @@ func (m *messagesCmp) renderView() {
 	if m.width == 0 {
 		return
 	}
+	emitCopies := func(upto int, last bool) {
+		for _, c := range m.copies {
+			if (!last && c.after == upto) || (last && c.after >= upto) {
+				b := renderCopyBlock(c, m.width, pos)
+				m.uiMessages = append(m.uiMessages, b)
+				pos += b.height + 1
+			}
+		}
+	}
 	for inx, msg := range m.messages {
+		emitCopies(inx, false)
 		switch msg.Role {
 		case message.User:
 			if cache, ok := m.cachedContent[msg.ID]; ok && cache.width == m.width {
@@ -416,6 +460,8 @@ func (m *messagesCmp) renderView() {
 			}
 		}
 	}
+
+	emitCopies(len(m.messages), true)
 
 	messages := make([]string, 0)
 	for _, v := range m.uiMessages {
