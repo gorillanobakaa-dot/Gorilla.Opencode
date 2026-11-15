@@ -1,0 +1,91 @@
+package dialog
+
+import (
+	"strings"
+
+	"github.com/opencode-ai/opencode/internal/llm/models"
+)
+
+// collapseFamilies turns the flat provider list into one row per model family.
+// The row stands for the variant of the chosen effort (m.effort), so Enter
+// sends exactly the backend id for that effort. Families with no effort choice
+// stay a single plain row. current is the saved model: its effort is the
+// starting point for its family.
+func (m *modelDialogCmp) collapseFamilies(current models.ModelID) {
+	groups := models.GroupFamilies(m.models)
+	if m.effort == nil {
+		m.effort = map[string]string{}
+	}
+	rows := make([]models.Model, 0, len(groups))
+	for _, g := range groups {
+		for _, v := range g.Variants {
+			if v.ID == current {
+				if _, _, e := models.FamilyOf(v); e != "" {
+					m.effort[g.Key] = e
+				}
+			}
+		}
+		rows = append(rows, familyRow(g, m.effort[g.Key]))
+	}
+	m.families = groups
+	m.models = rows
+}
+
+// cycleEffort moves the highlighted family one effort level up or down and
+// swaps the row to the variant for that level.
+func (m *modelDialogCmp) cycleEffort(delta int) {
+	if m.families == nil || m.selectedIdx >= len(m.families) {
+		return
+	}
+	g := m.families[m.selectedIdx]
+	efforts := g.Efforts()
+	if len(efforts) < 2 {
+		return
+	}
+	_, _, cur := models.FamilyOf(m.models[m.selectedIdx])
+	i := 0
+	for j, e := range efforts {
+		if e == cur {
+			i = j
+		}
+	}
+	i += delta
+	if i < 0 || i >= len(efforts) {
+		return
+	}
+	m.effort[g.Key] = efforts[i]
+	m.models[m.selectedIdx] = familyRow(g, efforts[i])
+}
+
+// effortStrip renders "low  [HIGH]  max" for a family row, or "" when the
+// model offers no effort choice.
+func (m *modelDialogCmp) effortStrip(i int) string {
+	if m.families == nil || i >= len(m.families) {
+		return ""
+	}
+	efforts := m.families[i].Efforts()
+	if len(efforts) < 2 {
+		return ""
+	}
+	_, _, cur := models.FamilyOf(m.models[i])
+	parts := make([]string, 0, len(efforts))
+	for _, e := range efforts {
+		if e == cur {
+			parts = append(parts, "["+strings.ToUpper(e)+"]")
+		} else {
+			parts = append(parts, e)
+		}
+	}
+	return "effort: " + strings.Join(parts, " ") + " ([ ] changes)"
+}
+
+// familyRow is the row for a family at an effort: the variant's model with the
+// family's display name (no "(High)", no provider suffix); the ID stays the
+// backend id for that effort.
+func familyRow(g models.FamilyGroup, effort string) models.Model {
+	v := g.Pick(effort)
+	if g.Name != "" {
+		v.Name = g.Name
+	}
+	return v
+}

@@ -85,6 +85,12 @@ type modelDialogCmp struct {
 	// this is the article: full description, exact prices, context, and WHICH
 	// credential serves it.
 	detail *models.Model
+
+	// Nested picker: a provider column shows ONE row per model family; the
+	// effort (low..max) is the second level, cycled with [ and ]. families
+	// holds the groups behind the collapsed rows (same index as m.models).
+	families []models.FamilyGroup
+	effort   map[string]string
 }
 
 type modelKeyMap struct {
@@ -125,6 +131,9 @@ type modelKeyMap struct {
 	// a load finishes, the user starts something in LM Studio -- and a list
 	// read at launch describes a machine that has moved on.
 	RefreshLocal key.Binding
+	// Effort level of the highlighted family (second level of the picker).
+	EffortDown key.Binding
+	EffortUp   key.Binding
 }
 
 var modelKeys = modelKeyMap{
@@ -190,6 +199,14 @@ var modelKeys = modelKeyMap{
 	ShowHidden: key.NewBinding(
 		key.WithKeys("H"),
 		key.WithHelp("H", "review hidden"),
+	),
+	EffortDown: key.NewBinding(
+		key.WithKeys("["),
+		key.WithHelp("[", "lower effort"),
+	),
+	EffortUp: key.NewBinding(
+		key.WithKeys("]"),
+		key.WithHelp("]", "higher effort"),
 	),
 	RefreshLocal: key.NewBinding(
 		key.WithKeys("ctrl+r"),
@@ -289,6 +306,12 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.hScrollOffset = idx
 			m.setupModelsForProvider(ProviderBookmarks)
+			return m, nil
+		case key.Matches(msg, modelKeys.EffortDown):
+			m.cycleEffort(-1)
+			return m, nil
+		case key.Matches(msg, modelKeys.EffortUp):
+			m.cycleEffort(1)
 			return m, nil
 		case key.Matches(msg, modelKeys.Mark):
 			return m.toggleMarkCurrent()
@@ -761,6 +784,9 @@ func (m *modelDialogCmp) View() string {
 		label := m.models[i].Name
 		if d := m.models[i].Description; d != "" {
 			label = fmt.Sprintf("%s — %s", m.models[i].Name, d)
+		}
+		if es := m.effortStrip(i); es != "" {
+			label += "  " + es
 		}
 		// GORILLA OVERRIDE: every OpenAI-compatible endpoint lands under the one
 		// "local" provider, so name the connection each model comes from.
@@ -1402,6 +1428,7 @@ func (m *modelDialogCmp) setupModelsForProvider(provider models.ModelProvider) {
 	selectedModelId := agentCfg.Model
 
 	m.provider = provider
+	m.families = nil
 	if provider == ProviderAvailableNow {
 		m.models = availableNowModels()
 	} else if provider == ProviderHidden {
@@ -1410,6 +1437,7 @@ func (m *modelDialogCmp) setupModelsForProvider(provider models.ModelProvider) {
 		m.models = bookmarkedModels()
 	} else {
 		m.models = getModelsForProvider(provider)
+		m.collapseFamilies(selectedModelId)
 	}
 	m.selectedIdx = 0
 	m.scrollOffset = 0
