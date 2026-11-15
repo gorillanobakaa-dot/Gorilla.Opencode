@@ -49,12 +49,18 @@ const (
 	TypeMessage        = "message"
 	TypeNotifyWhenIdle = "notify_when_idle"
 	TypeIdleNotice     = "idle_notice"
+	// TypeCC is a display-only copy of someone else's traffic (Zero's net
+	// messages, mirrored by Fieldkit). GORILLA (2026-11-15, owner): the person
+	// wants to see them; the AI must never receive them, so a CC is shown and
+	// never queued in the inbox.
+	TypeCC = "cc"
 )
 
 // Message kinds held in the inbox.
 const (
 	KindMessage = "message"
 	KindIdle    = "idle_notice"
+	KindCC      = "cc"
 )
 
 // Limits. MaxTextBytes and MaxPerMinute are stated on the /peers page and in the
@@ -233,6 +239,12 @@ func HumanNotice(m Message) string {
 			at, m.From.Name, m.From.Folder)
 	}
 	text := m.Text
+	if m.Kind == KindCC {
+		if utf8.RuneCountInString(text) > humanNoticeMax {
+			text = string([]rune(text)[:humanNoticeMax]) + " [… cut]"
+		}
+		return fmt.Sprintf("[%s] Copy of Zero's traffic (shown to you only; your AI does not get it)\n%s", at, text)
+	}
 	if utf8.RuneCountInString(text) > humanNoticeMax {
 		text = string([]rune(text)[:humanNoticeMax]) + " [… cut here; the AI receives all of it]"
 	}
@@ -258,4 +270,11 @@ func SplitFirst(s string) (first, rest string) {
 		return s, ""
 	}
 	return s[:i], strings.TrimSpace(s[i:])
+}
+
+// IsFence reports whether a stored user entry is a block of fenced peer
+// messages (FormatForAI output) and not something the person typed. The
+// interface draws such an entry apart from the person's own words.
+func IsFence(text string) bool {
+	return strings.HasPrefix(text, "<message from peer session ")
 }

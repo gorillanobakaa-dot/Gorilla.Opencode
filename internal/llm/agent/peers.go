@@ -4,8 +4,9 @@
 //  1. Busy and idle. The main conversation's turns are what peers see as this
 //     session being busy; the end of a turn is what sends a waiting idle
 //     notice.
-//  2. Delivery. Messages received since the last turn are put in front of the
-//     user's text, each inside a fence that names the sender and says it is not
+//  2. Delivery. Messages received since the last turn become their own entry
+//     in front of the user's turn (never part of the user's text), each inside
+//     a fence that names the sender and says it is not
 //     the user's instruction and grants no permission. (Until 2026-10-23 the
 //     turn was also marked as having read untrusted content; that mark is
 //     gone.) Every front end (the full interface, plain
@@ -51,12 +52,4 @@ func requeuePeerMessages(msgs []peers.Message) {
 	if s := peers.Active(); s != nil && len(msgs) > 0 {
 		s.Requeue(msgs)
 	}
-}
-
-// withPeerBlock puts the fenced messages in front of the user's own text.
-func withPeerBlock(block, content string) string {
-	if block == "" {
-		return content
-	}
-	return block + content
 }

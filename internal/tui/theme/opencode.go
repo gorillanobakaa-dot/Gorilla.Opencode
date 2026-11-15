@@ -65,8 +65,8 @@ func NewOpenCodeTheme() *OpenCodeTheme {
 		Light: lightRed,
 	}
 	theme.WarningColor = lipgloss.AdaptiveColor{
-		Dark:  "#FF0000",
-		Light: "#FF0000",
+		Dark:  "#f5a742", // amber, not red: red is the error colour and the status bar
+		Light: "#9a5b00",
 	}
 	theme.SuccessColor = lipgloss.AdaptiveColor{
 		Dark:  darkGreen,

@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	redBg   = "48;2;255;51;51" // SpeedColor on a dark terminal
+	redBg   = "48;2;198;40;40" // SpeedBg on a dark terminal
 	blackBg = "48;2;0;0;0"
 	blueBg  = "48;2;30;58;138"
 )

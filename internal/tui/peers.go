@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/opencode-ai/opencode/internal/peers"
+	"github.com/opencode-ai/opencode/internal/tui/components/chat"
 	"github.com/opencode-ai/opencode/internal/tui/util"
 )
 
@@ -44,7 +45,14 @@ func AttachPeers(p *tea.Program) {
 	if p == nil || s == nil {
 		return
 	}
-	s.SetNotify(func(m peers.Message) { p.Send(peerNotice(m)) })
+	s.SetNotify(func(m peers.Message) {
+		if m.Kind == peers.KindCC {
+			// A copy of Zero's traffic: its own block in the conversation, display only.
+			p.Send(chat.PeerCopyMsg{At: m.At, Text: m.Text})
+			return
+		}
+		p.Send(peerNotice(m))
+	})
 }
 
 // peersCommand handles /peers and /peers name NEW.

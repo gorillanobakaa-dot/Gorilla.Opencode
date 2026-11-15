@@ -474,6 +474,21 @@ func (s *Session) handle(req Request, peerPID int) Reply {
 		}
 		return Reply{OK: true}
 
+	case TypeCC:
+		// Display only: recorded for /peers and shown, never put in the inbox.
+		if err := checkText(req.Text); err != nil {
+			s.mu.Unlock()
+			return refuse(err.Error())
+		}
+		m := Message{From: from, At: now, Text: sanitizeText(req.Text), Kind: KindCC}
+		s.pushRecentLocked(m)
+		fn := s.notify
+		s.mu.Unlock()
+		if fn != nil {
+			go fn(m)
+		}
+		return Reply{OK: true}
+
 	case TypeNotifyWhenIdle:
 		s.mu.Unlock()
 		// The notice goes to the endpoint in the register, never to an address

@@ -315,7 +315,7 @@ func (m statusCmp) chrome() statusChrome {
 		// alike; kept on narrow screens too, where the cost detail goes.
 		speed := ""
 		if s, ok := agent.LastSpeed(m.session.ID); ok {
-			speed = styles.Padded().Background(styles.SpeedColor).
+			speed = styles.Padded().Background(styles.SpeedBg).
 				Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render(s.Summary())
 		}
 		tokenInfoWidth = lipgloss.Width(tokens) + 2 + lipgloss.Width(speed)
@@ -329,7 +329,7 @@ func (m statusCmp) chrome() statusChrome {
 	// colours drew "AUTO - approving without asking" black on black: the one
 	// warning that must stay readable was invisible.
 	c.diagnostics = styles.Padded().
-		Background(styles.SpeedColor).
+		Background(styles.SpeedBg).
 		Foreground(lipgloss.Color("#FFFFFF")).
 		Bold(true).
 		Render(m.projectDiagnostics())
@@ -356,7 +356,7 @@ func (m statusCmp) chrome() statusChrome {
 	switch permission.EffectiveMode(m.session.ID) {
 	case config.PermissionAuto:
 		c.yolo = styles.Padded().
-			Background(styles.SpeedColor).
+			Background(styles.SpeedBg).
 			Foreground(lipgloss.Color("#FFFFFF")).
 			Bold(true).
 			// ASCII on purpose: the radiation sign is double-width in a
@@ -364,13 +364,13 @@ func (m statusCmp) chrome() statusChrome {
 			Render("AUTO - approving without asking")
 	case config.PermissionAcceptEdits:
 		c.yolo = styles.Padded().
-			Background(styles.SpeedColor).
+			Background(styles.SpeedBg).
 			Foreground(lipgloss.Color("#FFFFFF")).
 			Bold(true).
 			Render("EDITS auto-approved")
 	case config.PermissionPlan:
 		c.yolo = styles.Padded().
-			Background(styles.SpeedColor).
+			Background(styles.SpeedBg).
 			Foreground(lipgloss.Color("#FFFFFF")).
 			Bold(true).
 			Render("PLAN — read-only")
@@ -395,11 +395,11 @@ func (m statusCmp) chrome() statusChrome {
 		}
 		switch permission.EffectiveMode(m.session.ID) {
 		case config.PermissionAuto:
-			c.yolo = styles.Padded().Background(styles.SpeedColor).Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render("AUTO")
+			c.yolo = styles.Padded().Background(styles.SpeedBg).Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render("AUTO")
 		case config.PermissionAcceptEdits:
-			c.yolo = styles.Padded().Background(styles.SpeedColor).Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render("EDITS")
+			c.yolo = styles.Padded().Background(styles.SpeedBg).Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render("EDITS")
 		case config.PermissionPlan:
-			c.yolo = styles.Padded().Background(styles.SpeedColor).Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render("PLAN")
+			c.yolo = styles.Padded().Background(styles.SpeedBg).Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render("PLAN")
 		}
 		if m.projectDiagnostics() == "No diagnostics" {
 			c.diagnostics = ""
@@ -457,7 +457,7 @@ func (m statusCmp) View() string {
 	} else {
 		status += styles.Padded().
 			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(styles.SpeedColor).
+			Background(styles.SpeedBg).
 			Width(c.avail).
 			Render(truncateStatusMsg(workingFolderLabel(), c.avail-infoPadding))
 	}

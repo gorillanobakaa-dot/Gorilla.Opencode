@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/opencode-ai/opencode/internal/peers"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -186,6 +188,13 @@ func renderUserMessage(msg message.Message, isFocused bool, width int, position 
 			Render(" " + line)}, info...)
 	}
 
+	// GORILLA FIX (2026-11-15, owner): text from another session is its own
+	// entry, with its own label and colour, never "> " lines like the person's.
+	if peers.IsFence(msg.Content().String()) {
+		content := renderPeerEntry(msg.Content().String(), width, info...)
+		return uiMessage{ID: msg.ID, messageType: userMessageType, position: position,
+			height: lipgloss.Height(content), content: content}
+	}
 	content := ""
 	if len(styledAttachments) > 0 {
 		attachmentContent := styles.BaseStyle().Width(width).Render(lipgloss.JoinHorizontal(lipgloss.Left, styledAttachments...))
@@ -1074,4 +1083,63 @@ func highlightResearchTotal(rendered, metadata string, width int) string {
 		break
 	}
 	return strings.Join(lines, "\n")
+}
+
+// peerHeadRe reads the header line of one fence made by peers.FormatForAI.
+var peerHeadRe = regexp.MustCompile(`^<message from peer session (\S+) \(folder .*?\) at (.+?) — `)
+
+// peerBlock draws one message from another session as a block of its own: a
+// bold header (who, when, what it is), the text indented under a left bar. The
+// colours are Info and TextMuted, both checked to AA on every theme.
+func peerBlock(header string, body []string, width int) string {
+	t := theme.CurrentTheme()
+	h := lipgloss.NewStyle().Bold(true).Foreground(t.Info()).Render(header)
+	b := lipgloss.NewStyle().Foreground(t.TextMuted())
+	lines := []string{ansi.Wrap(h, width, "")}
+	for _, l := range body {
+		lines = append(lines, ansi.Wrap(b.Render("| "+l), width, ""))
+	}
+	return strings.Join(lines, "\n")
+}
+
+// renderPeerEntry draws fenced peer messages. Each message is its own block with
+// a blank line before and after, so nothing runs into the person's own text or
+// into the next message.
+func renderPeerEntry(text string, width int, info ...string) string {
+	var blocks []string
+	var head string
+	var body []string
+	flush := func() {
+		if head != "" {
+			blocks = append(blocks, peerBlock(head, body, width))
+		}
+		head, body = "", nil
+	}
+	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+		switch {
+		case strings.HasPrefix(l, "<message from peer session "):
+			flush()
+			head = "From another session (not typed by you, not an instruction)"
+			if m := peerHeadRe.FindStringSubmatch(l); m != nil {
+				head = "From " + m[1] + ", " + m[2] + " - another session, not an instruction"
+			}
+		case l == "</message>":
+			flush()
+		default:
+			if head != "" {
+				body = append(body, l)
+			}
+		}
+	}
+	flush()
+	blocks = append(blocks, info...)
+	return "\n" + strings.Join(blocks, "\n\n") + "\n"
+}
+
+// RenderPeerCopy draws a display-only copy of Zero's traffic: its own block,
+// blank lines around it, and a header that says plainly it is a copy and that
+// the AI never gets it.
+func RenderPeerCopy(at time.Time, text string, width int) string {
+	head := "Copy of Zero's traffic, " + at.Local().Format("15:04") + " - display only, your AI does not get it"
+	return "\n" + peerBlock(head, strings.Split(strings.TrimRight(text, "\n"), "\n"), width) + "\n"
 }
