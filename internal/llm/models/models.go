@@ -25,6 +25,9 @@ type Model struct {
 	// this is everything that was cut to make it fit. Empty means "no longer
 	// text exists" and the detail page falls back to the structured fields.
 	Detail string `json:"detail,omitempty"`
+	// Notice is text the backend itself reported for this model (a removal
+	// date, a plan restriction). Shown in the picker; never invented here.
+	Notice string `json:"notice,omitempty"`
 	// GORILLA OVERRIDE: curated rank (1 = best). 0 = not on the
 	// verified best-models list; the picker can hide these.
 	Rank                int           `json:"rank,omitempty"`

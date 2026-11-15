@@ -54,3 +54,14 @@ func TestPickerStartsOnSavedEffort(t *testing.T) {
 		t.Fatalf("got %q", m.models[0].ID)
 	}
 }
+
+func TestPickerShowsBackendNoticeWhicheverEffortIsHighlighted(t *testing.T) {
+	a := fam("gpt-oss-120b-low", "GPT-OSS 120B (Low)")
+	b := fam("gpt-oss-120b-medium", "GPT-OSS 120B (Medium)")
+	b.Notice = "GPT-OSS will be removed from Antigravity on November 18, 2026."
+	m := &modelDialogCmp{models: []models.Model{a, b}}
+	m.collapseFamilies("")
+	if n := m.noticeFor(0); !strings.Contains(n, "November 18") {
+		t.Fatalf("notice %q", n)
+	}
+}

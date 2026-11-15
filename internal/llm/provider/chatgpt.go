@@ -252,7 +252,13 @@ func (c *chatgptClient) buildRequest(messages []message.Message, ts []tools.Base
 		req.ToolChoice = "auto"
 	}
 	if c.providerOptions.model.CanReason {
-		req.Reasoning = &cgReason{Effort: "medium"}
+		// The effort the owner chose (agent config ReasoningEffort, passed as an
+		// OpenAI option by the agent); medium only when none was chosen.
+		oo := openaiOptions{reasoningEffort: "medium"}
+		for _, o := range c.providerOptions.openaiOptions {
+			o(&oo)
+		}
+		req.Reasoning = &cgReason{Effort: oo.reasoningEffort}
 	}
 	return req
 }

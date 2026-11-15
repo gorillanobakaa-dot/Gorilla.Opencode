@@ -1570,7 +1570,7 @@ func createAgentProviderFor(agentName config.AgentName, modelID models.ModelID) 
 		provider.WithSystemMessage(prompt.GetAgentPromptFor(agentName, model)),
 		provider.WithMaxTokens(maxTokens),
 	}
-	if model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal && model.CanReason {
+	if model.Provider == models.ProviderOpenAI || (model.Provider == models.ProviderLocal || model.Provider == models.ProviderChatGPT) && model.CanReason {
 		opts = append(
 			opts,
 			provider.WithOpenAIOptions(

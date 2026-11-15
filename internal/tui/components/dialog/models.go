@@ -788,6 +788,9 @@ func (m *modelDialogCmp) View() string {
 		if es := m.effortStrip(i); es != "" {
 			label += "  " + es
 		}
+		if n := m.noticeFor(i); n != "" {
+			label += "  !! " + n
+		}
 		// GORILLA OVERRIDE: every OpenAI-compatible endpoint lands under the one
 		// "local" provider, so name the connection each model comes from.
 		// Otherwise a list mixing 102 NVIDIA NIM models with the two served by a

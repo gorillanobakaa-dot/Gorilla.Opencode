@@ -86,6 +86,7 @@ the ids it actually honours.`,
 				SupportsImages:   m.SupportsImages,
 				SupportsThinking: m.SupportsThinking,
 				IsInternal:       m.IsInternal,
+				Notice:           m.Notice(),
 			})
 		}
 

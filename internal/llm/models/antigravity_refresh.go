@@ -36,6 +36,8 @@ type AntigravityRow struct {
 	SupportsImages   bool
 	SupportsThinking bool
 	IsInternal       bool
+	// Notice is the backend's tagDescription (e.g. a removal date).
+	Notice string
 }
 
 const antigravityCacheSchema = 1
@@ -121,6 +123,7 @@ func BuildAntigravityModels(rows []AntigravityRow) map[ModelID]Model {
 			Description:         fmt.Sprintf("%s · your Google sign-in, no per-token charge", FamilyName(displayNameFor(r))),
 			ContextWindow:       r.MaxTokens,
 			DefaultMaxTokens:    maxOut,
+			Notice:              r.Notice,
 			CanReason:           r.SupportsThinking,
 			SupportsAttachments: r.SupportsImages,
 			// The entitlement is the user's own (free tier or a Google AI plan):
