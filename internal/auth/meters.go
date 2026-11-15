@@ -50,6 +50,7 @@ func (q *QuotaSummary) ToMeterWithModels(account string, live map[string]Antigra
 		return nil
 	}
 	out := make([]quota.Meter, 0, len(q.Groups))
+	covered := map[string]bool{}
 	for _, g := range q.Groups {
 		// The GROUP name is the heading, not "ANTIGRAVITY". A Google sign-in
 		// reports several model families under one account ("Gemini Models",
@@ -66,7 +67,10 @@ func (q *QuotaSummary) ToMeterWithModels(account string, live map[string]Antigra
 			Kind:     quota.KindWindowQuota,
 			Note:     g.Description,
 		}
-		if ids := groupModelIDs(g.Description, live); len(ids) > 0 {
+		if ids := groupModelIDs(groupFamilySpec(g), live); len(ids) > 0 {
+			for _, id := range ids {
+				covered[id] = true
+			}
 			m.Note = strings.TrimSpace(m.Note + "\nModel ids: " + strings.Join(ids, ", "))
 		}
 		for _, b := range g.Buckets {
@@ -83,6 +87,26 @@ func (q *QuotaSummary) ToMeterWithModels(account string, live map[string]Antigra
 			})
 		}
 		out = append(out, m)
+	}
+	// Every live model sits under a group or under "other": one the group
+	// descriptions do not name (Argon, Orchestrator, a new variant) is shown,
+	// never silently dropped. Nothing here is a hard-coded model name.
+	if len(live) > 0 {
+		var other []string
+		for id := range live {
+			if !covered[id] {
+				other = append(other, id)
+			}
+		}
+		if len(other) > 0 {
+			sort.Strings(other)
+			out = append(out, quota.Meter{
+				Provider: "other / bucket unknown",
+				Account:  account,
+				Kind:     quota.KindWindowQuota,
+				Note:     "Models the backend lists that no quota group names:\nModel ids: " + strings.Join(other, ", "),
+			})
+		}
 	}
 	// The summary-level description explains the shared weekly limit and is
 	// written once, under the groups it applies to. Attaching it to the last
@@ -188,4 +212,31 @@ func groupModelIDs(desc string, live map[string]AntigravityModelInfo) []string {
 	}
 	sort.Strings(ids)
 	return ids
+}
+
+// groupFamilies is the family list a group's description names (the text after
+// its first colon), or "" when it names none. The group's own heading is added
+// by the caller, so a group such as "Gemini 4 Argon" with no list still claims
+// the models whose display name carries its heading.
+func groupFamilies(g QuotaGroup) string {
+	if i := strings.Index(g.Description, ":"); i >= 0 {
+		return g.Description[i+1:]
+	}
+	return ""
+}
+
+// groupFamilySpec is the ": a, b" text groupModelIDs reads: the description's
+// own list when it has one, else the group's heading (without a trailing
+// "models"), so a group that lists nothing still claims the models named like
+// it. The heading is NOT added when a list exists: "Gemini Models" would claim
+// every Gemini model, including another group's.
+func groupFamilySpec(g QuotaGroup) string {
+	if fams := strings.TrimSpace(groupFamilies(g)); fams != "" {
+		return ": " + fams
+	}
+	h := strings.TrimSpace(g.DisplayName)
+	if len(h) > 7 && strings.EqualFold(h[len(h)-7:], " models") {
+		h = h[:len(h)-7]
+	}
+	return ": " + h
 }
