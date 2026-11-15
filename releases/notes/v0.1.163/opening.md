@@ -31,6 +31,9 @@ Fewer permission dialogs and a clearer choice of model and effort mean less clic
 - Messages typed while the agent is busy are queued and delivered at the next tool boundary; Esc stops the running tool.
 - `-p` works in the folder it was started in; the output limit is clamped to what the provider allows.
 - Gemini 4 models are listed only when the backend serves them.
+- The model picker shows the notice the backend sends for a model (for example that GPT-OSS is removed from Antigravity on November 18, 2026).
+- ChatGPT now sends the reasoning effort you chose; before, it always sent medium.
+- Tests record the request and check that the effort is in it for OpenAI, ChatGPT and Antigravity.
 
 ## Files
 

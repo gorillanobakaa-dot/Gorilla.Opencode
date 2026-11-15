@@ -31,6 +31,9 @@ Fewer permission dialogs and a clearer choice of model and effort mean less clic
 - Messages typed while the agent is busy are queued and delivered at the next tool boundary; Esc stops the running tool.
 - `-p` works in the folder it was started in; the output limit is clamped to what the provider allows.
 - Gemini 4 models are listed only when the backend serves them.
+- The model picker shows the notice the backend sends for a model (for example that GPT-OSS is removed from Antigravity on November 18, 2026).
+- ChatGPT now sends the reasoning effort you chose; before, it always sent medium.
+- Tests record the request and check that the effort is in it for OpenAI, ChatGPT and Antigravity.
 
 ## Files
 
@@ -64,6 +67,9 @@ Yes, if you use Gorilla OpenCode. Nothing you have set up is removed.
 - Messages typed while the agent is busy are queued and delivered at the next tool boundary; Esc stops the running tool.
 - `-p` works in the folder it was started in; the output limit is clamped to what the provider allows.
 - Gemini 4 models are listed only when the backend serves them.
+- The model picker shows the notice the backend sends for a model (for example that GPT-OSS is removed from Antigravity on November 18, 2026).
+- ChatGPT now sends the reasoning effort you chose; before, it always sent medium.
+- Tests record the request and check that the effort is in it for OpenAI, ChatGPT and Antigravity.
 
 ### What was NOT checked
 
@@ -85,7 +91,8 @@ Written for someone who will audit, fork or change the code. It covers the same 
 - permissions.web, git -C / --no-pager reads, read-only diagnosis commands, outside-root places (PRs #74-#82)
 - tui: Esc 'Continue or change?'; steer queue; peers notice; status bar working folder
 - antigravity: real app list body, UA and ideType; probe hides models the backend does not serve; v0.1.161 and v0.1.162 were never tagged, their changes ship here
-- range `v0.1.160..ae03148` (PRs #64-#82)
+- picker: backend notice (tagTitle, tagDescription); ChatGPT sends the chosen effort; recorded-transport tests (PR #83)
+- range `v0.1.160..origin/main` (PRs #64-#83)
 
 ### Security posture
 
