@@ -210,3 +210,52 @@ func TestEveryLiveModelIsUnderAGroupOrOther(t *testing.T) {
 		t.Errorf("without a live list want 3 meters, got %d", got)
 	}
 }
+
+// Real Pro wire shape (redacted capture) plus a synthetic AI Ultra response in
+// the same shape: Carbon and Orchestrator buckets. Both must render one meter
+// per backend group, with no code change; nothing names a bucket.
+func TestEveryBackendBucketGetsAMeter(t *testing.T) {
+	pro := capturedQuotaJSON
+	ultra := `{"groups":[
+	 {"buckets":[{"bucketId":"gemini-weekly","displayName":"Weekly Limit","window":"weekly","resetTime":"2026-08-10T14:34:46Z","remainingFraction":0.3}],
+	  "displayName":"Gemini Models","description":"Models within this group: Gemini Flash, Gemini Pro"},
+	 {"buckets":[{"bucketId":"carbon-5h","displayName":"5-hour Limit","window":"5h","remainingFraction":0.8},
+	             {"bucketId":"carbon-weekly","displayName":"Weekly Limit","window":"weekly","remainingFraction":0.6}],
+	  "displayName":"Gemini 4 Carbon"},
+	 {"buckets":[{"bucketId":"orch-weekly","window":"weekly","remainingFraction":0.9}],
+	  "displayName":"Orchestrator","description":"Models within this group: Orchestrator"},
+	 {"buckets":[{"bucketId":"mystery-weekly","window":"weekly"}]}
+	]}`
+	for name, wire := range map[string]string{"pro": pro, "ultra": ultra} {
+		var q QuotaSummary
+		if err := json.Unmarshal([]byte(wire), &q); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		meters := q.ToMeter("a@b.c")
+		if len(meters) != len(q.Groups) {
+			t.Fatalf("%s: %d groups but %d meters", name, len(q.Groups), len(meters))
+		}
+		for i, m := range meters {
+			if len(m.Bars) != len(q.Groups[i].Buckets) {
+				t.Errorf("%s: meter %q has %d bars, backend sent %d buckets", name, m.Provider, len(m.Bars), len(q.Groups[i].Buckets))
+			}
+		}
+		if name == "ultra" {
+			if meters[1].Provider != "Gemini 4 Carbon" || len(meters[1].Bars) != 2 || meters[1].Bars[0].Label != "5-hour Limit" {
+				t.Errorf("carbon meter wrong: %+v", meters[1])
+			}
+			if meters[3].Provider != "mystery-weekly" || meters[3].Bars[0].Remaining != quota.FractionUnknown {
+				t.Errorf("unnamed group without a reading must be titled by bucket id and unknown, got %+v", meters[3])
+			}
+		}
+	}
+	// A model with no group stays under "other" with the reason.
+	var q QuotaSummary
+	_ = json.Unmarshal([]byte(pro), &q)
+	live := map[string]AntigravityModelInfo{"gemini-4-carbon-disabled": {DisplayName: "Gemini 4 Carbon"}}
+	ms := q.ToMeterWithModels("a", live)
+	last := ms[len(ms)-1]
+	if last.Provider != "other / bucket unknown" || !strings.Contains(last.Note, "No quota reading from the backend for this plan") {
+		t.Errorf("unmapped model: %+v", last)
+	}
+}
