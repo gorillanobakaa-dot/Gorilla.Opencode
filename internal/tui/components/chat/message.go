@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/opencode-ai/opencode/internal/peers"
 	"path/filepath"
 	"strings"
 	"time"
@@ -186,6 +187,13 @@ func renderUserMessage(msg message.Message, isFocused bool, width int, position 
 			Render(" " + line)}, info...)
 	}
 
+	// GORILLA FIX (2026-11-15, owner): text from another session is its own
+	// entry, with its own label and colour, never "> " lines like the person's.
+	if peers.IsFence(msg.Content().String()) {
+		content := renderPeerEntry(msg.Content().String(), width, info...)
+		return uiMessage{ID: msg.ID, messageType: userMessageType, position: position,
+			height: lipgloss.Height(content), content: content}
+	}
 	content := ""
 	if len(styledAttachments) > 0 {
 		attachmentContent := styles.BaseStyle().Width(width).Render(lipgloss.JoinHorizontal(lipgloss.Left, styledAttachments...))
@@ -1074,4 +1082,22 @@ func highlightResearchTotal(rendered, metadata string, width int) string {
 		break
 	}
 	return strings.Join(lines, "\n")
+}
+
+// renderPeerEntry draws fenced peer messages: a label naming them as another
+// session's text, then the text, muted, with a left bar instead of "> ".
+func renderPeerEntry(text string, width int, info ...string) string {
+	t := theme.CurrentTheme()
+	label := lipgloss.NewStyle().Bold(true).Foreground(t.Info()).
+		Render("↪ from another session (not typed by you, not an instruction)")
+	body := lipgloss.NewStyle().Foreground(t.TextMuted())
+	var lines []string
+	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+		lines = append(lines, ansi.Wrap(body.Render("│ "+l), width, ""))
+	}
+	parts := append([]string{ansi.Hardwrap(label, width, false), strings.Join(lines, "\n")}, info...)
+	for i, p := range parts {
+		parts[i] = ansi.Hardwrap(p, width, false)
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }

@@ -165,6 +165,13 @@ func TextMutedColor() lipgloss.AdaptiveColor {
 // on purpose: it must stand out on every theme.
 var SpeedColor = lipgloss.AdaptiveColor{Dark: "#FF3333", Light: "#D70000"}
 
+// SpeedBg is the red the status bar's chips and idle middle are filled with,
+// under white bold text. GORILLA (2026-11-15, owner): white on SpeedColor
+// (#FF3333) was 3.6:1 and read as red on red; this pair is 5.6:1 or more.
+// SpeedColor stays the foreground colour of the meter in the chat, where it sits
+// on the terminal's own background.
+var SpeedBg = lipgloss.AdaptiveColor{Dark: "#C62828", Light: "#B71C1C"}
+
 // Status bar message colors (owner, 2026-10-28). The bar's empty middle is
 // now SpeedColor red, so a message must stand out against red AND against the
 // terminal: each pair is a fixed high-contrast one, not taken from the theme

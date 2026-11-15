@@ -259,3 +259,10 @@ func SplitFirst(s string) (first, rest string) {
 	}
 	return s[:i], strings.TrimSpace(s[i:])
 }
+
+// IsFence reports whether a stored user entry is a block of fenced peer
+// messages (FormatForAI output) and not something the person typed. The
+// interface draws such an entry apart from the person's own words.
+func IsFence(text string) bool {
+	return strings.HasPrefix(text, "<message from peer session ")
+}

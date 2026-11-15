@@ -563,9 +563,26 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 	// trash, before any peer text is attached. A helper's prompt is ignored
 	// (the session is linked to its parent first). See tools/trash.go.
 	tools.NoteUserRequest(sessionID, content)
-	userMsg, err := a.createUserMessage(ctx, sessionID, withPeerBlock(peerBlock, content), attachmentParts)
+	// GORILLA FIX (2026-11-15, owner): the fenced peer messages are an entry of
+	// their own, stored and shown apart from what the person typed. They used
+	// to be glued in front of the person's text and were drawn as one block of
+	// "> " lines, as if the person had typed them.
+	var peerEntry []message.Message
+	if peerBlock != "" {
+		pm, perr := a.messages.Create(ctx, sessionID, message.CreateMessageParams{
+			Role:  message.User,
+			Parts: []message.ContentPart{message.TextContent{Text: peerBlock}},
+		})
+		if perr != nil {
+			requeuePeerMessages(peerMsgs)
+			return a.err(fmt.Errorf("failed to create peer message entry: %w", perr))
+		}
+		peerEntry = append(peerEntry, pm)
+	}
+	userMsg, err := a.createUserMessage(ctx, sessionID, content, attachmentParts)
 	if err != nil {
-		requeuePeerMessages(peerMsgs)
+		// The peer entry is already stored, so the messages are not put back:
+		// they stay visible in the conversation, as sent.
 		return a.err(fmt.Errorf("failed to create user message: %w", err))
 	}
 	// The taint bit that was cleared here at each new user turn (2026-08-19,
@@ -575,7 +592,7 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 	// the model repeated then is not held against what they ask for now.
 	stuck.Reset(sessionID)
 	// Append the new user message to the conversation history.
-	msgHistory := append(msgs, userMsg)
+	msgHistory := append(append(msgs, peerEntry...), userMsg)
 	// Messages from here on belong to this turn; see elideOldToolResults.
 	turnStart := len(msgs)
 

@@ -43,6 +43,22 @@ func startPeerPair(t *testing.T) (sender, receiver *peers.Session) {
 	return sender, receiver
 }
 
+// peerEntryAndTyped: the sent history ends with the fenced peer entry, then the
+// person's own turn, as two separate user entries.
+func peerEntryAndTyped(t *testing.T, h []message.Message) (peer, typed string) {
+	t.Helper()
+	var users []string
+	for _, m := range h {
+		if m.Role == message.User {
+			users = append(users, m.Content().String())
+		}
+	}
+	if len(users) < 2 {
+		t.Fatalf("expected a peer entry and a typed entry, got %d user entries", len(users))
+	}
+	return users[len(users)-2], users[len(users)-1]
+}
+
 func loadoutSnapshot() map[string]bool {
 	out := map[string]bool{}
 	for _, c := range config.LoadoutComponents {
@@ -113,7 +129,10 @@ func TestAPeerMessageGrantsNothing(t *testing.T) {
 	if ev := runTurn(t, coder, sess, "what did the other session say?"); ev.Error != nil {
 		t.Fatalf("turn failed: %v", ev.Error)
 	}
-	sent := lastUserText(model.history[0])
+	sent, typed := peerEntryAndTyped(t, model.history[0])
+	if typed != "what did the other session say?" {
+		t.Errorf("the person's turn is not exactly what they typed: %q", typed)
+	}
 	for _, want := range []string{
 		"<message from peer session alpha (folder " + sender.Folder() + ")",
 		peers.FenceNote, hostile, "</message>",
@@ -122,11 +141,8 @@ func TestAPeerMessageGrantsNothing(t *testing.T) {
 			t.Errorf("the turn the AI received lacks %q:\n%s", want, sent)
 		}
 	}
-	if !strings.HasSuffix(sent, "what did the other session say?") {
-		t.Errorf("the person's own words are not the end of the turn:\n%s", sent)
-	}
-	if strings.Index(sent, "</message>") > strings.Index(sent, "what did the other session say?") {
-		t.Error("the person's words sit inside the fence")
+	if strings.Contains(typed, "<message from peer session") || strings.Contains(sent, "what did the other session say?") {
+		t.Error("peer text and the person's words were merged into one entry")
 	}
 
 	// It changed nothing it must not.

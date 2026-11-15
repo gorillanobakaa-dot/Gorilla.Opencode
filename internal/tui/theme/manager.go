@@ -31,6 +31,7 @@ func RegisterTheme(name string, theme Theme) {
 	globalManager.mu.Lock()
 	defer globalManager.mu.Unlock()
 
+	ensureAA(theme) // GORILLA (2026-11-15): no unreadable colour pair in any theme
 	globalManager.themes[name] = theme
 
 	// If this is the first theme, make it the default
