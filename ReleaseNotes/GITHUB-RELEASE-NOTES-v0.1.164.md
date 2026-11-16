@@ -38,6 +38,7 @@ Yes, if you use Gorilla OpenCode. Nothing you have set up is removed.
 
 ### Why this matters
 
+- `/usage` shows the exact time left until each meter resets ("resets in 4h 59m" for the five-hour meter, "resets in 3d 15h" for a weekly one), the same way for every provider. Where the backend sends no reset time (a full, unused meter) none is shown, never a guess.
 - `/usage` shows one quota meter for each limit the backend reports, including the Ultra-only one.
 - A reading that is missing is shown as unknown, not as 0%; a model with no meter says why.
 - Messages from other sessions (peers) are drawn as their own block with a header, apart from what you typed, and are never passed to the AI as your words.
@@ -52,6 +53,16 @@ Yes, if you use Gorilla OpenCode. Nothing you have set up is removed.
 
 ---
 
+## Screenshots
+
+These two pictures are drawn by the program's own panel code from a recorded sample reading, with the example address user@example.com. They are not a live account.
+
+[![Gorilla OpenCode v0.1.164 usage panel showing the five-hour meter resets in 4h 59m, the weekly meter resets in 3d 15h, and full unused meters with no reset time](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.164/docs/screenshots/gallery/v0164-usage-reset-countdown.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.164/docs/screenshots/gallery/v0164-usage-reset-countdown.png)
+
+[![Gorilla OpenCode v0.1.164 a peer session message drawn as its own block with a header, apart from typed text, and the display only copy of Zero traffic](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.164/docs/screenshots/gallery/v0164-peer-block-apart.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.164/docs/screenshots/gallery/v0164-peer-block-apart.png)
+
+---
+
 # For developers: how it works, and how to check it
 
 Written for someone who will audit, fork or change the code. It covers the same release as the plain-language part above; neither is a summary of the other.
@@ -60,6 +71,7 @@ Written for someone who will audit, fork or change the code. It covers the same 
 
 ### Summary
 
+- usage: the countdown comes from the backend's own reset field through one formatter, `quota.ResetIn` (rounds up; under a day `4h 59m`, from a day `3d 15h`); no reset field means no text; tests cover both (replaces "resets today" and floor-to-days)
 - usage: one quota meter per backend bucket (Ultra-only included); missing reading is unknown, not 0%; unmapped models say why (PR #87)
 - peers: short socket path for a long state folder; debug line with the effort sent (PR #86)
 - tui: peer messages are their own entry, drawn apart; display-only copy of Zero's traffic, never queued for the AI; every theme pair and the status bar reach WCAG AA (PR #88)

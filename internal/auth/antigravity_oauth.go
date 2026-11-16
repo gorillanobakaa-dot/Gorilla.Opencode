@@ -31,6 +31,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/opencode-ai/opencode/internal/quota"
 )
 
 const (
@@ -484,8 +486,8 @@ func FormatQuotaLineFor(q *QuotaSummary, now time.Time, plan string) string {
 		seg := fmt.Sprintf("%s: %d%%", g.DisplayName, int(b.RemainingFraction*100+0.5))
 		if b.ResetTime != "" {
 			if t, perr := time.Parse(time.RFC3339, b.ResetTime); perr == nil {
-				if d := int(t.Sub(now).Hours() / 24); d >= 0 {
-					seg += fmt.Sprintf(" (resets in %dd)", d)
+				if d := t.Sub(now); d > 0 {
+					seg += " (" + quota.ResetIn(d) + ")"
 				}
 			}
 		}

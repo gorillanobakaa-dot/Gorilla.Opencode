@@ -16,7 +16,6 @@ package auth
 // nothing forced to agree. A Meter carries both or fails Validate().
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -182,21 +181,7 @@ func chatGPTResetPhrase(resetAt int64) string {
 	if d <= 0 {
 		return "resets now"
 	}
-	// ROUND UP, not down. Truncating renders a window with 29m59s left as
-	// "resets in 29m", which is EARLIER than the truth, so a user who waits
-	// exactly that long retries into a limit that has not lifted yet. Rounding
-	// up errs the safe way: the number is an upper bound, and the allowance is
-	// back by then or sooner. It also removes an ugly off-by-one where a reset
-	// set exactly 30 minutes out displays as 29.
-	ceilDiv := func(a, b time.Duration) int { return int((a + b - 1) / b) }
-	switch {
-	case d < time.Hour:
-		return fmt.Sprintf("resets in %dm", ceilDiv(d, time.Minute))
-	case d < 48*time.Hour:
-		return fmt.Sprintf("resets in %dh", ceilDiv(d, time.Hour))
-	default:
-		return fmt.Sprintf("resets in %dd", ceilDiv(d, 24*time.Hour))
-	}
+	return quota.ResetIn(d)
 }
 
 // groupModelIDs returns the live model ids whose display name contains one of

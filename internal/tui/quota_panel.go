@@ -213,15 +213,11 @@ func quotaResetPhrase(resetTime string, now time.Time) string {
 	if err != nil {
 		return ""
 	}
-	d := int(t.Sub(now).Hours() / 24)
-	switch {
-	case d < 0:
+	d := t.Sub(now)
+	if d <= 0 {
 		return ""
-	case d == 0:
-		return "resets today"
-	default:
-		return fmt.Sprintf("resets in %dd", d)
 	}
+	return quota.ResetIn(d)
 }
 
 // chatGPTMeter carries the active ChatGPT session's meter into the pure

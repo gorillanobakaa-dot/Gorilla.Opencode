@@ -409,3 +409,20 @@ func TestQuotaPanelTextUsesTheWholeWidth(t *testing.T) {
 		t.Fatalf("fixture no longer has a reset clause; the test would pass vacuously:\n%s", got)
 	}
 }
+
+// The backend's own reset field drives the countdown: hours and minutes for the
+// five-hour meter, days and hours for a weekly one, and nothing at all where
+// the backend sent no reset time (a full, unused meter). Never a guess.
+func TestQuotaResetPhraseCountdownAndAbsent(t *testing.T) {
+	now := time.Date(2026, 11, 16, 8, 0, 0, 0, time.UTC)
+	for _, tc := range []struct{ reset, want string }{
+		{now.Add(4*time.Hour + 59*time.Minute).Format(time.RFC3339), "resets in 4h 59m"},
+		{now.Add(3*24*time.Hour + 15*time.Hour).Format(time.RFC3339), "resets in 3d 15h"},
+		{"", ""},
+		{now.Add(-time.Hour).Format(time.RFC3339), ""},
+	} {
+		if got := meterResetPhrase(tc.reset, now); got != tc.want {
+			t.Errorf("meterResetPhrase(%q) = %q, want %q", tc.reset, got, tc.want)
+		}
+	}
+}

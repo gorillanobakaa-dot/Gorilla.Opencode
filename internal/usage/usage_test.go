@@ -95,8 +95,8 @@ func TestEmptySession(t *testing.T) {
 func TestResetTimesAreWorded(t *testing.T) {
 	stub(t, models.ProviderAntigravity)
 	for in, want := range map[string]string{
-		"2026-10-24T09:42:32Z": "resets in 2d 21h",
-		"2026-10-21T20:20:12Z": "resets in 8h 20m",
+		"2026-10-24T09:42:32Z": "resets in 2d 22h", // rounded UP now (was floor): the figure is an upper bound, same rule for every meter
+		"2026-10-21T20:20:12Z": "resets in 8h 21m",
 		"2026-10-21T12:05:00Z": "resets in 5m",
 		"2026-10-20T00:00:00Z": "resets now",
 		"resets in 23d":        "resets in 23d",

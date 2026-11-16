@@ -39,7 +39,10 @@ package quota
 // own header: unknown and plenty-left must never look alike. Kind generalises
 // that rule from one provider to all of them.
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // Kind says what a meter is measuring, which decides whether a bar is honest.
 type Kind int
@@ -182,4 +185,28 @@ func FromReading(r Reading, account string) Meter {
 		m.Bars[0].Remaining = FractionUnknown
 	}
 	return m
+}
+
+// ResetIn words the time left until a reset, the same way for every meter:
+// "resets in 4h 59m" under a day, "resets in 3d 15h" from a day up. A zero
+// trailing unit is left out ("resets in 5h", "resets in 2d"). It rounds UP to
+// the next minute (or hour from a day up) so the figure is an upper bound: a
+// user who waits that long is never retrying into a limit that has not lifted.
+// d must be positive; the caller decides what a reset in the past means.
+func ResetIn(d time.Duration) string {
+	if d >= 24*time.Hour {
+		h := int((d + time.Hour - 1) / time.Hour)
+		if h%24 == 0 {
+			return fmt.Sprintf("resets in %dd", h/24)
+		}
+		return fmt.Sprintf("resets in %dd %dh", h/24, h%24)
+	}
+	m := int((d + time.Minute - 1) / time.Minute)
+	switch {
+	case m >= 60 && m%60 == 0:
+		return fmt.Sprintf("resets in %dh", m/60)
+	case m >= 60:
+		return fmt.Sprintf("resets in %dh %dm", m/60, m%60)
+	}
+	return fmt.Sprintf("resets in %dm", m)
 }
