@@ -207,15 +207,10 @@ func resetPhrase(r string) string {
 		return r
 	}
 	d := t.Sub(now())
-	switch {
-	case d <= 0:
+	if d <= 0 {
 		return "resets now"
-	case d >= 24*time.Hour:
-		return fmt.Sprintf("resets in %dd %dh", int(d.Hours())/24, int(d.Hours())%24)
-	case d >= time.Hour:
-		return fmt.Sprintf("resets in %dh %dm", int(d.Hours()), int(d.Minutes())%60)
 	}
-	return fmt.Sprintf("resets in %dm", int(d.Minutes()))
+	return quota.ResetIn(d)
 }
 
 // Report is the whole answer: this session, then what is left.

@@ -4,6 +4,7 @@
 
 ## Summary
 
+- usage: the countdown comes from the backend's own reset field through one formatter, `quota.ResetIn` (rounds up; under a day `4h 59m`, from a day `3d 15h`); no reset field means no text; tests cover both (replaces "resets today" and floor-to-days)
 - usage: one quota meter per backend bucket (Ultra-only included); missing reading is unknown, not 0%; unmapped models say why (PR #87)
 - peers: short socket path for a long state folder; debug line with the effort sent (PR #86)
 - tui: peer messages are their own entry, drawn apart; display-only copy of Zero's traffic, never queued for the AI; every theme pair and the status bar reach WCAG AA (PR #88)
