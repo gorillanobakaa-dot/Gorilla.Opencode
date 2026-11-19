@@ -51,3 +51,34 @@ func TestChosenEffortIsTheModelIDSent(t *testing.T) {
 		t.Errorf("unoffered effort must fall back to the default, sent %q", got)
 	}
 }
+
+func TestDisplayNameWithEffort(t *testing.T) {
+	gpt := Model{
+		ID:                     "chatgpt.gpt-6.2-sol",
+		Name:                   "GPT-6.2-Sol (ChatGPT sign-in)",
+		Provider:               ProviderChatGPT,
+		DefaultReasoningEffort: "medium",
+		ReasoningEfforts: []ReasoningEffort{
+			{Effort: "low"},
+			{Effort: "medium"},
+			{Effort: "high"},
+			{Effort: "xhigh"},
+			{Effort: "max"},
+			{Effort: "ultra"},
+		},
+	}
+	if got := DisplayNameWithEffort(gpt, ""); got != "GPT-6.2-Sol (Medium) (ChatGPT sign-in)" {
+		t.Errorf("default effort = %q", got)
+	}
+	if got := DisplayNameWithEffort(gpt, "xhigh"); got != "GPT-6.2-Sol (XHigh) (ChatGPT sign-in)" {
+		t.Errorf("xhigh effort = %q", got)
+	}
+	if got := DisplayNameWithEffort(gpt, "ultra"); got != "GPT-6.2-Sol (Ultra) (ChatGPT sign-in)" {
+		t.Errorf("ultra effort = %q", got)
+	}
+	// Antigravity models already include effort in their Name and stay untouched.
+	ag := agModel("claude-sonnet-5-5-high", "Claude Sonnet 5.5 (High)")
+	if got := DisplayNameWithEffort(ag, "low"); got != ag.Name {
+		t.Errorf("antigravity name changed: got %q want %q", got, ag.Name)
+	}
+}

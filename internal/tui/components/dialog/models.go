@@ -231,9 +231,9 @@ var modelKeys = modelKeyMap{
 // taller than the window — a frame taller than its window is the bug that makes
 // the footer march down the screen (see TestFooterMustStaySmallerThanTheWindow).
 func (m *modelDialogCmp) visibleRows() int {
-	// title + subtitle + connection line (or search query line) + scroll
-	// indicator + hint + padding + border + margin
-	const chrome = 15
+	// title + search line + spacer + scroll indicator + 3-row effort slider +
+	// 2-row keycap footer + padding + border
+	const chrome = 16
 	if m.height <= 0 {
 		return numVisibleModels // not sized yet
 	}
@@ -732,24 +732,13 @@ func (m *modelDialogCmp) View() string {
 		Width(w).
 		Render(titleText)
 
-	// The lines between the title and the list: what this column is (ranked
-	// or not), and WHICH credential serves it — then one blank spacer.
+	// The lines between the title and the list: an underlined Search: input box
+	// matching Agy CLI, optional empty-column connection status, then one blank spacer.
 	var infoLines []string
-	if m.searchActive {
-		// The query line doubles as the match counter, so narrowing the words
-		// visibly narrows the number.
-		qline := fmt.Sprintf("/ %s|  — %d of %d models match name or description",
-			m.query, len(m.models), len(m.searchDomain))
-		if r := []rune(qline); len(r) > w {
-			qline = string(r[:w-3]) + styles.Ellipsis
-		}
-		infoLines = append(infoLines, baseStyle.Foreground(t.Accent()).Width(w).Render(qline))
-	} else {
-		infoLines = append(infoLines, baseStyle.Foreground(t.TextMuted()).Width(w).Render("/ Search models"))
-		if len(m.models) == 0 {
-			if status := m.connectionLine(); status != "" {
-				infoLines = append(infoLines, baseStyle.Foreground(t.TextMuted()).Render(pickerLine(status, w)))
-			}
+	infoLines = append(infoLines, m.renderSearchBar(w))
+	if !m.searchActive && len(m.models) == 0 {
+		if status := m.connectionLine(); status != "" {
+			infoLines = append(infoLines, baseStyle.Foreground(t.TextMuted()).Render(pickerLine(status, w)))
 		}
 	}
 	// GORILLA OVERRIDE (2026-10-25): why the picker opened by itself, in one
@@ -859,70 +848,64 @@ func (m *modelDialogCmp) View() string {
 
 	scrollIndicator := m.getScrollIndicators(w)
 
-	// GORILLA OVERRIDE: say what the keys do, on every provider column.
-	//
-	// Bookmarking was unfindable: nothing anywhere mentioned space, and the only
-	// label naming the shortlist appeared AFTER you had already used it —
-	// a feature you cannot discover without already knowing it. Reported from a
-	// live run: "there's no indication that YOU HAVE THE OPTION to even select
-	// your models and bookmark them".
-	//
-	// One line, on every column, in the frame the user is already reading.
-	var segs []hintSeg
+	// GORILLA OVERRIDE: say what the keys do, on every provider column, using
+	// clean highlighted keycaps + muted labels matching Agy CLI's footer.
+	var secondary []keyHint
 	switch {
 	case m.searchActive:
-		segs = []hintSeg{
-			{"type to filter   up/down move   ", false},
-			{"tab details", true},
-			{"   enter use   esc back to columns", false},
+		secondary = []keyHint{
+			{"type", "Filter"},
+			{"tab", "Details"},
+			{"enter", "Select"},
+			{"esc", "Back to columns"},
 		}
 	case m.provider == ProviderHidden:
 		// The review column: the only useful action here is getting them back.
-		segs = []hintSeg{
-			{"d RESTORE", true},
-			{"   x mark   a add to your list   ", false},
-			{"tab details", true},
+		secondary = []keyHint{
+			{"d", "Restore"},
+			{"x", "Mark"},
+			{"a", "Add"},
+			{"tab", "Details"},
 		}
 	case m.provider == ProviderBookmarks:
-		segs = []hintSeg{
-			{"space remove from bookmarks   ", false},
-			{"x mark   d hide   ", false},
-			{"/ search", true},
-			{"   ", false},
-			{"tab details", true},
+		secondary = []keyHint{
+			{"space", "Unbookmark"},
+			{"x", "Mark"},
+			{"d", "Hide"},
+			{"/", "Search"},
+			{"tab", "Details"},
 		}
 	default:
-		segs = []hintSeg{
-			{"space * bookmark   ", false},
-			{"x mark", true},
-			{"   a add marked   d hide   ", false},
-			{"b YOUR LIST", true},
-			{"   ", false},
-			{"/ search", true},
-			{"   ", false},
-			{"tab details", true},
+		secondary = []keyHint{
+			{"space", "Bookmark"},
+			{"x", "Mark"},
+			{"a", "Add"},
+			{"d", "Hide"},
+			{"b", "Your List"},
+			{"/", "Search"},
+			{"tab", "Details"},
 		}
 	}
 	// GORILLA OVERRIDE (2026-09-01): advertise the re-scan, but only on the
 	// column where it does anything.
-	//
-	// This is the one list in the program that can go stale while you are
-	// looking at it, because which models a runtime HOLDS is decided outside
-	// this program and changes on an idle timer. A key nobody knows about is
-	// worth as little as the config file this dialog exists to replace.
 	if m.provider == models.ProviderLocal && !m.searchActive {
-		segs = append(segs, hintSeg{"   ", false}, hintSeg{"ctrl+r re-scan", true})
+		secondary = append(secondary, keyHint{"ctrl+r", "Re-scan"})
 	}
 	// GORILLA OVERRIDE (2026-08-20): say how many are marked, and say it where
-	// the user is already looking. "a" acting on an invisible set is the failure
-	// this line prevents.
+	// the user is already looking.
+	secondaryPrefix := ""
 	if n := len(m.marked); n > 0 {
-		segs = append([]hintSeg{{fmt.Sprintf("%d marked   ", n), true}}, segs...)
+		secondaryPrefix = fmt.Sprintf("%d marked  ", n)
 	}
-	hintLine := renderHint(w, segs)
-	keys := []hintSeg{{"up/down model   ", true}, {"left/right effort   ", true}, {"enter apply   esc back", true}}
+	hintLine := renderKeyHints(w, secondaryPrefix, secondary)
+	primaryKeys := []keyHint{
+		{"▴/▾", "Navigate"},
+		{"◂/▸", "Effort"},
+		{"enter", "Select"},
+		{"esc", "Go Back"},
+	}
 	if m.hScrollPossible && !m.searchActive {
-		keys = append(keys, hintSeg{"   ctrl+left/right provider", false})
+		primaryKeys = append(primaryKeys, keyHint{"ctrl+◂/▸", "Provider"})
 	}
 
 	parts := []string{title}
@@ -931,16 +914,13 @@ func (m *modelDialogCmp) View() string {
 		baseStyle.Width(w).Render(lipgloss.JoinVertical(lipgloss.Left, modelItems...)),
 		scrollIndicator,
 	)
-	if effort := m.effortStrip(m.selectedIdx); effort != "" {
-		parts = append(parts, baseStyle.Foreground(t.Accent()).Render(pickerLine(effort, w)))
-	}
-	if detail := m.effortDescription(m.selectedIdx); detail != "" {
-		parts = append(parts, baseStyle.Foreground(t.TextMuted()).Render(pickerLine(detail, w)))
+	if slider := m.effortSliderLines(m.selectedIdx, w); len(slider) > 0 {
+		parts = append(parts, slider...)
 	}
 	if notice := m.noticeFor(m.selectedIdx); notice != "" {
 		parts = append(parts, baseStyle.Foreground(t.Warning()).Render(pickerLine(notice, w)))
 	}
-	parts = append(parts, renderHint(w, keys), hintLine)
+	parts = append(parts, renderKeyHints(w, "Keyboard: ", primaryKeys), hintLine)
 	content := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
 	return baseStyle.Padding(1, 2).
@@ -949,6 +929,85 @@ func (m *modelDialogCmp) View() string {
 		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)
+}
+
+func (m *modelDialogCmp) renderSearchBar(w int) string {
+	t := theme.CurrentTheme()
+	base := styles.BaseStyle()
+	const label = "  Search: "
+	labelW := len(label)
+	fieldW := 22
+	if w-labelW < fieldW {
+		fieldW = max(6, w-labelW)
+	}
+
+	if m.searchActive {
+		txt := []rune(m.query + "|")
+		if len(txt) > fieldW {
+			txt = txt[len(txt)-fieldW:]
+		}
+		padded := string(txt) + strings.Repeat(" ", max(0, fieldW-len(txt)))
+		line := base.Foreground(t.Text()).Bold(true).Render(label) +
+			base.Foreground(t.Accent()).Underline(true).Render(padded)
+		if rem := w - labelW - fieldW; rem > 4 {
+			count := fmt.Sprintf("  — %d of %d models match", len(m.models), len(m.searchDomain))
+			line += base.Foreground(t.TextMuted()).Render(pickerLine(count, rem))
+		}
+		return line
+	}
+
+	placeholder := []rune("/ to search")
+	if len(placeholder) > fieldW {
+		placeholder = placeholder[:fieldW]
+	}
+	padded := string(placeholder) + strings.Repeat(" ", max(0, fieldW-len(placeholder)))
+	return base.Foreground(t.Text()).Render(label) +
+		base.Foreground(t.TextMuted()).Underline(true).Render(padded)
+}
+
+type keyHint struct {
+	key   string
+	label string
+}
+
+func renderKeyHints(w int, prefix string, items []keyHint) string {
+	t := theme.CurrentTheme()
+	base := styles.BaseStyle()
+	prefixStyle := base.Foreground(t.Text()).Bold(true)
+	keyStyle := base.Foreground(sliderArrowActive).Bold(true)
+	labelStyle := base.Foreground(t.TextMuted())
+
+	var parts []string
+	used := 0
+	if prefix != "" {
+		pw := lipgloss.Width(prefix)
+		if pw <= w {
+			parts = append(parts, prefixStyle.Render(prefix))
+			used = pw
+		}
+	}
+	for idx, it := range items {
+		sep := ""
+		if idx > 0 {
+			sep = "  "
+		}
+		itemW := len(sep) + lipgloss.Width(it.key)
+		if it.label != "" {
+			itemW += 1 + lipgloss.Width(it.label)
+		}
+		if used+itemW > w {
+			break
+		}
+		if sep != "" {
+			parts = append(parts, base.Render(sep))
+		}
+		parts = append(parts, keyStyle.Render(it.key))
+		if it.label != "" {
+			parts = append(parts, base.Render(" "), labelStyle.Render(it.label))
+		}
+		used += itemW
+	}
+	return base.Width(w).Render(strings.Join(parts, ""))
 }
 
 func pickerProviderName(p models.ModelProvider) string {

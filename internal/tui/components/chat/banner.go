@@ -53,7 +53,7 @@ func SessionBanner(width int) string {
 		if agent, ok := cfg.Agents[config.AgentCoder]; ok {
 			label := string(agent.Model)
 			if m, ok := models.SupportedModels[agent.Model]; ok && m.Name != "" {
-				label = m.Name
+				label = models.DisplayNameWithEffort(m, agent.ReasoningEffort)
 			}
 			lines = append(lines, dim.Render("model   ")+lipgloss.NewStyle().Foreground(t.Text()).Render(label))
 		}
