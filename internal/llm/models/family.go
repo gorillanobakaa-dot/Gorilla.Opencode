@@ -18,9 +18,9 @@ import (
 )
 
 // effortOrder ranks the effort words; unknown words are not efforts.
-var effortOrder = map[string]int{"none": 0, "minimal": 1, "low": 2, "medium": 3, "high": 4, "xhigh": 5, "max": 6}
+var effortOrder = map[string]int{"none": 0, "minimal": 1, "low": 2, "medium": 3, "high": 4, "xhigh": 5, "max": 6, "ultra": 7}
 
-var effortNameRe = regexp.MustCompile(`(?i)\s*\((none|minimal|low|medium|high|xhigh|max)\)`)
+var effortNameRe = regexp.MustCompile(`(?i)\s*\((none|minimal|low|medium|high|xhigh|max|ultra)\)`)
 
 // FamilyOf returns the family key, the family's display name and the effort of
 // a model. effort is "" when the id carries none (the model has no effort
@@ -120,4 +120,55 @@ func GroupFamilies(list []Model) []FamilyGroup {
 // FamilyName drops an effort word in parentheses from a display name.
 func FamilyName(display string) string {
 	return strings.TrimSpace(effortNameRe.ReplaceAllString(display, ""))
+}
+
+// FormatEffortLabel formats an effort key for status bars and labels
+// (e.g. "medium" -> "Medium", "xhigh" -> "XHigh").
+func FormatEffortLabel(effort string) string {
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "":
+		return ""
+	case "none":
+		return "None"
+	case "minimal":
+		return "Minimal"
+	case "low":
+		return "Low"
+	case "medium":
+		return "Medium"
+	case "high":
+		return "High"
+	case "xhigh":
+		return "XHigh"
+	case "max":
+		return "Max"
+	case "ultra":
+		return "Ultra"
+	default:
+		s := strings.TrimSpace(effort)
+		return strings.ToUpper(s[:1]) + s[1:]
+	}
+}
+
+// DisplayNameWithEffort formats a model's display name with its active
+// reasoning effort when the provider stores effort separately from the model
+// ID (ChatGPT). Antigravity variants already carry their effort in Name.
+func DisplayNameWithEffort(m Model, savedEffort string) string {
+	if m.Name == "" || m.Provider != ProviderChatGPT {
+		return m.Name
+	}
+	effort := m.ResolveReasoningEffort(savedEffort)
+	label := FormatEffortLabel(effort)
+	if label == "" {
+		return m.Name
+	}
+	tag := " (" + label + ")"
+	if strings.Contains(strings.ToLower(m.Name), strings.ToLower(tag)) {
+		return m.Name
+	}
+	const chatGPTSuffix = " (ChatGPT sign-in)"
+	if strings.HasSuffix(m.Name, chatGPTSuffix) {
+		return strings.TrimSuffix(m.Name, chatGPTSuffix) + tag + chatGPTSuffix
+	}
+	return m.Name + tag
 }

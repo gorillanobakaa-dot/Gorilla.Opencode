@@ -158,7 +158,7 @@ func (m *sidebarCmp) modelName() string {
 		return ""
 	}
 	if mdl, ok := models.SupportedModels[agent.Model]; ok && mdl.Name != "" {
-		return mdl.Name
+		return models.DisplayNameWithEffort(mdl, agent.ReasoningEffort)
 	}
 	return string(agent.Model)
 }

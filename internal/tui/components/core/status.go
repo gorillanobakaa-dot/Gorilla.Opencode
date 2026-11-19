@@ -577,7 +577,7 @@ func (m statusCmp) model() string {
 	return styles.Padded().
 		Background(t.Secondary()).
 		Foreground(t.Background()).
-		Render(model.Name)
+		Render(models.DisplayNameWithEffort(model, coder.ReasoningEffort))
 }
 
 func NewStatusCmp(lspClients map[string]*lsp.Client) StatusCmp {

@@ -1434,15 +1434,15 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, util.ReportError(fmt.Errorf("%s chosen, but the background agents could not be moved, so nothing will be sent yet: %w", model.Name, ferr))
 			}
 			config.ClearPendingModelChoices()
-			return a, util.ReportInfo(fmt.Sprintf("Model chosen: %s, for every agent", model.Name))
+			return a, util.ReportInfo(fmt.Sprintf("Model chosen: %s, for every agent", models.DisplayNameWithEffort(model, msg.Effort)))
 		}
 
 		// GORILLA FIX: bring the helper agents along. Changing the coder used to
 		// leave summarizer/task/title on the old model — invisible until a title
 		// failed, or worse, until summarisation was needed mid-session.
-		note := fmt.Sprintf("Model changed to %s", model.Name)
+		note := fmt.Sprintf("Model changed to %s", models.DisplayNameWithEffort(model, msg.Effort))
 		if msg.Effort != "" {
-			note = fmt.Sprintf("Model set to %s (%s reasoning)", model.Name, msg.Effort)
+			note = fmt.Sprintf("Model set to %s", models.DisplayNameWithEffort(model, msg.Effort))
 		}
 		if prevCoder == msg.Model.ID {
 			return a, util.ReportInfo(note)
