@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/tui/layout"
@@ -31,7 +32,8 @@ const (
 
 // ModelSelectedMsg is sent when a model is selected
 type ModelSelectedMsg struct {
-	Model models.Model
+	Model  models.Model
+	Effort string
 }
 
 // CloseModelDialogMsg is sent when a model is selected
@@ -146,12 +148,12 @@ var modelKeys = modelKeyMap{
 		key.WithHelp("down", "next model"),
 	),
 	Left: key.NewBinding(
-		key.WithKeys("left"),
-		key.WithHelp("<-", "scroll left"),
+		key.WithKeys("left", "["),
+		key.WithHelp("left", "lower effort"),
 	),
 	Right: key.NewBinding(
-		key.WithKeys("right"),
-		key.WithHelp("->", "scroll right"),
+		key.WithKeys("right", "]"),
+		key.WithHelp("right", "higher effort"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),
@@ -170,12 +172,12 @@ var modelKeys = modelKeyMap{
 		key.WithHelp("k", "previous model"),
 	),
 	H: key.NewBinding(
-		key.WithKeys("h"),
-		key.WithHelp("h", "scroll left"),
+		key.WithKeys("h", "ctrl+left"),
+		key.WithHelp("ctrl+left", "previous provider"),
 	),
 	L: key.NewBinding(
-		key.WithKeys("l"),
-		key.WithHelp("l", "scroll right"),
+		key.WithKeys("l", "ctrl+right"),
+		key.WithHelp("ctrl+right", "next provider"),
 	),
 	// GORILLA OVERRIDE (2026-08-20): a picker needs a way to pick MANY. Until
 	// now the only multi-item mechanism was the bookmark list, toggled one model
@@ -241,7 +243,7 @@ var modelKeys = modelKeyMap{
 func (m *modelDialogCmp) visibleRows() int {
 	// title + subtitle + connection line (or search query line) + scroll
 	// indicator + hint + padding + border + margin
-	const chrome = 13
+	const chrome = 15
 	if m.height <= 0 {
 		return numVisibleModels // not sized yet
 	}
@@ -289,11 +291,11 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.moveSelectionUp()
 		case key.Matches(msg, modelKeys.Down) || key.Matches(msg, modelKeys.J):
 			m.moveSelectionDown()
-		case key.Matches(msg, modelKeys.Left) || key.Matches(msg, modelKeys.H):
+		case key.Matches(msg, modelKeys.H):
 			if m.hScrollPossible {
 				m.switchProvider(-1)
 			}
-		case key.Matches(msg, modelKeys.Right) || key.Matches(msg, modelKeys.L):
+		case key.Matches(msg, modelKeys.L):
 			if m.hScrollPossible {
 				m.switchProvider(1)
 			}
@@ -307,10 +309,10 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.hScrollOffset = idx
 			m.setupModelsForProvider(ProviderBookmarks)
 			return m, nil
-		case key.Matches(msg, modelKeys.EffortDown):
+		case key.Matches(msg, modelKeys.Left):
 			m.cycleEffort(-1)
 			return m, nil
-		case key.Matches(msg, modelKeys.EffortUp):
+		case key.Matches(msg, modelKeys.Right):
 			m.cycleEffort(1)
 			return m, nil
 		case key.Matches(msg, modelKeys.Mark):
@@ -376,6 +378,10 @@ func (m *modelDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.scrollOffset = max(0, min(m.scrollOffset, m.selectedIdx))
+		if m.selectedIdx >= m.scrollOffset+m.visibleRows() {
+			m.scrollOffset = m.selectedIdx - m.visibleRows() + 1
+		}
 	}
 
 	return m, nil
@@ -404,7 +410,10 @@ func (m *modelDialogCmp) selectCurrent() (tea.Model, tea.Cmd) {
 			"%s is no longer offered by its provider — press space to remove it from your bookmarks",
 			chosen.ID))
 	}
-	util.ReportInfo(fmt.Sprintf("selected model: %s", chosen.Name))
+	var effort string
+	if chosen.Provider == models.ProviderChatGPT {
+		effort = m.chatGPTEffort(chosen)
+	}
 	// Leave the dialog the way the next open should find it: on a provider
 	// column, not inside a stale search or detail page — this object is
 	// reused between opens without a reset.
@@ -412,7 +421,7 @@ func (m *modelDialogCmp) selectCurrent() (tea.Model, tea.Cmd) {
 	if m.searchActive {
 		m.closeSearch()
 	}
-	return m, util.CmdHandler(ModelSelectedMsg{Model: chosen})
+	return m, util.CmdHandler(ModelSelectedMsg{Model: chosen, Effort: effort})
 }
 
 // toggleBookmarkCurrent flips the bookmark on the highlighted model and, when
@@ -520,6 +529,10 @@ func (m *modelDialogCmp) applyFilter() {
 		}
 	}
 	m.models = out
+	m.families = nil
+	if cfg := config.Get(); cfg != nil {
+		m.collapseFamilies(cfg.Agents[config.AgentCoder].Model)
+	}
 	m.selectedIdx, m.scrollOffset = 0, 0
 }
 
@@ -553,6 +566,10 @@ func (m *modelDialogCmp) openDetail() {
 // including space and the letters j/k/h/l/b that navigate the list — is text.
 func (m *modelDialogCmp) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
+	case msg.Type == tea.KeyLeft:
+		m.cycleEffort(-1)
+	case msg.Type == tea.KeyRight:
+		m.cycleEffort(1)
 	case key.Matches(msg, modelKeys.Up):
 		m.moveSelectionUp()
 	case key.Matches(msg, modelKeys.Down):
@@ -655,6 +672,7 @@ func (m *modelDialogCmp) switchProvider(offset int) {
 //
 // GORILLA OVERRIDE: added for the /connect u=use-for-session flow.
 func (m *modelDialogCmp) SwitchToProvider(p models.ModelProvider) {
+	m.effort = nil
 	cfg := config.Get()
 	m.availableProviders = getEnabledProviders(cfg)
 	m.hScrollPossible = len(m.availableProviders) > 1
@@ -711,12 +729,12 @@ func (m *modelDialogCmp) View() string {
 	// sentences, so the template stranded the word "Model" on the end:
 	//   "Select * HIDDEN - press d to restore, they return to their own provider Model"
 	// Caught by reading a screenshot, not by any test.
-	titleText := fmt.Sprintf("Select %s Model", providerDisplayName(m.provider))
+	titleText := "Models / " + pickerProviderName(m.provider)
 	if m.provider == ProviderHidden || m.provider == ProviderBookmarks {
 		titleText = providerDisplayName(m.provider)
 	}
 	if m.searchActive {
-		titleText = "Search Models — every provider at once"
+		titleText = "Models / All providers"
 	}
 	title := baseStyle.
 		Foreground(t.Primary()).
@@ -737,30 +755,7 @@ func (m *modelDialogCmp) View() string {
 		}
 		infoLines = append(infoLines, baseStyle.Foreground(t.Accent()).Width(w).Render(qline))
 	} else {
-		// GORILLA OVERRIDE: for a curated provider, tell the user the top of
-		// the list is the probe-verified coding ranking (1 = best), and that
-		// the rest of the provider's catalog follows below — nothing is hidden.
-		if len(m.models) > 0 && m.models[0].Rank > 0 {
-			ranked := 0
-			for _, mm := range m.models {
-				if mm.Rank > 0 {
-					ranked++
-				}
-			}
-			infoLines = append(infoLines, baseStyle.Foreground(t.TextMuted()).Width(w).
-				Render(fmt.Sprintf("%d ranked best-first (1=best); %d more below — full catalog, your call", ranked, len(m.models)-ranked)))
-		}
-		// GORILLA OVERRIDE: name the credential behind the column. A row
-		// reading "MoonshotAI: Kimi K2" LOOKS like it comes from Moonshot,
-		// but the request is billed to whichever key this provider column
-		// holds — and someone rotating free keys to spread quota cannot make
-		// an informed pick without knowing which key is live right now.
-		if cl := m.connectionLine(); cl != "" {
-			if r := []rune(cl); len(r) > w {
-				cl = string(r[:w-3]) + styles.Ellipsis
-			}
-			infoLines = append(infoLines, baseStyle.Foreground(t.TextMuted()).Width(w).Render(cl))
-		}
+		infoLines = append(infoLines, baseStyle.Foreground(t.TextMuted()).Width(w).Render("/ Search models"))
 	}
 	// GORILLA OVERRIDE (2026-10-25): why the picker opened by itself, in one
 	// line above everything else. See config/model_choice.go.
@@ -777,19 +772,15 @@ func (m *modelDialogCmp) View() string {
 	endIdx := min(m.scrollOffset+m.visibleRows(), len(m.models))
 	modelItems := make([]string, 0, endIdx-m.scrollOffset)
 
+	var currentID models.ModelID
+	if cfg := config.Get(); cfg != nil {
+		currentID = cfg.Agents[config.AgentCoder].Model
+	}
+	currentFamily, _, _ := models.FamilyOf(models.SupportedModels[currentID])
 	for i := m.scrollOffset; i < endIdx; i++ {
-		// GORILLA OVERRIDE: show "N. Name — description" for curated
-		// ranked models (N = quality rank, 1 = best), so the picker
-		// reads as a leaderboard; plain "Name — description" otherwise.
 		label := m.models[i].Name
-		if d := m.models[i].Description; d != "" {
-			label = fmt.Sprintf("%s — %s", m.models[i].Name, d)
-		}
-		if es := m.effortStrip(i); es != "" {
-			label += "  " + es
-		}
-		if n := m.noticeFor(i); n != "" {
-			label += "  !! " + n
+		if family, _, _ := models.FamilyOf(m.models[i]); currentID != "" && (m.models[i].ID == currentID || family == currentFamily) {
+			label += "  (current)"
 		}
 		// GORILLA OVERRIDE: every OpenAI-compatible endpoint lands under the one
 		// "local" provider, so name the connection each model comes from.
@@ -810,11 +801,6 @@ func (m *modelDialogCmp) View() string {
 			if home := models.SupportedModels[m.models[i].ID].Provider; home != "" {
 				label = fmt.Sprintf("[%s] %s", home, label)
 			}
-		}
-		// Ranks are per-provider judgements; in a cross-provider search they
-		// would collide ("1." three times) and imply an ordering nobody made.
-		if r := m.models[i].Rank; r > 0 && !m.searchActive {
-			label = fmt.Sprintf("%2d. %s", r, label)
 		}
 		// GORILLA OVERRIDE: mark what is already on the shortlist, everywhere it
 		// appears. Without it, someone browsing a provider has no way to tell
@@ -863,15 +849,13 @@ func (m *modelDialogCmp) View() string {
 		case "not-loaded":
 			label += "  (on disk)"
 		}
-		if r := []rune(label); len(r) > w-1 {
-			label = string(r[:w-4]) + styles.Ellipsis
-		}
-		itemStyle := baseStyle.Width(w)
+		prefix := "  "
+		itemStyle := baseStyle
 		if i == m.selectedIdx {
-			itemStyle = itemStyle.Background(t.Primary()).
-				Foreground(t.Background()).Bold(true)
+			prefix = "> "
+			itemStyle = itemStyle.Foreground(t.Primary()).Bold(true)
 		}
-		modelItems = append(modelItems, itemStyle.Render(label))
+		modelItems = append(modelItems, itemStyle.Render(pickerLine(prefix+label, w)))
 	}
 	if m.searchActive && len(m.models) == 0 {
 		modelItems = append(modelItems, baseStyle.Foreground(t.TextMuted()).Width(w).
@@ -940,21 +924,28 @@ func (m *modelDialogCmp) View() string {
 	if n := len(m.marked); n > 0 {
 		segs = append([]hintSeg{{fmt.Sprintf("%d marked   ", n), true}}, segs...)
 	}
-	if !m.searchActive {
-		if m.hScrollPossible {
-			segs = append(segs, hintSeg{"   <-/-> other providers", false})
-		}
-		segs = append(segs, hintSeg{"   enter use   esc close", false})
-	}
 	hintLine := renderHint(w, segs)
+	keys := []hintSeg{{"up/down model   left/right effort   enter apply   esc back", true}}
+	if m.hScrollPossible && !m.searchActive {
+		keys = append(keys, hintSeg{"   ctrl+left/right provider", false})
+	}
 
 	parts := []string{title}
 	parts = append(parts, infoLines...)
 	parts = append(parts,
 		baseStyle.Width(w).Render(lipgloss.JoinVertical(lipgloss.Left, modelItems...)),
 		scrollIndicator,
-		hintLine,
 	)
+	if effort := m.effortStrip(m.selectedIdx); effort != "" {
+		parts = append(parts, baseStyle.Foreground(t.Accent()).Render(pickerLine(effort, w)))
+	}
+	if detail := m.effortDescription(m.selectedIdx); detail != "" {
+		parts = append(parts, baseStyle.Foreground(t.TextMuted()).Render(pickerLine(detail, w)))
+	}
+	if notice := m.noticeFor(m.selectedIdx); notice != "" {
+		parts = append(parts, baseStyle.Foreground(t.Warning()).Render(pickerLine(notice, w)))
+	}
+	parts = append(parts, renderHint(w, keys), hintLine)
 	content := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
 	return baseStyle.Padding(1, 2).
@@ -963,6 +954,21 @@ func (m *modelDialogCmp) View() string {
 		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)
+}
+
+func pickerProviderName(p models.ModelProvider) string {
+	switch p {
+	case models.ProviderAntigravity:
+		return "Antigravity"
+	case models.ProviderChatGPT:
+		return "ChatGPT"
+	default:
+		return providerDisplayName(p)
+	}
+}
+
+func pickerLine(line string, width int) string {
+	return ansi.Truncate(line, width, styles.Ellipsis)
 }
 
 // connectionLine says which credential serves the CURRENT column, in the
@@ -1236,6 +1242,7 @@ func (m *modelDialogCmp) BindingKeys() []key.Binding {
 }
 
 func (m *modelDialogCmp) setupModels() {
+	m.effort = nil
 	cfg := config.Get()
 	modelInfo := GetSelectedModel(cfg)
 	m.availableProviders = getEnabledProviders(cfg)
@@ -1447,8 +1454,10 @@ func (m *modelDialogCmp) setupModelsForProvider(provider models.ModelProvider) {
 
 	// Try to select the current model if it belongs to this provider
 	if provider == models.SupportedModels[selectedModelId].Provider {
+		family, _, _ := models.FamilyOf(models.SupportedModels[selectedModelId])
 		for i, model := range m.models {
-			if model.ID == selectedModelId {
+			key, _, _ := models.FamilyOf(model)
+			if model.ID == selectedModelId || key == family {
 				m.selectedIdx = i
 				// Adjust scroll position to keep selected model visible
 				if m.selectedIdx >= m.visibleRows() {

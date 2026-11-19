@@ -51,20 +51,27 @@ func TestOpenAISendsChosenEffort(t *testing.T) {
 
 // ChatGPT sign-in (Responses API): the effort is reasoning.effort.
 func TestChatGPTSendsChosenEffort(t *testing.T) {
-	for _, effort := range []string{"low", "medium", "high"} {
+	model := models.Model{APIModel: "gpt-test", CanReason: true,
+		DefaultReasoningEffort: "medium",
+		ReasoningEfforts:       []models.ReasoningEffort{{Effort: "none"}, {Effort: "low"}, {Effort: "medium"}, {Effort: "high"}, {Effort: "xhigh"}},
+	}
+	for _, effort := range []string{"none", "low", "medium", "high", "xhigh"} {
 		c := &chatgptClient{providerOptions: providerClientOptions{
-			model:         models.Model{APIModel: "gpt-test", CanReason: true},
-			openaiOptions: []OpenAIOption{WithReasoningEffort(effort)},
+			model:         model,
+			openaiOptions: []OpenAIOption{WithChatGPTReasoningEffort(effort)},
 		}}
 		b, _ := json.Marshal(c.buildRequest(effortMsgs(), nil))
 		if !strings.Contains(string(b), `"reasoning":{"effort":"`+effort+`"}`) {
 			t.Fatalf("effort %s not in %s", effort, b)
 		}
 	}
-	// nothing chosen -> medium, as before
-	c := &chatgptClient{providerOptions: providerClientOptions{model: models.Model{APIModel: "g", CanReason: true}}}
+	c := &chatgptClient{providerOptions: providerClientOptions{model: model}}
 	if b, _ := json.Marshal(c.buildRequest(effortMsgs(), nil)); !strings.Contains(string(b), `"effort":"medium"`) {
 		t.Fatalf("default: %s", b)
+	}
+	c.providerOptions.model.ReasoningEfforts = nil
+	if b, _ := json.Marshal(c.buildRequest(effortMsgs(), nil)); strings.Contains(string(b), `"reasoning"`) {
+		t.Fatalf("legacy catalogue sent an unverified effort: %s", b)
 	}
 }
 

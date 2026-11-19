@@ -93,9 +93,10 @@ var (
 		return q.ToMeterWithModels("", live), creds.PlanLabel(), nil
 	}
 	chatGPTMeters = func() []quota.Meter {
-		q, _ := auth.LoadChatGPTQuota()
-		if q == nil {
-			q = &auth.ChatGPTQuota{}
+		creds, _ := auth.LoadChatGPTCreds()
+		q, _ := auth.LoadChatGPTQuota(creds, true)
+		if q.Empty() {
+			q, _ = auth.LoadChatGPTQuota(creds, false)
 		}
 		return []quota.Meter{q.ToMeter("")}
 	}
@@ -156,7 +157,7 @@ func allowance(ctx context.Context, p models.ModelProvider) []string {
 		}
 		return append([]string{head + ":"}, meterLines(meters)...)
 	case p == models.ProviderChatGPT:
-		return append([]string{"ChatGPT allowance (from its last reply):"}, meterLines(chatGPTMeters())...)
+		return append([]string{"ChatGPT allowance (last saved reading):"}, meterLines(chatGPTMeters())...)
 	}
 	for _, id := range quota.Supported() {
 		if models.ModelProvider(id) != p {

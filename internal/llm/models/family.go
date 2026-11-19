@@ -31,12 +31,15 @@ func FamilyOf(m Model) (family, name, effort string) {
 		api = string(m.ID)
 	}
 	family = api
-	if i := strings.LastIndex(api, "-"); i > 0 {
+	if i := strings.LastIndex(api, "-"); i > 0 && m.Provider != ProviderChatGPT {
 		if _, ok := effortOrder[strings.ToLower(api[i+1:])]; ok {
 			family, effort = api[:i], strings.ToLower(api[i+1:])
 		}
 	}
 	name = trimAntigravitySuffix(m.Name)
+	if m.Provider == ProviderChatGPT {
+		name = strings.TrimSuffix(name, " (ChatGPT sign-in)")
+	}
 	name = strings.TrimSpace(effortNameRe.ReplaceAllString(name, ""))
 	return string(m.Provider) + "/" + family, name, effort
 }

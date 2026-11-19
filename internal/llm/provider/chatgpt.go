@@ -254,12 +254,15 @@ func (c *chatgptClient) buildRequest(messages []message.Message, ts []tools.Base
 	if c.providerOptions.model.CanReason {
 		// The effort the owner chose (agent config ReasoningEffort, passed as an
 		// OpenAI option by the agent); medium only when none was chosen.
-		oo := openaiOptions{reasoningEffort: "medium"}
+		oo := openaiOptions{}
 		for _, o := range c.providerOptions.openaiOptions {
 			o(&oo)
 		}
-		req.Reasoning = &cgReason{Effort: oo.reasoningEffort}
-		logEffort(string(c.providerOptions.model.Provider), c.providerOptions.model.APIModel, oo.reasoningEffort, "reasoning.effort")
+		effort := c.providerOptions.model.ResolveReasoningEffort(oo.reasoningEffort)
+		if effort != "" {
+			req.Reasoning = &cgReason{Effort: effort}
+			logEffort(string(c.providerOptions.model.Provider), c.providerOptions.model.APIModel, effort, "reasoning.effort")
+		}
 	}
 	return req
 }
@@ -298,14 +301,9 @@ func (c *chatgptClient) post(ctx context.Context, body cgRequest) (*http.Respons
 		return req, nil
 	}
 	resp, err := doWithConnectRetry(ctx, newReq) // chatgpt_connect_retry.go
-	// GORILLA OVERRIDE (2026-08-23): the usage meter for this backend rides the
-	// RESPONSE, not a queryable endpoint — there is none. Recording it here, at
-	// the one point every ChatGPT request passes through, costs zero extra
-	// requests, which is what §8 demands on a metered link. Best-effort and
-	// silent: failing to note a usage number must never break the request that
-	// carried it. See internal/auth/chatgpt_quota.go.
+	// Capture the fallback reading without issuing another request.
 	if err == nil && resp != nil {
-		auth.RecordChatGPTQuota(resp.Header)
+		auth.RecordChatGPTQuota(c.creds, resp.Header)
 	}
 	return resp, err
 }

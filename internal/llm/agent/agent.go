@@ -60,7 +60,7 @@ type Service interface {
 	// has completed or the provider reports no cache figures -- see
 	// UsageReportsCache, which is not the same question.
 	LastUsage() provider.TokenUsage
-	Update(agentName config.AgentName, modelID models.ModelID) (models.Model, error)
+	Update(agentName config.AgentName, modelID models.ModelID, effort ...string) (models.Model, error)
 	Summarize(ctx context.Context, sessionID string) error
 	// GORILLA OVERRIDE: swap the active tool set at runtime so context
 	// loadout changes take effect without a restart.
@@ -1303,7 +1303,7 @@ func (a *agent) TrackUsage(ctx context.Context, sessionID string, model models.M
 	return nil
 }
 
-func (a *agent) Update(agentName config.AgentName, modelID models.ModelID) (models.Model, error) {
+func (a *agent) Update(agentName config.AgentName, modelID models.ModelID, effort ...string) (models.Model, error) {
 	if a.IsBusy() {
 		return models.Model{}, fmt.Errorf("cannot change model while processing requests")
 	}
@@ -1320,12 +1320,20 @@ func (a *agent) Update(agentName config.AgentName, modelID models.ModelID) (mode
 	//
 	// Building first makes the failure honest: if the provider cannot be made,
 	// the config is untouched and the interface keeps telling the truth.
-	provider, err := createAgentProviderFor(agentName, modelID)
+	var requestedEffort string
+	if len(effort) > 0 {
+		requestedEffort = effort[0]
+	}
+	choice, err := config.PrepareAgentModel(agentName, modelID, requestedEffort)
+	if err != nil {
+		return models.Model{}, err
+	}
+	provider, err := createAgentProviderWithConfig(agentName, choice)
 	if err != nil {
 		return models.Model{}, fmt.Errorf("failed to create provider for model %s: %w", modelID, err)
 	}
 
-	if err := config.UpdateAgentModel(agentName, modelID); err != nil {
+	if err := config.SaveAgentModel(agentName, choice); err != nil {
 		return models.Model{}, fmt.Errorf("failed to update config: %w", err)
 	}
 
@@ -1552,9 +1560,15 @@ func createAgentProviderFor(agentName config.AgentName, modelID models.ModelID) 
 	if !ok {
 		return nil, fmt.Errorf("agent %s not found", agentName)
 	}
-	model, ok := models.SupportedModels[modelID]
+	agentConfig.Model = modelID
+	return createAgentProviderWithConfig(agentName, agentConfig)
+}
+
+func createAgentProviderWithConfig(agentName config.AgentName, agentConfig config.Agent) (provider.Provider, error) {
+	cfg := config.Get()
+	model, ok := models.SupportedModels[agentConfig.Model]
 	if !ok {
-		return nil, fmt.Errorf("model %s not supported", modelID)
+		return nil, fmt.Errorf("model %s not supported", agentConfig.Model)
 	}
 
 	// GORILLA OVERRIDE: local models don't use a single providers.local key —
@@ -1587,7 +1601,9 @@ func createAgentProviderFor(agentName config.AgentName, modelID models.ModelID) 
 		provider.WithSystemMessage(prompt.GetAgentPromptFor(agentName, model)),
 		provider.WithMaxTokens(maxTokens),
 	}
-	if model.Provider == models.ProviderOpenAI || (model.Provider == models.ProviderLocal || model.Provider == models.ProviderChatGPT) && model.CanReason {
+	if model.Provider == models.ProviderChatGPT {
+		opts = append(opts, provider.WithOpenAIOptions(provider.WithChatGPTReasoningEffort(agentConfig.ReasoningEffort)))
+	} else if model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal && model.CanReason {
 		opts = append(
 			opts,
 			provider.WithOpenAIOptions(

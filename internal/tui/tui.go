@@ -597,21 +597,43 @@ const anthropicUsageLine = "Anthropic (API key): your credit balance is on conso
 
 // activeChatGPTMeter returns the ChatGPT meter when ChatGPT is the provider the
 // session actually spends against, else nil.
-func activeChatGPTMeters() []quota.Meter {
-	if coderProvider() != models.ProviderChatGPT {
-		return nil
+func activeChatGPTMeters(ctx context.Context) []quota.Meter {
+	creds, err := auth.LoadChatGPTCreds()
+	if err != nil || creds == nil {
+		return []quota.Meter{{Provider: auth.ChatGPTProviderName, Err: "sign in to ChatGPT to read account usage"}}
 	}
-	var account string
-	if creds, _ := auth.LoadChatGPTCreds(); creds != nil {
-		account = creds.Email
+	account := creds.Email
+	if account == "" {
+		account = "Signed-in account"
 	}
-	q, _ := auth.LoadChatGPTQuota()
-	if q == nil {
-		// Signed in but nothing read yet. The adapter marks this Pending, which
-		// is a real third state: blank and 100% are both lies.
-		q = &auth.ChatGPTQuota{}
+	q, err := creds.RetrieveUsage(ctx)
+	note := "Usage source: ChatGPT account"
+	if err != nil {
+		q, _ = auth.LoadChatGPTQuota(creds, true)
+		note = "Cached account reading"
+		if q.Empty() {
+			q, _ = auth.LoadChatGPTQuota(creds, false)
+			note = "Last response reading (account-wide limits and credits unavailable)"
+		}
+		if q.Empty() {
+			return []quota.Meter{{Provider: auth.ChatGPTProviderName, Account: account, Plan: creds.PlanType, Err: err.Error()}}
+		}
+		if q.SeenAt > 0 {
+			note += " from " + time.Unix(q.SeenAt, 0).Local().Format("Jan 2, 15:04")
+		}
 	}
-	return []quota.Meter{q.ToMeter(account)}
+	meter := q.ToMeter(account)
+	if meter.Note == "" {
+		meter.Note = "Credits: balance unavailable"
+	}
+	meter.Note = note + "\n" + meter.Note
+	out := []quota.Meter{meter}
+	for i := range q.Additional {
+		extra := q.Additional[i].ToMeter(account)
+		extra.Provider = auth.ChatGPTProviderName + " / " + q.Additional[i].LimitName
+		out = append(out, extra)
+	}
+	return out
 }
 
 // quotaTierCheckCmd fetches a fresh quota reading and compares it against the
@@ -713,16 +735,10 @@ func antigravityUsageCmd(quiet bool) tea.Cmd {
 			// Show the ACTIVE provider's own meter instead of a blank. Removing
 			// the wrong number without supplying the right one left a user at
 			// 20% of a monthly limit with nothing to look at.
-			if cg := activeChatGPTMeters(); len(cg) > 0 {
-				msg.meters = cg
-				switch m := cg[0]; {
-				case m.Pending:
-					line = "No usage reading yet this session: this backend reports usage on its replies."
-				case len(m.Bars) > 0:
-					line = fmt.Sprintf("%s: %d%% left", m.Bars[0].Label,
-						int(m.Bars[0].Remaining*100+0.5))
-				}
-				msg.line = line
+			if coderProvider() == models.ProviderChatGPT {
+				msg.meters = activeChatGPTMeters(context.Background())
+				msg.line = "ChatGPT subscription usage"
+				return msg
 			}
 			msg.balances = configuredBalances(context.Background())
 			return msg
@@ -749,10 +765,17 @@ func antigravityUsageCmd(quiet bool) tea.Cmd {
 		// The live model list names which models each quota group covers, and
 		// lists the ones no group names under "other / bucket unknown". Best
 		// effort: without it the groups keep the provider's own wording.
-		live, _ := creds.FetchAvailableModels(context.Background())
+		var live map[string]auth.AntigravityModelInfo
+		var catalogueErr error
+		if !quiet {
+			live, catalogueErr = creds.FetchAvailableModels(context.Background())
+		}
 		meters := q.ToMeterWithModels(creds.Email, live)
 		_, msg.fractions = bananaAlerts(nil, meters) // seed/update the alert baseline
 		if !quiet {
+			if catalogueErr != nil {
+				msg.line += " · Model coverage unavailable"
+			}
 			msg.meters = meters
 			msg.balances = configuredBalances(context.Background())
 		}
@@ -1402,7 +1425,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// has followed it (config/model_choice.go).
 		choosing := config.ModelChoicePending()
 
-		model, err := a.app.CoderAgent.Update(config.AgentCoder, msg.Model.ID)
+		model, err := a.app.CoderAgent.Update(config.AgentCoder, msg.Model.ID, msg.Effort)
 		if err != nil {
 			return a, util.ReportError(err)
 		}
@@ -1418,6 +1441,12 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// leave summarizer/task/title on the old model — invisible until a title
 		// failed, or worse, until summarisation was needed mid-session.
 		note := fmt.Sprintf("Model changed to %s", model.Name)
+		if msg.Effort != "" {
+			note = fmt.Sprintf("Model set to %s (%s reasoning)", model.Name, msg.Effort)
+		}
+		if prevCoder == msg.Model.ID {
+			return a, util.ReportInfo(note)
+		}
 		moves, ferr := config.FollowCoderModel(prevCoder, msg.Model.ID)
 		if ferr != nil {
 			// Not fatal: the coder switch already succeeded and is what was asked

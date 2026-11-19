@@ -887,7 +887,11 @@ func validateAgentMaxTokens(cfg *Config, name AgentName, agent Agent, model mode
 	// GORILLA OVERRIDE: operator-precedence bug — the original condition
 	// parsed as (CanReason && OpenAI) || Local, forcing reasoning effort
 	// onto every local-provider model whether it can reason or not.
-	if model.CanReason && (model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal || model.Provider == models.ProviderChatGPT) {
+	if model.Provider == models.ProviderChatGPT {
+		updatedAgent := cfg.Agents[name]
+		updatedAgent.ReasoningEffort = model.ResolveReasoningEffort(agent.ReasoningEffort)
+		cfg.Agents[name] = updatedAgent
+	} else if model.CanReason && (model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal) {
 		if agent.ReasoningEffort == "" {
 			// Set default reasoning effort for models that support it
 			logging.Info("setting default reasoning effort for model that supports reasoning",
@@ -1828,19 +1832,28 @@ func WorkingDirectory() string {
 }
 
 func UpdateAgentModel(agentName AgentName, modelID models.ModelID) error {
+	choice, err := PrepareAgentModel(agentName, modelID, "")
+	if err != nil {
+		return err
+	}
+	return SaveAgentModel(agentName, choice)
+}
+
+// PrepareAgentModel resolves a model choice before it is applied to the live agent.
+func PrepareAgentModel(agentName AgentName, modelID models.ModelID, effort string) (Agent, error) {
 	if cfg == nil {
-		panic("config not loaded")
+		return Agent{}, fmt.Errorf("config not loaded")
 	}
 
 	existingAgentCfg := cfg.Agents[agentName]
 
 	model, ok := models.SupportedModels[modelID]
 	if !ok {
-		return fmt.Errorf("model %s not supported", modelID)
+		return Agent{}, fmt.Errorf("model %s not supported", modelID)
 	}
 
 	maxTokens := existingAgentCfg.MaxTokens
-	if model.DefaultMaxTokens > 0 {
+	if model.DefaultMaxTokens > 0 && (modelID != existingAgentCfg.Model || effort == "") {
 		maxTokens = model.DefaultMaxTokens
 	}
 	// GORILLA OVERRIDE (2026-10-28): a title is a few words. Load() pins it to
@@ -1850,11 +1863,27 @@ func UpdateAgentModel(agentName AgentName, modelID models.ModelID) error {
 		maxTokens = 80
 	}
 
-	newAgentCfg := Agent{
+	choice := Agent{
 		Model:           modelID,
 		MaxTokens:       maxTokens,
 		ReasoningEffort: existingAgentCfg.ReasoningEffort,
 	}
+	if model.Provider == models.ProviderChatGPT {
+		if effort != "" && !model.SupportsReasoningEffort(effort) {
+			return Agent{}, fmt.Errorf("%s does not offer reasoning effort %q", model.Name, effort)
+		}
+		if effort == "" && existingAgentCfg.Model == modelID {
+			effort = existingAgentCfg.ReasoningEffort
+		}
+		choice.ReasoningEffort = model.ResolveReasoningEffort(effort)
+	}
+	return choice, nil
+}
+
+// SaveAgentModel commits a prepared choice, restoring the live settings on failure.
+func SaveAgentModel(agentName AgentName, newAgentCfg Agent) error {
+	existingAgentCfg := cfg.Agents[agentName]
+	modelID := newAgentCfg.Model
 	cfg.Agents[agentName] = newAgentCfg
 
 	prevHold, hadHold := pendingChoiceFor(agentName)
@@ -1873,16 +1902,19 @@ func UpdateAgentModel(agentName AgentName, modelID models.ModelID) error {
 		return fmt.Errorf("failed to update agent model: %s is unusable (%s)", modelID, held.Reason)
 	}
 	// A model the person picked ends any hold on this agent.
-	clearPendingChoice(agentName)
-	// Written to config.json below, so it is a choice now, not a derivation.
-	forgetDerivedRoleAgent(agentName)
-
-	return updateCfgFile(func(config *Config) {
+	if err := updateCfgFile(func(config *Config) {
 		if config.Agents == nil {
 			config.Agents = make(map[AgentName]Agent)
 		}
-		config.Agents[agentName] = newAgentCfg
-	})
+		config.Agents[agentName] = cfg.Agents[agentName]
+	}); err != nil {
+		cfg.Agents[agentName] = existingAgentCfg
+		restorePendingChoice(agentName, prevHold, hadHold)
+		return err
+	}
+	clearPendingChoice(agentName)
+	forgetDerivedRoleAgent(agentName)
+	return nil
 }
 
 // UpdateTheme updates the theme in the configuration and writes it to the config file.

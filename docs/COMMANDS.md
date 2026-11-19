@@ -195,7 +195,7 @@ Looks through the project and writes a short file describing how to build, test 
 
 **Choose which AI answers you.**
 
-Bigger models are better at hard problems and cost more; small ones are cheap and fast. Models running on your own machine cost nothing to use. Each is listed with the connection it comes from.
+Use Up and Down to browse models and Left and Right to choose their reasoning effort when available. Press Enter to apply or Esc to close. Use / to search enabled providers, Ctrl+Left or Ctrl+Right to change provider, and Tab for model and connection details.
 
 ### `/connect`
 
@@ -253,7 +253,7 @@ Removes the stored sign-in. Any API keys you typed are untouched.
 
 **Show your quota and balances — how many bananas are left.**
 
-Shows what you have left to spend, in plain words. If you signed in with Antigravity: which plan Google reports (free tier, or e.g. Google AI Pro), how much of your weekly allowance remains — Gemini has a separate pool from Claude and GPT-OSS — and when each resets. If you have a DeepSeek or OpenRouter key: your remaining balance there too. A one-line summary also appears on its own at the start of each session. Below it: what this conversation has cost so far, and how much of what was sent was the conversation sent again — the reason long sessions get expensive. The AI can read the same answer with its usage tool, so you can simply ask it.
+Shows the current provider's quota and this conversation's cost. ChatGPT sign-in reads the current account's limits and credits on demand, including the 5-hour and weekly windows when supplied. Antigravity names the model families sharing each reported meter and lists routes whose group is unavailable. Configured DeepSeek and OpenRouter keys can also show balances. The session ledger shows cost and how much of your conversation was sent again.
 
 ## Cost, speed and behaviour
 

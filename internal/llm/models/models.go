@@ -30,17 +30,19 @@ type Model struct {
 	Notice string `json:"notice,omitempty"`
 	// GORILLA OVERRIDE: curated rank (1 = best). 0 = not on the
 	// verified best-models list; the picker can hide these.
-	Rank                int           `json:"rank,omitempty"`
-	Provider            ModelProvider `json:"provider"`
-	APIModel            string        `json:"api_model"`
-	CostPer1MIn         float64       `json:"cost_per_1m_in"`
-	CostPer1MOut        float64       `json:"cost_per_1m_out"`
-	CostPer1MInCached   float64       `json:"cost_per_1m_in_cached"`
-	CostPer1MOutCached  float64       `json:"cost_per_1m_out_cached"`
-	ContextWindow       int64         `json:"context_window"`
-	DefaultMaxTokens    int64         `json:"default_max_tokens"`
-	CanReason           bool          `json:"can_reason"`
-	SupportsAttachments bool          `json:"supports_attachments"`
+	Rank                   int               `json:"rank,omitempty"`
+	Provider               ModelProvider     `json:"provider"`
+	APIModel               string            `json:"api_model"`
+	CostPer1MIn            float64           `json:"cost_per_1m_in"`
+	CostPer1MOut           float64           `json:"cost_per_1m_out"`
+	CostPer1MInCached      float64           `json:"cost_per_1m_in_cached"`
+	CostPer1MOutCached     float64           `json:"cost_per_1m_out_cached"`
+	ContextWindow          int64             `json:"context_window"`
+	DefaultMaxTokens       int64             `json:"default_max_tokens"`
+	CanReason              bool              `json:"can_reason"`
+	ReasoningEfforts       []ReasoningEffort `json:"reasoning_efforts,omitempty"`
+	DefaultReasoningEffort string            `json:"default_reasoning_effort,omitempty"`
+	SupportsAttachments    bool              `json:"supports_attachments"`
 	// GORILLA OVERRIDE (2026-09-01): whether a LOCAL runtime currently holds
 	// this model in memory. "loaded", "not-loaded", or empty when the
 	// endpoint does not say (plain /v1/models) or the model is not local.
@@ -57,6 +59,30 @@ type Model struct {
 	// and the two differ a lot: a model advertising 262,144 may be loaded at
 	// 20,224. Zero when unknown.
 	MaxContextWindow int64 `json:"max_context_window,omitempty"`
+}
+
+type ReasoningEffort struct {
+	Effort      string `json:"effort"`
+	Description string `json:"description,omitempty"`
+}
+
+func (m Model) SupportsReasoningEffort(value string) bool {
+	for _, option := range m.ReasoningEfforts {
+		if option.Effort == value {
+			return true
+		}
+	}
+	return false
+}
+
+func (m Model) ResolveReasoningEffort(saved string) string {
+	if m.SupportsReasoningEffort(saved) {
+		return saved
+	}
+	if m.SupportsReasoningEffort(m.DefaultReasoningEffort) {
+		return m.DefaultReasoningEffort
+	}
+	return ""
 }
 
 // GORILLA CULL (2026-08-21): Bedrock, Azure, Copilot and VertexAI were removed

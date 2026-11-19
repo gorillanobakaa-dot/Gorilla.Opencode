@@ -156,6 +156,25 @@ func TestGroupMetersNameTheModelIDsTheyCover(t *testing.T) {
 	}
 }
 
+func TestQuotaGroupSeparatesOrchestratorRoutes(t *testing.T) {
+	groups := []QuotaGroup{
+		{DisplayName: "Gemini Models", Description: "Models within this group: Gemini 4 Neon, Gemini 4 Hydrogen, Orchestrator (Neon)"},
+		{DisplayName: "Gemini 4 Argon"},
+	}
+	for model, want := range map[string]int{
+		"Gemini 4 Hydrogen (XHigh)":        0,
+		"Gemini 4 Neon (Low)":              0,
+		"Gemini 4 Argon (Medium)":          1,
+		"Orchestrator (Neon)":              0,
+		"Orchestrator (Argon)":             -1,
+		"Gemini 4 Hydrogen (Orchestrator)": -1,
+	} {
+		if got := quotaGroupForModel(groups, model); got != want {
+			t.Errorf("%s: got group %d, want %d", model, got, want)
+		}
+	}
+}
+
 // The real wire: fetchAvailableModels JSON through the same struct the client
 // decodes, and the quota groups as Google describes them (owner screenshot
 // 2026-11-14). Every live model is under a group or under "other"; none is

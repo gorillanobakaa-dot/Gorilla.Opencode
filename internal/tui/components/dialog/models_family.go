@@ -3,6 +3,7 @@ package dialog
 import (
 	"strings"
 
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 )
 
@@ -19,7 +20,7 @@ func (m *modelDialogCmp) collapseFamilies(current models.ModelID) {
 	rows := make([]models.Model, 0, len(groups))
 	for _, g := range groups {
 		for _, v := range g.Variants {
-			if v.ID == current {
+			if v.ID == current && m.effort[g.Key] == "" {
 				if _, _, e := models.FamilyOf(v); e != "" {
 					m.effort[g.Key] = e
 				}
@@ -34,6 +35,32 @@ func (m *modelDialogCmp) collapseFamilies(current models.ModelID) {
 // cycleEffort moves the highlighted family one effort level up or down and
 // swaps the row to the variant for that level.
 func (m *modelDialogCmp) cycleEffort(delta int) {
+	if m.selectedIdx >= len(m.models) {
+		return
+	}
+	model := m.models[m.selectedIdx]
+	if model.Provider == models.ProviderChatGPT {
+		efforts := model.ReasoningEfforts
+		i := -1
+		if delta < 0 {
+			i = len(efforts)
+		}
+		selected := m.chatGPTEffort(model)
+		for j, effort := range efforts {
+			if effort.Effort == selected {
+				i = j
+				break
+			}
+		}
+		if i += delta; i >= 0 && i < len(efforts) {
+			if m.effort == nil {
+				m.effort = make(map[string]string)
+			}
+			key, _, _ := models.FamilyOf(model)
+			m.effort[key] = efforts[i].Effort
+		}
+		return
+	}
 	if m.families == nil || m.selectedIdx >= len(m.families) {
 		return
 	}
@@ -60,6 +87,18 @@ func (m *modelDialogCmp) cycleEffort(delta int) {
 // effortStrip renders "low  [HIGH]  max" for a family row, or "" when the
 // model offers no effort choice.
 func (m *modelDialogCmp) effortStrip(i int) string {
+	if i < len(m.models) && m.models[i].Provider == models.ProviderChatGPT {
+		model := m.models[i]
+		selected := m.chatGPTEffort(model)
+		parts := []string{"Reasoning"}
+		for _, option := range model.ReasoningEfforts {
+			parts = append(parts, effortLabel(option.Effort, selected))
+		}
+		if selected == "" {
+			parts = append(parts, "[PROVIDER DEFAULT]")
+		}
+		return strings.Join(parts, "  ")
+	}
 	if m.families == nil || i >= len(m.families) {
 		return ""
 	}
@@ -70,13 +109,43 @@ func (m *modelDialogCmp) effortStrip(i int) string {
 	_, _, cur := models.FamilyOf(m.models[i])
 	parts := make([]string, 0, len(efforts))
 	for _, e := range efforts {
-		if e == cur {
-			parts = append(parts, "["+strings.ToUpper(e)+"]")
-		} else {
-			parts = append(parts, e)
+		parts = append(parts, effortLabel(e, cur))
+	}
+	return "Reasoning  " + strings.Join(parts, "  ")
+}
+
+func effortLabel(effort, selected string) string {
+	if effort == selected {
+		return "[" + strings.ToUpper(effort) + "]"
+	}
+	return effort
+}
+
+func (m *modelDialogCmp) chatGPTEffort(model models.Model) string {
+	key, _, _ := models.FamilyOf(model)
+	saved := m.effort[key]
+	if saved == "" {
+		if cfg := config.Get(); cfg != nil {
+			if coder := cfg.Agents[config.AgentCoder]; coder.Model == model.ID {
+				saved = coder.ReasoningEffort
+			}
 		}
 	}
-	return "effort: " + strings.Join(parts, " ") + " ([ ] changes)"
+	return model.ResolveReasoningEffort(saved)
+}
+
+func (m *modelDialogCmp) effortDescription(i int) string {
+	if i >= len(m.models) || m.models[i].Provider != models.ProviderChatGPT {
+		return ""
+	}
+	model := m.models[i]
+	selected := m.chatGPTEffort(model)
+	for _, option := range model.ReasoningEfforts {
+		if option.Effort == selected {
+			return option.Description
+		}
+	}
+	return ""
 }
 
 // familyRow is the row for a family at an effort: the variant's model with the
