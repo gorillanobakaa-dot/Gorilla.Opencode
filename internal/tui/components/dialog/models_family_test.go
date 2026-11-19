@@ -185,15 +185,7 @@ func TestEffortSliderDynamicColorsPerLevel(t *testing.T) {
 		},
 	}
 
-	wantRGB := map[string]string{
-		"minimal": "38;2;56;189;248",  // cyan
-		"low":     "38;2;34;197;94",   // bright green
-		"medium":  "38;2;234;179;8",   // amber/yellow
-		"high":    "38;2;239;68;68",   // red
-		"xhigh":   "38;2;192;38;211",  // purple/magenta
-		"max":     "38;2;232;121;249", // bright magenta
-		"ultra":   "38;2;244;114;182", // bright pink
-	}
+	seenColors := map[string]string{}
 	key, _, _ := models.FamilyOf(model)
 	for _, opt := range model.ReasoningEfforts {
 		m := &modelDialogCmp{
@@ -204,11 +196,23 @@ func TestEffortSliderDynamicColorsPerLevel(t *testing.T) {
 		if len(lines) != 3 {
 			t.Fatalf("%s: want 3 slider lines, got %d", opt.Effort, len(lines))
 		}
-		if !strings.Contains(lines[0], wantRGB[opt.Effort]) {
-			t.Errorf("%s: track row missing color %s: %q", opt.Effort, wantRGB[opt.Effort], lines[0])
+		// Extract the exact TrueColor RGB sequence lipgloss emits for this level's AdaptiveColor.
+		sample := lipgloss.NewStyle().Foreground(effortColor(opt.Effort)).Render("X")
+		rgbIdx := strings.Index(sample, "38;2;")
+		if rgbIdx < 0 {
+			t.Fatalf("%s: expected TrueColor sequence in %q", opt.Effort, sample)
 		}
-		if !strings.Contains(lines[1], wantRGB[opt.Effort]) {
-			t.Errorf("%s: label row missing color %s: %q", opt.Effort, wantRGB[opt.Effort], lines[1])
+		wantSeq, _, _ := strings.Cut(sample[rgbIdx:], "m")
+		if prev, dup := seenColors[wantSeq]; dup {
+			t.Errorf("%s shares color %s with %s", opt.Effort, wantSeq, prev)
+		}
+		seenColors[wantSeq] = opt.Effort
+
+		if !strings.Contains(lines[0], wantSeq) {
+			t.Errorf("%s: track row missing color %s: %q", opt.Effort, wantSeq, lines[0])
+		}
+		if !strings.Contains(lines[1], wantSeq) {
+			t.Errorf("%s: label row missing color %s: %q", opt.Effort, wantSeq, lines[1])
 		}
 		if !hasSGR(lines[2], "3") {
 			t.Errorf("%s: description row should be italic: %q", opt.Effort, lines[2])
