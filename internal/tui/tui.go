@@ -774,7 +774,7 @@ func antigravityUsageCmd(quiet bool) tea.Cmd {
 		_, msg.fractions = bananaAlerts(nil, meters) // seed/update the alert baseline
 		if !quiet {
 			if catalogueErr != nil {
-				msg.line += " · Model coverage unavailable"
+				msg.line += " | Model coverage unavailable"
 			}
 			msg.meters = meters
 			msg.balances = configuredBalances(context.Background())

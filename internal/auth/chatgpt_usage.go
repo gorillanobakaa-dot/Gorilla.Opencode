@@ -75,7 +75,7 @@ func (c *ChatGPTCreds) RetrieveUsage(ctx context.Context) (*ChatGPTQuota, error)
 	if err != nil {
 		return nil, fmt.Errorf("could not authenticate ChatGPT usage")
 	}
-	url := strings.TrimSuffix(ChatGPTBackend, "/codex") + "/wham/usage"
+	url := chatGPTBackendBase + "/wham/usage"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err

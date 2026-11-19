@@ -77,7 +77,8 @@ const (
 	// ChatGPTBackend is where the token is actually spendable. A ChatGPT-plan
 	// token is NOT an API key: it does not authenticate against api.openai.com at
 	// all, only against this backend, which speaks the Responses API shape.
-	ChatGPTBackend = "https://chatgpt.com/backend-api/codex"
+	ChatGPTBackend     = chatGPTBackendBase + "/codex"
+	chatGPTBackendBase = "https://chatgpt.com/backend-api"
 
 	// ChatGPTOriginator identifies this client on every request. See the file
 	// header before changing it.
