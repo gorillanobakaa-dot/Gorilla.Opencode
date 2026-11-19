@@ -90,12 +90,17 @@ jobs:
 
       # The script tees the output and turns each failure into an annotation:
       # annotations are public, the step log needs a login. Keep it.
-      - name: test
-        if: steps.select.outputs.mode != 'none'
+      - name: test full Go suite
+        if: steps.select.outputs.mode == 'all'
+        run: bash .github/scripts/go-test-annotate.sh ./... -count=1
+
+      - name: test selected Go packages
+        if: steps.select.outputs.mode == 'some'
+        env:
+          SELECTED_PACKAGES: ${{ steps.select.outputs.packages }}
         run: |
-          pkgs='./...'
-          if [ "${{ steps.select.outputs.mode }}" = some ]; then pkgs="${{ steps.select.outputs.packages }}"; fi
-          bash .github/scripts/go-test-annotate.sh $pkgs -count=1
+          read -ra pkgs <<< "$SELECTED_PACKAGES"
+          bash .github/scripts/go-test-annotate.sh "${pkgs[@]}" -count=1
 
   # Windows is a first-class target (goal windows-capabilities, 2026-10-26).
   # Same commands as above, run natively on windows-latest: the shell, Job
@@ -138,13 +143,19 @@ jobs:
         run: go vet ./...
 
       # Git Bash ships on windows-latest; same annotation script as above.
-      - name: test
+      - name: test full Go suite
+        if: steps.select.outputs.mode == 'all'
         shell: bash
-        if: steps.select.outputs.mode != 'none'
+        run: bash .github/scripts/go-test-annotate.sh ./... -count=1 -timeout 30m
+
+      - name: test selected Go packages
+        if: steps.select.outputs.mode == 'some'
+        shell: bash
+        env:
+          SELECTED_PACKAGES: ${{ steps.select.outputs.packages }}
         run: |
-          pkgs='./...'
-          if [ "${{ steps.select.outputs.mode }}" = some ]; then pkgs="${{ steps.select.outputs.packages }}"; fi
-          bash .github/scripts/go-test-annotate.sh $pkgs -count=1 -timeout 30m
+          read -ra pkgs <<< "$SELECTED_PACKAGES"
+          bash .github/scripts/go-test-annotate.sh "${pkgs[@]}" -count=1 -timeout 30m
 
   # The embedded toolbox (internal/toolbox, job 04): the -tags toolbox build and
   # its Hash/Extract tests, on Windows where the helpers run. A fresh clone has
