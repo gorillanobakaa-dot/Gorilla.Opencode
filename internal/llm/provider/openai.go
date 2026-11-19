@@ -957,6 +957,13 @@ func WithOpenAIDisableCache() OpenAIOption {
 	}
 }
 
+// WithChatGPTReasoningEffort leaves validation to the signed-in model catalogue.
+func WithChatGPTReasoningEffort(effort string) OpenAIOption {
+	return func(options *openaiOptions) {
+		options.reasoningEffort = effort
+	}
+}
+
 func WithReasoningEffort(effort string) OpenAIOption {
 	return func(options *openaiOptions) {
 		defaultReasoningEffort := "medium"

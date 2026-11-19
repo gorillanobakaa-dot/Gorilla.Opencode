@@ -65,7 +65,7 @@ The program picks the smaller model for background work on purpose. A ChatGPT
 plan has **one** shared allowance, so spending the strong model on titling a chat
 brings your pause forward for no benefit you can see.
 
-Switch models any time with `/model`.
+Switch models with `/model`. Use Left and Right to choose an effort advertised for the highlighted model. Press Enter to save the model and effort together.
 
 ### Why GPT-5.6 is missing
 
@@ -96,9 +96,10 @@ warning.
 sign-ins on **31 August 2026**. Nothing here breaks; the model is withdrawn. Use
 GPT-5.5.
 
-**There is no usage meter.** The Antigravity sign-in has a screen showing how much
-allowance is left (`/usage`). We have not found an equivalent for this one, and
-showing you an invented number would be worse than showing none.
+**Subscription usage is available on demand.** Run `/usage` on a ChatGPT
+model to fetch the account's reported windows and credit balance. If the
+request fails, the command labels the last saved reading for the same
+account when available.
 
 **The model list does not refresh itself.** It is a snapshot of what the service
 reported on 17 August 2026. When OpenAI changes the lineup, it takes a new

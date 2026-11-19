@@ -16,6 +16,7 @@ package auth
 // nothing forced to agree. A Meter carries both or fails Validate().
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -49,8 +50,17 @@ func (q *QuotaSummary) ToMeterWithModels(account string, live map[string]Antigra
 		return nil
 	}
 	out := make([]quota.Meter, 0, len(q.Groups))
-	covered := map[string]bool{}
-	for _, g := range q.Groups {
+	membership := make(map[int][]string)
+	var other []string
+	for id, model := range live {
+		index := quotaGroupForModel(q.Groups, model.DisplayName)
+		if index < 0 {
+			other = append(other, id)
+		} else {
+			membership[index] = append(membership[index], id)
+		}
+	}
+	for i, g := range q.Groups {
 		// The GROUP name is the heading, not "ANTIGRAVITY". A Google sign-in
 		// reports several model families under one account ("Gemini Models",
 		// "Claude and GPT Models") and each is its own barrel with its own
@@ -71,11 +81,8 @@ func (q *QuotaSummary) ToMeterWithModels(account string, live map[string]Antigra
 			Kind:     quota.KindWindowQuota,
 			Note:     g.Description,
 		}
-		if ids := groupModelIDs(groupFamilySpec(g), live); len(ids) > 0 {
-			for _, id := range ids {
-				covered[id] = true
-			}
-			m.Note = strings.TrimSpace(m.Note + "\nModel ids: " + strings.Join(ids, ", "))
+		if ids := membership[i]; len(ids) > 0 {
+			m.Note = appendQuotaModels(m.Note, "Models sharing this quota", ids, live)
 		}
 		for _, b := range g.Buckets {
 			label := b.DisplayName
@@ -102,22 +109,13 @@ func (q *QuotaSummary) ToMeterWithModels(account string, live map[string]Antigra
 	// Every live model sits under a group or under "other": one the group
 	// descriptions do not name (Argon, Orchestrator, a new variant) is shown,
 	// never silently dropped. Nothing here is a hard-coded model name.
-	if len(live) > 0 {
-		var other []string
-		for id := range live {
-			if !covered[id] {
-				other = append(other, id)
-			}
-		}
-		if len(other) > 0 {
-			sort.Strings(other)
-			out = append(out, quota.Meter{
-				Provider: "other / bucket unknown",
-				Account:  account,
-				Kind:     quota.KindWindowQuota,
-				Note:     "No quota reading from the backend for this plan.\nModel ids: " + strings.Join(other, ", "),
-			})
-		}
+	if len(other) > 0 {
+		out = append(out, quota.Meter{
+			Provider: "other / bucket unknown",
+			Account:  account,
+			Kind:     quota.KindWindowQuota,
+			Note:     appendQuotaModels("No quota reading from the backend for this plan.", "Quota group unavailable", other, live),
+		})
 	}
 	// The summary-level description explains the shared weekly limit and is
 	// written once, under the groups it applies to. Attaching it to the last
@@ -168,6 +166,18 @@ func (q *ChatGPTQuota) ToMeter(account string) quota.Meter {
 	}
 	add(q.Primary, false)
 	add(q.Secondary, true)
+	if q.Credits != nil {
+		switch {
+		case q.Credits.Unlimited:
+			m.Note = "Credits: unlimited"
+		case q.Credits.Balance != nil && strings.TrimSpace(*q.Credits.Balance) != "":
+			m.Note = "Credits: " + *q.Credits.Balance
+		case q.Credits.HasCredits != nil && !*q.Credits.HasCredits:
+			m.Note = "Credits: 0"
+		default:
+			m.Note = "Credits: balance unavailable"
+		}
+	}
 	return m
 }
 
@@ -184,56 +194,58 @@ func chatGPTResetPhrase(resetAt int64) string {
 	return quota.ResetIn(d)
 }
 
-// groupModelIDs returns the live model ids whose display name contains one of
-// the family names listed in a group description after the first colon.
-func groupModelIDs(desc string, live map[string]AntigravityModelInfo) []string {
-	i := strings.Index(desc, ":")
-	if i < 0 || len(live) == 0 {
-		return nil
-	}
-	var fams []string
-	for _, f := range strings.Split(desc[i+1:], ",") {
-		if f = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(f), "."))); f != "" {
-			fams = append(fams, f)
+var quotaEffortSuffix = regexp.MustCompile(`(?i)\s+\((none|minimal|low|medium|high|xhigh|max|thinking)\)$`)
+
+func quotaModelName(name string) string {
+	return quotaEffortSuffix.ReplaceAllString(strings.Join(strings.Fields(name), " "), "")
+}
+
+func appendQuotaModels(note, label string, ids []string, live map[string]AntigravityModelInfo) string {
+	sort.Strings(ids)
+	var names []string
+	seen := make(map[string]bool)
+	for _, id := range ids {
+		name := quotaModelName(live[id].DisplayName)
+		if name != "" && !seen[name] {
+			seen[name] = true
+			names = append(names, name)
 		}
 	}
-	var ids []string
-	for id, info := range live {
-		name := strings.ToLower(info.DisplayName)
-		for _, f := range fams {
-			if strings.Contains(name, f) {
-				ids = append(ids, id)
-				break
+	if len(names) > 0 {
+		sort.Strings(names)
+		note += "\n" + label + ": " + strings.Join(names, ", ")
+	}
+	return strings.TrimSpace(note + "\nModel ids: " + strings.Join(ids, ", "))
+}
+
+// Prefer an exact family name. A generic family label may also cover a model
+// with a numeric version. Distinct named routes need an explicit match.
+func quotaGroupForModel(groups []QuotaGroup, name string) int {
+	name = strings.ToLower(quotaModelName(name))
+	best, bestScore := -1, 0
+	for i, group := range groups {
+		families := group.DisplayName
+		const prefix = "models within this group:"
+		if desc := strings.TrimSpace(group.Description); strings.HasPrefix(strings.ToLower(desc), prefix) {
+			families = desc[len(prefix):]
+		}
+		for _, family := range strings.Split(families, ",") {
+			family = strings.ToLower(quotaModelName(strings.TrimSuffix(strings.TrimSpace(family), ".")))
+			if family == "" {
+				continue
+			}
+			score := 0
+			if name == family {
+				score = len(name) + 1
+			} else if tail, ok := strings.CutPrefix(name, family+" "); ok && tail != "" && tail[0] >= '0' && tail[0] <= '9' && !strings.Contains(tail, "(") {
+				score = len(family)
+			}
+			if score > bestScore {
+				best, bestScore = i, score
+			} else if score > 0 && score == bestScore && best != i {
+				best = -1
 			}
 		}
 	}
-	sort.Strings(ids)
-	return ids
-}
-
-// groupFamilies is the family list a group's description names (the text after
-// its first colon), or "" when it names none. The group's own heading is added
-// by the caller, so a group such as "Gemini 4 Argon" with no list still claims
-// the models whose display name carries its heading.
-func groupFamilies(g QuotaGroup) string {
-	if i := strings.Index(g.Description, ":"); i >= 0 {
-		return g.Description[i+1:]
-	}
-	return ""
-}
-
-// groupFamilySpec is the ": a, b" text groupModelIDs reads: the description's
-// own list when it has one, else the group's heading (without a trailing
-// "models"), so a group that lists nothing still claims the models named like
-// it. The heading is NOT added when a list exists: "Gemini Models" would claim
-// every Gemini model, including another group's.
-func groupFamilySpec(g QuotaGroup) string {
-	if fams := strings.TrimSpace(groupFamilies(g)); fams != "" {
-		return ": " + fams
-	}
-	h := strings.TrimSpace(g.DisplayName)
-	if len(h) > 7 && strings.EqualFold(h[len(h)-7:], " models") {
-		h = h[:len(h)-7]
-	}
-	return ": " + h
+	return best
 }

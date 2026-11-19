@@ -5,6 +5,32 @@ import (
 	"testing"
 )
 
+func TestChatGPTAccountUsageShowsPaidWindowsAndZeroCredits(t *testing.T) {
+	q, account, err := decodeChatGPTUsage([]byte(`{
+		"account_id":"fixture", "plan_type":"plus",
+		"rate_limit":{
+			"primary_window":{"used_percent":56,"limit_window_seconds":18000,"reset_at":1800000000},
+			"secondary_window":{"used_percent":72,"limit_window_seconds":604800,"reset_at":1800400000}
+		},
+		"credits":{"has_credits":false,"unlimited":false,"balance":"0"},
+		"additional_rate_limits":[{"limit_name":"Model pool","rate_limit":{
+			"primary_window":{"used_percent":4,"limit_window_seconds":2592000}
+		}}]
+	}`))
+	if err != nil || account != "fixture" {
+		t.Fatalf("decode usage: account=%q error=%v", account, err)
+	}
+	meter := q.ToMeter("fixture")
+	if meter.Plan != "plus" || meter.Note != "Credits: 0" || len(meter.Bars) != 2 ||
+		meter.Bars[0].Label != "5h limit" || meter.Bars[0].Remaining != 0.44 ||
+		meter.Bars[1].Label != "Weekly limit" || meter.Bars[1].Remaining != 0.28 {
+		t.Fatalf("unexpected account meter: %+v", meter)
+	}
+	if len(q.Additional) != 1 || q.Additional[0].Primary.Label(false) != "Monthly limit" {
+		t.Fatalf("named model allowance missing: %+v", q.Additional)
+	}
+}
+
 // Window labels are ported from the Codex reference client, not invented. The
 // first hand-written version had no 5h bucket (the most common ChatGPT window)
 // and used threshold ranges instead of a 5% tolerance, so it would have called

@@ -1,7 +1,10 @@
 package auth
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,10 +21,8 @@ import (
 // that off (same day) removed the lie but left a blank, while the user sat at
 // 20% of a monthly limit with no way to see it from inside the program.
 //
-// THERE IS NO ENDPOINT TO CALL. Established from the Codex reference client at
-// ~/Downloads/codex-rust-v0.147.0 (codex-rs/codex-api/src/rate_limits.rs): the
-// numbers ride the responses we already make, as `x-codex-*` headers. So this
-// costs ZERO extra requests, which is the §8-correct outcome on a metered link.
+// Ordinary replies carry optional fallback readings. Explicit /usage can also
+// read the account-wide limits, using the operation published by Codex.
 //
 // TWO TRAPS, both encoded below:
 //  1. The wire field is `used_percent`, NOT remaining. This project's panel
@@ -138,12 +139,20 @@ type ChatGPTQuota struct {
 	// PlanType is shown beside the account, as Codex does ("(Free)").
 	PlanType string `json:"plan_type,omitempty"`
 	// SeenAt records when this reading was taken, so a stale number can say so.
-	SeenAt int64 `json:"seen_at,omitempty"`
+	SeenAt     int64           `json:"seen_at,omitempty"`
+	Credits    *ChatGPTCredits `json:"credits,omitempty"`
+	Additional []ChatGPTQuota  `json:"additional,omitempty"`
+}
+
+type ChatGPTCredits struct {
+	HasCredits *bool   `json:"has_credits"`
+	Unlimited  bool    `json:"unlimited"`
+	Balance    *string `json:"balance"`
 }
 
 // Empty reports whether the reading carries no usable window.
 func (q *ChatGPTQuota) Empty() bool {
-	return q == nil || (q.Primary == nil && q.Secondary == nil)
+	return q == nil || (q.Primary == nil && q.Secondary == nil && q.Credits == nil && len(q.Additional) == 0)
 }
 
 func headerFloat(h http.Header, name string) (float64, bool) {
@@ -152,7 +161,7 @@ func headerFloat(h http.Header, name string) (float64, bool) {
 		return 0, false
 	}
 	f, err := strconv.ParseFloat(v, 64)
-	return f, err == nil
+	return f, err == nil && !math.IsNaN(f) && !math.IsInf(f, 0) && f >= 0 && f <= 100
 }
 
 func headerInt(h http.Header, name string) int64 {
@@ -223,19 +232,31 @@ func ParseChatGPTQuota(h http.Header) *ChatGPTQuota {
 	return q
 }
 
-// ChatGPTQuotaPath returns ~/.config/gorilla-opencode/chatgpt-quota.json.
-func ChatGPTQuotaPath() string {
+// Separate account and turn snapshots so a turn cannot overwrite account usage.
+func chatGPTQuotaPath(c *ChatGPTCreds, accountSnapshot bool) string {
+	if c == nil || c.AccountID == "" {
+		return ""
+	}
 	base := os.Getenv("XDG_CONFIG_HOME")
 	if base == "" {
 		home, _ := os.UserHomeDir()
 		base = filepath.Join(home, ".config")
 	}
-	return filepath.Join(base, "gorilla-opencode", "chatgpt-quota.json")
+	scope := "response"
+	if accountSnapshot {
+		scope = "account"
+	}
+	name := fmt.Sprintf("chatgpt-quota-%x-%s.json", sha256.Sum256([]byte(c.AccountID)), scope)
+	return filepath.Join(base, "gorilla-opencode", name)
 }
 
 // LoadChatGPTQuota reads the last stored reading, or (nil, nil) if none.
-func LoadChatGPTQuota() (*ChatGPTQuota, error) {
-	data, err := os.ReadFile(ChatGPTQuotaPath())
+func LoadChatGPTQuota(c *ChatGPTCreds, accountSnapshot bool) (*ChatGPTQuota, error) {
+	path := chatGPTQuotaPath(c, accountSnapshot)
+	if path == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -249,29 +270,51 @@ func LoadChatGPTQuota() (*ChatGPTQuota, error) {
 	return &q, nil
 }
 
-// Save writes the reading atomically. Best-effort by design: failing to record
+// save writes the reading atomically. Best-effort by design: failing to record
 // a usage number must never break the request that carried it.
-func (q *ChatGPTQuota) Save() error {
-	path := ChatGPTQuotaPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+func (q *ChatGPTQuota) save(c *ChatGPTCreds, accountSnapshot bool) error {
+	path := chatGPTQuotaPath(c, accountSnapshot)
+	if path == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(q, "", "  ")
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".chatgpt-quota-*")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	defer os.Remove(tmp.Name())
+	_, writeErr := tmp.Write(data)
+	closeErr := tmp.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	return os.Rename(tmp.Name(), path)
 }
 
 // RecordChatGPTQuota parses a response's usage headers and stores them when
 // present. Silent on every failure path: this is observability, not plumbing
 // the user asked for.
-func RecordChatGPTQuota(h http.Header) {
+func RecordChatGPTQuota(c *ChatGPTCreds, h http.Header) {
+	if c == nil {
+		return
+	}
+	if id := strings.TrimSpace(h.Get("x-codex-active-limit")); id != "" && !strings.EqualFold(id, "codex") {
+		return
+	}
 	if q := ParseChatGPTQuota(h); q != nil {
-		_ = q.Save()
+		if q.LimitName != "" && !strings.EqualFold(q.LimitName, "codex") {
+			return
+		}
+		q.PlanType = c.PlanType
+		_ = q.save(c, false)
 	}
 }

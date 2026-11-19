@@ -4,11 +4,29 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 )
 
 func fam(id, name string) models.Model {
 	return models.Model{ID: models.ModelID(id), Provider: "antigravity", APIModel: id, Name: name}
+}
+
+func TestPickerChatGPTEffortUsesArrowsAndKeepsModelID(t *testing.T) {
+	model := models.Model{
+		ID: "chatgpt.fixture", APIModel: "fixture", Provider: models.ProviderChatGPT,
+		DefaultReasoningEffort: "high",
+		ReasoningEfforts:       []models.ReasoningEffort{{Effort: "high"}, {Effort: "xhigh"}},
+	}
+	m := &modelDialogCmp{models: []models.Model{model}, searchActive: true}
+	m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if got := m.chatGPTEffort(model); got != "xhigh" || m.models[0].ID != model.ID {
+		t.Fatalf("picked %q on %q", got, m.models[0].ID)
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	if got := m.chatGPTEffort(model); got != "high" {
+		t.Fatalf("left arrow picked %q", got)
+	}
 }
 
 func TestPickerOneRowPerFamilyAndEffortIsSentID(t *testing.T) {

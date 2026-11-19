@@ -71,9 +71,8 @@ type ChatGPTCatalogueEntry struct {
 	// SupportedReasoningLevels is present on every model that thinks. Used to
 	// set CanReason from the wire rather than from a guess, because claiming it
 	// falsely makes the client send a reasoning field the model rejects.
-	SupportedReasoningLevels []struct {
-		Effort string `json:"effort"`
-	} `json:"supported_reasoning_levels"`
+	SupportedReasoningLevels []ReasoningEffort `json:"supported_reasoning_levels"`
+	DefaultReasoningLevel    string            `json:"default_reasoning_level"`
 }
 
 type chatgptCatalogueResponse struct {
@@ -196,6 +195,15 @@ func BuildChatGPTModels(entries []ChatGPTCatalogueEntry) []Model {
 				"tuned for that other shape."
 		}
 
+		var efforts []ReasoningEffort
+		seen := make(map[string]bool)
+		for _, effort := range e.SupportedReasoningLevels {
+			effort.Effort = strings.ToLower(strings.TrimSpace(effort.Effort))
+			if effort.Effort != "" && !seen[effort.Effort] {
+				seen[effort.Effort] = true
+				efforts = append(efforts, effort)
+			}
+		}
 		out = append(out, Model{
 			ID:          ModelID(string(ProviderChatGPT) + "." + e.Slug),
 			Name:        name + " (ChatGPT sign-in)",
@@ -209,9 +217,11 @@ func BuildChatGPTModels(entries []ChatGPTCatalogueEntry) []Model {
 			DefaultMaxTokens: min(ctx/2, 32_000),
 			// From the wire, not from a guess: every model that thinks publishes
 			// its reasoning levels.
-			CanReason:           len(e.SupportedReasoningLevels) > 0,
-			SupportsAttachments: true,
-			Rank:                chatgptRankFor(i),
+			CanReason:              len(efforts) > 0,
+			ReasoningEfforts:       efforts,
+			DefaultReasoningEffort: strings.ToLower(strings.TrimSpace(e.DefaultReasoningLevel)),
+			SupportsAttachments:    true,
+			Rank:                   chatgptRankFor(i),
 
 			// Zero in every cost field because nothing here is billed per token.
 			// The ChatGPT plan is, and a free plan is not billed at all. Do not
