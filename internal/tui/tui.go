@@ -2375,6 +2375,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, nil
 			}
 			if a.currentPage == page.ChatPage && !a.showQuit && !a.showPermissions && !a.showSessionDialog && !a.showCommandDialog {
+				a.modelDialog.Init()
 				a.showModelDialog = true
 				return a, nil
 			}

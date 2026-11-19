@@ -134,8 +134,6 @@ type modelKeyMap struct {
 	// read at launch describes a machine that has moved on.
 	RefreshLocal key.Binding
 	// Effort level of the highlighted family (second level of the picker).
-	EffortDown key.Binding
-	EffortUp   key.Binding
 }
 
 var modelKeys = modelKeyMap{
@@ -201,14 +199,6 @@ var modelKeys = modelKeyMap{
 	ShowHidden: key.NewBinding(
 		key.WithKeys("H"),
 		key.WithHelp("H", "review hidden"),
-	),
-	EffortDown: key.NewBinding(
-		key.WithKeys("["),
-		key.WithHelp("[", "lower effort"),
-	),
-	EffortUp: key.NewBinding(
-		key.WithKeys("]"),
-		key.WithHelp("]", "higher effort"),
 	),
 	RefreshLocal: key.NewBinding(
 		key.WithKeys("ctrl+r"),
@@ -756,6 +746,11 @@ func (m *modelDialogCmp) View() string {
 		infoLines = append(infoLines, baseStyle.Foreground(t.Accent()).Width(w).Render(qline))
 	} else {
 		infoLines = append(infoLines, baseStyle.Foreground(t.TextMuted()).Width(w).Render("/ Search models"))
+		if len(m.models) == 0 {
+			if status := m.connectionLine(); status != "" {
+				infoLines = append(infoLines, baseStyle.Foreground(t.TextMuted()).Render(pickerLine(status, w)))
+			}
+		}
 	}
 	// GORILLA OVERRIDE (2026-10-25): why the picker opened by itself, in one
 	// line above everything else. See config/model_choice.go.
@@ -925,7 +920,7 @@ func (m *modelDialogCmp) View() string {
 		segs = append([]hintSeg{{fmt.Sprintf("%d marked   ", n), true}}, segs...)
 	}
 	hintLine := renderHint(w, segs)
-	keys := []hintSeg{{"up/down model   left/right effort   enter apply   esc back", true}}
+	keys := []hintSeg{{"up/down model   ", true}, {"left/right effort   ", true}, {"enter apply   esc back", true}}
 	if m.hScrollPossible && !m.searchActive {
 		keys = append(keys, hintSeg{"   ctrl+left/right provider", false})
 	}

@@ -93,9 +93,7 @@ func (m Model) ResolveReasoningEffort(saved string) string {
 // credit card?"). Between them they contributed 30 entries to a picker whose whole
 // problem is that it is too long to read.
 //
-// They were not deleted: the files are in
-// /home/gorilla/Agents.Work.Trash/gorilla-opencode-provider-cull-26-08-21-11-58/
-// should anyone ever want them back.
+// The removed provider implementations remain in repository history.
 
 const (
 	// ForTests
