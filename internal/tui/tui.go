@@ -1157,6 +1157,22 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.app.Permissions.GrantFamily(msg.Permission, msg.Family)
 		case dialog.PermissionDeny:
 			a.app.Permissions.Deny(msg.Permission)
+		case dialog.PermissionYolo:
+			// GORILLA OVERRIDE (2026-11-21): Shift+Y on the dialog. This is the
+			// moment a person most wants YOLO (the agent is parked on a
+			// question), and the editor is not reachable from here.
+			//
+			// It turns YOLO on, which answers every waiting question YOLO
+			// covers, this one included. If THIS one is a carve-out (it cannot
+			// be undone, or it is outside your project) it is NOT approved by
+			// the key: the dialog stays and asks, as YOLO always does.
+			a.app.Permissions.AutoApproveSession(msg.Permission.SessionID)
+			if !a.app.Permissions.IsCovered(msg.Permission) {
+				return a, util.ReportWarn("☢ YOLO ON for this conversation. This one is still asked: " +
+					"it cannot be undone, or it is outside your project.")
+			}
+			cmd = util.ReportWarn("☢ YOLO ON for this conversation. Every tool call is approved " +
+				"automatically, with no further prompts. /yolo off turns it off.")
 		}
 		// Answering one question can settle others already in the queue: an
 		// "allow for session", or a fleet grant, covers them outright. Grant
@@ -1165,7 +1181,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.app.Permissions.IsCovered, a.app.Permissions.Grant)
 		a.permissionQueue = rest
 		if next != nil {
-			return a, a.permissions.SetPermissions(*next)
+			return a, tea.Batch(cmd, a.permissions.SetPermissions(*next))
 		}
 		a.showPermissions = false
 		return a, cmd
@@ -1889,8 +1905,29 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// GORILLA OVERRIDE: /clear starts a fresh session, dropping
 			// the accumulated context. Routed through the chat page's
 			// full new-session flow so the editor/sidebar reset cleanly.
+			//
+			// GORILLA OVERRIDE (2026-11-21): it is allowed mid-turn now, so it
+			// must also STOP the turn it abandons. Before, the old run simply
+			// carried on in the background, spending tokens on a conversation
+			// nobody was looking at. Cancel releases any permission question it
+			// was parked on; anything queued for it is dropped so it cannot be
+			// sent into the new chat. The old conversation stays in history.
+			clearCmds := []tea.Cmd{util.CmdHandler(chat.NewSessionMsg{})}
+			if old := a.selectedSession.ID; old != "" {
+				a.app.CoderAgent.Cancel(old)
+				agent.DropQueued(old)
+				a.app.Permissions.RevokeAutoApprove(old)
+			}
 			a.selectedSession = session.Session{}
-			return a, util.CmdHandler(chat.NewSessionMsg{})
+			a.isCompacting = false
+			// In the alternate screen the message list empties by itself. In
+			// scrollback mode the old text lives in the terminal's own buffer,
+			// so wipe the visible screen too; the terminal's scrollback, which
+			// can still be scrolled back to, is left alone.
+			if a.scrollback {
+				clearCmds = append(clearCmds, tea.ClearScreen)
+			}
+			return a, tea.Batch(clearCmds...)
 		case "context", "loadout", "tokens":
 			// GORILLA OVERRIDE (2026-09-02): hand the dialog the live cache
 			// figures as it opens.
@@ -1941,25 +1978,44 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, a.setPermissionMode(config.NormalisePermissionMode(want))
 		case "yolo", "auto", "autopilot", "goal":
-			if a.selectedSession.ID == "" && strings.TrimSpace(msg.Args) == "" {
+			// GORILLA OVERRIDE (2026-11-21): /yolo works mid-turn.
+			//
+			// It used to be refused while the agent ran (the editor never
+			// dispatched it), and a bare /yolo TOGGLED, so typing it twice
+			// turned it off again. Now: bare /yolo turns it ON and stays on
+			// however often it is repeated; /yolo off turns it OFF and stays off.
+			// "off" used to fall through as a TASK, i.e. it armed YOLO and sent
+			// the word "off" to the model.
+			//
+			// Neither form touches the running turn: no cancel, no new request.
+			// Turning it on also answers the questions already waiting that YOLO
+			// covers (the service does that), under the same carve-outs as ever.
+			arg := strings.TrimSpace(msg.Args)
+			off := strings.EqualFold(arg, "off")
+			if a.selectedSession.ID == "" && (arg == "" || off) {
 				return a, util.ReportWarn("Start a conversation first — YOLO applies to the session you are in.")
 			}
-			if config.PermissionMode() == config.PermissionAuto && strings.TrimSpace(msg.Args) == "" {
+			busyNote := ""
+			if a.selectedSession.ID != "" && a.app.CoderAgent.IsSessionBusy(a.selectedSession.ID) {
+				busyNote = " The running turn carries on."
+			}
+			if off {
+				if config.PermissionMode() == config.PermissionAuto {
+					return a, util.ReportInfo("The standing mode is auto, for every conversation, so /yolo off cannot end it. /mode ask turns it off; Shift+Tab cycles.")
+				}
+				a.app.Permissions.RevokeAutoApprove(a.selectedSession.ID)
+				return a, util.ReportInfo("YOLO OFF — the next tool call asks before it touches anything." + busyNote)
+			}
+			if config.PermissionMode() == config.PermissionAuto && arg == "" {
 				return a, util.ReportInfo("The standing mode is already auto, for every conversation. /mode ask turns it off; Shift+Tab cycles.")
 			}
-			task := strings.TrimSpace(msg.Args)
-			// With no task, this toggles. Toggling OFF must never be mistaken
-			// for arming, so the off-branch comes first and only when bare.
-			if task == "" && a.app.Permissions.IsAutoApproved(a.selectedSession.ID) {
-				a.app.Permissions.RevokeAutoApprove(a.selectedSession.ID)
-				return a, util.ReportInfo("YOLO OFF — you will be asked again before tools touch anything.")
-			}
+			task := arg
 			if a.selectedSession.ID != "" {
 				a.app.Permissions.AutoApproveSession(a.selectedSession.ID)
 			}
 			warning := "☢ YOLO ON for this conversation. Every tool call is approved automatically — " +
 				"file edits, shell commands, web access, and every research helper — with no further prompts. " +
-				"It ends when this conversation does, or type /yolo again. /tasks still kills helpers."
+				"It ends when this conversation does, or type /yolo off. /tasks still kills helpers." + busyNote
 			if task == "" {
 				return a, util.ReportWarn(warning)
 			}

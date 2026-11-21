@@ -358,6 +358,16 @@ func (s *permissionService) RegisterChildSession(child, parent string) {
 func (s *permissionService) IsCovered(p PermissionRequest) bool {
 	s.mu.RLock()
 	root := s.rootSession(p.SessionID)
+	s.mu.RUnlock()
+	// GORILLA OVERRIDE (2026-11-21): YOLO turned on while questions were queued
+	// covers them too, under the same carve-outs as a fresh request.
+	if s.autoApprovedNow(root, p.SessionID) && s.autoMayAnswer(CreatePermissionRequest{
+		SessionID: p.SessionID, ToolName: p.ToolName, Action: p.Action, Path: p.Path,
+		GrantKey: p.GrantKey, Egress: p.Egress, Irreversible: p.Irreversible, HardStop: p.HardStop,
+	}, root) {
+		return true
+	}
+	s.mu.RLock()
 	if s.hasFleetGrantLocked(root, p.ToolName) {
 		s.mu.RUnlock()
 		return true
@@ -802,7 +812,7 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 
 	// The session travels with the waiter: a sweep that cannot tell whose
 	// request it is would cancel other conversations' prompts too.
-	s.pendingRequests.Store(permission.ID, pendingRequest{ch: respCh, sessionID: root})
+	s.pendingRequests.Store(permission.ID, pendingRequest{ch: respCh, sessionID: root, opts: opts})
 	defer s.pendingRequests.Delete(permission.ID)
 	// GORILLA FIX (2026-10-23): say when the question is settled, however it
 	// was settled, so every front end can take its dialog down. A request that
@@ -812,6 +822,17 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	// question nobody was waiting for, and nothing ran. Published after the
 	// waiter is gone, as DeletedEvent, which no front end treats as a question.
 	defer s.Publish(pubsub.DeletedEvent, permission)
+
+	// GORILLA FIX (2026-11-21): /yolo can now land while a tool is mid-flight.
+	// The auto-approve flag was read at the top of this function; if /yolo
+	// arrived between that read and the waiter being registered just above,
+	// releasePendingAutoApproved (which only sees registered waiters) missed
+	// this request and it would have been asked even though YOLO is on. Look
+	// again now that the waiter exists: from here on, either this check or the
+	// release sees it.
+	if s.autoApprovedNow(root, opts.SessionID) && s.autoMayAnswer(opts, root) {
+		return true
+	}
 
 	// Recorded only for prompts that reach a person: a family is proposed
 	// from what they have already been asked, not from what was waved through.
@@ -873,6 +894,10 @@ func (s *permissionService) CancelSession(sessionID string) int {
 type pendingRequest struct {
 	ch        chan bool
 	sessionID string
+	// opts is the request as it was raised. /yolo typed WHILE a question is
+	// waiting needs to judge that question against the same carve-outs
+	// (mustAskAnyway) that Request applies, so it has to remember it.
+	opts CreatePermissionRequest
 }
 
 // SetUnattended records that there is no human at the keyboard.
@@ -897,10 +922,66 @@ func (s *permissionService) SetUnattended(v bool) {
 	s.mu.Unlock()
 }
 
+// AutoApproveSession turns YOLO on for a conversation. It is safe to call at
+// any moment, including while a turn is running, and calling it again changes
+// nothing.
+//
+// GORILLA OVERRIDE (2026-11-21): it used to append blindly (so a second call
+// stored the id twice) and it only affected requests raised AFTER it. A tool
+// already parked on a permission prompt stayed parked, so "turn YOLO on" mid-run
+// did nothing until the person answered the very question YOLO was meant to
+// make go away. It now also answers every waiting question YOLO covers, using
+// the same carve-outs Request uses: an irreversible command, a hard stop, or a
+// path outside every workspace root is still asked.
 func (s *permissionService) AutoApproveSession(sessionID string) {
 	s.mu.Lock()
-	s.autoApproveSessions = append(s.autoApproveSessions, sessionID)
+	if !slices.Contains(s.autoApproveSessions, sessionID) {
+		s.autoApproveSessions = append(s.autoApproveSessions, sessionID)
+	}
+	root := s.rootSession(sessionID)
 	s.mu.Unlock()
+	s.releasePendingAutoApproved(root)
+}
+
+// autoApprovedNow reports whether YOLO covers this conversation right now,
+// standing auto mode included.
+func (s *permissionService) autoApprovedNow(root, sessionID string) bool {
+	if config.PermissionMode() == config.PermissionAuto {
+		return true
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return slices.Contains(s.autoApproveSessions, root) || slices.Contains(s.autoApproveSessions, sessionID)
+}
+
+// autoMayAnswer is the rest of Request's auto-approve test, in one place so a
+// waiting request is judged exactly as a new one is: plan mode decides first,
+// then the carve-outs. true means "YOLO answers yes without asking".
+func (s *permissionService) autoMayAnswer(opts CreatePermissionRequest, root string) bool {
+	if decided, _ := s.modeDecision(opts, root); decided {
+		return false
+	}
+	return s.mustAskAnyway(opts, root) == ""
+}
+
+// releasePendingAutoApproved answers yes to every waiting question under root
+// that YOLO covers. Non-blocking: a waiter that was already answered has a full
+// channel and must not stall the caller, which is the UI thread.
+func (s *permissionService) releasePendingAutoApproved(root string) int {
+	released := 0
+	s.pendingRequests.Range(func(_, value any) bool {
+		p, ok := value.(pendingRequest)
+		if !ok || p.sessionID != root || !s.autoMayAnswer(p.opts, root) {
+			return true
+		}
+		select {
+		case p.ch <- true:
+			released++
+		default:
+		}
+		return true
+	})
+	return released
 }
 
 // RevokeAutoApprove ends YOLO mode. Kept separate from Grant/Deny because it

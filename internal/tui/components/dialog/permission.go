@@ -29,6 +29,10 @@ const (
 	// tools/commandfamily.go for what a family may cover and what it never does.
 	PermissionAllowFamily PermissionAction = "allow_family"
 	PermissionDeny        PermissionAction = "deny"
+	// PermissionYolo is the Y key: turn YOLO on for the whole conversation from
+	// the very dialog that is in the way. Not a button, so Enter can never land
+	// on it by accident. The TUI decides what it answers: see the handler.
+	PermissionYolo PermissionAction = "yolo"
 )
 
 // PermissionResponseMsg represents the user's response to a permission request
@@ -59,6 +63,7 @@ type permissionsMapping struct {
 	Tab          key.Binding
 	FamilyLess   key.Binding
 	FamilyMore   key.Binding
+	Yolo         key.Binding
 }
 
 var permissionsKeys = permissionsMapping{
@@ -101,6 +106,12 @@ var permissionsKeys = permissionsMapping{
 	FamilyMore: key.NewBinding(
 		key.WithKeys("]"),
 		key.WithHelp("]", "longer family"),
+	),
+	// Capital Y on purpose: it hands over every later prompt in this
+	// conversation, so it is never a key you hit by typing "y" for yes.
+	Yolo: key.NewBinding(
+		key.WithKeys("Y"),
+		key.WithHelp("Shift+Y", "YOLO for this conversation"),
 	),
 }
 
@@ -216,6 +227,8 @@ func (p *permissionDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				p.familyIdx++
 			}
 			return p, nil
+		case key.Matches(msg, permissionsKeys.Yolo):
+			return p, p.respond(PermissionYolo)
 		case key.Matches(msg, permissionsKeys.Deny):
 			return p, p.respond(PermissionDeny)
 		default:

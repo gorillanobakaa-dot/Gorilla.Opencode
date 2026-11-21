@@ -64,6 +64,8 @@ cost before they start. Everything else is local.
 
 The AI forgets everything said so far. Use this when you move to a different task — a long conversation costs more on every message, because the whole history is sent each time.
 
+It works while the agent is running: the running turn is stopped, anything you queued for it is dropped, and the screen is cleared. The old conversation stays in your history.
+
 ### `/plain`
 
 *Also: `/copyable`*
@@ -401,7 +403,9 @@ Normally the program stops and asks before it edits a file, runs a command, or r
 
 What you are handing over: file edits, shell commands and web access, unattended. Use it when you have told the agent to get on with a job and you do not want to babysit it. Do not use it in a folder you cannot afford to have changed.
 
-It lasts only as long as this conversation and is never written to disk, so it cannot silently follow you into tomorrow. Type /yolo again to turn it off. /tasks still stops helpers at any time.
+It lasts only as long as this conversation and is never written to disk, so it cannot silently follow you into tomorrow.
+
+It works while the agent is running. Forgot to turn it on? Type /yolo now: the turn is not cancelled, and any question already waiting is approved. Typing /yolo again changes nothing; /yolo off turns it off, and the next tool call asks again. Things that can never be undone, and paths outside your project, are still asked. /tasks still stops helpers at any time.
 
 ### `/tasks`
 
