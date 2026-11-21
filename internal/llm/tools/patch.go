@@ -187,9 +187,17 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 
 	// Request permission for all changes
 	for path, change := range commit.Changes {
+		absPath := path
+		if !filepath.IsAbs(absPath) {
+			absPath = filepath.Join(config.WorkingDirectory(), absPath)
+		}
+		// GORILLA FIX (2026-11-21): scope patch prompts to the workspace root
+		// just like write.go and edit.go. Previously each file used
+		// filepath.Dir(path), so a multi-file patch across subdirectories
+		// raised a separate prompt per directory even after "Allow for session".
+		dir := permissionScope(absPath)
 		switch change.Type {
 		case diff.ActionAdd:
-			dir := filepath.Dir(path)
 			patchDiff, _, _ := diff.GenerateDiff("", *change.NewContent, path)
 			p := p.permissions.Request(
 				permission.CreatePermissionRequest{
@@ -197,7 +205,7 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 					Path:      dir,
 					ToolName:  PatchToolName,
 					// Grant covers THIS path, not every patch in the session.
-					GrantKey:    path,
+					GrantKey:    absPath,
 					Action:      "create",
 					Description: fmt.Sprintf("Create file %s", path),
 					Params: EditPermissionsParams{
@@ -219,7 +227,6 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 				newContent = *change.NewContent
 			}
 			patchDiff, _, _ := diff.GenerateDiff(currentContent, newContent, path)
-			dir := filepath.Dir(path)
 
 			// GORILLA OVERRIDE (2026-08-18): "*** Move to:" writes the content to
 			// a DIFFERENT path and deletes the original (internal/diff/patch.go
@@ -250,7 +257,7 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 					Path:      dir,
 					ToolName:  PatchToolName,
 					// Grant covers THIS path, not every patch in the session.
-					GrantKey:    path,
+					GrantKey:    absPath,
 					Action:      "update",
 					Description: describe,
 					Params: EditPermissionsParams{
@@ -263,7 +270,6 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 				return ToolResponse{}, permission.ErrorPermissionDenied
 			}
 		case diff.ActionDelete:
-			dir := filepath.Dir(path)
 			patchDiff, _, _ := diff.GenerateDiff(*change.OldContent, "", path)
 			p := p.permissions.Request(
 				permission.CreatePermissionRequest{
@@ -271,7 +277,7 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 					Path:      dir,
 					ToolName:  PatchToolName,
 					// Grant covers THIS path, not every patch in the session.
-					GrantKey:    path,
+					GrantKey:    absPath,
 					Action:      "delete",
 					Description: fmt.Sprintf("Delete file %s", path),
 					Params: EditPermissionsParams{

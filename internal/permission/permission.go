@@ -418,6 +418,46 @@ func (s *permissionService) familyCovers(root, toolName, action, path, grantKey,
 	return false
 }
 
+// samePath reports whether two paths refer to the same location after cleaning,
+// ignoring case on Windows.
+func samePath(a, b string) bool {
+	if a == "" || b == "" {
+		return a == b
+	}
+	a, b = filepath.Clean(a), filepath.Clean(b)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
+}
+
+// grantScopeDir turns a file path (e.g. an outside-workspace screenshot named
+// by a bash command) into its parent directory for family/class grants, while
+// leaving directories untouched and refusing to widen to "/", a drive root, or
+// the user's home directory.
+func grantScopeDir(p string) string {
+	if p == "" || p == "." {
+		return p
+	}
+	clean := filepath.Clean(p)
+	isFile := false
+	if fi, err := os.Stat(clean); err == nil {
+		isFile = !fi.IsDir()
+	} else if filepath.Ext(filepath.Base(clean)) != "" {
+		isFile = true
+	}
+	if !isFile {
+		return clean
+	}
+	dir := filepath.Dir(clean)
+	home, _ := os.UserHomeDir()
+	if dir == "/" || dir == "." || dir == filepath.VolumeName(dir)+string(filepath.Separator) ||
+		(home != "" && samePath(dir, home)) {
+		return clean
+	}
+	return dir
+}
+
 // pathWithin reports whether p is dir itself or lies underneath it. Case is
 // ignored on Windows, where the filesystem ignores it too.
 func pathWithin(p, dir string) bool {
@@ -456,18 +496,21 @@ func (s *permissionService) GrantFamily(p PermissionRequest, family string) {
 		s.Grant(p)
 		return
 	}
-	s.Grant(p)
 	s.mu.Lock()
+	root := s.rootSession(p.SessionID)
+	scopePath := grantScopeDir(p.Path)
 	s.familyGrants = append(s.familyGrants, familyGrant{
-		SessionID: p.SessionID, // already the tree root: Request stores it so
+		SessionID: root,
 		ToolName:  p.ToolName,
 		Action:    p.Action,
-		Path:      p.Path,
+		Path:      scopePath,
 		Family:    family,
 	})
 	s.mu.Unlock()
+	s.grantPending(p.ID)
+	s.releasePendingCovered(root)
 	logging.Info("family grant recorded", "tool", p.ToolName, "action", p.Action,
-		"path", p.Path, "family", family, "session", p.SessionID)
+		"path", scopePath, "family", family, "session", root)
 }
 
 func (s *permissionService) AskedKeys(sessionID, toolName string) []string {
@@ -553,34 +596,37 @@ func (s *permissionService) HasFleetGrant(sessionID, toolName string) bool {
 // inside the same workspace root (see sessionGrantCovers). The exact request
 // is still stored too, so a request no class covers is answered as before.
 func (s *permissionService) GrantPersistant(permission PermissionRequest) {
-	if v, ok := s.pendingRequests.Load(permission.ID); ok {
-		if p, ok := v.(pendingRequest); ok {
-			p.ch <- true
-		}
-	}
 	s.mu.Lock()
+	root := s.rootSession(permission.SessionID)
+	permission.SessionID = root
+	if permission.Path != "" && permission.Path != "." {
+		permission.Path = filepath.Clean(permission.Path)
+	}
 	s.sessionPermissions = append(s.sessionPermissions, permission)
 	if c := strings.TrimSpace(permission.SessionClass); c != "" && permission.Irreversible == "" {
 		if m, ok := familyMatcherFor(permission.ToolName); ok && m(permission.GrantKey, c) {
 			s.familyGrants = append(s.familyGrants, familyGrant{
-				SessionID: permission.SessionID, ToolName: permission.ToolName,
-				Action: permission.Action, Path: permission.Path, Family: c,
+				SessionID: root, ToolName: permission.ToolName,
+				Action: permission.Action, Path: grantScopeDir(permission.Path), Family: c,
 			})
 		}
 	}
 	s.mu.Unlock()
+	s.grantPending(permission.ID)
+	s.releasePendingCovered(root)
 }
 
 // sessionGrantCovers reports whether a remembered "Allow for session" answer
 // covers a request. The exact match is the rule for every tool. File-changing
-// tools also match by place: a change anywhere inside the same root, by any of
-// the edit tools, because the dialog said "every file change inside <root>"
-// and a diff in git is where such a change is reviewed anyway.
+// tools also match by place: a change anywhere inside the same root (or inside
+// an approved directory), by any of the edit tools, because the dialog said
+// "every file change inside <root>" and a diff in git is where such a change
+// is reviewed anyway.
 func sessionGrantCovers(g PermissionRequest, toolName, action, path, grantKey string) bool {
-	if g.ToolName == toolName && g.Action == action && g.Path == path && g.GrantKey == grantKey {
+	if g.ToolName == toolName && g.Action == action && samePath(g.Path, path) && g.GrantKey == grantKey {
 		return true
 	}
-	return editTools[g.ToolName] && editTools[toolName] && g.Path != "" && g.Path == path &&
+	return editTools[g.ToolName] && editTools[toolName] && g.Path != "" && pathWithin(path, g.Path) &&
 		g.Irreversible == ""
 }
 
@@ -594,7 +640,7 @@ func SessionScope(p PermissionRequest) string {
 	case editTools[p.ToolName] && place != "":
 		return "every file change inside " + place
 	case strings.TrimSpace(p.SessionClass) != "":
-		return "every `" + strings.TrimSpace(p.SessionClass) + " ...` command run in " + place +
+		return "every `" + strings.TrimSpace(p.SessionClass) + " ...` command run in " + grantScopeDir(place) +
 			" (one command each, no chaining)"
 	case p.GrantKey == GrantWholeTool:
 		return "every call of " + p.ToolName + " in this session"
@@ -604,11 +650,30 @@ func SessionScope(p PermissionRequest) string {
 	return "this exact request"
 }
 
-func (s *permissionService) Grant(permission PermissionRequest) {
-	if v, ok := s.pendingRequests.Load(permission.ID); ok {
+// grantPending answers a waiting request yes without blocking the caller, and
+// synchronously extends extraRoots when approving an outside-root auto-mode
+// carve-out so any queued sibling prompts in the same folder are drained right
+// away instead of racing the waking goroutine.
+func (s *permissionService) grantPending(id string) (root string, addedExtraRoot bool) {
+	if v, ok := s.pendingRequests.Load(id); ok {
 		if p, ok := v.(pendingRequest); ok {
-			p.ch <- true
+			root = p.sessionID
+			if p.override != "" && p.opts.Irreversible == "" && p.opts.HardStop == "" {
+				s.addExtraRoot(p.sessionID, p.opts.Path)
+				addedExtraRoot = true
+			}
+			select {
+			case p.ch <- true:
+			default:
+			}
 		}
+	}
+	return root, addedExtraRoot
+}
+
+func (s *permissionService) Grant(permission PermissionRequest) {
+	if root, added := s.grantPending(permission.ID); added {
+		s.releasePendingCovered(root)
 	}
 }
 
@@ -623,7 +688,10 @@ func (s *permissionService) Deny(permission PermissionRequest) {
 			}
 			s.personDenied[p.sessionID] = true
 			s.mu.Unlock()
-			p.ch <- false
+			select {
+			case p.ch <- false:
+			default:
+			}
 		}
 	}
 }
@@ -631,7 +699,10 @@ func (s *permissionService) Deny(permission PermissionRequest) {
 func (s *permissionService) Refuse(permission PermissionRequest) {
 	if v, ok := s.pendingRequests.Load(permission.ID); ok {
 		if p, ok := v.(pendingRequest); ok {
-			p.ch <- false
+			select {
+			case p.ch <- false:
+			default:
+			}
 		}
 	}
 }
@@ -695,7 +766,7 @@ func (s *permissionService) hasGrant(sessionID, toolName, action, path, grantKey
 	s.mu.RUnlock()
 	for _, p := range grants {
 		if p.ToolName == toolName && p.Action == action &&
-			p.SessionID == sessionID && p.Path == path && p.GrantKey == grantKey {
+			p.SessionID == sessionID && samePath(p.Path, path) && p.GrantKey == grantKey {
 			return true
 		}
 	}
@@ -812,7 +883,9 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 
 	// The session travels with the waiter: a sweep that cannot tell whose
 	// request it is would cancel other conversations' prompts too.
-	s.pendingRequests.Store(permission.ID, pendingRequest{ch: respCh, sessionID: root, opts: opts})
+	s.pendingRequests.Store(permission.ID, pendingRequest{
+		ch: respCh, sessionID: root, opts: opts, override: override, req: permission,
+	})
 	defer s.pendingRequests.Delete(permission.ID)
 	// GORILLA FIX (2026-10-23): say when the question is settled, however it
 	// was settled, so every front end can take its dialog down. A request that
@@ -823,14 +896,12 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	// waiter is gone, as DeletedEvent, which no front end treats as a question.
 	defer s.Publish(pubsub.DeletedEvent, permission)
 
-	// GORILLA FIX (2026-11-21): /yolo can now land while a tool is mid-flight.
-	// The auto-approve flag was read at the top of this function; if /yolo
-	// arrived between that read and the waiter being registered just above,
-	// releasePendingAutoApproved (which only sees registered waiters) missed
-	// this request and it would have been asked even though YOLO is on. Look
-	// again now that the waiter exists: from here on, either this check or the
-	// release sees it.
-	if s.autoApprovedNow(root, opts.SessionID) && s.autoMayAnswer(opts, root) {
+	// GORILLA FIX (2026-11-21): /yolo, GrantPersistant, GrantFamily, or an
+	// outside-root extraRoot approval can land while a parallel tool call is
+	// mid-flight between the initial check above and waiter registration. Look
+	// again now that the waiter exists so a burst of parallel calls cannot slip
+	// past a grant that just landed.
+	if s.IsCovered(permission) {
 		return true
 	}
 
@@ -898,6 +969,12 @@ type pendingRequest struct {
 	// waiting needs to judge that question against the same carve-outs
 	// (mustAskAnyway) that Request applies, so it has to remember it.
 	opts CreatePermissionRequest
+	// override is the auto-approve carve-out reason, if any, so grantPending
+	// can extend extraRoots synchronously before drainPermissionQueue runs.
+	override string
+	// req is the published request, so releasePendingCovered can re-check
+	// IsCovered after a session/family/extraRoot grant arrives.
+	req PermissionRequest
 }
 
 // SetUnattended records that there is no human at the keyboard.
@@ -972,6 +1049,27 @@ func (s *permissionService) releasePendingAutoApproved(root string) int {
 	s.pendingRequests.Range(func(_, value any) bool {
 		p, ok := value.(pendingRequest)
 		if !ok || p.sessionID != root || !s.autoMayAnswer(p.opts, root) {
+			return true
+		}
+		select {
+		case p.ch <- true:
+			released++
+		default:
+		}
+		return true
+	})
+	return released
+}
+
+// releasePendingCovered answers yes to every waiting question under root that
+// is now covered by a session grant, family grant, fleet grant, extra root, or
+// YOLO. Called after GrantPersistant, GrantFamily, or an outside-root Grant so
+// a burst of parallel tool calls settles in one click instead of flooding.
+func (s *permissionService) releasePendingCovered(root string) int {
+	released := 0
+	s.pendingRequests.Range(func(_, value any) bool {
+		p, ok := value.(pendingRequest)
+		if !ok || p.sessionID != root || !s.IsCovered(p.req) {
 			return true
 		}
 		select {
@@ -1067,7 +1165,7 @@ func normalisePermissionPath(p string) string {
 	if p == "" || p == "." {
 		return config.WorkingDirectory()
 	}
-	return p
+	return filepath.Clean(p)
 }
 
 // PermissionWaitForTest shortens the wait so the timeout path can be asserted
@@ -1209,7 +1307,7 @@ func (s *permissionService) inExtraRoot(root, path string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, d := range s.extraRoots[root] {
-		if abs == d || strings.HasPrefix(abs, strings.TrimRight(d, string(filepath.Separator))+string(filepath.Separator)) {
+		if pathWithin(abs, d) {
 			return true
 		}
 	}
