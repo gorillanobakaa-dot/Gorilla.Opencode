@@ -124,10 +124,65 @@ var (
 	subAgentRegMu sync.Mutex
 	subAgentReg   = map[string]*subAgentEntry{}
 	subAgentSeq   int
+	// GORILLA OVERRIDE (2026-11-21): persistent per-session spawn audit log.
+	// UnregisterSubAgent/UnregisterSubAgentsForCall remove finished rows from
+	// subAgentReg, which erased how many helpers had been spawned in the session.
+	// Keeping the audit slice lets /tasks, /agents, and the status bar report
+	// accurate session-wide agent telemetry at any time.
+	subAgentAudit   []SubAgentInfo
+	subAgentAuditIx = map[string]int{}
 	// subAgentBroker fans out spawn (Created) / exit (Deleted) events so the
 	// TUI can show live state (status-bar count, /tasks list, spawn toast).
 	subAgentBroker = pubsub.NewBroker[SubAgentInfo]()
 )
+
+// SessionAgentStats summarizes every sub-agent spawned during a session (or
+// across the whole process when parentSessionID is empty).
+type SessionAgentStats struct {
+	TotalSpawned int
+	Running      int
+	Queued       int
+	Done         int
+	Failed       int
+	Killed       int
+	History      []SubAgentInfo
+}
+
+// SessionAgentTelemetry returns the cumulative spawn count, state breakdown,
+// and ordered history for parentSessionID (or all sessions if empty).
+func SessionAgentTelemetry(parentSessionID string) SessionAgentStats {
+	subAgentRegMu.Lock()
+	defer subAgentRegMu.Unlock()
+	var stats SessionAgentStats
+	for _, info := range subAgentAudit {
+		if parentSessionID != "" && info.ParentSessionID != parentSessionID {
+			continue
+		}
+		stats.TotalSpawned++
+		switch info.State {
+		case SubAgentRunning:
+			stats.Running++
+		case SubAgentQueued:
+			stats.Queued++
+		case SubAgentDone:
+			stats.Done++
+		case SubAgentFailed:
+			stats.Failed++
+		case SubAgentKilled:
+			stats.Killed++
+		}
+		stats.History = append(stats.History, info)
+	}
+	return stats
+}
+
+// ResetSessionAgentTelemetry clears the audit history (for tests).
+func ResetSessionAgentTelemetry() {
+	subAgentRegMu.Lock()
+	subAgentAudit = nil
+	subAgentAuditIx = map[string]int{}
+	subAgentRegMu.Unlock()
+}
 
 // SubAgentSubscribe matches the setupSubscriber signature so the TUI can wire it
 // alongside the other service subscriptions in cmd/root.go.
@@ -160,6 +215,8 @@ func RegisterSubAgentState(sessionID, parentSessionID, toolCallID, prompt string
 		State:           state,
 	}
 	subAgentReg[id] = &subAgentEntry{info: info, cancel: cancel, seq: subAgentSeq}
+	subAgentAuditIx[id] = len(subAgentAudit)
+	subAgentAudit = append(subAgentAudit, info)
 	subAgentRegMu.Unlock()
 
 	subAgentBroker.Publish(pubsub.CreatedEvent, info)
@@ -194,6 +251,9 @@ func SetSubAgentState(id string, state SubAgentState) {
 			record = true
 		}
 		entry.info.State = state
+		if idx, found := subAgentAuditIx[id]; found && idx < len(subAgentAudit) {
+			subAgentAudit[idx].State = state
+		}
 	}
 	subAgentRegMu.Unlock()
 
@@ -213,6 +273,9 @@ func UnregisterSubAgent(id string) {
 	entry, ok := subAgentReg[id]
 	if ok {
 		delete(subAgentReg, id)
+		if idx, found := subAgentAuditIx[id]; found && idx < len(subAgentAudit) && subAgentAudit[idx].State.Live() {
+			subAgentAudit[idx].State = SubAgentDone
+		}
 	}
 	subAgentRegMu.Unlock()
 
@@ -331,6 +394,9 @@ func KillSubAgent(id string) (SubAgentInfo, bool) {
 	entry, ok := subAgentReg[id]
 	if ok {
 		delete(subAgentReg, id)
+		if idx, found := subAgentAuditIx[id]; found && idx < len(subAgentAudit) {
+			subAgentAudit[idx].State = SubAgentKilled
+		}
 	}
 	subAgentRegMu.Unlock()
 
@@ -356,6 +422,9 @@ func KillAllSubAgents() int {
 	for id, e := range subAgentReg {
 		entries = append(entries, e)
 		delete(subAgentReg, id)
+		if idx, found := subAgentAuditIx[id]; found && idx < len(subAgentAudit) {
+			subAgentAudit[idx].State = SubAgentKilled
+		}
 	}
 	subAgentRegMu.Unlock()
 

@@ -334,15 +334,34 @@ func (m statusCmp) chrome() statusChrome {
 		Bold(true).
 		Render(m.projectDiagnostics())
 
-	// GORILLA OVERRIDE: live helper-agent count. Transparency — the user
-	// always sees how many sub-agents are running on their behalf, and that
-	// /tasks can stop them.
+	// GORILLA OVERRIDE: live helper-agent count, session spawn telemetry, and
+	// persistent Gorilla Nuclear Option confirmation. Transparency — the user
+	// always sees whether solo/nuclear mode is active and how many sub-agents
+	// are running or were spawned in this session.
 	helpersWidth := 0
-	if n := agent.ActiveSubAgentCount(); n > 0 {
+	sessionStats := agent.SessionAgentTelemetry(m.session.ID)
+	if config.MaxSubAgents() == config.SubAgentsNuclear {
+		c.helpers = styles.Padded().
+			Background(styles.SpeedBg).
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Bold(true).
+			Render("SOLO (NUCLEAR)")
+		helpersWidth = lipgloss.Width(c.helpers)
+	} else if n := agent.ActiveSubAgentCount(); n > 0 {
+		label := fmt.Sprintf("🦍 %d helper(s) | /tasks", n)
+		if sessionStats.TotalSpawned > n {
+			label = fmt.Sprintf("🦍 %d active (%d spawned) | /tasks", n, sessionStats.TotalSpawned)
+		}
 		c.helpers = styles.Padded().
 			Background(t.Warning()).
 			Foreground(t.Background()).
-			Render(fmt.Sprintf("🦍 %d helper(s) | /tasks", n))
+			Render(label)
+		helpersWidth = lipgloss.Width(c.helpers)
+	} else if sessionStats.TotalSpawned > 0 {
+		c.helpers = styles.Padded().
+			Background(t.BackgroundSecondary()).
+			Foreground(t.TextMuted()).
+			Render(fmt.Sprintf("agents: %d spawned | /tasks", sessionStats.TotalSpawned))
 		helpersWidth = lipgloss.Width(c.helpers)
 	}
 

@@ -2114,8 +2114,23 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.offerGate.armed = false // asked for: its keys are answers
 			return a, nil
 		case "task", "tasks", "agents", "kill":
-			// GORILLA OVERRIDE: /tasks — live monitor of running helper
-			// agents; kill one, or the Nuclear Option (kill 'em all).
+			// GORILLA OVERRIDE: /tasks — live monitor + session spawn audit of
+			// helper agents; kill one, or the Nuclear Option (kill 'em all).
+			a.tasksDialog.SetSessionID(a.selectedSession.ID)
+			arg := strings.ToLower(strings.TrimSpace(msg.Args))
+			if arg == "audit" || arg == "stats" || arg == "count" || arg == "status" {
+				st := agent.SessionAgentTelemetry(a.selectedSession.ID)
+				limit := "unlimited"
+				switch n := config.MaxSubAgents(); {
+				case n == config.SubAgentsNuclear:
+					limit = "NUCLEAR (0 — solo)"
+				case n > 0:
+					limit = fmt.Sprintf("max %d/turn", n)
+				}
+				return a, util.ReportInfo(fmt.Sprintf(
+					"Session agents: %d spawned (%d running, %d queued, %d done, %d failed, %d killed) | Limit: %s",
+					st.TotalSpawned, st.Running, st.Queued, st.Done, st.Failed, st.Killed, limit))
+			}
 			a.showTasksDialog = true
 			return a, nil
 		// GORILLA OVERRIDE: /help and /commands open the plain-language command

@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/agent"
 	"github.com/opencode-ai/opencode/internal/tui/layout"
 	"github.com/opencode-ai/opencode/internal/tui/styles"
@@ -31,14 +32,18 @@ type CloseTasksDialogMsg struct{}
 type TasksDialog interface {
 	tea.Model
 	layout.Bindings
+	SetSessionID(id string)
 }
 
 type tasksDialogCmp struct {
 	selectedIdx int
 	termWidth   int
+	sessionID   string
 }
 
 func NewTasksDialogCmp() TasksDialog { return &tasksDialogCmp{} }
+
+func (m *tasksDialogCmp) SetSessionID(id string) { m.sessionID = id }
 
 type tasksKeyMap struct {
 	Up, Down, Kill, Nuke, Escape key.Binding
@@ -125,13 +130,33 @@ func (m *tasksDialogCmp) View() string {
 	// a number the run does not have.
 	header := base.Foreground(t.Primary()).Bold(true).Width(w).
 		Render("🦍 Helper agents — " + taskCountSummary(tasks))
-	sub := base.Foreground(t.TextMuted()).Width(w).
-		Render("Every sub-agent the main agent spawned on your behalf. You are in control.")
+	stats := agent.SessionAgentTelemetry(m.sessionID)
+	limitStr := "UNLIMITED"
+	switch n := config.MaxSubAgents(); {
+	case n == config.SubAgentsNuclear:
+		limitStr = "NUCLEAR (0 — solo mode)"
+	case n > 0:
+		limitStr = fmt.Sprintf("max %d/turn", n)
+	}
+	telemetryLine := fmt.Sprintf("Session audit: %d spawned (%d running, %d queued, %d done, %d failed, %d killed) | Limit: %s",
+		stats.TotalSpawned, stats.Running, stats.Queued, stats.Done, stats.Failed, stats.Killed, limitStr)
+	sub := base.Foreground(t.TextMuted()).Width(w).Render(truncate(telemetryLine, w))
 
 	var rows []string
 	if len(tasks) == 0 {
 		rows = append(rows, base.Foreground(t.TextMuted()).Width(w).
 			Render("  (no helper agents running right now)"))
+		// Show historical spawns from this session so the user can still audit
+		// what gorilla.opencode spawned even after helpers finished.
+		if len(stats.History) > 0 {
+			rows = append(rows, base.Foreground(t.TextMuted()).Bold(true).Width(w).
+				Render("  Spawned earlier in this session:"))
+			start := max(0, len(stats.History)-8)
+			for _, h := range stats.History[start:] {
+				line := fmt.Sprintf("   %-4s %-7s  %s", h.ID, h.State.Label(), truncate(h.Prompt, max(12, w-16)))
+				rows = append(rows, base.Foreground(t.TextMuted()).Width(w).Render(line))
+			}
+		}
 	} else {
 		for i, tk := range tasks {
 			elapsed := time.Since(tk.StartedAt).Truncate(time.Second)
