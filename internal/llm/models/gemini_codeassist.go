@@ -72,6 +72,17 @@ func init() {
 		clone.CostPer1MInCached = 0
 		clone.CostPer1MOut = 0
 		clone.CostPer1MOutCached = 0
+		// GORILLA FIX (2026-11-21): expose the same Thinking Effort bar
+		// (low / medium / high) on free Google Code Assist accounts so free
+		// logins keep UI feature parity with paid accounts.
+		if clone.CanReason && len(clone.ReasoningEfforts) == 0 {
+			clone.DefaultReasoningEffort = "medium"
+			clone.ReasoningEfforts = []ReasoningEffort{
+				{Effort: "low", Description: "Faster responses, lighter reasoning (2K thinking budget)"},
+				{Effort: "medium", Description: "Balanced speed and reasoning quality (8K thinking budget)"},
+				{Effort: "high", Description: "Deeper reasoning for complex problems (24K thinking budget)"},
+			}
+		}
 		GeminiCAModels[clone.ID] = clone
 	}
 	// Additive copy into the global registry (order-independent).

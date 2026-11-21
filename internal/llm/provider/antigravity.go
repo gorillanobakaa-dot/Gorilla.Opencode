@@ -130,8 +130,15 @@ func antigravityErr(resp *http.Response) error {
 	return fmt.Errorf("Antigravity HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 }
 
+// antigravityUtilityMaxTokens caps non-streaming helper calls (titles and
+// summaries) so they never reserve or burn a 64K Opus 5.5 High output budget.
+const antigravityUtilityMaxTokens int64 = 4096
+
 func (c *antigravityClient) send(ctx context.Context, messages []message.Message, ts []tools.BaseTool) (*ProviderResponse, error) {
 	env := c.buildEnvelope(messages, ts)
+	if mt, ok := env.Request.GenerationConfig["maxOutputTokens"].(int64); ok && mt > antigravityUtilityMaxTokens {
+		env.Request.GenerationConfig["maxOutputTokens"] = antigravityUtilityMaxTokens
+	}
 	resp, err := postRetryingServerErrors(ctx, func() (*http.Response, error) { return c.post(ctx, "generateContent", env) })
 	if err != nil {
 		return nil, err
@@ -201,10 +208,20 @@ func (c *antigravityClient) stream(ctx context.Context, messages []message.Messa
 			}
 			cand := chunk.Response.Candidates[0]
 			for _, p := range cand.Content.Parts {
-				if p.Text != "" {
-					fullText.WriteString(p.Text)
-					eventChan <- ProviderEvent{Type: EventContentDelta, Content: p.Text}
+				if p.Text == "" {
+					continue
 				}
+				// GORILLA FIX (2026-11-21): route `"thought": true` chunks to
+				// EventThinkingDelta rather than fullText/EventContentDelta.
+				// Otherwise every thinking token (thousands per step on Claude
+				// Opus 5.5 High) is saved as assistant prose and re-sent as
+				// input on every later tool step, causing O(N^2) credit burn.
+				if p.Thought {
+					eventChan <- ProviderEvent{Type: EventThinkingDelta, Thinking: p.Text}
+					continue
+				}
+				fullText.WriteString(p.Text)
+				eventChan <- ProviderEvent{Type: EventContentDelta, Content: p.Text}
 			}
 			_, calls := collectParts(cand.Content.Parts)
 			allCalls = append(allCalls, calls...)

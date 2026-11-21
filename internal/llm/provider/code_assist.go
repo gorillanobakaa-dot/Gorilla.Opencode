@@ -43,7 +43,13 @@ func newCodeAssistClient(opts providerClientOptions) CodeAssistClient {
 // ---- JSON shapes (Gemini REST, hand-built) ---------------------------------
 
 type caPart struct {
-	Text             string          `json:"text,omitempty"`
+	Text string `json:"text,omitempty"`
+	// GORILLA FIX (2026-11-21): Gemini/Antigravity streaming marks thinking
+	// chunks with `"thought": true`. Without this field, Antigravity and Code
+	// Assist treated every thinking chunk as visible assistant text, stored it
+	// in message history, and re-sent all prior thinking tokens on every
+	// subsequent tool step (O(N^2) credit burn on Claude Opus 5.5 High).
+	Thought          bool            `json:"thought,omitempty"`
 	FunctionCall     *caFunctionCall `json:"functionCall,omitempty"`
 	FunctionResponse *caFunctionResp `json:"functionResponse,omitempty"`
 	InlineData       *caBlob         `json:"inlineData,omitempty"`
@@ -257,13 +263,41 @@ func convertToolsCA(ts []tools.BaseTool) []caTool {
 	return []caTool{{FunctionDeclarations: decls}}
 }
 
+// caThinkingBudget maps a reasoning effort name to a Gemini Code Assist
+// thinkingBudget value (or -1 if unset).
+func caThinkingBudget(effort string) (int, bool) {
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "none", "minimal":
+		return 0, true
+	case "low":
+		return 2048, true
+	case "medium":
+		return 8192, true
+	case "high":
+		return 24576, true
+	default:
+		return 0, false
+	}
+}
+
 func (c *codeAssistClient) buildEnvelope(messages []message.Message, ts []tools.BaseTool) caEnvelope {
+	genCfg := map[string]any{
+		"maxOutputTokens": c.providerOptions.maxTokens,
+	}
+	if c.providerOptions.model.CanReason {
+		effort := c.providerOptions.model.ResolveReasoningEffort(c.providerOptions.reasoningEffort)
+		if budget, ok := caThinkingBudget(effort); ok {
+			genCfg["thinkingConfig"] = map[string]any{
+				"thinkingBudget":  budget,
+				"includeThoughts": budget > 0,
+			}
+			logEffort(string(c.providerOptions.model.Provider), c.providerOptions.model.APIModel, effort, "thinkingBudget")
+		}
+	}
 	req := caInnerRequest{
-		Contents: caConvertMessages(messages, false), // Gemini matches tools by name; no ids
-		Tools:    convertToolsCA(ts),
-		GenerationConfig: map[string]any{
-			"maxOutputTokens": c.providerOptions.maxTokens,
-		},
+		Contents:         caConvertMessages(messages, false), // Gemini matches tools by name; no ids
+		Tools:            convertToolsCA(ts),
+		GenerationConfig: genCfg,
 	}
 	if sys := c.providerOptions.systemMessage; sys != "" {
 		req.SystemInstruction = &caContent{Parts: []caPart{{Text: sys}}}
@@ -336,7 +370,7 @@ func collectParts(parts []caPart) (string, []message.ToolCall) {
 	var sb strings.Builder
 	var calls []message.ToolCall
 	for _, p := range parts {
-		if p.Text != "" {
+		if p.Text != "" && !p.Thought {
 			sb.WriteString(p.Text)
 		}
 		if p.FunctionCall != nil {
@@ -481,10 +515,15 @@ func (c *codeAssistClient) stream(ctx context.Context, messages []message.Messag
 			}
 			cand := chunk.Response.Candidates[0]
 			for _, p := range cand.Content.Parts {
-				if p.Text != "" {
-					fullText.WriteString(p.Text)
-					eventChan <- ProviderEvent{Type: EventContentDelta, Content: p.Text}
+				if p.Text == "" {
+					continue
 				}
+				if p.Thought {
+					eventChan <- ProviderEvent{Type: EventThinkingDelta, Thinking: p.Text}
+					continue
+				}
+				fullText.WriteString(p.Text)
+				eventChan <- ProviderEvent{Type: EventContentDelta, Content: p.Text}
 			}
 			_, calls := collectParts(cand.Content.Parts)
 			allCalls = append(allCalls, calls...)

@@ -119,10 +119,11 @@ type Provider interface {
 }
 
 type providerClientOptions struct {
-	apiKey        string
-	model         models.Model
-	maxTokens     int64
-	systemMessage string
+	apiKey          string
+	model           models.Model
+	maxTokens       int64
+	systemMessage   string
+	reasoningEffort string
 
 	anthropicOptions []AnthropicOption
 	openaiOptions    []OpenAIOption
@@ -130,6 +131,15 @@ type providerClientOptions struct {
 }
 
 type ProviderClientOption func(*providerClientOptions)
+
+// WithEffort passes the user's chosen reasoning effort (e.g. "low", "medium",
+// "high") to providers that configure thinking via request fields rather than
+// distinct model IDs (such as free-tier Google Code Assist).
+func WithEffort(effort string) ProviderClientOption {
+	return func(options *providerClientOptions) {
+		options.reasoningEffort = effort
+	}
+}
 
 type ProviderClient interface {
 	send(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (*ProviderResponse, error)

@@ -488,7 +488,12 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 			logging.WarnPersist(note, logging.PersistTimeArg, 45*time.Second)
 		}
 	}
-	if len(msgs) == 0 {
+	// GORILLA FIX (2026-11-21): skip the hidden background title generation
+	// call when Gorilla Nuclear Option (MaxSubAgents == 0) is active. Nuclear
+	// mode promises "main agent works solo, fewest calls"; previously it still
+	// fired a hidden AgentTitle request (often dragged onto Claude Opus 5.5
+	// High by FollowCoderModel), burning a full extra flagship turn immediately.
+	if len(msgs) == 0 && config.MaxSubAgents() != config.SubAgentsNuclear {
 		go func() {
 			defer logging.RecoverPanic("agent.Run", func() {
 				logging.ErrorPersist("panic while generating title")
@@ -1668,6 +1673,8 @@ func createAgentProviderWithConfig(agentName config.AgentName, agentConfig confi
 	}
 	if model.Provider == models.ProviderChatGPT {
 		opts = append(opts, provider.WithOpenAIOptions(provider.WithChatGPTReasoningEffort(agentConfig.ReasoningEffort)))
+	} else if model.Provider == models.ProviderGeminiCA && model.CanReason {
+		opts = append(opts, provider.WithEffort(agentConfig.ReasoningEffort))
 	} else if model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal && model.CanReason {
 		opts = append(
 			opts,
