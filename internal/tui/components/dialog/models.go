@@ -761,8 +761,48 @@ func (m *modelDialogCmp) View() string {
 		currentID = cfg.Agents[config.AgentCoder].Model
 	}
 	currentFamily, _, _ := models.FamilyOf(models.SupportedModels[currentID])
+
+	// GORILLA OVERRIDE (2026-11-21): organize picker rows with "Newer models"
+	// and "Legacy models" headers, vendor dividers (Anthropic vs Gemini), launch
+	// year-month tags, distinct accent colors, and legacy tier descriptors.
+	useTierHeaders := m.shouldShowTierHeaders()
+	shownNewerHeader := false
+	shownLegacyHeader := false
+	lastVendor := ""
+
 	for i := m.scrollOffset; i < endIdx; i++ {
+		tier := models.ModelTierInfo(m.models[i])
+		if useTierHeaders {
+			if !tier.IsLegacy && !shownNewerHeader {
+				shownNewerHeader = true
+				lastVendor = ""
+				hdr := baseStyle.Foreground(t.Accent()).Bold(true).Render("  Newer models")
+				modelItems = append(modelItems, pickerLine(hdr, w))
+			}
+			if tier.IsLegacy && !shownLegacyHeader {
+				shownLegacyHeader = true
+				lastVendor = ""
+				if len(modelItems) > 0 {
+					modelItems = append(modelItems, baseStyle.Width(w).Render(""))
+				}
+				div := renderSectionDivider("Legacy models", w, t.TextMuted())
+				modelItems = append(modelItems, div)
+			}
+			if tier.Vendor != "" && tier.Vendor != "Other" && tier.Vendor != lastVendor {
+				if lastVendor != "" {
+					modelItems = append(modelItems, renderSectionDivider(tier.Vendor, w, t.TextMuted()))
+				}
+				lastVendor = tier.Vendor
+			}
+		}
+
 		label := m.models[i].Name
+		if useTierHeaders && !tier.IsLegacy && tier.LaunchYM != "" {
+			label += "  [" + tier.LaunchYM + "]"
+		}
+		if useTierHeaders && tier.Descriptor != "" {
+			label += "  — " + tier.Descriptor
+		}
 		if family, _, _ := models.FamilyOf(m.models[i]); currentID != "" && (m.models[i].ID == currentID || family == currentFamily) {
 			label += "  (current)"
 		}
@@ -838,6 +878,12 @@ func (m *modelDialogCmp) View() string {
 		if i == m.selectedIdx {
 			prefix = "> "
 			itemStyle = itemStyle.Foreground(t.Primary()).Bold(true)
+		} else if useTierHeaders {
+			if tier.IsLegacy {
+				itemStyle = itemStyle.Foreground(t.TextMuted())
+			} else if accentCol, ok := tierAccentColor(tier.Accent); ok {
+				itemStyle = itemStyle.Foreground(accentCol)
+			}
 		}
 		modelItems = append(modelItems, itemStyle.Render(pickerLine(prefix+label, w)))
 	}
@@ -1656,12 +1702,87 @@ func getModelsForProvider(provider models.ModelProvider) []models.Model {
 			rest = append(rest, m)
 		}
 	}
-	slices.SortFunc(ranked, func(a, b models.Model) int { return a.Rank - b.Rank })
-	slices.SortFunc(rest, byCoding)
+	// GORILLA OVERRIDE (2026-11-21): keep newer models strictly above legacy
+	// generations while preserving curated Rank / codingRank within each tier.
+	tierCmp := func(a, b models.Model) int {
+		ta, tb := models.ModelTierInfo(a), models.ModelTierInfo(b)
+		if ta.IsLegacy != tb.IsLegacy {
+			if !ta.IsLegacy {
+				return -1
+			}
+			return 1
+		}
+		return 0
+	}
+	slices.SortFunc(ranked, func(a, b models.Model) int {
+		if c := tierCmp(a, b); c != 0 {
+			return c
+		}
+		return a.Rank - b.Rank
+	})
+	slices.SortFunc(rest, func(a, b models.Model) int {
+		if c := tierCmp(a, b); c != 0 {
+			return c
+		}
+		return byCoding(a, b)
+	})
 	if len(ranked) > 0 {
-		return append(ranked, rest...)
+		out := append(ranked, rest...)
+		slices.SortStableFunc(out, tierCmp)
+		return out
 	}
 	return rest
+}
+
+func (m *modelDialogCmp) shouldShowTierHeaders() bool {
+	if m.searchActive || len(m.models) == 0 {
+		return false
+	}
+	switch m.provider {
+	case ProviderBookmarks, ProviderHidden, ProviderAvailableNow, models.ProviderLocal:
+		return false
+	}
+	hasNewer, hasLegacy := false, false
+	for _, mod := range m.models {
+		ti := models.ModelTierInfo(mod)
+		if ti.IsLegacy {
+			hasLegacy = true
+		} else if ti.LaunchYM != "" || ti.Descriptor != "" {
+			hasNewer = true
+		}
+	}
+	return hasNewer || hasLegacy
+}
+
+func tierAccentColor(a models.TierAccent) (lipgloss.AdaptiveColor, bool) {
+	switch a {
+	case models.AccentCyan:
+		return lipgloss.AdaptiveColor{Dark: "#56D4DD", Light: "#00707A"}, true
+	case models.AccentGreen:
+		return lipgloss.AdaptiveColor{Dark: "#56D364", Light: "#1A7F37"}, true
+	case models.AccentYellow:
+		return lipgloss.AdaptiveColor{Dark: "#E3B341", Light: "#9A6700"}, true
+	case models.AccentRed:
+		return lipgloss.AdaptiveColor{Dark: "#F85149", Light: "#CF222E"}, true
+	default:
+		return lipgloss.AdaptiveColor{}, false
+	}
+}
+
+func renderSectionDivider(label string, width int, fg lipgloss.AdaptiveColor) string {
+	base := styles.BaseStyle().Foreground(fg)
+	title := " " + label + " "
+	rem := width - 2 - lipgloss.Width(title)
+	if rem < 4 {
+		return base.Render(pickerLine("  -- "+label+" --", width))
+	}
+	left := 2
+	right := rem - left
+	if right < 2 {
+		right = 2
+	}
+	line := "  " + strings.Repeat("─", left) + title + strings.Repeat("─", right)
+	return base.Render(pickerLine(line, width))
 }
 
 // codingRank scores a model id by coding usefulness (lower = better).
