@@ -75,6 +75,22 @@ func WatchTerminalResize(p *tea.Program, stop <-chan struct{}) {
 		return
 	}
 
+	// GORILLA FIX (2026-11-21): reconcile the startup terminal size once after
+	// Bubble Tea initializes. When launched via a maximized conhost shortcut or
+	// right after SetCurrentConsoleFontEx changes the font metrics, Bubble Tea
+	// can capture a stale initial size (e.g. 120x30) and never receive SIGWINCH.
+	// Sending the live size once right after startup snaps the TUI to the full
+	// viewport immediately instead of waiting for a manual resize.
+	select {
+	case <-stop:
+		return
+	case <-time.After(120 * time.Millisecond):
+		if w, h, err := term.GetSize(fd); err == nil && w > 0 && h > 0 {
+			lastW, lastH = w, h
+			p.Send(tea.WindowSizeMsg{Width: w, Height: h})
+		}
+	}
+
 	ticker := time.NewTicker(resizePollInterval)
 	defer ticker.Stop()
 	for {
