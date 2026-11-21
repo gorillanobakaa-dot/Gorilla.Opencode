@@ -583,11 +583,24 @@ var All = []Command{
 			"and answers get worse, then stop. This writes a summary of everything " +
 			"so far and continues from that instead, so the thread survives while " +
 			"the bulk goes.\n\n" +
-			"Use it when a long session starts to drift, or before starting a big " +
-			"job in an old conversation. It costs one model call to write the " +
-			"summary. Models with small windows need this often — the status bar " +
-			"shows how full you are. It also runs by itself at 95% full if you " +
-			"leave that setting on in /settings.",
+			"Works mid-session: if the agent is mid-turn, /compact queues itself " +
+			"and runs as soon as the turn finishes. If the dedicated summarizer " +
+			"fails or is unset, it falls back to your active model automatically. " +
+			"Models with small windows need this often — the status bar shows how " +
+			"full you are. It also runs by itself at 85% of the usable window if " +
+			"you leave that setting on in /settings.",
+	},
+	{
+		Name:    "plan",
+		Group:   GroupSession,
+		Summary: "Structured planning mode: write and approve a plan before acting.",
+		Detail: "Switches to read-only plan mode and tells the AI to inspect the " +
+			"codebase and output a concrete, numbered execution plan (goal, files, " +
+			"steps, verification, risks) before changing anything.\n\n" +
+			"  /plan          turn plan mode on (works mid-turn too)\n" +
+			"  /plan <task>   turn plan mode on and generate a plan for <task>\n" +
+			"  /plan go       approve the plan, restore your previous mode, and execute strictly\n" +
+			"  /plan off      exit plan mode and restore your previous permission mode",
 	},
 	{
 		Name:    "init",

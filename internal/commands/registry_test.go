@@ -222,7 +222,7 @@ func TestListedCommandsAreRegisteredDispatchedAndExplained(t *testing.T) {
 	listed := []string{
 		"arsenal", "clear", "plain", "review", "port", "resume", "sessions", "copy", "export", "add-dir",
 		"connect", "purge", "update", "connection", "providers", "login", "logout", "usage", "context",
-		"settings", "prompts", "reset", "compact", "init", "mode", "yolo", "tasks",
+		"settings", "prompts", "reset", "compact", "plan", "init", "mode", "yolo", "tasks",
 	}
 	dispatched := dispatchedNames(t)
 	for _, n := range listed {

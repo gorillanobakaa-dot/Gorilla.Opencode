@@ -25,6 +25,7 @@ cost before they start. Everything else is local.
 | `/message NAME text` | Send a short message to another session. |
 | `/export` | Save this conversation to a file. |
 | `/compact` · `/summarize` `/summarise` | Squeeze the conversation down so it keeps working. |
+| `/plan` | Structured planning mode: write and approve a plan before acting. |
 | `/mode` · `/permissions` | How much the AI may do before asking. Shift+Tab cycles. |
 | `/cd [folder]` | Switch to working in one folder. |
 | `/add-dir` · `/adddir` `/dirs` `/roots` | Work in more than one folder at once. |
@@ -150,7 +151,18 @@ This one saves the conversation you are in, and lets you name the file. To save 
 
 Every message you send carries the whole conversation with it, and each model has a limit on how much it can hold. Approach that limit and answers get worse, then stop. This writes a summary of everything so far and continues from that instead, so the thread survives while the bulk goes.
 
-Use it when a long session starts to drift, or before starting a big job in an old conversation. It costs one model call to write the summary. Models with small windows need this often — the status bar shows how full you are. It also runs by itself at 95% full if you leave that setting on in /settings.
+Works mid-session: if the agent is mid-turn, /compact queues itself and runs as soon as the turn finishes. If the dedicated summarizer fails or is unset, it falls back to your active model automatically. Models with small windows need this often — the status bar shows how full you are. It also runs by itself at 85% of the usable window if you leave that setting on in /settings.
+
+### `/plan`
+
+**Structured planning mode: write and approve a plan before acting.**
+
+Switches to read-only plan mode and tells the AI to inspect the codebase and output a concrete, numbered execution plan (goal, files, steps, verification, risks) before changing anything.
+
+/plan          turn plan mode on (works mid-turn too)
+  /plan <task>   turn plan mode on and generate a plan for <task>
+  /plan go       approve the plan, restore your previous mode, and execute strictly
+  /plan off      exit plan mode and restore your previous permission mode
 
 ### `/mode`
 

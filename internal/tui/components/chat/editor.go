@@ -512,21 +512,26 @@ var yoloWords = map[string]bool{"yolo": true, "auto": true, "autopilot": true, "
 // isLiveCommand reports whether a slash command must run even while the agent
 // is mid-turn.
 //
-// GORILLA OVERRIDE (2026-11-21): three more joined the control commands.
+// GORILLA OVERRIDE (2026-11-21): live commands that do not interleave a second
+// request with one already in flight:
 //
-//   - /yolo and /yolo off (and the aliases). Forgetting to turn YOLO on used to
-//     mean Esc, which cancels the whole turn. Only the BARE form and "off" are
+//   - /yolo and /yolo off (and the aliases). Only the BARE form and "off" are
 //     live: "/yolo <task>" starts new work, so it still waits for an idle agent.
-//   - /clear and /new. Starting over is exactly what a person wants when a run
-//     has gone wrong, and it was refused with "Agent is working".
-//
-// The criterion is the same as controlCommands': the command changes a setting
-// or abandons a conversation, it does not send anything to the model.
+//   - /plan and /plan off|stop|exit|cancel: flips standing mode without
+//     cancelling; "/plan <task>" and "/plan go" still wait for an idle agent.
+//   - /compact (bare, plus summarize/summarise): queues compaction to run as
+//     soon as the current turn finishes instead of refusing mid-session.
+//   - /clear and /new: cancels the abandoned turn and opens a fresh chat.
 func isLiveCommand(word, args string) bool {
 	a := strings.TrimSpace(args)
 	switch {
 	case yoloWords[word]:
 		return a == "" || strings.EqualFold(a, "off")
+	case word == "plan":
+		return a == "" || strings.EqualFold(a, "off") || strings.EqualFold(a, "stop") ||
+			strings.EqualFold(a, "exit") || strings.EqualFold(a, "cancel")
+	case word == "compact" || word == "summarize" || word == "summarise":
+		return a == ""
 	case word == "clear" || word == "new":
 		return true
 	}

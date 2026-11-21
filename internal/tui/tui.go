@@ -385,7 +385,11 @@ type appModel struct {
 
 	isCompacting      bool
 	compactingMessage string
+	compactAfterTurn  bool
+	planReturnMode    string
 }
+
+type compactStartErrMsg struct{ err error }
 
 func (a appModel) Init() tea.Cmd {
 	var cmds []tea.Cmd
@@ -1243,26 +1247,39 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 
 	case startCompactSessionMsg:
+		if a.isCompacting {
+			return a, util.ReportInfo("Already compacting this conversation.")
+		}
+		if a.selectedSession.ID == "" {
+			return a, util.ReportWarn("No active session to summarize")
+		}
 		// Start compacting the current session
 		a.isCompacting = true
 		a.compactingMessage = "Starting summarization..."
+		sessionID := a.selectedSession.ID
 
-		if a.selectedSession.ID == "" {
-			a.isCompacting = false
-			return a, util.ReportWarn("No active session to summarize")
-		}
-
-		// Start the summarization process
+		// GORILLA FIX (2026-11-21): surface synchronous Summarize errors
+		// (e.g. ErrSessionBusy or missing provider). Previously the return
+		// error was dropped and isCompacting stayed true forever, freezing
+		// the "Starting summarization..." overlay on screen.
 		return a, func() tea.Msg {
 			ctx := context.Background()
-			a.app.CoderAgent.Summarize(ctx, a.selectedSession.ID)
+			if err := a.app.CoderAgent.Summarize(ctx, sessionID); err != nil {
+				return compactStartErrMsg{err: err}
+			}
 			return nil
 		}
+
+	case compactStartErrMsg:
+		a.isCompacting = false
+		a.compactingMessage = ""
+		return a, util.ReportError(msg.err)
 
 	case pubsub.Event[agent.AgentEvent]:
 		payload := msg.Payload
 		if payload.Error != nil {
 			a.isCompacting = false
+			a.compactAfterTurn = false
 			return a, util.ReportError(payload.Error)
 		}
 
@@ -1272,6 +1289,10 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.isCompacting = false
 			return a, util.ReportInfo("Session summarization complete")
 		} else if payload.Done && payload.Type == agent.AgentEventTypeResponse && a.selectedSession.ID != "" {
+			if a.compactAfterTurn {
+				a.compactAfterTurn = false
+				cmds = append(cmds, util.CmdHandler(startCompactSessionMsg{}))
+			}
 			// GORILLA OVERRIDE: after each completed response, re-read the
 			// quota (throttled) and announce any banana-tier crossing. Without
 			// this, a tool-heavy session can fall from "loaded up" to "just a
@@ -1920,6 +1941,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			a.selectedSession = session.Session{}
 			a.isCompacting = false
+			a.compactAfterTurn = false
 			// In the alternate screen the message list empties by itself. In
 			// scrollback mode the old text lives in the terminal's own buffer,
 			// so wipe the visible screen too; the terminal's scrollback, which
@@ -2036,7 +2058,57 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.selectedSession.ID == "" {
 				return a, util.ReportWarn("Nothing to compact yet — this starts once a conversation exists.")
 			}
+			if a.isCompacting {
+				return a, util.ReportInfo("Already compacting this conversation.")
+			}
+			if a.app.CoderAgent.IsSessionBusy(a.selectedSession.ID) {
+				a.compactAfterTurn = true
+				return a, util.ReportInfo("Compaction queued — will compact as soon as this turn finishes.")
+			}
 			return a, util.CmdHandler(startCompactSessionMsg{})
+		case "plan":
+			// GORILLA OVERRIDE (2026-11-21): structured planning mode.
+			// Switches into read-only plan mode (where the model is instructed
+			// on the wire to produce a concrete numbered plan before taking
+			// actions), remembers the prior standing mode for /plan off, and
+			// supports `/plan <task>` to plan a job and `/plan go` (or approve/
+			// execute) to exit plan mode and execute the approved plan strictly.
+			arg := strings.TrimSpace(msg.Args)
+			lower := strings.ToLower(arg)
+			busy := a.selectedSession.ID != "" && a.app.CoderAgent.IsSessionBusy(a.selectedSession.ID)
+			switch lower {
+			case "off", "stop", "exit", "cancel":
+				restore := a.planReturnMode
+				if restore == "" || restore == config.PermissionPlan {
+					restore = config.PermissionAsk
+				}
+				a.planReturnMode = ""
+				return a, a.setPermissionMode(restore)
+			case "go", "approve", "execute":
+				if busy {
+					return a, util.ReportWarn("Wait for the current turn to finish before executing the plan.")
+				}
+				restore := a.planReturnMode
+				if restore == "" || restore == config.PermissionPlan {
+					restore = config.PermissionAsk
+				}
+				a.planReturnMode = ""
+				modeCmd := a.setPermissionMode(restore)
+				execPrompt := "Plan approved. Execute the numbered plan above strictly step by step, in order, without deviating or adding unrequested changes."
+				return a, tea.Batch(modeCmd, util.CmdHandler(chat.SendMsg{Text: execPrompt}))
+			}
+			if cur := config.PermissionMode(); cur != config.PermissionPlan {
+				a.planReturnMode = cur
+			}
+			modeCmd := a.setPermissionMode(config.PermissionPlan)
+			if arg == "" {
+				note := "PLAN MODE ON (read-only) — the AI will write a numbered execution plan and cannot edit files or run commands until you approve. Type /plan <task> to plan a job, /plan go to execute, or /plan off to exit."
+				if busy {
+					note += " The running turn carries on."
+				}
+				return a, tea.Batch(modeCmd, util.ReportInfo(note))
+			}
+			return a, tea.Batch(modeCmd, util.CmdHandler(chat.SendMsg{Text: arg}))
 		case "init":
 			a.showInitDialog = true
 			a.offerGate.armed = false // asked for: its keys are answers
