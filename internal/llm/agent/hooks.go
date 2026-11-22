@@ -206,6 +206,10 @@ func (a *agent) runBeforeToolHooks(ctx context.Context, sessionID, tool, input s
 	if !a.hooksApply() {
 		return ""
 	}
+	// F0.4: the built-in hard-lines gate runs first and cannot be configured away.
+	if refusal := a.runHardlinesGate(ctx, sessionID, tool, input); refusal != "" {
+		return refusal
+	}
 	for _, h := range hooksFor(config.HookBeforeTool, tool) {
 		o := runHook(ctx, h, hookToolEnv(config.HookBeforeTool, sessionID, tool, input), input)
 		if o.passed() {
