@@ -798,6 +798,14 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 		return answer
 	}
 
+	// GORILLA OVERRIDE (2026-11-22, F0.7): the job's mandate (mandate.go). A tool
+	// on its list with no carve-out is approved here; anything else that would
+	// reach a dialog is refused below, never asked.
+	mand := loadMandate()
+	if mand.covers(opts.ToolName) && s.mustAskAnyway(opts, root) == "" {
+		return true
+	}
+
 	// GORILLA FIX (2026-08-19): this used to be an unconditional `return true`
 	// and it was the FIRST thing in the function — before grant matching,
 	// before anything. Auto-approve meant total, with zero carve-outs, so
@@ -877,6 +885,13 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 			"tool", permission.ToolName, "action", permission.Action,
 			"grant_key", permission.GrantKey, "session", root)
 		return true
+	}
+
+	// F0.7: under a mandate the fallback is a refusal, never a prompt.
+	if mand != nil {
+		logging.Warn("mandate: refused without asking (outside the job's pre-approval)",
+			"tool", opts.ToolName, "action", opts.Action, "grant_key", opts.GrantKey, "session", root)
+		return false
 	}
 
 	respCh := make(chan bool, 1)
