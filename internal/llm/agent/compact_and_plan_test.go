@@ -36,6 +36,7 @@ func TestWithPlanDirectiveInjectsOnlyInPlanModeWithoutMutatingHistory(t *testing
 	if _, err := config.Load(t.TempDir(), false); err != nil {
 		t.Fatalf("config.Load: %v", err)
 	}
+	t.Cleanup(func() { _ = config.SetPermissionMode(config.PermissionAsk) })
 	orig := []message.Message{
 		{ID: "u1", Role: message.User, Parts: []message.ContentPart{message.TextContent{Text: "refactor auth"}}},
 	}

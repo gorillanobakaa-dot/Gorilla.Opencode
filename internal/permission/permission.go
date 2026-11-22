@@ -1165,7 +1165,7 @@ func normalisePermissionPath(p string) string {
 	if p == "" || p == "." {
 		return config.WorkingDirectory()
 	}
-	return filepath.Clean(p)
+	return p
 }
 
 // PermissionWaitForTest shortens the wait so the timeout path can be asserted

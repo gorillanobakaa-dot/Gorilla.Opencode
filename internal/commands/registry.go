@@ -593,7 +593,7 @@ var All = []Command{
 	{
 		Name:    "plan",
 		Group:   GroupSession,
-		Summary: "Structured planning mode: write and approve a plan before acting.",
+		Summary: "Plan mode: write and approve a step-by-step plan first.",
 		Detail: "Switches to read-only plan mode and tells the AI to inspect the " +
 			"codebase and output a concrete, numbered execution plan (goal, files, " +
 			"steps, verification, risks) before changing anything.\n\n" +

@@ -2067,48 +2067,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, util.CmdHandler(startCompactSessionMsg{})
 		case "plan":
-			// GORILLA OVERRIDE (2026-11-21): structured planning mode.
-			// Switches into read-only plan mode (where the model is instructed
-			// on the wire to produce a concrete numbered plan before taking
-			// actions), remembers the prior standing mode for /plan off, and
-			// supports `/plan <task>` to plan a job and `/plan go` (or approve/
-			// execute) to exit plan mode and execute the approved plan strictly.
-			arg := strings.TrimSpace(msg.Args)
-			lower := strings.ToLower(arg)
-			busy := a.selectedSession.ID != "" && a.app.CoderAgent.IsSessionBusy(a.selectedSession.ID)
-			switch lower {
-			case "off", "stop", "exit", "cancel":
-				restore := a.planReturnMode
-				if restore == "" || restore == config.PermissionPlan {
-					restore = config.PermissionAsk
-				}
-				a.planReturnMode = ""
-				return a, a.setPermissionMode(restore)
-			case "go", "approve", "execute":
-				if busy {
-					return a, util.ReportWarn("Wait for the current turn to finish before executing the plan.")
-				}
-				restore := a.planReturnMode
-				if restore == "" || restore == config.PermissionPlan {
-					restore = config.PermissionAsk
-				}
-				a.planReturnMode = ""
-				modeCmd := a.setPermissionMode(restore)
-				execPrompt := "Plan approved. Execute the numbered plan above strictly step by step, in order, without deviating or adding unrequested changes."
-				return a, tea.Batch(modeCmd, util.CmdHandler(chat.SendMsg{Text: execPrompt}))
-			}
-			if cur := config.PermissionMode(); cur != config.PermissionPlan {
-				a.planReturnMode = cur
-			}
-			modeCmd := a.setPermissionMode(config.PermissionPlan)
-			if arg == "" {
-				note := "PLAN MODE ON (read-only) — the AI will write a numbered execution plan and cannot edit files or run commands until you approve. Type /plan <task> to plan a job, /plan go to execute, or /plan off to exit."
-				if busy {
-					note += " The running turn carries on."
-				}
-				return a, tea.Batch(modeCmd, util.ReportInfo(note))
-			}
-			return a, tea.Batch(modeCmd, util.CmdHandler(chat.SendMsg{Text: arg}))
+			return a.handlePlanCommand(msg.Args)
 		case "init":
 			a.showInitDialog = true
 			a.offerGate.armed = false // asked for: its keys are answers
@@ -2917,6 +2876,48 @@ func (a appModel) setPermissionMode(mode string) tea.Cmd {
 		return util.ReportInfo(text + ". Persisted: every conversation runs this way until you change it.")
 	}
 	return util.ReportInfo(text)
+}
+
+// handlePlanCommand implements /plan, /plan <task>, /plan go, and /plan off.
+// Kept out of the slash-command switch in Update so its subcommand cases are
+// not misread as top-level slash commands by internal/commands/registry_test.go.
+func (a appModel) handlePlanCommand(rawArgs string) (tea.Model, tea.Cmd) {
+	arg := strings.TrimSpace(rawArgs)
+	lower := strings.ToLower(arg)
+	busy := a.selectedSession.ID != "" && a.app.CoderAgent.IsSessionBusy(a.selectedSession.ID)
+	switch lower {
+	case "off", "stop", "exit", "cancel":
+		prev := a.planReturnMode
+		if prev == "" || prev == config.PermissionPlan {
+			prev = config.PermissionAsk
+		}
+		a.planReturnMode = ""
+		return a, a.setPermissionMode(prev)
+	case "go", "approve", "execute":
+		if busy {
+			return a, util.ReportWarn("Wait for the current turn to finish before executing the plan.")
+		}
+		prev := a.planReturnMode
+		if prev == "" || prev == config.PermissionPlan {
+			prev = config.PermissionAsk
+		}
+		a.planReturnMode = ""
+		modeCmd := a.setPermissionMode(prev)
+		execPrompt := "Plan approved. Execute the numbered plan above strictly step by step, in order, without deviating or adding unrequested changes."
+		return a, tea.Batch(modeCmd, util.CmdHandler(chat.SendMsg{Text: execPrompt}))
+	}
+	if cur := config.PermissionMode(); cur != config.PermissionPlan {
+		a.planReturnMode = cur
+	}
+	modeCmd := a.setPermissionMode(config.PermissionPlan)
+	if arg == "" {
+		note := "PLAN MODE ON (read-only) — the AI will write a numbered execution plan and cannot edit files or run commands until you approve. Type /plan <task> to plan a job, /plan go to execute, or /plan off to exit."
+		if busy {
+			note += " The running turn carries on."
+		}
+		return a, tea.Batch(modeCmd, util.ReportInfo(note))
+	}
+	return a, tea.Batch(modeCmd, util.CmdHandler(chat.SendMsg{Text: arg}))
 }
 
 func (a *appModel) RegisterCommand(cmd dialog.Command) {

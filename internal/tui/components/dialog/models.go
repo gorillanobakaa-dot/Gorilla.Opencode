@@ -1781,7 +1781,7 @@ func renderSectionDivider(label string, width int, fg lipgloss.AdaptiveColor) st
 	if right < 2 {
 		right = 2
 	}
-	line := "  " + strings.Repeat("─", left) + title + strings.Repeat("─", right)
+	line := "  " + strings.Repeat("-", left) + title + strings.Repeat("-", right)
 	return base.Render(pickerLine(line, width))
 }
 

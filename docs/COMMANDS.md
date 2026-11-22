@@ -25,7 +25,7 @@ cost before they start. Everything else is local.
 | `/message NAME text` | Send a short message to another session. |
 | `/export` | Save this conversation to a file. |
 | `/compact` · `/summarize` `/summarise` | Squeeze the conversation down so it keeps working. |
-| `/plan` | Structured planning mode: write and approve a plan before acting. |
+| `/plan` | Plan mode: write and approve a step-by-step plan first. |
 | `/mode` · `/permissions` | How much the AI may do before asking. Shift+Tab cycles. |
 | `/cd [folder]` | Switch to working in one folder. |
 | `/add-dir` · `/adddir` `/dirs` `/roots` | Work in more than one folder at once. |
@@ -155,7 +155,7 @@ Works mid-session: if the agent is mid-turn, /compact queues itself and runs as 
 
 ### `/plan`
 
-**Structured planning mode: write and approve a plan before acting.**
+**Plan mode: write and approve a step-by-step plan first.**
 
 Switches to read-only plan mode and tells the AI to inspect the codebase and output a concrete, numbered execution plan (goal, files, steps, verification, risks) before changing anything.
 
