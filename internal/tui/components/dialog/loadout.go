@@ -114,7 +114,7 @@ func (m *loadoutDialogCmp) width() int {
 }
 
 type loadoutKeyMap struct {
-	Up, Down, Left, Right, Toggle, Reset, LowBW, RateDown, RateUp, LeashDown, LeashUp, Escape key.Binding
+	Up, Down, Left, Right, Toggle, Confirm, Reset, LowBW, RateDown, RateUp, LeashDown, LeashUp, Escape key.Binding
 	// AllLSP is the bulk language-server switch. GORILLA OVERRIDE.
 	AllLSP key.Binding
 	// UndoLowBW puts back exactly what the low-bandwidth preset switched
@@ -129,10 +129,11 @@ var loadoutKeys = loadoutKeyMap{
 	// GORILLA OVERRIDE: <-/-> adjust the selected dial (speed / helpers). Arrow
 	// keys work on every keyboard layout — unlike -/+/[/], which are awkward
 	// or hidden on non-US keyboards (this was a real pain on a JP keyboard).
-	Left:   key.NewBinding(key.WithKeys("left"), key.WithHelp("<-", "less")),
-	Right:  key.NewBinding(key.WithKeys("right"), key.WithHelp("->", "more")),
-	Toggle: key.NewBinding(key.WithKeys(" ", "enter"), key.WithHelp("space", "toggle/change")),
-	Reset:  key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reset defaults")),
+	Left:    key.NewBinding(key.WithKeys("left"), key.WithHelp("<-", "less")),
+	Right:   key.NewBinding(key.WithKeys("right"), key.WithHelp("->", "more")),
+	Toggle:  key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "toggle/select")),
+	Confirm: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "confirm & close")),
+	Reset:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reset defaults")),
 	// GORILLA OVERRIDE: one-key low-bandwidth profile (optional tools off).
 	LowBW: key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "low-bandwidth preset")),
 	// GORILLA OVERRIDE: bulk switch for the language servers. Nine configured
@@ -250,10 +251,36 @@ func (m *loadoutDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.adjustSelected(-1)
 		case key.Matches(msg, loadoutKeys.Right):
 			return m, m.adjustSelected(+1)
+		case key.Matches(msg, loadoutKeys.Confirm):
+			// GORILLA FIX (2026-11-22): Enter confirms and closes /context,
+			// cementing every active dial (including Nuclear Option) and toggle
+			// in place. Previously Enter shared Toggle with Space and bumped a
+			// dial right (+1), silently undoing Nuclear Option when a user
+			// pressed Enter to save and exit.
+			summary := "Context loadout saved: " + subAgentLabel()
+			if config.MaxSubAgents() == config.SubAgentsNuclear {
+				summary = "Saved: NUCLEAR OPTION ACTIVE — main agent works solo"
+			} else if m.lastAppliedNote != "" {
+				summary = m.lastAppliedNote
+			}
+			return m, tea.Batch(
+				util.CmdHandler(LoadoutChangedMsg{}),
+				util.ReportInfo(summary),
+				util.CmdHandler(CloseLoadoutDialogMsg{}),
+			)
 		case key.Matches(msg, loadoutKeys.Toggle):
-			// On a dial, "change" nudges it up; on a tool row, it toggles.
-			if m.selectedIdx < numDials {
-				return m, m.adjustSelected(+1)
+			// Space selects/locks a dial in place (without bumping it away from
+			// Nuclear Option) and flips ON/OFF on feature and display rows.
+			if m.selectedIdx == rowPace {
+				m.recordApplied(rowPace, "SAVED: AI server pace = "+rateLimitLabel())
+				return m, util.ReportInfo("Selected: AI SERVER requests = " + rateLimitLabel())
+			}
+			if m.selectedIdx == rowLeash {
+				m.recordApplied(rowLeash, "SAVED: "+subAgentLabel())
+				return m, tea.Batch(
+					util.CmdHandler(LoadoutChangedMsg{}),
+					util.ReportInfo("Selected: "+subAgentLabel()),
+				)
 			}
 			if e, ok := extraAtRow(m.selectedIdx); ok {
 				now := !config.ExtraEnabled(e.ID)
@@ -687,7 +714,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 		Render(fitLine("  \"free\" = already generated and paid for; hiding it saves nothing. \"COSTS EXTRA\" = the model writes more."))
 
 	help := base.Foreground(t.TextMuted()).Width(w).
-		Render(fitLine("up/down pick | left/right dial | space flips ON/OFF | L all LSPs | l low-bw | r reset | esc close   ⚠ = disabling cripples the agent"))
+		Render(fitLine("up/down pick | left/right dial | space toggle/select | enter confirm & close | L all LSPs | l low-bw | r reset | esc close   ⚠ = disabling cripples the agent"))
 
 	// Window the feature rows rather than rendering all of them. featureRows is
 	// decided by measurement in View(), not by a guess at how much chrome the rest
@@ -746,7 +773,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	// Nuclear Option is active, outside `if !compact`, matching LOW-BANDWIDTH.
 	if config.MaxSubAgents() == config.SubAgentsNuclear {
 		parts = append(parts, base.Foreground(t.Error()).Bold(true).Width(w).
-			Render(fitLine("NUCLEAR OPTION ACTIVE: ALL sub-agents disabled (solo mode). Press -> on Agents to re-enable.")))
+			Render(fitLine("NUCLEAR OPTION ACTIVE: ALL sub-agents disabled (solo mode). Press Enter to confirm & close, or -> on Agents to re-enable.")))
 	}
 	// GORILLA OVERRIDE (2026-11-21): explicit inline confirmation when a
 	// dial (agent count / nuclear / rate limit) has been committed via <-/->.
