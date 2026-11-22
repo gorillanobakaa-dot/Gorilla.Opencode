@@ -28,13 +28,22 @@ func standInDeny() string {
 		`i=$(cat); case "$i" in *"git push"*|*"rm -rf"*|*.env*) echo '`+denyJSON+`';; esac`)
 }
 
+// hardlinesAgent: config.Load keeps the first test's working directory, which
+// the harness has already removed; the hook must start in a directory that exists.
+func hardlinesAgent(t *testing.T, name config.AgentName) (*agent, *memMessages) {
+	t.Helper()
+	a, m := newLoopAgent(t, name, &scriptedProvider{})
+	config.Get().WorkingDir = t.TempDir()
+	return a, m
+}
+
 func bashInput(cmd string) string {
 	b, _ := json.Marshal(map[string]string{"command": cmd})
 	return string(b)
 }
 
 func TestHardlinesGateStandIn(t *testing.T) {
-	a, _ := newLoopAgent(t, config.AgentCoder, &scriptedProvider{})
+	a, _ := hardlinesAgent(t, config.AgentCoder)
 	t.Setenv("GORILLA_HARDLINES_CMD", standInDeny())
 	ctx := context.Background()
 
@@ -56,7 +65,7 @@ func TestHardlinesGateStandIn(t *testing.T) {
 }
 
 func TestHardlinesGateFailsClosed(t *testing.T) {
-	a, _ := newLoopAgent(t, config.AgentCoder, &scriptedProvider{})
+	a, _ := hardlinesAgent(t, config.AgentCoder)
 	t.Setenv("GORILLA_HARDLINES_CMD", pick(`exit 3`, `exit 3`))
 	got := a.runBeforeToolHooks(context.Background(), "s", "bash", bashInput("git status"))
 	if !strings.HasPrefix(got, HookRefusedPrefix) || !strings.Contains(got, "could not decide") {
@@ -65,7 +74,7 @@ func TestHardlinesGateFailsClosed(t *testing.T) {
 }
 
 func TestHardlinesGateSkipsTitleAgent(t *testing.T) {
-	a, _ := newLoopAgent(t, config.AgentTitle, &scriptedProvider{})
+	a, _ := hardlinesAgent(t, config.AgentTitle)
 	t.Setenv("GORILLA_HARDLINES_CMD", standInDeny())
 	if got := a.runBeforeToolHooks(context.Background(), "s", "bash", bashInput("git push")); got != "" {
 		t.Fatalf("the title agent runs no hooks, got %q", got)
@@ -102,7 +111,7 @@ func TestHardlinesReplayThroughRealFieldkit(t *testing.T) {
 		}
 	}
 	t.Setenv("GORILLA_HARDLINES_CMD", "") // use the real hook
-	a, _ := newLoopAgent(t, config.AgentCoder, &scriptedProvider{})
+	a, _ := hardlinesAgent(t, config.AgentCoder)
 	for _, c := range qwenReplay {
 		got := a.runBeforeToolHooks(context.Background(), "s", c.tool, c.input)
 		if !strings.HasPrefix(got, HookRefusedPrefix) {
