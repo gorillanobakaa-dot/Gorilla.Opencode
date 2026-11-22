@@ -91,17 +91,18 @@ Yes — especially if you use `/context` to set a sub-agent cap or turn on
 
 #### 4. Gorilla Nuclear Option active (zero sub-agents, solo mode)
 
-[![Context loadout dialog with Gorilla Nuclear Option enabled, displaying the red NUCLEAR OPTION ACTIVE warning banner, green [APPLIED] SAVED Nuclear confirmation, inline [SET] tag, and red SOLO (NUCLEAR) badge in the status bar](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.168/docs/screenshots/gallery/v0168-context-nuclear-option.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.168/docs/screenshots/gallery/v0168-context-nuclear-option.png)
+[![Context loadout dialog with Gorilla Nuclear Option enabled, displaying the red NUCLEAR OPTION ACTIVE warning banner with Enter to confirm and close, green [APPLIED] SAVED Nuclear confirmation, inline [SET] tag, and enter confirm and close footer](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/gallery/v0168-context-nuclear-option.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/gallery/v0168-context-nuclear-option.png)
 
 - **What you are seeing:** **Gorilla Nuclear Option** turned on (dial all the
   way left with `←`, then press **`Enter`** to confirm and close). You get
   three unmistakable signals that no background sub-agents can spawn:
-  1. The bright red **`NUCLEAR OPTION ACTIVE: ALL sub-agents disabled (solo mode)`**
+  1. The bright red **`NUCLEAR OPTION ACTIVE: ALL sub-agents disabled (solo mode). Press Enter to confirm & close, or -> on Agents to re-enable.`**
      banner at the top.
   2. The green **`[APPLIED] SAVED: GORILLA NUCLEAR`** confirmation and inline
      **`[SET]`** tag on the highlighted row.
-  3. The persistent red **`SOLO (NUCLEAR)`** badge on the bottom status bar so
-     you always know solo mode is locked on even after closing `/context`.
+  3. The updated bottom key bar showing **`enter confirm & close`** alongside
+     `space toggle/select` and `left/right dial`, so hitting `Enter` locks
+     Nuclear Option in place and closes `/context`.
 
 ### What was checked
 
