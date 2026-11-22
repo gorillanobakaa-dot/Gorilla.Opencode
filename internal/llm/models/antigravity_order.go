@@ -76,6 +76,9 @@ type agKey struct {
 func antigravityKey(label string) agKey {
 	s := strings.ToLower(trimAntigravitySuffix(label))
 	k := agKey{family: agFamilyOther, effort: 1}
+	if v := agVersionRe.FindString(s); v != "" {
+		k.version, _ = strconv.ParseFloat(v, 64)
+	}
 	switch {
 	case strings.Contains(s, "lite"):
 		k.family = agFamilyLite
@@ -85,7 +88,10 @@ func antigravityKey(label string) agKey {
 		k.family = agFamilySonnet
 	case strings.Contains(s, "orchestrator"):
 		k.family = agFamilyOrchestrator
-	case strings.Contains(s, "hydrogen"), strings.Contains(s, "argon"), strings.Contains(s, "carbon"):
+	// GORILLA FIX (2026-11-21): Gemini 4 Neon (and any Gemini 4.x+) must rank
+	// in agFamilyGemini4, not fall through to agFamilyOther beside legacy rows.
+	case strings.Contains(s, "neon"), strings.Contains(s, "hydrogen"), strings.Contains(s, "argon"), strings.Contains(s, "carbon"),
+		strings.Contains(s, "gemini") && k.version >= 4.0:
 		k.family = agFamilyGemini4
 	case strings.Contains(s, "claude"):
 		k.family = agFamilyOtherClaude
@@ -94,13 +100,14 @@ func antigravityKey(label string) agKey {
 	case strings.Contains(s, "gemini") && strings.Contains(s, "flash"):
 		k.family = agFamilyGeminiFlash
 	}
-	if v := agVersionRe.FindString(s); v != "" {
-		k.version, _ = strconv.ParseFloat(v, 64)
-	}
 	// Effort is the backend's own bracket. No bracket and "medium" are the same
 	// middle setting; "tiered" lets the backend choose, so it sits below a
 	// stated medium and above a stated low.
 	switch {
+	case strings.Contains(s, "(max)"):
+		k.effort = -2
+	case strings.Contains(s, "(xhigh)"):
+		k.effort = -1
 	case strings.Contains(s, "(high)"), strings.Contains(s, "thinking"):
 		k.effort = 0
 	case strings.Contains(s, "(tiered)"):

@@ -25,6 +25,7 @@ cost before they start. Everything else is local.
 | `/message NAME text` | Send a short message to another session. |
 | `/export` | Save this conversation to a file. |
 | `/compact` · `/summarize` `/summarise` | Squeeze the conversation down so it keeps working. |
+| `/plan` | Plan mode: write and approve a step-by-step plan first. |
 | `/mode` · `/permissions` | How much the AI may do before asking. Shift+Tab cycles. |
 | `/cd [folder]` | Switch to working in one folder. |
 | `/add-dir` · `/adddir` `/dirs` `/roots` | Work in more than one folder at once. |
@@ -63,6 +64,8 @@ cost before they start. Everything else is local.
 **Start a fresh conversation.**
 
 The AI forgets everything said so far. Use this when you move to a different task — a long conversation costs more on every message, because the whole history is sent each time.
+
+It works while the agent is running: the running turn is stopped, anything you queued for it is dropped, and the screen is cleared. The old conversation stays in your history.
 
 ### `/plain`
 
@@ -148,7 +151,18 @@ This one saves the conversation you are in, and lets you name the file. To save 
 
 Every message you send carries the whole conversation with it, and each model has a limit on how much it can hold. Approach that limit and answers get worse, then stop. This writes a summary of everything so far and continues from that instead, so the thread survives while the bulk goes.
 
-Use it when a long session starts to drift, or before starting a big job in an old conversation. It costs one model call to write the summary. Models with small windows need this often — the status bar shows how full you are. It also runs by itself at 95% full if you leave that setting on in /settings.
+Works mid-session: if the agent is mid-turn, /compact queues itself and runs as soon as the turn finishes. If the dedicated summarizer fails or is unset, it falls back to your active model automatically. Models with small windows need this often — the status bar shows how full you are. It also runs by itself at 85% of the usable window if you leave that setting on in /settings.
+
+### `/plan`
+
+**Plan mode: write and approve a step-by-step plan first.**
+
+Switches to read-only plan mode and tells the AI to inspect the codebase and output a concrete, numbered execution plan (goal, files, steps, verification, risks) before changing anything.
+
+/plan          turn plan mode on (works mid-turn too)
+  /plan <task>   turn plan mode on and generate a plan for <task>
+  /plan go       approve the plan, restore your previous mode, and execute strictly
+  /plan off      exit plan mode and restore your previous permission mode
 
 ### `/mode`
 
@@ -401,7 +415,9 @@ Normally the program stops and asks before it edits a file, runs a command, or r
 
 What you are handing over: file edits, shell commands and web access, unattended. Use it when you have told the agent to get on with a job and you do not want to babysit it. Do not use it in a folder you cannot afford to have changed.
 
-It lasts only as long as this conversation and is never written to disk, so it cannot silently follow you into tomorrow. Type /yolo again to turn it off. /tasks still stops helpers at any time.
+It lasts only as long as this conversation and is never written to disk, so it cannot silently follow you into tomorrow.
+
+It works while the agent is running. Forgot to turn it on? Type /yolo now: the turn is not cancelled, and any question already waiting is approved. Typing /yolo again changes nothing; /yolo off turns it off, and the next tool call asks again. Things that can never be undone, and paths outside your project, are still asked. /tasks still stops helpers at any time.
 
 ### `/tasks`
 

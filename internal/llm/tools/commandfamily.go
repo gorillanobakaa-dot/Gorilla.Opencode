@@ -124,6 +124,48 @@ func isBareWord(w string) bool {
 	return true
 }
 
+// isModuleName reports whether a word looks like a dotted Python module name
+// (`fieldkit`, `fieldkit.core.doctor`), never a path or shell expression.
+func isModuleName(w string) bool {
+	if w == "" || strings.HasPrefix(w, "-") || strings.HasPrefix(w, ".") || strings.HasSuffix(w, ".") || strings.Contains(w, "..") {
+		return false
+	}
+	for _, r := range w {
+		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' || r == '.') {
+			return false
+		}
+	}
+	return true
+}
+
+// pythonPreModuleFlags are standalone boolean Python interpreter flags that
+// take no argument and commonly precede `-m <module>` (e.g. `python -I -m
+// fieldkit ...`). They are ONLY skipped when `-m <module>` follows them, so
+// `python -I script.py` or `python -c ...` never produces an unasked family.
+var pythonPreModuleFlags = map[string]bool{
+	"-I": true, "-u": true, "-B": true, "-s": true, "-S": true,
+	"-E": true, "-O": true, "-OO": true, "-q": true, "-P": true,
+}
+
+// modulePrefixEnd checks whether words[1:] is zero or more standalone Python
+// interpreter flags followed by `-m <module>`, returning the word count
+// covering `<prog> [flags...] -m <module>` (or 0 if it is not a `-m` invocation).
+func modulePrefixEnd(cmd string, words [][2]int) int {
+	for i := 1; i < len(words); i++ {
+		w := familyWordText(cmd, words[i])
+		if w == "-m" {
+			if i+1 < len(words) && isModuleName(familyWordText(cmd, words[i+1])) {
+				return i + 2
+			}
+			return 0
+		}
+		if !pythonPreModuleFlags[w] {
+			return 0
+		}
+	}
+	return 0
+}
+
 // BashFamilyCovers is the FamilyMatcher registered for the bash tool: does cmd
 // fall inside family? See the file comment for the rule. The shell in use
 // decides the quoting rules, because the two shells disagree about what a
@@ -358,23 +400,26 @@ func SuggestCommandFamily(cmd string, earlier []string) string {
 	}
 	n := best
 	if n < familyMinWords {
-		// Fallback: the program and its bare subcommand words. A flag stops
-		// the walk — `python -c <code>` must NOT fall back to `python -c`,
-		// which would be "any code at all"; the only flag followed is `-m
-		// <module>`, which names a program. When the walk yields a single
-		// word there is no family worth proposing unasked.
-		n = 1
-		for i := 1; i < len(words) && n < familyDefaultMaxWords; i++ {
-			w := familyWordText(cmd, words[i])
-			if w == "-m" && i+1 < len(words) && isBareWord(familyWordText(cmd, words[i+1])) {
-				n = i + 2
-				i++
-				continue
+		// GORILLA FIX (2026-11-21): recognise `<python> [-I|-u|-B|...] -m
+		// <module>` (including dotted modules such as `fieldkit.core.doctor`)
+		// before the bare-word walk. Previously `-I` broke the walk at word 1
+		// and dots failed isBareWord, so `python -I -m fieldkit ...` got no
+		// SessionClass and prompted again on every single invocation.
+		if end := modulePrefixEnd(cmd, words); end >= familyMinWords {
+			n = end
+		} else {
+			// Fallback: the program and its bare subcommand words. A flag stops
+			// the walk — `python -c <code>` must NOT fall back to `python -c`,
+			// which would be "any code at all". When the walk yields a single
+			// word there is no family worth proposing unasked.
+			n = 1
+			for i := 1; i < len(words) && n < familyDefaultMaxWords; i++ {
+				w := familyWordText(cmd, words[i])
+				if !isBareWord(w) {
+					break
+				}
+				n = i + 1
 			}
-			if !isBareWord(w) {
-				break
-			}
-			n = i + 1
 		}
 	}
 	if n >= len(words) {

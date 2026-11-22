@@ -152,9 +152,10 @@ func FormatEffortLabel(effort string) string {
 
 // DisplayNameWithEffort formats a model's display name with its active
 // reasoning effort when the provider stores effort separately from the model
-// ID (ChatGPT). Antigravity variants already carry their effort in Name.
+// ID (ChatGPT, free-tier Gemini Code Assist, etc.). Antigravity variants
+// already carry their effort in Name.
 func DisplayNameWithEffort(m Model, savedEffort string) string {
-	if m.Name == "" || m.Provider != ProviderChatGPT {
+	if m.Name == "" || (m.Provider != ProviderChatGPT && len(m.ReasoningEfforts) == 0) {
 		return m.Name
 	}
 	effort := m.ResolveReasoningEffort(savedEffort)

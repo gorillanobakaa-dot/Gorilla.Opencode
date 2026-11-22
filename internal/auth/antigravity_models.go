@@ -86,17 +86,29 @@ func (c *AntigravityCreds) FetchAvailableModels(ctx context.Context) (map[string
 		return nil, err
 	}
 	var resp fetchAvailableModelsResp
-	// The body the real Antigravity app sends (captured 2026-11-13 with mitmdump
-	// in front of app 2.31.2): {"project":"aicode-consumers"}. An empty body
-	// returns a shorter list WITHOUT the Gemini 4 family; the app's own project
-	// is not the account's project. Nothing is invented here: only ids the
-	// backend lists are ever shown.
-	if err := c.callAntigravity(ctx, token, "fetchAvailableModels", map[string]any{"project": AntigravityListProject}, &resp); err != nil {
-		return nil, fmt.Errorf("fetchAvailableModels: %w", err)
+	// GORILLA FIX (2026-11-21): try the standard app project first, and if a
+	// free/consumer account rejects it or returns an empty list, retry with the
+	// account's own ProjectID (and finally an empty body) instead of silently
+	// leaving the user stranded on the outdated 5-model built-in fallback list.
+	bodies := []map[string]any{{"project": AntigravityListProject}}
+	if c.ProjectID != "" && c.ProjectID != AntigravityListProject {
+		bodies = append(bodies, map[string]any{"project": c.ProjectID})
 	}
-	if len(resp.Models) == 0 {
-		return nil, fmt.Errorf("backend returned no models")
-	}
+	bodies = append(bodies, map[string]any{})
 
-	return resp.Models, nil
+	var lastErr error
+	for _, body := range bodies {
+		resp = fetchAvailableModelsResp{}
+		if err := c.callAntigravity(ctx, token, "fetchAvailableModels", body, &resp); err != nil {
+			lastErr = err
+			continue
+		}
+		if len(resp.Models) > 0 {
+			return resp.Models, nil
+		}
+	}
+	if lastErr != nil {
+		return nil, fmt.Errorf("fetchAvailableModels: %w", lastErr)
+	}
+	return nil, fmt.Errorf("backend returned no models")
 }

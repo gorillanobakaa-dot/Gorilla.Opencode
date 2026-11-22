@@ -378,6 +378,12 @@ Desktop launches read keys from ~/.config/%s/env`, appBinName)
 		tui.ReopenProviderPortal = reopenProviderPortal
 		tui.ReopenConnectionPicker = func() error { runConnectionPicker(); return nil }
 		tui.ConnectionSwitchSummary = TakeSwitchSummary
+		// GORILLA OVERRIDE (2026-11-21): enforce a crisp monospace console font
+		// (Cascadia Mono 18 on Windows conhost, or OSC 50 TrueType font on
+		// xterm/rxvt) BEFORE Bubble Tea reads the initial terminal grid size.
+		if applied := tui.EnsureConsoleFont(); applied != "" {
+			logging.Info("console font override applied", "font", applied)
+		}
 		zone.NewGlobal()
 		program := tea.NewProgram(
 			tui.New(app),

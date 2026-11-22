@@ -488,7 +488,12 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 			logging.WarnPersist(note, logging.PersistTimeArg, 45*time.Second)
 		}
 	}
-	if len(msgs) == 0 {
+	// GORILLA FIX (2026-11-21): skip the hidden background title generation
+	// call when Gorilla Nuclear Option (MaxSubAgents == 0) is active. Nuclear
+	// mode promises "main agent works solo, fewest calls"; previously it still
+	// fired a hidden AgentTitle request (often dragged onto Claude Opus 5.5
+	// High by FollowCoderModel), burning a full extra flagship turn immediately.
+	if len(msgs) == 0 && config.MaxSubAgents() != config.SubAgentsNuclear {
 		go func() {
 			defer logging.RecoverPanic("agent.Run", func() {
 				logging.ErrorPersist("panic while generating title")
@@ -538,17 +543,7 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
 		return a.err(fmt.Errorf("failed to get session: %w", err))
 	}
 	if session.SummaryMessageID != "" {
-		summaryMsgInex := -1
-		for i, msg := range msgs {
-			if msg.ID == session.SummaryMessageID {
-				summaryMsgInex = i
-				break
-			}
-		}
-		if summaryMsgInex != -1 {
-			msgs = msgs[summaryMsgInex:]
-			msgs[0].Role = message.User
-		}
+		msgs = sliceFromSummary(msgs, session.SummaryMessageID)
 	}
 
 	// GORILLA (2026-10-10): messages from other sessions open the user's turn,
@@ -712,10 +707,64 @@ func (a *agent) createUserMessage(ctx context.Context, sessionID, content string
 	})
 }
 
+// sliceFromSummary keeps only messages from summaryID onward, relabelling the
+// summary itself as a User turn so every provider accepts it as the start of
+// the conversation. Shared by processGeneration and Summarize so a second
+// /compact does not re-send ancient already-compacted history.
+func sliceFromSummary(msgs []message.Message, summaryID string) []message.Message {
+	if summaryID == "" {
+		return msgs
+	}
+	for i, msg := range msgs {
+		if msg.ID == summaryID {
+			out := make([]message.Message, len(msgs)-i)
+			copy(out, msgs[i:])
+			out[0].Role = message.User
+			return out
+		}
+	}
+	return msgs
+}
+
+// planModeDirective is attached on the wire (never persisted to history) when
+// standing permission mode is "plan", so the model writes a concrete numbered
+// plan instead of wasting tokens trying mutating tools and getting refused.
+const planModeDirective = "[STRUCTURED PLAN MODE — READ-ONLY]\n" +
+	"Mutating tools (edit, write, patch, non-read-only bash) are disabled in this mode.\n" +
+	"1. Inspect only what you need using read-only tools.\n" +
+	"2. Produce a concrete numbered execution plan covering: Goal, Files to change (exact paths), Numbered steps, Verification, and Risks.\n" +
+	"3. Do NOT attempt edits or commands. Stop after presenting the plan and wait for the owner to approve (/plan go or /plan off). Once approved, follow the numbered plan strictly without deviating."
+
+// withPlanDirective returns a wire copy of msgHistory with planModeDirective
+// appended to the final User message when structured plan mode is active.
+func withPlanDirective(agentName config.AgentName, msgHistory []message.Message) []message.Message {
+	if agentName != config.AgentCoder || config.PermissionMode() != config.PermissionPlan || len(msgHistory) == 0 {
+		return msgHistory
+	}
+	lastUser := -1
+	for i := len(msgHistory) - 1; i >= 0; i-- {
+		if msgHistory[i].Role == message.User {
+			lastUser = i
+			break
+		}
+	}
+	if lastUser < 0 {
+		return msgHistory
+	}
+	out := make([]message.Message, len(msgHistory))
+	copy(out, msgHistory)
+	parts := make([]message.ContentPart, len(out[lastUser].Parts)+1)
+	copy(parts, out[lastUser].Parts)
+	parts[len(parts)-1] = message.TextContent{Text: planModeDirective}
+	out[lastUser].Parts = parts
+	return out
+}
+
 func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msgHistory []message.Message) (message.Message, *message.Message, error) {
 	ctx = context.WithValue(ctx, tools.SessionIDContextKey, sessionID)
 	clock := newStreamClock()
-	eventChan := a.prov().StreamResponse(ctx, msgHistory, a.visibleTools(sessionID))
+	wireHistory := withPlanDirective(a.agentName, msgHistory)
+	eventChan := a.prov().StreamResponse(ctx, wireHistory, a.visibleTools(sessionID))
 
 	assistantMsg, err := a.messages.Create(ctx, sessionID, message.CreateMessageParams{
 		Role:  message.Assistant,
@@ -1343,7 +1392,15 @@ func (a *agent) Update(agentName config.AgentName, modelID models.ModelID, effor
 }
 
 func (a *agent) Summarize(ctx context.Context, sessionID string) error {
-	if a.summarizeProvider == nil {
+	// GORILLA FIX (2026-11-21): fall back to the active coder provider if no
+	// separate summarizer was configured, and if the configured summarizer
+	// fails mid-call (e.g. stale provider after /models switch), retry once on
+	// the active coder provider.
+	sumProv := a.summarizeProvider
+	if sumProv == nil {
+		sumProv = a.prov()
+	}
+	if sumProv == nil {
 		return fmt.Errorf("summarize provider not available")
 	}
 
@@ -1367,7 +1424,18 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 		}
 
 		a.Publish(pubsub.CreatedEvent, event)
-		// Get all messages from the session
+		oldSession, err := a.sessions.Get(summarizeCtx, sessionID)
+		if err != nil {
+			event = AgentEvent{
+				Type:  AgentEventTypeError,
+				Error: fmt.Errorf("failed to get session: %w", err),
+				Done:  true,
+			}
+			a.Publish(pubsub.CreatedEvent, event)
+			return
+		}
+		// Get all messages from the session and slice from the last summary so
+		// repeated /compact calls do not re-send already-compacted history.
 		msgs, err := a.messages.List(summarizeCtx, sessionID)
 		msgs = answerOrphanedToolCalls(msgs)
 		if err != nil {
@@ -1379,6 +1447,7 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 			a.Publish(pubsub.CreatedEvent, event)
 			return
 		}
+		msgs = sliceFromSummary(msgs, oldSession.SummaryMessageID)
 		summarizeCtx = context.WithValue(summarizeCtx, tools.SessionIDContextKey, sessionID)
 
 		if len(msgs) == 0 {
@@ -1416,12 +1485,24 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 
 		a.Publish(pubsub.CreatedEvent, event)
 
-		// Send the messages to the summarize provider
-		response, err := a.summarizeProvider.SendMessages(
+		usedProv := sumProv
+		response, err := usedProv.SendMessages(
 			summarizeCtx,
 			msgsWithPrompt,
 			make([]tools.BaseTool, 0),
 		)
+		if err != nil {
+			if fallback := a.prov(); fallback != nil && fallback != usedProv {
+				logging.Warn("summarize provider failed; retrying with active coder model",
+					"summarize_model", usedProv.Model().ID, "fallback_model", fallback.Model().ID, "error", err)
+				usedProv = fallback
+				response, err = usedProv.SendMessages(
+					summarizeCtx,
+					msgsWithPrompt,
+					make([]tools.BaseTool, 0),
+				)
+			}
+		}
 		if err != nil {
 			event = AgentEvent{
 				Type:  AgentEventTypeError,
@@ -1444,22 +1525,11 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 		}
 		event = AgentEvent{
 			Type:     AgentEventTypeSummarize,
-			Progress: "Creating new session...",
+			Progress: "Saving summary...",
 		}
 
 		a.Publish(pubsub.CreatedEvent, event)
-		oldSession, err := a.sessions.Get(summarizeCtx, sessionID)
-		if err != nil {
-			event = AgentEvent{
-				Type:  AgentEventTypeError,
-				Error: fmt.Errorf("failed to get session: %w", err),
-				Done:  true,
-			}
-
-			a.Publish(pubsub.CreatedEvent, event)
-			return
-		}
-		// Create a message in the new session with the summary
+		// Create a message in the session with the summary
 		msg, err := a.messages.Create(summarizeCtx, oldSession.ID, message.CreateMessageParams{
 			Role: message.Assistant,
 			Parts: []message.ContentPart{
@@ -1469,7 +1539,7 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 					Time:   time.Now().Unix(),
 				},
 			},
-			Model: a.summarizeProvider.Model().ID,
+			Model: usedProv.Model().ID,
 		})
 		if err != nil {
 			event = AgentEvent{
@@ -1484,7 +1554,7 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 		oldSession.SummaryMessageID = msg.ID
 		// Booked BEFORE the gauge is reset: addCall reads the previous prompt
 		// to count what the summary call sent again (all of it, usually).
-		addCall(&oldSession, callCost(a.summarizeProvider.Model(), response.Usage, time.Now()))
+		addCall(&oldSession, callCost(usedProv.Model(), response.Usage, time.Now()))
 		// The context has genuinely been emptied and refilled with a summary,
 		// so the gauge resets. The cumulative counters do not — summarising
 		// costs real tokens, and a ledger that forgets them at every
@@ -1503,6 +1573,7 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 				Done:  true,
 			}
 			a.Publish(pubsub.CreatedEvent, event)
+			return
 		}
 
 		event = AgentEvent{
@@ -1512,7 +1583,6 @@ func (a *agent) Summarize(ctx context.Context, sessionID string) error {
 			Done:      true,
 		}
 		a.Publish(pubsub.CreatedEvent, event)
-		// Send final success event with the new session ID
 	}()
 
 	return nil
@@ -1603,6 +1673,8 @@ func createAgentProviderWithConfig(agentName config.AgentName, agentConfig confi
 	}
 	if model.Provider == models.ProviderChatGPT {
 		opts = append(opts, provider.WithOpenAIOptions(provider.WithChatGPTReasoningEffort(agentConfig.ReasoningEffort)))
+	} else if model.Provider == models.ProviderGeminiCA && model.CanReason {
+		opts = append(opts, provider.WithEffort(agentConfig.ReasoningEffort))
 	} else if model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal && model.CanReason {
 		opts = append(
 			opts,

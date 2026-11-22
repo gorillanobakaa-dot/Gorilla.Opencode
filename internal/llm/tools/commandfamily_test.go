@@ -340,3 +340,42 @@ func TestAFamilyAnswerIsImmediate(t *testing.T) {
 		t.Fatal("test data drifted")
 	}
 }
+
+// GORILLA FIX (2026-11-21): `python -I -m fieldkit ...` and dotted modules
+// (e.g. `python -I -u -m fieldkit.core.doctor ...`) must produce a SessionClass
+// on the first prompt so "Allow for session" persists across subsequent calls.
+func TestPythonIsolatedModuleGetsSessionClassAndPersists(t *testing.T) {
+	cases := map[string]string{
+		`python -I -m fieldkit status`:                      "python -I -m fieldkit",
+		`python -I -u -m fieldkit.core.doctor --probe`:      "python -I -u -m fieldkit.core.doctor",
+		`python3 -B -m pytest tests/test_a.py`:              "python3 -B -m pytest",
+		`C:\Python312\python.exe -I -m fieldkit cards list`: `C:\Python312\python.exe -I -m fieldkit`,
+		`python -I script.py`:                               "", // no -m: must not default to `python -I`
+		`python -I -c "print(1)"`:                           "", // -c stays refused unasked
+	}
+	for cmd, want := range cases {
+		if got := SuggestCommandFamily(cmd, nil); got != want {
+			t.Errorf("SuggestCommandFamily(%q, nil) = %q, want %q", cmd, got, want)
+		}
+	}
+
+	svc := realPerms(t)
+	prompts := answerPrompts(t, svc, func(p permission.PermissionRequest) {
+		svc.GrantPersistant(p)
+	})
+	cmds := []string{
+		`python -I -m fieldkit status`,
+		`python -I -m fieldkit cards list`,
+		`python -I -m fieldkit doctor --lean`,
+		`python -I -m fieldkit readiness`,
+	}
+	for _, c := range cmds {
+		_, req := bashRequestOn(t, svc, c)
+		if !svc.Request(req) {
+			t.Fatalf("%q was denied", c)
+		}
+	}
+	if *prompts != 1 {
+		t.Fatalf("expected 1 prompt for four `python -I -m fieldkit` commands after Allow for session, got %d", *prompts)
+	}
+}

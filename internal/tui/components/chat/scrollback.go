@@ -58,7 +58,11 @@ func RenderForScrollback(
 		return ""
 	}
 
-	return strings.TrimRight(strings.Join(blocks, "\n"), "\n")
+	// GORILLA OVERRIDE (2026-11-21): separate conversational output and each
+	// tool execution block with a blank line instead of stacking them directly
+	// on top of each other as a wall of text. Still ends with no trailing
+	// newline so tea.Println supplies the single line break.
+	return strings.TrimRight(strings.Join(blocks, "\n\n"), "\n")
 }
 
 // ScrollbackReady reports whether a message is settled enough to print.

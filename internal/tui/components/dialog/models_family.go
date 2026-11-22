@@ -206,7 +206,10 @@ func (m *modelDialogCmp) cycleEffort(delta int) {
 		return
 	}
 	model := m.models[m.selectedIdx]
-	if model.Provider == models.ProviderChatGPT {
+	// GORILLA FIX (2026-11-21): support ReasoningEfforts on ANY provider (not
+	// only ChatGPT), so free-tier Google Code Assist accounts get the exact
+	// same interactive Thinking Effort bar as paid accounts.
+	if model.Provider == models.ProviderChatGPT || len(model.ReasoningEfforts) > 0 {
 		efforts := model.ReasoningEfforts
 		i := -1
 		if delta < 0 {
@@ -257,7 +260,7 @@ func (m *modelDialogCmp) effortStops(i int) ([]effortStop, int) {
 	if i < 0 || i >= len(m.models) {
 		return nil, -1
 	}
-	if m.models[i].Provider == models.ProviderChatGPT {
+	if m.models[i].Provider == models.ProviderChatGPT || len(m.models[i].ReasoningEfforts) > 0 {
 		model := m.models[i]
 		if len(model.ReasoningEfforts) == 0 {
 			return nil, -1
@@ -277,7 +280,11 @@ func (m *modelDialogCmp) effortStops(i int) ([]effortStop, int) {
 		return nil, -1
 	}
 	efforts := m.families[i].Efforts()
-	if len(efforts) < 2 {
+	// GORILLA FIX (2026-11-21): keep single-effort variants (common on free
+	// Antigravity tiers) visible in the Effort bar instead of hiding the bar
+	// completely and making the UI look outdated. Models with 0 efforts still
+	// return nil.
+	if len(efforts) == 0 {
 		return nil, -1
 	}
 	_, _, cur := models.FamilyOf(m.models[i])

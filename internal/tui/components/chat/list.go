@@ -104,7 +104,8 @@ type messagesCmp struct {
 	// printed records which message IDs have already been written out. Printing
 	// is irreversible, and every pubsub update carries the WHOLE message, so
 	// without this a streaming reply would be emitted again on every token.
-	printed map[string]bool
+	printed    map[string]bool
+	printedAny bool
 	// reasonedLines is the watermark of how many COMPLETE reasoning lines have
 	// already been printed for a message still in flight, and reasoningOpened
 	// whether its "thinking" marker has been emitted. Both are keyed by message

@@ -369,6 +369,13 @@ func (b *bashTool) bashPermissionRequest(sessionID, command string, v bashVerdic
 		// the one exact string. Same bounds as a family; see
 		// permission.GrantPersistant.
 		class = SuggestCommandFamily(command, nil)
+		// GORILLA FIX (2026-11-21): if the fallback found no class on its own
+		// but this session already asked for a sibling command with a shared
+		// prefix outside quotes, promote that family to SessionClass so
+		// "Allow for session" remembers it instead of asking again.
+		if class == "" && family != "" && BashFamilyNote(command, family) == "" {
+			class = family
+		}
 	}
 	return permission.CreatePermissionRequest{
 		SessionID: sessionID,

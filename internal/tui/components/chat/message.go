@@ -868,6 +868,22 @@ func renderToolResponse(toolCall message.ToolCall, response message.ToolResult, 
 	}
 }
 
+// toolAccentColor distinguishes tool execution categories visually from plain
+// conversational prose: shell commands in warning, file writes in primary,
+// read/search tools in info, and other tools in secondary.
+func toolAccentColor(name string, t theme.Theme) lipgloss.AdaptiveColor {
+	switch name {
+	case tools.BashToolName:
+		return t.Warning()
+	case tools.EditToolName, tools.WriteToolName, tools.PatchToolName, tools.SparseToolName, tools.FilesToolName:
+		return t.Primary()
+	case tools.ViewToolName, tools.FindToolName, tools.FetchToolName, tools.WebSearchToolName, "glob", "grep", "ls":
+		return t.Info()
+	default:
+		return t.Secondary()
+	}
+}
+
 func renderToolMessage(
 	toolCall message.ToolCall,
 	allMessages []message.Message,
@@ -880,27 +896,38 @@ func renderToolMessage(
 	if nested {
 		width = width - 3
 	}
+	if width < 12 {
+		width = 12
+	}
 
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
+	accent := toolAccentColor(toolCall.Name, t)
 
+	// GORILLA OVERRIDE (2026-11-21): give tool execution logs distinct visual
+	// block styling (category-coloured left rail + bold tool badge) so reads,
+	// edits, and commands do not blend into conversational prose as a wall of
+	// text. No background fill is added so scrollback stays transparent.
 	style := baseStyle.
 		Width(width - 1).
 		BorderLeft(true).
-		BorderStyle(lipgloss.ThickBorder()).
+		BorderStyle(lipgloss.NormalBorder()).
 		PaddingLeft(1).
-		BorderForeground(t.TextMuted())
+		BorderForeground(accent)
 
 	response := findToolResponse(toolCall.ID, allMessages)
-	toolNameText := baseStyle.Foreground(t.TextMuted()).
-		Render(fmt.Sprintf("%s: ", toolName(toolCall.Name)))
+	toolNameText := baseStyle.Foreground(accent).Bold(true).
+		Render(fmt.Sprintf("[%s] ", toolName(toolCall.Name)))
+
+	bodyWidth := max(8, width-3)
+	paramWidth := max(4, bodyWidth-lipgloss.Width(toolNameText))
 
 	if !toolCall.Finished {
 		// Get a brief description of what the tool is doing
 		toolAction := getToolAction(toolCall.Name)
 
 		progressText := baseStyle.
-			Width(width - 2 - lipgloss.Width(toolNameText)).
+			Width(paramWidth).
 			Foreground(t.TextMuted()).
 			Render(fmt.Sprintf("%s", toolAction))
 
@@ -914,15 +941,15 @@ func renderToolMessage(
 		return toolMsg
 	}
 
-	params := renderToolParams(width-2-lipgloss.Width(toolNameText), toolCall)
+	params := renderToolParams(paramWidth, toolCall)
 	responseContent := ""
 	if response != nil {
-		responseContent = renderToolResponse(toolCall, *response, width-2)
+		responseContent = renderToolResponse(toolCall, *response, bodyWidth)
 		responseContent = strings.TrimSuffix(responseContent, "\n")
 	} else {
 		responseContent = baseStyle.
 			Italic(true).
-			Width(width - 2).
+			Width(bodyWidth).
 			Foreground(t.TextMuted()).
 			Render("Waiting for response...")
 	}
@@ -930,8 +957,8 @@ func renderToolMessage(
 	parts := []string{}
 	if !nested {
 		formattedParams := baseStyle.
-			Width(width - 2 - lipgloss.Width(toolNameText)).
-			Foreground(t.TextMuted()).
+			Width(paramWidth).
+			Foreground(t.Text()).
 			Render(params)
 
 		parts = append(parts, lipgloss.JoinHorizontal(lipgloss.Left, toolNameText, formattedParams))
@@ -939,9 +966,10 @@ func renderToolMessage(
 		prefix := baseStyle.
 			Foreground(t.TextMuted()).
 			Render(" \\_ ")
+		nestedParamW := max(4, paramWidth-lipgloss.Width(prefix))
 		formattedParams := baseStyle.
-			Width(width - 2 - lipgloss.Width(toolNameText)).
-			Foreground(t.TextMuted()).
+			Width(nestedParamW).
+			Foreground(t.Text()).
 			Render(params)
 		parts = append(parts, lipgloss.JoinHorizontal(lipgloss.Left, prefix, toolNameText, formattedParams))
 	}

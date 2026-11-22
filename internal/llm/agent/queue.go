@@ -113,3 +113,10 @@ func InterruptTool(sessionID string) bool {
 const InterruptedToolResult = "The owner pressed Esc: this tool call was STOPPED before it finished (its output, if any, is partial). " +
 	"Do not run anything else yet. Ask the owner one short question: continue with the previous plan, or change it? " +
 	"Then wait for the answer."
+
+// DropQueued throws away what was queued for a conversation that is being
+// abandoned (/clear), so it can never be sent into the next one. TakeQueued
+// returns the same text for a caller that wants it; this is for one that does not.
+func DropQueued(sessionID string) int {
+	return len(TakeQueued(sessionID))
+}

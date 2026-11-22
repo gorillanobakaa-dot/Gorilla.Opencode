@@ -466,9 +466,16 @@ func NewChatPage(app *app.App) tea.Model {
 	completionDialog := dialog.NewCompletionDialogCmp(cg)
 
 	messagesModel := chat.NewMessagesCmp(app)
+	// GORILLA OVERRIDE (2026-11-21): in scrollback mode there is no bordered
+	// pane around the transcript, so horizontal padding steals viewport columns
+	// for nothing. Use the full usable width in scrollback mode.
+	msgPadding := layout.WithPadding(1, 1, 0, 1)
+	if !config.AlternateScreenEnabled() {
+		msgPadding = layout.WithPadding(0, 0, 0, 0)
+	}
 	messagesContainer := layout.NewContainer(
 		messagesModel,
-		layout.WithPadding(1, 1, 0, 1),
+		msgPadding,
 	)
 	editorModel := chat.NewEditorCmp(app)
 	editorCap, _ := editorModel.(chat.HeightCapped)

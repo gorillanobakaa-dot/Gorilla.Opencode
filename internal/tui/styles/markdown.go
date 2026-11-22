@@ -7,7 +7,10 @@ import (
 	"github.com/opencode-ai/opencode/internal/tui/theme"
 )
 
-const defaultMargin = 1
+// GORILLA OVERRIDE (2026-11-21): 0 document margin so rendered markdown uses
+// the full available terminal width instead of leaving dead columns on both
+// sides of every paragraph and code block.
+const defaultMargin = 0
 
 // Helper functions for style pointers
 func boolPtr(b bool) *bool       { return &b }

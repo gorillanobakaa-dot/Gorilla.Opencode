@@ -329,7 +329,16 @@ func (m *messagesCmp) printPending() []tea.Cmd {
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
-		cmds = append(cmds, printLine(text))
+		// GORILLA OVERRIDE (2026-11-21): separate consecutive turns in
+		// scrollback with one blank line so user prompts, agent replies, and
+		// tool logs do not run together into a wall of text. Kept inside a
+		// single printLine command so print-once counting stays 1 cmd/message.
+		if m.printedAny {
+			cmds = append(cmds, printLine("\n"+text))
+		} else {
+			cmds = append(cmds, printLine(text))
+		}
+		m.printedAny = true
 	}
 	return cmds
 }
@@ -341,6 +350,7 @@ func (m *messagesCmp) printPending() []tea.Cmd {
 // which is correct — that is the history the user asked to be able to keep.
 func (m *messagesCmp) forgetPrinted() {
 	m.printed = make(map[string]bool, len(m.printed))
+	m.printedAny = false
 }
 
 // FooterView is the whole of what the transcript contributes to the screen when

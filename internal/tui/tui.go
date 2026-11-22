@@ -385,7 +385,11 @@ type appModel struct {
 
 	isCompacting      bool
 	compactingMessage string
+	compactAfterTurn  bool
+	planReturnMode    string
 }
+
+type compactStartErrMsg struct{ err error }
 
 func (a appModel) Init() tea.Cmd {
 	var cmds []tea.Cmd
@@ -1157,6 +1161,22 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.app.Permissions.GrantFamily(msg.Permission, msg.Family)
 		case dialog.PermissionDeny:
 			a.app.Permissions.Deny(msg.Permission)
+		case dialog.PermissionYolo:
+			// GORILLA OVERRIDE (2026-11-21): Shift+Y on the dialog. This is the
+			// moment a person most wants YOLO (the agent is parked on a
+			// question), and the editor is not reachable from here.
+			//
+			// It turns YOLO on, which answers every waiting question YOLO
+			// covers, this one included. If THIS one is a carve-out (it cannot
+			// be undone, or it is outside your project) it is NOT approved by
+			// the key: the dialog stays and asks, as YOLO always does.
+			a.app.Permissions.AutoApproveSession(msg.Permission.SessionID)
+			if !a.app.Permissions.IsCovered(msg.Permission) {
+				return a, util.ReportWarn("☢ YOLO ON for this conversation. This one is still asked: " +
+					"it cannot be undone, or it is outside your project.")
+			}
+			cmd = util.ReportWarn("☢ YOLO ON for this conversation. Every tool call is approved " +
+				"automatically, with no further prompts. /yolo off turns it off.")
 		}
 		// Answering one question can settle others already in the queue: an
 		// "allow for session", or a fleet grant, covers them outright. Grant
@@ -1165,7 +1185,7 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.app.Permissions.IsCovered, a.app.Permissions.Grant)
 		a.permissionQueue = rest
 		if next != nil {
-			return a, a.permissions.SetPermissions(*next)
+			return a, tea.Batch(cmd, a.permissions.SetPermissions(*next))
 		}
 		a.showPermissions = false
 		return a, cmd
@@ -1227,26 +1247,39 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 
 	case startCompactSessionMsg:
+		if a.isCompacting {
+			return a, util.ReportInfo("Already compacting this conversation.")
+		}
+		if a.selectedSession.ID == "" {
+			return a, util.ReportWarn("No active session to summarize")
+		}
 		// Start compacting the current session
 		a.isCompacting = true
 		a.compactingMessage = "Starting summarization..."
+		sessionID := a.selectedSession.ID
 
-		if a.selectedSession.ID == "" {
-			a.isCompacting = false
-			return a, util.ReportWarn("No active session to summarize")
-		}
-
-		// Start the summarization process
+		// GORILLA FIX (2026-11-21): surface synchronous Summarize errors
+		// (e.g. ErrSessionBusy or missing provider). Previously the return
+		// error was dropped and isCompacting stayed true forever, freezing
+		// the "Starting summarization..." overlay on screen.
 		return a, func() tea.Msg {
 			ctx := context.Background()
-			a.app.CoderAgent.Summarize(ctx, a.selectedSession.ID)
+			if err := a.app.CoderAgent.Summarize(ctx, sessionID); err != nil {
+				return compactStartErrMsg{err: err}
+			}
 			return nil
 		}
+
+	case compactStartErrMsg:
+		a.isCompacting = false
+		a.compactingMessage = ""
+		return a, util.ReportError(msg.err)
 
 	case pubsub.Event[agent.AgentEvent]:
 		payload := msg.Payload
 		if payload.Error != nil {
 			a.isCompacting = false
+			a.compactAfterTurn = false
 			return a, util.ReportError(payload.Error)
 		}
 
@@ -1256,6 +1289,10 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.isCompacting = false
 			return a, util.ReportInfo("Session summarization complete")
 		} else if payload.Done && payload.Type == agent.AgentEventTypeResponse && a.selectedSession.ID != "" {
+			if a.compactAfterTurn {
+				a.compactAfterTurn = false
+				cmds = append(cmds, util.CmdHandler(startCompactSessionMsg{}))
+			}
 			// GORILLA OVERRIDE: after each completed response, re-read the
 			// quota (throttled) and announce any banana-tier crossing. Without
 			// this, a tool-heavy session can fall from "loaded up" to "just a
@@ -1889,8 +1926,30 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// GORILLA OVERRIDE: /clear starts a fresh session, dropping
 			// the accumulated context. Routed through the chat page's
 			// full new-session flow so the editor/sidebar reset cleanly.
+			//
+			// GORILLA OVERRIDE (2026-11-21): it is allowed mid-turn now, so it
+			// must also STOP the turn it abandons. Before, the old run simply
+			// carried on in the background, spending tokens on a conversation
+			// nobody was looking at. Cancel releases any permission question it
+			// was parked on; anything queued for it is dropped so it cannot be
+			// sent into the new chat. The old conversation stays in history.
+			clearCmds := []tea.Cmd{util.CmdHandler(chat.NewSessionMsg{})}
+			if old := a.selectedSession.ID; old != "" {
+				a.app.CoderAgent.Cancel(old)
+				agent.DropQueued(old)
+				a.app.Permissions.RevokeAutoApprove(old)
+			}
 			a.selectedSession = session.Session{}
-			return a, util.CmdHandler(chat.NewSessionMsg{})
+			a.isCompacting = false
+			a.compactAfterTurn = false
+			// In the alternate screen the message list empties by itself. In
+			// scrollback mode the old text lives in the terminal's own buffer,
+			// so wipe the visible screen too; the terminal's scrollback, which
+			// can still be scrolled back to, is left alone.
+			if a.scrollback {
+				clearCmds = append(clearCmds, tea.ClearScreen)
+			}
+			return a, tea.Batch(clearCmds...)
 		case "context", "loadout", "tokens":
 			// GORILLA OVERRIDE (2026-09-02): hand the dialog the live cache
 			// figures as it opens.
@@ -1941,25 +2000,44 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, a.setPermissionMode(config.NormalisePermissionMode(want))
 		case "yolo", "auto", "autopilot", "goal":
-			if a.selectedSession.ID == "" && strings.TrimSpace(msg.Args) == "" {
+			// GORILLA OVERRIDE (2026-11-21): /yolo works mid-turn.
+			//
+			// It used to be refused while the agent ran (the editor never
+			// dispatched it), and a bare /yolo TOGGLED, so typing it twice
+			// turned it off again. Now: bare /yolo turns it ON and stays on
+			// however often it is repeated; /yolo off turns it OFF and stays off.
+			// "off" used to fall through as a TASK, i.e. it armed YOLO and sent
+			// the word "off" to the model.
+			//
+			// Neither form touches the running turn: no cancel, no new request.
+			// Turning it on also answers the questions already waiting that YOLO
+			// covers (the service does that), under the same carve-outs as ever.
+			arg := strings.TrimSpace(msg.Args)
+			off := strings.EqualFold(arg, "off")
+			if a.selectedSession.ID == "" && (arg == "" || off) {
 				return a, util.ReportWarn("Start a conversation first — YOLO applies to the session you are in.")
 			}
-			if config.PermissionMode() == config.PermissionAuto && strings.TrimSpace(msg.Args) == "" {
+			busyNote := ""
+			if a.selectedSession.ID != "" && a.app.CoderAgent.IsSessionBusy(a.selectedSession.ID) {
+				busyNote = " The running turn carries on."
+			}
+			if off {
+				if config.PermissionMode() == config.PermissionAuto {
+					return a, util.ReportInfo("The standing mode is auto, for every conversation, so /yolo off cannot end it. /mode ask turns it off; Shift+Tab cycles.")
+				}
+				a.app.Permissions.RevokeAutoApprove(a.selectedSession.ID)
+				return a, util.ReportInfo("YOLO OFF — the next tool call asks before it touches anything." + busyNote)
+			}
+			if config.PermissionMode() == config.PermissionAuto && arg == "" {
 				return a, util.ReportInfo("The standing mode is already auto, for every conversation. /mode ask turns it off; Shift+Tab cycles.")
 			}
-			task := strings.TrimSpace(msg.Args)
-			// With no task, this toggles. Toggling OFF must never be mistaken
-			// for arming, so the off-branch comes first and only when bare.
-			if task == "" && a.app.Permissions.IsAutoApproved(a.selectedSession.ID) {
-				a.app.Permissions.RevokeAutoApprove(a.selectedSession.ID)
-				return a, util.ReportInfo("YOLO OFF — you will be asked again before tools touch anything.")
-			}
+			task := arg
 			if a.selectedSession.ID != "" {
 				a.app.Permissions.AutoApproveSession(a.selectedSession.ID)
 			}
 			warning := "☢ YOLO ON for this conversation. Every tool call is approved automatically — " +
 				"file edits, shell commands, web access, and every research helper — with no further prompts. " +
-				"It ends when this conversation does, or type /yolo again. /tasks still kills helpers."
+				"It ends when this conversation does, or type /yolo off. /tasks still kills helpers." + busyNote
 			if task == "" {
 				return a, util.ReportWarn(warning)
 			}
@@ -1980,14 +2058,38 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.selectedSession.ID == "" {
 				return a, util.ReportWarn("Nothing to compact yet — this starts once a conversation exists.")
 			}
+			if a.isCompacting {
+				return a, util.ReportInfo("Already compacting this conversation.")
+			}
+			if a.app.CoderAgent.IsSessionBusy(a.selectedSession.ID) {
+				a.compactAfterTurn = true
+				return a, util.ReportInfo("Compaction queued — will compact as soon as this turn finishes.")
+			}
 			return a, util.CmdHandler(startCompactSessionMsg{})
+		case "plan":
+			return a.handlePlanCommand(msg.Args)
 		case "init":
 			a.showInitDialog = true
 			a.offerGate.armed = false // asked for: its keys are answers
 			return a, nil
 		case "task", "tasks", "agents", "kill":
-			// GORILLA OVERRIDE: /tasks — live monitor of running helper
-			// agents; kill one, or the Nuclear Option (kill 'em all).
+			// GORILLA OVERRIDE: /tasks — live monitor + session spawn audit of
+			// helper agents; kill one, or the Nuclear Option (kill 'em all).
+			a.tasksDialog.SetSessionID(a.selectedSession.ID)
+			arg := strings.ToLower(strings.TrimSpace(msg.Args))
+			if arg == "audit" || arg == "stats" || arg == "count" || arg == "status" {
+				st := agent.SessionAgentTelemetry(a.selectedSession.ID)
+				limit := "unlimited"
+				switch n := config.MaxSubAgents(); {
+				case n == config.SubAgentsNuclear:
+					limit = "NUCLEAR (0 — solo)"
+				case n > 0:
+					limit = fmt.Sprintf("max %d/turn", n)
+				}
+				return a, util.ReportInfo(fmt.Sprintf(
+					"Session agents: %d spawned (%d running, %d queued, %d done, %d failed, %d killed) | Limit: %s",
+					st.TotalSpawned, st.Running, st.Queued, st.Done, st.Failed, st.Killed, limit))
+			}
 			a.showTasksDialog = true
 			return a, nil
 		// GORILLA OVERRIDE: /help and /commands open the plain-language command
@@ -2774,6 +2876,48 @@ func (a appModel) setPermissionMode(mode string) tea.Cmd {
 		return util.ReportInfo(text + ". Persisted: every conversation runs this way until you change it.")
 	}
 	return util.ReportInfo(text)
+}
+
+// handlePlanCommand implements /plan, /plan <task>, /plan go, and /plan off.
+// Kept out of the slash-command switch in Update so its subcommand cases are
+// not misread as top-level slash commands by internal/commands/registry_test.go.
+func (a appModel) handlePlanCommand(rawArgs string) (tea.Model, tea.Cmd) {
+	arg := strings.TrimSpace(rawArgs)
+	lower := strings.ToLower(arg)
+	busy := a.selectedSession.ID != "" && a.app.CoderAgent.IsSessionBusy(a.selectedSession.ID)
+	switch lower {
+	case "off", "stop", "exit", "cancel":
+		prev := a.planReturnMode
+		if prev == "" || prev == config.PermissionPlan {
+			prev = config.PermissionAsk
+		}
+		a.planReturnMode = ""
+		return a, a.setPermissionMode(prev)
+	case "go", "approve", "execute":
+		if busy {
+			return a, util.ReportWarn("Wait for the current turn to finish before executing the plan.")
+		}
+		prev := a.planReturnMode
+		if prev == "" || prev == config.PermissionPlan {
+			prev = config.PermissionAsk
+		}
+		a.planReturnMode = ""
+		modeCmd := a.setPermissionMode(prev)
+		execPrompt := "Plan approved. Execute the numbered plan above strictly step by step, in order, without deviating or adding unrequested changes."
+		return a, tea.Batch(modeCmd, util.CmdHandler(chat.SendMsg{Text: execPrompt}))
+	}
+	if cur := config.PermissionMode(); cur != config.PermissionPlan {
+		a.planReturnMode = cur
+	}
+	modeCmd := a.setPermissionMode(config.PermissionPlan)
+	if arg == "" {
+		note := "PLAN MODE ON (read-only) — the AI will write a numbered execution plan and cannot edit files or run commands until you approve. Type /plan <task> to plan a job, /plan go to execute, or /plan off to exit."
+		if busy {
+			note += " The running turn carries on."
+		}
+		return a, tea.Batch(modeCmd, util.ReportInfo(note))
+	}
+	return a, tea.Batch(modeCmd, util.CmdHandler(chat.SendMsg{Text: arg}))
 }
 
 func (a *appModel) RegisterCommand(cmd dialog.Command) {

@@ -68,6 +68,12 @@ type loadoutDialogCmp struct {
 	// featureTop is the first feature row shown, so a long list scrolls instead of
 	// running off the screen.
 	featureTop int
+	// GORILLA OVERRIDE (2026-11-21): explicit visual confirmation inside the
+	// dialog whenever the user changes a dial with left/right arrows (so they
+	// can see the new agent count / Nuclear setting is committed and saved).
+	lastAppliedRow  int
+	lastAppliedNote string
+	lastAppliedRev  uint64
 }
 
 // width returns the dialog inner width — as wide as the terminal allows,
@@ -302,15 +308,19 @@ func (m *loadoutDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Legacy direct shortcuts (work regardless of selection).
 		case key.Matches(msg, loadoutKeys.RateDown):
 			config.StepRateLimitRPM(-1)
+			m.recordApplied(rowPace, "SAVED: AI server pace = "+rateLimitLabel())
 			return m, util.ReportInfo("AI SERVER requests: " + rateLimitLabel())
 		case key.Matches(msg, loadoutKeys.RateUp):
 			config.StepRateLimitRPM(+1)
+			m.recordApplied(rowPace, "SAVED: AI server pace = "+rateLimitLabel())
 			return m, util.ReportInfo("AI SERVER requests: " + rateLimitLabel())
 		case key.Matches(msg, loadoutKeys.LeashDown):
 			config.StepMaxSubAgents(-1)
+			m.recordApplied(rowLeash, "SAVED: "+subAgentLabel())
 			return m, tea.Batch(util.CmdHandler(LoadoutChangedMsg{}), util.ReportInfo("GORILLA AGENTS/SUBAGENTS: "+subAgentLabel()))
 		case key.Matches(msg, loadoutKeys.LeashUp):
 			config.StepMaxSubAgents(+1)
+			m.recordApplied(rowLeash, "SAVED: "+subAgentLabel())
 			return m, tea.Batch(util.CmdHandler(LoadoutChangedMsg{}), util.ReportInfo("GORILLA AGENTS/SUBAGENTS: "+subAgentLabel()))
 		case key.Matches(msg, loadoutKeys.Escape):
 			return m, util.CmdHandler(CloseLoadoutDialogMsg{})
@@ -319,15 +329,23 @@ func (m *loadoutDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *loadoutDialogCmp) recordApplied(row int, note string) {
+	m.lastAppliedRow = row + 1 // 1-based so zero value means "none yet"
+	m.lastAppliedNote = note
+	m.lastAppliedRev++
+}
+
 // adjustSelected applies a −1/+1 step to whichever dial is highlighted. On a
 // tool row it does nothing (those toggle with space). dir<0 = less, dir>0 = more.
 func (m *loadoutDialogCmp) adjustSelected(dir int) tea.Cmd {
 	switch m.selectedIdx {
 	case rowPace:
 		config.StepRateLimitRPM(dir)
+		m.recordApplied(rowPace, "SAVED: AI server pace = "+rateLimitLabel())
 		return util.ReportInfo("AI SERVER requests: " + rateLimitLabel())
 	case rowLeash:
 		config.StepMaxSubAgents(dir)
+		m.recordApplied(rowLeash, "SAVED: "+subAgentLabel())
 		// Nuclear toggles the helper tool's schema tokens in/out of the loadout.
 		return tea.Batch(util.CmdHandler(LoadoutChangedMsg{}), util.ReportInfo("GORILLA AGENTS/SUBAGENTS: "+subAgentLabel()))
 	}
@@ -376,8 +394,11 @@ func (m *loadoutDialogCmp) View() string {
 	// dialog, so explanatory prose gives way before any row does. Same approach as
 	// /help and the sign-in overlay.
 	for i, compact := range []bool{false, true} {
-		// The scroll note appears and disappears with the selection, so it counts.
-		key := uint64(m.selectedIdx)*1315423911 + uint64(i)
+		// The scroll note and dial confirmation appear and disappear with state.
+		key := uint64(m.selectedIdx)*1315423911 + m.lastAppliedRev*2654435761 + uint64(i)
+		if config.MaxSubAgents() == config.SubAgentsNuclear {
+			key ^= 0x9e3779b97f4a7c15
+		}
 		view := m.fitter.Fit(m.budgetHeight(), total, 1, key, func(rows int) string {
 			return m.renderAt(rows, compact)
 		})
@@ -385,7 +406,7 @@ func (m *loadoutDialogCmp) View() string {
 			return view
 		}
 	}
-	return m.fitter.Fit(m.budgetHeight(), total, 1, uint64(m.selectedIdx)*1315423911+99,
+	return m.fitter.Fit(m.budgetHeight(), total, 1, uint64(m.selectedIdx)*1315423911+m.lastAppliedRev*2654435761+99,
 		func(rows int) string { return m.renderAt(rows, true) })
 }
 
@@ -596,17 +617,21 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 		Render(fitLine("🦍 GORILLA CONTROLS — tune for your connection / free tier  (up/down pick a line | left/right change it):"))
 	// Dial rows carry the same "> " selection pointer as the toggle rows, so
 	// "where am I" reads the same way everywhere in the dialog.
-	dialRow := func(selected bool, label, desc string) string {
+	dialRow := func(rowIdx int, selected bool, label, desc string) string {
 		mark := "  "
 		if selected {
 			mark = "> "
 		}
-		return rowStyle(selected, false).Render(fitLine(fmt.Sprintf("%s%-32s ‹ <-/-> ›  %s", mark, label, desc)))
+		tag := ""
+		if m.lastAppliedRow == rowIdx+1 {
+			tag = " [SET]"
+		}
+		return rowStyle(selected, false).Render(fitLine(fmt.Sprintf("%s%-32s ‹ <-/-> ›%s  %s", mark, label, tag, desc)))
 	}
 
 	var rows []string
-	rows = append(rows, dialRow(m.selectedIdx == rowPace, "AI SERVER requests — pace-setter", paceDesc()))
-	rows = append(rows, dialRow(m.selectedIdx == rowLeash, "GORILLA AGENTS/SUBAGENTS — leash", leashDesc()))
+	rows = append(rows, dialRow(rowPace, m.selectedIdx == rowPace, "AI SERVER requests — pace-setter", paceDesc()))
+	rows = append(rows, dialRow(rowLeash, m.selectedIdx == rowLeash, "GORILLA AGENTS/SUBAGENTS — leash", leashDesc()))
 
 	// --- Section 2: switch features on/off ---
 	featHeader := base.Foreground(t.Primary()).Bold(true).Width(w).
@@ -716,6 +741,18 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 		parts = append(parts, base.Foreground(t.Error()).Bold(true).Width(w).
 			Render(fitLine(fmt.Sprintf(
 				"LOW-BANDWIDTH MODE: %d %s switched off. Press u to put them back.", n, word))))
+	}
+	// GORILLA OVERRIDE (2026-11-21): persistent confirmation when Gorilla
+	// Nuclear Option is active, outside `if !compact`, matching LOW-BANDWIDTH.
+	if config.MaxSubAgents() == config.SubAgentsNuclear {
+		parts = append(parts, base.Foreground(t.Error()).Bold(true).Width(w).
+			Render(fitLine("NUCLEAR OPTION ACTIVE: ALL sub-agents disabled (solo mode). Press -> on Agents to re-enable.")))
+	}
+	// GORILLA OVERRIDE (2026-11-21): explicit inline confirmation when a
+	// dial (agent count / nuclear / rate limit) has been committed via <-/->.
+	if m.lastAppliedNote != "" {
+		parts = append(parts, base.Foreground(t.Success()).Bold(true).Width(w).
+			Render(fitLine("[APPLIED] "+m.lastAppliedNote)))
 	}
 
 	if !compact {

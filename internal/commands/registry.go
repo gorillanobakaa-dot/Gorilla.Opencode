@@ -166,7 +166,10 @@ var All = []Command{
 		Summary: "Start a fresh conversation.",
 		Detail: "The AI forgets everything said so far. Use this when you move to a " +
 			"different task — a long conversation costs more on every message, " +
-			"because the whole history is sent each time.",
+			"because the whole history is sent each time.\n\n" +
+			"It works while the agent is running: the running turn is stopped, " +
+			"anything you queued for it is dropped, and the screen is cleared. " +
+			"The old conversation stays in your history.",
 	},
 	{
 		Name:    "plain",
@@ -580,11 +583,24 @@ var All = []Command{
 			"and answers get worse, then stop. This writes a summary of everything " +
 			"so far and continues from that instead, so the thread survives while " +
 			"the bulk goes.\n\n" +
-			"Use it when a long session starts to drift, or before starting a big " +
-			"job in an old conversation. It costs one model call to write the " +
-			"summary. Models with small windows need this often — the status bar " +
-			"shows how full you are. It also runs by itself at 95% full if you " +
-			"leave that setting on in /settings.",
+			"Works mid-session: if the agent is mid-turn, /compact queues itself " +
+			"and runs as soon as the turn finishes. If the dedicated summarizer " +
+			"fails or is unset, it falls back to your active model automatically. " +
+			"Models with small windows need this often — the status bar shows how " +
+			"full you are. It also runs by itself at 85% of the usable window if " +
+			"you leave that setting on in /settings.",
+	},
+	{
+		Name:    "plan",
+		Group:   GroupSession,
+		Summary: "Plan mode: write and approve a step-by-step plan first.",
+		Detail: "Switches to read-only plan mode and tells the AI to inspect the " +
+			"codebase and output a concrete, numbered execution plan (goal, files, " +
+			"steps, verification, risks) before changing anything.\n\n" +
+			"  /plan          turn plan mode on (works mid-turn too)\n" +
+			"  /plan <task>   turn plan mode on and generate a plan for <task>\n" +
+			"  /plan go       approve the plan, restore your previous mode, and execute strictly\n" +
+			"  /plan off      exit plan mode and restore your previous permission mode",
 	},
 	{
 		Name:    "init",
@@ -631,8 +647,13 @@ var All = []Command{
 			"and you do not want to babysit it. Do not use it in a folder you " +
 			"cannot afford to have changed.\n\n" +
 			"It lasts only as long as this conversation and is never written to " +
-			"disk, so it cannot silently follow you into tomorrow. Type /yolo again " +
-			"to turn it off. /tasks still stops helpers at any time.",
+			"disk, so it cannot silently follow you into tomorrow.\n\n" +
+			"It works while the agent is running. Forgot to turn it on? Type " +
+			"/yolo now: the turn is not cancelled, and any question already " +
+			"waiting is approved. Typing /yolo again changes nothing; /yolo off " +
+			"turns it off, and the next tool call asks again. Things that can " +
+			"never be undone, and paths outside your project, are still asked. " +
+			"/tasks still stops helpers at any time.",
 	},
 	{
 		Name:    "tasks",

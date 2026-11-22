@@ -506,6 +506,38 @@ var controlCommands = map[string]bool{
 	"context": true, "loadout": true, "tokens": true,
 }
 
+// yoloWords are the typed names of /yolo (see commands/registry.go).
+var yoloWords = map[string]bool{"yolo": true, "auto": true, "autopilot": true, "goal": true}
+
+// isLiveCommand reports whether a slash command must run even while the agent
+// is mid-turn.
+//
+// GORILLA OVERRIDE (2026-11-21): live commands that do not interleave a second
+// request with one already in flight:
+//
+//   - /yolo and /yolo off (and the aliases). Only the BARE form and "off" are
+//     live: "/yolo <task>" starts new work, so it still waits for an idle agent.
+//   - /plan and /plan off|stop|exit|cancel: flips standing mode without
+//     cancelling; "/plan <task>" and "/plan go" still wait for an idle agent.
+//   - /compact (bare, plus summarize/summarise): queues compaction to run as
+//     soon as the current turn finishes instead of refusing mid-session.
+//   - /clear and /new: cancels the abandoned turn and opens a fresh chat.
+func isLiveCommand(word, args string) bool {
+	a := strings.TrimSpace(args)
+	switch {
+	case yoloWords[word]:
+		return a == "" || strings.EqualFold(a, "off")
+	case word == "plan":
+		return a == "" || strings.EqualFold(a, "off") || strings.EqualFold(a, "stop") ||
+			strings.EqualFold(a, "exit") || strings.EqualFold(a, "cancel")
+	case word == "compact" || word == "summarize" || word == "summarise":
+		return a == ""
+	case word == "clear" || word == "new":
+		return true
+	}
+	return false
+}
+
 // pressEnter is what a pressed (not pasted) Enter does: a trailing backslash
 // becomes a line break, anything else is sent.
 func (m *editorCmp) pressEnter() tea.Cmd {
@@ -534,7 +566,7 @@ func (m *editorCmp) send() tea.Cmd {
 	if strings.HasPrefix(raw, "/") {
 		word, args, _ := strings.Cut(strings.TrimPrefix(raw, "/"), " ")
 		word = strings.ToLower(strings.TrimSpace(word))
-		if controlCommands[word] {
+		if controlCommands[word] || isLiveCommand(word, args) {
 			m.textarea.Reset()
 			m.rememberSent(raw)
 			return util.CmdHandler(SlashCommandMsg{Name: word, Args: strings.TrimSpace(args)})
@@ -550,7 +582,7 @@ func (m *editorCmp) send() tea.Cmd {
 			m.rememberSent(text)
 			return util.ReportInfo(fmt.Sprintf("Queued (%d): the agent gets it at its next step. esc cancels the turn.", agent.QueuedCount(m.session.ID)))
 		}
-		return util.ReportWarn("Agent is working. esc cancels it. /model, /context and /tasks still work.")
+		return util.ReportWarn("Agent is working. esc cancels it. /yolo, /yolo off, /clear, /model, /context and /tasks still work.")
 	}
 
 	value := m.textarea.Value()
@@ -620,6 +652,20 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.session = msg
 		}
 		return m, nil
+	case SessionClearedMsg:
+		// GORILLA FIX (2026-11-21): /clear reset the page and the message list
+		// but not this box, which kept the OLD session id. Idle, that was
+		// harmless; with /clear now allowed mid-turn it matters, because the
+		// busy check below would then ask whether the abandoned session was
+		// still winding down and refuse the first message of the new chat.
+		// Attachments and the history cursor belong to the old conversation too.
+		m.session = session.Session{}
+		m.attachments = nil
+		m.pendingEnter = 0
+		m.historyPos = len(m.history)
+		m.draft = ""
+		m.textarea.Reset()
+		return m, util.CmdHandler(EditorHeightMsg{Height: m.desiredHeight()})
 	case dialog.AttachmentAddedMsg:
 		if len(m.attachments) >= maxAttachments {
 			logging.ErrorPersist(fmt.Sprintf("cannot add more than %d images", maxAttachments))
