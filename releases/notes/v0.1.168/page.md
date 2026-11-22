@@ -56,7 +56,7 @@ Yes — especially if you use `/context` to set a sub-agent cap or turn on
 
 #### 1. Tiered `/model` picker with Newer vs Legacy models & vendor dividers
 
-[![Tiered Antigravity model picker showing Newer models on top with launch dates and color coding, Legacy models underneath separated by Anthropic, Gemini, and OpenAI dividers, and red SOLO (NUCLEAR) status in the bottom bar](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.168/docs/screenshots/gallery/v0168-model-picker-tiers.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.168/docs/screenshots/gallery/v0168-model-picker-tiers.png)
+![Tiered Antigravity model picker showing Newer models on top with launch dates and color coding, Legacy models underneath separated by vendor dividers, and red SOLO NUCLEAR status in the bottom bar](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.168/docs/screenshots/gallery/v0168-model-picker-tiers.png)
 
 - **What you are seeing:** The `/model` picker after the `0.1.167`/`0.1.168`
   reorganization. The newest generation models sit at the top under
@@ -69,7 +69,7 @@ Yes — especially if you use `/context` to set a sub-agent cap or turn on
 
 #### 2. Setting a 3-agent cap in `/context` with instant confirmation
 
-[![Context loadout dialog with the Agents/Subagents dial set to up to 3 agents per turn, showing the inline [SET] badge and green [APPLIED] SAVED confirmation banner at the top](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.168/docs/screenshots/gallery/v0168-context-agents-3.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.168/docs/screenshots/gallery/v0168-context-agents-3.png)
+![Context loadout dialog with the Agents dial set to up to 3 agents per turn, showing the inline SET badge and green APPLIED SAVED confirmation banner at the top](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.168/docs/screenshots/gallery/v0168-context-agents-3.png)
 
 - **What you are seeing:** The `/context` menu when you dial the
   **GORILLA AGENTS/SUBAGENTS** limit to **3 agents per turn** using `←`/`→`.
@@ -80,7 +80,7 @@ Yes — especially if you use `/context` to set a sub-agent cap or turn on
 
 #### 3. Raising the cap to 12 agents/subagents in `/context`
 
-[![Context loadout dialog dialed up to 12 agents/subagents per turn with [SET] inline tag, green [APPLIED] SAVED banner, and live per-turn token count in the bottom bar](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.168/docs/screenshots/gallery/v0168-context-agents-12.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.168/docs/screenshots/gallery/v0168-context-agents-12.png)
+![Context loadout dialog dialed up to 12 agents per turn with SET inline tag, green APPLIED SAVED banner, and live per-turn token count in the bottom bar](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.168/docs/screenshots/gallery/v0168-context-agents-12.png)
 
 - **What you are seeing:** The same `/context` menu dialed up to **12
   agents/subagents per turn** for heavier parallel jobs. The green
@@ -89,20 +89,26 @@ Yes — especially if you use `/context` to set a sub-agent cap or turn on
   tokens/turn`), and every feature row below tells you in plain English what
   turning it off saves and what stops working.
 
-#### 4. Gorilla Nuclear Option active (zero sub-agents, solo mode)
+#### 4. Gorilla Nuclear Option active — Before (`0.1.167`) vs After (`0.1.168`)
 
-[![Context loadout dialog with Gorilla Nuclear Option enabled, displaying the red NUCLEAR OPTION ACTIVE warning banner with Enter to confirm and close, green [APPLIED] SAVED Nuclear confirmation, inline [SET] tag, and enter confirm and close footer](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/gallery/v0168-context-nuclear-option.png)](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/gallery/v0168-context-nuclear-option.png)
+**Before (`0.1.167` — before `Enter` confirmed and closed `/context`):**
+
+![Before: Context loadout dialog in v0.1.167 with Gorilla Nuclear Option enabled, showing the old esc-only close hint and red SOLO NUCLEAR status bar](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/v0.1.168/docs/screenshots/gallery/v0168-context-nuclear-option.png)
+
+**After (`0.1.168` — `Enter` confirms, locks Nuclear Option in place, and closes `/context`):**
+
+![After: Context loadout dialog in v0.1.168 with Gorilla Nuclear Option enabled, displaying the red NUCLEAR OPTION ACTIVE banner with Press Enter to confirm and close, green APPLIED SAVED Nuclear confirmation, inline SET tag, and enter confirm and close footer](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/014a1540b4c11390fd159805052ad5e771f4c682/docs/screenshots/gallery/v0168-context-nuclear-option.png)
 
 - **What you are seeing:** **Gorilla Nuclear Option** turned on (dial all the
-  way left with `←`, then press **`Enter`** to confirm and close). You get
-  three unmistakable signals that no background sub-agents can spawn:
-  1. The bright red **`NUCLEAR OPTION ACTIVE: ALL sub-agents disabled (solo mode). Press Enter to confirm & close, or -> on Agents to re-enable.`**
-     banner at the top.
+  way left with `←`, then press **`Enter`** to confirm and close). Comparing
+  **Before** vs **After**:
+  1. The bright red top banner now says **`NUCLEAR OPTION ACTIVE: ALL sub-agents disabled (solo mode). Press Enter to confirm & close, or -> on Agents to re-enable.`**
   2. The green **`[APPLIED] SAVED: GORILLA NUCLEAR`** confirmation and inline
-     **`[SET]`** tag on the highlighted row.
-  3. The updated bottom key bar showing **`enter confirm & close`** alongside
-     `space toggle/select` and `left/right dial`, so hitting `Enter` locks
-     Nuclear Option in place and closes `/context`.
+     **`[SET]`** tag stay locked on when you press `Space` or `Enter`.
+  3. The bottom key bar now explicitly shows **`enter confirm & close`** and
+     **`space toggle/select`** (instead of the old `space flips ON/OFF | ... | esc close`),
+     and pressing `Enter` closes `/context` while keeping the red **`SOLO (NUCLEAR)`**
+     mode active.
 
 ### What was checked
 
