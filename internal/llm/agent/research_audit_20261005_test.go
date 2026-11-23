@@ -191,9 +191,9 @@ func TestRunRefusesAThirdDossierCall(t *testing.T) {
 		config.ToggleLoadout(config.DossierComponentID)
 		defer config.ToggleLoadout(config.DossierComponentID)
 	}
-	if config.MaxSubAgents() != config.SubAgentsUnlimited {
-		t.Skip("the helper leash is set in this environment; the refusal under test sits behind it")
-	}
+	prevLeash := config.MaxSubAgents()
+	config.SetMaxSubAgents(config.SubAgentsUnlimited)
+	defer config.SetMaxSubAgents(prevLeash)
 
 	sid := "run-ceiling-" + t.Name()
 	// messages is nil, so the question key is "": spend the allowance on it.

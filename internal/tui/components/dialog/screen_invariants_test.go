@@ -266,6 +266,10 @@ func sizedDialogs(t *testing.T) map[string]func() sizedDialog {
 			return viaWindowSize{m}
 		},
 		"/context": func() sizedDialog {
+			// The ratchet below was recorded with helpers unlimited; the Economy
+			// default (0) adds one status row, so pin the leash to keep it measuring
+			// the same layout.
+			config.SetMaxSubAgents(config.SubAgentsUnlimited)
 			m := NewLoadoutDialogCmp()
 			m.Init()
 			return viaWindowSize{m}
@@ -281,6 +285,10 @@ func sizedDialogs(t *testing.T) map[string]func() sizedDialog {
 			return viaWindowSize{m}
 		},
 		"/reset": func() sizedDialog {
+			// The /context builder above pins the leash to Unlimited, which
+			// differs from the default and would add a "helper leash" row here.
+			// Reset to the default so /reset measures a fresh install.
+			config.SetMaxSubAgents(config.DefaultMaxSubAgents)
 			m := NewResetDialogCmp()
 			m.Init()
 			return viaWindowSize{m}
