@@ -27,11 +27,11 @@ or run long sessions on a paid model.
 ---
 # In plain language: everything in this release
 
-This is the complete explanation. Nothing below is behind a link.
+This is the complete explanation, not a summary of one. Nothing below is behind a link.
 
 <!-- plain-language track: in full, on this page -->
 
-## What changed
+### What changed
 
 1. The program no longer stops you over and over to ask permission. If one
    action is refused, only that action is skipped.
@@ -40,14 +40,19 @@ This is the complete explanation. Nothing below is behind a link.
    "SOLO MODE" instead of a scary red "NUCLEAR OPTION".
 4. If a long session wastes money re-sending the old chat, it tells you once.
 
-## Should you download it?
+### Should you download it?
 
 Yes, if you run it unattended, use `/plan`, or pay per use.
 
 ---
-# For developers
 
-## Summary
+# For developers: how it works, and how to check it
+
+Written for someone who will audit, fork or change the code. It covers the same release as the plain-language part above; neither is a summary of the other.
+
+<!-- developer track: in full, on this page -->
+
+### Summary
 
 - `internal/permission`: per-call refusals (`permission.Refused`) instead of the
   sentinel that cancelled the whole tool batch; `GORILLA_UNATTENDED` switch;
@@ -62,11 +67,11 @@ Yes, if you run it unattended, use `/plan`, or pay per use.
   silently; a stand-in hook runs the same refusal list and logs loudly that
   real Fieldkit did not run.
 
-## Security posture
+### Security posture
 
 No new network calls, telemetry, providers or dependencies. Fail-closed hard
 lines unchanged: unattended mode still refuses what the hardlines gate refuses.
 
-## Not verified
+### Not verified
 
 Live TUI run on a real terminal; real-Fieldkit replay in CI.
