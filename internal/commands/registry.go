@@ -593,7 +593,7 @@ var All = []Command{
 	{
 		Name:    "plan",
 		Group:   GroupSession,
-		Summary: "Plan mode: plan first. /plan off leaves it, /plan go runs it.",
+		Summary: "Plan first. /plan off leaves it, /plan go runs it.",
 		Detail: "Switches to plan mode: the AI may read and inspect everything (files, screenshots and OCR, searches; shell commands ask first) and may write the plan file, but changes nothing else until you approve. Plan mode is never remembered: the app always starts in ask. It tells the AI to inspect the " +
 			"codebase and output a concrete, numbered execution plan (goal, files, " +
 			"steps, verification, risks) before changing anything.\n\n" +
