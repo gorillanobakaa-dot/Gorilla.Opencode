@@ -30,10 +30,10 @@ const (
 // powerful first (UNLIMITED) down to the Nuclear Option (0 = disabled).
 var SubAgentPresets = []int{SubAgentsUnlimited, 100, 50, 25, 12, 6, 3, 1, SubAgentsNuclear}
 
-// DefaultMaxSubAgents preserves upstream behaviour out of the box (unlimited);
-// the user leashes it if their tier needs it. (The low-bandwidth loadout preset
-// already disables the helper tool entirely.)
-const DefaultMaxSubAgents = SubAgentsUnlimited
+// DefaultMaxSubAgents is Economy Mode (owner rule: solo, zero sub-agents unless
+// the owner explicitly asks). Helpers are opt-in: raise the leash in /context or
+// settings (subagents.max) for a session that needs them.
+const DefaultMaxSubAgents = SubAgentsNuclear
 
 var (
 	maxSubAgents  = DefaultMaxSubAgents
