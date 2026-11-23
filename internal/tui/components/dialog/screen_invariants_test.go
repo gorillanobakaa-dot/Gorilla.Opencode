@@ -285,6 +285,10 @@ func sizedDialogs(t *testing.T) map[string]func() sizedDialog {
 			return viaWindowSize{m}
 		},
 		"/reset": func() sizedDialog {
+			// The /context builder above pins the leash to Unlimited, which
+			// differs from the default and would add a "helper leash" row here.
+			// Reset to the default so /reset measures a fresh install.
+			config.SetMaxSubAgents(config.DefaultMaxSubAgents)
 			m := NewResetDialogCmp()
 			m.Init()
 			return viaWindowSize{m}
