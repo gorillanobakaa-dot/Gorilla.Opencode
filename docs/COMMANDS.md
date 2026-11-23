@@ -49,6 +49,7 @@ cost before they start. Everything else is local.
 | `/osint <question>` · `/dossier` | The serious one. Professional dossier. Burns real money. |
 | `/review [--quick|--security|--full] [--diff REF] [folder]` · `/audit` `/codereview` | Run real analysers over your code and report honestly. |
 | `/port [operation] [--onto REF] [--series DIR] [--build CMD]` · `/patch` `/backport` `/forwardport` | Move patches to another version of the code. |
+| `/work` | Pick Economy, Time-sensitive or Fast helper-agent limit. |
 | `/yolo` · `/auto` `/autopilot` `/goal` | Approve everything for this conversation. No more prompts. |
 | `/tasks` · `/task` `/agents` `/kill` | See and stop background helpers. |
 | `/helpers` · `/roles` | The three kinds of helper and how to ask for each. |
@@ -404,6 +405,18 @@ So it tells you which of those happened for every patch, and shows you the diff 
 Anything that changes your tree asks first. /port inspect never does, because it only reads.
 
 Type /port help to read this again at any time.
+
+### `/work`
+
+**Pick Economy, Time-sensitive or Fast helper-agent limit.**
+
+Three modes, saved so every conversation starts in the one you chose:
+
+economy — solo, no helper agents. The default, and the cheapest.
+time-sensitive — up to 6 helper agents at once, for a deadline.
+fast — up to 1000 helper agents. Spends the most; use it on purpose.
+
+/work shows the current one; /work <name> sets it. It is the same dial as the helper limit in /context, which can also set any number in between.
 
 ### `/yolo`
 

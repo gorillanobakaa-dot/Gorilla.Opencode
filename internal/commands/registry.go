@@ -635,7 +635,7 @@ var All = []Command{
 	{
 		Name:    "work",
 		Group:   GroupHelpers,
-		Summary: "Economy, time-sensitive or fast: how many helper agents may run.",
+		Summary: "Pick Economy, Time-sensitive or Fast helper-agent limit.",
 		Detail: "Three modes, saved so every conversation starts in the one you chose:\n\n" +
 			"economy — solo, no helper agents. The default, and the cheapest.\n" +
 			"time-sensitive — up to 6 helper agents at once, for a deadline.\n" +
