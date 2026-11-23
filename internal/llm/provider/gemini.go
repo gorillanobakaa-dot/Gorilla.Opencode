@@ -199,6 +199,7 @@ func (g *geminiClient) send(ctx context.Context, messages []message.Message, too
 	if len(tools) > 0 {
 		config.Tools = g.convertTools(tools)
 	}
+	g.applyThinking(config)
 
 	// GORILLA OVERRIDE: never swallow Create errors — a nil chat
 	// segfaults inside the SDK on the first Send.
@@ -297,6 +298,7 @@ func (g *geminiClient) stream(ctx context.Context, messages []message.Message, t
 	if len(tools) > 0 {
 		config.Tools = g.convertTools(tools)
 	}
+	g.applyThinking(config)
 
 	// GORILLA OVERRIDE: never swallow Create errors — a nil chat
 	// segfaults inside the SDK on the first SendStream.
@@ -641,4 +643,20 @@ func geminiRetryNotice(err error, attempts int) string {
 		return serverRetryNotice(code, attempts)
 	}
 	return fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, retryCeiling())
+}
+
+// applyThinking turns the effort bar's choice into a thinking budget for
+// reasoning models (same mapping as the Code Assist client).
+func (g *geminiClient) applyThinking(config *genai.GenerateContentConfig) {
+	if !g.providerOptions.model.CanReason {
+		return
+	}
+	effort := g.providerOptions.model.ResolveReasoningEffort(g.providerOptions.reasoningEffort)
+	budget, ok := caThinkingBudget(effort)
+	if !ok {
+		return
+	}
+	b := int32(budget)
+	config.ThinkingConfig = &genai.ThinkingConfig{ThinkingBudget: &b, IncludeThoughts: budget > 0}
+	logEffort(string(g.providerOptions.model.Provider), g.providerOptions.model.APIModel, effort, "thinkingBudget")
 }

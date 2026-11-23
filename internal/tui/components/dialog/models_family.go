@@ -209,8 +209,8 @@ func (m *modelDialogCmp) cycleEffort(delta int) {
 	// GORILLA FIX (2026-11-21): support ReasoningEfforts on ANY provider (not
 	// only ChatGPT), so free-tier Google Code Assist accounts get the exact
 	// same interactive Thinking Effort bar as paid accounts.
-	if model.Provider == models.ProviderChatGPT || len(model.ReasoningEfforts) > 0 {
-		efforts := model.ReasoningEfforts
+	if model.Provider == models.ProviderChatGPT || len(model.EffortOptions()) > 0 {
+		efforts := model.EffortOptions()
 		i := -1
 		if delta < 0 {
 			i = len(efforts)
@@ -260,15 +260,15 @@ func (m *modelDialogCmp) effortStops(i int) ([]effortStop, int) {
 	if i < 0 || i >= len(m.models) {
 		return nil, -1
 	}
-	if m.models[i].Provider == models.ProviderChatGPT || len(m.models[i].ReasoningEfforts) > 0 {
+	if m.models[i].Provider == models.ProviderChatGPT || len(m.models[i].EffortOptions()) > 0 {
 		model := m.models[i]
-		if len(model.ReasoningEfforts) == 0 {
+		if len(model.EffortOptions()) == 0 {
 			return nil, -1
 		}
 		selected := m.chatGPTEffort(model)
-		stops := make([]effortStop, 0, len(model.ReasoningEfforts))
+		stops := make([]effortStop, 0, len(model.EffortOptions()))
 		active := -1
-		for j, opt := range model.ReasoningEfforts {
+		for j, opt := range model.EffortOptions() {
 			stops = append(stops, effortStop{Level: opt.Effort, Description: opt.Description})
 			if opt.Effort == selected {
 				active = j

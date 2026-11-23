@@ -207,7 +207,7 @@ func (a *anthropicClient) preparedMessages(messages []anthropic.MessageParam, to
 			}
 		}
 		if messageContent != "" && a.options.shouldThink != nil && a.options.shouldThink(messageContent) {
-			thinkingParam = anthropicThinking(a.providerOptions.model.APIModel, a.providerOptions.maxTokens)
+			thinkingParam = anthropicThinking(a.providerOptions.model.APIModel, a.providerOptions.maxTokens, a.providerOptions.model.ResolveReasoningEffort(a.providerOptions.reasoningEffort))
 		}
 	}
 
@@ -530,10 +530,18 @@ var legacyBudgetThinking = []string{"claude-3", "claude-haiku-4-5", "claude-sonn
 
 // anthropicThinking returns the thinking setting a model accepts. The pinned
 // SDK (v1.4.0) has no adaptive type, so the adaptive form is sent as raw JSON.
-func anthropicThinking(apiModel string, maxTokens int64) anthropic.ThinkingConfigParamUnion {
+func anthropicThinking(apiModel string, maxTokens int64, effort string) anthropic.ThinkingConfigParamUnion {
 	for _, prefix := range legacyBudgetThinking {
 		if strings.HasPrefix(apiModel, prefix) {
-			return anthropic.ThinkingConfigParamOfEnabled(int64(float64(maxTokens) * 0.8))
+			frac := 0.8
+			switch effort {
+			case "low":
+				frac = 0.25
+			case "medium":
+				frac = 0.5
+			}
+			// budget_tokens has a 1024 floor and must stay below max_tokens.
+			return anthropic.ThinkingConfigParamOfEnabled(max(int64(float64(maxTokens)*frac), 1024))
 		}
 	}
 	adaptive := param.Override[anthropic.ThinkingConfigEnabledParam](map[string]any{"type": "adaptive"})
