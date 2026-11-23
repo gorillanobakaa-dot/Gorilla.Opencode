@@ -155,7 +155,7 @@ func FormatEffortLabel(effort string) string {
 // ID (ChatGPT, free-tier Gemini Code Assist, etc.). Antigravity variants
 // already carry their effort in Name.
 func DisplayNameWithEffort(m Model, savedEffort string) string {
-	if m.Name == "" || (m.Provider != ProviderChatGPT && len(m.ReasoningEfforts) == 0) {
+	if m.Name == "" || (m.Provider != ProviderChatGPT && len(m.EffortOptions()) == 0) {
 		return m.Name
 	}
 	effort := m.ResolveReasoningEffort(savedEffort)

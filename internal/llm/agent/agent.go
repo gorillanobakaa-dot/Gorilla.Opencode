@@ -1675,7 +1675,14 @@ func createAgentProviderWithConfig(agentName config.AgentName, agentConfig confi
 		opts = append(opts, provider.WithOpenAIOptions(provider.WithChatGPTReasoningEffort(agentConfig.ReasoningEffort)))
 	} else if model.Provider == models.ProviderGeminiCA && model.CanReason {
 		opts = append(opts, provider.WithEffort(agentConfig.ReasoningEffort))
-	} else if model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal && model.CanReason {
+	} else if model.CanReason && (model.Provider == models.ProviderGemini || model.Provider == models.ProviderAnthropic) {
+		// The effort bar's choice, resolved against this model's stops.
+		opts = append(opts, provider.WithEffort(agentConfig.ReasoningEffort))
+		if model.Provider == models.ProviderAnthropic && agentName == config.AgentCoder {
+			opts = append(opts, provider.WithAnthropicOptions(
+				provider.WithAnthropicShouldThinkFn(provider.DefaultShouldThinkFn)))
+		}
+	} else if model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderOpenRouter && model.CanReason || model.Provider == models.ProviderLocal && model.CanReason {
 		opts = append(
 			opts,
 			provider.WithOpenAIOptions(

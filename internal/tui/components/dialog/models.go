@@ -401,7 +401,7 @@ func (m *modelDialogCmp) selectCurrent() (tea.Model, tea.Cmd) {
 			chosen.ID))
 	}
 	var effort string
-	if chosen.Provider == models.ProviderChatGPT || len(chosen.ReasoningEfforts) > 0 {
+	if chosen.Provider == models.ProviderChatGPT || len(chosen.EffortOptions()) > 0 {
 		effort = m.chatGPTEffort(chosen)
 	}
 	// Leave the dialog the way the next open should find it: on a provider

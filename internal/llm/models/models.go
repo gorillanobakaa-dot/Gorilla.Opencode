@@ -66,8 +66,50 @@ type ReasoningEffort struct {
 	Description string `json:"description,omitempty"`
 }
 
+// defaultEfforts is the low/medium/high bar given to a reasoning model whose
+// catalogue lists no stops. Only providers whose client turns the choice into a
+// real request parameter are listed: a bar that changes nothing is fake parity.
+func defaultEfforts() []ReasoningEffort {
+	return []ReasoningEffort{
+		{Effort: "low", Description: "Faster responses, lighter reasoning"},
+		{Effort: "medium", Description: "Balanced speed and reasoning quality"},
+		{Effort: "high", Description: "Deeper reasoning for complex problems"},
+	}
+}
+
+// EffortOptions returns the effort stops to show for this model: its own list,
+// or the default triple for a reasoning model on a provider that honours it
+// (Gemini API key, OpenRouter, Anthropic budget-thinking models). Free and paid
+// accounts of one model therefore get the same bar.
+func (m Model) EffortOptions() []ReasoningEffort {
+	if len(m.ReasoningEfforts) > 0 || !m.CanReason {
+		return m.ReasoningEfforts
+	}
+	switch m.Provider {
+	case ProviderGemini, ProviderOpenRouter:
+		return defaultEfforts()
+	case ProviderAnthropic:
+		if AnthropicBudgetThinking(m.APIModel) {
+			return defaultEfforts()
+		}
+	}
+	return nil
+}
+
+// AnthropicBudgetThinking reports whether a Claude model takes thinking as a
+// token budget (and so can honour an effort level). Newer models take
+// {"type":"adaptive"} and have no budget to scale.
+func AnthropicBudgetThinking(apiModel string) bool {
+	for _, p := range []string{"claude-3", "claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-5", "claude-opus-4-1", "claude-opus-4-0", "claude-sonnet-4-0", "claude-opus-4-2025", "claude-sonnet-4-2025"} {
+		if strings.HasPrefix(apiModel, p) {
+			return true
+		}
+	}
+	return false
+}
+
 func (m Model) SupportsReasoningEffort(value string) bool {
-	for _, option := range m.ReasoningEfforts {
+	for _, option := range m.EffortOptions() {
 		if option.Effort == value {
 			return true
 		}
@@ -81,6 +123,9 @@ func (m Model) ResolveReasoningEffort(saved string) string {
 	}
 	if m.SupportsReasoningEffort(m.DefaultReasoningEffort) {
 		return m.DefaultReasoningEffort
+	}
+	if m.SupportsReasoningEffort("medium") {
+		return "medium"
 	}
 	return ""
 }
