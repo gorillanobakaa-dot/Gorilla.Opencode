@@ -593,14 +593,14 @@ var All = []Command{
 	{
 		Name:    "plan",
 		Group:   GroupSession,
-		Summary: "Plan mode: write and approve a step-by-step plan first.",
-		Detail: "Switches to read-only plan mode and tells the AI to inspect the " +
+		Summary: "Plan mode: plan first. /plan off leaves it, /plan go runs it.",
+		Detail: "Switches to plan mode: the AI may read and inspect everything (files, screenshots and OCR, searches; shell commands ask first) and may write the plan file, but changes nothing else until you approve. Plan mode is never remembered: the app always starts in ask. It tells the AI to inspect the " +
 			"codebase and output a concrete, numbered execution plan (goal, files, " +
 			"steps, verification, risks) before changing anything.\n\n" +
 			"  /plan          turn plan mode on (works mid-turn too)\n" +
 			"  /plan <task>   turn plan mode on and generate a plan for <task>\n" +
 			"  /plan go       approve the plan, restore your previous mode, and execute strictly\n" +
-			"  /plan off      exit plan mode and restore your previous permission mode",
+			"  /plan off      EXIT plan mode and restore your previous permission mode (also /mode ask, or Shift+Tab)",
 	},
 	{
 		Name:    "init",
@@ -640,7 +640,7 @@ var All = []Command{
 			"economy — solo, no helper agents. The default, and the cheapest.\n" +
 			"time-sensitive — up to 6 helper agents at once, for a deadline.\n" +
 			"fast — up to 1000 helper agents. Spends the most; use it on purpose.\n\n" +
-			"/work shows the current one; /work <name> sets it. It is the same dial " +
+			"HOW TO PICK: type /work followed by the name, e.g. /work time-sensitive. /work alone shows the current one. It is the same dial " +
 			"as the helper limit in /context, which can also set any number in between.",
 	},
 	{

@@ -405,6 +405,14 @@ func Load(workingDir string, debug bool) (*Config, error) {
 	// the lower layer and must not import config.
 	fileutil.SetWorkspaceRootsFn(Roots)
 
+	// GORILLA FIX (2026-11-23): plan mode is a per-task state, never a standing
+	// one. /plan persisted it, so the next launch started read-only and the owner
+	// was refused on the first command. Start in "ask" instead (in memory; the
+	// file is rewritten on the next mode change).
+	if cfg.Permissions.Mode == PermissionPlan {
+		cfg.Permissions.Mode = PermissionAsk
+	}
+
 	// Validate configuration
 	if err := Validate(); err != nil {
 		return cfg, fmt.Errorf("config validation failed: %w", err)

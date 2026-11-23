@@ -58,8 +58,21 @@ func (c *antigravityClient) buildEnvelope(messages []message.Message, ts []tools
 	if c.creds != nil {
 		project = c.creds.ProjectID
 	}
-	logEffort(string(c.providerOptions.model.Provider), c.providerOptions.model.APIModel,
-		effortInModelID(c.providerOptions.model.APIModel), "model id suffix")
+	if effortInModelID(c.providerOptions.model.APIModel) != "" {
+		logEffort(string(c.providerOptions.model.Provider), c.providerOptions.model.APIModel,
+			effortInModelID(c.providerOptions.model.APIModel), "model id suffix")
+	} else if c.providerOptions.model.CanReason && len(c.providerOptions.model.EffortOptions()) > 0 {
+		// One id, no effort word (Gemini 4 Hydrogen Sonar): the chosen level is
+		// sent as the thinking budget.
+		effort := c.providerOptions.model.ResolveReasoningEffort(c.providerOptions.reasoningEffort)
+		if budget, ok := caThinkingBudget(effort); ok {
+			req.GenerationConfig["thinkingConfig"] = map[string]any{
+				"thinkingBudget":  budget,
+				"includeThoughts": budget > 0,
+			}
+			logEffort(string(c.providerOptions.model.Provider), c.providerOptions.model.APIModel, effort, "thinkingBudget")
+		}
+	}
 	return caEnvelope{
 		Model:       c.providerOptions.model.APIModel,
 		Project:     project,

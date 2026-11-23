@@ -83,11 +83,11 @@ func TestAcceptEditsApprovesEditsInsideTheRootsOnly(t *testing.T) {
 func TestPlanModeRefusesWithoutAskingButStillAsksForTheWeb(t *testing.T) {
 	s := withMode(t, config.PermissionPlan)
 	prompts := countPrompts(t, s)
-	if s.Request(editReq()) || s.Request(bashReq()) {
-		t.Fatal("plan mode approved a change")
+	if s.Request(editReq()) {
+		t.Fatal("plan mode approved a source edit")
 	}
 	if *prompts != 0 {
-		t.Fatalf("plan mode published %d prompts; it must refuse without asking", *prompts)
+		t.Fatalf("plan mode published %d prompts; a source edit must be refused without asking", *prompts)
 	}
 	web := CreatePermissionRequest{SessionID: "conversation", ToolName: "web_fetch", Action: "fetch",
 		Path: config.WorkingDirectory(), GrantKey: "https://example.test", Egress: true}
@@ -166,7 +166,8 @@ func TestRefusedInPlanModeIsNotTheDenySentinel(t *testing.T) {
 }
 
 func TestPlanDocumentWritesAreAllowedSourceIsNot(t *testing.T) {
-	for p, want := range map[string]bool{"PLAN.md": true, "docs/ROADMAP.md": true, "main.go": false, "plan.go": false, "notes.md": false, "": false} {
+	for p, want := range map[string]bool{"PLAN.md": true, "docs/ROADMAP.md": true, "main.go": false, "plan.go": false, "notes.md": false, "": false,
+		"Improvements.gorilla.opencode/fix.me": true, "src/improvements/x.go": false} {
 		if isPlanDocument(p) != want {
 			t.Errorf("isPlanDocument(%q) = %v, want %v", p, !want, want)
 		}
