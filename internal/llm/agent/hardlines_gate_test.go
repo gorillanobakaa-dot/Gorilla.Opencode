@@ -103,7 +103,8 @@ var qwenReplay = []struct{ tool, input string }{
 func replayWithStandIn(t *testing.T, why string) {
 	t.Helper()
 	t.Logf("REAL-FIELDKIT REPLAY NOT RUN (%s): checking refusal plumbing with the stand-in hook only", why)
-	t.Setenv("GORILLA_HARDLINES_CMD", standInDeny())
+	// deny-all hook: this checks the refusal plumbing for every replay case, not Fieldkit's rules.
+	t.Setenv("GORILLA_HARDLINES_CMD", pick(`[Console]::In.ReadToEnd() | Out-Null; Write-Output '`+denyJSON+`'`, `cat >/dev/null; echo '`+denyJSON+`'`))
 	a, _ := hardlinesAgent(t, config.AgentCoder)
 	for _, c := range qwenReplay {
 		if got := a.runBeforeToolHooks(context.Background(), "s", c.tool, c.input); !strings.HasPrefix(got, HookRefusedPrefix) {
