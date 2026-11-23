@@ -6,6 +6,7 @@ package permission
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/opencode-ai/opencode/internal/config"
@@ -144,6 +145,30 @@ func TestModeCycleAndSpellings(t *testing.T) {
 	for in, want := range map[string]string{"yolo": "auto", "Accept Edits": "accept-edits", "readonly": "plan", "default": "ask", "bogus": ""} {
 		if got := config.NormalisePermissionMode(in); got != want {
 			t.Errorf("NormalisePermissionMode(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// A refusal by plan mode must not look like a person's Deny: the agent loop ends
+// the batch on ErrorPermissionDenied, and nobody was asked here.
+func TestRefusedInPlanModeIsNotTheDenySentinel(t *testing.T) {
+	withMode(t, config.PermissionPlan)
+	err := Refused("edit")
+	if err == nil || errors.Is(err, ErrorPermissionDenied) {
+		t.Fatalf("plan-mode refusal must be a plain error, got %v", err)
+	}
+	if err := config.SetPermissionMode(config.PermissionAsk); err != nil {
+		t.Fatal(err)
+	}
+	if !errors.Is(Refused("edit"), ErrorPermissionDenied) {
+		t.Fatalf("outside plan mode the sentinel must stay")
+	}
+}
+
+func TestPlanDocumentWritesAreAllowedSourceIsNot(t *testing.T) {
+	for p, want := range map[string]bool{"PLAN.md": true, "docs/ROADMAP.md": true, "main.go": false, "plan.go": false, "notes.md": false, "": false} {
+		if isPlanDocument(p) != want {
+			t.Errorf("isPlanDocument(%q) = %v, want %v", p, !want, want)
 		}
 	}
 }

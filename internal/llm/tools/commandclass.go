@@ -42,6 +42,7 @@ var readOnlyAdditions = []string{
 	"command -v", "diff", "cmp", "md5sum", "sha256sum", "sha1sum", "shasum", "md5",
 	"sort", "cut", "tr", "column", "od", "hexdump", "xxd", "strings", "tac", "nl", "zcat",
 	"jq", "readelf", "objdump", "nm",
+	"git count-objects", "git worktree list",
 	// Linux hardware and kernel diagnosis (owner 2026-11-14): all read; the
 	// words that make one write (iw set, ip link set, rfkill block ...) are in
 	// unsafeFlagsFor.

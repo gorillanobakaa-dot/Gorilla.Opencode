@@ -215,7 +215,7 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 				},
 			)
 			if !p {
-				return ToolResponse{}, permission.ErrorPermissionDenied
+				return ToolResponse{}, permission.Refused("patch")
 			}
 		case diff.ActionUpdate:
 			currentContent := ""
@@ -267,7 +267,7 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 				},
 			)
 			if !p {
-				return ToolResponse{}, permission.ErrorPermissionDenied
+				return ToolResponse{}, permission.Refused("patch")
 			}
 		case diff.ActionDelete:
 			patchDiff, _, _ := diff.GenerateDiff(*change.OldContent, "", path)
@@ -287,7 +287,7 @@ func (p *patchTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 				},
 			)
 			if !p {
-				return ToolResponse{}, permission.ErrorPermissionDenied
+				return ToolResponse{}, permission.Refused("patch")
 			}
 		}
 	}
