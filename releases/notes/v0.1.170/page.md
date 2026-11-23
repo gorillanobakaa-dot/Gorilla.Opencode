@@ -29,26 +29,26 @@ This is the complete explanation, not a summary of one. Nothing below is behind 
 
 <!-- plain-language track: in full, on this page -->
 
-## What changed
+### What changed
 
 1. `/plan` lets the AI look at everything (files, screenshots, searches) and save its plan file. It changes nothing else until you say go.
 2. The program never starts in plan mode.
 3. `/plan off` and `/work` choices are explained in `/help`, and their messages stay on screen.
 4. Gemini 4 Hydrogen (Sonar) has an effort meter.
 
-## Should you download it?
+### Should you download it?
 
 Yes, if you use `/plan`.
 
-### Screenshots
+#### Screenshots
 
-![Plan mode 1](../../../docs/screenshots/v0.1.170/plan-mode-1.png)
-![Plan mode 2](../../../docs/screenshots/v0.1.170/plan-mode-2.png)
-![Plan mode 3](../../../docs/screenshots/v0.1.170/plan-mode-3.png)
-![Plan mode 4](../../../docs/screenshots/v0.1.170/plan-mode-4.png)
-![Plan mode 5](../../../docs/screenshots/v0.1.170/plan-mode-5.png)
-![Plan mode 6](../../../docs/screenshots/v0.1.170/plan-mode-6.png)
-![Plan mode 7](../../../docs/screenshots/v0.1.170/plan-mode-7.png)
+![Plan mode 1](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-1.png)
+![Plan mode 2](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-2.png)
+![Plan mode 3](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-3.png)
+![Plan mode 4](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-4.png)
+![Plan mode 5](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-5.png)
+![Plan mode 6](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-6.png)
+![Plan mode 7](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-7.png)
 
 ---
 
@@ -58,18 +58,4 @@ Written for someone who will audit, fork or change the code. It covers the same 
 
 <!-- developer track: in full, on this page -->
 
-### Summary
 
-- `internal/permission/mode.go`: plan mode allows reads, lets `bash` take the normal ask path, and allows `write`/`edit` of plan documents (`isPlanDocument`: .md/.txt/.me/.json/.yaml/.yml with plan/roadmap/strategy/rfc/todo/improvement in any path component; outside the workspace it asks). Other tools stay refused.
-- `internal/llm/agent/agent.go`: `planModeDirective` reworded to match.
-- `internal/config/config.go`: a persisted `plan` mode loads as `ask`.
-- `internal/commands/registry.go`, `internal/tui/tui.go`: `/plan off` and `/work` pick help; `ReportInfoEcho` keeps the messages in the transcript.
-- `internal/llm/models/models.go`, `internal/llm/provider/antigravity.go`: single-id Gemini Antigravity models get `EffortOptions()`, and `thinkingConfig.thinkingBudget` is sent.
-
-### Security posture
-
-No new network calls, telemetry, providers or dependencies. Plan-mode shell commands and out-of-workspace plan writes still ask.
-
-### Not verified
-
-Live TUI run; live Hydrogen API call; the `view` refusal by the owner's Fieldkit tool-router hook is not changed (hook not weakened).

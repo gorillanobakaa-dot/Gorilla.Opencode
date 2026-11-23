@@ -13,10 +13,10 @@ Yes, if you use `/plan`.
 
 ### Screenshots
 
-![Plan mode 1](../../../docs/screenshots/v0.1.170/plan-mode-1.png)
-![Plan mode 2](../../../docs/screenshots/v0.1.170/plan-mode-2.png)
-![Plan mode 3](../../../docs/screenshots/v0.1.170/plan-mode-3.png)
-![Plan mode 4](../../../docs/screenshots/v0.1.170/plan-mode-4.png)
-![Plan mode 5](../../../docs/screenshots/v0.1.170/plan-mode-5.png)
-![Plan mode 6](../../../docs/screenshots/v0.1.170/plan-mode-6.png)
-![Plan mode 7](../../../docs/screenshots/v0.1.170/plan-mode-7.png)
+![Plan mode 1](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-1.png)
+![Plan mode 2](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-2.png)
+![Plan mode 3](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-3.png)
+![Plan mode 4](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-4.png)
+![Plan mode 5](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-5.png)
+![Plan mode 6](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-6.png)
+![Plan mode 7](https://raw.githubusercontent.com/gorillanobakaa-dot/Gorilla.Opencode/main/docs/screenshots/v0.1.170/plan-mode-7.png)
