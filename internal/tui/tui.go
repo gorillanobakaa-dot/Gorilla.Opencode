@@ -386,6 +386,7 @@ type appModel struct {
 	isCompacting      bool
 	compactingMessage string
 	compactAfterTurn  bool
+	resentWarned      map[string]bool
 	planReturnMode    string
 }
 
@@ -1322,6 +1323,15 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// That lag is what the hard guard in agent/contextbudget.go exists to
 			// catch. This threshold's job is to make that guard rare, so it fires
 			// at 85% of the USABLE window rather than 95% of the total.
+			// Resent-token warning, once per session: when almost all of the input
+			// billed so far was the conversation sent again, a fresh session is cheaper.
+			if sel := a.selectedSession; sel.ID != "" && sel.CumulativePromptTokens >= 200000 && sel.ResentShare() >= 0.9 && !a.resentWarned[sel.ID] {
+				if a.resentWarned == nil {
+					a.resentWarned = map[string]bool{}
+				}
+				a.resentWarned[sel.ID] = true
+				cmds = append(cmds, util.ReportWarn(fmt.Sprintf("%d%% of this session's input was the old conversation re-sent. Run /compact or start a new session to cut cost.", int(100*sel.ResentShare()))))
+			}
 			usable := agent.UsableWindow(model)
 			if usable > 0 && tokens >= int64(float64(usable)*0.85) && config.Get().AutoCompact {
 				cmds = append(cmds, util.CmdHandler(startCompactSessionMsg{}))
