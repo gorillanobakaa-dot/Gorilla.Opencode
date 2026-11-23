@@ -179,7 +179,7 @@ func (w *writeTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error
 		},
 	)
 	if !p {
-		return ToolResponse{}, permission.ErrorPermissionDenied
+		return ToolResponse{}, permission.Refused("write")
 	}
 
 	// GORILLA FIX (2026-08-18): re-check staleness AFTER the grant.

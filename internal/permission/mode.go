@@ -5,7 +5,10 @@ package permission
 // file holds what each one does to a request.
 
 import (
+	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/opencode-ai/opencode/internal/config"
 )
@@ -35,6 +38,40 @@ func PlanModeRefusal(toolName string) string {
 		"the user can read and approve. The user switches modes with /mode or Shift+Tab.", toolName)
 }
 
+// Refused is the error a tool returns when its permission request was not
+// granted. A person's Deny (or a refusal by a rule) is ErrorPermissionDenied,
+// which the agent loop treats as the end of the batch. Plan mode refuses
+// without asking anyone, so it is an ordinary tool error carrying the plan-mode
+// explanation: the model reads it, the other calls in the same message still
+// run, and the turn is not ended (found by audit 2026-11-23: one refused edit
+// cancelled every other call as "canceled by user").
+func Refused(toolName string) error {
+	if config.PermissionMode() == config.PermissionPlan {
+		return errors.New(PlanModeRefusal(toolName))
+	}
+	return ErrorPermissionDenied
+}
+
+// isPlanDocument reports whether path is the plan document itself (PLAN.md,
+// *plan*.md, roadmap/strategy/rfc/todo notes). Plan mode lets the agent record
+// its plan there; source files stay refused.
+func isPlanDocument(path string) bool {
+	if path == "" {
+		return false
+	}
+	clean := filepath.Clean(path)
+	base := strings.ToLower(filepath.Base(clean))
+	if strings.ToLower(filepath.Ext(clean)) != ".md" {
+		return false
+	}
+	for _, w := range []string{"plan", "roadmap", "strategy", "rfc", "todo"} {
+		if strings.Contains(base, w) {
+			return true
+		}
+	}
+	return false
+}
+
 // modeDecision applies the standing mode to a request BEFORE grants are
 // consulted. decided=false means "carry on with the normal path".
 //
@@ -50,6 +87,10 @@ func (s *permissionService) modeDecision(opts CreatePermissionRequest, root stri
 	case config.PermissionPlan:
 		if opts.Egress {
 			return false, false
+		}
+		// The plan document itself may be written; source code may not.
+		if (opts.ToolName == "write" || opts.ToolName == "edit") && isPlanDocument(opts.Path) && s.mustAskAnyway(opts, root) == "" {
+			return true, true
 		}
 		return true, false
 	case config.PermissionAcceptEdits:

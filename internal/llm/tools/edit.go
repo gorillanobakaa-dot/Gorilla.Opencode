@@ -209,7 +209,7 @@ func (e *editTool) createNewFile(ctx context.Context, filePath, content string) 
 		},
 	)
 	if !p {
-		return ToolResponse{}, permission.ErrorPermissionDenied
+		return ToolResponse{}, permission.Refused("edit")
 	}
 
 	if err = os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
@@ -323,7 +323,7 @@ func (e *editTool) deleteContent(ctx context.Context, filePath, oldString string
 		},
 	)
 	if !p {
-		return ToolResponse{}, permission.ErrorPermissionDenied
+		return ToolResponse{}, permission.Refused("edit")
 	}
 
 	err = os.WriteFile(filePath, []byte(newContent), 0o644)
@@ -443,7 +443,7 @@ func (e *editTool) replaceContent(ctx context.Context, filePath, oldString, newS
 		},
 	)
 	if !p {
-		return ToolResponse{}, permission.ErrorPermissionDenied
+		return ToolResponse{}, permission.Refused("edit")
 	}
 
 	err = os.WriteFile(filePath, []byte(newContent), 0o644)

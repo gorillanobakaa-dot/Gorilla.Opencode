@@ -119,6 +119,7 @@ var safeReadOnlyCommands = []string{
 	// egress, not a read. Flags that write, delete or run a program are caught
 	// by unsafeFlags in commandgate.go.
 	"git status", "git log", "git diff", "git show", "git branch", "git tag", "git remote", "git ls-files",
+	"git count-objects", "git worktree list", "git rev-list", "git check-ignore", "git check-attr",
 	"git rev-parse", "git config --get", "git config --list", "git describe", "git blame", "git grep", "git shortlog",
 
 	// "go fmt" (rewrites files), "go mod" (downloads) and "go env" (-w writes
@@ -457,7 +458,7 @@ func (b *bashTool) Run(ctx context.Context, call ToolCall) (ToolResponse, error)
 					"Gorilla OpenCode interactively and approve it when asked",
 					permission.ErrorPermissionDenied, irreversible)
 			}
-			return ToolResponse{}, permission.ErrorPermissionDenied
+			return ToolResponse{}, permission.Refused("bash")
 		}
 	}
 	// Every embedded helper the command calls by name is hash-checked (and
