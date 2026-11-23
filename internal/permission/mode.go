@@ -89,9 +89,15 @@ func (s *permissionService) modeDecision(opts CreatePermissionRequest, root stri
 			return false, false
 		}
 		// The plan document itself may be written; source code may not.
-		if (opts.ToolName == "write" || opts.ToolName == "edit") && isPlanDocument(opts.Path) && s.mustAskAnyway(opts, root) == "" {
+		// GORILLA FIX (2026-11-23): write and edit put the WORKSPACE ROOT in
+		// Path (permissionScope) and the file itself in GrantKey, so testing
+		// Path alone never matched a plan file and every plan write was
+		// refused: /plan could not write its own plan. Test the file.
+		if (opts.ToolName == "write" || opts.ToolName == "edit") &&
+			(isPlanDocument(opts.GrantKey) || isPlanDocument(opts.Path)) && s.mustAskAnyway(opts, root) == "" {
 			return true, true
 		}
+		s.markPolicyRefusal(root, PlanModeRefusal(opts.ToolName))
 		return true, false
 	case config.PermissionAcceptEdits:
 		if editTools[opts.ToolName] && s.mustAskAnyway(opts, root) == "" {

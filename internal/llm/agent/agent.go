@@ -1012,6 +1012,19 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
 					goto out
 				}
 				if errors.Is(toolErr, permission.ErrorPermissionDenied) {
+					if why, ok := permission.TakePolicyRefusal(sessionID); ok {
+						// GORILLA FIX (2026-11-23): refused with nobody asked
+						// (mandate, unattended irreversible action). That is a
+						// per-call error: the model reads it, the other calls
+						// in the batch still run, the turn carries on.
+						ran[i] = false
+						toolResults[i] = message.ToolResult{
+							ToolCallID: toolCall.ID,
+							Content:    permission.PolicyRefusalResult(why),
+							IsError:    true,
+						}
+						continue
+					}
 					ran[i] = false // the person said no; the model did not loop
 					// The tool may have wrapped the sentinel with its reason
 					// ("permission denied: this command was NOT run, because

@@ -327,6 +327,10 @@ type permissionService struct {
 	// noAnswer records, per root session, that the last refusal was a timeout:
 	// nobody answered within PermissionWait. See TakeNoAnswer.
 	noAnswer map[string]bool
+	// policyRefused records, per root session, why the last request was refused
+	// WITHOUT asking anyone (mandate, unattended irreversible action, plan
+	// mode). See TakePolicyRefusal.
+	policyRefused map[string]string
 }
 
 // rootSession walks a helper session up to the conversation it belongs to.
@@ -745,6 +749,47 @@ func TakeNoAnswer(sessionID string) bool {
 	return was
 }
 
+func (s *permissionService) markPolicyRefusal(root, why string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.policyRefused == nil {
+		s.policyRefused = make(map[string]string)
+	}
+	s.policyRefused[root] = why
+}
+
+// TakePolicyRefusal reports, once, why the last request in this session tree
+// was refused without asking anyone (a mandate, an unattended irreversible
+// action), and clears the mark. The agent turns it into a per-call error the
+// model reads, so one refused call no longer cancels the batch or ends the turn.
+func TakePolicyRefusal(sessionID string) (string, bool) {
+	svc, ok := active.(*permissionService)
+	if !ok || sessionID == "" {
+		return "", false
+	}
+	svc.mu.Lock()
+	defer svc.mu.Unlock()
+	root := svc.rootSession(sessionID)
+	why, was := svc.policyRefused[root]
+	delete(svc.policyRefused, root)
+	return why, was
+}
+
+// PolicyRefusalResult is what the model reads for a call refused without a question.
+func PolicyRefusalResult(why string) string {
+	return "Not run: " + why + ". Nobody was asked and nobody will be. Do not retry it or a variant; " +
+		"carry on with the rest of the task another way, or record it as blocked in your reply."
+}
+
+// envUnattended reports whether GORILLA_UNATTENDED asks for a run with no questions.
+func envUnattended() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("GORILLA_UNATTENDED"))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
 // NoAnswerResult is what the model and the person read when a permission
 // question timed out.
 func NoAnswerResult() string {
@@ -790,6 +835,15 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	if config.PermissionMode() == config.PermissionAuto {
 		autoApproved = true
 	}
+	// GORILLA OVERRIDE (2026-11-23): GORILLA_UNATTENDED=1 is the long-horizon
+	// switch for the TUI. It was only reachable through `-p`, so a long job in
+	// the interactive app flooded the owner with questions (reads outside the
+	// root, OCR, screenshots) even in YOLO. Set, nobody is asked anything: the
+	// carve-outs log, irreversible actions are refused per call.
+	envUnattended := envUnattended()
+	if envUnattended {
+		autoApproved = true
+	}
 	if decided, answer := s.modeDecision(opts, root); decided {
 		if !answer {
 			logging.Info("plan mode: refused without asking", "tool", opts.ToolName,
@@ -822,7 +876,7 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 			return true
 		}
 		s.mu.RLock()
-		unattended := s.unattended
+		unattended := s.unattended || envUnattended
 		s.mu.RUnlock()
 		if unattended && opts.Irreversible != "" {
 			// The other carve-outs log and proceed when nobody is watching,
@@ -831,6 +885,7 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 			logging.Warn("refusing an irreversible action because nobody is watching",
 				"tool", opts.ToolName, "action", opts.Action, "reason", override,
 				"grant_key", opts.GrantKey, "session", root)
+			s.markPolicyRefusal(root, "this cannot be undone ("+opts.Irreversible+") and nobody is watching, so it was refused")
 			return false
 		}
 		if unattended {
@@ -891,6 +946,7 @@ func (s *permissionService) Request(opts CreatePermissionRequest) bool {
 	if mand != nil {
 		logging.Warn("mandate: refused without asking (outside the job's pre-approval)",
 			"tool", opts.ToolName, "action", opts.Action, "grant_key", opts.GrantKey, "session", root)
+		s.markPolicyRefusal(root, "it is outside the pre-approved list for this unattended job (mandate)")
 		return false
 	}
 
