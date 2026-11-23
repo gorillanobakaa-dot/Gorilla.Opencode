@@ -25,7 +25,7 @@ cost before they start. Everything else is local.
 | `/message NAME text` | Send a short message to another session. |
 | `/export` | Save this conversation to a file. |
 | `/compact` · `/summarize` `/summarise` | Squeeze the conversation down so it keeps working. |
-| `/plan` | Plan mode: write and approve a step-by-step plan first. |
+| `/plan` | Plan first. /plan off leaves it, /plan go runs it. |
 | `/mode` · `/permissions` | How much the AI may do before asking. Shift+Tab cycles. |
 | `/cd [folder]` | Switch to working in one folder. |
 | `/add-dir` · `/adddir` `/dirs` `/roots` | Work in more than one folder at once. |
@@ -156,14 +156,14 @@ Works mid-session: if the agent is mid-turn, /compact queues itself and runs as 
 
 ### `/plan`
 
-**Plan mode: write and approve a step-by-step plan first.**
+**Plan first. /plan off leaves it, /plan go runs it.**
 
-Switches to read-only plan mode and tells the AI to inspect the codebase and output a concrete, numbered execution plan (goal, files, steps, verification, risks) before changing anything.
+Switches to plan mode: the AI may read and inspect everything (files, screenshots and OCR, searches; shell commands ask first) and may write the plan file, but changes nothing else until you approve. Plan mode is never remembered: the app always starts in ask. It tells the AI to inspect the codebase and output a concrete, numbered execution plan (goal, files, steps, verification, risks) before changing anything.
 
 /plan          turn plan mode on (works mid-turn too)
   /plan <task>   turn plan mode on and generate a plan for <task>
   /plan go       approve the plan, restore your previous mode, and execute strictly
-  /plan off      exit plan mode and restore your previous permission mode
+  /plan off      EXIT plan mode and restore your previous permission mode (also /mode ask, or Shift+Tab)
 
 ### `/mode`
 
@@ -416,7 +416,7 @@ economy — solo, no helper agents. The default, and the cheapest.
 time-sensitive — up to 6 helper agents at once, for a deadline.
 fast — up to 1000 helper agents. Spends the most; use it on purpose.
 
-/work shows the current one; /work <name> sets it. It is the same dial as the helper limit in /context, which can also set any number in between.
+HOW TO PICK: type /work followed by the name, e.g. /work time-sensitive. /work alone shows the current one. It is the same dial as the helper limit in /context, which can also set any number in between.
 
 ### `/yolo`
 

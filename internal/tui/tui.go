@@ -2014,14 +2014,16 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// leash by name (config/workmode.go).
 			want := strings.TrimSpace(msg.Args)
 			if want == "" {
-				return a, util.ReportInfo(fmt.Sprintf("Work mode: %s. Options: economy (solo, 0 helpers), time-sensitive (6), fast (1000). /work <name> sets one.", config.CurrentWorkMode()))
+				// GORILLA FIX (2026-11-23): Echo keeps the text in the transcript; the
+				// status-bar toast alone vanished after ~10 s ("flashes and disappears").
+				return a, util.ReportInfoEcho(fmt.Sprintf("Work mode: %s. To pick one, type /work economy (solo, no helpers), /work time-sensitive (up to 6 helpers) or /work fast (up to 1000 helpers).", config.CurrentWorkMode()))
 			}
 			wm := config.ParseWorkMode(want)
 			if wm == nil {
 				return a, util.ReportError(fmt.Errorf("unknown work mode %q — use economy, time-sensitive or fast", want))
 			}
 			config.SetWorkMode(*wm)
-			return a, util.ReportInfo(fmt.Sprintf("Work mode: %s — %s.", wm.Name, wm.Layman))
+			return a, util.ReportInfoEcho(fmt.Sprintf("Work mode: %s — %s.", wm.Name, wm.Layman))
 		case "yolo", "auto", "autopilot", "goal":
 			// GORILLA OVERRIDE (2026-11-21): /yolo works mid-turn.
 			//
@@ -2934,11 +2936,11 @@ func (a appModel) handlePlanCommand(rawArgs string) (tea.Model, tea.Cmd) {
 	}
 	modeCmd := a.setPermissionMode(config.PermissionPlan)
 	if arg == "" {
-		note := "PLAN MODE ON (read-only) — the AI will write a numbered execution plan and cannot edit files or run commands until you approve. Type /plan <task> to plan a job, /plan go to execute, or /plan off to exit."
+		note := "PLAN MODE ON — the AI may read, search and inspect freely (shell reads, files, screenshots/OCR) and may write the plan file, but changes nothing else. Type /plan <task> to plan a job, /plan go to approve and execute, or /plan off to leave plan mode."
 		if busy {
 			note += " The running turn carries on."
 		}
-		return a, tea.Batch(modeCmd, util.ReportInfo(note))
+		return a, tea.Batch(modeCmd, util.ReportInfoEcho(note))
 	}
 	return a, tea.Batch(modeCmd, util.CmdHandler(chat.SendMsg{Text: arg}))
 }

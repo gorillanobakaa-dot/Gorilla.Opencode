@@ -729,11 +729,11 @@ func sliceFromSummary(msgs []message.Message, summaryID string) []message.Messag
 // planModeDirective is attached on the wire (never persisted to history) when
 // standing permission mode is "plan", so the model writes a concrete numbered
 // plan instead of wasting tokens trying mutating tools and getting refused.
-const planModeDirective = "[STRUCTURED PLAN MODE — READ-ONLY]\n" +
-	"Mutating tools (edit, write, patch, non-read-only bash) are disabled in this mode.\n" +
-	"1. Inspect only what you need using read-only tools.\n" +
-	"2. Produce a concrete numbered execution plan covering: Goal, Files to change (exact paths), Numbered steps, Verification, and Risks.\n" +
-	"3. Do NOT attempt edits or commands. Stop after presenting the plan and wait for the owner to approve (/plan go or /plan off). Once approved, follow the numbered plan strictly without deviating."
+const planModeDirective = "[STRUCTURED PLAN MODE]\n" +
+	"You may read and inspect freely: view/read files, search, read screenshots (OCR), and run shell commands (the person is asked first). You may write or create the plan file (a plan/roadmap/todo/improvements document, e.g. PLAN.md or fix.me). You must not change anything else (no source edits, no patches) until the owner approves.\n" +
+	"1. Inspect what you need.\n" +
+	"2. Produce a concrete numbered execution plan covering: Goal, Files to change (exact paths), Numbered steps, Verification, and Risks. Save it to a plan file if asked.\n" +
+	"3. Stop after presenting the plan and wait for the owner to approve (/plan go or /plan off). Once approved, follow the numbered plan strictly without deviating."
 
 // withPlanDirective returns a wire copy of msgHistory with planModeDirective
 // appended to the final User message when structured plan mode is active.

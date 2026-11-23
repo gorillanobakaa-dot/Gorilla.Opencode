@@ -92,6 +92,15 @@ func (m Model) EffortOptions() []ReasoningEffort {
 		if AnthropicBudgetThinking(m.APIModel) {
 			return defaultEfforts()
 		}
+	case ProviderAntigravity:
+		// GORILLA FIX (2026-11-23): a Gemini model the backend serves under ONE
+		// id with no effort word (gemini-4-hydrogen-sonar) had no meter, because
+		// the picker only builds one from per-effort ids. The client now sends
+		// thinkingConfig for it, so the bar is real. Ids that carry an effort
+		// suffix keep their family bar.
+		if _, _, e := FamilyOf(m); e == "" && strings.Contains(strings.ToLower(m.APIModel), "gemini") {
+			return defaultEfforts()
+		}
 	}
 	return nil
 }

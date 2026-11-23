@@ -52,21 +52,29 @@ func Refused(toolName string) error {
 	return ErrorPermissionDenied
 }
 
-// isPlanDocument reports whether path is the plan document itself (PLAN.md,
-// *plan*.md, roadmap/strategy/rfc/todo notes). Plan mode lets the agent record
-// its plan there; source files stay refused.
+// isPlanDocument reports whether path is a plan document: a note file
+// (.md .txt .me .json .yaml .yml) whose name holds plan/roadmap/strategy/rfc/
+// todo/improvement, or any note file inside a folder named like that
+// (GORILLA FIX 2026-11-23: the owner's plan file is fix.me in an
+// "Improvements" folder, which the old .md-only rule refused). Source code
+// extensions never match.
 func isPlanDocument(path string) bool {
 	if path == "" {
 		return false
 	}
 	clean := filepath.Clean(path)
-	base := strings.ToLower(filepath.Base(clean))
-	if strings.ToLower(filepath.Ext(clean)) != ".md" {
+	switch strings.ToLower(filepath.Ext(clean)) {
+	case ".md", ".txt", ".me", ".json", ".yaml", ".yml":
+	default:
 		return false
 	}
-	for _, w := range []string{"plan", "roadmap", "strategy", "rfc", "todo"} {
-		if strings.Contains(base, w) {
-			return true
+	words := []string{"plan", "roadmap", "strategy", "rfc", "todo", "improvement"}
+	parts := strings.Split(strings.ToLower(filepath.ToSlash(clean)), "/")
+	for _, part := range parts {
+		for _, w := range words {
+			if strings.Contains(part, w) {
+				return true
+			}
 		}
 	}
 	return false
@@ -75,9 +83,9 @@ func isPlanDocument(path string) bool {
 // modeDecision applies the standing mode to a request BEFORE grants are
 // consulted. decided=false means "carry on with the normal path".
 //
-//   - plan refuses every non-egress request outright, without publishing a
-//     prompt. Egress (a web read) still goes to the prompt: research is part
-//     of planning, and the person decides it as they always did.
+//   - plan refuses file changes outright (except the plan document), without a
+//     prompt. Egress (a web read) and shell commands still go to the prompt:
+//     research is part of planning, and the person decides it.
 //   - accept-edits approves an edit tool inside the roots, unless a carve-out
 //     applies (mustAskAnyway), in which case the normal path asks.
 //   - auto joins the auto-approve path in Request, carve-outs included; ask
@@ -94,8 +102,20 @@ func (s *permissionService) modeDecision(opts CreatePermissionRequest, root stri
 		// Path alone never matched a plan file and every plan write was
 		// refused: /plan could not write its own plan. Test the file.
 		if (opts.ToolName == "write" || opts.ToolName == "edit") &&
-			(isPlanDocument(opts.GrantKey) || isPlanDocument(opts.Path)) && s.mustAskAnyway(opts, root) == "" {
-			return true, true
+			(isPlanDocument(opts.GrantKey) || isPlanDocument(opts.Path)) {
+			if s.mustAskAnyway(opts, root) == "" {
+				return true, true
+			}
+			// Outside the workspace (e.g. an Improvements folder on the
+			// Desktop): the person decides, as in ask mode, instead of a refusal.
+			return false, false
+		}
+		// GORILLA FIX (2026-11-23): shell commands ask instead of being
+		// refused outright. Read-only ones already run without a dialog; the
+		// rest (python -m fieldkit size find, OCR helpers) were blocked, which
+		// left the model unable to read anything and was called sabotage.
+		if opts.ToolName == "bash" {
+			return false, false
 		}
 		s.markPolicyRefusal(root, PlanModeRefusal(opts.ToolName))
 		return true, false
