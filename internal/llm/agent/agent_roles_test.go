@@ -351,7 +351,7 @@ func TestAgentRolesStayInsideTheLeash(t *testing.T) {
 
 	config.SetMaxSubAgents(config.SubAgentsNuclear)
 	resp = runAgentTool(t, tool, "parent-nuclear", "call-n1", AgentParams{Prompt: "x", Role: "coder"})
-	if !resp.IsError || !strings.Contains(resp.Content, "DISABLED") {
+	if !resp.IsError || !strings.Contains(resp.Content, "are OFF") {
 		t.Errorf("coder helper ran under the Nuclear Option: %q", resp.Content)
 	}
 	if rec.spawned != 1 {

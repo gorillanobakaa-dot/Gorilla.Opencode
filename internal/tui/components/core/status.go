@@ -345,7 +345,7 @@ func (m statusCmp) chrome() statusChrome {
 			Background(styles.SpeedBg).
 			Foreground(lipgloss.Color("#FFFFFF")).
 			Bold(true).
-			Render("SOLO (NUCLEAR)")
+			Render("SOLO (0 helpers)")
 		helpersWidth = lipgloss.Width(c.helpers)
 	} else if n := agent.ActiveSubAgentCount(); n > 0 {
 		label := fmt.Sprintf("🦍 %d helper(s) | /tasks", n)

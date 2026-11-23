@@ -141,7 +141,7 @@ func (b *agentTool) Run(ctx context.Context, call tools.ToolCall) (tools.ToolRes
 	// Every role counts against the same leash.
 	switch limit := config.MaxSubAgents(); {
 	case limit == config.SubAgentsNuclear:
-		return tools.NewTextErrorResponse("Sub-agents are DISABLED (Gorilla Nuclear Option). Do this task yourself with the direct tools, or the user can re-enable helpers in /context."), nil
+		return tools.NewTextErrorResponse("Sub-agents are OFF (helper leash is 0, the default Economy mode). Do this task yourself with the direct tools, or the user can re-enable helpers in /context."), nil
 	case limit != config.SubAgentsUnlimited:
 		if ok, used := reserveSubAgentSpawn(sessionID, limit); !ok {
 			return tools.NewTextErrorResponse(fmt.Sprintf("Helper-agent limit reached for this turn (%d used of %d allowed). Continue this task with the direct tools instead of spawning another helper.", used, limit)), nil
