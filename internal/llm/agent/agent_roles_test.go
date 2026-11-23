@@ -96,7 +96,10 @@ func TestAgentRolePlanIsReadOnlyAndAsksForAPlan(t *testing.T) {
 
 func TestAgentRoleCoderHasWriteToolsButCannotSpawnHelpers(t *testing.T) {
 	loadRoleConfig(t)
-	config.SetMaxSubAgents(config.DefaultMaxSubAgents)
+	// The check needs helpers on (Economy default is 0): it proves the coder
+	// still cannot spawn them even when the main agent can.
+	config.SetMaxSubAgents(config.SubAgentsUnlimited)
+	t.Cleanup(func() { config.SetMaxSubAgents(config.DefaultMaxSubAgents) })
 	got := toolNames((&agentTool{}).roleTools(AgentRoleCoder))
 	for _, w := range []string{tools.BashToolName, tools.EditToolName, tools.WriteToolName} {
 		if !got[w] {

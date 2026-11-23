@@ -266,6 +266,10 @@ func sizedDialogs(t *testing.T) map[string]func() sizedDialog {
 			return viaWindowSize{m}
 		},
 		"/context": func() sizedDialog {
+			// The ratchet below was recorded with helpers unlimited; the Economy
+			// default (0) adds one status row, so pin the leash to keep it measuring
+			// the same layout.
+			config.SetMaxSubAgents(config.SubAgentsUnlimited)
 			m := NewLoadoutDialogCmp()
 			m.Init()
 			return viaWindowSize{m}
