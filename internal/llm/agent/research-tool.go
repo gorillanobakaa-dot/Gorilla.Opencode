@@ -1446,7 +1446,7 @@ func (r *researchTool) Run(ctx context.Context, call tools.ToolCall) (tools.Tool
 	// complete one.
 	switch limit := config.MaxSubAgents(); {
 	case limit == config.SubAgentsNuclear:
-		return tools.NewTextErrorResponse("Sub-agents are DISABLED (Gorilla Nuclear Option). Research helpers cannot run. Investigate with the direct tools, or re-enable helpers in /context."), nil
+		return tools.NewTextErrorResponse("Sub-agents are OFF (helper leash is 0, the default Economy mode). Research helpers cannot run. Investigate with the direct tools, or re-enable helpers in /context."), nil
 	case limit != config.SubAgentsUnlimited:
 		if ok, used := reserveSubAgentSpawn(sessionID, limit); !ok {
 			return tools.NewTextErrorResponse(fmt.Sprintf("Helper-agent limit reached for this turn (%d used of %d allowed). Investigate with the direct tools instead.", used, limit)), nil

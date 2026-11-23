@@ -259,7 +259,7 @@ func (m *loadoutDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// pressed Enter to save and exit.
 			summary := "Context loadout saved: " + subAgentLabel()
 			if config.MaxSubAgents() == config.SubAgentsNuclear {
-				summary = "Saved: NUCLEAR OPTION ACTIVE — main agent works solo"
+				summary = "Saved: SOLO MODE (0 helpers), main agent works alone"
 			} else if m.lastAppliedNote != "" {
 				summary = m.lastAppliedNote
 			}
@@ -773,7 +773,7 @@ func (m *loadoutDialogCmp) renderAt(featureRows int, compact bool) string {
 	// Nuclear Option is active, outside `if !compact`, matching LOW-BANDWIDTH.
 	if config.MaxSubAgents() == config.SubAgentsNuclear {
 		parts = append(parts, base.Foreground(t.Error()).Bold(true).Width(w).
-			Render(fitLine("NUCLEAR OPTION ACTIVE: ALL sub-agents disabled (solo mode). Press Enter to confirm & close, or -> on Agents to re-enable.")))
+			Render(fitLine("SOLO MODE (default): sub-agents are off. Nuclear = 0 helpers. Press Enter to confirm & close, or -> on Agents to re-enable.")))
 	}
 	// GORILLA OVERRIDE (2026-11-21): explicit inline confirmation when a
 	// dial (agent count / nuclear / rate limit) has been committed via <-/->.

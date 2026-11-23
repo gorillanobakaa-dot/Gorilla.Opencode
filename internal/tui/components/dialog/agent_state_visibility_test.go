@@ -40,8 +40,8 @@ func TestLoadoutDialogConfirmsAgentCountAndNuclearState(t *testing.T) {
 	if !strings.Contains(view, "[APPLIED]") {
 		t.Errorf("loadout dialog missing [APPLIED] confirmation banner:\n%s", view)
 	}
-	if !strings.Contains(view, "NUCLEAR OPTION ACTIVE") {
-		t.Errorf("loadout dialog missing persistent NUCLEAR OPTION ACTIVE banner:\n%s", view)
+	if !strings.Contains(view, "SOLO MODE (default)") {
+		t.Errorf("loadout dialog missing persistent SOLO MODE (default) banner:\n%s", view)
 	}
 }
 
