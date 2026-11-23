@@ -1999,6 +1999,19 @@ func (a appModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, util.ReportError(fmt.Errorf("unknown permission mode %q — use one of %s", want, strings.Join(config.PermissionModes, ", ")))
 			}
 			return a, a.setPermissionMode(config.NormalisePermissionMode(want))
+		case "work":
+			// GORILLA (2026-11-23): economy / time-sensitive / fast = the helper
+			// leash by name (config/workmode.go).
+			want := strings.TrimSpace(msg.Args)
+			if want == "" {
+				return a, util.ReportInfo(fmt.Sprintf("Work mode: %s. Options: economy (solo, 0 helpers), time-sensitive (6), fast (1000). /work <name> sets one.", config.CurrentWorkMode()))
+			}
+			wm := config.ParseWorkMode(want)
+			if wm == nil {
+				return a, util.ReportError(fmt.Errorf("unknown work mode %q — use economy, time-sensitive or fast", want))
+			}
+			config.SetWorkMode(*wm)
+			return a, util.ReportInfo(fmt.Sprintf("Work mode: %s — %s.", wm.Name, wm.Layman))
 		case "yolo", "auto", "autopilot", "goal":
 			// GORILLA OVERRIDE (2026-11-21): /yolo works mid-turn.
 			//

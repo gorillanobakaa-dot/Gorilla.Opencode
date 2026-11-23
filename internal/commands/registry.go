@@ -633,6 +633,17 @@ var All = []Command{
 			"The status bar shows the mode whenever it is not \"ask\".",
 	},
 	{
+		Name:    "work",
+		Group:   GroupHelpers,
+		Summary: "Pick Economy, Time-sensitive or Fast helper-agent limit.",
+		Detail: "Three modes, saved so every conversation starts in the one you chose:\n\n" +
+			"economy — solo, no helper agents. The default, and the cheapest.\n" +
+			"time-sensitive — up to 6 helper agents at once, for a deadline.\n" +
+			"fast — up to 1000 helper agents. Spends the most; use it on purpose.\n\n" +
+			"/work shows the current one; /work <name> sets it. It is the same dial " +
+			"as the helper limit in /context, which can also set any number in between.",
+	},
+	{
 		Name:    "yolo",
 		Aliases: []string{"auto", "autopilot", "goal"},
 		Group:   GroupHelpers,
