@@ -97,17 +97,36 @@ var qwenReplay = []struct{ tool, input string }{
 	{"view", `{"file_path":"C:\\Users\\gorilla1\\.ssh\\id_ed25519"}`},
 }
 
+// replayWithStandIn runs the same replay list through the stand-in deny hook
+// when the real Fieldkit cannot run here (CI). It is loud on purpose: the log
+// says the real-Fieldkit replay did NOT run, instead of a silent skip.
+func replayWithStandIn(t *testing.T, why string) {
+	t.Helper()
+	t.Logf("REAL-FIELDKIT REPLAY NOT RUN (%s): checking refusal plumbing with the stand-in hook only", why)
+	// deny-all hook: this checks the refusal plumbing for every replay case, not Fieldkit's rules.
+	t.Setenv("GORILLA_HARDLINES_CMD", pick(`[Console]::In.ReadToEnd() | Out-Null; Write-Output '`+denyJSON+`'`, `cat >/dev/null; echo '`+denyJSON+`'`))
+	a, _ := hardlinesAgent(t, config.AgentCoder)
+	for _, c := range qwenReplay {
+		if got := a.runBeforeToolHooks(context.Background(), "s", c.tool, c.input); !strings.HasPrefix(got, HookRefusedPrefix) {
+			t.Errorf("%s %s was NOT refused by the stand-in: %q", c.tool, c.input, got)
+		}
+	}
+}
+
 func TestHardlinesReplayThroughRealFieldkit(t *testing.T) {
 	dir := hardlinesFieldkitDir()
 	if dir == "" {
-		t.Skip("no Fieldkit")
+		replayWithStandIn(t, "no Fieldkit")
+		return
 	}
 	if _, err := os.Stat(filepath.Join(dir, "fieldkit", "autopilot", "claude_hook.py")); err != nil {
-		t.Skip("Fieldkit is not on this machine")
+		replayWithStandIn(t, "Fieldkit is not on this machine")
+		return
 	}
 	if _, err := exec.LookPath("python"); err != nil {
 		if _, err2 := exec.LookPath("python3"); err2 != nil {
-			t.Skip("no python")
+			replayWithStandIn(t, "no python")
+			return
 		}
 	}
 	t.Setenv("GORILLA_HARDLINES_CMD", "") // use the real hook
